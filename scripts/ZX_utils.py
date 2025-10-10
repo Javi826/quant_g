@@ -380,17 +380,19 @@ def wait_for_next_candle(timeframe='4h'):
     print(f"🕒 Waiting for next candle: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
     time.sleep(sleep_seconds)
     
-def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx"):
+def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):
+    
+    if save:
 
-    #average_gain       = grid_results_df['Net_Gain'].sum()
-    #average_win_ratio  = grid_results_df['Win_Ratio'].mean()
-    
-    grid_results_df.to_excel(filename, index=False)
-    
-    #print(f"\n📂 File saved successfully as: {filename}")
-    #print("\n📊 Backtest Averages >")
-    #print(f"🔹 Sum Gain          : {average_gain:,.2f} USDT".replace(",", "."))
-    #print(f"🔹 Average win_ratio : {average_win_ratio:,.3f}\n")
+        #average_gain       = grid_results_df['Net_Gain'].sum()
+        #average_win_ratio  = grid_results_df['Win_Ratio'].mean()
+        
+        grid_results_df.to_excel(filename, index=False)
+        
+        #print(f"\n📂 File saved successfully as: {filename}")
+        #print("\n📊 Backtest Averages >")
+        #print(f"🔹 Sum Gain          : {average_gain:,.2f} USDT".replace(",", "."))
+        #print(f"🔹 Average win_ratio : {average_win_ratio:,.3f}\n")
       
 
 def send_email(detected_cryptos):

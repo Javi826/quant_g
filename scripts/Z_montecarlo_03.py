@@ -13,7 +13,7 @@ from ZX_utils import filter_symbols
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from ZX_optimize_MC import generate_paths_for_symbol, optimize_for_symbol
 
-from Z_add_signals_03 import add_indicators_arrays, explosive_signal_arrays
+from Z_add_signals_03 import add_indicators, explosive_signal
 
 DTYPE = np.float32
 #DTYPE = np.float64
@@ -32,10 +32,10 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------rrr
 # CONFIGURATION
 # -----------------------------
-TIMEFRAME           = '1H'
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-06-03"
-MIN_VOL_USDT        = 500_000
+TIMEFRAME           = '1H'
+MIN_VOL_USDT        = 120_000
 
 # -----------------------------
 # GRID 
@@ -73,12 +73,12 @@ OUTPUT_FILE = os.path.join(RESULTS_DIR, f"montecarlo_entropy_crypto_{TIMEFRAME}.
 # -----------------------------
 INDICATOR_CACHE = {}
 
-def cached_add_indicators_arrays(close, m_accel=5):
+def cached_add_indicators(close, m_accel=5):
     close = close.astype(DTYPE, copy=False)
     key   = (hash(close.data.tobytes()), m_accel)
     if key in INDICATOR_CACHE:
         return INDICATOR_CACHE[key]
-    entropia, accel = add_indicators_arrays(close, m_accel)
+    entropia, accel = add_indicators(close, m_accel)
     entropia = np.asarray(entropia, dtype=DTYPE)
     accel    = np.asarray(accel, dtype=DTYPE)
     INDICATOR_CACHE[key] = (entropia, accel)
@@ -119,8 +119,8 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
             if path_idx >= arr.shape[0]:
                 continue
             close = arr[path_idx, :, 3].astype(DTYPE, copy=False)
-            entropia, accel = cached_add_indicators_arrays(close, m_accel=param_dict.get('ACCEL_SPAN',5))
-            signal = explosive_signal_arrays(entropia, accel, entropia_max=param_dict.get('ENTROPY_MAX',1.0), live=False)
+            entropia, accel = cached_add_indicators(close, m_accel=param_dict.get('ACCEL_SPAN',5))
+            signal = explosive_signal(entropia, accel, entropia_max=param_dict.get('ENTROPY_MAX',1.0), live=False)
             signal = np.asarray(signal, dtype=DTYPE)
             ohlcv_arrays[sym] = {
                 'ts': TS_INDEX,

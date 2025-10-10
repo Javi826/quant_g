@@ -1,15 +1,11 @@
-import heapq
+# === FILE: add_signals.py ===
+# --------------------------------
 import logging
 import warnings
 import numpy as np
-import pandas as pd
 from numba import njit
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
-
-# -----------------------------
-# CÁLCULO DE GANANCIAS NETAS (igual)
-# -----------------------------
 
 @njit
 def second_diff(close):
@@ -66,7 +62,7 @@ def ewm_numba(x, span):
     return ewm
 
 @njit
-def add_indicators_arrays(close, m_accel=5):
+def add_indicators(close, m_accel=5):
     delta = delta_numba(close)
     entropia = rolling_entropy_numba(delta, 5, 10)
     accel_raw = second_diff(close)
@@ -75,7 +71,7 @@ def add_indicators_arrays(close, m_accel=5):
 
 
 @njit
-def explosive_signal_arrays(entropia, accel, entropia_max=2.0, live=False):
+def explosive_signal(entropia, accel, entropia_max=2.0, live=False):
     signal = (entropia < entropia_max) & (accel > 0)
     if not live:
         signal_shifted = np.empty_like(signal)
@@ -83,4 +79,3 @@ def explosive_signal_arrays(entropia, accel, entropia_max=2.0, live=False):
         signal_shifted[1:] = signal[:-1]
         signal = signal_shifted
     return signal
-

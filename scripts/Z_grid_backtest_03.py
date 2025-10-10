@@ -12,7 +12,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_A
 from ZX_analysis import report_backtesting
 from ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
-from Z_add_signals_03 import add_indicators_arrays, explosive_signal_arrays
+from Z_add_signals_03 import add_indicators, explosive_signal
 
 start_time = time.time()
 SAVE_SYMBOLS = False
@@ -20,9 +20,9 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-TIMEFRAME           = '1H'
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-06-03"
+TIMEFRAME           = '4H'
 MIN_VOL_USDT        = 500_000
 
 # -----------------------------------------------------------------------------
@@ -83,8 +83,8 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_base.items():
-        entropia, accel   = add_indicators_arrays(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
-        signal            = explosive_signal_arrays(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
+        entropia, accel   = add_indicators(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
+        signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
@@ -145,16 +145,12 @@ for comb, results in grid_results_list:
     })
     grid_records.append(row)
 
-grid_results_df = pd.DataFrame(grid_records, columns=[
-    *param_names,
-    "symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance",
-    "Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct"
-])
+grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct"])
 
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
-# save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_generic_{DATA_FOLDER}_{TIMEFRAME}.xlsx")
+save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_generic_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
 
 print(f"TIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
