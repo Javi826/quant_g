@@ -12,41 +12,23 @@ INITIAL_BALANCE      = 10000
 ORDER_AMOUNT         = 100
 
 # ============================
-# Helper: get_price_at_int (nivel módulo)
+# Helper: get_price_at_int (nivel módulo) para evitar closures no picklables
 # ============================
 
-# Función numba para acelerar searchsorted (fallback)
-@njit
-def _search_price_numba(ts_int_arr, close_arr, t_int):
-    idx = np.searchsorted(ts_int_arr, t_int, side='right') - 1
-    if idx >= 0:
-        return close_arr[idx]
-    else:
-        # retornamos NaN dentro de numba y lo convertimos a None arriba
-        return np.nan
-
 def get_price_at_int(sym, t, sym_data, ts_index_map_by_sym_int):
-    """
-    Devuelve el precio de cierre para el símbolo `sym` en el timestamp `t`.
-    Usa diccionario de índices para acceso rápido y fallback acelerado con Numba.
-    Retorna None si no encuentra un precio (misma semántica que tu versión original).
-    """
-    t_int = int(t)
 
-    # acceso rápido por índice (O(1))
+    # normalizar t a int64 (ns)
+    t_int   = int(t) if not isinstance(t, (int, np.integer)) else int(t)
+    d       = sym_data[sym]
     idx_map = ts_index_map_by_sym_int[sym]
-    idx = idx_map.get(t_int)
+    idx     = idx_map.get(t_int)
     if idx is not None:
-        return float(sym_data[sym]['close'][idx])
-
-    # fallback con numba searchsorted (devuelve NaN si no hay índice)
-    ts_arr = sym_data[sym]['ts_int']
-    close_arr = sym_data[sym]['close']
-    val = _search_price_numba(ts_arr, close_arr, t_int)
-    if np.isnan(val):
-        return None
-    return float(val)
-
+        return float(d['close'][idx])
+    # fallback: searchsorted sobre d['ts_int']
+    idx = np.searchsorted(d['ts_int'], t_int, side='right') - 1
+    if idx >= 0:
+        return float(d['close'][idx])
+    return None
 
 def run_grid_backtest(
     ohlcv_arrays,
@@ -109,6 +91,7 @@ def run_grid_backtest(
     trades = {sym: [] for sym in symbols}
     trade_times = {sym: [] for sym in symbols}
 
+    # Trade log optimizado con listas
     trade_log_cols = {
         'symbol': [],
         'buy_time': [],
@@ -122,6 +105,7 @@ def run_grid_backtest(
         'commission_sell': []
     }
 
+    # Sim balance optimizado con listas separadas
     sim_balance_cols = {
         'timestamp': [],
         'balance': []
@@ -133,20 +117,16 @@ def run_grid_backtest(
     symbol_order = {s: i for i, s in enumerate(symbols)}
     ts_index_map_by_sym_int = {sym: {int(t): idx for idx, t in enumerate(d['ts_int'])} for sym, d in sym_data.items()}
 
-    # ------------------------------------------------------------------
-    # Helper local (inline-style) para acceder rápido al precio sin overhead
-    # ------------------------------------------------------------------
-    def _get_price_at_int_local(sym_local, t_int_local):
-        # Intentamos lookup O(1) en mapa
+    def _get_price_at_int(sym_local, t_int_local):
+        d_local = sym_data[sym_local]
         idx_map_local = ts_index_map_by_sym_int[sym_local]
         idx_local = idx_map_local.get(int(t_int_local))
         if idx_local is not None:
-            return float(sym_data[sym_local]['close'][idx_local])
-        # fallback: searchsorted (usamos numpy aquí; get_price_at_int usa numba)
-        arr_ts = sym_data[sym_local]['ts_int']
+            return float(d_local['close'][idx_local])
+        arr_ts = d_local['ts_int']
         idx_local = np.searchsorted(arr_ts, np.int64(t_int_local), side='right') - 1
         if idx_local >= 0:
-            return float(sym_data[sym_local]['close'][idx_local])
+            return float(d_local['close'][idx_local])
         return None
 
     def close_position(pos, exec_time, exec_price, exit_reason):
@@ -160,7 +140,7 @@ def run_grid_backtest(
         trades[pos['symbol']].append(profit)
         trade_times[pos['symbol']].append(exec_time)
 
-        # Llenar listas separadas (manteniendo orden y campos idéntico)
+        # Llenar listas separadas
         trade_log_cols['symbol'].append(pos['symbol'])
         trade_log_cols['buy_time'].append(pos['buy_time'])
         trade_log_cols['buy_price'].append(buy_price)
@@ -173,78 +153,47 @@ def run_grid_backtest(
         trade_log_cols['commission_sell'].append(commission_sell)
 
     # -------------------------
-    # Bucle principal optimizado (misma lógica, menos overhead)
+    # Bucle principal
     # -------------------------
     open_heap = open_positions_heap
     sym_data_local = sym_data
     signals_local = signals_by_time
     symbol_order_local = symbol_order
 
-    # Prebind de funciones/objetos para acceder rápido (menos búsquedas en glob/locals)
-    np_searchsorted = np.searchsorted
-    heapq_pop = heapq.heappop
-    heapq_push = heapq.heappush
-
     for t_int in all_timestamps_int:
-        # ---------------------------------------------------------
-        # Cerrar posiciones vencidas (mismo comportamiento que antes)
-        # ---------------------------------------------------------
+        # Cerrar posiciones vencidas
         while open_heap and open_heap[0][0] <= t_int:
-            _, _, pos = heapq_pop(open_heap)
+            _, _, pos = heapq.heappop(open_heap)
             if pos.get('closed', False):
                 continue
-
-            # Si la posición tiene exec_price/exec_time preestablecidos y venció -> cerrar con esos
             if 'exec_price' in pos and ('exec_time_int' in pos) and pos['exec_time_int'] <= t_int:
                 close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
                 pos['closed'] = True
-                continue
-
-            # Si no, cerrar usando precio en sell_time_int (fallback)
-            sym = pos['symbol']
-            sell_ts_int = pos.get('sell_time_int', None)
-            if sell_ts_int is None:
-                sell_ts_int = int(np.int64(sym_data_local[sym]['ts_int'][-1]))
-
-            # obtener precio usando la versión local (rápida)
-            exec_price = _get_price_at_int_local(sym, sell_ts_int)
-            if exec_price is not None:
-                exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
             else:
-                # si no hay precio, cerrar con el último close disponible
-                exec_price = float(sym_data_local[sym]['close'][-1])
-                last_time_dt = sym_data_local[sym]['ts'][-1]
-                close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
-            pos['closed'] = True
+                sym = pos['symbol']
+                sell_ts_int = pos.get('sell_time_int', None)
+                if sell_ts_int is None:
+                    sell_ts_int = int(np.int64(sym_data_local[sym]['ts_int'][-1]))
+                exec_price = _get_price_at_int(sym, sell_ts_int)
+                if exec_price is not None:
+                    exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
+                    close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
+                else:
+                    exec_price = float(sym_data_local[sym]['close'][-1])
+                    last_time_dt = sym_data_local[sym]['ts'][-1]
+                    close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
+                pos['closed'] = True
 
-        # ---------------------------------------------------------
         # Actualizar sim balance solo si hay posiciones abiertas
-        # ---------------------------------------------------------
         if open_heap:
-            # calculamos positions_value con un loop explícito (menos overhead que el generator)
-            pv = 0.0
-            for _sell_time, _counter, pos in open_heap:
-                if pos.get('closed', False):
-                    continue
-                sym_p = pos['symbol']
-                qty_p = pos['qty']
-                price_p = _get_price_at_int_local(sym_p, t_int)
-                if price_p is None:
-                    # fallback al último precio si no hay timestamp exacto
-                    price_p = float(sym_data_local[sym_p]['close'][-1])
-                pv += qty_p * price_p
+            positions_value = sum(pos['qty'] * _get_price_at_int(pos['symbol'], t_int) for _, _, pos in open_heap if not pos.get('closed', False))
             sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-            sim_balance_cols['balance'].append(cash + pv)
-            # continuar al siguiente timestamp (igual que antes)
+            sim_balance_cols['balance'].append(cash + positions_value)
             continue
 
-        # ---------------------------------------------------------
-        # Abrir nuevas posiciones (mismo comportamiento)
-        # ---------------------------------------------------------
+        # Abrir nuevas posiciones
         events = signals_local.get(int(t_int), [])
         if events:
-            # ordenar eventos por orden de símbolo
             events = sorted(events, key=lambda x: symbol_order_local[x[0]])
             for sym, buy_idx in events:
                 if cash < order_amount:
@@ -272,7 +221,7 @@ def run_grid_backtest(
                     'commission_buy': commission_buy
                 }
 
-                # Detección intravela (idéntica a la original)
+                # Detección intravela
                 intravela_detected = False
                 if tp_price is not None or sl_price is not None:
                     if d['high'] is not None and d['low'] is not None:
@@ -316,33 +265,22 @@ def run_grid_backtest(
                         'exec_time_int': exec_time_int,
                         'exit_reason': exit_reason
                     })
-                    heapq_push(open_heap, (exec_time_int, counter, position))
+                    heapq.heappush(open_heap, (exec_time_int, counter, position))
                     counter += 1
                 else:
-                    heapq_push(open_heap, (sell_time_int, counter, position))
+                    heapq.heappush(open_heap, (sell_time_int, counter, position))
                     counter += 1
 
-        # ---------------------------------------------------------
-        # Registrar balance actual (después de abrir posiciones)
-        # ---------------------------------------------------------
-        pv = 0.0
-        for _sell_time, _counter, pos in open_heap:
-            if pos.get('closed', False):
-                continue
-            sym_p = pos['symbol']
-            qty_p = pos['qty']
-            price_p = _get_price_at_int_local(sym_p, t_int)
-            if price_p is None:
-                price_p = float(sym_data_local[sym_p]['close'][-1])
-            pv += qty_p * price_p
+        # Registrar balance actual
+        positions_value = sum(pos['qty'] * _get_price_at_int(pos['symbol'], t_int) for _, _, pos in open_heap if not pos.get('closed', False))
         sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-        sim_balance_cols['balance'].append(cash + pv)
+        sim_balance_cols['balance'].append(cash + positions_value)
 
     # -------------------------
     # Cierre final de posiciones
     # -------------------------
     while open_heap:
-        _, _, pos = heapq_pop(open_heap)
+        _, _, pos = heapq.heappop(open_heap)
         if pos.get('closed', False):
             continue
         sym = pos['symbol']
@@ -351,7 +289,7 @@ def run_grid_backtest(
             close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
         else:
             sell_ts_int = pos.get('sell_time_int', int(d['ts_int'][-1]))
-            exec_price = _get_price_at_int_local(sym, sell_ts_int)
+            exec_price = _get_price_at_int(sym, sell_ts_int)
             if exec_price is not None:
                 exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
                 close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
@@ -425,3 +363,4 @@ def run_grid_backtest(
     }
 
     return results
+
