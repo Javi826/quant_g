@@ -26,10 +26,9 @@ OPTUNA_N_PATHS       = 200
 FINAL_N_PATHS        = 200
 FINAL_N_OBS_PER_PATH = 2000
 FINAL_N_SUBSTEPS     = 10
-BASE_SEED            = 42
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
-# -----------------------------rrr
+# -----------------------------
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
@@ -40,12 +39,12 @@ MIN_VOL_USDT        = 120_000
 # -----------------------------
 # GRID 
 # -----------------------------
-SELL_AFTER_LIST     = [5,10,15,20,25]
-ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6]
-ACCEL_SPAN_LIST     = [5,10,15,20]
+SELL_AFTER_LIST     = [10,15,20,25]
+ENTROPY_MAX_LIST    = [1.0,1.5,2.0,2.5,3.0,3.5,4.0]
+ACCEL_SPAN_LIST     = [5,10,15]
 
-TP_PCT_LIST         = [0,5,10,20,30]
-SL_PCT_LIST         = [0,5,10,20,30]
+TP_PCT_LIST         = [0,5,10,20]
+SL_PCT_LIST         = [0,5,10,20]
 
 # =============================================================================
 # =============================================================================
@@ -104,7 +103,7 @@ def generate_paths_for_all_symbols(ohlcv_data, best_params_dict, n_paths, n_obs,
             jump_sigma=params["jump_sigma"],
             min_price=MIN_PRICE,
             timeframe=TIMEFRAME,
-            base_seed=base_seed
+            base_seed=42
         )
         if paths_array is not None:
             paths_array = np.asarray(paths_array, dtype=DTYPE)
@@ -175,7 +174,7 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
         all_results.append(portfolio_record)
     return all_results
 
-def parallel_with_progress(tasks, desc: str, n_jobs: int = -1):
+def parallel_with_progress(tasks, desc: str, n_jobs: int = 8):
     with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
         return Parallel(n_jobs=n_jobs)(tasks)
 
@@ -201,7 +200,7 @@ start_opt_time = time.time()
 results = parallel_with_progress(
     [delayed(optimize_for_symbol)(s, ohlcv_data, n_trials=50, n_paths=OPTUNA_N_PATHS,
                                   n_obs=FINAL_N_OBS_PER_PATH, n_substeps=FINAL_N_SUBSTEPS,
-                                  min_price=MIN_PRICE, timeframe=TIMEFRAME, base_seed=BASE_SEED)
+                                  min_price=MIN_PRICE, timeframe=TIMEFRAME, base_seed=42)
      for s in filtered_symbols],
     desc="\n🔁 Optimizing MC params"
 )
@@ -217,7 +216,7 @@ paths_per_symbol = generate_paths_for_all_symbols(
     n_paths=FINAL_N_PATHS,
     n_obs=FINAL_N_OBS_PER_PATH,
     n_substeps=FINAL_N_SUBSTEPS,
-    base_seed=BASE_SEED
+    base_seed=42
 )
 valid_symbols = [s for s, arr in paths_per_symbol.items() if arr is not None and arr.size > 0]
 
