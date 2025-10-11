@@ -9,6 +9,7 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from ZX_analysis import report_backtesting
 from ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
@@ -22,27 +23,27 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-06-03"
-TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 500_000
+TIMEFRAME           = '1H'
+MIN_VOL_USDT        = 120_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST     = [10,15,20,25]
-ENTROPY_MAX_LIST    = [1.0,1.5,2.0,2.5,3.0,3.5,4.0]
+SELL_AFTER_LIST     = [15,20,30]
+ENTROPY_MAX_LIST    = [1.0,1.5,2.0]
 ACCEL_SPAN_LIST     = [5,10,15]
 
-TP_PCT_LIST         = [0,5,10,20]
-SL_PCT_LIST         = [0,5,10,20]
+TP_PCT_LIST         = [0,5,10]
+SL_PCT_LIST         = [0,5,10]
 
 # =============================================================================
 # =============================================================================
-# SELL_AFTER_LIST    = [25]
-# ENTROPY_MAX_LIST   = [1.6]
+# SELL_AFTER_LIST    = [20]
+# ENTROPY_MAX_LIST   = [2]
 # ACCEL_SPAN_LIST    = [5]
 # 
 # TP_PCT_LIST        = [0]
-# SL_PCT_LIST        = [0]
+# SL_PCT_LIST        = [5]
 # =============================================================================
 # =============================================================================
 
@@ -108,6 +109,7 @@ all_combinations = list(product(*lists_for_grid))
 # -----------------------------------------------------------------------------
 # BACKTESTING PARALIZADO
 # -----------------------------------------------------------------------------
+
 with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=-1)(
         delayed(process_combo)(comb) for comb in all_combinations

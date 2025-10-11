@@ -22,8 +22,8 @@ start_time = time.time()
 # -----------------------------
 # MONTECARLO
 # -----------------------------
-OPTUNA_N_PATHS       = 200
-FINAL_N_PATHS        = 200
+OPTUNA_N_PATHS       = 50
+FINAL_N_PATHS        = 2000
 FINAL_N_OBS_PER_PATH = 2000
 FINAL_N_SUBSTEPS     = 10
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
@@ -47,14 +47,12 @@ TP_PCT_LIST         = [0,5,10,20]
 SL_PCT_LIST         = [0,5,10,20]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [20]
-# ENTROPY_MAX_LIST   = [1.4]
-# ACCEL_SPAN_LIST    = [15]
-# 
-# TP_PCT_LIST        = [0]
-# SL_PCT_LIST        = [15]
-# =============================================================================
+SELL_AFTER_LIST    = [20]
+ENTROPY_MAX_LIST   = [1]
+ACCEL_SPAN_LIST    = [10]
+
+TP_PCT_LIST        = [0]
+SL_PCT_LIST        = [0]
 # =============================================================================
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -174,7 +172,7 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
         all_results.append(portfolio_record)
     return all_results
 
-def parallel_with_progress(tasks, desc: str, n_jobs: int = 8):
+def parallel_with_progress(tasks, desc: str, n_jobs: int = 16):
     with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
         return Parallel(n_jobs=n_jobs)(tasks)
 
@@ -211,6 +209,7 @@ print(f"\n🕒 OPTUNA: {end_opt_time - start_opt_time:.2f} segundos")
 # -----------------------------
 # GENERAR PATHS
 # -----------------------------
+start_paths_gen_time = time.time() 
 paths_per_symbol = generate_paths_for_all_symbols(
     ohlcv_data, best_params_dict,
     n_paths=FINAL_N_PATHS,
@@ -219,7 +218,8 @@ paths_per_symbol = generate_paths_for_all_symbols(
     base_seed=42
 )
 valid_symbols = [s for s, arr in paths_per_symbol.items() if arr is not None and arr.size > 0]
-
+end_paths_gen_time = time.time()     # ⏱ Fin timer
+print(f"\n🕒 Paths generation: {end_paths_gen_time - start_paths_gen_time:.2f} segundos")
 # -----------------------------
 # EVALUAR Paths_IDX
 # -----------------------------
