@@ -1,144 +1,160 @@
+import random
 import pandas as pd
 import numpy as np
-from scipy.stats import pearsonr
-from sklearn.feature_selection import mutual_info_regression
-import matplotlib.pyplot as plt
+from numba import njit
 
-def analyze_grid_results(df, 
-                         parameters, 
-                         initial_capital=10000, 
-                         show_plots=False, 
-                         save_excel=False):
+DTYPE = np.float32
+
+# ============================================================
+# 1️⃣ Preprocesamiento: cálculo de features
+# ============================================================
+def compute_candle_features(df, raw_columns=[]):
     df = df.copy()
 
-    # -----------------------------
-    # Métricas derivadas
-    # -----------------------------
-    # Porcentaje sobre capital inicial
-    df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
+    # Porcentajes relativos vectorizados
+    df["pct_open_low"] = (df["low"] - df["open"]) / df["open"]
+    df["pct_open_high"] = (df["high"] - df["open"]) / df["open"]
+    df["pct_open_close"] = (df["close"] - df["open"]) / df["open"]
 
-    # Beneficio por señal
-    df["Gain_signal"] = df["Net_Gain"] / df["Num_Signals"]
-    df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
-
-    # Ordenar por ganancia neta
-    df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
-    
-    # -----------------------------
-    # Mutual Information + Pearson correlation
-    # -----------------------------
-    if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        print("\n⚠️ df_portfolio vacío o con <5 filas. Mutual Information y Pearson skipped.")
-        mi_series = pd.Series([None]*len(parameters), index=parameters)
-        pearson_series = pd.Series([None]*len(parameters), index=parameters)
+    if len(df.index) >= 2:
+        time_index = (df.index[1:] - df.index[:-1]).total_seconds()
+        mode = pd.Series(time_index).mode()[0]
+        time_index = np.insert(time_index, 0, mode)
     else:
-        y = df_portfolio["Net_Gain"].values
-        X = df_portfolio[parameters].copy()
+        time_index = np.zeros(len(df.index))
 
-        # Flags de discreto (int o bool)
-        discrete_flags = [
-            X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer)
-            for col in X.columns
-        ]
+    df["time_variation"] = time_index
 
-        # Convertir booleans a int para MI
-        X_mi = X.copy()
-        for col in X_mi.columns:
-            if X_mi[col].dtype == bool:
-                X_mi[col] = X_mi[col].astype(int)
+    # Diferencias de tiempo low/high
+    index_seconds = df.index.view(np.int64) // 10**9
+    low_seconds = pd.to_datetime(df["low_time"]).view(np.int64) // 10**9
+    high_seconds = pd.to_datetime(df["high_time"]).view(np.int64) // 10**9
+    df["var_low_time"] = (low_seconds - index_seconds).astype(float)
+    df["var_high_time"] = (high_seconds - index_seconds).astype(float)
 
-        # Mutual Information
-        mi_values = mutual_info_regression(X_mi, y, discrete_features=discrete_flags, random_state=42)
-        mi_series = pd.Series(mi_values, index=parameters)
+    df_raw = df[raw_columns].copy() if raw_columns else pd.DataFrame(index=df.index)
+    return df, df_raw
 
-        # Pearson correlation
-        pearson_values = []
-        for col in X.columns:
-            x_col = X[col].astype(int) if X[col].dtype == bool else X[col]
-            if x_col.nunique() > 1:
-                corr, _ = pearsonr(x_col, y)
-            else:
-                corr = np.nan
-            pearson_values.append(corr)
-        pearson_series = pd.Series(pearson_values, index=parameters)
 
-    # Mostrar análisis MI & Pearson
-    analysis_df = pd.DataFrame({
-        'Mutual_Information': mi_series,
-        'Pearson_Correlation': pearson_series
-    }).sort_values(by='Mutual_Information', ascending=False)
-    
-    #print("\n🔹 Analysis MI & Pearson:")
-    #print(analysis_df.round(2).to_string(index=False))
-         
-    metric_columns = [
-        'Net_Gain_pct', 
-        'Win_Ratio', 
-        'Num_Signals', 
-        'Gain_signal', 
-        'DD_pct'
+# ============================================================
+# 2️⃣ Núcleo numérico compilado con Numba
+# ============================================================
+@njit
+def _simulate_single_path_numba(sampled, start_price, start_timestamp):
+    """
+    Cálculo vectorizado de un solo path — compilado con Numba.
+    sampled: array (n_obs, n_features)
+    """
+    n_obs = sampled.shape[0]
+    open_prices = np.empty(n_obs, dtype=np.float64)
+    close_prices = np.empty(n_obs, dtype=np.float64)
+    low_prices = np.empty(n_obs, dtype=np.float64)
+    high_prices = np.empty(n_obs, dtype=np.float64)
+    times = np.empty(n_obs, dtype=np.float64)
+    low_times = np.empty(n_obs, dtype=np.float64)
+    high_times = np.empty(n_obs, dtype=np.float64)
+
+    open_price = start_price
+    current_time = start_timestamp
+
+    for t in range(n_obs):
+        pct_open_low  = sampled[t, 0]
+        pct_open_high = sampled[t, 1]
+        pct_open_close= sampled[t, 2]
+        time_var      = sampled[t, 3]
+        var_low_time  = sampled[t, 4]
+        var_high_time = sampled[t, 5]
+
+        current_time += time_var
+        times[t] = current_time
+        low_times[t]  = current_time + var_low_time
+        high_times[t] = current_time + var_high_time
+
+        close_price = open_price * (1.0 + pct_open_close)
+        low_price   = open_price * (1.0 + pct_open_low)
+        high_price  = open_price * (1.0 + pct_open_high)
+
+        if low_price > close_price:
+            low_price = close_price
+        if high_price < close_price:
+            high_price = close_price
+
+        open_prices[t]  = open_price
+        close_prices[t] = close_price
+        low_prices[t]   = low_price
+        high_prices[t]  = high_price
+
+        open_price = close_price
+
+    return open_prices, low_prices, high_prices, close_prices, times, low_times, high_times
+
+
+# ============================================================
+# 3️⃣ Función principal: genera múltiples paths con Numba
+# ============================================================
+def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], base_seed=42):
+    df_features, df_raw = compute_candle_features(df_hist, raw_columns)
+    n_rows = len(df_features)
+    if n_rows == 0 or n_obs == 0:
+        return []
+
+    # Construcción del array base
+    cols = [
+        df_features["pct_open_low"].to_numpy(np.float64),
+        df_features["pct_open_high"].to_numpy(np.float64),
+        df_features["pct_open_close"].to_numpy(np.float64),
+        df_features["time_variation"].to_numpy(np.float64),
+        df_features["var_low_time"].to_numpy(np.float64),
+        df_features["var_high_time"].to_numpy(np.float64)
     ]
+    for rc in raw_columns:
+        cols.append(df_raw[rc].to_numpy(np.float64))
 
-    # Reorganizar columnas: parámetros primero, luego métricas
-    ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
-    df_portfolio = df_portfolio[ordered_columns]
+    data_array = np.column_stack(cols)
+    n_features = data_array.shape[1]
 
-    # -----------------------------
-    # TOP COMBOS
-    # -----------------------------
-    df_top = df_portfolio.sort_values(by='Net_Gain_pct', ascending=False).head(3).copy()
-    df_top['Num_Signals'] = df_top['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-    
-    print("\n🥇 Top 3 combos by Net_Gain_pct:")
-    print(df_top.round(2).to_string(index=False))
+    start_price = float(df_features["open"].iloc[-1])
+    start_timestamp = df_features.index[-1].timestamp()  # segundos UNIX
 
-    df_top_win = df_portfolio.sort_values(by='DD_pct', ascending=True).head(3).copy()
-    df_top_win['Num_Signals'] = df_top_win['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-    
-    print("\n🥇 Top 3 combos by DD_pct:")
-    print(df_top_win.round(2).to_string(index=False))
-    
-    # -----------------------------
-    # PLOTS
-    # -----------------------------
-    if show_plots:
-        # Histograma DD_pct
-        plt.figure(figsize=(10,6))
-        plt.hist(df_portfolio['DD_pct'].dropna(), bins=20, color='#2ca02c', edgecolor='black', alpha=0.7)
-        plt.xlabel("DD_pct")
-        plt.ylabel("Frequency")
-        plt.title("Distribution of Portfolio Drawdown")
-        plt.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.show()
-        
-        # Histograma Net_Gain_pct
-        plt.figure(figsize=(10,6))
-        plt.hist(df_portfolio['Net_Gain_pct'].dropna(), bins=20, color='#1f77b4', edgecolor='black', alpha=0.7)
-        plt.xlabel("Net_Gain_pct (%)")
-        plt.ylabel("Frequency")
-        plt.title("Distribution of Portfolio Net Gain %")
-        plt.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.show()
+    paths = []
 
-        # Curvas por parámetro
-        win_ratio_scale = 100
-        colors = {'Net_Gain_pct':'blue', 'Win_Ratio':'green'}
-        for param in parameters:
-            grouped = df_portfolio.groupby(param).agg({
-                'Net_Gain': 'sum',
-                'Win_Ratio': 'mean'
-            }).reset_index()
-            grouped['Net_Gain_pct'] = grouped['Net_Gain'] / initial_capital * 100
-            grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * win_ratio_scale
-            
-            plt.figure(figsize=(8,5))
-            plt.plot(grouped[param], grouped['Net_Gain_pct'], marker='o', color=colors['Net_Gain_pct'], label='Net_Gain_pct')
-            plt.plot(grouped[param], grouped['Win_Ratio_scaled'], marker='o', color=colors['Win_Ratio'], label=f'Win_Ratio x {win_ratio_scale}')
-            plt.xlabel(param)
-            plt.ylabel('Value')
-            plt.title(f"{param} vs Portfolio Metrics")
-            plt.legend()
-            plt.grid(True, linestyle='--', alpha=0.5)
-            plt.show()
-                
-    return df_portfolio, mi_series
+    # ========================================================
+    # Bucle externo por path (Numba optimiza el interno)
+    # ========================================================
+    for i in range(n_paths):
+        rnd = random.Random(base_seed + i)
+        indices = np.array([rnd.randrange(n_rows) for _ in range(n_obs)], dtype=np.int64)
+        sampled = data_array[indices]
+
+        # Cálculo rápido con Numba
+        open_p, low_p, high_p, close_p, times_s, low_s, high_s = _simulate_single_path_numba(
+            sampled, start_price, start_timestamp
+        )
+
+        # Reconstrucción de fechas Pandas
+        times = pd.to_datetime(times_s, unit="s")
+        low_times = pd.to_datetime(low_s, unit="s")
+        high_times = pd.to_datetime(high_s, unit="s")
+
+        # Construcción del DataFrame
+        data_dict = {
+            "open": open_p,
+            "low": low_p,
+            "high": high_p,
+            "close": close_p,
+            "low_time": low_times,
+            "high_time": high_times
+        }
+
+        # Añadir raw columns (si las hay)
+        n_raw = n_features - 6
+        if n_raw > 0:
+            for idx_col, col_name in enumerate(raw_columns):
+                data_dict[col_name] = sampled[:, 6 + idx_col]
+
+        df_path = pd.DataFrame(data_dict, index=times)
+        df_path.index.name = "time"
+        df_path = df_path.astype({c: DTYPE for c in ["open", "low", "high", "close"]}, copy=False)
+        paths.append(df_path)
+
+    return paths
