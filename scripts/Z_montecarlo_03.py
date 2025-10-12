@@ -11,22 +11,20 @@ from joblib import Parallel, delayed
 from ZX_analysis import report_montecarlo
 from ZX_utils import filter_symbols
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-from ZX_optimize_MC import generate_paths_for_symbol, optimize_for_symbol
+from ZX_optimize_MC import generate_paths_for_symbol, optimize_for_symbol,summary_score_all_paths
 
 from Z_add_signals_03 import add_indicators, explosive_signal
 
 DTYPE = np.float32
-DTYPE = np.float64
 start_time = time.time()
 
 # -----------------------------
 # MONTECARLO
 # -----------------------------
 OPTUNA_N_PATHS       = 50
-FINAL_N_PATHS        = 200
+FINAL_N_PATHS        = 50
 FINAL_N_OBS_PER_PATH = 1000
-FINAL_N_SUBSTEPS     = 10
+FINAL_N_SUBSTEPS     = 1
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------
@@ -210,7 +208,7 @@ print(f"\n🕒 OPTUNA: {end_opt_time - start_opt_time:.2f} segundos")
 # -----------------------------
 # GENERAR PATHS
 # -----------------------------
-start_paths_gen_time = time.time() 
+
 paths_per_symbol = generate_paths_for_all_symbols(
     ohlcv_data, best_params_dict,
     n_paths=FINAL_N_PATHS,
@@ -219,8 +217,30 @@ paths_per_symbol = generate_paths_for_all_symbols(
     base_seed=42
 )
 valid_symbols = [s for s, arr in paths_per_symbol.items() if arr is not None and arr.size > 0]
-end_paths_gen_time = time.time()     # ⏱ Fin timer
-print(f"\n🕒 Paths generation: {end_paths_gen_time - start_paths_gen_time:.2f} segundos")
+
+# --- SCORE UNICO DE COMPARACION ---
+unicoprint_score = summary_score_all_paths(
+    ohlcv_data,
+    n_paths=OPTUNA_N_PATHS,
+    n_obs=FINAL_N_OBS_PER_PATH,
+    n_substeps=FINAL_N_SUBSTEPS,
+    base_seed=42,
+    DTYPE=DTYPE
+)
+
+# Score total
+print(f"\n🟢 UNICO SCORE MONTECARLO: {unicoprint_score['score_total']:.4f}")
+
+# Opcional: imprimir métricas individuales
+print("🔹 Métricas promedio por símbolo:")
+print(f"Mean : {unicoprint_score['sim_mean']:.4f}")
+print(f"Std  : {unicoprint_score['sim_std']:.4f}")
+print(f"Skew : {unicoprint_score['sim_skew']:.4f}")
+print(f"Kurt : {unicoprint_score['sim_kurt']:.4f}")
+print(f"ACF  : {unicoprint_score['sim_acf']:.4f}")
+print(f"KS   : {unicoprint_score['sim_ks']:.4f}")
+print(f"Wass : {unicoprint_score['sim_wass']:.4f}")
+
 # -----------------------------
 # EVALUAR Paths_IDX
 # -----------------------------

@@ -1,105 +1,134 @@
-# === FILE: Z_optimize_MC.py (NUMBA-accelerated, arrays 3D con DTYPE configurable) ===
+# === FILE: optimize_MC.py ===
+# --------------------------------
 import math
 import optuna
 import numpy as np
 from numba import njit, prange
-from ZX_utils import seed_for_symbol
 from scipy.stats import skew, kurtosis
 
 # -----------------------------
-# CONFIGURACIÓN GLOBAL DE TIPO NUMÉRICO
+# CONFIG / TIPOS
 # -----------------------------
 DTYPE = np.float32
 EPS = 1e-12
 
 # -----------------------------
-# FUNCIONES AUXILIARES
-# -----------------------------
-
-@njit
-def _lcg_next(state):
-    a = np.uint64(6364136223846793005)
-    c = np.uint64(1442695040888963407)
-    MASK = np.uint64(0xFFFFFFFFFFFFFFFF)
-    state = (a * state + c) & MASK
-    return state
-
-@njit
-def _lcg_uniform(state):
-    state = _lcg_next(state)
-    u = state / 18446744073709551616.0
-    return state, u
-
-@njit
-def _box_muller_from_uniforms(u1, u2):
-    if u1 <= 1e-18:
-        u1 = 1e-18
-    r = math.sqrt(-2.0 * math.log(u1))
-    theta = 2.0 * math.pi * u2
-    return r * math.cos(theta)
-
-@njit
-def generate_normal(state):
-    state, u1 = _lcg_uniform(state)
-    state, u2 = _lcg_uniform(state)
-    z = _box_muller_from_uniforms(u1, u2)
-    return state, z
-
-# -----------------------------
-# GENERACIÓN DE PATHS (NUMBA 3D)
+# GENERACIÓN DE PATHS (ANTITHETIC VARIATES) - VERSION CON RNG PREGENERADO
 # -----------------------------
 @njit(parallel=True)
-def generate_paths_numba_array(last_price, mu_bar, sigma_bar,
-                               n_paths, n_obs, n_substeps, min_price,
-                               jump_prob_per_substep, jump_mu, jump_sigma,
-                               seeds):
+def generate_paths_numba_array(
+    last_price, mu_bar, sigma_bar,
+    n_paths, n_obs, n_substeps, min_price,
+    jump_prob_per_substep, jump_mu, jump_sigma,
+    # arrays pre-generados:
+    zs_ret, zs_jump, u_vm, u_jump
+):
+    """
+    Genera paths sintéticos usando antithetic variates y volatilidad estocástica.
+    Se espera que zs_ret, zs_jump, u_vm, u_jump tengan forma (n_paths, n_obs, n_substeps).
+    Para cada path p generamos su antitético p + n_paths usando z -> -z.
+    """
+    # normaliza n_substeps por seguridad (en Numba recibimos el entero ya procesado)
     dt_bar = 1.0
     dt_step = dt_bar / max(1, n_substeps)
     sqrt_dt_step = math.sqrt(dt_step)
     VOL_FACTOR = 0.4
     MIN_VOL_MULT = 0.1
 
-    paths_array3d = np.empty((n_paths, n_obs, 4), dtype=DTYPE)
+    n_total = n_paths * 2
+    paths_array3d = np.empty((n_total, n_obs, 4), dtype=DTYPE)
 
     for p in prange(n_paths):
-        state = np.uint64(seeds[p])
-        s = last_price
+        s_pos = last_price
+        s_neg = last_price
 
         for i in range(n_obs):
-            path_min = 1e308
-            path_max = 0.0
-            open_price = s
+            path_min_pos = 1e308
+            path_max_pos = 0.0
+            path_min_neg = 1e308
+            path_max_neg = 0.0
+
+            open_price_pos = s_pos
+            open_price_neg = s_neg
 
             for k in range(n_substeps):
-                state, z = generate_normal(state)
-                state, u_vm = _lcg_uniform(state)
-                vol_multiplier = max(MIN_VOL_MULT, 1.0 + VOL_FACTOR * (u_vm * 2.0 - 1.0))
-                sigma_t = sigma_bar * vol_multiplier
+                # toma z y antitético
+                z = zs_ret[p, i, k]
+                z_neg = -z
 
-                increment = (mu_bar - 0.5 * sigma_t**2) * dt_step + sigma_t * sqrt_dt_step * z
-                s = max(s * math.exp(increment), min_price)
+                # vol multiplier pre-generado (u_vm) -> escalado y límite mínimo
+                uvm = u_vm[p, i, k]
+                vol_multiplier = max(MIN_VOL_MULT, 1.0 + VOL_FACTOR * (uvm * 2.0 - 1.0))
 
-                state, u_jump = _lcg_uniform(state)
-                if u_jump < jump_prob_per_substep:
-                    state, z_j = generate_normal(state)
-                    jump_factor = math.exp(jump_mu + jump_sigma * z_j)
-                    s = max(s * jump_factor, min_price)
+                # ajuste basado en último candle (similar a la versión original)
+                if i > 0:
+                    prev_close = float(paths_array3d[p, i-1, 3])
+                    # evita división por cero improbable
+                    if prev_close <= 0.0:
+                        last_ret = 0.0
+                    else:
+                        last_ret = math.log(s_pos / prev_close)
+                    vol_adjust = 1.0 + 0.8 * math.tanh(last_ret * 13.0)
+                else:
+                    vol_adjust = 1.0
 
-                path_min = min(path_min, s)
-                path_max = max(path_max, s)
+                sigma_t = sigma_bar * vol_multiplier * vol_adjust
 
-            close_price = s
-            path_min = max(path_min, min_price)
+                # --- Ajuste estocástico para skew/kurtosis (pequeño sesgo en caídas/subidas) ---
+                if z < 0:
+                    sigma_t *= 1.1  # 10% más volatilidad en caídas
+                else:
+                    sigma_t *= 0.95  # 5% menos en subidas
 
-            paths_array3d[p, i, 0] = open_price
-            paths_array3d[p, i, 1] = path_min
-            paths_array3d[p, i, 2] = path_max
-            paths_array3d[p, i, 3] = close_price
+                # Step normal
+                inc_pos = (mu_bar - 0.5 * sigma_t**2) * dt_step + sigma_t * sqrt_dt_step * z
+                inc_neg = (mu_bar - 0.5 * sigma_t**2) * dt_step + sigma_t * sqrt_dt_step * z_neg
+                s_pos = max(s_pos * math.exp(inc_pos), min_price)
+                s_neg = max(s_neg * math.exp(inc_neg), min_price)
+
+                # --- JUMP: mezcla de dos "escalas" para cola más pesada ---
+                uj = u_jump[p, i, k]
+                if uj < jump_prob_per_substep:
+                    # usa zs_jump para tamaño del salto
+                    zj = zs_jump[p, i, k]
+                    # mezcla: 90% pequeños saltos, 10% cola pesada (hiper-escala)
+                    if uvm < 0.9:
+                        # salto "pequeño" (similar a antes)
+                        jump_factor = math.exp(jump_mu + jump_sigma * zj)
+                    else:
+                        # salto "cola pesada": amplificamos media y sigma
+                        jump_factor = math.exp( (jump_mu * 3.0) + (jump_sigma * 4.0) * zj )
+                    # aplicamos mismo jump_factor a par antitético (común para ambos)
+                    s_pos = max(s_pos * jump_factor, min_price)
+                    s_neg = max(s_neg * jump_factor, min_price)
+
+                # Min/max tracking
+                if s_pos < path_min_pos:
+                    path_min_pos = s_pos
+                if s_pos > path_max_pos:
+                    path_max_pos = s_pos
+                if s_neg < path_min_neg:
+                    path_min_neg = s_neg
+                if s_neg > path_max_neg:
+                    path_max_neg = s_neg
+
+            # Guardar vela (path "positiva")
+            paths_array3d[p, i, 0] = open_price_pos
+            paths_array3d[p, i, 1] = max(path_min_pos, min_price)
+            paths_array3d[p, i, 2] = path_max_pos
+            paths_array3d[p, i, 3] = s_pos
+
+            # Guardar vela (path antitético)
+            paths_array3d[p + n_paths, i, 0] = open_price_neg
+            paths_array3d[p + n_paths, i, 1] = max(path_min_neg, min_price)
+            paths_array3d[p + n_paths, i, 2] = path_max_neg
+            paths_array3d[p + n_paths, i, 3] = s_neg
 
     return paths_array3d
 
+
 # -----------------------------
-# GENERACIÓN DE PATHS PARA UN SÍMBOLO
+# GENERACIÓN DE PATHS PARA UN SÍMBOLO (PRE-GENERA RNG)
 # -----------------------------
 def generate_paths_for_symbol(
         df_hist,
@@ -118,7 +147,7 @@ def generate_paths_for_symbol(
     df = df_hist
 
     if 'close' not in df.columns or len(df) < 2:
-        return np.full((n_paths, n_obs, 4), np.nan, dtype=DTYPE)
+        return np.full((n_paths*2, n_obs, 4), np.nan, dtype=DTYPE)
 
     closes = df["close"].astype(float)
     logret = np.log(closes / closes.shift(1)).iloc[1:]
@@ -126,34 +155,47 @@ def generate_paths_for_symbol(
     sigma_bar = max(float(np.nanstd(logret, ddof=0)) * vol_scale, 1e-8)
     last_price = float(df["close"].iloc[-1])
 
-    seeds = np.array([seed_for_symbol(sym_name, base_seed=base_seed, path_idx=i) for i in range(n_paths)], dtype=np.uint64)
-    paths_array3d = generate_paths_numba_array(last_price, mu_bar, sigma_bar,
-                                               n_paths, n_obs, n_substeps, min_price,
-                                               jump_prob_per_substep, jump_mu, jump_sigma, seeds)
+    # Asegurarse n_substeps >= 1 para la pre-generación
+    if n_substeps < 1:
+        n_substeps = 1
+
+    # Pre-generar normales y uniformes con PCG (default_rng)
+    rng = np.random.default_rng(base_seed)
+    # normales para ruido de retornos
+    zs_ret = rng.standard_normal(size=(n_paths, n_obs, n_substeps)).astype(np.float64)
+    # normales para el tamaño del salto
+    zs_jump = rng.standard_normal(size=(n_paths, n_obs, n_substeps)).astype(np.float64)
+    # uniformes para vol_multiplier (u_vm) y probabilidad de salto (u_jump)
+    u_vm = rng.random(size=(n_paths, n_obs, n_substeps)).astype(np.float64)
+    u_jump = rng.random(size=(n_paths, n_obs, n_substeps)).astype(np.float64)
+
+    # Llamada al kernel numba (ahora consume arrays pre-generados)
+    paths_array3d = generate_paths_numba_array(
+        last_price, mu_bar, sigma_bar,
+        n_paths, n_obs, n_substeps, min_price,
+        jump_prob_per_substep, jump_mu, jump_sigma,
+        zs_ret, zs_jump, u_vm, u_jump
+    )
     return paths_array3d
 
 # -----------------------------
-# KERNELS NUMBA PARA MÉTRICAS
+# KERNELS NUMBA PARA MÉTRICAS (sin cambios)
 # -----------------------------
 @njit
 def _acf_series_numba(x, nlags=50):
     N = x.shape[0]
     if N == 0:
         return np.zeros(nlags+1, dtype=DTYPE)
-
     xm = 0.0
     for i in range(N):
         xm += x[i]
     xm /= N
-
     max_lag = nlags if nlags < N-1 else N-1
     acf = np.zeros(max_lag+1, dtype=DTYPE)
-
     s0 = 0.0
     for i in range(N):
         t = x[i] - xm
         s0 += t * t
-
     if s0 == 0.0:
         acf[0] = 1.0
         for l in range(1, max_lag+1):
@@ -163,13 +205,11 @@ def _acf_series_numba(x, nlags=50):
             out[:max_lag+1] = acf
             return out
         return acf
-
     for lag in range(max_lag+1):
         cov = 0.0
         for i in range(N - lag):
             cov += (x[i] - xm) * (x[i + lag] - xm)
         acf[lag] = cov / s0
-
     if max_lag < nlags:
         out = np.zeros(nlags+1, dtype=DTYPE)
         out[:max_lag+1] = acf
@@ -182,20 +222,16 @@ def _ks_statistic_numba(a, b):
     nb = b.shape[0]
     if na == 0 or nb == 0:
         return 1.0
-
     sa = np.sort(a.copy())
     sb = np.sort(b.copy())
-
     i = 0
     j = 0
     ca = 0
     cb = 0
     D = 0.0
-
     while i < na or j < nb:
         va = sa[i] if i < na else 1e308
         vb = sb[j] if j < nb else 1e308
-
         if va <= vb:
             ca += 1
             i += 1
@@ -214,17 +250,14 @@ def _wasserstein_1d_numba(a, b):
     nb = b.shape[0]
     if na == 0 or nb == 0:
         return 1e308
-
     sa = np.sort(a.copy())
     sb = np.sort(b.copy())
-
     i = 0
     j = 0
     prev_x = min(sa[0], sb[0])
     ca = 0
     cb = 0
     total = 0.0
-
     while i < na or j < nb:
         xa = sa[i] if i < na else 1e308
         xb = sb[j] if j < nb else 1e308
@@ -235,7 +268,6 @@ def _wasserstein_1d_numba(a, b):
             Fb = cb / nb
             total += abs(Fa - Fb) * dx
             prev_x = x
-
         while i < na and sa[i] == x:
             ca += 1
             i += 1
@@ -250,7 +282,6 @@ def _compute_paths_metrics_numba(hist_rets, syn_array, nlags):
     dists = np.empty(npaths, dtype=DTYPE)
     ksD   = np.empty(npaths, dtype=DTYPE)
     acf_sum = np.zeros(nlags+1, dtype=DTYPE)
-
     for p in prange(npaths):
         r = syn_array[p]
         dists[p] = _wasserstein_1d_numba(hist_rets, r)
@@ -261,9 +292,9 @@ def _compute_paths_metrics_numba(hist_rets, syn_array, nlags):
     return dists, ksD, acf_sum
 
 # -----------------------------
-# EVALUACIÓN SINTÉTICO vs HISTÓRICO
+# EVALUACIÓN SINTÉTICO vs HISTÓRICO (con retorno de métricas)
 # -----------------------------
-def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
+def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50, return_metrics=False):
     if arr_syn_list is None:
         return None
 
@@ -320,8 +351,7 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
     sim_skew = 100.0 / (1.0 + abs(hist_skew - float(np.mean(syn_skews))) / (abs(hist_skew) + 1e-8))
     sim_kurt = 100.0 / (1.0 + abs(hist_kurt - float(np.mean(syn_kurts))) / (abs(hist_kurt) + 1e-8))
 
-    dists, ksD, acf_sum = _compute_paths_metrics_numba(np.ascontiguousarray(hist_rets),
-                                                       np.ascontiguousarray(syn_array), nlags_acf)
+    dists, ksD, acf_sum = _compute_paths_metrics_numba(np.ascontiguousarray(hist_rets), np.ascontiguousarray(syn_array), nlags_acf)
     npaths = syn_array.shape[0]
 
     syn_acfs_mean = acf_sum / npaths
@@ -340,7 +370,11 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
 
     weights = np.array([0.20, 0.20, 0.10, 0.10, 0.10, 0.10, 0.20], dtype=DTYPE)
     metrics = np.array([sim_mean, sim_std, sim_skew, sim_kurt, sim_acf, sim_ks, sim_wass], dtype=DTYPE)
-    return float(np.sum(metrics * weights))
+    score_total = float(np.sum(metrics * weights))
+
+    if return_metrics:
+        return np.append(metrics, score_total)
+    return score_total
 
 # -----------------------------
 # OPTUNA PARA OPTIMIZACIÓN
@@ -373,3 +407,48 @@ def optimize_for_symbol(symbol, ohlcv_data, n_trials, n_paths, n_obs, n_substeps
         df_hist, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, seed=base_seed
     )
     return symbol, best_params, best_score
+
+# -----------------------------
+# SUMMARY SCORE CON MÉTRICAS
+# -----------------------------
+def summary_score_all_paths(ohlcv_data, n_paths, n_obs, n_substeps, base_seed=42, DTYPE=np.float64):
+    """
+    Genera paths para todos los símbolos y devuelve un único score promedio ponderado
+    junto con la media de cada métrica individual.
+    """
+    scores = []
+    metrics_list = []
+
+    for symbol, df_hist in ohlcv_data.items():
+        df_syn_list = generate_paths_for_symbol(
+            df_hist, n_paths=n_paths, n_obs=n_obs, n_substeps=n_substeps,
+            vol_scale=1.0,
+            min_price=df_hist['close'].min(),
+            jump_prob_per_substep=0.01,
+            jump_mu=0.0,
+            jump_sigma=0.01,
+            timeframe='1H',
+            base_seed=base_seed
+        )
+
+        metrics = evaluate_synthetic_vs_real(df_hist, df_syn_list, return_metrics=True)
+        if metrics is not None:
+            metrics_list.append(metrics)
+            scores.append(metrics[-1])  # último = score_total
+
+    if len(scores) == 0:
+        return None
+
+    metrics_array = np.vstack(metrics_list)
+    mean_metrics = np.mean(metrics_array, axis=0)
+
+    return {
+        "score_total": float(np.mean(scores)),
+        "sim_mean": float(mean_metrics[0]),
+        "sim_std": float(mean_metrics[1]),
+        "sim_skew": float(mean_metrics[2]),
+        "sim_kurt": float(mean_metrics[3]),
+        "sim_acf": float(mean_metrics[4]),
+        "sim_ks": float(mean_metrics[5]),
+        "sim_wass": float(mean_metrics[6])
+    }

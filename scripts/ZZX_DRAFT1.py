@@ -1,427 +1,448 @@
-import heapq
-import logging
-import warnings
+# === FILE: optimize_MC.py ===
+# --------------------------------
+import math
+import optuna
 import numpy as np
-import pandas as pd
-from numba import njit
-logging.basicConfig(level=logging.INFO)
-warnings.filterwarnings("ignore")
+from numba import njit, prange
+from ZX_utils import seed_for_symbol
+from scipy.stats import skew, kurtosis
 
-MIN_PRICE            = 0.0001
-INITIAL_BALANCE      = 10000
-ORDER_AMOUNT         = 100
+# -----------------------------
+# FUNCIONES AUXILIARES
+# -----------------------------
+DTYPE = np.float32
+EPS = 1e-12
 
-# ============================
-# Helper: get_price_at_int (nivel módulo)
-# ============================
-
-# Función numba para acelerar searchsorted (fallback)
+# -----------------------------
+# RNG LINEAR CONGRUENTIAL
+# -----------------------------
 @njit
-def _search_price_numba(ts_int_arr, close_arr, t_int):
-    idx = np.searchsorted(ts_int_arr, t_int, side='right') - 1
-    if idx >= 0:
-        return close_arr[idx]
-    else:
-        # retornamos NaN dentro de numba y lo convertimos a None arriba
-        return np.nan
+def _lcg_next(state):
+    a = np.uint64(6364136223846793005)
+    c = np.uint64(1442695040888963407)
+    MASK = np.uint64(0xFFFFFFFFFFFFFFFF)
+    state = (a * state + c) & MASK
+    return state
 
-def get_price_at_int(sym, t, sym_data, ts_index_map_by_sym_int):
-    """
-    Devuelve el precio de cierre para el símbolo `sym` en el timestamp `t`.
-    Usa diccionario de índices para acceso rápido y fallback acelerado con Numba.
-    Retorna None si no encuentra un precio (misma semántica que tu versión original).
-    """
-    t_int = int(t)
+@njit
+def _lcg_uniform(state):
+    state = _lcg_next(state)
+    u = state / 18446744073709551616.0
+    return state, u
 
-    # acceso rápido por índice (O(1))
-    idx_map = ts_index_map_by_sym_int[sym]
-    idx = idx_map.get(t_int)
-    if idx is not None:
-        return float(sym_data[sym]['close'][idx])
+@njit
+def _box_muller_from_uniforms(u1, u2):
+    if u1 <= 1e-18:
+        u1 = 1e-18
+    r = math.sqrt(-2.0 * math.log(u1))
+    theta = 2.0 * math.pi * u2
+    return r * math.cos(theta)
 
-    # fallback con numba searchsorted (devuelve NaN si no hay índice)
-    ts_arr = sym_data[sym]['ts_int']
-    close_arr = sym_data[sym]['close']
-    val = _search_price_numba(ts_arr, close_arr, t_int)
-    if np.isnan(val):
-        return None
-    return float(val)
+@njit
+def generate_normal(state):
+    state, u1 = _lcg_uniform(state)
+    state, u2 = _lcg_uniform(state)
+    z = _box_muller_from_uniforms(u1, u2)
+    return state, z
 
-
-def run_grid_backtest(
-    ohlcv_arrays,
-    sell_after,
-    initial_balance=10000,
-    order_amount=100,
-    tp_pct=0.0,
-    sl_pct=0.0,
-    comi_pct=0.05
+# -----------------------------
+# GENERACIÓN DE PATHS (ANTITHETIC VARIATES)
+# -----------------------------
+@njit(parallel=True)
+def generate_paths_numba_array(
+    last_price, mu_bar, sigma_bar,
+    n_paths, n_obs, n_substeps, min_price,
+    jump_prob_per_substep, jump_mu, jump_sigma,
+    seeds
 ):
+    """
+    Genera paths sintéticos usando antithetic variates y volatilidad estocástica.
+    Por cada path p, genera su contrapartida p_ant con z → -z.
+    """
+    dt_bar = 1.0
+    dt_step = dt_bar / max(1, n_substeps)
+    sqrt_dt_step = math.sqrt(dt_step)
+    VOL_FACTOR = 0.4
+    MIN_VOL_MULT = 0.1
 
-    # -------------------------
-    # Configuración inicial
-    # -------------------------
-    comi_factor = float(comi_pct) / 100.0
-    cash        = float(initial_balance)
-    num_signals_executed = 0
+    n_total = n_paths * 2
+    paths_array3d = np.empty((n_total, n_obs, 4), dtype=DTYPE)
 
-    # Preparar sym_data con arrays y ts_int
-    symbols = list(ohlcv_arrays.keys())
-    sym_data = {}
-    for sym in symbols:
-        data = ohlcv_arrays[sym]
-        ts = data['ts']
-        ts_int = ts.astype('int64')
-        sym_data[sym] = {
-            'ts': ts,
-            'ts_int': ts_int,
-            'close': data['close'],
-            'high': data.get('high', None),
-            'low': data.get('low', None),
-            'signal': data['signal'],
-            'len': len(ts)
-        }
+    for p in prange(n_paths):
+        state = np.uint64(seeds[p])
+        s_pos = last_price
+        s_neg = last_price
 
-    # Señales por timestamp
-    signals_by_time = {}
-    for sym in symbols:
-        d = sym_data[sym]
-        sig_idxs = np.nonzero(d['signal'])[0]
-        ts_int_arr = d['ts_int']
-        for idx in sig_idxs:
-            t_int = int(ts_int_arr[idx])
-            lst = signals_by_time.get(t_int)
-            if lst is None:
-                signals_by_time[t_int] = [(sym, int(idx))]
-            else:
-                lst.append((sym, int(idx)))
+        for i in range(n_obs):
+            path_min_pos = 1e308
+            path_max_pos = 0.0
+            path_min_neg = 1e308
+            path_max_neg = 0.0
 
-    # Array ordenado de todos los timestamps
-    all_ts_set = set()
-    for d in sym_data.values():
-        all_ts_set.update(d['ts_int'].tolist())
-    all_timestamps_int = np.array(sorted(all_ts_set), dtype=np.int64)
-    all_timestamps_dt = all_timestamps_int.astype('datetime64[ns]')
+            open_price_pos = s_pos
+            open_price_neg = s_neg
 
-    # -------------------------
-    # Estructuras auxiliares
-    # -------------------------
-    trades = {sym: [] for sym in symbols}
-    trade_times = {sym: [] for sym in symbols}
+            for k in range(n_substeps):
+                # Genera z y antitético -z
+                state, z = generate_normal(state)
+                z_neg = -z
 
-    trade_log_cols = {
-        'symbol': [],
-        'buy_time': [],
-        'buy_price': [],
-        'sell_time': [],
-        'sell_price': [],
-        'qty': [],
-        'profit': [],
-        'exit_reason': [],
-        'commission_buy': [],
-        'commission_sell': []
-    }
+                # Volatilidad base aleatoria
+                state, u_vm = _lcg_uniform(state)
+                vol_multiplier = max(MIN_VOL_MULT, 1.0 + VOL_FACTOR * (u_vm * 2.0 - 1.0))
+                if i > 0:
+                    last_ret = math.log(s_pos / paths_array3d[p, i-1, 3])
+                    # Factor de ajuste: mayores retornos absolutos ⇒ mayor sigma
+                    vol_adjust = 1.0 + 0.8 * math.tanh(last_ret * 13.0)
+                else:
+                    vol_adjust = 1.0
+                sigma_t = sigma_bar * vol_multiplier * vol_adjust
 
-    sim_balance_cols = {
-        'timestamp': [],
-        'balance': []
-    }
+                # --- Ajuste estocástico para skew/kurtosis ---
+                if z < 0:
+                    sigma_t *= 1.1  # 10% más volatilidad en caídas
+                else:
+                    sigma_t *= 0.95  # 5% menos en subidas
 
-    open_positions_heap = []
-    counter = 0
+                # Step normal
+                inc_pos = (mu_bar - 0.5 * sigma_t**2) * dt_step + sigma_t * sqrt_dt_step * z
+                inc_neg = (mu_bar - 0.5 * sigma_t**2) * dt_step + sigma_t * sqrt_dt_step * z_neg
+                s_pos = max(s_pos * math.exp(inc_pos), min_price)
+                s_neg = max(s_neg * math.exp(inc_neg), min_price)
 
-    symbol_order = {s: i for i, s in enumerate(symbols)}
-    ts_index_map_by_sym_int = {sym: {int(t): idx for idx, t in enumerate(d['ts_int'])} for sym, d in sym_data.items()}
+                # Jump
+                state, u_jump = _lcg_uniform(state)
+                if u_jump < jump_prob_per_substep:
+                    state, z_j = generate_normal(state)
+                    jump_factor = math.exp(jump_mu + jump_sigma * z_j)
+                    s_pos = max(s_pos * jump_factor, min_price)
+                    s_neg = max(s_neg * jump_factor, min_price)
 
-    # ------------------------------------------------------------------
-    # Helper local (inline-style) para acceder rápido al precio sin overhead
-    # ------------------------------------------------------------------
-    def _get_price_at_int_local(sym_local, t_int_local):
-        # Intentamos lookup O(1) en mapa
-        idx_map_local = ts_index_map_by_sym_int[sym_local]
-        idx_local = idx_map_local.get(int(t_int_local))
-        if idx_local is not None:
-            return float(sym_data[sym_local]['close'][idx_local])
-        # fallback: searchsorted (usamos numpy aquí; get_price_at_int usa numba)
-        arr_ts = sym_data[sym_local]['ts_int']
-        idx_local = np.searchsorted(arr_ts, np.int64(t_int_local), side='right') - 1
-        if idx_local >= 0:
-            return float(sym_data[sym_local]['close'][idx_local])
+                # Min/max tracking
+                path_min_pos = min(path_min_pos, s_pos)
+                path_max_pos = max(path_max_pos, s_pos)
+                path_min_neg = min(path_min_neg, s_neg)
+                path_max_neg = max(path_max_neg, s_neg)
+
+            # Guardar vela
+            paths_array3d[p, i, 0] = open_price_pos
+            paths_array3d[p, i, 1] = max(path_min_pos, min_price)
+            paths_array3d[p, i, 2] = path_max_pos
+            paths_array3d[p, i, 3] = s_pos
+
+            paths_array3d[p + n_paths, i, 0] = open_price_neg
+            paths_array3d[p + n_paths, i, 1] = max(path_min_neg, min_price)
+            paths_array3d[p + n_paths, i, 2] = path_max_neg
+            paths_array3d[p + n_paths, i, 3] = s_neg
+
+    return paths_array3d
+
+
+# -----------------------------
+# GENERACIÓN DE PATHS PARA UN SÍMBOLO
+# -----------------------------
+def generate_paths_for_symbol(
+        df_hist,
+        n_paths,
+        n_obs,
+        n_substeps,
+        vol_scale,
+        min_price,
+        jump_prob_per_substep,
+        jump_mu,
+        jump_sigma,
+        timeframe,
+        base_seed=42
+    ):
+    sym_name = getattr(df_hist, "name", None) or "symbol"
+    df = df_hist
+
+    if 'close' not in df.columns or len(df) < 2:
+        return np.full((n_paths, n_obs, 4), np.nan, dtype=DTYPE)
+
+    closes = df["close"].astype(float)
+    logret = np.log(closes / closes.shift(1)).iloc[1:]
+    mu_bar = float(np.nanmean(logret)) if not logret.empty else 0.0
+    sigma_bar = max(float(np.nanstd(logret, ddof=0)) * vol_scale, 1e-8)
+    last_price = float(df["close"].iloc[-1])
+
+    seeds = np.array([seed_for_symbol(sym_name, base_seed=base_seed, path_idx=i) for i in range(n_paths)], dtype=np.uint64)
+    paths_array3d = generate_paths_numba_array(last_price, mu_bar, sigma_bar,
+                                               n_paths, n_obs, n_substeps, min_price,
+                                               jump_prob_per_substep, jump_mu, jump_sigma, seeds)
+    return paths_array3d
+
+# -----------------------------
+# KERNELS NUMBA PARA MÉTRICAS
+# -----------------------------
+@njit
+def _acf_series_numba(x, nlags=50):
+    N = x.shape[0]
+    if N == 0:
+        return np.zeros(nlags+1, dtype=DTYPE)
+    xm = 0.0
+    for i in range(N):
+        xm += x[i]
+    xm /= N
+    max_lag = nlags if nlags < N-1 else N-1
+    acf = np.zeros(max_lag+1, dtype=DTYPE)
+    s0 = 0.0
+    for i in range(N):
+        t = x[i] - xm
+        s0 += t * t
+    if s0 == 0.0:
+        acf[0] = 1.0
+        for l in range(1, max_lag+1):
+            acf[l] = 0.0
+        if max_lag < nlags:
+            out = np.zeros(nlags+1, dtype=DTYPE)
+            out[:max_lag+1] = acf
+            return out
+        return acf
+    for lag in range(max_lag+1):
+        cov = 0.0
+        for i in range(N - lag):
+            cov += (x[i] - xm) * (x[i + lag] - xm)
+        acf[lag] = cov / s0
+    if max_lag < nlags:
+        out = np.zeros(nlags+1, dtype=DTYPE)
+        out[:max_lag+1] = acf
+        return out
+    return acf
+
+@njit
+def _ks_statistic_numba(a, b):
+    na = a.shape[0]
+    nb = b.shape[0]
+    if na == 0 or nb == 0:
+        return 1.0
+    sa = np.sort(a.copy())
+    sb = np.sort(b.copy())
+    i = 0
+    j = 0
+    ca = 0
+    cb = 0
+    D = 0.0
+    while i < na or j < nb:
+        va = sa[i] if i < na else 1e308
+        vb = sb[j] if j < nb else 1e308
+        if va <= vb:
+            ca += 1
+            i += 1
+            d = (ca/na - cb/nb)
+        else:
+            cb += 1
+            j += 1
+            d = (cb/nb - ca/na)
+        if d > D:
+            D = d
+    return D
+
+@njit
+def _wasserstein_1d_numba(a, b):
+    na = a.shape[0]
+    nb = b.shape[0]
+    if na == 0 or nb == 0:
+        return 1e308
+    sa = np.sort(a.copy())
+    sb = np.sort(b.copy())
+    i = 0
+    j = 0
+    prev_x = min(sa[0], sb[0])
+    ca = 0
+    cb = 0
+    total = 0.0
+    while i < na or j < nb:
+        xa = sa[i] if i < na else 1e308
+        xb = sb[j] if j < nb else 1e308
+        x = xa if xa <= xb else xb
+        dx = x - prev_x
+        if dx > 0.0:
+            Fa = ca / na
+            Fb = cb / nb
+            total += abs(Fa - Fb) * dx
+            prev_x = x
+        while i < na and sa[i] == x:
+            ca += 1
+            i += 1
+        while j < nb and sb[j] == x:
+            cb += 1
+            j += 1
+    return total
+
+@njit(parallel=True)
+def _compute_paths_metrics_numba(hist_rets, syn_array, nlags):
+    npaths = syn_array.shape[0]
+    dists = np.empty(npaths, dtype=DTYPE)
+    ksD   = np.empty(npaths, dtype=DTYPE)
+    acf_sum = np.zeros(nlags+1, dtype=DTYPE)
+    for p in prange(npaths):
+        r = syn_array[p]
+        dists[p] = _wasserstein_1d_numba(hist_rets, r)
+        ksD[p]   = _ks_statistic_numba(hist_rets, r)
+        acf_p = _acf_series_numba(np.abs(r), nlags=nlags)
+        for k in range(acf_p.shape[0]):
+            acf_sum[k] += acf_p[k]
+    return dists, ksD, acf_sum
+
+# -----------------------------
+# EVALUACIÓN SINTÉTICO vs HISTÓRICO (con retorno de métricas)
+# -----------------------------
+def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50, return_metrics=False):
+    if arr_syn_list is None:
         return None
 
-    def close_position(pos, exec_time, exec_price, exit_reason):
-        nonlocal cash
-        qty = pos['qty']
-        buy_price = pos['buy_price']
-        commission_buy = pos.get('commission_buy', 0.0)
-        commission_sell = (qty * exec_price) * comi_factor if comi_factor != 0.0 else 0.0
-        cash += qty * exec_price - commission_sell
-        profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
-        trades[pos['symbol']].append(profit)
-        trade_times[pos['symbol']].append(exec_time)
+    syns = [arr_syn_list] if isinstance(arr_syn_list, np.ndarray) else [a for a in arr_syn_list if a is not None and getattr(a, "size", 0) > 0]
+    if len(syns) == 0:
+        return None
 
-        # Llenar listas separadas (manteniendo orden y campos idéntico)
-        trade_log_cols['symbol'].append(pos['symbol'])
-        trade_log_cols['buy_time'].append(pos['buy_time'])
-        trade_log_cols['buy_price'].append(buy_price)
-        trade_log_cols['sell_time'].append(exec_time)
-        trade_log_cols['sell_price'].append(exec_price)
-        trade_log_cols['qty'].append(qty)
-        trade_log_cols['profit'].append(profit)
-        trade_log_cols['exit_reason'].append(exit_reason)
-        trade_log_cols['commission_buy'].append(commission_buy)
-        trade_log_cols['commission_sell'].append(commission_sell)
+    closes_hist = df_hist['close'].to_numpy(dtype=DTYPE)
+    if closes_hist.size < 2:
+        return None
+    hist_rets_full = np.log(closes_hist[1:] / closes_hist[:-1])
 
-    # -------------------------
-    # Bucle principal optimizado (misma lógica, menos overhead)
-    # -------------------------
-    open_heap = open_positions_heap
-    sym_data_local = sym_data
-    signals_local = signals_by_time
-    symbol_order_local = symbol_order
-
-    # Prebind de funciones/objetos para acceder rápido (menos búsquedas en glob/locals)
-    np_searchsorted = np.searchsorted
-    heapq_pop = heapq.heappop
-    heapq_push = heapq.heappush
-
-    for t_int in all_timestamps_int:
-        # ---------------------------------------------------------
-        # Cerrar posiciones vencidas (mismo comportamiento que antes)
-        # ---------------------------------------------------------
-        while open_heap and open_heap[0][0] <= t_int:
-            _, _, pos = heapq_pop(open_heap)
-            if pos.get('closed', False):
+    syn_rets_list = []
+    for arr in syns:
+        arr = np.asarray(arr)
+        if arr.ndim == 3:
+            closes = arr[:, :, 3].astype(DTYPE, copy=False)
+            if closes.shape[1] < 2:
                 continue
-
-            # Si la posición tiene exec_price/exec_time preestablecidos y venció -> cerrar con esos
-            if 'exec_price' in pos and ('exec_time_int' in pos) and pos['exec_time_int'] <= t_int:
-                close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
-                pos['closed'] = True
+            rets = np.log(closes[:, 1:] / closes[:, :-1])
+            for p in range(rets.shape[0]):
+                syn_rets_list.append(rets[p].astype(DTYPE, copy=False))
+        elif arr.ndim == 2 and arr.shape[1] > 3:
+            closes = arr[:, 3].astype(DTYPE, copy=False)
+            if closes.size < 2:
                 continue
-
-            # Si no, cerrar usando precio en sell_time_int (fallback)
-            sym = pos['symbol']
-            sell_ts_int = pos.get('sell_time_int', None)
-            if sell_ts_int is None:
-                sell_ts_int = int(np.int64(sym_data_local[sym]['ts_int'][-1]))
-
-            # obtener precio usando la versión local (rápida)
-            exec_price = _get_price_at_int_local(sym, sell_ts_int)
-            if exec_price is not None:
-                exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
-            else:
-                # si no hay precio, cerrar con el último close disponible
-                exec_price = float(sym_data_local[sym]['close'][-1])
-                last_time_dt = sym_data_local[sym]['ts'][-1]
-                close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
-            pos['closed'] = True
-
-        # ---------------------------------------------------------
-        # Actualizar sim balance solo si hay posiciones abiertas
-        # ---------------------------------------------------------
-        if open_heap:
-            # calculamos positions_value con un loop explícito (menos overhead que el generator)
-            pv = 0.0
-            for _sell_time, _counter, pos in open_heap:
-                if pos.get('closed', False):
-                    continue
-                sym_p = pos['symbol']
-                qty_p = pos['qty']
-                price_p = _get_price_at_int_local(sym_p, t_int)
-                if price_p is None:
-                    # fallback al último precio si no hay timestamp exacto
-                    price_p = float(sym_data_local[sym_p]['close'][-1])
-                pv += qty_p * price_p
-            sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-            sim_balance_cols['balance'].append(cash + pv)
-            # continuar al siguiente timestamp (igual que antes)
+            rets = np.log(closes[1:] / closes[:-1])
+            syn_rets_list.append(rets.astype(DTYPE, copy=False))
+        else:
             continue
 
-        # ---------------------------------------------------------
-        # Abrir nuevas posiciones (mismo comportamiento)
-        # ---------------------------------------------------------
-        events = signals_local.get(int(t_int), [])
-        if events:
-            # ordenar eventos por orden de símbolo
-            events = sorted(events, key=lambda x: symbol_order_local[x[0]])
-            for sym, buy_idx in events:
-                if cash < order_amount:
-                    break
-                d = sym_data_local[sym]
-                price_t = float(d['close'][buy_idx])
-                qty = order_amount / price_t
-                commission_buy = order_amount * comi_factor if comi_factor != 0.0 else 0.0
-                cash -= (order_amount + commission_buy)
-                num_signals_executed += 1
+    if len(syn_rets_list) == 0:
+        return None
 
-                sell_idx = min(buy_idx + sell_after, d['len'] - 1)
-                sell_time_dt = d['ts'][sell_idx]
-                sell_time_int = int(d['ts_int'][sell_idx])
-                tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else np.inf
-                sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -np.inf
+    min_len = min(len(hist_rets_full), min(len(r) for r in syn_rets_list))
+    if min_len < 2:
+        return None
 
-                position = {
-                    'symbol': sym,
-                    'qty': qty,
-                    'buy_price': price_t,
-                    'buy_time': np.datetime64(int(t_int), 'ns'),
-                    'sell_time': sell_time_dt,
-                    'sell_time_int': sell_time_int,
-                    'commission_buy': commission_buy
-                }
+    hist_rets = hist_rets_full[-min_len:]
+    syn_array = np.vstack([r[-min_len:].astype(DTYPE, copy=False) for r in syn_rets_list])
 
-                # Detección intravela (idéntica a la original)
-                intravela_detected = False
-                if tp_price is not None or sl_price is not None:
-                    if d['high'] is not None and d['low'] is not None:
-                        start = buy_idx + 1
-                        end = sell_idx
-                        if end >= start:
-                            high_slice = d['high'][start:end+1]
-                            low_slice = d['low'][start:end+1]
-                            tp_hits = np.where((tp_price is not None) & (high_slice >= tp_price))[0]
-                            sl_hits = np.where((sl_price is not None) & (low_slice <= sl_price))[0]
-                            tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-                            sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+    hist_mean = float(np.mean(hist_rets))
+    hist_std  = float(np.std(hist_rets, ddof=1)) if min_len > 1 else 0.0
+    hist_skew = float(skew(hist_rets, bias=False))
+    hist_kurt = float(kurtosis(hist_rets, bias=False))
 
-                            if tp_first is not None and sl_first is not None:
-                                if sl_first <= tp_first:
-                                    chosen_idx = sl_first
-                                    exit_reason = 'SL'
-                                    exec_price = sl_price
-                                else:
-                                    chosen_idx = tp_first
-                                    exit_reason = 'TP'
-                                    exec_price = tp_price
-                                intravela_detected = True
-                            elif sl_first is not None:
-                                chosen_idx = sl_first
-                                exit_reason = 'SL'
-                                exec_price = sl_price
-                                intravela_detected = True
-                            elif tp_first is not None:
-                                chosen_idx = tp_first
-                                exit_reason = 'TP'
-                                exec_price = tp_price
-                                intravela_detected = True
+    syn_means = np.mean(syn_array, axis=1)
+    syn_stds  = np.std(syn_array, axis=1, ddof=1) if syn_array.shape[1] > 1 else np.zeros(syn_array.shape[0], dtype=DTYPE)
+    syn_skews = skew(syn_array, axis=1, bias=False)
+    syn_kurts = kurtosis(syn_array, axis=1, bias=False)
 
-                if intravela_detected:
-                    exec_time_dt = d['ts'][chosen_idx]
-                    exec_time_int = int(d['ts_int'][chosen_idx])
-                    position.update({
-                        'exec_price': float(exec_price),
-                        'exec_time': exec_time_dt,
-                        'exec_time_int': exec_time_int,
-                        'exit_reason': exit_reason
-                    })
-                    heapq_push(open_heap, (exec_time_int, counter, position))
-                    counter += 1
-                else:
-                    heapq_push(open_heap, (sell_time_int, counter, position))
-                    counter += 1
+    sim_mean = 100.0 * max(0.0, 1.0 - abs(hist_mean - float(np.mean(syn_means))) / (abs(hist_std) + EPS))
+    sim_std  = 100.0 / (1.0 + abs(hist_std - float(np.mean(syn_stds))) / (abs(hist_std) + 1e-8))
+    sim_skew = 100.0 / (1.0 + abs(hist_skew - float(np.mean(syn_skews))) / (abs(hist_skew) + 1e-8))
+    sim_kurt = 100.0 / (1.0 + abs(hist_kurt - float(np.mean(syn_kurts))) / (abs(hist_kurt) + 1e-8))
 
-        # ---------------------------------------------------------
-        # Registrar balance actual (después de abrir posiciones)
-        # ---------------------------------------------------------
-        pv = 0.0
-        for _sell_time, _counter, pos in open_heap:
-            if pos.get('closed', False):
-                continue
-            sym_p = pos['symbol']
-            qty_p = pos['qty']
-            price_p = _get_price_at_int_local(sym_p, t_int)
-            if price_p is None:
-                price_p = float(sym_data_local[sym_p]['close'][-1])
-            pv += qty_p * price_p
-        sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-        sim_balance_cols['balance'].append(cash + pv)
+    dists, ksD, acf_sum = _compute_paths_metrics_numba(np.ascontiguousarray(hist_rets), np.ascontiguousarray(syn_array), nlags_acf)
+    npaths = syn_array.shape[0]
 
-    # -------------------------
-    # Cierre final de posiciones
-    # -------------------------
-    while open_heap:
-        _, _, pos = heapq_pop(open_heap)
-        if pos.get('closed', False):
-            continue
-        sym = pos['symbol']
-        d = sym_data_local[sym]
-        if 'exec_price' in pos:
-            close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
-        else:
-            sell_ts_int = pos.get('sell_time_int', int(d['ts_int'][-1]))
-            exec_price = _get_price_at_int_local(sym, sell_ts_int)
-            if exec_price is not None:
-                exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
-            else:
-                exec_price = float(d['close'][-1])
-                last_time_dt = d['ts'][-1]
-                close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
+    syn_acfs_mean = acf_sum / npaths
+    hist_acf_abs = _acf_series_numba(np.abs(hist_rets), nlags=nlags_acf)
+    diff_norm = 0.0
+    hist_norm = 0.0
+    for k in range(hist_acf_abs.shape[0]):
+        diff_norm += (hist_acf_abs[k] - syn_acfs_mean[k]) ** 2
+        hist_norm += hist_acf_abs[k] ** 2
+    sim_acf = max(0.0, 100.0 * (1.0 - (diff_norm ** 0.5) / (hist_norm ** 0.5 + 1e-12))) if hist_norm > 0 else 0.0
 
-    # -------------------------
-    # Resultados finales
-    # -------------------------
-    final_balance = cash
-    all_trades = []
-    for sym in symbols:
-        all_trades.extend(trades[sym])
-    num_trades = len(all_trades)
-    proportion_winners = np.sum(np.array(all_trades) > 0.0) / num_trades if num_trades > 0 else np.nan
+    sim_ks = np.mean(100.0 * (1.0 - ksD))
+    p95 = float(np.percentile(dists, 95)) + 1e-12
+    wasser_scores = np.ones(npaths, dtype=DTYPE) * 100.0 if p95 <= 0 else 100.0 * (1.0 - np.clip(dists / p95, 0.0, 1.0))
+    sim_wass = float(np.mean(wasser_scores))
 
-    ts_index_map = {np.datetime64(int(t_int), 'ns'): i for i, t_int in enumerate(all_timestamps_int)}
-    max_dd_by_symbol = {}
-    final_balance_by_symbol = {}
-    for sym in symbols:
-        profits_series = np.zeros(len(all_timestamps_dt), dtype=np.float64)
-        for profit, t_close in zip(trades[sym], trade_times[sym]):
-            idx = ts_index_map.get(t_close)
-            if idx is None:
-                t_close_int = int(t_close.astype('int64'))
-                idx = int(np.searchsorted(all_timestamps_int, t_close_int, side='right') - 1)
-                if idx < 0:
-                    continue
-            profits_series[idx] += profit
-        equity = initial_balance + np.cumsum(profits_series)
-        if equity.size > 0:
-            cummax_sym = np.maximum.accumulate(equity)
-            drawdowns_sym = (cummax_sym - equity) / np.where(cummax_sym == 0, 1, cummax_sym)
-            max_dd_by_symbol[sym] = float(np.nanmax(drawdowns_sym))
-            final_balance_by_symbol[sym] = float(equity[-1])
-        else:
-            max_dd_by_symbol[sym] = 0.0
-            final_balance_by_symbol[sym] = float(initial_balance)
+    weights = np.array([0.20, 0.20, 0.10, 0.10, 0.10, 0.10, 0.20], dtype=DTYPE)
+    metrics = np.array([sim_mean, sim_std, sim_skew, sim_kurt, sim_acf, sim_ks, sim_wass], dtype=DTYPE)
+    score_total = float(np.sum(metrics * weights))
 
-    if len(sim_balance_cols['balance']) == 0:
-        sim_values = np.array([initial_balance], dtype=np.float64)
-    else:
-        sim_values = np.array(sim_balance_cols['balance'], dtype=np.float64)
+    if return_metrics:
+        return np.append(metrics, score_total)
+    return score_total
 
-    cummax = np.maximum.accumulate(sim_values)
-    drawdowns = (cummax - sim_values) / np.where(cummax == 0, 1, cummax)
-    max_dd_portfolio = float(np.nanmax(drawdowns)) if sim_values.size > 0 else 0.0
+# -----------------------------
+# OPTUNA PARA OPTIMIZACIÓN
+# -----------------------------
+def objective(trial, df_hist, n_paths, n_obs, n_substeps, min_price, timeframe, base_seed):
+    vol_scale = trial.suggest_float("vol_scale", 0.3, 1.0, step=0.05)
+    jump_prob_per_substep = trial.suggest_float("jump_prob_per_substep", 0.0, 0.030, step=0.0025)
+    jump_mu = trial.suggest_float("jump_mu", -0.02, 0.02, step=0.0025)
+    jump_sigma = trial.suggest_float("jump_sigma", 0.002, 0.024, step=0.002)
 
-    results = {}
-    for sym in symbols:
-        results[sym] = {
-            'df': None,
-            'trades': trades[sym],
-            'final_balance': final_balance_by_symbol[sym],
-            'num_signals': len(trades[sym]),
-            'proportion_winners': (np.nan if len(trades[sym]) == 0 else np.sum(np.array(trades[sym]) > 0.0) / len(trades[sym])),
-            'max_dd': max_dd_by_symbol[sym]
-        }
+    df_syn_list = generate_paths_for_symbol(
+        df_hist, n_paths=n_paths, n_obs=n_obs, n_substeps=n_substeps,
+        vol_scale=vol_scale, min_price=min_price,
+        jump_prob_per_substep=jump_prob_per_substep, jump_mu=jump_mu, jump_sigma=jump_sigma,
+        timeframe=timeframe, base_seed=base_seed
+    )
+    score = evaluate_synthetic_vs_real(df_hist, df_syn_list)
+    return score if score is not None else -np.inf
 
-    results["__PORTFOLIO__"] = {
-        'df': None,
-        'trades': all_trades,
-        'final_balance': final_balance,
-        'num_signals': num_signals_executed,
-        'proportion_winners': proportion_winners,
-        'max_dd': max_dd_portfolio,
-        'sim_balance_history': sim_balance_cols,  # dict de listas
-        'trade_log': pd.DataFrame(trade_log_cols)  # Crear DataFrame una sola vez al final
+def optimize_params_optuna(df_hist, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, seed: int = 42):
+    optuna.logging.set_verbosity(optuna.logging.CRITICAL)
+    sampler = optuna.samplers.TPESampler(seed=seed)
+    study = optuna.create_study(direction="maximize", sampler=sampler)
+    study.optimize(lambda trial: objective(trial, df_hist, n_paths, n_obs, n_substeps, min_price, timeframe, seed), n_trials=n_trials)
+    return study.best_params, study.best_value
+
+def optimize_for_symbol(symbol, ohlcv_data, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, base_seed: int = 42):
+    df_hist = ohlcv_data[symbol]
+    best_params, best_score = optimize_params_optuna(
+        df_hist, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, seed=base_seed
+    )
+    return symbol, best_params, best_score
+
+# -----------------------------
+# SUMMARY SCORE CON MÉTRICAS
+# -----------------------------
+def summary_score_all_paths(ohlcv_data, n_paths, n_obs, n_substeps, base_seed=42, DTYPE=np.float64):
+    """
+    Genera paths para todos los símbolos y devuelve un único score promedio ponderado
+    junto con la media de cada métrica individual.
+    """
+    scores = []
+    metrics_list = []
+
+    for symbol, df_hist in ohlcv_data.items():
+        df_syn_list = generate_paths_for_symbol(
+            df_hist, n_paths=n_paths, n_obs=n_obs, n_substeps=n_substeps,
+            vol_scale=1.0,
+            min_price=df_hist['close'].min(),
+            jump_prob_per_substep=0.01,
+            jump_mu=0.0,
+            jump_sigma=0.01,
+            timeframe='1H',
+            base_seed=base_seed
+        )
+
+        metrics = evaluate_synthetic_vs_real(df_hist, df_syn_list, return_metrics=True)
+        if metrics is not None:
+            metrics_list.append(metrics)
+            scores.append(metrics[-1])  # último = score_total
+
+    if len(scores) == 0:
+        return None
+
+    metrics_array = np.vstack(metrics_list)
+    mean_metrics = np.mean(metrics_array, axis=0)
+
+    return {
+        "score_total": float(np.mean(scores)),
+        "sim_mean": float(mean_metrics[0]),
+        "sim_std": float(mean_metrics[1]),
+        "sim_skew": float(mean_metrics[2]),
+        "sim_kurt": float(mean_metrics[3]),
+        "sim_acf": float(mean_metrics[4]),
+        "sim_ks": float(mean_metrics[5]),
+        "sim_wass": float(mean_metrics[6])
     }
-
-    return results
