@@ -189,7 +189,7 @@ def load_final_symbols(all_symbols,strategy="_",timeframe="10H"):
     folder = "symbols_live"
     try:
 
-        path_live    = os.path.join(folder, "symbols_live_{strategy}_{timeframe}.xlsx")
+        path_live    = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
         df_live      = pd.read_excel(path_live)
         live_symbols = set(df_live.iloc[:, 0].dropna().astype(str))
 

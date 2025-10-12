@@ -9,8 +9,9 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 
-from backtest_cy import run_grid_backtest_cy
+#from backtest_cy import run_grid_backtest_cy
 from ZX_analysis import report_backtesting
 from ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
@@ -25,27 +26,27 @@ SAVE_SYMBOLS = False
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-01-03"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 500_000
+MIN_VOL_USDT        = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 # =============================================================================
-# SELL_AFTER_LIST     = [10,15,20,25]
-# ENTROPY_MAX_LIST    = [0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,2.0]
-# ACCEL_SPAN_LIST     = [10,15,20]
-# 
-# TP_PCT_LIST         = [0,2.5,5,10]
-# SL_PCT_LIST         = [0,2.5,5,10]
+SELL_AFTER_LIST     = [10,15,20,25]
+ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
+ACCEL_SPAN_LIST     = [10,15,20]
+
+TP_PCT_LIST         = [0,2.5,5]
+SL_PCT_LIST         = [0,2.5,5]
 # =============================================================================
 
 # =============================================================================
-SELL_AFTER_LIST    = [10,20,30,40]
-ENTROPY_MAX_LIST   = [0.4,0.6,1.0,5.0]
-ACCEL_SPAN_LIST    = [5,10,15]
+SELL_AFTER_LIST    = [25]
+ENTROPY_MAX_LIST   = [0.6]
+ACCEL_SPAN_LIST    = [10]
 
-TP_PCT_LIST        = [0,5,10,15]
-SL_PCT_LIST        = [0,5,10,15]
+TP_PCT_LIST        = [0]
+SL_PCT_LIST        = [0]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -66,7 +67,7 @@ ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
     date_min=DATE_MIN
 )
 
-save_filtered_symbols(filtered_symbols, strategy="generic", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
+save_filtered_symbols(filtered_symbols, strategy="entropy", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_base = {}
 for sym, df in ohlcv_data.items():
@@ -91,7 +92,7 @@ def process_combo(comb):
         signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
-    results = run_grid_backtest_cy(
+    results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=params.get('SELL_AFTER', 10),
         initial_balance=INITIAL_BALANCE,

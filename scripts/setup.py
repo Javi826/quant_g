@@ -1,11 +1,8 @@
-# setup.py
 from setuptools import setup
 from Cython.Build import cythonize
-import numpy as np
+import numpy
 
 setup(
-    name="backtest_cy",
-    ext_modules=cythonize("backtest_cy.pyx", annotate=True, compiler_directives={'boundscheck': False, 'wraparound': False}),
-    include_dirs=[np.get_include()],
-    zip_safe=False,
+    ext_modules=cythonize("gridcore.pyx", compiler_directives={'language_level': "3"}),
+    include_dirs=[numpy.get_include()]
 )

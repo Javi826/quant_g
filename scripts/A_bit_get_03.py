@@ -11,15 +11,15 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 # CONFIGURATION
 # ----------------------
-TIMEFRAME            = '1H'
+TIMEFRAME            = '4H'
 ORDER_AMOUNT         = 100
 
-SELL_AFTER_N_CANDLES = 10
-ENTROPIA_MAX         = 1.2
+SELL_AFTER_N_CANDLES = 25
+ENTROPIA_MAX         = 0.6
 ACCEL_SPAN           = 10
 
-TP_PCT               = 15
-SL_PCT               = 10
+TP_PCT               = 0
+SL_PCT               = 0
 
 # ----------------------
 # FUNCTIONS
