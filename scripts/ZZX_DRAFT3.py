@@ -1,160 +1,238 @@
-import random
+import warnings
 import pandas as pd
 import numpy as np
-from numba import njit
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
+from sklearn.feature_selection import mutual_info_regression
 
-DTYPE = np.float32
+warnings.filterwarnings("ignore")
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.max_colwidth', None)
 
-# ============================================================
-# 1️⃣ Preprocesamiento: cálculo de features
-# ============================================================
-def compute_candle_features(df, raw_columns=[]):
+
+def report_backtesting(df, 
+                         parameters, 
+                         initial_capital=10000, 
+                         show_plots=False, 
+                         save_excel=False):
     df = df.copy()
 
-    # Porcentajes relativos vectorizados
-    df["pct_open_low"] = (df["low"] - df["open"]) / df["open"]
-    df["pct_open_high"] = (df["high"] - df["open"]) / df["open"]
-    df["pct_open_close"] = (df["close"] - df["open"]) / df["open"]
+    # -----------------------------
+    # Métricas derivadas
+    # -----------------------------
+    # Porcentaje sobre capital inicial
+    df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
 
-    if len(df.index) >= 2:
-        time_index = (df.index[1:] - df.index[:-1]).total_seconds()
-        mode = pd.Series(time_index).mode()[0]
-        time_index = np.insert(time_index, 0, mode)
+    # Beneficio por señal
+    df["Gain_signal"] = df["Net_Gain"] / df["Num_Signals"]
+    df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
+
+    # Ordenar por ganancia neta
+    df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
+    
+    # -----------------------------
+    # Mutual Information + Pearson correlation
+    # -----------------------------
+    if df_portfolio.empty or df_portfolio.shape[0] < 5:
+        print("\n⚠️ df_portfolio vacío o con <5 filas. Mutual Information y Pearson skipped.")
+        mi_series = pd.Series([None]*len(parameters), index=parameters)
+        pearson_series = pd.Series([None]*len(parameters), index=parameters)
     else:
-        time_index = np.zeros(len(df.index))
+        y = df_portfolio["Net_Gain"].values
+        X = df_portfolio[parameters].copy()
 
-    df["time_variation"] = time_index
+        # Flags de discreto (int o bool)
+        discrete_flags = [
+            X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer)
+            for col in X.columns
+        ]
 
-    # Diferencias de tiempo low/high
-    index_seconds = df.index.view(np.int64) // 10**9
-    low_seconds = pd.to_datetime(df["low_time"]).view(np.int64) // 10**9
-    high_seconds = pd.to_datetime(df["high_time"]).view(np.int64) // 10**9
-    df["var_low_time"] = (low_seconds - index_seconds).astype(float)
-    df["var_high_time"] = (high_seconds - index_seconds).astype(float)
+        # Convertir booleans a int para MI
+        X_mi = X.copy()
+        for col in X_mi.columns:
+            if X_mi[col].dtype == bool:
+                X_mi[col] = X_mi[col].astype(int)
 
-    df_raw = df[raw_columns].copy() if raw_columns else pd.DataFrame(index=df.index)
-    return df, df_raw
+        # Mutual Information
+        mi_values = mutual_info_regression(X_mi, y, discrete_features=discrete_flags, random_state=42)
+        mi_series = pd.Series(mi_values, index=parameters)
 
+        # Pearson correlation
+        pearson_values = []
+        for col in X.columns:
+            x_col = X[col].astype(int) if X[col].dtype == bool else X[col]
+            if x_col.nunique() > 1:
+                corr, _ = pearsonr(x_col, y)
+            else:
+                corr = np.nan
+            pearson_values.append(corr)
+        pearson_series = pd.Series(pearson_values, index=parameters)
 
-# ============================================================
-# 2️⃣ Núcleo numérico compilado con Numba
-# ============================================================
-@njit
-def _simulate_single_path_numba(sampled, start_price, start_timestamp):
-    """
-    Cálculo vectorizado de un solo path — compilado con Numba.
-    sampled: array (n_obs, n_features)
-    """
-    n_obs = sampled.shape[0]
-    open_prices = np.empty(n_obs, dtype=np.float64)
-    close_prices = np.empty(n_obs, dtype=np.float64)
-    low_prices = np.empty(n_obs, dtype=np.float64)
-    high_prices = np.empty(n_obs, dtype=np.float64)
-    times = np.empty(n_obs, dtype=np.float64)
-    low_times = np.empty(n_obs, dtype=np.float64)
-    high_times = np.empty(n_obs, dtype=np.float64)
-
-    open_price = start_price
-    current_time = start_timestamp
-
-    for t in range(n_obs):
-        pct_open_low  = sampled[t, 0]
-        pct_open_high = sampled[t, 1]
-        pct_open_close= sampled[t, 2]
-        time_var      = sampled[t, 3]
-        var_low_time  = sampled[t, 4]
-        var_high_time = sampled[t, 5]
-
-        current_time += time_var
-        times[t] = current_time
-        low_times[t]  = current_time + var_low_time
-        high_times[t] = current_time + var_high_time
-
-        close_price = open_price * (1.0 + pct_open_close)
-        low_price   = open_price * (1.0 + pct_open_low)
-        high_price  = open_price * (1.0 + pct_open_high)
-
-        if low_price > close_price:
-            low_price = close_price
-        if high_price < close_price:
-            high_price = close_price
-
-        open_prices[t]  = open_price
-        close_prices[t] = close_price
-        low_prices[t]   = low_price
-        high_prices[t]  = high_price
-
-        open_price = close_price
-
-    return open_prices, low_prices, high_prices, close_prices, times, low_times, high_times
-
-
-# ============================================================
-# 3️⃣ Función principal: genera múltiples paths con Numba
-# ============================================================
-def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], base_seed=42):
-    df_features, df_raw = compute_candle_features(df_hist, raw_columns)
-    n_rows = len(df_features)
-    if n_rows == 0 or n_obs == 0:
-        return []
-
-    # Construcción del array base
-    cols = [
-        df_features["pct_open_low"].to_numpy(np.float64),
-        df_features["pct_open_high"].to_numpy(np.float64),
-        df_features["pct_open_close"].to_numpy(np.float64),
-        df_features["time_variation"].to_numpy(np.float64),
-        df_features["var_low_time"].to_numpy(np.float64),
-        df_features["var_high_time"].to_numpy(np.float64)
+    # Mostrar análisis MI & Pearson
+    analysis_df = pd.DataFrame({
+        'Mutual_Information': mi_series,
+        'Pearson_Correlation': pearson_series
+    }).sort_values(by='Mutual_Information', ascending=False)
+    
+    #print("\n🔹 Analysis MI & Pearson:")
+    #print(analysis_df.round(2).to_string(index=False))
+         
+    metric_columns = [
+        'Net_Gain_pct', 
+        'Win_Ratio', 
+        'Num_Signals', 
+        'Gain_signal', 
+        'DD_pct'
     ]
-    for rc in raw_columns:
-        cols.append(df_raw[rc].to_numpy(np.float64))
 
-    data_array = np.column_stack(cols)
-    n_features = data_array.shape[1]
+    # Reorganizar columnas: parámetros primero, luego métricas
+    ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
+    df_portfolio = df_portfolio[ordered_columns]
 
-    start_price = float(df_features["open"].iloc[-1])
-    start_timestamp = df_features.index[-1].timestamp()  # segundos UNIX
+    # -----------------------------
+    # TOP COMBOS
+    # -----------------------------
+    df_top = df_portfolio.sort_values(by='Net_Gain_pct', ascending=False).head(3).copy()
+    df_top['Num_Signals'] = df_top['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+    
+    print("\n🥇 Top 3 combos by Net_Gain_pct:")
+    print(df_top.round(2).to_string(index=False))
 
-    paths = []
+    df_top_win = df_portfolio.sort_values(by='DD_pct', ascending=True).head(3).copy()
+    df_top_win['Num_Signals'] = df_top_win['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+    
+    print("\n🥇 Top 3 combos by DD_pct:")
+    print(df_top_win.round(2).to_string(index=False))
+    
+    # -----------------------------
+    # PLOTS
+    # -----------------------------
+    if show_plots:
+        # Histograma DD_pct
+        plt.figure(figsize=(10,6))
+        plt.hist(df_portfolio['DD_pct'].dropna(), bins=20, color='#2ca02c', edgecolor='black', alpha=0.7)
+        plt.xlabel("DD_pct")
+        plt.ylabel("Frequency")
+        plt.title("Distribution of Portfolio Drawdown")
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.show()
+        
+        # Histograma Net_Gain_pct
+        plt.figure(figsize=(10,6))
+        plt.hist(df_portfolio['Net_Gain_pct'].dropna(), bins=20, color='#1f77b4', edgecolor='black', alpha=0.7)
+        plt.xlabel("Net_Gain_pct (%)")
+        plt.ylabel("Frequency")
+        plt.title("Distribution of Portfolio Net Gain %")
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.show()
 
-    # ========================================================
-    # Bucle externo por path (Numba optimiza el interno)
-    # ========================================================
-    for i in range(n_paths):
-        rnd = random.Random(base_seed + i)
-        indices = np.array([rnd.randrange(n_rows) for _ in range(n_obs)], dtype=np.int64)
-        sampled = data_array[indices]
+        # Curvas por parámetro
+        win_ratio_scale = 100
+        colors = {'Net_Gain_pct':'blue', 'Win_Ratio':'green'}
+        for param in parameters:
+            grouped = df_portfolio.groupby(param).agg({
+                'Net_Gain': 'sum',
+                'Win_Ratio': 'mean'
+            }).reset_index()
+            grouped['Net_Gain_pct'] = grouped['Net_Gain'] / initial_capital * 100
+            grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * win_ratio_scale
+            
+            plt.figure(figsize=(8,5))
+            plt.plot(grouped[param], grouped['Net_Gain_pct'], marker='o', color=colors['Net_Gain_pct'], label='Net_Gain_pct')
+            plt.plot(grouped[param], grouped['Win_Ratio_scaled'], marker='o', color=colors['Win_Ratio'], label=f'Win_Ratio x {win_ratio_scale}')
+            plt.xlabel(param)
+            plt.ylabel('Value')
+            plt.title(f"{param} vs Portfolio Metrics")
+            plt.legend()
+            plt.grid(True, linestyle='--', alpha=0.5)
+            plt.show()
+                
+    return df_portfolio, mi_series
 
-        # Cálculo rápido con Numba
-        open_p, low_p, high_p, close_p, times_s, low_s, high_s = _simulate_single_path_numba(
-            sampled, start_price, start_timestamp
-        )
+def report_montecarlo(df_portfolio, param_names, initial_balance):
 
-        # Reconstrucción de fechas Pandas
-        times = pd.to_datetime(times_s, unit="s")
-        low_times = pd.to_datetime(low_s, unit="s")
-        high_times = pd.to_datetime(high_s, unit="s")
+    # -----------------------------
+    # RESUMEN POR COMBINACIÓN
+    # -----------------------------
+    summary_results = []
+    combos_present  = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
 
-        # Construcción del DataFrame
-        data_dict = {
-            "open": open_p,
-            "low": low_p,
-            "high": high_p,
-            "close": close_p,
-            "low_time": low_times,
-            "high_time": high_times
-        }
+    for comb in combos_present:
+        filt = np.ones(len(df_portfolio), dtype=bool)
+        for k, v in comb.items():
+            filt &= (df_portfolio[k] == v)
+        subset = df_portfolio[filt]
 
-        # Añadir raw columns (si las hay)
-        n_raw = n_features - 6
-        if n_raw > 0:
-            for idx_col, col_name in enumerate(raw_columns):
-                data_dict[col_name] = sampled[:, 6 + idx_col]
+        port_balances = subset['Portfolio_Final_Balance'].dropna()
+        port_dd = subset['DD'].dropna()
+        port_win_ratio = subset['Win_Ratio'].dropna() if 'Win_Ratio' in subset.columns else pd.Series(dtype=float)
 
-        df_path = pd.DataFrame(data_dict, index=times)
-        df_path.index.name = "time"
-        df_path = df_path.astype({c: DTYPE for c in ["open", "low", "high", "close"]}, copy=False)
-        paths.append(df_path)
+        if len(port_balances) > 0:
+            port_gain_abs          = port_balances - initial_balance
+            port_gain_pct          = (port_gain_abs / initial_balance) * 100
+            port_net_gain_mean     = port_gain_abs.mean()
+            port_net_gain_pct_mean = port_gain_pct.mean()
+        else:
+            port_net_gain_mean     = np.nan
+            port_net_gain_pct_mean = np.nan
 
-    return paths
+        port_dd_mean = port_dd.mean() if len(port_dd) > 0 else np.nan
+        port_win_ratio_mean = port_win_ratio.mean() if len(port_win_ratio) > 0 else np.nan
+
+        summary_results.append({
+            **comb,
+            "Net_Gain_m": port_net_gain_mean,
+            "Net_Gain_pct_m": port_net_gain_pct_mean,
+            "Win_Ratio_m": port_win_ratio_mean,
+            "DD_m": port_dd_mean,
+            "Paths_IDX": subset['path_index'].nunique() if 'path_index' in subset.columns else np.nan,
+            "Rows": len(subset)
+        })
+
+    df_summary = pd.DataFrame(summary_results).sort_values(by='Net_Gain_pct_m', ascending=False).reset_index(drop=True)
+
+    # -----------------------------
+    # HISTOGRAMS
+    # -----------------------------
+    group_cols = param_names
+    combo_grouped = df_portfolio.groupby(group_cols)['Portfolio_Final_Balance'].mean().reset_index()
+    combo_grouped['Net_Gain_pct_m'] = (combo_grouped['Portfolio_Final_Balance'] - initial_balance)/initial_balance*100
+
+    plt.figure(figsize=(10,6))
+    data1 = combo_grouped['Net_Gain_pct_m'].dropna()
+    plt.hist(data1, bins=50, edgecolor='black', color='#2ca02c', alpha=0.7)
+    plt.xlabel('Port Net Gain pct (mean per combination)')
+    plt.ylabel('Frequency')
+    plt.title('Distribution: Port Net Gain pct (mean per combination)')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.show()
+    plt.close()
+
+    path_grouped = df_portfolio.groupby('path_index')['Portfolio_Final_Balance'].mean().reset_index()
+    path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance)/initial_balance*100
+
+    plt.figure(figsize=(10,6))
+    data2 = path_grouped['Net_Gain_pct'].dropna()
+    plt.hist(data2, bins=max(10,min(50,len(data2))), edgecolor='white', color='#1f77b4')
+    plt.xlabel('Net Gain pct Portafolio (path_IDX)')
+    plt.ylabel('Frequency')
+    plt.title('Distribution: Net Gain pct Portafolio per Path_IDX')
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.show()
+    plt.close()
+
+    cols_to_show = [c for c in df_summary.columns if c not in ['Net_Gain_m','Rows']]
+
+    print('\n🎲 Top 3 combos per Net_Gain_pct_m:')
+    print(df_summary[cols_to_show].head(3).round(2).to_string(index=False))
+
+    print('\n🎲 Top 3 combos per Win_Ratio_m:')
+    print(df_summary.sort_values(by='Win_Ratio_m', ascending=False).head(3)[cols_to_show].round(2).to_string(index=False))
+
+    median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
+    print(f"\n🎲 P50 Net_Gain_pct per Path: {median_gain:.2f}%")
+
+    return df_summary
+

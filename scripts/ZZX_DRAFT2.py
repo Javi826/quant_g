@@ -1,88 +1,134 @@
-import random
+# === FILE: main_BACKTESTING_dual.py ===
+# --------------------------------------
+import os
+import time
 import numpy as np
 import pandas as pd
+from itertools import product
+from tqdm.auto import tqdm
+from tqdm_joblib import tqdm_joblib
+from joblib import Parallel, delayed
 
-DTYPE = np.float32
+# Importa ambas versiones de backtest
+from ZX_compute_BT import run_grid_backtest as run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+from backtest_cy import run_grid_backtest_cy
 
-def compute_candle_features(df, raw_columns=[]):
-    df = df.copy()
-    df["pct_open_low"]   = (df["low"] - df["open"]) / df["open"]
-    df["pct_open_high"]  = (df["high"] - df["open"]) / df["open"]
-    df["pct_open_close"] = (df["close"] - df["open"]) / df["open"]
+from ZX_analysis import report_backtesting
+from ZX_utils import filter_symbols, save_results, save_filtered_symbols
+from Z_add_signals_03 import add_indicators, explosive_signal
 
-    if len(df.index) >= 2:
-        time_index = (df.index[1:] - df.index[:-1]).total_seconds()
-        mode = pd.Series(time_index).mode()[0]
-        time_index = np.insert(time_index, 0, mode)
+# ---------------------------
+# CONFIGURACIÓN
+# ---------------------------
+DATA_FOLDER  = "data/crypto_2023_highlow_UPTO"
+DATE_MIN     = "2025-01-03"
+TIMEFRAME    = '4H'
+MIN_VOL_USDT = 500_000
+SAVE_SYMBOLS = False
+
+SELL_AFTER_LIST   = [10,20]
+ENTROPY_MAX_LIST  = [0.4,0.6]
+ACCEL_SPAN_LIST   = [5,10]
+TP_PCT_LIST       = [0,5]
+SL_PCT_LIST       = [0,5]
+
+param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
+lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
+
+# ---------------------------
+# CARGA Y FILTRADO DE DATOS
+# ---------------------------
+symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
+
+ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
+    symbols,
+    min_vol_usdt=MIN_VOL_USDT,
+    timeframe=TIMEFRAME,
+    data_folder=DATA_FOLDER,
+    min_price=MIN_PRICE,
+    vol_window=50,
+    date_min=DATE_MIN
+)
+
+save_filtered_symbols(filtered_symbols, strategy="generic", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
+
+ohlcv_base = {}
+for sym, df in ohlcv_data.items():
+    ohlcv_base[sym] = {
+        'ts': df.index.values.astype('datetime64[ns]'),
+        'open': df['open'].to_numpy(dtype=np.float64),
+        'high': df['high'].to_numpy(dtype=np.float64),
+        'low': df['low'].to_numpy(dtype=np.float64),
+        'close': df['close'].to_numpy(dtype=np.float64),
+        'volume': df['volume'].to_numpy(dtype=np.float64) if 'volume' in df.columns else np.zeros(len(df))
+    }
+
+# ---------------------------
+# FUNCIONES DE PROCESO
+# ---------------------------
+def process_combo(comb, version='py'):
+    params       = dict(zip(param_names, comb))
+    ohlcv_arrays = {}
+
+    for sym, arrs in ohlcv_base.items():
+        entropia, accel   = add_indicators(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
+        signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
+        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
+
+    if version == 'py':
+        return comb, run_grid_backtest(
+            ohlcv_arrays,
+            sell_after=params.get('SELL_AFTER', 10),
+            initial_balance=INITIAL_BALANCE,
+            order_amount=ORDER_AMOUNT,
+            tp_pct=params.get('TP_PCT', 0),
+            sl_pct=params.get('SL_PCT', 0),
+            comi_pct=0.05
+        )
     else:
-        time_index = np.zeros(len(df.index))
+        return comb, run_grid_backtest_cy(
+            ohlcv_arrays,
+            sell_after=params.get('SELL_AFTER', 10),
+            initial_balance=INITIAL_BALANCE,
+            order_amount=ORDER_AMOUNT,
+            tp_pct=params.get('TP_PCT', 0),
+            sl_pct=params.get('SL_PCT', 0),
+            comi_pct=0.05
+        )
 
-    df["time_variation"] = time_index
+# ---------------------------
+# GENERAR GRID
+# ---------------------------
+all_combinations = list(product(*lists_for_grid))
 
-    index_sec = df.index.view(np.int64) // 10**9
-    low_sec   = pd.to_datetime(df["low_time"]).view(np.int64) // 10**9
-    high_sec  = pd.to_datetime(df["high_time"]).view(np.int64) // 10**9
-    df["var_low_time"]  = (low_sec - index_sec).astype(float)
-    df["var_high_time"] = (high_sec - index_sec).astype(float)
+# ---------------------------
+# BACKTEST PARALIZADO PYTHON
+# ---------------------------
+start_time = time.time()
+with tqdm_joblib(tqdm(desc="🔁 Backtesting Python Grid...", total=len(all_combinations))) as progress:
+    py_results_list = Parallel(n_jobs=-1)(
+        delayed(process_combo)(comb, version='py') for comb in all_combinations
+    )
+elapsed_py = int(time.time() - start_time)
 
-    df_raw = df[raw_columns].copy() if raw_columns else pd.DataFrame(index=df.index)
-    return df, df_raw
+# ---------------------------
+# BACKTEST PARALIZADO CYTHON
+# ---------------------------
+start_time = time.time()
+with tqdm_joblib(tqdm(desc="🔁 Backtesting Cython Grid...", total=len(all_combinations))) as progress:
+    cy_results_list = Parallel(n_jobs=-1)(
+        delayed(process_combo)(comb, version='cy') for comb in all_combinations
+    )
+elapsed_cy = int(time.time() - start_time)
 
+# ---------------------------
+# VALIDACIÓN DE RESULTADOS
+# ---------------------------
+for ((comb_py, res_py), (comb_cy, res_cy)) in zip(py_results_list, cy_results_list):
+    assert comb_py == comb_cy, "Combinaciones diferentes"
+    final_py = res_py["__PORTFOLIO__"]["final_balance"]
+    final_cy = res_cy["__PORTFOLIO__"]["final_balance"]
+    if not np.isclose(final_py, final_cy, atol=1e-12):
+        print(f"⚠️ Diferencia detectada en {comb_py}: PY={final_py}, CY={final_cy}")
 
-def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], base_seed=42):
-    df_features, df_raw = compute_candle_features(df_hist, raw_columns)
-    n_rows = len(df_features)
-    if n_rows == 0 or n_obs == 0:
-        return np.empty((0, 0, 0))
-
-    cols = [
-        df_features["pct_open_low"].to_numpy(np.float64),
-        df_features["pct_open_high"].to_numpy(np.float64),
-        df_features["pct_open_close"].to_numpy(np.float64),
-        df_features["time_variation"].to_numpy(np.float64),
-        df_features["var_low_time"].to_numpy(np.float64),
-        df_features["var_high_time"].to_numpy(np.float64)
-    ]
-    for rc in raw_columns:
-        cols.append(df_raw[rc].to_numpy(np.float64))
-    data_array = np.column_stack(cols)
-
-    n_features = data_array.shape[1]
-    n_raw = n_features - 6
-    n_features_out = 6 + n_raw
-
-    start_price = float(df_features["open"].iloc[-1])
-    start_timestamp = df_features.index[-1].value // 10**9
-
-
-    paths_array = np.empty((n_paths, n_obs, n_features_out), dtype=np.float64)
-
-    for i in range(n_paths):
-        rnd = random.Random(base_seed + i)
-        indices = np.array([rnd.randrange(n_rows) for _ in range(n_obs)], dtype=np.int64)
-        sampled = data_array[indices]
-
-        pct_open_low, pct_open_high, pct_open_close = sampled[:, 0], sampled[:, 1], sampled[:, 2]
-
-        multipliers = 1.0 + pct_open_close
-        close_prices = start_price * np.cumprod(multipliers)
-        open_prices = np.empty_like(close_prices)
-        open_prices[0] = start_price
-        open_prices[1:] = close_prices[:-1]
-
-        low_prices  = np.minimum(open_prices * (1.0 + pct_open_low), close_prices)
-        high_prices = np.maximum(open_prices * (1.0 + pct_open_high), close_prices)
-
-        cumul_seconds = np.cumsum(sampled[:, 3])
-        times      = start_timestamp + cumul_seconds
-        low_times  = times + sampled[:, 4]
-        high_times = times + sampled[:, 5]
-
-        # stack completo
-        base_cols = [open_prices, low_prices, high_prices, close_prices, low_times, high_times]
-        if n_raw > 0:
-            for idx_col in range(n_raw):
-                base_cols.append(sampled[:, 6 + idx_col])
-        paths_array[i, :, :] = np.column_stack(base_cols)
-
-    return paths_array.astype(DTYPE, copy=False)
+print(f"✅ Backtests completados. Tiempo PY: {elapsed_py}s, Tiempo CY: {elapsed_cy}s")

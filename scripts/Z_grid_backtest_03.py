@@ -9,6 +9,8 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+
+from backtest_cy import run_grid_backtest_cy
 from ZX_analysis import report_backtesting
 from ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
@@ -22,26 +24,28 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-01-03"
-TIMEFRAME           = '1H'
-MIN_VOL_USDT        = 120_000
+TIMEFRAME           = '4H'
+MIN_VOL_USDT        = 500_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST     = [10,15,20,25]
-ENTROPY_MAX_LIST    = [1.0,1.5,2.0,2.5,3.0]
-ACCEL_SPAN_LIST     = [5,10,15]
-
-TP_PCT_LIST         = [0,5,10]
-SL_PCT_LIST         = [0,5,10]
+# =============================================================================
+# SELL_AFTER_LIST     = [10,15,20,25]
+# ENTROPY_MAX_LIST    = [0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,2.0]
+# ACCEL_SPAN_LIST     = [10,15,20]
+# 
+# TP_PCT_LIST         = [0,2.5,5,10]
+# SL_PCT_LIST         = [0,2.5,5,10]
+# =============================================================================
 
 # =============================================================================
-SELL_AFTER_LIST    = [20]
-ENTROPY_MAX_LIST   = [2]
-ACCEL_SPAN_LIST    = [5]
+SELL_AFTER_LIST    = [10,20,30,40]
+ENTROPY_MAX_LIST   = [0.4,0.6,1.0,5.0]
+ACCEL_SPAN_LIST    = [5,10,15]
 
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [5]
+TP_PCT_LIST        = [0,5,10,15]
+SL_PCT_LIST        = [0,5,10,15]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -87,7 +91,7 @@ def process_combo(comb):
         signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
-    results = run_grid_backtest(
+    results = run_grid_backtest_cy(
         ohlcv_arrays,
         sell_after=params.get('SELL_AFTER', 10),
         initial_balance=INITIAL_BALANCE,
@@ -106,7 +110,6 @@ all_combinations = list(product(*lists_for_grid))
 # -----------------------------------------------------------------------------
 # BACKTESTING PARALIZADO
 # -----------------------------------------------------------------------------
-
 with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=-1)(
         delayed(process_combo)(comb) for comb in all_combinations
@@ -130,6 +133,7 @@ for comb, results in grid_results_list:
     final_balance = float(port.get('final_balance', INITIAL_BALANCE))
     avg_trade     = np.nan if num_trades == 0 else np.mean(port['trades'])
     median_trade  = np.nan if num_trades == 0 else np.median(port['trades'])
+    sharpe_ratio  = float(port.get('sharpe', np.nan))  # ADDED SHARPE
 
     row = {param: value for param, value in zip(param_names, comb)}
     row.update({
@@ -142,16 +146,17 @@ for comb, results in grid_results_list:
         "Win_Ratio": float(win_ratio) if not pd.isna(win_ratio) else np.nan,
         "Avg_Trade": float(avg_trade) if not pd.isna(avg_trade) else np.nan,
         "Median_Trade": float(median_trade) if not pd.isna(median_trade) else np.nan,
-        "DD_pct": float(dd_pct)
+        "DD_pct": float(dd_pct),
+        "Sharpe": sharpe_ratio  # ADDED SHARPE
     })
     grid_records.append(row)
 
-grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct"])
+grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct", "Sharpe"])  # ADDED SHARPE
 
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
-save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_generic_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
+save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
 
 print(f"TIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")

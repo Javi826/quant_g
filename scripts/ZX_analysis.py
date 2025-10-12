@@ -83,7 +83,7 @@ def report_backtesting(df,
         'Net_Gain_pct', 
         'Win_Ratio', 
         'Num_Signals', 
-        'Gain_signal', 
+        'Sharpe', 
         'DD_pct'
     ]
 
@@ -100,10 +100,10 @@ def report_backtesting(df,
     print("\n🥇 Top 3 combos by Net_Gain_pct:")
     print(df_top.round(2).to_string(index=False))
 
-    df_top_win = df_portfolio.sort_values(by='DD_pct', ascending=True).head(3).copy()
+    df_top_win = df_portfolio.sort_values(by='Sharpe', ascending=False).head(3).copy()
     df_top_win['Num_Signals'] = df_top_win['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     
-    print("\n🥇 Top 3 combos by DD_pct:")
+    print("\n🥇 Top 3 combos by Sharpe:")
     print(df_top_win.round(2).to_string(index=False))
     
     # -----------------------------
@@ -152,12 +152,15 @@ def report_backtesting(df,
     return df_portfolio, mi_series
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
 
     # -----------------------------
     # RESUMEN POR COMBINACIÓN
     # -----------------------------
     summary_results = []
-    combos_present  = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
+    combos_present = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
 
     for comb in combos_present:
         filt = np.ones(len(df_portfolio), dtype=bool)
@@ -166,20 +169,22 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
         subset = df_portfolio[filt]
 
         port_balances = subset['Portfolio_Final_Balance'].dropna()
-        port_dd = subset['DD'].dropna()
+        port_dd       = subset['DD'].dropna() if 'DD' in subset.columns else pd.Series(dtype=float)
         port_win_ratio = subset['Win_Ratio'].dropna() if 'Win_Ratio' in subset.columns else pd.Series(dtype=float)
+        port_sharpe   = subset['Sharpe'].dropna() if 'Sharpe' in subset.columns else pd.Series(dtype=float)
 
         if len(port_balances) > 0:
-            port_gain_abs          = port_balances - initial_balance
-            port_gain_pct          = (port_gain_abs / initial_balance) * 100
-            port_net_gain_mean     = port_gain_abs.mean()
+            port_gain_abs = port_balances - initial_balance
+            port_gain_pct = (port_gain_abs / initial_balance) * 100
+            port_net_gain_mean = port_gain_abs.mean()
             port_net_gain_pct_mean = port_gain_pct.mean()
         else:
-            port_net_gain_mean     = np.nan
+            port_net_gain_mean = np.nan
             port_net_gain_pct_mean = np.nan
 
         port_dd_mean = port_dd.mean() if len(port_dd) > 0 else np.nan
         port_win_ratio_mean = port_win_ratio.mean() if len(port_win_ratio) > 0 else np.nan
+        port_sharpe_mean = port_sharpe.mean() if len(port_sharpe) > 0 else np.nan
 
         summary_results.append({
             **comb,
@@ -187,6 +192,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
             "Net_Gain_pct_m": port_net_gain_pct_mean,
             "Win_Ratio_m": port_win_ratio_mean,
             "DD_m": port_dd_mean,
+            "Sharpe_m": port_sharpe_mean,
             "Paths_IDX": subset['path_index'].nunique() if 'path_index' in subset.columns else np.nan,
             "Rows": len(subset)
         })
@@ -194,22 +200,8 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     df_summary = pd.DataFrame(summary_results).sort_values(by='Net_Gain_pct_m', ascending=False).reset_index(drop=True)
 
     # -----------------------------
-    # HISTOGRAMS
+    # HISTOGRAMAS
     # -----------------------------
-    group_cols = param_names
-    combo_grouped = df_portfolio.groupby(group_cols)['Portfolio_Final_Balance'].mean().reset_index()
-    combo_grouped['Net_Gain_pct_m'] = (combo_grouped['Portfolio_Final_Balance'] - initial_balance)/initial_balance*100
-
-    plt.figure(figsize=(10,6))
-    data1 = combo_grouped['Net_Gain_pct_m'].dropna()
-    plt.hist(data1, bins=50, edgecolor='black', color='#2ca02c', alpha=0.7)
-    plt.xlabel('Port Net Gain pct (mean per combination)')
-    plt.ylabel('Frequency')
-    plt.title('Distribution: Port Net Gain pct (mean per combination)')
-    plt.grid(True, linestyle='--', alpha=0.5)
-    plt.show()
-    plt.close()
-
     path_grouped = df_portfolio.groupby('path_index')['Portfolio_Final_Balance'].mean().reset_index()
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance)/initial_balance*100
 
@@ -223,17 +215,25 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     plt.show()
     plt.close()
 
+    # -----------------------------
+    # TOP 3 COMBOS
+    # -----------------------------
     cols_to_show = [c for c in df_summary.columns if c not in ['Net_Gain_m','Rows']]
-
+    
+    SHARPE_ADJUSTMENT_FACTOR = 1e6
+    
+    df_summary['Sharpe_m'] = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
     print('\n🎲 Top 3 combos per Net_Gain_pct_m:')
     print(df_summary[cols_to_show].head(3).round(2).to_string(index=False))
+    
 
-    print('\n🎲 Top 3 combos per Win_Ratio_m:')
-    print(df_summary.sort_values(by='Win_Ratio_m', ascending=False).head(3)[cols_to_show].round(2).to_string(index=False))
+    print('\n🎲 Top 3 combos per Sharpe_m:')
+    print(df_summary.sort_values(by='Sharpe_m', ascending=False).head(3)[cols_to_show].round(2).to_string(index=False))
 
     median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
     print(f"\n🎲 P50 Net_Gain_pct per Path: {median_gain:.2f}%")
 
     return df_summary
+
 
 
