@@ -336,15 +336,18 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50, return_metri
     hist_rets = hist_rets_full[-min_len:]
     syn_array = np.vstack([r[-min_len:].astype(DTYPE, copy=False) for r in syn_rets_list])
 
-    hist_mean = float(np.mean(hist_rets))
-    hist_std  = float(np.std(hist_rets, ddof=1)) if min_len > 1 else 0.0
-    hist_skew = float(skew(hist_rets, bias=False))
-    hist_kurt = float(kurtosis(hist_rets, bias=False))
+    hist_mean = float(np.nanmean(hist_rets))
+    hist_std  = float(np.nanstd(hist_rets, ddof=1)) if min_len > 1 else 0.0
+    hist_skew = float(skew(hist_rets, bias=False, nan_policy='omit') if len(hist_rets) > 2 else 0.0)
+    hist_kurt = float(kurtosis(hist_rets, bias=False, nan_policy='omit') if len(hist_rets) > 3 else 0.0)
+    
+    syn_means = np.nanmean(syn_array, axis=1)
+    syn_stds  = np.nanstd(syn_array, axis=1, ddof=1)
+    syn_skews = skew(syn_array, axis=1, bias=False, nan_policy='omit')
+    syn_skews = np.nan_to_num(syn_skews, nan=0.0)
+    syn_kurts = kurtosis(syn_array, axis=1, bias=False, nan_policy='omit')
+    syn_kurts = np.nan_to_num(syn_kurts, nan=0.0)
 
-    syn_means = np.mean(syn_array, axis=1)
-    syn_stds  = np.std(syn_array, axis=1, ddof=1) if syn_array.shape[1] > 1 else np.zeros(syn_array.shape[0], dtype=DTYPE)
-    syn_skews = skew(syn_array, axis=1, bias=False)
-    syn_kurts = kurtosis(syn_array, axis=1, bias=False)
 
     sim_mean = 100.0 * max(0.0, 1.0 - abs(hist_mean - float(np.mean(syn_means))) / (abs(hist_std) + EPS))
     sim_std  = 100.0 / (1.0 + abs(hist_std - float(np.mean(syn_stds))) / (abs(hist_std) + 1e-8))

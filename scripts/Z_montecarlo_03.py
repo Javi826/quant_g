@@ -22,18 +22,20 @@ start_time = time.time()
 # MONTECARLO
 # -----------------------------
 OPTUNA_N_PATHS       = 50
-FINAL_N_PATHS        = 50
+FINAL_N_PATHS        = 200
 FINAL_N_OBS_PER_PATH = 1000
-FINAL_N_SUBSTEPS     = 1
+FINAL_N_SUBSTEPS     = 5
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
+
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-06-03"
-TIMEFRAME           = '1H'
-MIN_VOL_USDT        = 120_000
+TIMEFRAME           = '4H'
+MIN_VOL_USDT        = 50_000
+N_JOBS              = 8
 
 # -----------------------------
 # GRID 
@@ -46,12 +48,14 @@ TP_PCT_LIST         = [0,5,10,20]
 SL_PCT_LIST         = [0,5,10,20]
 
 # =============================================================================
-SELL_AFTER_LIST    = [20,30]
-ENTROPY_MAX_LIST   = [1,2]
-ACCEL_SPAN_LIST    = [5,10]
-
-TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [0,5]
+# =============================================================================
+# SELL_AFTER_LIST    = [20,30]
+# ENTROPY_MAX_LIST   = [1,2]
+# ACCEL_SPAN_LIST    = [5,10]
+# 
+# TP_PCT_LIST        = [0,5]
+# SL_PCT_LIST        = [0,5]
+# =============================================================================
 # =============================================================================
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -171,7 +175,7 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
         all_results.append(portfolio_record)
     return all_results
 
-def parallel_with_progress(tasks, desc: str, n_jobs: int = -1):
+def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
     with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
         return Parallel(n_jobs=n_jobs)(tasks)
 
@@ -228,10 +232,7 @@ unicoprint_score = summary_score_all_paths(
     DTYPE=DTYPE
 )
 
-# Score total
 print(f"\n🟢 UNICO SCORE MONTECARLO: {unicoprint_score['score_total']:.4f}")
-
-# Opcional: imprimir métricas individuales
 print("🔹 Métricas promedio por símbolo:")
 print(f"Mean : {unicoprint_score['sim_mean']:.4f}")
 print(f"Std  : {unicoprint_score['sim_std']:.4f}")
