@@ -5,4 +5,4 @@ env_quant/
 *.pt
 __pycache__/
 
-scripts/utils/ZZ_connect_03.py
+utils/ZZ_connect_03.py
