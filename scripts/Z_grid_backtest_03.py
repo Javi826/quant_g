@@ -34,17 +34,19 @@ SELL_AFTER_LIST     = [10,15,20,25]
 ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
 ACCEL_SPAN_LIST     = [10,15,20]
 
-TP_PCT_LIST         = [0,2.5,5]
-SL_PCT_LIST         = [0,2.5,5]
+TP_PCT_LIST         = [5,10,15]
+SL_PCT_LIST         = [5,10,15]
 
 
 # =============================================================================
-SELL_AFTER_LIST    = [25]
-ENTROPY_MAX_LIST   = [0.6]
-ACCEL_SPAN_LIST    = [10]
-
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [0]
+# =============================================================================
+# SELL_AFTER_LIST    = [25]
+# ENTROPY_MAX_LIST   = [0.6]
+# ACCEL_SPAN_LIST    = [10]
+# 
+# TP_PCT_LIST        = [0]
+# SL_PCT_LIST        = [0]
+# =============================================================================
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -157,7 +159,7 @@ grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Ne
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
 
-print(f"TIMEFRAME        : {TIMEFRAME}")
+print(f"\nTIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
 print(f"DATE_MIN         : {DATE_MIN}")
 print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")

@@ -20,7 +20,7 @@ start_time = time.time()
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS          = 10
+FINAL_N_PATHS          = 100
 FINAL_N_OBS_PER_PATH   = 3000
 TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -30,7 +30,7 @@ TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]'
 DATA_FOLDER            = "data/crypto_2023_highlow_UPTO"
 DATE_MIN               = "2025-01-03"
 TIMEFRAME              = '4H'
-MIN_VOL_USDT           = 500_000
+MIN_VOL_USDT           = 50_000
 N_JOBS                 = -1
 
 # -----------------------------
@@ -42,8 +42,20 @@ HAMMER_LIST            = [True, False]
 SHOOTING_STAR_LIST     = [True, False]
 BULLISH_ENGULFING_LIST = [True, False]
 BEARISH_ENGULFING_LIST = [True, False]
-TP_PCT_LIST            = [0, 5]
-SL_PCT_LIST            = [0, 5]
+TP_PCT_LIST            = [0,15]
+SL_PCT_LIST            = [0,15]
+
+# -----------------------------
+# GRID DE PARÁMETROS
+# -----------------------------
+SELL_AFTER_LIST        = [20]
+DOJI_LIST              = [False]
+HAMMER_LIST            = [False]
+SHOOTING_STAR_LIST     = [False]
+BULLISH_ENGULFING_LIST = [True]
+BEARISH_ENGULFING_LIST = [False]
+TP_PCT_LIST            = [15]
+SL_PCT_LIST            = [0]
 
 param_names = ['SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR','BULLISH_ENGULFING', 'BEARISH_ENGULFING', 'TP_PCT', 'SL_PCT']
 

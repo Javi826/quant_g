@@ -19,10 +19,10 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "data/crypto_2023_highlow_UPTO"
-DATE_MIN     = "2025-01-03"
-TIMEFRAME    = '1H'
-MIN_VOL_USDT = 12_000
+DATA_FOLDER  = "data/crypto_2023_highlow_ONWARDS"
+DATE_MIN     = "2025-06-03"
+TIMEFRAME    = '4H'
+MIN_VOL_USDT = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
@@ -33,8 +33,21 @@ HAMMER_LIST            = [True, False]
 SHOOTING_STAR_LIST     = [True, False]
 BULLISH_ENGULFING_LIST = [True, False]
 BEARISH_ENGULFING_LIST = [True, False]
+
 TP_PCT_LIST            = [0,5,10,15]
 SL_PCT_LIST            = [0,5,10,15]
+
+# -----------------------------
+# GRID DE PARÁMETROS
+# -----------------------------
+SELL_AFTER_LIST        = [20]
+DOJI_LIST              = [False]
+HAMMER_LIST            = [False]
+SHOOTING_STAR_LIST     = [False]
+BULLISH_ENGULFING_LIST = [True]
+BEARISH_ENGULFING_LIST = [False]
+TP_PCT_LIST            = [15]
+SL_PCT_LIST            = [0]
 
 param_names = ['SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR','BULLISH_ENGULFING', 'BEARISH_ENGULFING', 'TP_PCT', 'SL_PCT']
 
@@ -156,7 +169,7 @@ grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Ne
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx", save=False)
 
-print(f"TIMEFRAME        : {TIMEFRAME}")
+print(f"\nTIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
 print(f"DATE_MIN         : {DATE_MIN}")
 print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")

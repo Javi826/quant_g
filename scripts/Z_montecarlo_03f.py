@@ -20,7 +20,7 @@ start_time = time.time()
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS        = 10
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = 3000
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -30,7 +30,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-01-03"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 500_000
+MIN_VOL_USDT        = 50_000
 N_JOBS              = -1
 
 # -----------------------------
@@ -44,12 +44,14 @@ TP_PCT_LIST         = [0,2.5,5]
 SL_PCT_LIST         = [0,2.5,5]
 
 # =============================================================================
-SELL_AFTER_LIST    = [25,30]
-ENTROPY_MAX_LIST   = [0.6,1.0]
-ACCEL_SPAN_LIST    = [5,10]
-
-TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [0,5]
+# =============================================================================
+# SELL_AFTER_LIST    = [25,30]
+# ENTROPY_MAX_LIST   = [0.6,1.0]
+# ACCEL_SPAN_LIST    = [5,10]
+# 
+# TP_PCT_LIST        = [0,5]
+# SL_PCT_LIST        = [0,5]
+# =============================================================================
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
