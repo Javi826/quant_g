@@ -1,5 +1,5 @@
 import ccxt
-
+#ENTROPY
 # -----------------------------
 # BITGET CONFIG
 # -----------------------------
@@ -8,11 +8,11 @@ import ccxt
 # -----------------------------
 # CONNECTION AND SYMBOLS
 # -----------------------------
-def connect_bitget():
+def connect_bitget_03():
     exchange = ccxt.bitget({
-        'apiKey': BITGET_API_KEY,
-        'secret': BITGET_API_SECRET,
-        'password': BITGET_API_PASS,
+        'apiKey': BITGET_API_KEY_03,
+        'secret': BITGET_API_SECRET_03,
+        'password': BITGET_API_PASS_03,
         'enableRateLimit': True,
         'options': {
             'defaultType': 'swap',      

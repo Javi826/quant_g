@@ -20,23 +20,23 @@ start_time = time.time()
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS          = 40
-FINAL_N_OBS_PER_PATH   = 1000
+FINAL_N_PATHS          = 50
+FINAL_N_OBS_PER_PATH   = 3000
 TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-DATA_FOLDER            = "data/crypto_2023_highlow_UPTO"
+DATA_FOLDER            = "data/crypto_2023_UPTO"
 DATE_MIN               = "2025-01-03"
 TIMEFRAME              = '4H'
-MIN_VOL_USDT           = 50_000
+MIN_VOL_USDT           = 800_000
 N_JOBS                 = -1
 
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
-SELL_AFTER_LIST        = [5,10,15,20]
+SELL_AFTER_LIST        = [15,20,25,30,35]
 
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
@@ -49,9 +49,7 @@ DARK_CLOUD_COVER_LIST  = [True, False]
 TP_PCT_LIST            = [0,15]
 SL_PCT_LIST            = [0,15]
 
-# -----------------------------
-# GRID DE PARÁMETROS
-# -----------------------------
+# =============================================================================
 # =============================================================================
 # SELL_AFTER_LIST        = [20]
 # DOJI_LIST              = [False]
@@ -59,8 +57,12 @@ SL_PCT_LIST            = [0,15]
 # SHOOTING_STAR_LIST     = [False]
 # BULLISH_ENGULFING_LIST = [True]
 # BEARISH_ENGULFING_LIST = [False]
-# TP_PCT_LIST            = [15]
+# PIERCING_LINE_LIST     = [False]
+# DARK_CLOUD_COVER_LIST  = [False]
+# 
+# TP_PCT_LIST            = [0]
 # SL_PCT_LIST            = [0]
+# =============================================================================
 # =============================================================================
 
 param_names = [

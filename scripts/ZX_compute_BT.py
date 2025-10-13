@@ -3,7 +3,6 @@ import logging
 import warnings
 import numpy as np
 import pandas as pd
-from numba import njit
 
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")

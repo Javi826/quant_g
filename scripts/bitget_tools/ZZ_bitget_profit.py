@@ -1,11 +1,5 @@
-"""
-Complete script:
-- Winrate of closed positions (history-position)
-- Total profitability using real USDT balance (CCXT)
-- Date filter
-"""
-
-import ccxt
+import os
+import sys
 import requests
 import hmac
 import hashlib
@@ -13,18 +7,19 @@ import base64
 import time
 from typing import List, Dict, Any
 from datetime import datetime
-from ZZ_connect_03 import connect_bitget,BITGET_API_KEY,BITGET_API_SECRET,BITGET_API_PASS
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from utils.ZZ_connect import connect_bitget_03,BITGET_API_KEY_03,BITGET_API_SECRET_03,BITGET_API_PASS_03
 
 # -----------------------------
 # BITGET CONFIGURATION
 # -----------------------------
-BASE_URL = "https://api.bitget.com"
-INITIAL_CAPITAL = 840.0  # Initial capital for profitability calculation
+BASE_URL        = "https://api.bitget.com"
+INITIAL_CAPITAL = 511.0  # Initial capital for profitability calculation
 
 # -----------------------------
 # Connect with CCXT
 # -----------------------------
-exchange = connect_bitget()
+exchange = connect_bitget_03()
 
 def get_usdt_balance_total(exchange):
     """Returns the total USDT balance including used in open positions"""
@@ -47,7 +42,7 @@ def sign_request(timestamp: str, method: str, request_path: str, query_string: s
     if query_string:
         to_sign += "?" + query_string
     to_sign += body
-    signature = hmac.new(BITGET_API_SECRET.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
+    signature = hmac.new(BITGET_API_SECRET_03.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
     return base64.b64encode(signature).decode()
 
 def make_get(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -58,9 +53,9 @@ def make_get(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
     timestamp = str(int(time.time() * 1000))
     sign = sign_request(timestamp, "GET", endpoint, qs, "")
     headers = {
-        "ACCESS-KEY": BITGET_API_KEY,
+        "ACCESS-KEY": BITGET_API_KEY_03,
         "ACCESS-SIGN": sign,
-        "ACCESS-PASSPHRASE": BITGET_API_PASS,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_03,
         "ACCESS-TIMESTAMP": timestamp,
         "Content-Type": "application/json"
     }
@@ -139,7 +134,7 @@ def calculate_winrate_from_history(history: List[Dict[str, Any]]):
 # -----------------------------
 if __name__ == "__main__":
     # Start date for filtering
-    start_date = "2025-09-23"  # change as needed
+    start_date = "2025-10-01"  # change as needed
     start_time = date_to_timestamp_ms(start_date)
 
     # End date always today

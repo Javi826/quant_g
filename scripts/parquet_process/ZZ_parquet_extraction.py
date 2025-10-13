@@ -13,7 +13,7 @@ PRODUCT_TYPE           = "usdt-futures"
 
 TIMEFRAME              = "4H"          
 LIMIT                  = 200           
-DATA_FOLDER            = "Crypto_2021"
+DATA_FOLDER            = "crypto_2021"
 START_DATE             = "2021-01-02"  
 REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06  
@@ -29,7 +29,6 @@ def sanitize_filename(name):
     """Sanitiza nombre de fichero quitando caracteres peligrosos y espacios."""
     safe = re.sub(r'[^\w\-_\. ]', '_', name)
     return safe.strip()
-
 
 def parse_timeframe_to_ms(tf):
     """

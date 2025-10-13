@@ -1,19 +1,30 @@
-from pathlib import Path
 import os
-import pandas as pd
 import sys
+import pandas as pd
+from pathlib import Path
 
-# -----------------------------
-# CONFIGURATION
-# -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent  # sube un nivel desde la carpeta del script
+# Carpeta donde está este script
+CURRENT_DIR = Path(__file__).resolve().parent
 
-SOURCE_FOLDER = BASE_DIR / "crypto_2023_highlow"
-END_DATE      = "2025-06-01"
-START_DATE    = "2025-06-02"
+# Carpeta al mismo nivel que CURRENT_DIR
+BASE_DIR = CURRENT_DIR.parent
 
-TARGET_FOLDER_UPTO    = BASE_DIR / f"{SOURCE_FOLDER.name}_UPTO"
-TARGET_FOLDER_ONWARDS = BASE_DIR / f"{SOURCE_FOLDER.name}_ONWARDS"
+# Nombre de la carpeta que quieres leer
+FOLDER_NAME = "crypto_2021"
+
+# Ruta a la carpeta dentro de "data"
+SOURCE_FOLDER = BASE_DIR / "data" / FOLDER_NAME
+
+# Fechas
+END_DATE   = "2025-01-01"
+START_DATE = "2025-01-02"
+
+# Carpetas destino (al mismo nivel que "data")
+TARGET_FOLDER_UPTO    = BASE_DIR / f"{FOLDER_NAME}_UPTO"
+TARGET_FOLDER_ONWARDS = BASE_DIR / f"{FOLDER_NAME}_ONWARDS"
+
+print("SOURCE_FOLDER:", SOURCE_FOLDER)
+print("Existe SOURCE_FOLDER?", SOURCE_FOLDER.exists())
 
 
 os.makedirs(TARGET_FOLDER_UPTO, exist_ok=True)

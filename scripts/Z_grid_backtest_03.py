@@ -15,16 +15,16 @@ from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
 from Z_add_signals_03 import add_indicators, explosive_signal
 
-start_time = time.time()
+start_time   = time.time()
 SAVE_SYMBOLS = False
-
+STRATEGY     ="entropy"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
-DATE_MIN            = "2025-06-03"
+DATA_FOLDER         = "data/crypto_2023_UPTO"
+DATE_MIN            = "2025-01-03"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 50_000
+MIN_VOL_USDT        = 500_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
@@ -34,16 +34,18 @@ SELL_AFTER_LIST     = [10,15,20,25]
 ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
 ACCEL_SPAN_LIST     = [10,15,20]
 
-TP_PCT_LIST         = [5,10,15]
-SL_PCT_LIST         = [5,10,15]
+TP_PCT_LIST         = [10,15]
+SL_PCT_LIST         = [10,15]
 
 # =============================================================================
-SELL_AFTER_LIST    = [20,25,30]
-ENTROPY_MAX_LIST   = [0.6,1.0,1.5]
-ACCEL_SPAN_LIST    = [5,10,15]
-
-TP_PCT_LIST        = [0,15,20]
-SL_PCT_LIST        = [0,15,20]
+# =============================================================================
+# SELL_AFTER_LIST    = [20,25,30]
+# ENTROPY_MAX_LIST   = [0.6,1.0,1.5]
+# ACCEL_SPAN_LIST    = [5,10,15]
+# 
+# TP_PCT_LIST        = [0,15,20]
+# SL_PCT_LIST        = [0,15,20]
+# =============================================================================
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -64,7 +66,7 @@ ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
     date_min=DATE_MIN
 )
 
-save_filtered_symbols(filtered_symbols, strategy="entropy", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
+save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_base = {}
 for sym, df in ohlcv_data.items():

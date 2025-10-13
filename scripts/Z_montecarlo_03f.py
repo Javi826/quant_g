@@ -27,7 +27,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------
 # CONFIGURATION
 # -----------------------------
-DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
+DATA_FOLDER         = "data/crypto_2023_UPTO"
 DATE_MIN            = "2025-01-03"
 TIMEFRAME           = '4H'
 MIN_VOL_USDT        = 50_000

@@ -76,8 +76,10 @@ def report_backtesting(df,
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
     
-    #print("\n🔹 Analysis MI & Pearson:")
-    #print(analysis_df.round(2).to_string(index=False))
+# =============================================================================
+#     print("\n🔹 Analysis MI & Pearson:")
+#     print(analysis_df.round(2).to_string(index=False))
+# =============================================================================
          
     metric_columns = [
         'Net_Gain_pct', 

@@ -1,9 +1,13 @@
+import sys
+import os
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from utils.ZZ_connect_03 import connect_bitget
-from parquet_process.ZZ_parquet_extraction import get_futures_symbols_from_api,_call_history_candles,to_dataframe_from_api
-from Z_add_signals_04 import add_indicators, explosive_signal  # <-- Cambiado a 04
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from utils.ZZ_connect import connect_bitget
+from parquet_process.ZZ_parquet_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
+from Z_add_signals_04 import add_indicators, explosive_signal
 from utils.ZX_utils import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv, send_request, PRODUCT_TYPE
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
@@ -11,12 +15,12 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 # CONFIGURACIÓN GENERAL
 # ----------------------
-TIMEFRAME            = '4H'
-ORDER_AMOUNT         = 100
+TIMEFRAME              = '4H'
+ORDER_AMOUNT           = 100
 
-SELL_AFTER_N_CANDLES = 20
-TP_PCT               = 50
-SL_PCT               = 50
+SELL_AFTER_N_CANDLES   = 20
+TP_PCT                 = 50
+SL_PCT                 = 50
 
 # ----------------------
 # CONFIGURACIÓN DE PATRONES
@@ -64,7 +68,7 @@ def check_latest_signal(df, symbol):
 # ----------------------
 exchange       = connect_bitget()
 all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
-final_symbols  = load_final_symbols(all_symbols,strategy="entropy",timeframe=TIMEFRAME)
+final_symbols  = load_final_symbols(all_symbols,strategy="patterns",timeframe=TIMEFRAME)
 open_positions = []
 
 while True:

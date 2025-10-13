@@ -13,21 +13,22 @@ from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 from Z_add_signals_04 import add_indicators, explosive_signal
 
-start_time = time.time()
+start_time   = time.time()
 SAVE_SYMBOLS = False
-
+STRATEGY     ="patterns"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "data/crypto_2023_highlow_UPTO"
-DATE_MIN     = "2025-06-03"
-TIMEFRAME    = '4H'
-MIN_VOL_USDT = 500_000
+DATA_FOLDER            = "data/crypto_2023_UPTO"
+DATE_MIN               = "2025-01-03"
+TIMEFRAME              = '4H'
+MIN_VOL_USDT           = 800_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST        = [5,10,15,20]
+SELL_AFTER_LIST        = [20,25,30,35]
+
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
 SHOOTING_STAR_LIST     = [True, False]
@@ -36,23 +37,26 @@ BEARISH_ENGULFING_LIST = [True, False]
 PIERCING_LINE_LIST     = [True, False]
 DARK_CLOUD_COVER_LIST  = [True, False]
 
-TP_PCT_LIST            = [0,5,10,15]
-SL_PCT_LIST            = [0,5,10,15]
+TP_PCT_LIST            = [0,10,15]
+SL_PCT_LIST            = [0,10,15]
 
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
 # =============================================================================
-SELL_AFTER_LIST        = [30]
-DOJI_LIST              = [False]
-HAMMER_LIST            = [True]
-SHOOTING_STAR_LIST     = [True]
-BULLISH_ENGULFING_LIST = [True]
-BEARISH_ENGULFING_LIST = [True]
-PIERCING_LINE_LIST     = [False]
-DARK_CLOUD_COVER_LIST  = [True]
-TP_PCT_LIST            = [0]
-SL_PCT_LIST            = [0]
+# =============================================================================
+# SELL_AFTER_LIST        = [20]
+# DOJI_LIST              = [False]
+# HAMMER_LIST            = [False]
+# SHOOTING_STAR_LIST     = [False]
+# BULLISH_ENGULFING_LIST = [True]
+# BEARISH_ENGULFING_LIST = [False]
+# PIERCING_LINE_LIST     = [False]
+# DARK_CLOUD_COVER_LIST  = [False]
+# 
+# TP_PCT_LIST            = [0]
+# SL_PCT_LIST            = [0]
+# =============================================================================
 # =============================================================================
 
 param_names = [
@@ -78,7 +82,7 @@ ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
     date_min=DATE_MIN
 )
 
-save_filtered_symbols(filtered_symbols, strategy="patterns", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
+save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
 
 # -----------------------------------------------------------------------------
 # FUNCIÓN DE PROCESO PARA UNA COMBINACIÓN
