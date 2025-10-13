@@ -13,8 +13,8 @@ PRODUCT_TYPE           = "usdt-futures"
 
 TIMEFRAME              = "4H"          
 LIMIT                  = 200           
-DATA_FOLDER            = "Crypto_2023T"
-START_DATE             = "2023-01-02"  
+DATA_FOLDER            = "Crypto_2021"
+START_DATE             = "2021-01-02"  
 REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06  
 MAX_ITER_PER_SYMBOL    = 2000     

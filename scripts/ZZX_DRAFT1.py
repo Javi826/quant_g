@@ -3,11 +3,6 @@ import logging
 import warnings
 import numpy as np
 import pandas as pd
-from numba import njit
-import cProfile
-import pstats
-from pstats import SortKey
-import time
 
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
@@ -17,28 +12,31 @@ INITIAL_BALANCE = 10000
 ORDER_AMOUNT    = 100
 
 # ============================
-# Helper: get_price_at_int (nivel módulo)
+# Helper: vectorized lookup + get_price
 # ============================
+def build_price_lookup(sym_data):
+    """
+    Construye lookup por símbolo: ts_int -> close
+    """
+    lookup = {}
+    for sym, d in sym_data.items():
+        lookup[sym] = {
+            'ts_int': d['ts_int'],
+            'close': d['close']
+        }
+    return lookup
 
-def get_price_at_int(sym, t, sym_data, ts_index_map_by_sym_int):
-    # normalizar t a int64 (ns)
-    t_int   = int(t) if not isinstance(t, (int, np.integer)) else int(t)
-    d       = sym_data[sym]
-    idx_map = ts_index_map_by_sym_int[sym]
-    idx     = idx_map.get(t_int)
-    if idx is not None:
-        return float(d['close'][idx])
-    # fallback: searchsorted sobre d['ts_int']
-    idx = np.searchsorted(d['ts_int'], t_int, side='right') - 1
+def get_price_from_lookup(sym, t_int, lookup):
+    d = lookup[sym]
+    idx_map = d['ts_int']
+    idx = np.searchsorted(idx_map, t_int, side='right') - 1
     if idx >= 0:
         return float(d['close'][idx])
     return None
 
-
 # ============================
-# Función principal del backtest
+# Main backtest
 # ============================
-
 def run_grid_backtest(
     ohlcv_arrays,
     sell_after,
@@ -49,10 +47,10 @@ def run_grid_backtest(
     comi_pct=0.05
 ):
     comi_factor = float(comi_pct) / 100.0
-    cash        = float(initial_balance)
+    cash = float(initial_balance)
     num_signals_executed = 0
 
-    # Preparar sym_data con arrays y ts_int
+    # Preparar sym_data
     symbols = list(ohlcv_arrays.keys())
     sym_data = {}
     for sym in symbols:
@@ -90,6 +88,12 @@ def run_grid_backtest(
     all_timestamps_int = np.array(sorted(all_ts_set), dtype=np.int64)
     all_timestamps_dt = all_timestamps_int.astype('datetime64[ns]')
 
+    # Construir lookup de precios
+    price_lookup = build_price_lookup(sym_data)
+
+    # ============================
+    # Estructuras auxiliares
+    # ============================
     trades = {sym: [] for sym in symbols}
     trade_times = {sym: [] for sym in symbols}
 
@@ -101,8 +105,7 @@ def run_grid_backtest(
     sim_balance_cols = {'timestamp': [], 'balance': []}
     open_positions_heap = []
     counter = 0
-    symbol_order = {s: i for i, s in enumerate(symbols)}
-    ts_index_map_by_sym_int = {sym: {int(t): idx for idx, t in enumerate(d['ts_int'])} for sym, d in sym_data.items()}
+    symbol_order = {s:i for i,s in enumerate(symbols)}
 
     def close_position(pos, exec_time, exec_price, exit_reason):
         nonlocal cash
@@ -126,51 +129,40 @@ def run_grid_backtest(
         trade_log_cols['commission_buy'].append(commission_buy)
         trade_log_cols['commission_sell'].append(commission_sell)
 
-    open_heap = open_positions_heap
-    sym_data_local = sym_data
-    signals_local = signals_by_time
-    symbol_order_local = symbol_order
-
+    # ============================
+    # Bucle principal
+    # ============================
     for t_int in all_timestamps_int:
         # Cerrar posiciones vencidas
-        while open_heap and open_heap[0][0] <= t_int:
-            _, _, pos = heapq.heappop(open_heap)
+        while open_positions_heap and open_positions_heap[0][0] <= t_int:
+            _, _, pos = heapq.heappop(open_positions_heap)
             if pos.get('closed', False):
                 continue
-            if 'exec_price' in pos and ('exec_time_int' in pos) and pos['exec_time_int'] <= t_int:
-                close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
-                pos['closed'] = True
-            else:
-                sym = pos['symbol']
-                sell_ts_int = pos.get('sell_time_int', int(sym_data_local[sym]['ts_int'][-1]))
-                exec_price = get_price_at_int(sym, sell_ts_int, sym_data_local, ts_index_map_by_sym_int)
-                if exec_price is not None:
-                    exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                    close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
-                else:
-                    exec_price = float(sym_data_local[sym]['close'][-1])
-                    last_time_dt = sym_data_local[sym]['ts'][-1]
-                    close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
-                pos['closed'] = True
+            sym = pos['symbol']
+            sell_t_int = pos.get('exec_time_int', pos.get('sell_time_int', int(sym_data[sym]['ts_int'][-1])))
+            exec_price = get_price_from_lookup(sym, sell_t_int, price_lookup)
+            exec_time_dt = np.datetime64(sell_t_int, 'ns')
+            close_position(pos, exec_time_dt, exec_price, pos.get('exit_reason', 'SELL_AFTER'))
+            pos['closed'] = True
 
-        # Actualizar balance si hay posiciones abiertas
-        if open_heap:
+        # Actualizar sim balance
+        if open_positions_heap:
             positions_value = sum(
-                pos['qty'] * get_price_at_int(pos['symbol'], t_int, sym_data_local, ts_index_map_by_sym_int)
-                for _, _, pos in open_heap if not pos.get('closed', False)
+                pos['qty'] * get_price_from_lookup(pos['symbol'], t_int, price_lookup)
+                for _, _, pos in open_positions_heap if not pos.get('closed', False)
             )
-            sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
+            sim_balance_cols['timestamp'].append(np.datetime64(t_int, 'ns'))
             sim_balance_cols['balance'].append(cash + positions_value)
             continue
 
         # Abrir nuevas posiciones
-        events = signals_local.get(int(t_int), [])
+        events = signals_by_time.get(int(t_int), [])
         if events:
-            events = sorted(events, key=lambda x: symbol_order_local[x[0]])
+            events = sorted(events, key=lambda x:symbol_order[x[0]])
             for sym, buy_idx in events:
                 if cash < order_amount:
                     break
-                d = sym_data_local[sym]
+                d = sym_data[sym]
                 price_t = float(d['close'][buy_idx])
                 qty = order_amount / price_t
                 commission_buy = order_amount * comi_factor if comi_factor != 0.0 else 0.0
@@ -193,18 +185,19 @@ def run_grid_backtest(
                     'commission_buy': commission_buy
                 }
 
+                # Detección intravela
                 intravela_detected = False
-                if tp_price is not None or sl_price is not None:
+                if tp_price != np.inf or sl_price != -np.inf:
                     if d['high'] is not None and d['low'] is not None:
                         start = buy_idx + 1
                         end = sell_idx
                         if end >= start:
                             high_slice = d['high'][start:end+1]
                             low_slice = d['low'][start:end+1]
-                            tp_hits = np.where((tp_price is not None) & (high_slice >= tp_price))[0]
-                            sl_hits = np.where((sl_price is not None) & (low_slice <= sl_price))[0]
-                            tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-                            sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+                            tp_hits = np.where(high_slice >= tp_price)[0]
+                            sl_hits = np.where(low_slice <= sl_price)[0]
+                            tp_first = tp_hits[0] + start if tp_hits.size>0 else None
+                            sl_first = sl_hits[0] + start if sl_hits.size>0 else None
 
                             if tp_first is not None and sl_first is not None:
                                 if sl_first <= tp_first:
@@ -236,79 +229,93 @@ def run_grid_backtest(
                         'exec_time_int': exec_time_int,
                         'exit_reason': exit_reason
                     })
-                    heapq.heappush(open_heap, (exec_time_int, counter, position))
+                    heapq.heappush(open_positions_heap, (exec_time_int, counter, position))
                     counter += 1
                 else:
-                    heapq.heappush(open_heap, (sell_time_int, counter, position))
+                    heapq.heappush(open_positions_heap, (sell_time_int, counter, position))
                     counter += 1
 
+        # Registrar balance actual
         positions_value = sum(
-            pos['qty'] * get_price_at_int(pos['symbol'], t_int, sym_data_local, ts_index_map_by_sym_int)
-            for _, _, pos in open_heap if not pos.get('closed', False)
+            pos['qty'] * get_price_from_lookup(pos['symbol'], t_int, price_lookup)
+            for _, _, pos in open_positions_heap if not pos.get('closed', False)
         )
-        sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
+        sim_balance_cols['timestamp'].append(np.datetime64(t_int, 'ns'))
         sim_balance_cols['balance'].append(cash + positions_value)
 
-    # cierre final
-    while open_heap:
-        _, _, pos = heapq.heappop(open_heap)
+    # ============================
+    # Cierre final
+    # ============================
+    while open_positions_heap:
+        _, _, pos = heapq.heappop(open_positions_heap)
         if pos.get('closed', False):
             continue
         sym = pos['symbol']
-        d = sym_data_local[sym]
-        if 'exec_price' in pos:
-            close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'])
-        else:
-            sell_ts_int = pos.get('sell_time_int', int(d['ts_int'][-1]))
-            exec_price = get_price_at_int(sym, sell_ts_int, sym_data_local, ts_index_map_by_sym_int)
-            if exec_price is not None:
-                exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER')
-            else:
-                exec_price = float(d['close'][-1])
-                last_time_dt = d['ts'][-1]
-                close_position(pos, last_time_dt, exec_price, 'FORCED_LAST')
+        sell_t_int = pos.get('exec_time_int', pos.get('sell_time_int', int(sym_data[sym]['ts_int'][-1])))
+        exec_price = get_price_from_lookup(sym, sell_t_int, price_lookup)
+        exec_time_dt = np.datetime64(sell_t_int, 'ns')
+        close_position(pos, exec_time_dt, exec_price, pos.get('exit_reason', 'SELL_AFTER'))
+        pos['closed'] = True
 
-    # métricas y resultados omitidos (idénticos al original)
-    # ... (continúa igual)
-    return {
+    # ============================
+    # Resultados
+    # ============================
+    final_balance = cash
+    all_trades = []
+    for sym in symbols:
+        all_trades.extend(trades[sym])
+    num_trades = len(all_trades)
+    proportion_winners = np.sum(np.array(all_trades) > 0.0) / num_trades if num_trades>0 else np.nan
+
+    sim_values = np.array(sim_balance_cols['balance'], dtype=np.float64) if sim_balance_cols['balance'] else np.array([initial_balance], dtype=np.float64)
+    cummax = np.maximum.accumulate(sim_values)
+    drawdowns = (cummax - sim_values) / np.where(cummax==0, 1, cummax)
+    max_dd_portfolio = float(np.nanmax(drawdowns))
+
+    def compute_annualized_sharpe_from_equity(equity_arr, time_index_dt):
+        if equity_arr is None or equity_arr.size<2:
+            return np.nan
+        returns = (equity_arr[1:] / equity_arr[:-1]) - 1.0
+        returns = returns[np.isfinite(returns)]
+        if returns.size==0:
+            return np.nan
+        deltas_s = np.diff(time_index_dt.astype('int64')).astype(np.float64)/1e9 if len(time_index_dt)>=2 else np.array([24*3600])
+        positive = deltas_s[deltas_s>0]
+        median_delta_s = float(np.median(positive)) if positive.size>0 else 24*3600
+        periods_per_year = (365*24*3600)/median_delta_s if median_delta_s>0 else 252.0
+        mean_periodic = np.nanmean(returns)
+        std_periodic = np.nanstd(returns, ddof=0)
+        if not np.isfinite(std_periodic) or std_periodic==0.0:
+            return np.nan
+        annualized_mean = mean_periodic * periods_per_year
+        annualized_std = std_periodic * np.sqrt(periods_per_year)
+        return float(annualized_mean / annualized_std)
+
+    sharpe_portfolio = compute_annualized_sharpe_from_equity(sim_values, np.array(sim_balance_cols['timestamp'], dtype='datetime64[ns]'))
+
+    results = {
         "__PORTFOLIO__": {
-            "sim_balance_history": sim_balance_cols,
-            "trade_log": pd.DataFrame(trade_log_cols)
+            'df': None,
+            'trades': all_trades,
+            'final_balance': final_balance,
+            'num_signals': num_signals_executed,
+            'proportion_winners': proportion_winners,
+            'max_dd': max_dd_portfolio,
+            'sim_balance_history': sim_balance_cols,
+            'trade_log': pd.DataFrame(trade_log_cols),
+            'sharpe': sharpe_portfolio
         }
     }
 
-
-# ============================
-# PROFILING
-# ============================
-
-if __name__ == "__main__":
-    # Simulación de ejemplo mínima (debes reemplazar con tus datos reales)
-    ts = np.arange(np.datetime64("2025-01-01"), np.datetime64("2025-01-02"), np.timedelta64(1, "m"))
-    ohlcv_arrays = {
-        "BTCUSDT": {
-            "ts": ts,
-            "close": np.linspace(30000, 30100, len(ts)),
-            "high": np.linspace(30000, 30110, len(ts)),
-            "low": np.linspace(29990, 30100, len(ts)),
-            "signal": np.zeros(len(ts), dtype=int)
+    for sym in symbols:
+        results[sym] = {
+            'df': None,
+            'trades': trades[sym],
+            'final_balance': sum(trades[sym]) + initial_balance,
+            'num_signals': len(trades[sym]),
+            'proportion_winners': np.nan if len(trades[sym])==0 else np.sum(np.array(trades[sym])>0)/len(trades[sym]),
+            'max_dd': 0.0,
+            'sharpe': np.nan
         }
-    }
-    ohlcv_arrays["BTCUSDT"]["signal"][::100] = 1
 
-    profiler = cProfile.Profile()
-    profiler.enable()
-    start = time.perf_counter()
-
-    results = run_grid_backtest(ohlcv_arrays, sell_after=10)
-
-    profiler.disable()
-    end = time.perf_counter()
-
-    print(f"\n⏱️ Tiempo total: {end - start:.3f} s\n")
-    stats = pstats.Stats(profiler).sort_stats(SortKey.CUMULATIVE)
-    stats.print_stats(20)
-
-    profiler.dump_stats("profile_run_grid.prof")
-    print("\n📊 Perfil guardado en 'profile_run_grid.prof' (abre con: snakeviz profile_run_grid.prof)\n")
+    return results

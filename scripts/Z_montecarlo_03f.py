@@ -8,8 +8,8 @@ from tqdm import tqdm
 from itertools import product
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_analysis import report_montecarlo
-from ZX_utils import filter_symbols
+from utils.ZX_analysis import report_montecarlo
+from utils.ZX_utils import filter_symbols
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 #from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from ZX_optimize_MCf import generate_multiple_paths
@@ -45,12 +45,14 @@ TP_PCT_LIST         = [0,2.5,5]
 SL_PCT_LIST         = [0,2.5,5]
 
 # =============================================================================
-SELL_AFTER_LIST    = [25]
-ENTROPY_MAX_LIST   = [0.6]
-ACCEL_SPAN_LIST    = [10]
-
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [0]
+# =============================================================================
+# SELL_AFTER_LIST    = [25]
+# ENTROPY_MAX_LIST   = [0.6]
+# ACCEL_SPAN_LIST    = [10]
+# 
+# TP_PCT_LIST        = [0]
+# SL_PCT_LIST        = [0]
+# =============================================================================
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']

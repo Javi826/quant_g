@@ -1,10 +1,10 @@
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from ZZ_connect_03 import connect_bitget
-from ZZ_parquet_extraction import get_futures_symbols_from_api,_call_history_candles,to_dataframe_from_api
+from utils.ZZ_connect_03 import connect_bitget
+from parquet_process.ZZ_parquet_extraction import get_futures_symbols_from_api,_call_history_candles,to_dataframe_from_api
 from Z_add_signals_03 import add_indicators, explosive_signal
-from ZX_utils import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv,send_request, PRODUCT_TYPE
+from utils.ZX_utils import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv,send_request, PRODUCT_TYPE
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 

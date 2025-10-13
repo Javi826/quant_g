@@ -9,11 +9,11 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 
 #from backtest_cy import run_grid_backtest_cy
-from ZX_analysis import report_backtesting
-from ZX_utils import filter_symbols, save_results, save_filtered_symbols
+from utils.ZX_analysis import report_backtesting
+from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
 from Z_add_signals_03 import add_indicators, explosive_signal
 
@@ -25,28 +25,28 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-01-03"
-TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 50_000
+TIMEFRAME           = '1H'
+MIN_VOL_USDT        = 12_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
-# =============================================================================
+
 SELL_AFTER_LIST     = [10,15,20,25]
 ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
 ACCEL_SPAN_LIST     = [10,15,20]
 
 TP_PCT_LIST         = [0,2.5,5]
 SL_PCT_LIST         = [0,2.5,5]
-# =============================================================================
+
 
 # =============================================================================
-SELL_AFTER_LIST    = [25]
-ENTROPY_MAX_LIST   = [0.6]
-ACCEL_SPAN_LIST    = [10]
+SELL_AFTER_LIST    = [10,15,25]
+ENTROPY_MAX_LIST   = [0.6,0.8,1.0]
+ACCEL_SPAN_LIST    = [5,10,15]
 
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [0]
+TP_PCT_LIST        = [0,5,10]
+SL_PCT_LIST        = [0,5,10]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
