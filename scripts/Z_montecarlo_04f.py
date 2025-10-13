@@ -20,8 +20,8 @@ start_time = time.time()
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS          = 100
-FINAL_N_OBS_PER_PATH   = 3000
+FINAL_N_PATHS          = 40
+FINAL_N_OBS_PER_PATH   = 1000
 TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------
@@ -36,29 +36,39 @@ N_JOBS                 = -1
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
-SELL_AFTER_LIST        = [25, 30]
+SELL_AFTER_LIST        = [5,10,15,20]
+
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
 SHOOTING_STAR_LIST     = [True, False]
 BULLISH_ENGULFING_LIST = [True, False]
 BEARISH_ENGULFING_LIST = [True, False]
+PIERCING_LINE_LIST     = [True, False]
+DARK_CLOUD_COVER_LIST  = [True, False]
+
 TP_PCT_LIST            = [0,15]
 SL_PCT_LIST            = [0,15]
 
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
-SELL_AFTER_LIST        = [20]
-DOJI_LIST              = [False]
-HAMMER_LIST            = [False]
-SHOOTING_STAR_LIST     = [False]
-BULLISH_ENGULFING_LIST = [True]
-BEARISH_ENGULFING_LIST = [False]
-TP_PCT_LIST            = [15]
-SL_PCT_LIST            = [0]
+# =============================================================================
+# SELL_AFTER_LIST        = [20]
+# DOJI_LIST              = [False]
+# HAMMER_LIST            = [False]
+# SHOOTING_STAR_LIST     = [False]
+# BULLISH_ENGULFING_LIST = [True]
+# BEARISH_ENGULFING_LIST = [False]
+# TP_PCT_LIST            = [15]
+# SL_PCT_LIST            = [0]
+# =============================================================================
 
-param_names = ['SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR','BULLISH_ENGULFING', 'BEARISH_ENGULFING', 'TP_PCT', 'SL_PCT']
-
+param_names = [
+    'SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR',
+    'BULLISH_ENGULFING', 'BEARISH_ENGULFING',
+    'PIERCING_LINE', 'DARK_CLOUD_COVER',
+    'TP_PCT', 'SL_PCT'
+]
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
@@ -102,10 +112,12 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
                 param_dict['HAMMER'],
                 param_dict['SHOOTING_STAR'],
                 param_dict['BULLISH_ENGULFING'],
-                param_dict['BEARISH_ENGULFING']
+                param_dict['BEARISH_ENGULFING'],
+                param_dict['PIERCING_LINE'],
+                param_dict['DARK_CLOUD_COVER']
             ]
             df_signal = explosive_signal(df_ind, pattern_flags, live=False)
-            signal = np.asarray(df_signal['signal'], dtype=bool)
+            signal    = np.asarray(df_signal['signal'], dtype=bool)
 
             ohlcv_arrays[sym] = {
                 'ts': TS_INDEX,

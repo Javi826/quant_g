@@ -19,10 +19,10 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "data/crypto_2023_highlow_ONWARDS"
+DATA_FOLDER  = "data/crypto_2023_highlow_UPTO"
 DATE_MIN     = "2025-06-03"
 TIMEFRAME    = '4H'
-MIN_VOL_USDT = 50_000
+MIN_VOL_USDT = 500_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
@@ -33,6 +33,8 @@ HAMMER_LIST            = [True, False]
 SHOOTING_STAR_LIST     = [True, False]
 BULLISH_ENGULFING_LIST = [True, False]
 BEARISH_ENGULFING_LIST = [True, False]
+PIERCING_LINE_LIST     = [True, False]
+DARK_CLOUD_COVER_LIST  = [True, False]
 
 TP_PCT_LIST            = [0,5,10,15]
 SL_PCT_LIST            = [0,5,10,15]
@@ -40,17 +42,25 @@ SL_PCT_LIST            = [0,5,10,15]
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
-SELL_AFTER_LIST        = [20]
+# =============================================================================
+SELL_AFTER_LIST        = [30]
 DOJI_LIST              = [False]
-HAMMER_LIST            = [False]
-SHOOTING_STAR_LIST     = [False]
+HAMMER_LIST            = [True]
+SHOOTING_STAR_LIST     = [True]
 BULLISH_ENGULFING_LIST = [True]
-BEARISH_ENGULFING_LIST = [False]
-TP_PCT_LIST            = [15]
+BEARISH_ENGULFING_LIST = [True]
+PIERCING_LINE_LIST     = [False]
+DARK_CLOUD_COVER_LIST  = [True]
+TP_PCT_LIST            = [0]
 SL_PCT_LIST            = [0]
+# =============================================================================
 
-param_names = ['SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR','BULLISH_ENGULFING', 'BEARISH_ENGULFING', 'TP_PCT', 'SL_PCT']
-
+param_names = [
+    'SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR',
+    'BULLISH_ENGULFING', 'BEARISH_ENGULFING',
+    'PIERCING_LINE', 'DARK_CLOUD_COVER',
+    'TP_PCT', 'SL_PCT'
+]
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
@@ -86,7 +96,9 @@ def process_combo(comb):
             params['HAMMER'],
             params['SHOOTING_STAR'],
             params['BULLISH_ENGULFING'],
-            params['BEARISH_ENGULFING']
+            params['BEARISH_ENGULFING'],
+            params['PIERCING_LINE'],
+            params['DARK_CLOUD_COVER']
         ]
 
         df_signal = explosive_signal(df_ind, pattern_flags, live=False)

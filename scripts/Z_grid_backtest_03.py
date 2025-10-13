@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
@@ -21,7 +21,7 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_highlow_ONWARDS"
+DATA_FOLDER         = "data/crypto_2023_highlow_UPTO"
 DATE_MIN            = "2025-06-03"
 TIMEFRAME           = '4H'
 MIN_VOL_USDT        = 50_000
@@ -37,16 +37,13 @@ ACCEL_SPAN_LIST     = [10,15,20]
 TP_PCT_LIST         = [5,10,15]
 SL_PCT_LIST         = [5,10,15]
 
+# =============================================================================
+SELL_AFTER_LIST    = [20,25,30]
+ENTROPY_MAX_LIST   = [0.6,1.0,1.5]
+ACCEL_SPAN_LIST    = [5,10,15]
 
-# =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [25]
-# ENTROPY_MAX_LIST   = [0.6]
-# ACCEL_SPAN_LIST    = [10]
-# 
-# TP_PCT_LIST        = [0]
-# SL_PCT_LIST        = [0]
-# =============================================================================
+TP_PCT_LIST        = [0,15,20]
+SL_PCT_LIST        = [0,15,20]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']

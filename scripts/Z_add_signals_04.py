@@ -27,6 +27,8 @@ def add_indicators(df):
     - Martillo (Hammer)
     - Estrella fugaz (Shooting Star)
     - Engulfing alcista y bajista
+    - Piercing Line (alcista)
+    - Dark Cloud Cover (bajista)
     """
     # Cuerpo y mechas
     df['body'] = (df['close'] - df['open']).abs()
@@ -60,10 +62,28 @@ def add_indicators(df):
         (df['close'] <= df['open'].shift(1))
     )
 
+    # Piercing Line (alcista)
+    df['piercing_line'] = (
+        (df['close'].shift(1) < df['open'].shift(1)) &    # vela roja anterior
+        (df['close'] > df['open']) &                     # vela verde actual
+        (df['open'] < df['close'].shift(1)) &           # abre por debajo del cierre de la roja
+        (df['close'] >= df['open'].shift(1) + 0.5 * (df['close'].shift(1) - df['open'].shift(1)))  # cierra al menos a la mitad
+    )
+
+    # Dark Cloud Cover (bajista)
+    df['dark_cloud_cover'] = (
+        (df['close'].shift(1) > df['open'].shift(1)) &   # vela verde anterior
+        (df['close'] < df['open']) &                     # vela roja actual
+        (df['open'] > df['close'].shift(1)) &           # abre por encima del cierre de la verde
+        (df['close'] <= df['open'].shift(1) - 0.5 * (df['close'].shift(1) - df['open'].shift(1)))  # cierra al menos a la mitad
+    )
+
     return df
 
+
 def explosive_signal(df, pattern_flags, live=False):
-    patterns = ['doji', 'hammer', 'shooting_star', 'bullish_engulfing', 'bearish_engulfing']
+    patterns = ['doji', 'hammer', 'shooting_star', 'bullish_engulfing', 'bearish_engulfing', 'piercing_line', 'dark_cloud_cover']
+
     active_patterns = [pat for pat, flag in zip(patterns, pattern_flags) if flag]
 
     signal = pd.Series(False, index=df.index)
@@ -75,4 +95,3 @@ def explosive_signal(df, pattern_flags, live=False):
 
     df['signal'] = signal.fillna(False)
     return df
-

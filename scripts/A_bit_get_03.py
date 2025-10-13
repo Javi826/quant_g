@@ -18,8 +18,8 @@ SELL_AFTER_N_CANDLES = 25
 ENTROPIA_MAX         = 0.6
 ACCEL_SPAN           = 10
 
-TP_PCT               = 0
-SL_PCT               = 0
+TP_PCT               = 50
+SL_PCT               = 50
 
 # ----------------------
 # FUNCTIONS
