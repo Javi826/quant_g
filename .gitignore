@@ -5,3 +5,6 @@ env_quant/
 *.pt
 __pycache__/
 
+utils.ZZ_connect_03.py
+Notebooks.Bitget_profit.ipynb
+Notebooks.Bitget_sell.ipynb
