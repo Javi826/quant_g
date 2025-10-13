@@ -1,5 +1,5 @@
-# === FILE: add_signals.py ===
-# --------------------------------
+# === FILE: add_signals03.py ===
+# ---------------------------------
 import logging
 import warnings
 import numpy as np

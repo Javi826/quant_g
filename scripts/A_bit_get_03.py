@@ -25,17 +25,18 @@ SL_PCT               = 0
 # FUNCTIONS
 # ----------------------
 def check_latest_signal(df, symbol):
-    
-    df          = normalize_live_ohlcv(df)   
-    df          = add_indicators(df, m_accel=ACCEL_SPAN)
-    signals_df  = explosive_signal(df, entropia_max=ENTROPIA_MAX, live=True)
-    last_signal = signals_df['signal'].iloc[-1]
-    
-    if last_signal:  
-        last = df.iloc[-1]
+
+    df              = normalize_live_ohlcv(df)
+    close_prices    = df['close'].values
+    entropia, accel = add_indicators(close_prices, m_accel=ACCEL_SPAN)
+    signals         = explosive_signal(entropia, accel, entropia_max=ENTROPIA_MAX, live=True)
+    last_signal =    signals[-1]
+
+    if last_signal:
+        last = df.iloc[-1]  
         return {
             'symbol': symbol,
-            'timestamp': last['timestamp'], 
+            'timestamp': last['timestamp'],
             'close': last['close'],
         }
 

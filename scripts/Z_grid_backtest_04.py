@@ -9,11 +9,9 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
-
-from Z_add_signals_03 import add_indicators, explosive_signal
+from Z_add_signals_04 import add_indicators, explosive_signal
 
 start_time = time.time()
 SAVE_SYMBOLS = False
@@ -21,33 +19,25 @@ SAVE_SYMBOLS = False
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_highlow_ONWARDS"
-DATE_MIN            = "2025-06-03"
-TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 50_000
+DATA_FOLDER  = "data/crypto_2023_highlow_UPTO"
+DATE_MIN     = "2025-01-03"
+TIMEFRAME    = '1H'
+MIN_VOL_USDT = 12_000
 
 # -----------------------------------------------------------------------------
-# GRID: 
+# GRID DE PARÁMETROS
 # -----------------------------------------------------------------------------
+SELL_AFTER_LIST        = [5,10,15,20]
+DOJI_LIST              = [True, False]
+HAMMER_LIST            = [True, False]
+SHOOTING_STAR_LIST     = [True, False]
+BULLISH_ENGULFING_LIST = [True, False]
+BEARISH_ENGULFING_LIST = [True, False]
+TP_PCT_LIST            = [0,5,10,15]
+SL_PCT_LIST            = [0,5,10,15]
 
-SELL_AFTER_LIST     = [10,15,20,25]
-ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
-ACCEL_SPAN_LIST     = [10,15,20]
+param_names = ['SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR','BULLISH_ENGULFING', 'BEARISH_ENGULFING', 'TP_PCT', 'SL_PCT']
 
-TP_PCT_LIST         = [0,2.5,5]
-SL_PCT_LIST         = [0,2.5,5]
-
-
-# =============================================================================
-SELL_AFTER_LIST    = [25]
-ENTROPY_MAX_LIST   = [0.6]
-ACCEL_SPAN_LIST    = [10]
-
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [0]
-# =============================================================================
-
-param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
@@ -65,40 +55,49 @@ ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
     date_min=DATE_MIN
 )
 
-save_filtered_symbols(filtered_symbols, strategy="entropy", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
-
-ohlcv_base = {}
-for sym, df in ohlcv_data.items():
-    ohlcv_base[sym] = {
-        'ts': df.index.values.astype('datetime64[ns]'),
-        'open': df['open'].to_numpy(dtype=np.float64),
-        'high': df['high'].to_numpy(dtype=np.float64),
-        'low': df['low'].to_numpy(dtype=np.float64),
-        'close': df['close'].to_numpy(dtype=np.float64),
-        'volume': df['volume'].to_numpy(dtype=np.float64) if 'volume' in df.columns else np.zeros(len(df))
-    }
+save_filtered_symbols(filtered_symbols, strategy="patterns", timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
 
 # -----------------------------------------------------------------------------
 # FUNCIÓN DE PROCESO PARA UNA COMBINACIÓN
 # -----------------------------------------------------------------------------
 def process_combo(comb):
-    params       = dict(zip(param_names, comb))
+    params = dict(zip(param_names, comb))
     ohlcv_arrays = {}
 
-    for sym, arrs in ohlcv_base.items():
-        entropia, accel   = add_indicators(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
-        signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
-        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
+    for sym, df in ohlcv_data.items():
+        df_ind = add_indicators(df.copy())
+
+        # Crear pattern_flags según la combinación de parámetros
+        pattern_flags = [
+            params['DOJI'],
+            params['HAMMER'],
+            params['SHOOTING_STAR'],
+            params['BULLISH_ENGULFING'],
+            params['BEARISH_ENGULFING']
+        ]
+
+        df_signal = explosive_signal(df_ind, pattern_flags, live=False)
+
+        ohlcv_arrays[sym] = {
+            'ts': df_signal.index.values.astype('datetime64[ns]'),
+            'open': df_signal['open'].to_numpy(dtype=np.float64),
+            'high': df_signal['high'].to_numpy(dtype=np.float64),
+            'low': df_signal['low'].to_numpy(dtype=np.float64),
+            'close': df_signal['close'].to_numpy(dtype=np.float64),
+            'volume': df_signal['volume'].to_numpy(dtype=np.float64) if 'volume' in df_signal.columns else np.zeros(len(df_signal)),
+            'signal': df_signal['signal'].to_numpy(dtype=bool)
+        }
 
     results = run_grid_backtest(
         ohlcv_arrays,
-        sell_after=params.get('SELL_AFTER', 10),
+        sell_after=params['SELL_AFTER'],
         initial_balance=INITIAL_BALANCE,
         order_amount=ORDER_AMOUNT,
-        tp_pct=params.get('TP_PCT', 0),
-        sl_pct=params.get('SL_PCT', 0),
+        tp_pct=params['TP_PCT'],
+        sl_pct=params['SL_PCT'],
         comi_pct=0.05
     )
+
     return comb, results
 
 # -----------------------------------------------------------------------------
@@ -123,8 +122,8 @@ for comb, results in grid_results_list:
     if port is None:
         continue
 
-    net_gain      = np.sum(port['trades']) if len(port.get('trades', [])) > 0 else 0.0
-    net_gain_pct  = (net_gain / INITIAL_BALANCE) * 100.0 if INITIAL_BALANCE != 0 else np.nan
+    net_gain      = np.sum(port.get('trades', [])) if len(port.get('trades', [])) > 0 else 0.0
+    net_gain_pct  = (net_gain / INITIAL_BALANCE) * 100.0
     num_signals   = int(port.get('num_signals', 0))
     num_trades    = len(port.get('trades', []))
     win_ratio     = port.get('proportion_winners', np.nan)
@@ -132,7 +131,7 @@ for comb, results in grid_results_list:
     final_balance = float(port.get('final_balance', INITIAL_BALANCE))
     avg_trade     = np.nan if num_trades == 0 else np.mean(port['trades'])
     median_trade  = np.nan if num_trades == 0 else np.median(port['trades'])
-    sharpe_ratio  = float(port.get('sharpe', np.nan))  # ADDED SHARPE
+    sharpe_ratio  = float(port.get('sharpe', np.nan))
 
     row = {param: value for param, value in zip(param_names, comb)}
     row.update({
@@ -146,25 +145,21 @@ for comb, results in grid_results_list:
         "Avg_Trade": float(avg_trade) if not pd.isna(avg_trade) else np.nan,
         "Median_Trade": float(median_trade) if not pd.isna(median_trade) else np.nan,
         "DD_pct": float(dd_pct),
-        "Sharpe": sharpe_ratio  # ADDED SHARPE
+        "Sharpe": sharpe_ratio
     })
     grid_records.append(row)
 
-grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct", "Sharpe"])  # ADDED SHARPE
+grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct", "Sharpe"])
 
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
-save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
+save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx", save=False)
 
 print(f"TIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
 print(f"DATE_MIN         : {DATE_MIN}")
 print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
-print(f"ENTROPY_MAX_LIST = {ENTROPY_MAX_LIST}")
-print(f"ACCEL_SPAN_LIST  = {ACCEL_SPAN_LIST}")
-print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
-print(f"SL_PCT_LIST      = {SL_PCT_LIST}")
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, initial_capital=INITIAL_BALANCE)
 
