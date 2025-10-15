@@ -1,161 +1,148 @@
-#!/usr/bin/env python3
-# compare_latest_signal.py
-# Compara la última señal entre versión "numba-like" y "pandas"
-
 import numpy as np
 import pandas as pd
+import itertools
+from tqdm import tqdm
+from tqdm_joblib import tqdm_joblib
+from joblib import Parallel, delayed
+from ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE, ORDER_AMOUNT
+from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 
-# ---------------- Configuración ----------------
-ACCEL_SPAN = 10
-ENTROPIA_MAX = 1.5
 
-# ---------------- Implementaciones numba-like ----------------
-def second_diff_np(close):
-    close = np.asarray(close, dtype=np.float64)
-    n = len(close)
-    accel_raw = np.zeros(n, dtype=np.float64)
-    for i in range(2, n):
-        accel_raw[i] = close[i] - 2*close[i-1] + close[i-2]
-    return accel_raw
+def walk_forward_optimization(data_dict, param_ranges,
+                              length_train_set=2000, pct_train_set=0.8,
+                              anchored=True, com_ewm=1.5,
+                              n_jobs=-1):
 
-def delta_np(close):
-    close = np.asarray(close, dtype=np.float64)
-    n = len(close)
-    delta = np.empty(n, dtype=np.float64)
-    if n > 0:
-        delta[0] = 0.0
-    for i in range(1, n):
-        delta[i] = close[i] - close[i-1]
-    return delta
+    keys = list(param_ranges.keys())
+    all_combinations = list(itertools.product(*[param_ranges[k] for k in keys]))
+    dict_combinations = [dict(zip(keys, comb)) for comb in all_combinations]
+    length_test = int(length_train_set / pct_train_set - length_train_set)
+    best_params_list = []
+    window_idx = 0
 
-def rolling_entropy_np(delta, window=5, bins=10):
-    delta = np.asarray(delta, dtype=np.float64)
-    n = len(delta)
-    entropia = np.zeros(n, dtype=np.float64)
-    if n == 0:
-        return entropia
-    delta_min = delta.min()
-    delta_max = delta.max()
-    hist = np.zeros(bins, dtype=np.float64)
-    for i in range(n):
-        start = max(0, i - window + 1)
-        hist[:] = 0.0
-        for j in range(start, i + 1):
-            denom = (delta_max - delta_min + 1e-9)
-            bin_idx = int((delta[j] - delta_min) / denom * bins)
-            if bin_idx >= bins:
-                bin_idx = bins - 1
-            hist[bin_idx] += 1.0
-        s = hist.sum()
-        e = 0.0
-        if s > 0:
-            for k in range(bins):
-                if hist[k] > 0:
-                    p = hist[k]/s
-                    e -= p * np.log2(p)
-        entropia[i] = e
-    return entropia
+    start = 0
+    end = length_train_set
 
-def ewm_np(x, span):
-    x = np.asarray(x, dtype=np.float64)
-    n = len(x)
-    if n == 0:
-        return np.array([], dtype=np.float64)
-    alpha = 2.0 / (span + 1.0)
-    ewm = np.empty(n, dtype=np.float64)
-    ewm[0] = x[0]
-    for i in range(1, n):
-        ewm[i] = alpha * x[i] + (1 - alpha) * ewm[i-1]
-    return ewm
+    ref_sym = max(data_dict.keys(), key=lambda k: len(data_dict[k]['ts']))
+    ref_ts = data_dict[ref_sym]['ts']
+    max_length = len(ref_ts)
 
-def add_indicators_numba_like(close, m_accel=5):
-    delta = delta_np(close)
-    entropia = rolling_entropy_np(delta, window=5, bins=10)
-    accel_raw = second_diff_np(close)
-    accel = ewm_np(accel_raw, m_accel)
-    return entropia, accel
+    def evaluate_WFO(params, base_arrays):
+        ohlcv_arrays = {}
+        for sym, arrs in base_arrays.items():
+            entropia, accel = add_indicators_03(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
+            signal = explosive_signal_03(entropia, accel,
+                                         entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
+            ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
-def explosive_signal_numba_like(entropia, accel, entropia_max=2.0, live=False):
-    entropia = np.asarray(entropia, dtype=np.float64)
-    accel = np.asarray(accel, dtype=np.float64)
-    signal = (entropia < entropia_max) & (accel > 0.0)
-    if not live:
-        signal_shifted = np.empty_like(signal, dtype=np.bool_)
-        if signal_shifted.size > 0:
-            signal_shifted[0] = False
-            if signal_shifted.size > 1:
-                signal_shifted[1:] = signal[:-1]
-        signal = signal_shifted
-    return signal
+        results = run_grid_backtest(
+            ohlcv_arrays,
+            sell_after=params.get('SELL_AFTER', 10),
+            tp_pct=params.get('TP_PCT', 0),
+            sl_pct=params.get('SL_PCT', 0),
+            initial_balance=INITIAL_BALANCE,
+            order_amount=ORDER_AMOUNT,
+            comi_pct=0.05
+        )
 
-# ---------------- Implementaciones pandas ----------------
-def add_indicators_pandas(close_series, m_accel=5):
-    s = pd.Series(close_series).astype(np.float64)
-    n = len(s)
-    delta = np.empty(n, dtype=np.float64)
-    if n > 0:
-        delta[0] = 0.0
-    for i in range(1, n):
-        delta[i] = s.iat[i] - s.iat[i-1]
-    entropia = rolling_entropy_np(delta, window=5, bins=10)
-    accel_raw = np.zeros(n, dtype=np.float64)
-    for i in range(2, n):
-        accel_raw[i] = s.iat[i] - 2*s.iat[i-1] + s.iat[i-2]
-    accel = ewm_np(accel_raw, m_accel)
-    return pd.Series(entropia, index=s.index), pd.Series(accel, index=s.index)
+        port = results.get("__PORTFOLIO__", {})
+        net_gain = np.sum(port.get('trades', [])) if len(port.get('trades', [])) > 0 else 0.0
+        net_gain_pct = (net_gain / INITIAL_BALANCE) * 100.0 if INITIAL_BALANCE != 0 else 0.0
+        criterion = net_gain_pct
+        return criterion, params
 
-def explosive_signal_pandas(entropia_s, accel_s, entropia_max=2.0, live=False):
-    ent = np.asarray(entropia_s, dtype=np.float64)
-    acc = np.asarray(accel_s, dtype=np.float64)
-    signal = (ent < entropia_max) & (acc > 0.0)
-    if not live:
-        signal_shifted = np.empty_like(signal, dtype=np.bool_)
-        if signal_shifted.size > 0:
-            signal_shifted[0] = False
-            if signal_shifted.size > 1:
-                signal_shifted[1:] = signal[:-1]
-        signal = signal_shifted
-    return pd.Series(signal, index=entropia_s.index)
+    while start < max_length:
+        remaining_data = max_length - start
+        is_last_window = remaining_data < (length_train_set + length_test)
 
-# ---------------- Funciones auxiliares ----------------
-def normalize_live_ohlcv(df):
-    # Solo como ejemplo: asegurar tipo float y columnas mínimas
-    df = df.copy()
-    df['close'] = df['close'].astype(float)
-    return df
+        train_indices = {}
+        test_indices = {}
 
-# ---------------- Funciones de prueba ----------------
-def check_latest_signal_vector(df, symbol):
-    df = normalize_live_ohlcv(df)
-    close_prices = df['close'].values
-    entropia, accel = add_indicators_numba_like(close_prices, m_accel=ACCEL_SPAN)
-    signals = explosive_signal_numba_like(entropia, accel, entropia_max=ENTROPIA_MAX, live=True)
-    return signals[-1]
+        for sym, arr_dict in data_dict.items():
+            sym_length = len(arr_dict['ts'])
+            if start >= sym_length:
+                continue
 
-def check_latest_signal_pandas(df, symbol):
-    df = normalize_live_ohlcv(df)
-    ent, acc = add_indicators_pandas(df['close'], m_accel=ACCEL_SPAN)
-    sig = explosive_signal_pandas(ent, acc, entropia_max=ENTROPIA_MAX, live=True)
-    return sig.iloc[-1]
+            if is_last_window:
+                remaining = sym_length - start
+                train_size = int(remaining * pct_train_set)
+                test_size = remaining - train_size
+                if train_size < 100 or test_size < 50:
+                    continue
+                t0, t1 = start, start + train_size
+                test0, test1 = t1, sym_length
+            else:
+                t0 = 0 if anchored else start
+                t1 = min(end, sym_length) if anchored else min(start + length_train_set, sym_length)
+                test0 = t1
+                test1 = min(t1 + length_test, sym_length)
 
-# ---------------- Test ----------------
-if __name__ == "__main__":
-    # Crear DataFrame de ejemplo
-    rng = np.random.default_rng(42)
-    df = pd.DataFrame({
-        'timestamp': pd.date_range("2025-01-01", periods=100, freq='T'),
-        'close': rng.normal(100, 2, 100),
-        'open': rng.normal(100, 2, 100),
-        'high': rng.normal(102, 2, 100),
-        'low': rng.normal(98, 2, 100),
-        'volume': rng.integers(100, 200, 100)
-    })
-    
-    symbol = "TEST"
-    
-    signal_vec = check_latest_signal_vector(df, symbol)
-    signal_pd  = check_latest_signal_pandas(df, symbol)
-    
-    print("Última señal versión vectorizada:", signal_vec)
-    print("Última señal versión pandas     :", signal_pd)
-    print("Coinciden?", signal_vec == signal_pd)
+            if t1 > t0 and test1 > test0:
+                train_indices[sym] = (t0, t1)
+                test_indices[sym] = (test0, test1)
+
+        if not train_indices:
+            break
+
+        ventana_start_train = ref_ts[start]
+        train_end_idx = min(start + length_train_set - 1, len(ref_ts) - 1)
+        ventana_end_train = ref_ts[train_end_idx]
+        test_start_idx = min(start + length_train_set, len(ref_ts) - 1)
+        ventana_start_test = ref_ts[test_start_idx]
+        test_end_idx = min(start + length_train_set + length_test - 1, len(ref_ts) - 1)
+        ventana_end_test = ref_ts[test_end_idx]
+
+        print(f"\nVentana {window_idx}{' (ÚLTIMA - ADAPTATIVA)' if is_last_window else ''}:")
+        print(f"  Train: {ventana_start_train} -> {ventana_end_train}")
+        print(f"  Test:  {ventana_start_test} -> {ventana_end_test}")
+        print(f"  Símbolos en ventana: {len(train_indices)}")
+
+        base_arrays = {}
+        for sym, (t0, t1) in train_indices.items():
+            arr_dict = data_dict[sym]
+            ts_slice = arr_dict['ts'][t0:t1].astype('datetime64[ns]')
+            open_slice = np.asarray(arr_dict['open'][t0:t1], dtype=np.float64)
+            high_slice = np.asarray(arr_dict['high'][t0:t1], dtype=np.float64)
+            low_slice = np.asarray(arr_dict['low'][t0:t1], dtype=np.float64)
+            close_slice = np.asarray(arr_dict['close'][t0:t1], dtype=np.float64)
+            volume_slice = np.asarray(arr_dict.get('volume_quote', np.zeros_like(close_slice))[t0:t1], dtype=np.float64)
+            base_arrays[sym] = {
+                'ts': ts_slice, 'open': open_slice, 'high': high_slice,
+                'low': low_slice, 'close': close_slice, 'volume_quote': volume_slice
+            }
+
+        with tqdm_joblib(tqdm(desc=f"🔁 WFO Ventana {window_idx}...", total=len(dict_combinations))):
+            results = Parallel(n_jobs=n_jobs)(
+                delayed(evaluate_WFO)(params, base_arrays) for params in dict_combinations
+            )
+
+        best_criterion, best_params = max(results, key=lambda x: x[0])
+        best_params_list.append(best_params)
+
+        print(f"  Mejor criterio: {best_criterion:.4f}")
+        print(f"  Mejores parámetros: {best_params}")
+
+        window_idx += 1
+        if is_last_window:
+            break
+
+        if anchored:
+            end += length_test
+        else:
+            start += length_train_set + length_test
+            end = start + length_train_set
+
+    df_params = pd.DataFrame(best_params_list)
+    df_num = df_params.select_dtypes(include=[np.number])
+    df_cat = df_params.select_dtypes(exclude=[np.number])
+    df_num_ewm = df_num.ewm(com=com_ewm, ignore_na=True).mean()
+
+    if not df_cat.empty:
+        df_cat_mode = df_cat.mode().iloc[-1:] if len(df_cat) > 0 else df_cat.iloc[-1:]
+        df_final = pd.concat([df_num_ewm, df_cat_mode], axis=1)
+    else:
+        df_final = df_num_ewm
+
+    final_params = df_final.iloc[-1].to_dict()
+    print(f"\n✅ WFO completado: {window_idx} ventanas procesadas")
+    return final_params

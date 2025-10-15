@@ -81,32 +81,34 @@ def report_backtesting(df,
 #     print(analysis_df.round(2).to_string(index=False))
 # =============================================================================
          
-    metric_columns = [
-        'Net_Gain_pct', 
-        'Win_Ratio', 
-        'Num_Signals', 
-        'Sharpe', 
-        'DD_pct'
-    ]
-
-    # Reorganizar columnas: parámetros primero, luego métricas
+    metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals']
+    
+    # Reorder columns: parameters first, then metrics
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
-
-    # -----------------------------
-    # TOP COMBOS
-    # -----------------------------
-    df_top = df_portfolio.sort_values(by='Net_Gain_pct', ascending=False).head(3).copy()
-    df_top['Num_Signals'] = df_top['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     
-    print("\n🥇 Top 3 combos by Net_Gain_pct:")
-    print(df_top.round(2).to_string(index=False))
-
-    df_top_win = df_portfolio.sort_values(by='Sharpe', ascending=False).head(3).copy()
-    df_top_win['Num_Signals'] = df_top_win['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+    # -----------------------------
+    # 🧠 BEST COMBOS PER METRIC
+    # -----------------------------
+    best_netgain = df_portfolio.loc[df_portfolio['Net_Gain_pct'].idxmax()]
+    best_sharpe  = df_portfolio.loc[df_portfolio['Sharpe'].idxmax()]
+    best_dd      = df_portfolio.loc[df_portfolio['DD_pct'].idxmin()]
     
-    print("\n🥇 Top 3 combos by Sharpe:")
-    print(df_top_win.round(2).to_string(index=False))
+    # Build summary table
+    df_summary = pd.DataFrame([
+        {'Metric': 'Net Gain % ', **best_netgain},
+        {'Metric': 'Sharpe     ',     **best_sharpe},
+        {'Metric': 'Lowest DD %', **best_dd}
+    ])
+    
+    # Format numeric values
+    df_summary['Num_Signals'] = df_summary['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+    df_summary = df_summary.round(2)
+    
+    print("\n🏆 Summary of best parameter combinations by metric:")
+    print(df_summary.to_string(index=False))
+
+
     
     # -----------------------------
     # PLOTS
@@ -154,9 +156,6 @@ def report_backtesting(df,
     return df_portfolio, mi_series
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import pandas as pd
 
     # -----------------------------
     # RESUMEN POR COMBINACIÓN
@@ -204,18 +203,38 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     # -----------------------------
     # HISTOGRAMAS
     # -----------------------------
-    path_grouped = df_portfolio.groupby('path_index')['Portfolio_Final_Balance'].mean().reset_index()
-    path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance)/initial_balance*100
-
-    plt.figure(figsize=(10,6))
-    data2 = path_grouped['Net_Gain_pct'].dropna()
-    plt.hist(data2, bins=max(10,min(50,len(data2))), edgecolor='white', color='#1f77b4')
-    plt.xlabel('Net Gain pct Portafolio (path_IDX)')
-    plt.ylabel('Frequency')
-    plt.title('Distribution: Net Gain pct Portafolio per Path_IDX')
-    plt.grid(True, linestyle='--', alpha=0.5)
+    path_grouped = df_portfolio.groupby('path_index').agg({
+        'Portfolio_Final_Balance': 'mean',
+        'DD': 'mean'  # Asegurarnos de tener el drawdown medio por path_index
+    }).reset_index()
+    
+    # Calcular Net Gain %
+    path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
+    
+    # Subplots: 2 filas, 1 columna
+    fig, axes = plt.subplots(2, 1, figsize=(22,10))  # altura mayor para que no se solapen
+    
+    # Histograma Net_Gain_pct
+    data_gain = path_grouped['Net_Gain_pct'].dropna()
+    axes[0].hist(data_gain, bins=max(10,min(50,len(data_gain))), edgecolor='white', color='#1f77b4')
+    axes[0].set_xlabel('Net Gain pct Portafolio (path_IDX)')
+    axes[0].set_ylabel('Frequency')
+    axes[0].set_title('Distribution: Net Gain pct per Path_IDX')
+    axes[0].grid(True, linestyle='--', alpha=0.5)
+    
+    # Histograma DD
+    data_dd = path_grouped['DD'].dropna()
+    axes[1].hist(data_dd, bins=max(10,min(50,len(data_dd))), edgecolor='white', color='#2ca02c')
+    axes[1].set_xlabel('DD pct Portafolio (path_IDX)')
+    axes[1].set_ylabel('Frequency')
+    axes[1].set_title('Distribution: Drawdown per Path_IDX')
+    axes[1].grid(True, linestyle='--', alpha=0.5)
+    
+    plt.tight_layout()  # Ajusta automáticamente los espacios
     plt.show()
     plt.close()
+
+
 
     # -----------------------------
     # TOP 3 COMBOS
@@ -233,7 +252,20 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     print(df_summary.sort_values(by='Sharpe_m', ascending=False).head(3)[cols_to_show].round(2).to_string(index=False))
 
     median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
-    print(f"\n🎲 P50 Net_Gain_pct per Path: {median_gain:.2f}%")
+    print(f"\n🎲 P50 Net_Gain_pct per Path    : {median_gain:.2f}%")
+
+    # -----------------------------
+    # Desviación estándar
+    # -----------------------------
+    std_gain = path_grouped['Net_Gain_pct'].dropna().std()
+    print(f"🎲 Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
+
+    # -----------------------------
+    # Probabilidad de path negativo
+    # -----------------------------
+    prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
+    print(f"🎲 Probability of Negative Path : {prob_negative:.2f}%")
+
 
     return df_summary
 

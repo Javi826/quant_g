@@ -9,42 +9,43 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-
+#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 
-from Z_add_signals_03 import add_indicators, explosive_signal
+from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 
-start_time   = time.time()
-SAVE_SYMBOLS = False
-STRATEGY     ="entropy"
+start_time         = time.time()
+SAVE_SYMBOLS       = False
+STRATEGY           ="entropy"
+N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_UPTO"
 DATE_MIN            = "2025-01-03"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 500_000
+MIN_VOL_USDT        = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST     = [10,15,20,25]
-ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
+ENTROPY_MAX_LIST    = [0.6,0.8,1.0,1.2,1.4,1.6]
 ACCEL_SPAN_LIST     = [10,15,20]
 
-TP_PCT_LIST         = [10,15]
-SL_PCT_LIST         = [10,15]
+TP_PCT_LIST         = [0,5,10]
+SL_PCT_LIST         = [0,5,10]
 
 # =============================================================================
 # =============================================================================
-# SELL_AFTER_LIST    = [20,25,30]
-# ENTROPY_MAX_LIST   = [0.6,1.0,1.5]
-# ACCEL_SPAN_LIST    = [5,10,15]
+# SELL_AFTER_LIST    = [15]
+# ENTROPY_MAX_LIST   = [1.6]
+# ACCEL_SPAN_LIST    = [20]
 # 
-# TP_PCT_LIST        = [0,15,20]
-# SL_PCT_LIST        = [0,15,20]
+# TP_PCT_LIST        = [0]
+# SL_PCT_LIST        = [0]
 # =============================================================================
 # =============================================================================
 
@@ -56,7 +57,7 @@ lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 # -----------------------------------------------------------------------------
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
 
-ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
+ohlcv_data, filtered_symbols = filter_symbols(
     symbols,
     min_vol_usdt=MIN_VOL_USDT,
     timeframe=TIMEFRAME,
@@ -76,7 +77,7 @@ for sym, df in ohlcv_data.items():
         'high': df['high'].to_numpy(dtype=np.float64),
         'low': df['low'].to_numpy(dtype=np.float64),
         'close': df['close'].to_numpy(dtype=np.float64),
-        'volume': df['volume'].to_numpy(dtype=np.float64) if 'volume' in df.columns else np.zeros(len(df))
+        'volume_quote': df['volume_quote'].to_numpy(dtype=np.float64) if 'volume_quote' in df.columns else np.zeros(len(df))
     }
 
 # -----------------------------------------------------------------------------
@@ -87,17 +88,17 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_base.items():
-        entropia, accel   = add_indicators(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
-        signal            = explosive_signal(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
+        entropia, accel   = add_indicators_03(arrs['close'], m_accel=params.get('ACCEL_SPAN', 5))
+        signal            = explosive_signal_03(entropia, accel, entropia_max=params.get('ENTROPY_MAX', 1.0), live=False)
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=params.get('SELL_AFTER', 10),
-        initial_balance=INITIAL_BALANCE,
-        order_amount=ORDER_AMOUNT,
         tp_pct=params.get('TP_PCT', 0),
         sl_pct=params.get('SL_PCT', 0),
+        initial_balance=INITIAL_BALANCE,
+        order_amount=ORDER_AMOUNT,
         comi_pct=0.05
     )
     return comb, results
@@ -111,7 +112,7 @@ all_combinations = list(product(*lists_for_grid))
 # BACKTESTING PARALIZADO
 # -----------------------------------------------------------------------------
 with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinations))) as progress:
-    grid_results_list = Parallel(n_jobs=-1)(
+    grid_results_list = Parallel(n_jobs=N_JOBS)(
         delayed(process_combo)(comb) for comb in all_combinations
     )
 
@@ -165,7 +166,7 @@ print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
 print(f"ENTROPY_MAX_LIST = {ENTROPY_MAX_LIST}")
 print(f"ACCEL_SPAN_LIST  = {ACCEL_SPAN_LIST}")
 print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
-print(f"SL_PCT_LIST      = {SL_PCT_LIST}")
+print(f"SL_PCT_LIST      = {SL_PCT_LIST}\n")
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, initial_capital=INITIAL_BALANCE)
 

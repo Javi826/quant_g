@@ -2,7 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 
-DTYPE = np.float32
+DTYPE = np.float64
 
 def compute_candle_features(df, raw_columns=[]):
     df = df.copy()

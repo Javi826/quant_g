@@ -11,7 +11,8 @@ from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
-from Z_add_signals_04 import add_indicators, explosive_signal
+from Z_add_signals_04 import add_indicators_04, explosive_signal_04
+#from ZZX_DRAFT1 import add_indicators, explosive_signal
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
@@ -22,12 +23,13 @@ STRATEGY     ="patterns"
 DATA_FOLDER            = "data/crypto_2023_UPTO"
 DATE_MIN               = "2025-01-03"
 TIMEFRAME              = '4H'
-MIN_VOL_USDT           = 800_000
+MIN_VOL_USDT           = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST        = [20,25,30,35]
+SELL_AFTER_LIST        = [15,20,25,30]
+ENTROPIA_MAX_LIST      = [1.0,1.5,2.0,2.5]
 
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
@@ -37,8 +39,8 @@ BEARISH_ENGULFING_LIST = [True, False]
 PIERCING_LINE_LIST     = [True, False]
 DARK_CLOUD_COVER_LIST  = [True, False]
 
-TP_PCT_LIST            = [0,10,15]
-SL_PCT_LIST            = [0,10,15]
+TP_PCT_LIST            = [0,10,15,20]
+SL_PCT_LIST            = [0,10,15,20]
 
 # -----------------------------
 # GRID DE PARÁMETROS
@@ -46,13 +48,15 @@ SL_PCT_LIST            = [0,10,15]
 # =============================================================================
 # =============================================================================
 # SELL_AFTER_LIST        = [20]
-# DOJI_LIST              = [False]
-# HAMMER_LIST            = [False]
-# SHOOTING_STAR_LIST     = [False]
+# ENTROPIA_MAX_LIST      = [1.0]
+# 
+# DOJI_LIST              = [True]
+# HAMMER_LIST            = [True]
+# SHOOTING_STAR_LIST     = [True]
 # BULLISH_ENGULFING_LIST = [True]
-# BEARISH_ENGULFING_LIST = [False]
+# BEARISH_ENGULFING_LIST = [True]
 # PIERCING_LINE_LIST     = [False]
-# DARK_CLOUD_COVER_LIST  = [False]
+# DARK_CLOUD_COVER_LIST  = [True]
 # 
 # TP_PCT_LIST            = [0]
 # SL_PCT_LIST            = [0]
@@ -60,7 +64,7 @@ SL_PCT_LIST            = [0,10,15]
 # =============================================================================
 
 param_names = [
-    'SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR',
+    'SELL_AFTER', 'ENTROPIA_MAX', 'DOJI', 'HAMMER', 'SHOOTING_STAR',
     'BULLISH_ENGULFING', 'BEARISH_ENGULFING',
     'PIERCING_LINE', 'DARK_CLOUD_COVER',
     'TP_PCT', 'SL_PCT'
@@ -92,7 +96,7 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, df in ohlcv_data.items():
-        df_ind = add_indicators(df.copy())
+        df_ind = add_indicators_04(df.copy())
 
         # Crear pattern_flags según la combinación de parámetros
         pattern_flags = [
@@ -105,7 +109,13 @@ def process_combo(comb):
             params['DARK_CLOUD_COVER']
         ]
 
-        df_signal = explosive_signal(df_ind, pattern_flags, live=False)
+        # 🆕 PASAMOS entropia_max COMO PARÁMETRO
+        df_signal = explosive_signal_04(
+            df_ind,
+            pattern_flags,
+            entropia_max=params['ENTROPIA_MAX'],
+            live=False
+        )
 
         ohlcv_arrays[sym] = {
             'ts': df_signal.index.values.astype('datetime64[ns]'),
@@ -135,7 +145,7 @@ def process_combo(comb):
 all_combinations = list(product(*lists_for_grid))
 
 # -----------------------------------------------------------------------------
-# BACKTESTING PARALIZADO
+# BACKTESTING PARALELIZADO
 # -----------------------------------------------------------------------------
 with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=-1)(
@@ -178,19 +188,29 @@ for comb, results in grid_results_list:
     })
     grid_records.append(row)
 
-grid_results_df = pd.DataFrame(grid_records, columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance","Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct", "Sharpe"])
+grid_results_df = pd.DataFrame(
+    grid_records,
+    columns=[*param_names,"symbol", "Net_Gain", "Net_Gain_pct", "Final_Balance",
+             "Num_Signals", "Num_Trades", "Win_Ratio", "Avg_Trade", "Median_Trade", "DD_pct", "Sharpe"]
+)
 
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
-save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx", save=False)
+save_results(grid_results_df.to_dict('records'), grid_results_df,
+             filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx", save=False)
 
-print(f"\nTIMEFRAME        : {TIMEFRAME}")
-print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
-print(f"DATE_MIN         : {DATE_MIN}")
-print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
+print(f"\nTIMEFRAME         : {TIMEFRAME}")
+print(f"MIN_VOL_USDT      : {MIN_VOL_USDT}")
+print(f"DATE_MIN          : {DATE_MIN}")
+print(f"SELL_AFTER_LIST   = {SELL_AFTER_LIST}")
+print(f"ENTROPIA_MAX_LIST = {ENTROPIA_MAX_LIST}\n")
 
-df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, initial_capital=INITIAL_BALANCE)
+df_portfolio, mi_series = report_backtesting(
+    df=grid_results_df,
+    parameters=param_names,
+    initial_capital=INITIAL_BALANCE
+)
 
 elapsed = int(time.time() - start_time)
 print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

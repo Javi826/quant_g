@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.ZZ_connect import connect_bitget_03
 from parquet_process.ZZ_parquet_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
-from Z_add_signals_04 import add_indicators, explosive_signal
+from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 from utils.ZX_utils import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv, send_request, PRODUCT_TYPE
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
@@ -32,8 +32,8 @@ def check_latest_signal(df, symbol):
 
     df              = normalize_live_ohlcv(df)
     close_prices    = df['close'].values
-    entropia, accel = add_indicators(close_prices, m_accel=ACCEL_SPAN)
-    signals         = explosive_signal(entropia, accel, entropia_max=ENTROPIA_MAX, live=True)
+    entropia, accel = add_indicators_03(close_prices, m_accel=ACCEL_SPAN)
+    signals         = explosive_signal_03(entropia, accel, entropia_max=ENTROPIA_MAX, live=True)
     last_signal =    signals[-1]
 
     if last_signal:

@@ -14,7 +14,7 @@ from utils.ZZ_connect import connect_bitget_03,BITGET_API_KEY_03,BITGET_API_SECR
 # BITGET CONFIGURATION
 # -----------------------------
 BASE_URL        = "https://api.bitget.com"
-INITIAL_CAPITAL = 511.0  # Initial capital for profitability calculation
+INITIAL_CAPITAL = 511.0  
 
 # -----------------------------
 # Connect with CCXT
@@ -134,7 +134,7 @@ def calculate_winrate_from_history(history: List[Dict[str, Any]]):
 # -----------------------------
 if __name__ == "__main__":
     # Start date for filtering
-    start_date = "2025-10-01"  # change as needed
+    start_date = "2025-10-12"  # change as needed
     start_time = date_to_timestamp_ms(start_date)
 
     # End date always today

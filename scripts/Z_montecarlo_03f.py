@@ -11,8 +11,9 @@ from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from ZX_optimize_MCf import generate_multiple_paths
-from Z_add_signals_03 import add_indicators, explosive_signal
+from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 
 DTYPE = np.float32
 start_time = time.time()
@@ -28,9 +29,9 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_UPTO"
-DATE_MIN            = "2025-01-03"
+DATE_MIN            = "2023-01-03"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 50_000
+MIN_VOL_USDT        = 500_000
 N_JOBS              = -1
 
 # -----------------------------
@@ -40,18 +41,16 @@ SELL_AFTER_LIST     = [10,15,20,25]
 ENTROPY_MAX_LIST    = [0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8]
 ACCEL_SPAN_LIST     = [10,15,20]
 
-TP_PCT_LIST         = [0,2.5,5]
-SL_PCT_LIST         = [0,2.5,5]
+TP_PCT_LIST         = [0,5,10]
+SL_PCT_LIST         = [0,5,10]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [25,30]
-# ENTROPY_MAX_LIST   = [0.6,1.0]
-# ACCEL_SPAN_LIST    = [5,10]
-# 
-# TP_PCT_LIST        = [0,5]
-# SL_PCT_LIST        = [0,5]
-# =============================================================================
+SELL_AFTER_LIST    = [16]
+ENTROPY_MAX_LIST   = [1.4]
+ACCEL_SPAN_LIST    = [15]
+
+TP_PCT_LIST        = [10]
+SL_PCT_LIST        = [0]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -97,10 +96,10 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
             close = arr[:, 3].astype(DTYPE)
 
             # Indicadores y señales sin cache
-            entropia, accel = add_indicators(close, m_accel=param_dict.get('ACCEL_SPAN',5))
+            entropia, accel = add_indicators_03(close, m_accel=param_dict.get('ACCEL_SPAN',5))
             entropia = np.asarray(entropia, dtype=DTYPE)
             accel    = np.asarray(accel, dtype=DTYPE)
-            signal   = explosive_signal(entropia, accel, entropia_max=param_dict.get('ENTROPY_MAX',1.0), live=False)
+            signal   = explosive_signal_03(entropia, accel, entropia_max=param_dict.get('ENTROPY_MAX',1.0), live=False)
             signal   = np.asarray(signal, dtype=DTYPE)
 
             ohlcv_arrays[sym] = {
@@ -119,10 +118,10 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
             result = run_grid_backtest(
                 ohlcv_arrays,
                 sell_after=param_dict.get('SELL_AFTER',10),
-                initial_balance=INITIAL_BALANCE,
-                order_amount=ORDER_AMOUNT,
                 tp_pct=param_dict.get('TP_PCT',0),
                 sl_pct=param_dict.get('SL_PCT',0),
+                initial_balance=INITIAL_BALANCE,
+                order_amount=ORDER_AMOUNT,
                 comi_pct=0.05
             )
         except Exception as e:
@@ -178,7 +177,7 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # -----------------------------
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
 
-ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
+ohlcv_data, filtered_symbols = filter_symbols(
     symbols,
     min_vol_usdt=MIN_VOL_USDT,
     timeframe=TIMEFRAME,
@@ -220,14 +219,14 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------
 # SUMMARY / REPORT
 # -----------------------------
-print(f"TIMEFRAME        : {TIMEFRAME}")
+print(f"\nTIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
 print(f"DATE_MIN         : {DATE_MIN}")
 print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
 print(f"ENTROPY_MAX_LIST = {ENTROPY_MAX_LIST}")
 print(f"ACCEL_SPAN_LIST  = {ACCEL_SPAN_LIST}")
 print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
-print(f"SL_PCT_LIST      = {SL_PCT_LIST}")
+print(f"SL_PCT_LIST      = {SL_PCT_LIST}\n")
 
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 

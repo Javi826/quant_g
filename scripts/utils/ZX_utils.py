@@ -162,17 +162,12 @@ def filter_symbols(symbols,
     # -------------------
     # Summary
     # -------------------
-    print(f"🔹 Total symbols BROKER        : {len(symbols)}")
-    print(f"❌ Symbols removed total       : {len(removed_symbols)}")
-    print(f"✅ Symbols remaining           : {len(filtered_symbols)}\n")
+    print(f"🔹Total symbols BROKER   : {len(symbols)}")
+    print(f"🔹Symbols removed total  : {len(removed_symbols)}")
+    print(f"🔹Symbols remaining      : {len(filtered_symbols)}\n")
 
-# =============================================================================
-#     print("📊 Details by reason:")
-#    for reason, count in removed_by_reasons.items():
-#        print(f"   - {reason:<25}: {count}")
-# =============================================================================
 
-    return ohlcv_data, filtered_symbols, removed_symbols
+    return ohlcv_data, filtered_symbols
 
 def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="symbols_live"):
 
@@ -184,9 +179,10 @@ def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_sy
         print(f"📂 {len(filtered_symbols)} símbolos filtrados guardados en '{path_symbols}'")
 
 
-def load_final_symbols(all_symbols,strategy="_",timeframe="10H"):
+def load_final_symbols(all_symbols,strategy="_",timeframe="4H"):
 
-    folder = "symbols_live"
+    folder = os.path.join(os.path.dirname(__file__), "..", "symbols_live")
+    folder = os.path.abspath(folder)
     try:
 
         path_live    = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")

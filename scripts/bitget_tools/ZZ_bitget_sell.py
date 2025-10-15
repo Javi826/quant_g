@@ -7,8 +7,8 @@ import base64
 import json
 import requests
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils.ZZ_connect import connect_bitget,BITGET_API_KEY,BITGET_API_SECRET,BITGET_API_PASS
-from ZZ_connect import connect_bitget,BITGET_API_KEY,BITGET_API_SECRET,BITGET_API_PASS
+from utils.ZZ_connect import connect_bitget_03,BITGET_API_KEY_03,BITGET_API_SECRET_03,BITGET_API_PASS_03
+
 
 # -----------------------------
 # BITGET ENTROPIA - CREDENCIALES
@@ -32,7 +32,7 @@ def sign_request(timestamp, method, path, query_string, body_str):
     if query_string:
         to_sign += "?" + query_string
     to_sign += body_str
-    digest = hmac.new(BITGET_API_SECRET.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
+    digest = hmac.new(BITGET_API_SECRET_03.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
     return base64.b64encode(digest).decode()
 
 def send_request(method, path, params=None, body=None):
@@ -41,10 +41,10 @@ def send_request(method, path, params=None, body=None):
     body_str = _body_to_str(body)
     sign = sign_request(ts, method, path, query_string, body_str)
     headers = {
-        "ACCESS-KEY": BITGET_API_KEY,
+        "ACCESS-KEY": BITGET_API_KEY_03,
         "ACCESS-SIGN": sign,
         "ACCESS-TIMESTAMP": ts,
-        "ACCESS-PASSPHRASE": BITGET_API_PASS,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_03,
         "Content-Type": "application/json"
     }
     url = BASE_URL + path + (f"?{query_string}" if query_string else "")

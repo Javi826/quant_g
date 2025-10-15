@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_funcional_sharpe_no_cache.py ===
+# === FILE: main_MONTECARLOpy ===
 # -----------------------------------------------------------
 import os
 import time
@@ -10,17 +10,17 @@ from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from ZX_optimize_MCf import generate_multiple_paths
-from Z_add_signals_04 import add_indicators, explosive_signal
-
+from Z_add_signals_04 import add_indicators_04, explosive_signal_04
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 DTYPE = np.float32
 start_time = time.time()
 
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS          = 200
+FINAL_N_PATHS          = 100
 FINAL_N_OBS_PER_PATH   = 3000
 TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -30,13 +30,14 @@ TS_INDEX               = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]'
 DATA_FOLDER            = "data/crypto_2023_UPTO"
 DATE_MIN               = "2025-01-03"
 TIMEFRAME              = '4H'
-MIN_VOL_USDT           = 800_000
+MIN_VOL_USDT           = 500_000
 N_JOBS                 = -1
 
 # -----------------------------
 # GRID DE PARÁMETROS
 # -----------------------------
-SELL_AFTER_LIST        = [15,20,25,30,35]
+SELL_AFTER_LIST        = [10,15,20]
+ENTROPIA_MAX_LIST      = [0.5, 1.0,1.5,2.0]
 
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
@@ -50,27 +51,30 @@ TP_PCT_LIST            = [0,15]
 SL_PCT_LIST            = [0,15]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST        = [20]
-# DOJI_LIST              = [False]
-# HAMMER_LIST            = [False]
-# SHOOTING_STAR_LIST     = [False]
-# BULLISH_ENGULFING_LIST = [True]
-# BEARISH_ENGULFING_LIST = [False]
-# PIERCING_LINE_LIST     = [False]
-# DARK_CLOUD_COVER_LIST  = [False]
-# 
-# TP_PCT_LIST            = [0]
-# SL_PCT_LIST            = [0]
-# =============================================================================
+SELL_AFTER_LIST        = [20]
+ENTROPIA_MAX_LIST      = [0.5]
+
+DOJI_LIST              = [True]
+HAMMER_LIST            = [True]
+SHOOTING_STAR_LIST     = [False]
+BULLISH_ENGULFING_LIST = [False]
+BEARISH_ENGULFING_LIST = [True]
+PIERCING_LINE_LIST     = [True]
+DARK_CLOUD_COVER_LIST  = [False]
+
+TP_PCT_LIST            = [0]
+SL_PCT_LIST            = [15]
+
 # =============================================================================
 
 param_names = [
-    'SELL_AFTER', 'DOJI', 'HAMMER', 'SHOOTING_STAR',
+    'SELL_AFTER', 'ENTROPIA_MAX',
+    'DOJI', 'HAMMER', 'SHOOTING_STAR',
     'BULLISH_ENGULFING', 'BEARISH_ENGULFING',
     'PIERCING_LINE', 'DARK_CLOUD_COVER',
     'TP_PCT', 'SL_PCT'
 ]
+
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
@@ -100,7 +104,7 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
             if path_idx >= arr_paths.shape[0]:
                 continue
 
-            arr = arr_paths[path_idx]  # (n_obs, n_features)
+            arr = arr_paths[path_idx]  
             open_ = arr[:, 0].astype(DTYPE)
             low_  = arr[:, 1].astype(DTYPE)
             high_ = arr[:, 2].astype(DTYPE)
@@ -108,7 +112,7 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
 
             # Indicadores y señales sin cache
             df_dummy = pd.DataFrame({'open': open_, 'high': high_, 'low': low_, 'close': close})
-            df_ind   = add_indicators(df_dummy.copy())
+            df_ind   = add_indicators_04(df_dummy.copy())
             pattern_flags = [
                 param_dict['DOJI'],
                 param_dict['HAMMER'],
@@ -118,7 +122,13 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
                 param_dict['PIERCING_LINE'],
                 param_dict['DARK_CLOUD_COVER']
             ]
-            df_signal = explosive_signal(df_ind, pattern_flags, live=False)
+            df_signal = explosive_signal_04(
+                                        df_ind,
+                                        pattern_flags,
+                                        entropia_max=param_dict['ENTROPIA_MAX'],
+                                        live=False
+                                    )
+
             signal    = np.asarray(df_signal['signal'], dtype=bool)
 
             ohlcv_arrays[sym] = {
@@ -137,10 +147,10 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
             result = run_grid_backtest(
                 ohlcv_arrays,
                 sell_after=param_dict['SELL_AFTER'],
-                initial_balance=INITIAL_BALANCE,
-                order_amount=ORDER_AMOUNT,
                 tp_pct=param_dict['TP_PCT'],
                 sl_pct=param_dict['SL_PCT'],
+                initial_balance=INITIAL_BALANCE,
+                order_amount=ORDER_AMOUNT,
                 comi_pct=0.05
             )
         except Exception as e:
@@ -219,10 +229,11 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------
 # SUMMARY / REPORT
 # -----------------------------
-print(f"TIMEFRAME        : {TIMEFRAME}")
-print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
-print(f"DATE_MIN         : {DATE_MIN}")
-print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
+print(f"\nTIMEFRAME         : {TIMEFRAME}")
+print(f"MIN_VOL_USDT      : {MIN_VOL_USDT}")
+print(f"DATE_MIN          : {DATE_MIN}")
+print(f"SELL_AFTER_LIST   = {SELL_AFTER_LIST}")
+print(f"ENTROPIA_MAX_LIST = {ENTROPIA_MAX_LIST}\n")
 
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
