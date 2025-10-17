@@ -36,7 +36,7 @@ def report_backtesting(df,
     # Mutual Information + Pearson correlation
     # -----------------------------
     if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        print("\n⚠️ df_portfolio vacío o con <5 filas. Mutual Information y Pearson skipped.")
+        print("\n⚠️ df_portfolio empty or <5 filas. Mutual Information y Pearson skipped.\n")
         mi_series = pd.Series([None]*len(parameters), index=parameters)
         pearson_series = pd.Series([None]*len(parameters), index=parameters)
     else:
@@ -88,7 +88,7 @@ def report_backtesting(df,
     df_portfolio = df_portfolio[ordered_columns]
     
     # -----------------------------
-    # 🧠 BEST COMBOS PER METRIC
+    # BEST COMBOS PER METRIC
     # -----------------------------
     best_netgain = df_portfolio.loc[df_portfolio['Net_Gain_pct'].idxmax()]
     best_sharpe  = df_portfolio.loc[df_portfolio['Sharpe'].idxmax()]
@@ -96,63 +96,98 @@ def report_backtesting(df,
     
     # Build summary table
     df_summary = pd.DataFrame([
-        {'Metric': 'Net Gain % ', **best_netgain},
-        {'Metric': 'Sharpe     ',     **best_sharpe},
-        {'Metric': 'Lowest DD %', **best_dd}
+        {'Metric':'Net_Gain_pct', **best_netgain},
+        {'Metric':'Sharpe      ',     **best_sharpe},
+        {'Metric':'Lowest DD   ', **best_dd}
     ])
     
     # Format numeric values
     df_summary['Num_Signals'] = df_summary['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     df_summary = df_summary.round(2)
-    
-    print("\n🏆 Summary of best parameter combinations by metric:")
+
     print(df_summary.to_string(index=False))
-
-
-    
+  
     # -----------------------------
     # PLOTS
     # -----------------------------
     if show_plots:
-        # Histograma DD_pct
-        plt.figure(figsize=(10,6))
-        plt.hist(df_portfolio['DD_pct'].dropna(), bins=20, color='#2ca02c', edgecolor='black', alpha=0.7)
-        plt.xlabel("DD_pct")
-        plt.ylabel("Frequency")
-        plt.title("Distribution of Portfolio Drawdown")
-        plt.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.show()
-        
-        # Histograma Net_Gain_pct
-        plt.figure(figsize=(10,6))
-        plt.hist(df_portfolio['Net_Gain_pct'].dropna(), bins=20, color='#1f77b4', edgecolor='black', alpha=0.7)
-        plt.xlabel("Net_Gain_pct (%)")
-        plt.ylabel("Frequency")
-        plt.title("Distribution of Portfolio Net Gain %")
-        plt.grid(axis='y', linestyle='--', alpha=0.5)
-        plt.show()
 
-        # Curvas por parámetro
-        win_ratio_scale = 100
-        colors = {'Net_Gain_pct':'blue', 'Win_Ratio':'green'}
+        metrics_to_plot = []
+        if 'Net_Gain_pct' in df_portfolio.columns:
+            metrics_to_plot.append('Net_Gain_pct')
+        if 'Win_Ratio' in df_portfolio.columns:
+            metrics_to_plot.append('Win_Ratio')
+        
         for param in parameters:
-            grouped = df_portfolio.groupby(param).agg({
-                'Net_Gain': 'sum',
-                'Win_Ratio': 'mean'
-            }).reset_index()
-            grouped['Net_Gain_pct'] = grouped['Net_Gain'] / initial_capital * 100
-            grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * win_ratio_scale
+            agg_dict = {metric: 'sum' if metric=='Net_Gain_pct' else 'mean' for metric in metrics_to_plot}
+            grouped = df_portfolio.groupby(param).agg(agg_dict).reset_index()
+            
+            # Escalar Win_Ratio para graficar
+            if 'Win_Ratio' in grouped.columns:
+                grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * 100
             
             plt.figure(figsize=(8,5))
-            plt.plot(grouped[param], grouped['Net_Gain_pct'], marker='o', color=colors['Net_Gain_pct'], label='Net_Gain_pct')
-            plt.plot(grouped[param], grouped['Win_Ratio_scaled'], marker='o', color=colors['Win_Ratio'], label=f'Win_Ratio x {win_ratio_scale}')
+            plt.plot(grouped[param], grouped['Net_Gain_pct'], marker='o', color='blue', label='Net_Gain_pct')
+            if 'Win_Ratio_scaled' in grouped.columns:
+                plt.plot(grouped[param], grouped['Win_Ratio_scaled'], marker='o', color='green', label='Win_Ratio x100')
             plt.xlabel(param)
             plt.ylabel('Value')
             plt.title(f"{param} vs Portfolio Metrics")
             plt.legend()
             plt.grid(True, linestyle='--', alpha=0.5)
             plt.show()
-                
+            
+    # -----------------------------
+    # -----------------------------
+    # PLOT: Net Gain % y DD vs Tiempo
+    # -----------------------------
+    
+    def plot_netgain_dd(equity_hist, initial_capital, title="Net Gain % y DD"):
+        timestamps = pd.to_datetime(equity_hist['timestamp'])
+        balances = np.array(equity_hist['balance'])
+        
+        # Net Gain %
+        net_gain_pct = (balances - initial_capital) / initial_capital * 100
+        
+        # Drawdown %
+        cumulative_max = np.maximum.accumulate(balances)
+        dd_pct = (balances - cumulative_max) / cumulative_max * 100
+        
+        fig, ax1 = plt.subplots(figsize=(12,6))
+        
+        ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.0, label='Net Gain %')
+        ax1.set_xlabel("Time")
+        ax1.set_ylabel("Net_Gain_pct", color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+        
+        ax2 = ax1.twinx()
+        ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.2, label='DD %')
+        ax2.set_ylabel("Drawdown", color='red')
+        ax2.tick_params(axis='y', labelcolor='red')
+        
+        fig.suptitle(title)
+        fig.autofmt_xdate()
+        ax1.grid(True, linestyle='--', alpha=0.6)
+        
+        # Leyenda combinada
+        lines, labels = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines + lines2, labels + labels2, loc='best')
+        
+        plt.show()
+    
+    # -----------------------------
+    # Uso en tu función
+    # -----------------------------
+    best_row = df.loc[df["Net_Gain_pct"].idxmax()]
+    equity_hist = best_row.get("sim_balance_history", None)
+    plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Net Gain")
+ 
+    best_row = df.loc[df["Sharpe"].idxmax()]
+    equity_hist = best_row.get("sim_balance_history", None)
+
+    plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
+         
     return df_portfolio, mi_series
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):
@@ -233,38 +268,57 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     plt.tight_layout()  # Ajusta automáticamente los espacios
     plt.show()
     plt.close()
-
-
-
+    
     # -----------------------------
     # TOP 3 COMBOS
     # -----------------------------
     cols_to_show = [c for c in df_summary.columns if c not in ['Net_Gain_m','Rows']]
     
+    # -----------------------------
+    # MEJORES COMBOS POR MÉTRICA
+    # -----------------------------
     SHARPE_ADJUSTMENT_FACTOR = 1e6
-    
     df_summary['Sharpe_m'] = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
-    print('\n🎲 Top 3 combos per Net_Gain_pct_m:')
-    print(df_summary[cols_to_show].head(3).round(2).to_string(index=False))
     
+    # Determinar las mejores combinaciones por métrica
+    best_netgain = df_summary.loc[df_summary['Net_Gain_pct_m'].idxmax()]
+    best_sharpe  = df_summary.loc[df_summary['Sharpe_m'].idxmax()]
+    best_dd      = df_summary.loc[df_summary['DD_m'].idxmin()]
+    
+    # Construir tabla resumen
+    df_best = pd.DataFrame([
+        {'Metric': 'Net_Gain_pct',   **best_netgain},
+        {'Metric': 'Sharpe      ',       **best_sharpe},
+        {'Metric': 'Lowest DD   ',  **best_dd}
+    ])
+    
+    # Eliminar columnas innecesarias si existen
+    df_best = df_best.drop(columns=['Net_Gain_m', 'Rows'], errors='ignore')
+    
+    # Reordenar columnas: Metric primero
+    cols = ['Metric'] + [c for c in df_best.columns if c != 'Metric']
+    df_best = df_best[cols]
+    
+    # Redondear y formatear
+    df_best = df_best.round(2)
 
-    print('\n🎲 Top 3 combos per Sharpe_m:')
-    print(df_summary.sort_values(by='Sharpe_m', ascending=False).head(3)[cols_to_show].round(2).to_string(index=False))
+    print(df_best.to_string(index=False))
+
 
     median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
-    print(f"\n🎲 P50 Net_Gain_pct per Path    : {median_gain:.2f}%")
+    print(f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%")
 
     # -----------------------------
     # Desviación estándar
     # -----------------------------
     std_gain = path_grouped['Net_Gain_pct'].dropna().std()
-    print(f"🎲 Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
+    print(f"Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
 
     # -----------------------------
     # Probabilidad de path negativo
     # -----------------------------
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
-    print(f"🎲 Probability of Negative Path : {prob_negative:.2f}%")
+    print(f"Probability of Negative Path : {prob_negative:.2f}%")
 
 
     return df_summary

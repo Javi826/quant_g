@@ -82,9 +82,6 @@ def explosive_signal_04(df, pattern_flags, entropia_max=2.0, live=False):
     for pat in active_patterns:
         signal |= df[pat]
 
-    # -----------------------------
-    # FILTRO DE ENTROPÍA
-    # -----------------------------
     signal &= (df['entropia'] < entropia_max)
 
     if not live:

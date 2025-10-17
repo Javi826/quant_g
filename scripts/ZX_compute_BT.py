@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 MIN_PRICE       = 0.0001
 INITIAL_BALANCE = 10000
 ORDER_AMOUNT    = 100
+COMISION = 0.05
 
 # ============================
 # Helper: get_price_at_int - OPTIMIZADO
@@ -75,7 +76,9 @@ def prepare_data(ohlcv_arrays):
             'high': data.get('high'),
             'low': data.get('low'),
             'signal': data['signal'],
-            'len': len(ts)
+            'len': len(ts),
+            'high_time': data.get('high_time'),
+            'low_time': data.get('low_time')
         }
         
         ts_int_arrays[sym] = ts_int
@@ -185,45 +188,74 @@ def close_expired_positions(t_int, open_heap, sym_data_local, ts_int_arrays, clo
 # ============================
 
 def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
+
     intravela_detected = False
     chosen_idx = None
     exit_reason = None
     exec_price = None
 
-    if tp_price is not None or sl_price is not None:
-        if d['high'] is not None and d['low'] is not None:
-            start = buy_idx + 1
-            end = sell_idx
-            if end >= start:
-                high_slice = d['high'][start:end+1]
-                low_slice = d['low'][start:end+1]
-                tp_hits = np.where((tp_price is not None) & (high_slice >= tp_price))[0]
-                sl_hits = np.where((sl_price is not None) & (low_slice <= sl_price))[0]
-                tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-                sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+    if tp_price is None and sl_price is None:
+        return intravela_detected, chosen_idx, exit_reason, exec_price
 
-                if tp_first is not None and sl_first is not None:
-                    if sl_first <= tp_first:
-                        chosen_idx = sl_first
-                        exit_reason = 'SL'
-                        exec_price = sl_price
-                    else:
-                        chosen_idx = tp_first
-                        exit_reason = 'TP'
-                        exec_price = tp_price
-                    intravela_detected = True
-                elif sl_first is not None:
-                    chosen_idx = sl_first
-                    exit_reason = 'SL'
-                    exec_price = sl_price
-                    intravela_detected = True
-                elif tp_first is not None:
-                    chosen_idx = tp_first
-                    exit_reason = 'TP'
-                    exec_price = tp_price
-                    intravela_detected = True
+    if d['high'] is None or d['low'] is None:
+        return intravela_detected, chosen_idx, exit_reason, exec_price
+
+    start = buy_idx + 1
+    end = sell_idx
+    if end < start:
+        return intravela_detected, chosen_idx, exit_reason, exec_price
+
+    # slices de high y low
+    high_slice = d['high'][start:end+1]
+    low_slice = d['low'][start:end+1]
+
+    # encontrar los primeros índices que alcanzan TP o SL
+    tp_hits = np.where((tp_price is not None) & (high_slice >= tp_price))[0]
+    sl_hits = np.where((sl_price is not None) & (low_slice <= sl_price))[0]
+
+    tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
+    sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+
+    if tp_first is not None and sl_first is not None:
+        # revisar tiempos intrabar si están disponibles
+        tp_time = d.get('high_time', None)
+        sl_time = d.get('low_time', None)
+
+        if tp_time is not None and sl_time is not None:
+            tp_time_val = tp_time[tp_first]
+            sl_time_val = sl_time[sl_first]
+            if sl_time_val <= tp_time_val:
+                chosen_idx = sl_first
+                exit_reason = 'SL'
+                exec_price = sl_price
+            else:
+                chosen_idx = tp_first
+                exit_reason = 'TP'
+                exec_price = tp_price
+        else:
+            # fallback a índices si no hay timestamps
+            if sl_first <= tp_first:
+                chosen_idx = sl_first
+                exit_reason = 'SL'
+                exec_price = sl_price
+            else:
+                chosen_idx = tp_first
+                exit_reason = 'TP'
+                exec_price = tp_price
+        intravela_detected = True
+    elif sl_first is not None:
+        chosen_idx = sl_first
+        exit_reason = 'SL'
+        exec_price = sl_price
+        intravela_detected = True
+    elif tp_first is not None:
+        chosen_idx = tp_first
+        exit_reason = 'TP'
+        exec_price = tp_price
+        intravela_detected = True
 
     return intravela_detected, chosen_idx, exit_reason, exec_price
+
 
 # ============================
 # Helper: compute_post_backtest_metrics

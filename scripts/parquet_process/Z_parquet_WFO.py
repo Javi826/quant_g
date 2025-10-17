@@ -1,5 +1,4 @@
 import os
-import sys
 import pandas as pd
 from pathlib import Path
 
@@ -10,28 +9,28 @@ CURRENT_DIR = Path(__file__).resolve().parent
 BASE_DIR = CURRENT_DIR.parent
 
 # Nombre de la carpeta que quieres leer
-FOLDER_NAME = "crypto_2021"
+FOLDER_NAME = "crypto_2023"
 
 # Ruta a la carpeta dentro de "data"
 SOURCE_FOLDER = BASE_DIR / "data" / FOLDER_NAME
 
 # Fechas
-END_DATE   = "2025-01-01"
-START_DATE = "2025-01-02"
+END_DATE   = "2025-03-01"
+START_DATE = "2025-03-02"
 
 # Carpetas destino (al mismo nivel que "data")
-TARGET_FOLDER_UPTO    = BASE_DIR / f"{FOLDER_NAME}_UPTO"
-TARGET_FOLDER_ONWARDS = BASE_DIR / f"{FOLDER_NAME}_ONWARDS"
+TARGET_FOLDER_UPTO    = BASE_DIR / "data" / f"{FOLDER_NAME}_IS"
+TARGET_FOLDER_ONWARDS = BASE_DIR / "data" / f"{FOLDER_NAME}_OOS"
 
 print("SOURCE_FOLDER:", SOURCE_FOLDER)
-print("Existe SOURCE_FOLDER?", SOURCE_FOLDER.exists())
+print("SOURCE_FOLDER?", SOURCE_FOLDER.exists())
 
 
 os.makedirs(TARGET_FOLDER_UPTO, exist_ok=True)
 os.makedirs(TARGET_FOLDER_ONWARDS, exist_ok=True)
 
 # Convert dates to datetime
-end_datetime = pd.to_datetime(END_DATE)
+end_datetime   = pd.to_datetime(END_DATE)
 start_datetime = pd.to_datetime(START_DATE)
 
 # List all parquet and Excel files in the source folder
@@ -39,8 +38,6 @@ files = list(Path(SOURCE_FOLDER).glob("*.parquet")) + list(Path(SOURCE_FOLDER).g
 
 for file_path in files:
     try:
-        # Read the file depending on its extension
-        # Read the file depending on its extension
         if file_path.suffix == ".parquet":
             df = pd.read_parquet(file_path)
         elif file_path.suffix == ".xlsx":
@@ -57,7 +54,6 @@ for file_path in files:
                 df = df.set_index("timestamp")
             else:
                 df.index = pd.to_datetime(df.index, errors="coerce")
-
 
         # -----------------------------
         # Cut upto END_DATE (_UPTO)

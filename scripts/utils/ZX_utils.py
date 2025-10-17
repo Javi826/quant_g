@@ -19,12 +19,6 @@ from email.mime.multipart import MIMEMultipart
 np.random.seed(42)
 random.seed(42)
 
-# EMAIL CONFIG
-# -----------------------------
-EMAIL_FROM     = "jlahoz.ferrandez@gmail.com"
-EMAIL_PASSWORD = "tvli cxgk duwh yzdd"
-EMAIL_TO       = "jlahoz.ferrandez@gmail.com"
-
 API_KEY        = "bg_afdcb9221ad98efb3b0b7bdd4c236338"
 API_SECRET     = "0c4214cbfccfb648f841b43ca5d68531c8fb44b75ab271fdd222da9a74ee413f"
 API_PASSPHRASE = "Cryptobitget86"
@@ -61,8 +55,8 @@ def filter_symbols(symbols,
                    data_folder=None, 
                    exchange=None,
                    min_price=None, 
-                   vol_window=50,
-                   date_min=None):  # <-- Nuevo parámetro
+                   vol_window=50):
+
 
 
     ohlcv_data = {}
@@ -76,8 +70,7 @@ def filter_symbols(symbols,
         "Last close too low": 0,
         "Avg volume too low": 0,
         "Contains zeros": 0,
-        "File missing": 0,
-        "First candle before DATE_MIN": 0  # Nuevo motivo
+        "File missing": 0
     }
 
     for sym in symbols:
@@ -122,17 +115,6 @@ def filter_symbols(symbols,
             else:
                 df.index = pd.to_datetime(df.index, errors="coerce")
 
-
-        # ------------------- 
-        # DATE_MIN
-        # -------------------
-        
-        if removed_reason is None and date_min is not None:
-            first_date = df.index.min()
-            if first_date > pd.to_datetime(date_min):
-                removed_reason = "First candle before DATE_MIN"
-
-
         # -------------------
         # Min price
         # -------------------
@@ -148,7 +130,23 @@ def filter_symbols(symbols,
             avg_vol = df['volume_quote'].tail(vol_window).mean()
             if avg_vol < min_vol_usdt:
                 removed_reason = "Avg volume too low"
-
+                              
+        # -------------------
+        # MIN BARRS
+        # -------------------
+            
+        if removed_reason is None:
+            n_rows = len(df)
+            if timeframe is None or timeframe == "4H":
+                min_bars = 1000
+            elif timeframe == "1H":
+                min_bars = 4000
+            else:
+                min_bars = 1000  # Ajustable para otros timeframes
+        
+            if n_rows < min_bars:
+                removed_reason = "Not enough bars"
+                
         # -------------------
         # Registrar resultado
         # -------------------
@@ -386,7 +384,12 @@ def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",sa
 
         grid_results_df.to_excel(filename, index=False)
         print(f"📂 File saved successfully as: {filename}")
-      
+
+# EMAIL CONFIG
+# -----------------------------
+EMAIL_FROM     = "jlahoz.ferrandez@gmail.com"
+EMAIL_PASSWORD = "tvli cxgk duwh yzdd"
+EMAIL_TO       = "jlahoz.ferrandez@gmail.com"
 
 def send_email(detected_cryptos):
     if not detected_cryptos: return
