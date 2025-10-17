@@ -13,7 +13,6 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
 from Z_add_signals_04 import add_indicators_04, explosive_signal_04
-#from ZZX_DRAFT1 import add_indicators, explosive_signal
 
 start_time          = time.time()
 SAVE_SYMBOLS        = False
@@ -30,7 +29,7 @@ MIN_VOL_USDT           = 50_000
 # GRID DE PARÁMETROS
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST        = [15,20,25,30]
-ENTROPIA_MAX_LIST      = [1.0,1.5,2.0,2.5]
+ENTROPIA_MAX_LIST      = [0.5,1.0,1.5,2.0]
 
 DOJI_LIST              = [True, False]
 HAMMER_LIST            = [True, False]
@@ -40,23 +39,25 @@ BEARISH_ENGULFING_LIST = [True, False]
 PIERCING_LINE_LIST     = [True, False]
 DARK_CLOUD_COVER_LIST  = [True, False]
 
-TP_PCT_LIST            = [0,10,15,20]
-SL_PCT_LIST            = [0,10,15,20]
+TP_PCT_LIST            = [0,10,15]
+SL_PCT_LIST            = [0,10,15]
 
 # =============================================================================
-SELL_AFTER_LIST        = [20,30]
-ENTROPIA_MAX_LIST      = [1.0,2.0]
-
-DOJI_LIST              = [True,False]
-HAMMER_LIST            = [True]
-SHOOTING_STAR_LIST     = [True]
-BULLISH_ENGULFING_LIST = [True]
-BEARISH_ENGULFING_LIST = [True]
-PIERCING_LINE_LIST     = [False]
-DARK_CLOUD_COVER_LIST  = [True]
-
-TP_PCT_LIST            = [0,5]
-SL_PCT_LIST            = [0,6]
+# =============================================================================
+# SELL_AFTER_LIST        = [20,30]
+# ENTROPIA_MAX_LIST      = [1.0,2.0]
+# 
+# DOJI_LIST              = [True,False]
+# HAMMER_LIST            = [True]
+# SHOOTING_STAR_LIST     = [True]
+# BULLISH_ENGULFING_LIST = [True]
+# BEARISH_ENGULFING_LIST = [True]
+# PIERCING_LINE_LIST     = [False]
+# DARK_CLOUD_COVER_LIST  = [True]
+# 
+# TP_PCT_LIST            = [0,5]
+# SL_PCT_LIST            = [0,6]
+# =============================================================================
 # =============================================================================
 
 param_names = [
@@ -93,10 +94,8 @@ def process_combo(comb):
     for sym in ohlcv_data.keys():
         df = ohlcv_data[sym].copy()
 
-        # Añadimos indicadores
         df_ind = add_indicators_04(df)
 
-        # Crear pattern_flags según la combinación de parámetros
         pattern_flags = [
             params['DOJI'],
             params['HAMMER'],
@@ -107,7 +106,6 @@ def process_combo(comb):
             params['DARK_CLOUD_COVER']
         ]
 
-        # Generamos señales
         df_signal = explosive_signal_04(
             df_ind, 
             pattern_flags, 
@@ -115,12 +113,10 @@ def process_combo(comb):
             live=False
         )
 
-        # Convertimos a arrays para backtesting
         arr = prepare_ohlcv_arrays({sym: df_signal})[sym]
         arr['signal'] = df_signal['signal'].to_numpy(dtype=bool)
         ohlcv_arrays_combo[sym] = arr
 
-    # Ejecutar backtest
     results = run_grid_backtest(
         ohlcv_arrays_combo,
         sell_after=params['SELL_AFTER'],

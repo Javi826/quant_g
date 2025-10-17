@@ -7,7 +7,7 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
 from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 from utils.ZX_analysis import report_backtesting
@@ -17,7 +17,7 @@ from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 start_time         = time.time()
 SAVE_SYMBOLS       = False
 STRATEGY           ="entropy"
-N_JOBS             =1
+N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
@@ -37,12 +37,12 @@ TP_PCT_LIST         = [0,5,10,15]
 SL_PCT_LIST         = [0,5,10,15]
 
 # =============================================================================
-SELL_AFTER_LIST    = [20]
-ENTROPY_MAX_LIST   = [0.8]
-ACCEL_SPAN_LIST    = [15]
+SELL_AFTER_LIST    = [20,25,30]
+ENTROPY_MAX_LIST   = [0.4,0.6,0.8]
+ACCEL_SPAN_LIST    = [5,10,15]
 
 TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [5]
+SL_PCT_LIST        = [0,5]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']

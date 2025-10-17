@@ -15,7 +15,8 @@ start_time = time.time()
 # WFO SETTINGS
 # -----------------------------
 ANCHORED            = False
-LENGTH_TRAIN_SET    = 1800
+LENGTH_TRAIN_SET    = 800
+APROXIMATION        = 1.5
 N_JOBS              = -1 
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN

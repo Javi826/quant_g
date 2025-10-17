@@ -9,7 +9,7 @@ from collections import Counter
 
 def walk_forward_optimization(ohlcv_arr, param_ranges,
                               length_train_set=2000, pct_train_set=0.8,
-                              anchored=True, com_ewm=2.0,
+                              anchored=True, 
                               evaluate_fn=None,
                               n_jobs=-1):
 
