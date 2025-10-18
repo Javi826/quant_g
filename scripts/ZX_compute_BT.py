@@ -82,45 +82,34 @@ def prepare_data(ohlcv_arrays):
         }
         
         ts_int_arrays[sym] = ts_int
-        close_arrays[sym] = close_view
+        close_arrays[sym]  = close_view
         all_ts_int_lists.append(ts_int)
     
-    # Construir signals_by_time de forma más eficiente
     signals_by_time = defaultdict(list)
     
     for sym in symbols:
         signal_array = sym_data[sym]['signal']
         ts_int = sym_data[sym]['ts_int']
         
-        # Usar nonzero directamente y evitar iteración python
         sig_idxs = np.nonzero(signal_array)[0]
         
         if sig_idxs.size > 0:
-            # Extraer timestamps de señales de una vez
             t_ints_for_signals = ts_int[sig_idxs]
             
-            # Versión optimizada: construir lista de tuplas de una vez
             signal_tuples = [(sym, int(idx)) for idx in sig_idxs]
             
-            # Agrupar por timestamp
             for t_int, sig_tuple in zip(t_ints_for_signals, signal_tuples):
                 signals_by_time[int(t_int)].append(sig_tuple)
     
-    # Concatenar todos los timestamps de una vez (más eficiente que hstack incremental)
     if all_ts_int_lists:
-        # Concatenar y obtener únicos en un solo paso
+
         all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists))
     else:
         all_timestamps_int = np.array([], dtype=np.int64)
     
-    # Conversión directa usando view (más rápido que astype cuando es posible)
-    all_timestamps_dt = all_timestamps_int.view('datetime64[ns]')
-    
-    # Pre-construir symbol_order de forma más eficiente
-    symbol_order = {s: i for i, s in enumerate(symbols)}
-    
-    # Convertir defaultdict a dict regular (evita overhead en accesos futuros)
-    signals_by_time = dict(signals_by_time)
+    all_timestamps_dt = all_timestamps_int.view('datetime64[ns]')   
+    symbol_order      = {s: i for i, s in enumerate(symbols)}   
+    signals_by_time   = dict(signals_by_time)
     
     return sym_data, signals_by_time, all_timestamps_int, all_timestamps_dt, symbol_order, ts_int_arrays, close_arrays
 
@@ -197,8 +186,9 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
     if tp_price is None and sl_price is None:
         return intravela_detected, chosen_idx, exit_reason, exec_price
 
+    # 🚨 Exigir que existan high y low — si no, lanzar error
     if d['high'] is None or d['low'] is None:
-        return intravela_detected, chosen_idx, exit_reason, exec_price
+        raise ValueError(f"Faltan datos de 'high' o 'low' para el símbolo {d.get('symbol', '?')}")
 
     start = buy_idx + 1
     end = sell_idx
@@ -209,15 +199,12 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
     high_slice = d['high'][start:end+1]
     low_slice = d['low'][start:end+1]
 
-    # encontrar los primeros índices que alcanzan TP o SL
-    tp_hits = np.where((tp_price is not None) & (high_slice >= tp_price))[0]
-    sl_hits = np.where((sl_price is not None) & (low_slice <= sl_price))[0]
-
+    tp_hits = np.where(high_slice >= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
+    sl_hits = np.where(low_slice <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
     tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
     sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
 
     if tp_first is not None and sl_first is not None:
-        # revisar tiempos intrabar si están disponibles
         tp_time = d.get('high_time')
         sl_time = d.get('low_time')
 
@@ -233,7 +220,6 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
                 exit_reason = 'TP'
                 exec_price = tp_price
         else:
-            # fallback a índices si no hay timestamps
             if sl_first <= tp_first:
                 chosen_idx = sl_first
                 exit_reason = 'SL'

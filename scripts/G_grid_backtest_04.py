@@ -43,21 +43,19 @@ TP_PCT_LIST            = [0,10,15]
 SL_PCT_LIST            = [0,10,15]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST        = [20,30]
-# ENTROPIA_MAX_LIST      = [1.0,2.0]
-# 
-# DOJI_LIST              = [True,False]
-# HAMMER_LIST            = [True]
-# SHOOTING_STAR_LIST     = [True]
-# BULLISH_ENGULFING_LIST = [True]
-# BEARISH_ENGULFING_LIST = [True]
-# PIERCING_LINE_LIST     = [False]
-# DARK_CLOUD_COVER_LIST  = [True]
-# 
-# TP_PCT_LIST            = [0,5]
-# SL_PCT_LIST            = [0,6]
-# =============================================================================
+SELL_AFTER_LIST        = [20,30]
+ENTROPIA_MAX_LIST      = [1.0,2.0]
+
+DOJI_LIST              = [True,False]
+HAMMER_LIST            = [True]
+SHOOTING_STAR_LIST     = [True]
+BULLISH_ENGULFING_LIST = [True]
+BEARISH_ENGULFING_LIST = [True]
+PIERCING_LINE_LIST     = [False]
+DARK_CLOUD_COVER_LIST  = [True]
+
+TP_PCT_LIST            = [0,5]
+SL_PCT_LIST            = [0,6]
 # =============================================================================
 
 param_names = [

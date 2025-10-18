@@ -1,9 +1,12 @@
+import os
 import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
+
+DATA_FOLDER         = "data/crypto_2023_ISOLD"
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_rows', None)
@@ -22,14 +25,10 @@ def report_backtesting(df,
     # -----------------------------
     # Métricas derivadas
     # -----------------------------
-    # Porcentaje sobre capital inicial
     df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
-
-    # Beneficio por señal
     df["Gain_signal"] = df["Net_Gain"] / df["Num_Signals"]
     df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
 
-    # Ordenar por ganancia neta
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
     
     # -----------------------------
@@ -42,24 +41,16 @@ def report_backtesting(df,
     else:
         y = df_portfolio["Net_Gain"].values
         X = df_portfolio[parameters].copy()
+        discrete_flags = [X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer) for col in X.columns]
 
-        # Flags de discreto (int o bool)
-        discrete_flags = [
-            X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer)
-            for col in X.columns
-        ]
-
-        # Convertir booleans a int para MI
         X_mi = X.copy()
         for col in X_mi.columns:
             if X_mi[col].dtype == bool:
                 X_mi[col] = X_mi[col].astype(int)
 
-        # Mutual Information
         mi_values = mutual_info_regression(X_mi, y, discrete_features=discrete_flags, random_state=42)
         mi_series = pd.Series(mi_values, index=parameters)
 
-        # Pearson correlation
         pearson_values = []
         for col in X.columns:
             x_col = X[col].astype(int) if X[col].dtype == bool else X[col]
@@ -70,20 +61,12 @@ def report_backtesting(df,
             pearson_values.append(corr)
         pearson_series = pd.Series(pearson_values, index=parameters)
 
-    # Mostrar análisis MI & Pearson
     analysis_df = pd.DataFrame({
         'Mutual_Information': mi_series,
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
     
-# =============================================================================
-#     print("\n🔹 Analysis MI & Pearson:")
-#     print(analysis_df.round(2).to_string(index=False))
-# =============================================================================
-         
     metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals']
-    
-    # Reorder columns: parameters first, then metrics
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
     
@@ -94,24 +77,19 @@ def report_backtesting(df,
     best_sharpe  = df_portfolio.loc[df_portfolio['Sharpe'].idxmax()]
     best_dd      = df_portfolio.loc[df_portfolio['DD_pct'].idxmin()]
     
-    # Build summary table
     df_summary = pd.DataFrame([
         {'Metric':'Net_Gain_pct', **best_netgain},
-        {'Metric':'Sharpe      ',     **best_sharpe},
+        {'Metric':'Sharpe      ', **best_sharpe},
         {'Metric':'Lowest DD   ', **best_dd}
     ])
-    
-    # Format numeric values
     df_summary['Num_Signals'] = df_summary['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     df_summary = df_summary.round(2)
-
     print(df_summary.to_string(index=False))
   
     # -----------------------------
     # PLOTS
     # -----------------------------
     if show_plots:
-
         metrics_to_plot = []
         if 'Net_Gain_pct' in df_portfolio.columns:
             metrics_to_plot.append('Net_Gain_pct')
@@ -121,8 +99,6 @@ def report_backtesting(df,
         for param in parameters:
             agg_dict = {metric: 'sum' if metric=='Net_Gain_pct' else 'mean' for metric in metrics_to_plot}
             grouped = df_portfolio.groupby(param).agg(agg_dict).reset_index()
-            
-            # Escalar Win_Ratio para graficar
             if 'Win_Ratio' in grouped.columns:
                 grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * 100
             
@@ -138,10 +114,8 @@ def report_backtesting(df,
             plt.show()
             
     # -----------------------------
+    # PLOT: Net Gain % y DD vs Tiempo (con BTC siempre)
     # -----------------------------
-    # PLOT: Net Gain % y DD vs Tiempo
-    # -----------------------------
-    
     def plot_netgain_dd(equity_hist, initial_capital, title="Net Gain % y DD"):
         timestamps = pd.to_datetime(equity_hist['timestamp'])
         balances = np.array(equity_hist['balance'])
@@ -155,11 +129,33 @@ def report_backtesting(df,
         
         fig, ax1 = plt.subplots(figsize=(12,6))
         
-        ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.0, label='Net Gain %')
+        # Net Gain %
+        ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Net_Gain_pct", color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
         
+        # --- Línea Bitcoin ---
+        btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
+        btc_df = pd.read_parquet(btc_file)
+    
+        # Asegurarse de que haya columna timestamp
+        if 'timestamp' not in btc_df.columns:
+            if isinstance(btc_df.index, pd.DatetimeIndex):
+                btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
+            else:
+                raise ValueError("El parquet de BTC no tiene columna 'timestamp' ni índice datetime.")
+    
+        btc_df = btc_df[['timestamp', 'close']]
+        btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
+    
+        # Calcular BTC en porcentaje respecto al primer precio
+        btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
+    
+        # Graficar BTC
+        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], color='black', linewidth=0.2, label='BTC %')
+    
+        # Drawdown %
         ax2 = ax1.twinx()
         ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.2, label='DD %')
         ax2.set_ylabel("Drawdown", color='red')
@@ -175,9 +171,10 @@ def report_backtesting(df,
         ax1.legend(lines + lines2, labels + labels2, loc='best')
         
         plt.show()
+
     
     # -----------------------------
-    # Uso en tu función
+    # Uso de la función
     # -----------------------------
     best_row = df.loc[df["Net_Gain_pct"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
@@ -185,10 +182,10 @@ def report_backtesting(df,
  
     best_row = df.loc[df["Sharpe"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
-
     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
          
     return df_portfolio, mi_series
+
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):
 
