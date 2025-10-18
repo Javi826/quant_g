@@ -11,6 +11,7 @@ from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
 from tools.ZX_st_tools import extract_ohlcv_from_path,compile_MC_results
 from tools.ZX_optimize_MCf import generate_multiple_paths
 from Z_add_signals_03 import add_indicators_03, explosive_signal_03

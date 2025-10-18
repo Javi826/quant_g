@@ -4,18 +4,18 @@ import pstats
 import os
 import numpy as np
 from itertools import product
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-#from ZZX_DRAFT2 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_utils import filter_symbols
 from Z_add_signals_03 import add_indicators_03, explosive_signal_03
 from collections import defaultdict
 from joblib import Parallel, delayed
+from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 
 # ==============================
 # Configuración idéntica a main_BACKTESTING.py
 # ==============================
-DATA_FOLDER  = "data/crypto_2023_UPTO"
-DATE_MIN     = "2025-01-03"
+DATA_FOLDER  = "data/crypto_2023_ISOLD"
 TIMEFRAME    = '4H'
 MIN_VOL_USDT = 500_000
 
@@ -31,26 +31,17 @@ SL_PCT_LIST        = [0,5,10]
 # ==============================
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
 
-ohlcv_data, filtered_symbols, removed_symbols = filter_symbols(
+ohlcv_data, filtered_symbols = filter_symbols(
     symbols,
     min_vol_usdt=MIN_VOL_USDT,
     timeframe=TIMEFRAME,
     data_folder=DATA_FOLDER,
     min_price=MIN_PRICE,
-    vol_window=50,
-    date_min=DATE_MIN
+    vol_window=50
 )
 
-ohlcv_base = {}
-for sym, df in ohlcv_data.items():
-    ohlcv_base[sym] = {
-        'ts': df.index.values.astype('datetime64[ns]'),
-        'open': df['open'].to_numpy(dtype=np.float64),
-        'high': df['high'].to_numpy(dtype=np.float64),
-        'low': df['low'].to_numpy(dtype=np.float64),
-        'close': df['close'].to_numpy(dtype=np.float64),
-        'volume': df['volume'].to_numpy(dtype=np.float64) if 'volume' in df.columns else np.zeros(len(df))
-    }
+ohlcv_base = prepare_ohlcv_arrays(ohlcv_data)
+
 
 # ==============================
 # Wrapper para profiling de una combinación
@@ -103,7 +94,6 @@ local_functions = [
     "update_sim_balance",
     "execute_signal",
     "process_signals_for_timestamp",
-    "close_all_remaining_positions",
     "initialize_backtest_structures",
     "run_backtest_loop"
 ]
@@ -156,7 +146,7 @@ def profiled_worker(comb):
 # ==============================
 # Ejecutar paralelizado y consolidar stats
 # ==============================
-all_combinations = list(product(SELL_AFTER_LIST, ENTROPY_MAX_LIST, ACCEL_SPAN_LIST, TP_PCT_LIST, SL_PCT_LIST))
+all_combinations  = list(product(SELL_AFTER_LIST, ENTROPY_MAX_LIST, ACCEL_SPAN_LIST, TP_PCT_LIST, SL_PCT_LIST))
 accumulated_stats = defaultdict(lambda: {'calls': 0, 'time_total': 0.0, 'time_cum': 0.0})
 
 # ==============================

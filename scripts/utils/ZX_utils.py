@@ -130,6 +130,17 @@ def filter_symbols(symbols,
             avg_vol = df['volume_quote'].tail(vol_window).mean()
             if avg_vol < min_vol_usdt:
                 removed_reason = "Avg volume too low"
+                
+# =============================================================================
+#         max_vol_usdt = 100_000_000        
+#         # -------------------
+#         # Avg volume (últimas vol_window velas)
+#         # -------------------
+#         if removed_reason is None:
+#             avg_vol = df['volume_quote'].tail(vol_window).mean()
+#             if avg_vol > max_vol_usdt:
+#                 removed_reason = "Avg volume too low"
+# =============================================================================
                               
         # -------------------
         # MIN BARRS

@@ -33,42 +33,29 @@ def get_price_at_int(sym, t, sym_data, ts_int_arrays, close_arrays):
     return None
 
 # ============================
-# Helper: prepare_data - OPTIMIZADO AL MÁXIMO
+# Helper: prepare_data
 # ============================
 
 def prepare_data(ohlcv_arrays):
     from collections import defaultdict
-    
+
     if not ohlcv_arrays:
         return ({}, {}, np.array([], dtype=np.int64), 
                 np.array([], dtype='datetime64[ns]'), {}, {}, {})
     
     symbols = list(ohlcv_arrays.keys())
-    
-    # Pre-asignar diccionarios con tamaño conocido
-    sym_data = {}
-    ts_int_arrays = {}
-    close_arrays = {}
-    
-    # Lista para acumular todos los timestamps (más eficiente que hstack incremental)
+    sym_data, ts_int_arrays, close_arrays = {}, {}, {}
     all_ts_int_lists = []
     
-    # Procesar cada símbolo en un solo paso
     for sym in symbols:
         data = ohlcv_arrays[sym]
         ts = data['ts']
-        
-        # Convertir a datetime64[ns] si es necesario (operación in-place cuando es posible)
         if ts.dtype.kind != 'M':
             ts = ts.astype('datetime64[ns]')
+        ts_int = ts.view('int64')
         
-        # Conversión directa a int64 (view cuando es posible)
-        ts_int = ts.view('int64') if ts.dtype == np.dtype('datetime64[ns]') else ts.astype('int64')
+        close_view = data['close']
         
-        # Obtener view del array close (evita copia)
-        close_view = data['close'].view() if hasattr(data['close'], 'view') else data['close']
-        
-        # Guardar en estructuras de datos
         sym_data[sym] = {
             'ts': ts,
             'ts_int': ts_int,
@@ -86,61 +73,19 @@ def prepare_data(ohlcv_arrays):
         all_ts_int_lists.append(ts_int)
     
     signals_by_time = defaultdict(list)
-    
     for sym in symbols:
-        signal_array = sym_data[sym]['signal']
-        ts_int = sym_data[sym]['ts_int']
-        
-        sig_idxs = np.nonzero(signal_array)[0]
-        
+        sig_idxs = np.nonzero(sym_data[sym]['signal'])[0]
         if sig_idxs.size > 0:
-            t_ints_for_signals = ts_int[sig_idxs]
-            
-            signal_tuples = [(sym, int(idx)) for idx in sig_idxs]
-            
-            for t_int, sig_tuple in zip(t_ints_for_signals, signal_tuples):
-                signals_by_time[int(t_int)].append(sig_tuple)
+            t_ints = sym_data[sym]['ts_int'][sig_idxs]
+            for t_int, idx in zip(t_ints, sig_idxs):
+                signals_by_time[int(t_int)].append((sym, int(idx)))
     
-    if all_ts_int_lists:
-
-        all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists))
-    else:
-        all_timestamps_int = np.array([], dtype=np.int64)
+    all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists or [np.array([], dtype=np.int64)]))
+    all_timestamps_dt = all_timestamps_int.view('datetime64[ns]')
+    symbol_order = {s: i for i, s in enumerate(symbols)}
     
-    all_timestamps_dt = all_timestamps_int.view('datetime64[ns]')   
-    symbol_order      = {s: i for i, s in enumerate(symbols)}   
-    signals_by_time   = dict(signals_by_time)
-    
-    return sym_data, signals_by_time, all_timestamps_int, all_timestamps_dt, symbol_order, ts_int_arrays, close_arrays
+    return sym_data, dict(signals_by_time), all_timestamps_int, all_timestamps_dt, symbol_order, ts_int_arrays, close_arrays
 
-# ============================
-# Helper: close_position
-# ============================
-
-def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, trades, trade_times, trade_log_cols, cash):
-    qty = pos['qty']
-    buy_price = pos['buy_price']
-    commission_buy = pos.get('commission_buy', 0.0)
-    commission_sell = (qty * exec_price) * comi_factor if comi_factor != 0.0 else 0.0
-    cash += qty * exec_price - commission_sell
-    profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
-
-    sym = pos['symbol']
-    trades[sym].append(profit)
-    trade_times[sym].append(exec_time)
-
-    trade_log_cols['symbol'].append(sym)
-    trade_log_cols['buy_time'].append(pos['buy_time'])
-    trade_log_cols['buy_price'].append(buy_price)
-    trade_log_cols['sell_time'].append(exec_time)
-    trade_log_cols['sell_price'].append(exec_price)
-    trade_log_cols['qty'].append(qty)
-    trade_log_cols['profit'].append(profit)
-    trade_log_cols['exit_reason'].append(exit_reason)
-    trade_log_cols['commission_buy'].append(commission_buy)
-    trade_log_cols['commission_sell'].append(commission_sell)
-
-    return cash
 
 # ============================
 # Helper: close_expired_positions - MODIFICADO
@@ -177,6 +122,9 @@ def close_expired_positions(t_int, open_heap, sym_data_local, ts_int_arrays, clo
 # ============================
 
 def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
+    """
+    Detecta si TP o SL ocurren dentro de la barra y devuelve la información del cierre.
+    """
 
     intravela_detected = False
     chosen_idx = None
@@ -186,41 +134,44 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
     if tp_price is None and sl_price is None:
         return intravela_detected, chosen_idx, exit_reason, exec_price
 
-    # 🚨 Exigir que existan high y low — si no, lanzar error
-    if d['high'] is None or d['low'] is None:
-        raise ValueError(f"Faltan datos de 'high' o 'low' para el símbolo {d.get('symbol', '?')}")
+    # Validar timestamps intrabar
+    if (tp_price is not None or sl_price is not None) and (d.get('high_time') is None or d.get('low_time') is None):
+        raise ValueError(f"Faltan 'high_time' o 'low_time' para símbolo {d.get('symbol','?')} necesario para TP/SL intrabar")
 
     start = buy_idx + 1
     end = sell_idx
     if end < start:
         return intravela_detected, chosen_idx, exit_reason, exec_price
 
-    # slices de high y low
+    # Slices de precios
     high_slice = d['high'][start:end+1]
     low_slice = d['low'][start:end+1]
 
+    # Detectar hits de TP/SL dentro del slice
     tp_hits = np.where(high_slice >= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
     sl_hits = np.where(low_slice <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+
     tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
     sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
 
+    # Si ambos ocurren
     if tp_first is not None and sl_first is not None:
-        tp_time = d.get('high_time')
-        sl_time = d.get('low_time')
+        tp_time_val = d['high_time'][tp_first]
+        sl_time_val = d['low_time'][sl_first]
 
-        if tp_time is not None and sl_time is not None:
-            tp_time_val = tp_time[tp_first]
-            sl_time_val = sl_time[sl_first]
-            if sl_time_val <= tp_time_val:
-                chosen_idx = sl_first
-                exit_reason = 'SL'
-                exec_price = sl_price
-            else:
+        if tp_first == sl_first:
+            # Ambos en la misma vela → usar timestamps intrabar
+            if tp_time_val <= sl_time_val:
                 chosen_idx = tp_first
                 exit_reason = 'TP'
                 exec_price = tp_price
+            else:
+                chosen_idx = sl_first
+                exit_reason = 'SL'
+                exec_price = sl_price
         else:
-            if sl_first <= tp_first:
+            # Diferentes velas → tomar la primera que ocurre en índice
+            if sl_first < tp_first:
                 chosen_idx = sl_first
                 exit_reason = 'SL'
                 exec_price = sl_price
@@ -228,14 +179,17 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
                 chosen_idx = tp_first
                 exit_reason = 'TP'
                 exec_price = tp_price
+
         intravela_detected = True
-        
+
+    # Solo SL detectado
     elif sl_first is not None:
         chosen_idx = sl_first
         exit_reason = 'SL'
         exec_price = sl_price
         intravela_detected = True
-        
+
+    # Solo TP detectado
     elif tp_first is not None:
         chosen_idx = tp_first
         exit_reason = 'TP'
@@ -314,9 +268,9 @@ def compute_post_backtest_metrics(symbols, trades, trade_times, all_timestamps_d
         "max_dd_portfolio": max_dd_portfolio,
         "sharpe_portfolio": sharpe_portfolio,
         "proportion_winners": proportion_winners,
-        "final_balance_by_symbol": {},  # vacío porque no hay cálculo por símbolo
-        "max_dd_by_symbol": {},         # vacío porque no hay cálculo por símbolo
-        "sharpe_by_symbol": {}          # vacío porque no hay cálculo por símbolo
+        "final_balance_by_symbol": {},  
+        "max_dd_by_symbol": {},         
+        "sharpe_by_symbol": {}          
     }
 
 
@@ -348,14 +302,36 @@ def build_results_dict(symbols, trades, trade_times, final_balance_by_symbol,
 # ============================
 
 def update_sim_balance(t_int, open_heap, cash, sym_data_local, ts_int_arrays, close_arrays, sim_balance_cols):
-    positions_value = sum(
-        pos['qty'] * get_price_at_int(pos['symbol'], t_int, sym_data_local, ts_int_arrays, close_arrays)
-        for _, _, pos in open_heap if not pos.get('closed', False)
-    )
-    sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-    sim_balance_cols['balance'].append(cash + positions_value)
-    return sim_balance_cols
+    active_positions = [pos for _, _, pos in open_heap if not pos.get('closed', False)]
+    
+    if not active_positions:
+        total_value = 0.0
+    else:
+        # Agrupar por símbolo
+        symbol_groups = {}
+        for pos in active_positions:
+            sym = pos['symbol']
+            symbol_groups.setdefault(sym, []).append(pos['qty'])
+        
+        total_value = 0.0
+        for sym, qtys in symbol_groups.items():
+            # Obtener precio actual solo una vez por símbolo
+            ts_int = ts_int_arrays[sym]
+            close_arr = close_arrays[sym]
 
+            # Buscar índice más cercano sin pasar el timestamp actual
+            idx = np.searchsorted(ts_int, t_int, side='right') - 1
+            if idx < 0:
+                price = close_arr[0]
+            else:
+                price = close_arr[idx]
+
+            # Multiplicar suma de cantidades * precio
+            total_value += np.sum(qtys) * price
+
+    sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
+    sim_balance_cols['balance'].append(cash + total_value)
+    return sim_balance_cols
 
 # ============================
 # Helper: execute_signal
@@ -367,17 +343,22 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     d = sym_data_local[sym]
     price_t = float(d['close'][buy_idx])
     qty = order_amount / price_t
-    commission_buy = order_amount * comi_factor if comi_factor != 0.0 else 0.0
+
+    # Restar del cash el nominal más comisión de compra
+    commission_buy = qty * price_t * comi_factor
     cash -= (order_amount + commission_buy)
     num_signals_executed += 1
 
+    # Determinar índice de venta
     sell_idx = min(buy_idx + sell_after, d['len'] - 1)
     sell_time_dt = d['ts'][sell_idx]
     sell_time_int = int(d['ts_int'][sell_idx])
 
+    # Definir precios de TP/SL
     tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else np.inf
     sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -np.inf
 
+    # Crear posición
     position = {
         'symbol': sym,
         'qty': qty,
@@ -388,10 +369,12 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         'commission_buy': commission_buy
     }
 
+    # Detectar si TP/SL ocurre intrabar
     intravela_detected, chosen_idx, exit_reason, exec_price = detect_intrabar_exit(
         d, buy_idx, sell_idx, tp_price, sl_price
     )
 
+    # Actualizar posición con precio de cierre y empujar al heap
     if intravela_detected:
         exec_time_dt = d['ts'][chosen_idx]
         exec_time_int = int(d['ts_int'][chosen_idx])
@@ -408,38 +391,36 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     counter += 1
     return cash, counter, num_signals_executed, open_heap
 
+def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, trades, trade_times, trade_log_cols, cash):
+    qty = pos['qty']
+    buy_price = pos['buy_price']
 
-# ============================
-# Helper: close_all_remaining_positions - MODIFICADO
-# ============================
+    # Comisiones simétricas con el mismo porcentaje
+    commission_buy = qty * buy_price * comi_factor
+    commission_sell = qty * exec_price * comi_factor
 
-def close_all_remaining_positions(open_heap, sym_data_local, ts_int_arrays, close_arrays,
-                                  comi_factor, trades, trade_times, trade_log_cols, cash):
-    while open_heap:
-        _, _, pos = heapq.heappop(open_heap)
-        if pos.get('closed', False):
-            continue
-        sym = pos['symbol']
-        d = sym_data_local[sym]
-        if 'exec_price' in pos:
-            cash = close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'],
-                                  comi_factor, trades, trade_times, trade_log_cols, cash)
-        else:
-            sell_ts_int = pos.get('sell_time_int', int(d['ts_int'][-1]))
-            exec_price = get_price_at_int(sym, sell_ts_int, sym_data_local, ts_int_arrays, close_arrays)
-            if exec_price is not None:
-                exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-                cash = close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER',
-                                      comi_factor, trades, trade_times, trade_log_cols, cash)
-            else:
-                exec_price = float(d['close'][-1])
-                last_time_dt = d['ts'][-1]
-                cash = close_position(pos, last_time_dt, exec_price, 'FORCED_LAST',
-                                      comi_factor, trades, trade_times, trade_log_cols, cash)
+    cash += qty * exec_price - commission_sell
+    profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
+
+    sym = pos['symbol']
+    trades[sym].append(profit)
+    trade_times[sym].append(exec_time)
+
+    trade_log_cols['symbol'].append(sym)
+    trade_log_cols['buy_time'].append(pos['buy_time'])
+    trade_log_cols['buy_price'].append(buy_price)
+    trade_log_cols['sell_time'].append(exec_time)
+    trade_log_cols['sell_price'].append(exec_price)
+    trade_log_cols['qty'].append(qty)
+    trade_log_cols['profit'].append(profit)
+    trade_log_cols['exit_reason'].append(exit_reason)
+    trade_log_cols['commission_buy'].append(commission_buy)
+    trade_log_cols['commission_sell'].append(commission_sell)
+
     return cash
 
 
-# ============================
+#===================
 # Helper: initialize_backtest_structures
 # ============================
 def initialize_backtest_structures(symbols):
@@ -483,13 +464,19 @@ def process_signals_for_timestamp(
 
     events = signals_local.get(int(t_int))
     if events:
-        # Evitar lambda en cada llamada: usa operator.itemgetter
         from operator import itemgetter
         events = sorted(events, key=itemgetter(0))
-        so = symbol_order_local
+
         for sym, buy_idx in events:
+            total_days = len(close_arrays[sym])
+
+            # Chequeo: no abrir trade si no hay suficientes velas restantes para SELL_AFTER
+            if buy_idx + sell_after > total_days:
+                continue  # saltar este trade completamente
+
             if cash < order_amount:
                 break
+
             cash, counter, num_signals_executed, open_heap = execute_signal(
                 sym, buy_idx, cash, comi_factor, order_amount, sell_after,
                 sym_data_local, counter, open_heap, num_signals_executed,
@@ -543,6 +530,7 @@ def run_backtest_loop(
 # ============================
 # Función principal: run_grid_backtest - MODIFICADO
 # ============================
+
 def run_grid_backtest(
     ohlcv_arrays,
     sell_after,
@@ -555,7 +543,7 @@ def run_grid_backtest(
     comi_factor = float(comi_pct) / 100.0
     cash = float(initial_balance)
 
-    # Preparar datos - ahora retorna también ts_int_arrays y close_arrays
+    # Preparar datos
     (
         sym_data,
         signals_by_time,
@@ -581,21 +569,6 @@ def run_grid_backtest(
         symbol_order, cash, order_amount, comi_factor, sell_after, counter,
         tp_pct, sl_pct, trades, trade_times, trade_log_cols, sim_balance_cols,
         close_expired_positions, update_sim_balance, execute_signal
-    )
-
-    # ============================
-    # Cerrar todas las posiciones restantes
-    # ============================
-    cash = close_all_remaining_positions(
-        open_heap,
-        sym_data,
-        ts_int_arrays,
-        close_arrays,
-        comi_factor,
-        trades,
-        trade_times,
-        trade_log_cols,
-        cash
     )
 
     # ============================

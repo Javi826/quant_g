@@ -17,6 +17,7 @@ def prepare_ohlcv_arrays(ohlcv_data):
         }
     return ohlcv_arr
 
+
 def extract_ohlcv_from_path(paths_per_symbol, path_idx, ts_index=None, dtype=np.float32):
     ohlcv_arrays = {}
 

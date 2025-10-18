@@ -11,7 +11,7 @@ from datetime import datetime
 # Importar la implementación NumPy
 from ZX_compute_BT import run_grid_backtest as run_original
 from ZZX_DRAFT5 import run_grid_backtest as run_changed
-SELF_AFTER = 5
+SELF_AFTER =5
 # =====================================================================
 # DATOS EJEMPLO
 # =====================================================================
@@ -22,59 +22,58 @@ def create_controlled_test():
     dates1 = pd.to_datetime([
         "2024-01-01","2024-01-02","2024-01-03","2024-01-04","2024-01-05",
         "2024-01-06","2024-01-07","2024-01-08","2024-01-09","2024-01-10",
-        "2024-01-11","2024-01-12","2024-01-13","2024-01-14","2024-01-15",
-        "2024-01-16","2024-01-17","2024-01-18","2024-01-19","2024-01-20"
+        "2024-01-11","2024-01-12","2024-01-13","2024-01-14","2024-01-15"
     ])
-    close1 = list(range(100, 120))
+    close1 = list(range(100, 115))
     high1 = [c+1 for c in close1]
     low1 = [c-1 for c in close1]
-    signal1 = [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,0,0]
+    signal1 = [1,1,1,0,0,0,0,0,1,0,0,0,0,0,0]
     df1 = pd.DataFrame({"close": close1, "high": high1, "low": low1, "signal": signal1}, index=dates1)
 
     # ---------------------
     # Símbolo 2 (20 días)
     # ---------------------
-    close2 = list(range(200, 220))
+    close2 = list(range(200, 215))
     high2 = [c+1 for c in close2]
     low2 = [c-1 for c in close2]
-    signal2 = [0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0]
+    signal2 = [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0]
     df2 = pd.DataFrame({"close": close2, "high": high2, "low": low2, "signal": signal2}, index=dates1)
 
     # ---------------------
     # Símbolo 3 (20 días)
     # ---------------------
-    close3 = list(range(300, 320))
+    close3 = list(range(300, 315))
     high3 = [c+1 for c in close3]
     low3 = [c-1 for c in close3]
-    signal3 = [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0]
+    signal3 = [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0]
     df3 = pd.DataFrame({"close": close3, "high": high3, "low": low3, "signal": signal3}, index=dates1)
 
     # ---------------------
     # Símbolo 4 (15 días, distinto inicio)
     # ---------------------
     dates4 = pd.to_datetime([
-        "2023-01-03","2023-01-04","2023-01-05","2023-01-06","2023-01-07",
-        "2023-01-08","2023-01-09","2023-01-10","2023-01-11","2023-01-12",
-        "2023-01-13","2023-01-14","2023-01-15","2023-01-16","2023-01-17"
+        "2024-01-05","2024-01-06","2024-01-07","2024-01-08","2024-01-09",
+        "2024-01-10","2024-01-11","2024-01-12","2024-01-13","2024-01-14",
+        "2024-01-15","2024-01-16","2024-01-17","2024-01-18","2024-01-19"
     ])
     close4 = list(range(400, 415))
     high4 = [c+1 for c in close4]
     low4 = [c-1 for c in close4]
-    signal4 = [0,1,0,0,1,0,0,1,0,0,1,0,0,1,0]
+    signal4 = [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0]
     df4 = pd.DataFrame({"close": close4, "high": high4, "low": low4, "signal": signal4}, index=dates4)
 
     # ---------------------
     # Símbolo 5 (15 días, empieza como SYM1/SYM2/SYM3 pero termina antes)
     # ---------------------
     dates5 = pd.to_datetime([
-        "2025-01-01","2025-01-02","2025-01-03","2025-01-04","2025-01-05",
-        "2025-01-06","2025-01-07","2025-01-08","2025-01-09","2025-01-10",
-        "2025-01-11","2025-01-12","2025-01-13","2025-01-14","2025-01-15"
+        "2024-01-01","2024-01-02","2024-01-03","2024-01-04","2024-01-05",
+        "2024-01-06","2024-01-07","2024-01-08","2024-01-09","2024-01-10",
+        "2024-01-11","2024-01-12","2024-01-13","2024-01-14","2024-01-15"
     ])
     close5 = list(range(500, 515))
     high5 = [c+1 for c in close5]
     low5 = [c-1 for c in close5]
-    signal5 = [1,0,0,1,0,0,1,0,0,1,0,0,1,0,0]
+    signal5 = [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0]
     df5 = pd.DataFrame({"close": close5, "high": high5, "low": low5, "signal": signal5}, index=dates5)
 
     return {"SYM1": df1, "SYM2": df2, "SYM3": df3, "SYM4": df4, "SYM5": df5}

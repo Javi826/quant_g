@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
-#from ZZX_DRAFT5 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT,COMISION
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
@@ -23,8 +23,7 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_ISOLD"
 TIMEFRAME           = '4H'
-MIN_VOL_USDT        = 1500_000_000
-#MIN_VOL_USDT        = 50_000
+MIN_VOL_USDT        = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
@@ -34,16 +33,18 @@ SELL_AFTER_LIST     = [1,5,10,15,20,25,30,35]
 ENTROPY_MAX_LIST    = [0.2,0.4,0.5,0.6,0.7,0.8,1.0,1.2,1.4,1.6]
 ACCEL_SPAN_LIST     = [5,10,12,15,17,20]
 
-TP_PCT_LIST         = [0,5,10,15]
-SL_PCT_LIST         = [0,5,10,15]
+TP_PCT_LIST         = [0,5,10]
+SL_PCT_LIST         = [0,5,10]
 
 # =============================================================================
-SELL_AFTER_LIST    = [25,30]
-ENTROPY_MAX_LIST   = [0.4,0.6]
-ACCEL_SPAN_LIST    = [10,15]
-
-TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [0,5]
+# =============================================================================
+# SELL_AFTER_LIST    = [25,30,40]
+# ENTROPY_MAX_LIST   = [0.4,0.6,1.0]
+# ACCEL_SPAN_LIST    = [10,15,20]
+# 
+# TP_PCT_LIST        = [0,5]
+# SL_PCT_LIST        = [0,5]
+# =============================================================================
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
