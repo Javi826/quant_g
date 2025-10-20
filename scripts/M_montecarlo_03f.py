@@ -45,7 +45,7 @@ TP_PCT_LIST         = [0,5,10,15]
 SL_PCT_LIST         = [0,5,10,15]
 
 # =============================================================================
-SELL_AFTER_LIST    = [25]
+SELL_AFTER_LIST    = [25,30]
 ENTROPY_MAX_LIST   = [0.2]
 ACCEL_SPAN_LIST    = [20]
 

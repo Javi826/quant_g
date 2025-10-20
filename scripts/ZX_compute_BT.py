@@ -25,7 +25,6 @@ def get_price_at_int(sym, t, sym_data, ts_int_arrays, close_arrays):
     ts_arr = ts_int_arrays[sym]
     close_arr = close_arrays[sym]
     
-    # Búsqueda binaria directa sin diccionario intermedio
     idx = np.searchsorted(ts_arr, t_int, side='right') - 1
     
     if idx >= 0:
@@ -110,7 +109,7 @@ def close_expired_positions(t_int, open_heap, sym_data_local, ts_int_arrays, clo
                 cash = close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER',
                                       comi_factor, trades, trade_times, trade_log_cols, cash)
             else:
-                exec_price = float(sym_data_local[sym]['close'][-1])
+                exec_price = float(close_arrays[sym][-1])
                 last_time_dt = sym_data_local[sym]['ts'][-1]
                 cash = close_position(pos, last_time_dt, exec_price, 'FORCED_LAST',
                                       comi_factor, trades, trade_times, trade_log_cols, cash)
@@ -267,18 +266,14 @@ def compute_post_backtest_metrics(symbols, trades, trade_times, all_timestamps_d
         "final_balance": final_balance,
         "max_dd_portfolio": max_dd_portfolio,
         "sharpe_portfolio": sharpe_portfolio,
-        "proportion_winners": proportion_winners,
-        "final_balance_by_symbol": {},  
-        "max_dd_by_symbol": {},         
-        "sharpe_by_symbol": {}          
+        "proportion_winners": proportion_winners       
     }
 
 
 # ============================
 # build_results_dict - solo por portafolio
 # ============================
-def build_results_dict(symbols, trades, trade_times, final_balance_by_symbol, 
-                       max_dd_by_symbol, sharpe_by_symbol, 
+def build_results_dict(symbols, trades, trade_times, 
                        final_balance, num_signals_executed, 
                        proportion_winners, max_dd_portfolio,
                        sim_balance_cols, trade_log_cols, sharpe_portfolio):
@@ -302,20 +297,19 @@ def build_results_dict(symbols, trades, trade_times, final_balance_by_symbol,
 # ============================
 
 def update_sim_balance(t_int, open_heap, cash, sym_data_local, ts_int_arrays, close_arrays, sim_balance_cols):
-    active_positions = [pos for _, _, pos in open_heap if not pos.get('closed', False)]
     
-    if not active_positions:
+    symbol_qty_sum = {}
+    for _, _, pos in open_heap:
+        if pos.get('closed', False):
+            continue
+        sym = pos['symbol']
+        symbol_qty_sum[sym] = symbol_qty_sum.get(sym, 0.0) + pos['qty']
+
+    if not symbol_qty_sum:
         total_value = 0.0
     else:
-        # Agrupar por símbolo
-        symbol_groups = {}
-        for pos in active_positions:
-            sym = pos['symbol']
-            symbol_groups.setdefault(sym, []).append(pos['qty'])
-        
         total_value = 0.0
-        for sym, qtys in symbol_groups.items():
-            # Obtener precio actual solo una vez por símbolo
+        for sym, qty_sum in symbol_qty_sum.items():
             ts_int = ts_int_arrays[sym]
             close_arr = close_arrays[sym]
 
@@ -326,12 +320,14 @@ def update_sim_balance(t_int, open_heap, cash, sym_data_local, ts_int_arrays, cl
             else:
                 price = close_arr[idx]
 
-            # Multiplicar suma de cantidades * precio
-            total_value += np.sum(qtys) * price
+            # Valor total = cantidad * precio actual
+            total_value += qty_sum * price
 
+    # Registrar balance en el historial
     sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
     sim_balance_cols['balance'].append(cash + total_value)
     return sim_balance_cols
+
 
 # ============================
 # Helper: execute_signal
@@ -345,7 +341,7 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     qty = order_amount / price_t
 
     # Restar del cash el nominal más comisión de compra
-    commission_buy = qty * price_t * comi_factor
+    commission_buy = float(order_amount * comi_factor)   # cálculo único y determinista
     cash -= (order_amount + commission_buy)
     num_signals_executed += 1
 
@@ -396,7 +392,7 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, trades,
     buy_price = pos['buy_price']
 
     # Comisiones simétricas con el mismo porcentaje
-    commission_buy = qty * buy_price * comi_factor
+    commission_buy = pos.get('commission_buy')
     commission_sell = qty * exec_price * comi_factor
 
     cash += qty * exec_price - commission_sell
@@ -581,9 +577,6 @@ def run_grid_backtest(
     # ============================
     results = build_results_dict(
         symbols, trades, trade_times,
-        metrics['final_balance_by_symbol'],
-        metrics['max_dd_by_symbol'],
-        metrics['sharpe_by_symbol'],
         metrics['final_balance'],
         num_signals_executed,
         metrics['proportion_winners'],

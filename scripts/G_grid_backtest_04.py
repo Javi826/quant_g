@@ -21,9 +21,10 @@ N_JOBS              =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER            = "data/crypto_2023_ISOLD"
-TIMEFRAME              = '4H'
-MIN_VOL_USDT           = 50_000
+#DATA_FOLDER         = "data/crypto_2023_ISOLD"
+DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME           = '4H'
+MIN_VOL_USDT        = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
@@ -43,19 +44,21 @@ TP_PCT_LIST            = [0,10,15]
 SL_PCT_LIST            = [0,10,15]
 
 # =============================================================================
-SELL_AFTER_LIST        = [20,30]
-ENTROPIA_MAX_LIST      = [1.0,2.0]
-
-DOJI_LIST              = [True,False]
-HAMMER_LIST            = [True]
-SHOOTING_STAR_LIST     = [True]
-BULLISH_ENGULFING_LIST = [True]
-BEARISH_ENGULFING_LIST = [True]
-PIERCING_LINE_LIST     = [False]
-DARK_CLOUD_COVER_LIST  = [True]
-
-TP_PCT_LIST            = [0,5]
-SL_PCT_LIST            = [0,6]
+# =============================================================================
+# SELL_AFTER_LIST        = [20,30]
+# ENTROPIA_MAX_LIST      = [1.0,2.0]
+# 
+# DOJI_LIST              = [True,False]
+# HAMMER_LIST            = [True]
+# SHOOTING_STAR_LIST     = [True]
+# BULLISH_ENGULFING_LIST = [True]
+# BEARISH_ENGULFING_LIST = [True]
+# PIERCING_LINE_LIST     = [False]
+# DARK_CLOUD_COVER_LIST  = [True]
+# 
+# TP_PCT_LIST            = [0,5]
+# SL_PCT_LIST            = [0,6]
+# =============================================================================
 # =============================================================================
 
 param_names = [

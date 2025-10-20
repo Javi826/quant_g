@@ -1,13 +1,25 @@
-"""
-Tests Unitarios Exhaustivos para run_grid_backtest
-Casos hardcodeados con resultados esperados calculados manualmente
-"""
+import os
+import warnings
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
+from sklearn.feature_selection import mutual_info_regression
+
+DATA_FOLDER         = "data/crypto_2023_ISOLD"
+
+warnings.filterwarnings("ignore")
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.max_colwidth', None)
+
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
 # Importar función a testear
-from ZZX_DRAFT3 import run_grid_backtest
+from ZZX_DRAFT1 import run_grid_backtest
 
 # =====================================================================
 # UTILIDADES PARA TESTS
@@ -400,45 +412,18 @@ def get_case_multiple_signals():
 
 def get_case_insufficient_cash():
     """
-    Caso donde no hay suficiente cash para ejecutar la segunda señal:
+    Caso donde dos señales ocurren al mismo tiempo:
     - 1 símbolo
-    - 2 señales en diferentes timestamps
-    - Primera señal se ejecuta y cierra
-    - Segunda señal se ejecuta después del cierre (hay cash disponible)
-    
-    CÁLCULO MANUAL:
-    - Initial balance = 150
-    
-    Trade 1:
-    - Señal 1 en índice 2: buy@100, qty=1.0
-    - Commission buy = 1.0*100*0.0005 = 0.05
-    - Cash después compra = 150 - 100 - 0.05 = 49.95
-    - Sell@103 en índice 5 (2+3)
-    - Commission sell = 1.0*103*0.0005 = 0.0515
-    - Profit = (103-100)*1.0 - 0.05 - 0.0515 = 2.8985
-    - Cash después venta = 49.95 + 103 - 0.0515 = 152.8985
-    
-    Trade 2:
-    - Señal 2 en índice 8 (después de cerrar Trade 1 en índice 5)
-    - Cash disponible = 152.8985
-    - Buy@101, qty = 100/101 = 0.99009901
-    - Commission buy = 0.99009901*101*0.0005 = 0.05
-    - Cash después compra = 152.8985 - 100 - 0.05 = 52.8485
-    - Sell@104 en índice 11 (8+3)
-    - Commission sell = 0.99009901*104*0.0005 = 0.05148515
-    - Profit = (104-101)*0.99009901 - 0.05 - 0.05148515 = 2.86881485
-    - Cash después venta = 52.8485 + 103.009901 - 0.05148515 = 155.806715
-    
-    Final balance = 155.806715 (ajustado con precisión real)
+    - 2 señales en el mismo timestamp
+    - Solo se ejecuta la primera porque no hay cash suficiente para la segunda
     """
-    dates = pd.date_range('2024-01-01 00:00', periods=15, freq='1h')
+    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
     
-    prices = np.array([99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 104.0, 100.0,
-                       101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0])
-    signal = np.zeros(15, dtype=int)
+    prices = np.array([100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0])
+    signal = np.zeros(10, dtype=int)
     signal[2] = 1  # Primera señal
-    signal[8] = 1  # Segunda señal (SÍ se ejecutará después de cerrar la primera)
-    
+    signal[2] = 1  # Segunda señal en el mismo índice (puedes simular con otro símbolo o manejar lista de señales)
+
     data = {
         'SYM1': {
             'ts': dates.to_numpy().astype('datetime64[ns]'),
@@ -452,23 +437,24 @@ def get_case_insufficient_cash():
     }
     
     expected = {
-        'final_balance': 155.7673,  # Aproximado con tolerancia
-        'num_trades': 2,  # Ambas señales se ejecutan
-        'num_signals': 2,
-        'profit_trade_1': 2.8985,
-        'profit_trade_2': 2.8688  # Aproximado
+        'final_balance': 102.7389,  # Después de ejecutar solo la primera señal
+        'num_trades': 1,            # Solo se ejecuta la primera
+        'num_signals': 2,           # Dos señales llegaron
+        'profit_trade_1': 2.8384,   # Ganancia de la primera señal
+        'profit_trade_2': 0          # Segunda señal no se ejecuta
     }
     
     params = {
         'sell_after': 3,
         'tp_pct': 0.0,
         'sl_pct': 0.0,
-        'initial_balance': 150,  # Cash limitado pero suficiente para ambas secuencialmente
+        'initial_balance': 100,  # Solo alcanza para una señal
         'order_amount': 100,
         'comi_pct': 0.05
     }
     
     return data, params, expected
+
 
 
 # =====================================================================

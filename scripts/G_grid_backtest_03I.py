@@ -21,7 +21,8 @@ N_JOBS             = -1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_ISOLD"
+#DATA_FOLDER         = "data/crypto_2023_ISOLD"
+DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
 MIN_VOL_USDT        = 50_000
 
@@ -79,8 +80,8 @@ def process_combo(comb):
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=params['SELL_AFTER'],
-        tp_pct=params['TP_PCT'],      # porcentaje de take-profit
-        sl_pct=params['SL_PCT'],      # múltiplo del ATR
+        tp_pct=params['TP_PCT'],      
+        sl_pct=params['SL_PCT'],      
         initial_balance=INITIAL_BALANCE,
         order_amount=ORDER_AMOUNT,
         comi_pct=COMISION

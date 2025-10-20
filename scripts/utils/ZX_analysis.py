@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
 
-DATA_FOLDER         = "data/crypto_2023_ISOLD"
+DATA_FOLDER         = "data/crypto_2023_IS"
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_rows', None)
@@ -15,11 +15,8 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 
 
-def report_backtesting(df, 
-                         parameters, 
-                         initial_capital=10000, 
-                         show_plots=False, 
-                         save_excel=False):
+def report_backtesting(df,parameters,initial_capital=10000,show_plots=False,save_excel=False):
+    
     df = df.copy()
 
     # -----------------------------

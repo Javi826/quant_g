@@ -1,141 +1,208 @@
+import re
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from pathlib import Path
+from tqdm import tqdm
 
 # -----------------------------
 # PARÁMETROS DE CONFIGURACIÓN
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent  # sube un nivel
-input_folder = BASE_DIR / "crypto_2023"
-output_folder = BASE_DIR / "crypto_2023_highlow"
-timeframes_to_consider = ["15m", "1H"]
+input_folder = BASE_DIR / "data" / "crypto_2021_copy_clean"
+output_folder = BASE_DIR / "data" / "crypto_2021_highlow"
 
-# Crear carpeta de salida si no existe
+# Par de timeframes a procesar: [timeframe_superior, timeframe_intrabarra]
+timeframes_to_consider = ["1D", "4H"]
+
 output_folder.mkdir(exist_ok=True, parents=True)
 
-# -----------------------------
-# Función principal de cálculo
-# -----------------------------
-def find_timestamp_extremum(df_high_tf, df_low_tf):
-    df_high_tf = df_high_tf.copy()
-    df_high_tf = df_high_tf.loc[df_high_tf.index >= df_low_tf.index[0]]
 
-    # Inicializar columnas datetime
-    df_high_tf["low_time"] = pd.NaT
-    df_high_tf["high_time"] = pd.NaT
+def parse_filename(filename):
+    """
+    Extrae el símbolo y timeframe del nombre del archivo.
+    Formato esperado: sym_timeframe.parquet o sym_timeframe.xlsx
+    """
+    stem = filename.stem  # nombre sin extensión
+    parts = stem.rsplit("_", 1)
+    if len(parts) == 2:
+        symbol = parts[0]
+        timeframe = parts[1]
+        return symbol, timeframe
+    return None, None
 
-    for i in tqdm(range(len(df_high_tf) - 1), desc="Calculando extremos"):
-        start = df_high_tf.index[i]
-        end = df_high_tf.index[i + 1]
 
-        mask = (df_low_tf.index >= start) & (df_low_tf.index < end)
-        df_low_slice = df_low_tf.loc[mask]
+def read_file(filepath):
+    """Lee archivo parquet o xlsx y devuelve DataFrame con índice datetime."""
+    if filepath.suffix == ".parquet":
+        df = pd.read_parquet(filepath)
+    elif filepath.suffix == ".xlsx":
+        df = pd.read_excel(filepath)
+    else:
+        return None
+    
+    # Asegurar que timestamp sea el índice
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.set_index("timestamp")
+    elif not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+    
+    return df
 
-        if df_low_slice.empty:
-            df_high_tf.loc[start, ["high_time", "low_time"]] = [pd.NaT, pd.NaT]
-            continue
 
-        high_time = df_low_slice["high"].idxmax()
-        low_time = df_low_slice["low"].idxmin()
-        df_high_tf.loc[start, "high_time"] = high_time
-        df_high_tf.loc[start, "low_time"] = low_time
+def write_file(df, filepath):
+    """Escribe DataFrame a parquet o xlsx según extensión original."""
+    df_out = df.reset_index()
+    df_out.rename(columns={"index": "timestamp"}, inplace=True)
+    
+    if filepath.suffix == ".parquet":
+        df_out.to_parquet(filepath, index=False)
+    elif filepath.suffix == ".xlsx":
+        df_out.to_excel(filepath, index=False)
 
-    df_high_tf = df_high_tf.iloc[:-1]  # eliminar última fila incompleta
 
-    # Asegurar tipos
-    numeric_cols = ["open","high","low","close","volume_base","volume_quote"]
-    df_high_tf[numeric_cols] = df_high_tf[numeric_cols].astype(float)
-    df_high_tf["low_time"] = pd.to_datetime(df_high_tf["low_time"])
-    df_high_tf["high_time"] = pd.to_datetime(df_high_tf["high_time"])
-
-    # Porcentaje filas buenas
-    good_mask = df_high_tf["high_time"].notna() & df_high_tf["low_time"].notna()
-    percentage_good_row = good_mask.sum() / len(df_high_tf) * 100
-    percentage_garbage_row = 100 - percentage_good_row
-    print(f"WARNINGS: Garbage row: {'%.2f' % percentage_garbage_row} %")
-
-    return df_high_tf
-
-# -----------------------------
-# Detectar todos los ficheros Parquet
-# -----------------------------
-all_files = list(input_folder.glob("*.parquet"))
-
-file_map = {}
-for f in all_files:
-    name_parts = f.stem.split("_")
-    symbol = "_".join(name_parts[:-1])
-    tf_ext = name_parts[-1]
-    if symbol not in file_map:
-        file_map[symbol] = {}
-    file_map[symbol][tf_ext] = f
-
-# -----------------------------
-# Procesar todos los símbolos
-# -----------------------------
-summary = []
-
-for symbol, tf_files in file_map.items():
-    available_tfs = [tf for tf in tf_files.keys() if tf in timeframes_to_consider]
-    if len(available_tfs) < 2:
-        print(f"❌ Jumping {symbol}: no at least 2 df selected")
-        continue
-
-    def tf_to_minutes(tf):
-        if tf.endswith("m"):
-            return int(tf[:-1])
-        elif tf.endswith("h"):
-            return int(tf[:-1]) * 60
-        elif tf.endswith("d"):
-            return int(tf[:-1]) * 1440
-        else:
-            return 999999
-
-    sorted_tfs = sorted(available_tfs, key=tf_to_minutes)
-    low_tf_name = sorted_tfs[0]
-    high_tf_name = sorted_tfs[-1]
-
-    print(f"\nProcesando {symbol}: low_tf={low_tf_name}, high_tf={high_tf_name}")
-
-    # -----------------------------
-    # Cargar Parquet
-    # -----------------------------
-    df_low_tf  = pd.read_parquet(tf_files[low_tf_name], engine='pyarrow')
-    df_high_tf = pd.read_parquet(tf_files[high_tf_name], engine='pyarrow')
-
-    # Asegurar índice datetime
-    if not pd.api.types.is_datetime64_any_dtype(df_low_tf.index):
-        df_low_tf = df_low_tf.set_index(pd.to_datetime(df_low_tf["timestamp"]))
-    if not pd.api.types.is_datetime64_any_dtype(df_high_tf.index):
-        df_high_tf = df_high_tf.set_index(pd.to_datetime(df_high_tf["timestamp"]))
-
-    # Calcular extremos
-    df_ready = find_timestamp_extremum(df_high_tf, df_low_tf)
-
-    # Guardar Excel y Parquet
-    excel_file = output_folder / f"{symbol}_{high_tf_name}.xlsx"
-    parquet_file = output_folder / f"{symbol}_{high_tf_name}.parquet"
-
-    df_ready.to_excel(excel_file, index=False, float_format="%.6f")
-    df_ready.to_parquet(parquet_file, engine='pyarrow', index=False)
-
-    print(f"💾 Saved: {excel_file} y {parquet_file}")
-
-    summary.append({
-        "symbol": symbol,
-        "low_tf": low_tf_name,
-        "high_tf": high_tf_name,
-        "rows": len(df_ready),
-        "good_rows_pct": len(df_ready.dropna())/len(df_ready)*100
-    })
-
-# -----------------------------
-# Resumen final
-# -----------------------------
-print("\n--- Resumen final (solo filas con garbage) ---")
-for s in summary:
-    if s['good_rows_pct'] < 100:
-        print(f"{s['symbol']}: {s['low_tf']} -> {s['high_tf']}, filas={s['rows']}, good_rows%={'%.2f' % s['good_rows_pct']}%")
+def find_timestamp_extremum(df, df_lower_timeframe):
+    """
+    Encuentra el timestamp exacto donde ocurren el high y low de cada barra.
+    
+    :param df: DataFrame del timeframe superior (ej: 4H)
+    :param df_lower_timeframe: DataFrame del timeframe inferior (ej: 1H)
+    :return: df con columnas adicionales low_time y high_time
+    """
+    df = df.copy()
+    
+    # Ajustar inicio al primer dato disponible en lower timeframe
+    df = df.loc[df_lower_timeframe.index[0]:]
+    
+    # Inicializar nuevas columnas
+    df["low_time"] = pd.NaT
+    df["high_time"] = pd.NaT
+    
+    # Procesar cada barra
+    for i in tqdm(range(len(df) - 1), desc="Procesando barras"):
+        start = df.index[i]
+        end = df.index[i + 1]
         
+        # Extraer datos intrabarra del período
+        # Incluimos la barra inicial (start) pero excluimos la final (end)
+        intrabar_data = df_lower_timeframe.loc[start:end].iloc[:-1]
+        
+        if len(intrabar_data) == 0:
+            continue
+        
+        try:
+            # Encontrar timestamp del máximo y mínimo en todas las barras del período
+            high_time = intrabar_data["high"].idxmax()
+            low_time = intrabar_data["low"].idxmin()
+            
+            df.loc[start, "low_time"] = low_time
+            df.loc[start, "high_time"] = high_time
+            
+        except Exception as e:
+            print(f"Error en {start}: {e}")
+            continue
+    
+    # Eliminar última fila (incompleta)
+    df = df.iloc[:-1]
+    
+    # Estadísticas
+    valid_rows = df[["low_time", "high_time"]].notna().all(axis=1).sum()
+    total_rows = len(df)
+    percentage_valid = (valid_rows / total_rows * 100) if total_rows > 0 else 0
+    print(f"Filas válidas: {valid_rows}/{total_rows} ({percentage_valid:.2f}%)")
+    
+    return df
 
+
+def process_files():
+    """Procesa todos los archivos en la carpeta input."""
+    
+    # Obtener todos los archivos
+    files = list(input_folder.glob("*.parquet")) + list(input_folder.glob("*.xlsx"))
+    
+    if len(files) == 0:
+        print(f"❌ No se encontraron archivos en {input_folder}")
+        return
+    
+    # Agrupar por (símbolo, timeframe, extensión) para procesar cada uno
+    symbol_timeframe_files = {}
+    for file in files:
+        symbol, timeframe = parse_filename(file)
+        if symbol and timeframe:
+            key = (symbol, timeframe, file.suffix)
+            symbol_timeframe_files[key] = file
+    
+    # Reorganizar para contar símbolos únicos
+    symbols_set = set()
+    for (symbol, _, _) in symbol_timeframe_files.keys():
+        symbols_set.add(symbol)
+    
+    print(f"Encontrados {len(symbols_set)} símbolos")
+    print(f"Par a procesar: {timeframes_to_consider[0]} -> {timeframes_to_consider[1]}\n")
+    
+    tf_high = timeframes_to_consider[0]
+    tf_low = timeframes_to_consider[1]
+    
+    # Procesar cada combinación (símbolo, extensión)
+    processed = set()
+    
+    for (symbol, timeframe, extension) in sorted(symbol_timeframe_files.keys()):
+        # Solo procesar archivos del timeframe superior
+        if timeframe != tf_high:
+            continue
+        
+        # Evitar procesar el mismo símbolo+extensión dos veces
+        combo_key = (symbol, extension)
+        if combo_key in processed:
+            continue
+        
+        print(f"\n{'='*60}")
+        print(f"Procesando: {symbol} ({extension})")
+        print(f"{'='*60}")
+        
+        # Buscar archivos con la misma extensión
+        key_high = (symbol, tf_high, extension)
+        key_low = (symbol, tf_low, extension)
+        
+        if key_high not in symbol_timeframe_files:
+            print(f"⚠️  {symbol}: No existe archivo {tf_high}{extension}")
+            continue
+        
+        if key_low not in symbol_timeframe_files:
+            print(f"⚠️  {symbol}: No existe archivo {tf_low}{extension} (intrabarra)")
+            continue
+        
+        print(f"\n📊 {symbol}_{tf_high}{extension} (usando {tf_low}{extension} como intrabarra)")
+        
+        # Leer archivos
+        file_high = symbol_timeframe_files[key_high]
+        file_low = symbol_timeframe_files[key_low]
+        
+        df_high = read_file(file_high)
+        df_low = read_file(file_low)
+        
+        if df_high is None or df_low is None:
+            print(f"❌ Error leyendo archivos para {symbol}")
+            continue
+        
+        # Normalizar nombres de columnas a minúsculas
+        df_high.columns = df_high.columns.str.lower()
+        df_low.columns = df_low.columns.str.lower()
+        
+        # Procesar
+        df_result = find_timestamp_extremum(df_high, df_low)
+        
+        # Guardar resultado con la misma extensión
+        output_file = output_folder / file_high.name
+        write_file(df_result, output_file)
+        print(f"✅ Guardado: {output_file.name}")
+        
+        processed.add(combo_key)
+    
+    print(f"\n{'='*60}")
+    print("✨ Proceso completado")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    process_files()
