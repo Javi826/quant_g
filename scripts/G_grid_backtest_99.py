@@ -7,35 +7,33 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
-from Z_add_signals_03 import explosive_signal_03  
+from Z_add_signals_99 import explosive_signal_99  
 
-start_time         = time.time()
-SAVE_SYMBOLS       = False
-STRATEGY           ="patters"
-N_JOBS             =-1
+start_time = time.time()
+SAVE_SYMBOLS = False
+STRATEGY = "patterns"
+N_JOBS = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1D'
-ORDER_AMOUNT        = 300
-MIN_VOL_USDT        = 50_000
+DATA_FOLDER           = "data/crypto_2023_IS"
+TIMEFRAME             = '4H'
+MIN_VOL_USDT          = 1600_000_000
 
 # -----------------------------------------------------------------------------
 # GRID DE PARÁMETROS
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST     = [5,10,15,20,25,30]
-LOOKBACK_LIST       = [2,3,4,5]  
-      
-TP_PCT_LIST         = [0,5,10,15]
-SL_PCT_LIST         = [0,5,10,15]
+SELL_AFTER_LIST       = [1200]
 
-param_names = ['SELL_AFTER', 'LOOKBACK','TP_PCT', 'SL_PCT']
+TP_PCT_LIST           = [1000]
+SL_PCT_LIST           = [1000]
+
+param_names = ['SELL_AFTER','TP_PCT', 'SL_PCT']
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
@@ -54,25 +52,22 @@ ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
 # -----------------------------------------------------------------------------
 def process_combo(comb):
     params = dict(zip(param_names, comb))
-    ohlcv_arrays = {}
+    ohlcv_arrays_combo = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = explosive_signal_03(
+        signal = explosive_signal_99(
             high=arrs['high'],       
-            close=arrs['close'], 
-            lookback=params['LOOKBACK'],
-            live=False  
+            close=arrs['close'],    
+            live=False  # solo compra en el primer timestamp
         )
 
-        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
+        ohlcv_arrays_combo[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
-        ohlcv_arrays,
+        ohlcv_arrays_combo,
         sell_after=params['SELL_AFTER'],
         tp_pct=params['TP_PCT'],
-        sl_pct=params['SL_PCT'],
-        order_amount=ORDER_AMOUNT
-        
+        sl_pct=params['SL_PCT']
     )
     return comb, results
 
@@ -98,17 +93,15 @@ grid_results_df = pd.DataFrame(grid_records)
 save_results(grid_results_df.to_dict('records'),grid_results_df,filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
 
 print(f'\n🥇==Grid_backtest {STRATEGY}==🥇')
-print(f"DATA_FOLDER      : {DATA_FOLDER}")
-print(f"TIMEFRAME        : {TIMEFRAME}")
+print(f"\nTIMEFRAME        : {TIMEFRAME}")
 print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
-print(f"ORDER_AMOUNT     : {ORDER_AMOUNT}")
 print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
-print(f"LOOKBACK_LIST    = {LOOKBACK_LIST}")
+
 
 print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
 print(f"SL_PCT_LIST      = {SL_PCT_LIST}\n")
 
-df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
+df_portfolio, mi_series = report_backtesting(df=grid_results_df,parameters=param_names,initial_capital=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)
 print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

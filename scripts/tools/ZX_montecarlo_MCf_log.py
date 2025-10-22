@@ -2,7 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 
-DTYPE = np.float32
+DTYPE = np.float64
 
 def compute_candle_features(df, raw_columns=[]):
     df = df.copy()
@@ -54,7 +54,6 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
     start_price     = float(df_features["open"].iloc[-1])
     start_timestamp = df_features.index[-1].value // 10**9
 
-
     paths_array = np.empty((n_paths, n_obs, n_features_out), dtype=np.float64)
 
     for i in range(n_paths):
@@ -64,8 +63,13 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
 
         pct_open_low, pct_open_high, pct_open_close = sampled[:, 0], sampled[:, 1], sampled[:, 2]
 
-        multipliers  = 1.0 + pct_open_close
-        close_prices = start_price * np.cumprod(multipliers)
+        # --- Cambio a log-retornos centrados ---
+        log_returns = np.log1p(pct_open_close)            # log(1 + pct_open_close)
+        log_returns_centered = log_returns - np.mean(log_returns)
+        log_close_prices = np.cumsum(log_returns_centered) + np.log(start_price)
+        close_prices = np.exp(log_close_prices)
+        # --------------------------------------
+
         open_prices  = np.empty_like(close_prices)
         open_prices[0] = start_price
         open_prices[1:] = close_prices[:-1]
@@ -78,7 +82,6 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
         low_times  = times + sampled[:, 4]
         high_times = times + sampled[:, 5]
 
-        # stack completo
         base_cols = [open_prices, low_prices, high_prices, close_prices, low_times, high_times]
         if n_raw > 0:
             for idx_col in range(n_raw):

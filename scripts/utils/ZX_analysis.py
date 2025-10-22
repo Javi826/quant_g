@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
 
-DATA_FOLDER         = "data/crypto_2023_IS"
-
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -15,7 +13,8 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 
 
-def report_backtesting(df,parameters,initial_capital=10000,show_plots=False,save_excel=False):
+def report_backtesting(df, parameters, data_folder, initial_capital=10000, show_plots=False, save_excel=False):
+
     
     df = df.copy()
 
@@ -131,7 +130,7 @@ def report_backtesting(df,parameters,initial_capital=10000,show_plots=False,save
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Net_Gain_pct", color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
-        
+        DATA_FOLDER=data_folder
         # --- Línea Bitcoin ---
         btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
         btc_df = pd.read_parquet(btc_file)
@@ -150,11 +149,11 @@ def report_backtesting(df,parameters,initial_capital=10000,show_plots=False,save
         btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
     
         # Graficar BTC
-        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], color='black', linewidth=0.2, label='BTC %')
+        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], color='black', linewidth=0.3, label='BTC %')
     
         # Drawdown %
         ax2 = ax1.twinx()
-        ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.2, label='DD %')
+        ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
         ax2.set_ylabel("Drawdown", color='red')
         ax2.tick_params(axis='y', labelcolor='red')
         

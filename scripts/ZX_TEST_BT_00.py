@@ -1,1059 +1,169 @@
-import os
-import warnings
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
-from sklearn.feature_selection import mutual_info_regression
-
-DATA_FOLDER         = "data/crypto_2023_ISOLD"
-
-warnings.filterwarnings("ignore")
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.expand_frame_repr', False)
-pd.set_option('display.max_colwidth', None)
-
+"""
+Test simplificado: 1 símbolo, comparación Manual vs Función
+El cálculo manual se adapta automáticamente a los datos hardcodeados
+"""
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import timedelta
+from ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE, COMISION
+ORDER_AMOUNT        = 200
+# ============== DATOS DE PRUEBA (MODIFICAR AQUÍ) ==============
+base_time = pd.Timestamp('2024-01-01 00:00:00')
+timestamps = [base_time + timedelta(hours=i) for i in range(8)]
 
-# Importar función a testear
-from ZZX_DRAFT1 import run_grid_backtest
-
-# =====================================================================
-# UTILIDADES PARA TESTS
-# =====================================================================
-
-def assert_close(actual, expected, tolerance=1e-6, name=""):
-    """Verifica que dos valores sean aproximadamente iguales."""
-    if abs(actual - expected) > tolerance:
-        raise AssertionError(
-            f"❌ {name}: Expected {expected}, got {actual} (diff: {abs(actual - expected)})"
-        )
-    print(f"✅ {name}: {actual} ≈ {expected}")
-
-
-def create_test_data(case_name):
-    """
-    Crea datos de prueba hardcodeados para diferentes casos.
-    """
-    cases = {
-        "simple_no_tp_sl": get_simple_case_no_tp_sl,
-        "with_tp": get_case_with_tp,
-        "with_sl": get_case_with_sl,
-        "tp_sl_same_candle": get_case_tp_sl_same_candle,
-        "multiple_signals": get_case_multiple_signals,
-        "insufficient_cash": get_case_insufficient_cash,
-        "simultaneous_signals": get_case_simultaneous_signals,
-        "tp_before_sell_after": get_case_tp_before_sell_after,
-        "exact_tp_price": get_case_exact_tp_price,
-        "zero_commission": get_case_zero_commission
+ohlcv_data = {
+    'BTC': {
+        'ts': np.array(timestamps, dtype='datetime64[ns]'),
+        'close': np.array([100, 100, 100, 100, 100, 100, 100, 100], dtype=np.float64),
+        'high': np.array([100, 105, 100, 100, 100, 100, 100, 100], dtype=np.float64),
+        'low': np.array([100, 99.5, 100, 100, 100, 100, 100, 100], dtype=np.float64),
+        'signal': np.array([1, 0, 0, 0, 0, 0, 0, 0], dtype=bool),
+        'high_time': np.array(timestamps, dtype='datetime64[ns]'),
+        'low_time': np.array(timestamps, dtype='datetime64[ns]')
     }
-    
-    if case_name not in cases:
-        raise ValueError(f"Caso desconocido: {case_name}")
-    
-    return cases[case_name]()
+}
+
+# PARÁMETROS
+sell_after = 5
+tp_pct = 6.0
+sl_pct = 5.0
+
+# ============== CÁLCULO MANUAL FUNCIONALIZADO ==============
+def manual_backtest(signals, sell_after, close_prices, high_prices, low_prices,
+                    initial_balance, order_amount, comi_percent, tp_pct=0.0, sl_pct=0.0):
+    comm_factor = comi_percent / 100.0
+    cash = float(initial_balance)
+    trades = []
+    position_open = None  # None si no hay posición abierta
+
+    signal_indices = np.where(signals)[0]
+    n = len(close_prices)
+
+    for t in range(n):
+        # Ejecutar compra si hay señal y no hay posición abierta
+        if t in signal_indices and position_open is None:
+            buy_price = float(close_prices[t])
+            qty = order_amount / buy_price
+            comm_buy = order_amount * comm_factor
+            cash -= (order_amount + comm_buy)
+
+            tp_price = buy_price * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else float('inf')
+            sl_price = buy_price * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else float('-inf')
+
+            position_open = {
+                'buy_idx': t,
+                'buy_price': buy_price,
+                'qty': qty,
+                'commission_buy': comm_buy,
+                'tp_price': tp_price,
+                'sl_price': sl_price,
+                'sell_after_idx': min(t + sell_after, n - 1)
+            }
+
+        # Cerrar posición si hay alguna abierta
+        if position_open is not None:
+            sell_idx = t
+            high = high_prices[t]
+            low = low_prices[t]
+
+            # Determinar si se alcanza TP o SL
+            exec_price = None
+            exit_reason = None
+
+            if high >= position_open['tp_price']:
+                exec_price = position_open['tp_price']
+                exit_reason = 'TP'
+            elif low <= position_open['sl_price']:
+                exec_price = position_open['sl_price']
+                exit_reason = 'SL'
+            elif t >= position_open['sell_after_idx']:
+                exec_price = float(close_prices[t])
+                exit_reason = 'SELL_AFTER'
+
+            if exec_price is not None:
+                comm_sell = position_open['qty'] * exec_price * comm_factor
+                cash += position_open['qty'] * exec_price - comm_sell
+
+                profit = (exec_price - position_open['buy_price']) * position_open['qty'] - \
+                         position_open['commission_buy'] - comm_sell
+
+                trades.append({
+                    'buy_idx': position_open['buy_idx'],
+                    'sell_idx': t,
+                    'buy_price': position_open['buy_price'],
+                    'sell_price': exec_price,
+                    'qty': position_open['qty'],
+                    'commission_buy': position_open['commission_buy'],
+                    'commission_sell': comm_sell,
+                    'profit': profit,
+                    'exit_reason': exit_reason
+                })
+
+                position_open = None  # Liberar posición
+
+    final_balance = cash
+    total_profit = sum(t['profit'] for t in trades)
+    return trades, final_balance, total_profit
 
 
-# =====================================================================
-# CASO 1: SIMPLE SIN TP/SL
-# =====================================================================
+# ============== EXTRACCIÓN AUTOMÁTICA DE DATOS ==============
+symbol       = list(ohlcv_data.keys())[0]
+data         = ohlcv_data[symbol]
+close_prices = data['close']
+signals      = data['signal']
 
-def get_simple_case_no_tp_sl():
-    """
-    Caso más básico:
-    - 1 símbolo
-    - 1 señal
-    - Sin TP/SL
-    - Sell after 3 velas
-    
-    CÁLCULO MANUAL:
-    - Buy en índice 2: precio = 100, qty = 100/100 = 1.0
-    - Commission buy = 1.0 * 100 * 0.0005 = 0.05
-    - Cash después de compra = 10000 - 100 - 0.05 = 9899.95
-    - Sell en índice 5 (2+3): precio = 103
-    - Commission sell = 1.0 * 103 * 0.0005 = 0.0515
-    - Cash después de venta = 9899.95 + 103 - 0.0515 = 10002.8985
-    - Profit = (103-100)*1.0 - 0.05 - 0.0515 = 2.8985
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices = np.array([99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0])
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1  # Señal en índice 2
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 0.5,
-            'low': prices - 0.5,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10002.8985,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': 2.8985,
-        'buy_price': 100.0,
-        'sell_price': 103.0,
-        'exit_reason': 'SELL_AFTER'
-    }
-    
-    params = {
-        'sell_after': 3,
-        'tp_pct': 0.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
+# Ejecutar cálculo manual
+manual_trades, final_balance_manual, total_profit_manual = manual_backtest(
+    signals=signals,
+    sell_after=sell_after,
+    close_prices=close_prices,
+    high_prices=data['high'],
+    low_prices=data['low'],
+    initial_balance=INITIAL_BALANCE,
+    order_amount=ORDER_AMOUNT,
+    comi_percent=COMISION,
+    tp_pct=tp_pct,
+    sl_pct=sl_pct
+)
 
+print("\n[MANUAL]")
+for t in manual_trades:
+    print(f"Señal detectada en índice: {t['buy_idx']}")
+    print(f"Precio compra (t={t['buy_idx']})      : ${t['buy_price']:.2f}")
+    print(f"Precio venta (t={t['sell_idx']})       : ${t['sell_price']:.2f}")
+    print(f"Profit                   : ${t['profit']:.6f}\n")
 
-# =====================================================================
-# CASO 2: CON TAKE PROFIT
-# =====================================================================
+print(f"Balance final            : ${final_balance_manual:.6f}")
+print(f"Profit total             : ${total_profit_manual:.6f}")
 
-def get_case_with_tp():
-    """
-    Caso con TP:
-    - 1 símbolo
-    - 1 señal
-    - TP = 5% (alcanzado en vela 4)
-    - Sell after 10 velas
-    
-    CÁLCULO MANUAL:
-    - Buy en índice 2: precio = 100, qty = 1.0
-    - TP price = 100 * 1.05 = 105.0
-    - Commission buy = 0.05
-    - Vela índice 4: high = 106 >= 105 → TP alcanzado
-    - Sell en índice 4: precio = 105.0
-    - Commission sell = 1.0 * 105 * 0.0005 = 0.0525
-    - Profit = (105-100)*1.0 - 0.05 - 0.0525 = 4.8975
-    - Final balance = 10000 - 100 - 0.05 + 105 - 0.0525 = 10004.8975
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=15, freq='1h')
-    
-    prices = np.array([99.0, 99.5, 100.0, 102.0, 104.0, 105.0, 106.0, 107.0, 
-                       108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0])
-    highs = np.array([99.5, 100.0, 100.5, 103.0, 106.0, 106.5, 107.5, 108.5,
-                      109.5, 110.5, 111.5, 112.5, 113.5, 114.5, 115.5])
-    lows = np.array([98.5, 99.0, 99.5, 101.5, 103.5, 104.5, 105.5, 106.5,
-                     107.5, 108.5, 109.5, 110.5, 111.5, 112.5, 113.5])
-    
-    signal = np.zeros(15, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': highs,
-            'low': lows,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10004.8975,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': 4.8975,
-        'buy_price': 100.0,
-        'sell_price': 105.0,
-        'exit_reason': 'TP'
-    }
-    
-    params = {
-        'sell_after': 10,
-        'tp_pct': 5.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
+# ============== FUNCIÓN AUTOMÁTICA ==============
+print("\n[FUNCIÓN]")
+results   = run_grid_backtest(ohlcv_data, sell_after, tp_pct, sl_pct)
+portfolio = results['__PORTFOLIO__']
 
+final_balance_func = portfolio['final_balance']
+num_trades_func    = portfolio['num_signals']
+profit_func        = sum(portfolio['trades']) if portfolio['trades'] else 0
 
-# =====================================================================
-# CASO 3: CON STOP LOSS
-# =====================================================================
+print(f"Num trades               : {num_trades_func}")
+print(f"Profit                   : ${profit_func:.6f}")
+print(f"Balance                  : ${final_balance_func:.6f}")
 
-def get_case_with_sl():
-    """
-    Caso con SL:
-    - 1 símbolo
-    - 1 señal
-    - SL = 3% (alcanzado en vela 3)
-    - Sell after 10 velas
-    
-    CÁLCULO MANUAL:
-    - Buy en índice 2: precio = 100, qty = 1.0
-    - SL price = 100 * 0.97 = 97.0
-    - Commission buy = 0.05
-    - Vela índice 3: low = 96.5 <= 97 → SL alcanzado
-    - Sell en índice 3: precio = 97.0
-    - Commission sell = 1.0 * 97 * 0.0005 = 0.0485
-    - Profit = (97-100)*1.0 - 0.05 - 0.0485 = -3.0985
-    - Final balance = 10000 - 100 - 0.05 + 97 - 0.0485 = 9996.9015
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=15, freq='1h')
-    
-    prices = np.array([100.0, 99.5, 100.0, 98.0, 96.0, 95.0, 94.0, 93.0,
-                       92.0, 91.0, 90.0, 89.0, 88.0, 87.0, 86.0])
-    highs = np.array([100.5, 100.0, 100.5, 99.0, 97.0, 96.0, 95.0, 94.0,
-                      93.0, 92.0, 91.0, 90.0, 89.0, 88.0, 87.0])
-    lows = np.array([99.5, 99.0, 99.5, 96.5, 95.0, 94.0, 93.0, 92.0,
-                     91.0, 90.0, 89.0, 88.0, 87.0, 86.0, 85.0])
-    
-    signal = np.zeros(15, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': highs,
-            'low': lows,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 9996.9015,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': -3.0985,
-        'buy_price': 100.0,
-        'sell_price': 97.0,
-        'exit_reason': 'SL'
-    }
-    
-    params = {
-        'sell_after': 10,
-        'tp_pct': 0.0,
-        'sl_pct': 3.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
+# ============== COMPARACIÓN ==============
+print("\n" + "=" * 60)
+print("COMPARACIÓN")
+print("=" * 60)
 
+diff_balance = abs(final_balance_manual - final_balance_func)
+diff_profit  = abs(total_profit_manual - profit_func)
 
-# =====================================================================
-# CASO 4: TP Y SL EN LA MISMA VELA
-# =====================================================================
+print(f"Balance: Manual=${final_balance_manual:.6f}  Función=${final_balance_func:.6f}  Diff=${diff_balance:.8f}")
+print(f"Profit:  Manual=${total_profit_manual:.6f}      Función=${profit_func:.6f}      Diff=${diff_profit:.8f}")
 
-def get_case_tp_sl_same_candle():
-    """
-    Caso con TP y SL alcanzados en la misma vela:
-    - 1 símbolo
-    - 1 señal
-    - TP = 5%, SL = 3%
-    - Ambos alcanzados en vela 3
-    - SL ocurre primero según low_time < high_time
-    
-    CÁLCULO MANUAL:
-    - Buy en índice 2: precio = 100, qty = 1.0
-    - TP price = 105.0, SL price = 97.0
-    - Commission buy = 0.05
-    - Vela índice 3: high = 106 (TP), low = 96 (SL)
-    - low_time < high_time → SL primero
-    - Sell en índice 3: precio = 97.0
-    - Commission sell = 0.0485
-    - Profit = -3.0985
-    - Final balance = 9996.9015
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices = np.array([100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0])
-    highs = np.array([101.0, 101.0, 101.0, 106.0, 101.0, 101.0, 101.0, 101.0, 101.0, 101.0])
-    lows = np.array([99.0, 99.0, 99.0, 96.0, 99.0, 99.0, 99.0, 99.0, 99.0, 99.0])
-    
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1
-    
-    # low_time ocurre antes que high_time en vela 3
-    high_times = dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm')
-    low_times = dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': highs,
-            'low': lows,
-            'signal': signal,
-            'high_time': high_times,
-            'low_time': low_times
-        }
-    }
-    
-    expected = {
-        'final_balance': 9996.9015,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': -3.0985,
-        'buy_price': 100.0,
-        'sell_price': 97.0,
-        'exit_reason': 'SL'  # SL ocurre primero
-    }
-    
-    params = {
-        'sell_after': 5,
-        'tp_pct': 5.0,
-        'sl_pct': 3.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# CASO 5: MÚLTIPLES SEÑALES (SOLO EJECUTA UNA POR VEZ)
-# =====================================================================
-
-def get_case_multiple_signals():
-    """
-    Caso con múltiples señales:
-    - 2 símbolos
-    - Señales en diferentes momentos
-    - Solo se ejecuta una posición a la vez
-    
-    CÁLCULO MANUAL:
-    - Señal 1 en SYM1 índice 2: buy@100, sell@103 después de 3 velas
-      * Commission buy = 0.05, commission sell = 0.0515
-      * Profit = 2.8985
-      * Balance después = 10002.8985
-    
-    - Señal 2 en SYM2 índice 6 (después de cerrar señal 1):
-      * Buy@50, qty = 100/50 = 2.0
-      * Commission buy = 2.0*50*0.0005 = 0.05
-      * Sell@52 después de 3 velas (índice 9)
-      * Commission sell = 2.0*52*0.0005 = 0.052
-      * Profit = (52-50)*2.0 - 0.05 - 0.052 = 3.898
-      * Final balance = 10002.8985 - 100 - 0.05 + 104 - 0.052 = 10006.7965
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=15, freq='1h')
-    
-    # SYM1
-    prices1 = np.array([99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
-                        106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0])
-    signal1 = np.zeros(15, dtype=int)
-    signal1[2] = 1
-    
-    # SYM2
-    prices2 = np.array([49.0, 49.5, 50.0, 50.5, 51.0, 51.5, 50.0, 51.0,
-                        51.5, 52.0, 53.0, 54.0, 55.0, 56.0, 57.0])
-    signal2 = np.zeros(15, dtype=int)
-    signal2[6] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices1,
-            'high': prices1 + 0.5,
-            'low': prices1 - 0.5,
-            'signal': signal1,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        },
-        'SYM2': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices2,
-            'high': prices2 + 0.5,
-            'low': prices2 - 0.5,
-            'signal': signal2,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10006.7965,
-        'num_trades': 2,
-        'num_signals': 2,
-        'profit_trade_1': 2.8985,
-        'profit_trade_2': 3.898,
-        'total_profit': 6.7965
-    }
-    
-    params = {
-        'sell_after': 3,
-        'tp_pct': 0.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# CASO 6: CASH INSUFICIENTE
-# =====================================================================
-
-def get_case_insufficient_cash():
-    """
-    Caso donde dos señales ocurren al mismo tiempo:
-    - 1 símbolo
-    - 2 señales en el mismo timestamp
-    - Solo se ejecuta la primera porque no hay cash suficiente para la segunda
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices = np.array([100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0])
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1  # Primera señal
-    signal[2] = 1  # Segunda señal en el mismo índice (puedes simular con otro símbolo o manejar lista de señales)
-
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 0.5,
-            'low': prices - 0.5,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 102.7389,  # Después de ejecutar solo la primera señal
-        'num_trades': 1,            # Solo se ejecuta la primera
-        'num_signals': 2,           # Dos señales llegaron
-        'profit_trade_1': 2.8384,   # Ganancia de la primera señal
-        'profit_trade_2': 0          # Segunda señal no se ejecuta
-    }
-    
-    params = {
-        'sell_after': 3,
-        'tp_pct': 0.0,
-        'sl_pct': 0.0,
-        'initial_balance': 100,  # Solo alcanza para una señal
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-
-# =====================================================================
-# CASO 7: DOS SÍMBOLOS CON SEÑALES SIMULTÁNEAS
-# =====================================================================
-
-def get_case_simultaneous_signals():
-    """
-    Caso con señales simultáneas en diferentes símbolos:
-    - 2 símbolos con señales en el mismo timestamp
-    - AMBAS se ejecutan (mismo timestamp = no hay posiciones previas abiertas)
-    
-    CÁLCULO MANUAL:
-    - Señales en índice 2 para ambos símbolos (mismo timestamp)
-    - Por orden alfabético: SYM1 se ejecuta primero, luego SYM2
-    
-    Trade 1 (SYM1):
-    - Buy SYM1@100, qty=1.0
-    - Commission buy = 1.0*100*0.0005 = 0.05
-    - Cash después = 10000 - 100 - 0.05 = 9899.95
-    - Sell SYM1@103 en índice 5
-    - Commission sell = 1.0*103*0.0005 = 0.0515
-    - Profit SYM1 = (103-100)*1.0 - 0.05 - 0.0515 = 2.8985
-    - Cash después de venta = 9899.95 + 103 - 0.0515 = 10002.8985
-    
-    Trade 2 (SYM2):
-    - Buy SYM2@50, qty=100/50 = 2.0
-    - Commission buy = 2.0*50*0.0005 = 0.05
-    - Cash después = 9899.95 - 100 - 0.05 = 9799.90
-    - Sell SYM2@53 en índice 5
-    - Commission sell = 2.0*53*0.0005 = 0.053
-    - Profit SYM2 = (53-50)*2.0 - 0.05 - 0.053 = 5.897
-    - Cash después de ambas ventas = 9799.90 + 103 - 0.0515 + 106 - 0.053 = 10008.7955
-    
-    Final balance = 10008.7955
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices1 = np.array([99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0])
-    prices2 = np.array([49.0, 49.5, 50.0, 51.0, 52.0, 53.0, 54.0, 55.0, 56.0, 57.0])
-    
-    signal1 = np.zeros(10, dtype=int)
-    signal2 = np.zeros(10, dtype=int)
-    signal1[2] = 1  # Mismo índice
-    signal2[2] = 1  # Mismo índice (mismo timestamp)
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices1,
-            'high': prices1 + 0.5,
-            'low': prices1 - 0.5,
-            'signal': signal1,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        },
-        'SYM2': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices2,
-            'high': prices2 + 0.5,
-            'low': prices2 - 0.5,
-            'signal': signal2,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10008.7955,
-        'num_trades': 2,  # Ambas señales se ejecutan
-        'num_signals': 2,
-        'profit_trade_1': 2.8985,
-        'profit_trade_2': 5.897,
-        'total_profit': 8.7955
-    }
-    
-    params = {
-        'sell_after': 3,
-        'tp_pct': 0.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# CASO 8: TP ALCANZADO ANTES QUE SELL_AFTER
-# =====================================================================
-
-def get_case_tp_before_sell_after():
-    """
-    Caso donde TP se alcanza mucho antes que sell_after:
-    - TP en vela 3, pero sell_after = 10
-    - Debe cerrar en vela 3 con TP
-    
-    CÁLCULO MANUAL:
-    - Buy@100 en índice 2
-    - TP = 105.0 (5%)
-    - Vela 3: high = 106 → TP alcanzado
-    - Sell@105 en índice 3 (no espera a índice 12)
-    - Profit = (105-100)*1.0 - 0.05 - 0.0525 = 4.8975
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=15, freq='1h')
-    
-    prices = np.array([100.0, 100.0, 100.0, 104.0, 108.0, 110.0, 112.0, 114.0,
-                       116.0, 118.0, 120.0, 122.0, 124.0, 126.0, 128.0])
-    highs = np.array([100.5, 100.5, 100.5, 106.0, 109.0, 111.0, 113.0, 115.0,
-                      117.0, 119.0, 121.0, 123.0, 125.0, 127.0, 129.0])
-    lows = np.array([99.5, 99.5, 99.5, 103.5, 107.5, 109.5, 111.5, 113.5,
-                     115.5, 117.5, 119.5, 121.5, 123.5, 125.5, 127.5])
-    
-    signal = np.zeros(15, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': highs,
-            'low': lows,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10004.8975,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': 4.8975,
-        'exit_reason': 'TP',
-        'sell_index': 3  # No espera a 12
-    }
-    
-    params = {
-        'sell_after': 10,  # Largo pero TP ocurre antes
-        'tp_pct': 5.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# CASO 9: PRECIO EXACTO EN TP (BOUNDARY CASE)
-# =====================================================================
-
-def get_case_exact_tp_price():
-    """
-    Caso donde el high toca exactamente el precio TP:
-    - TP = 105.0
-    - High = 105.0 (exacto, no mayor)
-    - Debe ejecutar TP
-    
-    CÁLCULO MANUAL:
-    - Buy@100, TP=105.0
-    - Vela 3: high = 105.0 (>= 105.0) → TP ejecutado
-    - Profit = 4.8975
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices = np.array([100.0, 100.0, 100.0, 104.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0])
-    highs = np.array([100.5, 100.5, 100.5, 105.0, 106.5, 107.5, 108.5, 109.5, 110.5, 111.5])  # Exacto en índice 3
-    lows = np.array([99.5, 99.5, 99.5, 103.5, 105.5, 106.5, 107.5, 108.5, 109.5, 110.5])
-    
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': highs,
-            'low': lows,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10004.8975,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': 4.8975,
-        'exit_reason': 'TP'
-    }
-    
-    params = {
-        'sell_after': 5,
-        'tp_pct': 5.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.05
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# CASO 10: COMISIÓN CERO
-# =====================================================================
-
-def get_case_zero_commission():
-    """
-    Caso sin comisiones:
-    - Commission = 0%
-    - Profit puro = diferencia de precios
-    
-    CÁLCULO MANUAL:
-    - Buy@100, qty=1.0
-    - Commission buy = 0.0
-    - Commission sell = 0.0
-    - Sell@103
-    - Profit = (103-100)*1.0 - 0 - 0 = 3.0
-    - Final balance = 10000 - 100 + 103 = 10003.0
-    """
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    
-    prices = np.array([99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0])
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 0.5,
-            'low': prices - 0.5,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    expected = {
-        'final_balance': 10003.0,
-        'num_trades': 1,
-        'num_signals': 1,
-        'profit_trade_1': 3.0,
-        'commission_buy': 0.0,
-        'commission_sell': 0.0
-    }
-    
-    params = {
-        'sell_after': 3,
-        'tp_pct': 0.0,
-        'sl_pct': 0.0,
-        'initial_balance': 10000,
-        'order_amount': 100,
-        'comi_pct': 0.0  # Sin comisión
-    }
-    
-    return data, params, expected
-
-
-# =====================================================================
-# FUNCIONES DE TEST
-# =====================================================================
-
-def run_test(case_name, verbose=True):
-    """Ejecuta un test específico."""
-    if verbose:
-        print(f"\n{'='*70}")
-        print(f"TEST: {case_name.upper().replace('_', ' ')}")
-        print(f"{'='*70}")
-    
-    # Obtener datos y expectativas
-    data, params, expected = create_test_data(case_name)
-    
-    # Ejecutar backtest
-    results = run_grid_backtest(
-        ohlcv_arrays=data,
-        **params
-    )
-    
-    portfolio = results['__PORTFOLIO__']
-    
-    # Validar resultados
-    try:
-        # Balance final
-        assert_close(
-            portfolio['final_balance'],
-            expected['final_balance'],
-            tolerance=1e-4,
-            name="Final Balance"
-        )
-        
-        # Número de señales ejecutadas
-        assert portfolio['num_signals'] == expected['num_signals'], \
-            f"❌ Num Signals: Expected {expected['num_signals']}, got {portfolio['num_signals']}"
-        print(f"✅ Num Signals: {portfolio['num_signals']}")
-        
-        # Número de trades
-        assert len(portfolio['trades']) == expected['num_trades'], \
-            f"❌ Num Trades: Expected {expected['num_trades']}, got {len(portfolio['trades'])}"
-        print(f"✅ Num Trades: {len(portfolio['trades'])}")
-        
-        # Verificar trades individuales
-        if 'profit_trade_1' in expected:
-            assert_close(
-                portfolio['trades'][0],
-                expected['profit_trade_1'],
-                tolerance=1e-4,
-                name="Trade 1 Profit"
-            )
-        
-        if 'profit_trade_2' in expected and len(portfolio['trades']) > 1:
-            assert_close(
-                portfolio['trades'][1],
-                expected['profit_trade_2'],
-                tolerance=1e-4,
-                name="Trade 2 Profit"
-            )
-        
-        # Verificar precios de compra/venta
-        trade_log = portfolio['trade_log']
-        if len(trade_log) > 0:
-            if 'buy_price' in expected:
-                assert_close(
-                    trade_log.iloc[0]['buy_price'],
-                    expected['buy_price'],
-                    tolerance=1e-6,
-                    name="Buy Price"
-                )
-            
-            if 'sell_price' in expected:
-                assert_close(
-                    trade_log.iloc[0]['sell_price'],
-                    expected['sell_price'],
-                    tolerance=1e-6,
-                    name="Sell Price"
-                )
-            
-            if 'exit_reason' in expected:
-                assert trade_log.iloc[0]['exit_reason'] == expected['exit_reason'], \
-                    f"❌ Exit Reason: Expected {expected['exit_reason']}, got {trade_log.iloc[0]['exit_reason']}"
-                print(f"✅ Exit Reason: {expected['exit_reason']}")
-            
-            if 'commission_buy' in expected:
-                assert_close(
-                    trade_log.iloc[0]['commission_buy'],
-                    expected['commission_buy'],
-                    tolerance=1e-6,
-                    name="Commission Buy"
-                )
-            
-            if 'commission_sell' in expected:
-                assert_close(
-                    trade_log.iloc[0]['commission_sell'],
-                    expected['commission_sell'],
-                    tolerance=1e-6,
-                    name="Commission Sell"
-                )
-        
-        # Verificar profit total si está especificado
-        if 'total_profit' in expected:
-            total_profit = sum(portfolio['trades'])
-            assert_close(
-                total_profit,
-                expected['total_profit'],
-                tolerance=1e-4,
-                name="Total Profit"
-            )
-        
-        print(f"\n✅ {case_name}: PASSED")
-        return True
-        
-    except (AssertionError, Exception) as e:
-        print(f"\n❌ {case_name}: FAILED")
-        print(f"Error: {e}")
-        if verbose:
-            print("\n--- Trade Log ---")
-            print(portfolio['trade_log'])
-            print("\n--- Balance History ---")
-            print(f"Initial: {params['initial_balance']}")
-            print(f"Final: {portfolio['final_balance']}")
-            print(f"Expected: {expected['final_balance']}")
-        return False
-
-
-def run_all_tests():
-    """Ejecuta todos los tests."""
-    print("\n" + "🧪 EJECUTANDO TESTS UNITARIOS ".center(70, "="))
-    
-    test_cases = [
-        "simple_no_tp_sl",
-        "with_tp",
-        "with_sl",
-        "tp_sl_same_candle",
-        "multiple_signals",
-        "insufficient_cash",
-        "simultaneous_signals",
-        "tp_before_sell_after",
-        "exact_tp_price",
-        "zero_commission"
-    ]
-    
-    results = {}
-    for case in test_cases:
-        results[case] = run_test(case, verbose=True)
-    
-    # Resumen
-    print("\n" + "="*70)
-    print("RESUMEN DE TESTS")
-    print("="*70)
-    
-    passed = sum(results.values())
-    total = len(results)
-    
-    for case, result in results.items():
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"{case.ljust(30)}: {status}")
-    
-    print(f"\n{'='*70}")
-    print(f"Total: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
-    print(f"{'='*70}")
-    
-    return all(results.values())
-
-
-# =====================================================================
-# TESTS DE REGRESIÓN ADICIONALES
-# =====================================================================
-
-def test_edge_cases():
-    """Tests de casos extremos adicionales."""
-    print("\n" + "🔬 TESTS DE CASOS EXTREMOS ".center(70, "="))
-    
-    results = {}
-    
-    # Test 1: Señal en la última vela (no debe ejecutarse si sell_after > velas restantes)
-    print("\n--- Test: Señal en última vela ---")
-    dates = pd.date_range('2024-01-01 00:00', periods=5, freq='1h')
-    prices = np.array([100.0, 101.0, 102.0, 103.0, 104.0])
-    signal = np.zeros(5, dtype=int)
-    signal[4] = 1  # Última vela
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 0.5,
-            'low': prices - 0.5,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    result = run_grid_backtest(
-        ohlcv_arrays=data,
-        sell_after=3,
-        tp_pct=0.0,
-        sl_pct=0.0,
-        initial_balance=10000,
-        order_amount=100,
-        comi_pct=0.05
-    )
-    
-    # Debe NO ejecutar la señal o ejecutarla con sell en última vela disponible
-    portfolio = result['__PORTFOLIO__']
-    if portfolio['num_signals'] == 0:
-        print("✅ Señal en última vela correctamente ignorada")
-        results['last_candle_signal'] = True
-    elif portfolio['num_signals'] == 1:
-        print("⚠️ Señal ejecutada pero cerrada en última vela disponible")
-        results['last_candle_signal'] = True
-    else:
-        print("❌ Comportamiento inesperado con señal en última vela")
-        results['last_candle_signal'] = False
-    
-    # Test 2: Balance history debe tener longitud correcta
-    print("\n--- Test: Balance History Length ---")
-    dates = pd.date_range('2024-01-01 00:00', periods=10, freq='1h')
-    prices = np.array([100.0]*10)
-    signal = np.zeros(10, dtype=int)
-    signal[2] = 1
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 0.5,
-            'low': prices - 0.5,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    result = run_grid_backtest(
-        ohlcv_arrays=data,
-        sell_after=3,
-        tp_pct=0.0,
-        sl_pct=0.0,
-        initial_balance=10000,
-        order_amount=100,
-        comi_pct=0.05
-    )
-    
-    balance_hist = result['__PORTFOLIO__']['sim_balance_history']
-    if len(balance_hist['balance']) > 0:
-        print(f"✅ Balance history tiene {len(balance_hist['balance'])} puntos")
-        results['balance_history_length'] = True
-    else:
-        print("❌ Balance history vacío")
-        results['balance_history_length'] = False
-    
-    # Test 3: Proporción de ganadores correcta
-    print("\n--- Test: Win Rate Calculation ---")
-    dates = pd.date_range('2024-01-01 00:00', periods=20, freq='1h')
-    prices = np.array([100, 100, 100, 105, 105, 105, 105, 100, 100, 95,
-                       95, 95, 95, 100, 100, 105, 105, 105, 105, 110])
-    signal = np.zeros(20, dtype=int)
-    signal[2] = 1   # Ganador
-    signal[8] = 1   # Perdedor
-    signal[14] = 1  # Ganador
-    
-    data = {
-        'SYM1': {
-            'ts': dates.to_numpy().astype('datetime64[ns]'),
-            'close': prices,
-            'high': prices + 1,
-            'low': prices - 1,
-            'signal': signal,
-            'high_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(30, 'm'),
-            'low_time': dates.to_numpy().astype('datetime64[ns]') + np.timedelta64(15, 'm')
-        }
-    }
-    
-    result = run_grid_backtest(
-        ohlcv_arrays=data,
-        sell_after=3,
-        tp_pct=0.0,
-        sl_pct=0.0,
-        initial_balance=10000,
-        order_amount=100,
-        comi_pct=0.05
-    )
-    
-    portfolio = result['__PORTFOLIO__']
-    expected_winners = 2/3  # 2 ganadores de 3 trades
-    
-    if abs(portfolio['proportion_winners'] - expected_winners) < 0.01:
-        print(f"✅ Win rate correcto: {portfolio['proportion_winners']:.2%}")
-        results['win_rate'] = True
-    else:
-        print(f"❌ Win rate incorrecto: {portfolio['proportion_winners']:.2%} (esperado {expected_winners:.2%})")
-        results['win_rate'] = False
-    
-    # Resumen
-    print("\n" + "="*70)
-    passed = sum(results.values())
-    total = len(results)
-    print(f"Tests extremos: {passed}/{total} passed")
-    print("="*70)
-    
-    return all(results.values())
-
-
-# =====================================================================
-# SCRIPT PRINCIPAL
-# =====================================================================
-
-if __name__ == "__main__":
-    # Ejecutar todos los tests principales
-    print("\n" + "🚀 INICIANDO SUITE DE TESTS ".center(70, "="))
-    
-    main_success = run_all_tests()
-    
-    # Ejecutar tests de casos extremos
-    edge_success = test_edge_cases()
-    
-    # Resultado final
-    print("\n" + "="*70)
-    print("RESULTADO FINAL")
-    print("="*70)
-    
-    if main_success and edge_success:
-        print("✅ TODOS LOS TESTS PASARON")
-        print("\n💡 La función run_grid_backtest funciona correctamente")
-        exit_code = 0
-    else:
-        print("❌ ALGUNOS TESTS FALLARON")
-        print("\n💡 Revisa los errores arriba para debuggear")
-        if not main_success:
-            print("   - Tests principales fallaron")
-        if not edge_success:
-            print("   - Tests de casos extremos fallaron")
-        exit_code = 1
-    
-    print("="*70)
-    
+tolerance = 1e-5
+if diff_balance < tolerance and diff_profit < tolerance:
+    print("\n✓✓✓ TEST PASADO ✓✓✓")
+    print("Manual == Función")
+else:
+    print("\n✗✗✗ TEST FALLIDO ✗✗✗")
+    print(f"Manual != Función (tolerancia: {tolerance})")

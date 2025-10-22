@@ -5,7 +5,7 @@ from pathlib import Path
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 folder_a = BASE_DIR / "data" / "crypto_2023_IS"
-folder_b = BASE_DIR / "data" / "crypto_2023_ISOLD"
+folder_b = BASE_DIR / "data" / "crypto_OOS"
 
 # -----------------------------
 # FUNCIÓN AUXILIAR

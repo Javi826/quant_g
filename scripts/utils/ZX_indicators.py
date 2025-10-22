@@ -125,36 +125,3 @@ def ewm_numba(x, span):
     return ewm
 
 
-
-import numpy as np
-import pandas as pd
-
-# =========================
-# ENTROPÍA RODANTE
-# =========================
-def rolling_entropy_pandas(delta, window=5, bins=10):
-    delta_series = pd.Series(delta)
-    
-    def entropy_func(x):
-        hist, _ = np.histogram(x, bins=bins, range=(delta_series.min(), delta_series.max()))
-        prob = hist / hist.sum()
-        prob = prob[prob > 0]  # evitar log(0)
-        return -np.sum(prob * np.log2(prob))
-    
-    return delta_series.rolling(window, min_periods=1).apply(entropy_func, raw=True).to_numpy()
-
-
-# =========================
-# SEGUNDA DIFERENCIA
-# =========================
-def second_diff_pandas(close):
-    close_series = pd.Series(close)
-    return close_series.diff().diff().fillna(0).to_numpy()  # diff dos veces
-
-
-# =========================
-# EWM
-# =========================
-def ewm_pandas(x, span):
-    x_series = pd.Series(x)
-    return x_series.ewm(span=span, adjust=False).mean().to_numpy()

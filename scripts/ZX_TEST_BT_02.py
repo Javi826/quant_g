@@ -2,14 +2,14 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from ZX_compute_BT import run_grid_backtest as run_original
-from ZZX_DRAFT1 import run_grid_backtest as run_changed
+from ZZX_DRAFT2 import run_grid_backtest as run_changed
 
 # =====================================================================
 # PARÁMETROS
 # =====================================================================
 SELF_AFTER = 2
 INITIAL_BALANCE = 10000
-ORDER_AMOUNT = 100
+ORDER_AMOUNT = 10000
 COMI_PCT = 0.1
 TP_PCT = 3.0
 SL_PCT = 2.0
@@ -212,9 +212,9 @@ manual_trades = generate_manual_trades(ohlcv_arrays)
 manual_balance_final, manual_num, manual_win, manual_sharpe, manual_dd = compute_manual_metrics(manual_trades)
 
 results_orig = ensure_balance_history(run_original(
-    ohlcv_arrays, SELF_AFTER, TP_PCT, SL_PCT, INITIAL_BALANCE, ORDER_AMOUNT, COMI_PCT))
+    ohlcv_arrays, SELF_AFTER, TP_PCT, SL_PCT, ORDER_AMOUNT))
 results_changed = ensure_balance_history(run_changed(
-    ohlcv_arrays, SELF_AFTER, TP_PCT, SL_PCT, INITIAL_BALANCE, ORDER_AMOUNT, COMI_PCT))
+    ohlcv_arrays, SELF_AFTER, TP_PCT, SL_PCT,ORDER_AMOUNT))
 
 grid_results_df = results_to_df(results_orig)
 grid_changed_df = results_to_df(results_changed)

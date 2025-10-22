@@ -10,7 +10,7 @@ from datetime import datetime
 
 # Importar la implementación NumPy
 from ZX_compute_BT import run_grid_backtest as run_original
-from ZZX_DRAFT5 import run_grid_backtest as run_changed
+from ZZX_DRAFT2 import run_grid_backtest as run_changed
 SELF_AFTER =5
 # =====================================================================
 # DATOS EJEMPLO
@@ -127,9 +127,7 @@ if __name__ == "__main__":
         sell_after=SELF_AFTER,
         tp_pct=3.0,
         sl_pct=2.0,
-        initial_balance=10000,
-        order_amount=1000,
-        comi_pct=0.1
+        order_amount=100
     )
     results_orig = ensure_balance_history(results_orig)
 
@@ -139,9 +137,7 @@ if __name__ == "__main__":
         sell_after=SELF_AFTER,
         tp_pct=3.0,
         sl_pct=2.0,
-        initial_balance=10000,
-        order_amount=1000,
-        comi_pct=0.1
+        order_amount=100
     )
     results_changed = ensure_balance_history(results_changed)
 
