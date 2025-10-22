@@ -11,10 +11,7 @@ import requests
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_DOWN
-
-np.random.seed(42)
-random.seed(42)
-
+from ZZ_connect import API_KEY,API_SECRET,API_PASSPHRASE
 
 
 BASE_URL       = "https://api.bitget.com"
