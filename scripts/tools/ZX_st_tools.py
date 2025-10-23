@@ -59,6 +59,36 @@ def compile_grid_results(grid_results_list, param_names, initial_balance):
         median_trade  = np.nan if num_trades == 0 else np.median(port['trades'])
         sharpe_ratio  = float(port.get('sharpe', np.nan))
 
+        # -----------------------
+        # Calcular duración EN DÍAS (pero mantener nombre de columna 'duration_m')
+        # -----------------------
+        duration_days = np.nan
+        trade_log = port.get('trade_log', None)
+
+        try:
+            if isinstance(trade_log, pd.DataFrame):
+                tl_df = trade_log.copy()
+            elif isinstance(trade_log, dict):
+                tl_df = pd.DataFrame(trade_log)
+            elif isinstance(trade_log, list) and len(trade_log) > 0 and isinstance(trade_log[0], dict):
+                tl_df = pd.DataFrame(trade_log)
+            else:
+                tl_df = None
+
+            if tl_df is not None and not tl_df.empty and 'buy_time' in tl_df.columns and 'sell_time' in tl_df.columns:
+                tl_df['buy_time']  = pd.to_datetime(tl_df['buy_time'], errors='coerce')
+                tl_df['sell_time'] = pd.to_datetime(tl_df['sell_time'], errors='coerce')
+
+                valid_mask = tl_df['buy_time'].notna() & tl_df['sell_time'].notna()
+                if valid_mask.any():
+                    # seconds -> days: divide entre 86400
+                    durations = (tl_df.loc[valid_mask, 'sell_time'] - tl_df.loc[valid_mask, 'buy_time']).dt.total_seconds() / 86400.0
+                    durations = durations[durations >= 0]  # filtrar negativos raros
+                    if durations.size > 0:
+                        duration_days = float(durations.mean())
+        except Exception:
+            duration_days = np.nan
+
         row = {param: value for param, value in zip(param_names, comb)}
         row.update({
             "symbol": "__PORTFOLIO__",
@@ -72,13 +102,15 @@ def compile_grid_results(grid_results_list, param_names, initial_balance):
             "Median_Trade": float(median_trade) if not pd.isna(median_trade) else np.nan,
             "DD_pct": float(dd_pct),
             "Sharpe": sharpe_ratio,
-            "sim_balance_history": port.get("sim_balance_history", [])
+            "sim_balance_history": port.get("sim_balance_history", []),
+            # Mantengo el nombre anterior 'duration_m' pero el valor está en DÍAS
+            "duration_m": float(duration_days) if not pd.isna(duration_days) else np.nan
         })
         records.append(row)
-        
-        
 
     return records
+
+
 
 
 def compile_MC_results(result, param_dict, path_idx, initial_balance, dtype=np.float64):

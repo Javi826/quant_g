@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols,final_prints
-from Z_add_signals_01 import explosive_signal_01  # solo usamos la nueva función
+from Z_add_signals_03 import explosive_signal_03  # solo usamos la nueva función
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
@@ -16,7 +16,7 @@ start_time = time.time()
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1D'
+TIMEFRAME           = '1H'
 MIN_VOL_USDT        = 50_000
 ORDER_AMOUNT        = 200
 N_JOBS              = -1
@@ -36,15 +36,13 @@ elif TIMEFRAME == '1D':
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST    = [0,10,15]
-ENTROPY_MAX_LIST   = [0.1,0.2]
-ACCEL_SPAN_LIST    = [5,10,15]
+SELL_AFTER_LIST     = [0,5,10,15,20,25,30]
+LOOKBACK_LIST       = [1,2,3,4,5,6,7]  
+      
+TP_PCT_LIST         = [0,5,10,15,20]
+SL_PCT_LIST         = [5,10,15,20]
 
-TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [5,10]
-
-
-param_names  = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
+param_names = ['SELL_AFTER', 'LOOKBACK','TP_PCT', 'SL_PCT']
 param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -64,10 +62,10 @@ ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
 def strategy_builder(params, base_arrays):
     ohlcv_arrays = {}
     for sym, arrs in base_arrays.items():
-        signal = explosive_signal_01(
-            arrs['close'],
-            m_accel=params.get('ACCEL_SPAN'),
-            entropia_max=params.get('ENTROPY_MAX'),
+        signal = explosive_signal_03(
+            high=arrs['high'],       
+            close=arrs['close'], 
+            lookback=params.get('LOOKBACK'),
             live=False
         )
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
@@ -116,10 +114,10 @@ for name in param_names:
 # -----------------------------------------------------------------------------
 ohlcv_arrays = {}
 for sym, arrs in ohlcv_arr.items():
-    signal = explosive_signal_01(
-        arrs['close'],
-        m_accel=best_params_wfo['ACCEL_SPAN'],
-        entropia_max=best_params_wfo['ENTROPY_MAX'],
+    signal = explosive_signal_03(
+        high=arrs['high'],
+        close=arrs['close'], 
+        lookback=best_params_wfo['LOOKBACK'],
         live=False
     )
     ohlcv_arrays[sym] = {**arrs, 'signal': signal}

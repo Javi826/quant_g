@@ -1,11 +1,9 @@
 import os
 import time
 import json
-import random
 import hashlib
 import base64
 import hmac
-import numpy as np
 import pandas as pd
 import requests
 from urllib.parse import urlencode
@@ -17,6 +15,9 @@ from ZZ_connect import API_KEY,API_SECRET,API_PASSPHRASE
 BASE_URL       = "https://api.bitget.com"
 PRODUCT_TYPE   = 'usdt-futures'  
 
+def get_usdt_balance(exchange):
+    balance = exchange.fetch_balance()
+    return balance['free']['USDT']
 # SYMBOLS
 # -----------------------------
 def normalize_live_ohlcv(df):
@@ -54,6 +55,26 @@ def load_final_symbols(all_symbols,strategy="_",timeframe="4H"):
         print(f"⚠️ Error loading symbols: {e}")
         return []
     
+def wait_for_next_candle(timeframe='4h'):
+    now = datetime.utcnow()
+    if timeframe.endswith('H'):
+        minutes = int(timeframe[:-1]) * 60
+    elif timeframe.endswith('m'):
+        minutes = int(timeframe[:-1])
+    else:
+        raise ValueError("Timeframe incorrect, use 'm' or 'h'.")
+    total_minutes      = now.hour * 60 + now.minute
+    next_total_minutes = ((total_minutes // minutes) + 1) * minutes
+    delta_minutes      = next_total_minutes - total_minutes
+    next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
+    sleep_seconds      = (next_run - now).total_seconds()
+    now                = datetime.utcnow()
+    print(f"🕒 Waiting for next candle: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    time.sleep(sleep_seconds)
+    
+# =============================================================================
+# PLACE ORDER
+# =============================================================================   
 def _now_ms():
     return str(int(time.time() * 1000))
 
@@ -90,9 +111,7 @@ def send_request(method, path, params=None, body=None):
         return r.status_code, r.json() if ct.startswith("application/json") else r.text
     except Exception as e:
         return 0, {"error": str(e)}
-# =============================================================================
-# PLACE ORDER
-# =============================================================================
+
 def place_order(symbol: str, usdt_amount: float = 100, tp_percent: float = 5, sl_percent: float = 5,
                 product_type: str = "USDT-FUTURES", margin_coin: str = "USDT", margin_mode: str = "isolated"):
 
@@ -211,26 +230,7 @@ def place_order(symbol: str, usdt_amount: float = 100, tp_percent: float = 5, sl
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
 
-def get_usdt_balance(exchange):
-    balance = exchange.fetch_balance()
-    return balance['free']['USDT']
 
-def wait_for_next_candle(timeframe='4h'):
-    now = datetime.utcnow()
-    if timeframe.endswith('H'):
-        minutes = int(timeframe[:-1]) * 60
-    elif timeframe.endswith('m'):
-        minutes = int(timeframe[:-1])
-    else:
-        raise ValueError("Timeframe incorrect, use 'm' or 'h'.")
-    total_minutes      = now.hour * 60 + now.minute
-    next_total_minutes = ((total_minutes // minutes) + 1) * minutes
-    delta_minutes      = next_total_minutes - total_minutes
-    next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
-    sleep_seconds      = (next_run - now).total_seconds()
-    now                = datetime.utcnow()
-    print(f"🕒 Waiting for next candle: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    time.sleep(sleep_seconds)
     
 
 

@@ -62,7 +62,9 @@ def report_backtesting(df, parameters, data_folder, initial_capital=10000, show_
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
     
-    metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals']
+    # Incluir duration_m en las métricas mostradas (duration en minutos)
+    metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals', 'duration_m']
+
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
     

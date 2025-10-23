@@ -271,9 +271,13 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     cash -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        sell_idx = d['len'] - 1  # considerar toda la serie de precios hasta el final
+        # Cierre automático 30 días después de la compra
+        sell_time_dt_target = d['ts'][buy_idx] + np.timedelta64(15, 'D')
+        sell_idx = np.searchsorted(d['ts'], sell_time_dt_target, side='right') - 1
+        sell_idx = min(sell_idx, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
+
     sell_time_dt = d['ts'][sell_idx]
     sell_time_int = int(d['ts_int'][sell_idx])
 
@@ -324,7 +328,7 @@ def run_backtest_loop(
     open_heap = []
     counter = 0
     
-    
+    # Alias locales para velocidad
     sd = sym_data
     tia = ts_int_arrays
     ca = close_arrays
@@ -337,36 +341,46 @@ def run_backtest_loop(
     
     for t_int in all_timestamps_int:
         
+        # Cerrar posiciones expiradas
         cash = close_expired_positions(
             t_int, open_heap, sd, tia, ca, cf, trades, trade_times, trade_log_cols, cash
         )
         
-       
+        # Si no hay posiciones abiertas, buscar nuevas señales
         if not open_heap:
             events = sbt.get(int(t_int))
             if events:
-               
                 events_sorted = sorted(events, key=lambda x: x[0])
                 
                 for sym, buy_idx in events_sorted:
-                    # Validación inline
-                    if sa > 0 and buy_idx + sa > len(ca[sym]):
-                        continue
-                    
+                    # --- Validación inline mejorada ---
+                    if sa > 0:
+                        
+                        if buy_idx + sa > len(ca[sym]):
+                            continue
+                    else:
+                        
+                        if buy_idx + 30 >= len(ca[sym]):
+                            continue
+                    # --- Fin de validación ---
+
+                    # Verificar saldo suficiente
                     if cash < oa:
                         break
                     
+                    # Ejecutar señal
                     cash, counter = execute_signal(
                         sym, buy_idx, cash, cf, oa, sa, sd, counter, open_heap, tp, sp
                     )
                     num_signals_executed += 1
         
-        
+        # Actualizar balance simulado
         sim_balance_cols = update_sim_balance(
             t_int, open_heap, cash, tia, ca, sim_balance_cols
         )
     
     return cash, num_signals_executed
+
 
 
 # ============================
@@ -483,7 +497,7 @@ def run_grid_backtest(
         'qty','profit','exit_reason','commission_buy','commission_sell']}
     sim_balance_cols = {'timestamp': [], 'balance': []}
     
-    # Ejecutar backtest ultra-optimizado
+    # Ejecutar backtest 
     cash, num_signals_executed = run_backtest_loop(
         all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
         cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,

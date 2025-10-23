@@ -125,6 +125,26 @@ def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",sa
 
         grid_results_df.to_excel(filename, index=False)
         print(f"📂 File saved successfully as: {filename}")
+        
+def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
+    """
+    Imprime la configuración final del backtesting y los parámetros del grid alineados.
+    """
+    print(f'\n== {strategy} ==\n')
+    print(f"DATA_FOLDER       : {data_folder}")
+    print(f"TIMEFRAME         : {timeframe}")
+    print(f"MIN_VOL_USDT      : {min_vol_usdt}")
+    print(f"ORDER_AMOUNT      : {order_amount}")
+
+    # Calcular longitud máxima de los nombres base para alinear los prints
+    max_len = max(len(name) for name in param_names)
+
+    # Imprimir las listas de parámetros alineadas
+    for name, values_list in zip(param_names, lists_for_grid):
+        print(f"{name + '_LIST':<{max_len + 6}} : {values_list}")
+    print()
+
+
 
 # EMAIL CONFIG
 # -----------------------------

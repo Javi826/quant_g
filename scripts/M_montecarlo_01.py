@@ -9,11 +9,11 @@ from itertools import product
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
-from utils.ZX_utils import filter_symbols
+from utils.ZX_utils import filter_symbols,final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf import generate_multiple_paths
-#from ZZX_DRAFT1 import generate_multiple_paths
+#from tools.ZX_optimize_MCf_log import generate_multiple_paths
 from Z_add_signals_01 import explosive_signal_01
 
 DTYPE = np.float32
@@ -23,7 +23,7 @@ start_time = time.time()
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '4H'
+TIMEFRAME           = '1D'
 ORDER_AMOUNT        = 100
 MIN_VOL_USDT        = 50_000
 N_JOBS              = -1
@@ -31,7 +31,7 @@ N_JOBS              = -1
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS        = 50
+FINAL_N_PATHS        = 100
 
 if TIMEFRAME == '1H':
     FINAL_N_OBS_PER_PATH = 4000
@@ -46,22 +46,20 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0,5,10,15,20,25,30,35]
-ENTROPY_MAX_LIST   = [0.2,0.4,0.5,0.6,0.7,0.8,1.0,1.2]
-ACCEL_SPAN_LIST    = [5,10,12,15,17,20]
+SELL_AFTER_LIST    = [0,10,15,20,25,30,35]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
+ACCEL_SPAN_LIST    = [5,10,15,20]
 
-TP_PCT_LIST        = [0,5,10,15]
-SL_PCT_LIST        = [5,10,15]
+TP_PCT_LIST        = [0,5,10,15,20]
+SL_PCT_LIST        = [5,10,15,20]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [35]
-# ENTROPY_MAX_LIST   = [0.2]
-# ACCEL_SPAN_LIST    = [5]
-# 
-# TP_PCT_LIST        = [0]
-# SL_PCT_LIST        = [10]
-# =============================================================================
+SELL_AFTER_LIST    = [0]
+ENTROPY_MAX_LIST   = [0.1]
+ACCEL_SPAN_LIST    = [15]
+
+TP_PCT_LIST        = [10]
+SL_PCT_LIST        = [15]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -151,55 +149,6 @@ paths_per_symbol = generate_paths_for_all_symbols_funcional(
 valid_symbols = [s for s, arr in paths_per_symbol.items() if arr is not None and len(arr) > 0]
 end_paths_time = time.time()
 print(f"\n🕒 Paths generation: {end_paths_time - start_paths_time:.2f} segundos")
-import matplotlib.pyplot as plt
-
-# ----------------------------------------
-# PLOT: histórico + paths sintéticos BTCUSDT
-# ----------------------------------------
-symbol = 'BTCUSDT'
-
-if symbol not in paths_per_symbol:
-    print(f"⚠️ No se encontró {symbol} en paths_per_symbol")
-else:
-    # Datos originales
-    df_hist = ohlcv_data[symbol]
-    close_hist = df_hist['close'].values
-    n_hist = len(close_hist)
-
-    # Paths sintéticos
-    synthetic_paths = paths_per_symbol[symbol]  # shape: (n_paths, n_obs, n_features)
-    n_paths = synthetic_paths.shape[0]
-    n_obs = synthetic_paths.shape[1]
-
-    # Extraer columna 'close'
-    if isinstance(synthetic_paths, np.ndarray):
-        close_idx = 0
-        if 'close' in df_hist.columns:
-            close_idx = list(df_hist.columns).index('close')
-        close_paths = synthetic_paths[:, :, close_idx]
-    else:
-        raise ValueError("paths_per_symbol[symbol] debe ser un array numpy")
-
-    # Plot
-    plt.figure(figsize=(12,6))
-    plt.plot(close_hist, label='Histórico real', color='black', linewidth=2)
-
-    # Dibujar paths sintéticos continuando desde el último precio del histórico
-    n_plot = min(10, n_paths)
-    for i in range(n_plot):
-        # Concatenar el último valor histórico con el path sintético
-        full_path = np.concatenate(([close_hist[-1]], close_paths[i]))
-        plt.plot(range(n_hist, n_hist + n_obs + 1), full_path, alpha=0.5, linewidth=1)
-
-    plt.title(f"BTCUSDT - Histórico y {n_plot} paths sintéticos Monte Carlo")
-    plt.xlabel("Índice temporal simulado")
-    plt.ylabel("Precio")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-
 # -----------------------------
 # EVALUAR Paths_IDX
 # -----------------------------
@@ -218,16 +167,7 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------
 # SUMMARY / REPORT
 # -----------------------------
-print('\n🎰==MC_backtest==🎰')
-print(f"DATA_FOLDER      : {DATA_FOLDER}")
-print(f"TIMEFRAME        : {TIMEFRAME}")
-print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
-print(f"ORDER_AMOUNT     : {ORDER_AMOUNT}")
-print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
-print(f"ENTROPY_MAX_LIST = {ENTROPY_MAX_LIST}")
-print(f"ACCEL_SPAN_LIST  = {ACCEL_SPAN_LIST}")
-print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
-print(f"SL_PCT_LIST      = {SL_PCT_LIST}\n")
+final_prints(strategy="🎰 MC_backtest 🎰", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 

@@ -16,14 +16,14 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
 
-    keys              = list(param_ranges.keys())
-    all_combinations  = list(itertools.product(*[param_ranges[k] for k in keys]))
-    dict_combinations = [dict(zip(keys, comb)) for comb in all_combinations]
+    keys               = list(param_ranges.keys())
+    all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
+    dict_combinations  = [dict(zip(keys, comb)) for comb in all_combinations]
 
-    length_test       = int(length_train_set / pct_train_set - length_train_set)
-    best_params_list  = []
-    best_criteria_list = []  # ✅ list to store best criterion per window
-    window_idx        = 1
+    length_test        = int(length_train_set / pct_train_set - length_train_set)
+    best_params_list   = []
+    best_criteria_list = []  
+    window_idx         = 1
 
     start = 0
     end   = length_train_set

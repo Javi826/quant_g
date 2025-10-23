@@ -8,9 +8,10 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols
+from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols,final_prints
 from Z_add_signals_01 import explosive_signal_01
 
 start_time         = time.time()
@@ -20,9 +21,9 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-#DATA_FOLDER         = "data/crypto_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '4H'
+DATA_FOLDER         = "data/crypto_OOS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME           = '1D'
 ORDER_AMOUNT        = 100
 MIN_VOL_USDT        = 50_000
 
@@ -30,22 +31,20 @@ MIN_VOL_USDT        = 50_000
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0,5,10,15,20,25,30,35]
-ENTROPY_MAX_LIST   = [0.2,0.4,0.5,0.6,0.7,0.8,1.0,1.2]
-ACCEL_SPAN_LIST    = [5,10,12,15,17,20]
+SELL_AFTER_LIST    = [0]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
+ACCEL_SPAN_LIST    = [5,10,15,20]
 
-TP_PCT_LIST        = [0,5,10,15]
-SL_PCT_LIST        = [5,10,15]
+TP_PCT_LIST        = [0,5,10,15,20]
+SL_PCT_LIST        = [5,10,15,20]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [0,20,25]
-# ENTROPY_MAX_LIST   = [0.5,1.0]
-# ACCEL_SPAN_LIST    = [10]
-# 
-# TP_PCT_LIST        = [0,5,10]
-# SL_PCT_LIST        = [0,5,10]
-# =============================================================================
+SELL_AFTER_LIST    = [0]
+ENTROPY_MAX_LIST   = [0.4]
+ACCEL_SPAN_LIST    = [15]
+
+TP_PCT_LIST        = [0]
+SL_PCT_LIST        = [20]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -70,7 +69,11 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = explosive_signal_01(arrs['close'],m_accel=params.get('ACCEL_SPAN'),entropia_max=params.get('ENTROPY_MAX'),live=False)
+        signal = explosive_signal_01(arrs['close'],
+                                     m_accel=params.get('ACCEL_SPAN'),
+                                     entropia_max=params.get('ENTROPY_MAX'),
+                                     live=False)
+        
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
@@ -102,16 +105,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
-print(f'\n🥇==Grid_backtest {STRATEGY}==🥇')
-print(f"DATA_FOLDER      : {DATA_FOLDER}")
-print(f"TIMEFRAME        : {TIMEFRAME}")
-print(f"MIN_VOL_USDT     : {MIN_VOL_USDT}")
-print(f"ORDER_AMOUNT     : {ORDER_AMOUNT}")
-print(f"SELL_AFTER_LIST  = {SELL_AFTER_LIST}")
-print(f"ENTROPY_MAX_LIST = {ENTROPY_MAX_LIST}")
-print(f"ACCEL_SPAN_LIST  = {ACCEL_SPAN_LIST}")
-print(f"TP_PCT_LIST      = {TP_PCT_LIST}")
-print(f"SL_PCT_LIST      = {SL_PCT_LIST}\n")
+final_prints(strategy=f" 🥇Grid_Backest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

@@ -7,42 +7,43 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.ZZ_connect import connect_bitget_03
 from parquet_process.ZZ_parquet_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
-from Z_add_signals_03 import add_indicators_03, explosive_signal_03
-from utils.ZX_utils import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv, send_request, PRODUCT_TYPE
+from Z_add_signals_03 import explosive_signal_01
+from utils.ZX_live_trading import wait_for_next_candle, get_usdt_balance, place_order, load_final_symbols, normalize_live_ohlcv, send_request, PRODUCT_TYPE
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 # ----------------------
 # CONFIGURATION
 # ----------------------
-TIMEFRAME            = '4H'
+TIMEFRAME            = '1D'
 ORDER_AMOUNT         = 100
 
-SELL_AFTER_N_CANDLES = 25
-ENTROPIA_MAX         = 0.6
-ACCEL_SPAN           = 10
+SELL_AFTER_N_CANDLES = 7
+ENTROPIA_MAX         = 0.4
+ACCEL_SPAN           = 20
 
-TP_PCT               = 50
-SL_PCT               = 50
+TP_PCT               = 0
+SL_PCT               = 20
 
 # ----------------------
 # FUNCTIONS
 # ----------------------
-def check_latest_signal(df, symbol):
 
-    df              = normalize_live_ohlcv(df)
-    close_prices    = df['close'].values
-    entropia, accel = add_indicators_03(close_prices, m_accel=ACCEL_SPAN)
-    signals         = explosive_signal_03(entropia, accel, entropia_max=ENTROPIA_MAX, live=True)
-    last_signal =    signals[-1]
+def check_latest_signal(df, symbol):
+    df           = normalize_live_ohlcv(df)
+    close_prices = df['close'].values
+    signals      = explosive_signal_01(close_prices, m_accel=ACCEL_SPAN, entropia_max=ENTROPIA_MAX, live=True)
+
+    last_signal = signals[-1]
 
     if last_signal:
-        last = df.iloc[-1]  
+        last = df.iloc[-1]
         return {
             'symbol': symbol,
             'timestamp': last['timestamp'],
             'close': last['close'],
         }
+
 
 # ----------------------
 # MAIN LOOP
