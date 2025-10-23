@@ -11,10 +11,6 @@ from email.mime.multipart import MIMEMultipart
 np.random.seed(42)
 random.seed(42)
 
-API_KEY        = "bg_afdcb9221ad98efb3b0b7bdd4c236338"
-API_SECRET     = "0c4214cbfccfb648f841b43ca5d68531c8fb44b75ab271fdd222da9a74ee413f"
-API_PASSPHRASE = "Cryptobitget86"
-
 BASE_URL       = "https://api.bitget.com"
 PRODUCT_TYPE   = 'usdt-futures'  
 

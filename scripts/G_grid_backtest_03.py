@@ -21,7 +21,8 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_IS"
+DATA_FOLDER         = "data/crypto_OOS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '1D'
 ORDER_AMOUNT        = 100
 MIN_VOL_USDT        = 50_000
