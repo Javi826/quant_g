@@ -7,16 +7,41 @@ from numba import njit
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
-# === EMA =====
+# === SMA =====
 # ---------------------------------
+
 @njit
-def ema_numba(arr, period):
-    ema = np.empty_like(arr)
-    alpha = 2 / (period + 1)
-    ema[0] = arr[0]
-    for i in range(1, arr.size):
-        ema[i] = alpha * arr[i] + (1 - alpha) * ema[i-1]
-    return ema
+def sma_numba(x, span):
+    n = len(x)
+    sma = np.empty(n)
+    
+    # Para las primeras barras donde no hay suficientes datos
+    for i in range(span - 1):
+        sma[i] = np.mean(x[:i+1])
+    
+    # SMA "normal" a partir de span
+    cum_sum = np.sum(x[:span])
+    sma[span - 1] = cum_sum / span
+    
+    for i in range(span, n):
+        cum_sum = cum_sum - x[i - span] + x[i]
+        sma[i] = cum_sum / span
+    
+    return sma
+
+
+# === EWM =====
+# ---------------------------------
+
+@njit
+def ewm_numba(x, span):
+    n = len(x)
+    alpha = 2 / (span + 1)
+    ewm = np.empty(n)
+    ewm[0] = x[0]
+    for i in range(1, n):
+        ewm[i] = alpha * x[i] + (1 - alpha) * ewm[i - 1]
+    return ewm
 
 # === RSI =====
 # ---------------------------------
@@ -111,17 +136,5 @@ def second_diff(close):
         accel_raw[i] = close[i] - 2*close[i-1] + close[i-2]
     return accel_raw
 
-# === EWM =====
-# ---------------------------------
-
-@njit
-def ewm_numba(x, span):
-    n = len(x)
-    alpha = 2 / (span + 1)
-    ewm = np.empty(n)
-    ewm[0] = x[0]
-    for i in range(1, n):
-        ewm[i] = alpha * x[i] + (1 - alpha) * ewm[i - 1]
-    return ewm
 
 

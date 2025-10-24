@@ -8,7 +8,7 @@ from utils.ZX_indicators import rolling_entropy_numba,delta_numba,second_diff,ew
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
-def explosive_signal_02(close, sma_fast=5, sma_slow=20, live=False):
+def explosive_signal_02(close, sma_fast, sma_slow, live=False):
 
     fast_ma = ewm_numba(close, sma_fast)
     slow_ma = ewm_numba(close, sma_slow)

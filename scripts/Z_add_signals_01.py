@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore")
 
 
 @njit
-def explosive_signal_01(close, m_accel=5, entropia_max=2.0, live=False):
+def explosive_signal_01(close, m_accel, entropia_max, live=False):
 
     # --- Cálculo de indicadores ---
     delta     = delta_numba(close)

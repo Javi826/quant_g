@@ -4,10 +4,10 @@ import pstats
 import os
 import numpy as np
 from itertools import product
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
-from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_utils import filter_symbols
-from Z_add_signals_03 import add_indicators_03, explosive_signal_03
+from Z_add_signals_01 import explosive_signal_01
 from collections import defaultdict
 from joblib import Parallel, delayed
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
@@ -15,9 +15,10 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 # ==============================
 # Configuración idéntica a main_BACKTESTING.py
 # ==============================
-DATA_FOLDER  = "data/crypto_2023_ISOLD"
+DATA_FOLDER  = "data/crypto_2023_IS"
 TIMEFRAME    = '4H'
 MIN_VOL_USDT = 500_000
+ORDER_AMOUNT =100
 
 SELL_AFTER_LIST    = [20,30,40,50]
 ENTROPY_MAX_LIST   = [0.6,0.8,1.0,2.0]
@@ -49,18 +50,16 @@ ohlcv_base = prepare_ohlcv_arrays(ohlcv_data)
 def run_profiled(sell_after, entropy_max, accel_span, tp_pct, sl_pct):
     ohlcv_arrays = {}
     for sym, arrs in ohlcv_base.items():
-        entropia, accel = add_indicators_03(arrs['close'], m_accel=accel_span)
-        signal = explosive_signal_03(entropia, accel, entropia_max=entropy_max, live=False)
+        signal = explosive_signal_01(arrs['close'], m_accel=accel_span, entropia_max=entropy_max, live=False)
+
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=sell_after,
-        initial_balance=INITIAL_BALANCE,
         order_amount=ORDER_AMOUNT,
         tp_pct=tp_pct,
-        sl_pct=sl_pct,
-        comi_pct=0.05
+        sl_pct=sl_pct
     )
     return results
 
@@ -111,18 +110,16 @@ def profiled_worker(comb):
     # ==============================
     ohlcv_arrays = {}
     for sym, arrs in ohlcv_base.items():
-        entropia, accel = add_indicators_03(arrs['close'], m_accel=accel_span)
-        signal = explosive_signal_03(entropia, accel, entropia_max=entropy_max, live=False)
+        signal = explosive_signal_01(arrs['close'], m_accel=accel_span, entropia_max=entropy_max, live=False)
+
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=sell_after,
-        initial_balance=INITIAL_BALANCE,
         order_amount=ORDER_AMOUNT,
         tp_pct=tp_pct,
-        sl_pct=sl_pct,
-        comi_pct=0.05
+        sl_pct=sl_pct
     )
     profiler.disable()
 

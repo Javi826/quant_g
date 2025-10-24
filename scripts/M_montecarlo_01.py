@@ -23,8 +23,8 @@ start_time = time.time()
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1D'
-ORDER_AMOUNT        = 100
+TIMEFRAME           = '4H'
+ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
 N_JOBS              = -1
 
@@ -46,32 +46,26 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0,10,15,20,25,30,35]
-ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
+SELL_AFTER_LIST    = [0,10,15,20,25,30]
+ENTROPY_MAX_LIST   = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
 ACCEL_SPAN_LIST    = [5,10,15,20]
 
-TP_PCT_LIST        = [0,5,10,15,20]
+TP_PCT_LIST        = [0,5,10,15,20,50,100]
 SL_PCT_LIST        = [5,10,15,20]
 
 # =============================================================================
 SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [0.1]
-ACCEL_SPAN_LIST    = [15]
+ENTROPY_MAX_LIST   = [0.2]
+ACCEL_SPAN_LIST    = [20]
 
-TP_PCT_LIST        = [10]
-SL_PCT_LIST        = [15]
+TP_PCT_LIST        = [100]
+SL_PCT_LIST        = [20]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
-# -----------------------------
-# PATHS / OUTPUT
-# -----------------------------
-SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-RESULTS_DIR = SCRIPT_DIR
-OUTPUT_FILE = os.path.join(RESULTS_DIR, f"montecarlo_entropy_crypto_{TIMEFRAME}.xlsx")
 
 # -----------------------------
 # FUNCIONES AUXILIARES

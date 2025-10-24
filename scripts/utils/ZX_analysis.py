@@ -13,7 +13,7 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 
 
-def report_backtesting(df, parameters, data_folder, initial_capital=10000, show_plots=False, save_excel=False):
+def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=False, save_excel=False):
 
     
     df = df.copy()

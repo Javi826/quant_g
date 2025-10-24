@@ -16,16 +16,16 @@ start_time = time.time()
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1D'
+TIMEFRAME           = '4H'
 MIN_VOL_USDT        = 50_000
-ORDER_AMOUNT        = 200
+ORDER_AMOUNT        = 500
 N_JOBS              = -1
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = True
-YEARS_TRAIN         = 1  
+YEARS_TRAIN         = 1.0  
 if TIMEFRAME == '1H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 24)   
 elif TIMEFRAME == '4H':
@@ -36,12 +36,12 @@ elif TIMEFRAME == '1D':
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST    = [0,10,15]
-ENTROPY_MAX_LIST   = [0.1,0.2]
-ACCEL_SPAN_LIST    = [5,10,15]
+SELL_AFTER_LIST    = [0,15,25,35,50]
+ENTROPY_MAX_LIST   = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+ACCEL_SPAN_LIST    = [5,20,25,30,35,40,55,60]
 
-TP_PCT_LIST        = [0,5]
-SL_PCT_LIST        = [5,10]
+TP_PCT_LIST        = [5,10,15,20,100]
+SL_PCT_LIST        = [5,10,15,20]
 
 
 param_names  = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -78,7 +78,8 @@ def backtest_runner_default(ohlcv_arrays, params):
         ohlcv_arrays,
         sell_after=params.get('SELL_AFTER'),
         tp_pct=params.get('TP_PCT'),
-        sl_pct=params.get('SL_PCT')
+        sl_pct=params.get('SL_PCT'),
+        order_amount=ORDER_AMOUNT
     )
     results["__PORTFOLIO__"]["initial_balance"] = INITIAL_BALANCE
     return results
@@ -89,9 +90,16 @@ def evaluate_fn(params, base_arrays):
     return metric_fn_default(results), params
 
 def metric_fn_default(results):
-    port            = results.get("__PORTFOLIO__", {})   
-    sharpe_ratio    = float(port.get('sharpe', np.nan))
-    metric_score    = sharpe_ratio
+    port            = results.get("__PORTFOLIO__", {}) 
+    #sharpe_ratio    = float(port.get('sharpe'))
+    net_gain        = np.sum(port.get('trades', []))
+    net_gain_pct    = (net_gain / INITIAL_BALANCE) * 100.0 
+    dd_pct = float(port.get('max_dd', 0.0)) * 100.0
+    
+    metric_score    = (net_gain_pct - 3*dd_pct)
+    #metric_score    = net_gain_pct 
+    #metric_score    = sharpe_ratio
+   
     return metric_score
 
 # -----------------------------------------------------------------------------

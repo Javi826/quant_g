@@ -1,4 +1,5 @@
-
+import os
+from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
@@ -38,80 +39,151 @@ def extract_ohlcv_from_path(paths_per_symbol, path_idx, ts_index=None, dtype=np.
 
     return ohlcv_arrays
 
-
 def compile_grid_results(grid_results_list, param_names, initial_balance):
 
     records = []
-
+    
     for comb, results in grid_results_list:
         port = results.get("__PORTFOLIO__", None)
         if port is None:
             continue
+        
 
-        net_gain      = np.sum(port['trades']) if len(port.get('trades', [])) > 0 else 0.0
-        net_gain_pct  = (net_gain / initial_balance) * 100.0 if initial_balance != 0 else np.nan
-        num_signals   = int(port.get('num_signals', 0))
-        num_trades    = len(port.get('trades', []))
-        win_ratio     = port.get('proportion_winners', np.nan)
-        dd_pct        = port.get('max_dd', 0.0) * 100.0
         final_balance = float(port.get('final_balance', initial_balance))
-        avg_trade     = np.nan if num_trades == 0 else np.mean(port['trades'])
-        median_trade  = np.nan if num_trades == 0 else np.median(port['trades'])
+        num_signals   = int(port.get('num_signals', 0))
+        win_ratio     = float(port.get('proportion_winners', np.nan))
+        dd_pct        = float(port.get('max_dd', 0.0)) * 100.0
         sharpe_ratio  = float(port.get('sharpe', np.nan))
+        
 
-        # -----------------------
-        # Calcular duración EN DÍAS (pero mantener nombre de columna 'duration_m')
-        # -----------------------
-        duration_days = np.nan
-        trade_log = port.get('trade_log', None)
+        trades = port.get('trades', [])
+        num_trades = len(trades)
+        
+        if num_trades > 0:
+            trades_arr = np.array(trades, dtype=np.float64)
+            net_gain = float(np.sum(trades_arr))
+            avg_trade = float(np.mean(trades_arr))
+            median_trade = float(np.median(trades_arr))
+        else:
+            net_gain = 0.0
+            avg_trade = np.nan
+            median_trade = np.nan
+        
+        net_gain_pct = (net_gain / initial_balance) * 100.0 if initial_balance != 0 else np.nan
+        
 
-        try:
-            if isinstance(trade_log, pd.DataFrame):
-                tl_df = trade_log.copy()
-            elif isinstance(trade_log, dict):
-                tl_df = pd.DataFrame(trade_log)
-            elif isinstance(trade_log, list) and len(trade_log) > 0 and isinstance(trade_log[0], dict):
-                tl_df = pd.DataFrame(trade_log)
-            else:
-                tl_df = None
-
-            if tl_df is not None and not tl_df.empty and 'buy_time' in tl_df.columns and 'sell_time' in tl_df.columns:
-                tl_df['buy_time']  = pd.to_datetime(tl_df['buy_time'], errors='coerce')
-                tl_df['sell_time'] = pd.to_datetime(tl_df['sell_time'], errors='coerce')
-
-                valid_mask = tl_df['buy_time'].notna() & tl_df['sell_time'].notna()
-                if valid_mask.any():
-                    # seconds -> days: divide entre 86400
-                    durations = (tl_df.loc[valid_mask, 'sell_time'] - tl_df.loc[valid_mask, 'buy_time']).dt.total_seconds() / 86400.0
-                    durations = durations[durations >= 0]  # filtrar negativos raros
-                    if durations.size > 0:
-                        duration_days = float(durations.mean())
-        except Exception:
-            duration_days = np.nan
+        duration_days = _calculate_duration_optimized(port.get('trade_log'))
 
         row = {param: value for param, value in zip(param_names, comb)}
         row.update({
             "symbol": "__PORTFOLIO__",
-            "Net_Gain": float(net_gain),
+            "Net_Gain": net_gain,
             "Net_Gain_pct": float(net_gain_pct),
             "Final_Balance": final_balance,
             "Num_Signals": num_signals,
             "Num_Trades": num_trades,
-            "Win_Ratio": float(win_ratio) if not pd.isna(win_ratio) else np.nan,
-            "Avg_Trade": float(avg_trade) if not pd.isna(avg_trade) else np.nan,
-            "Median_Trade": float(median_trade) if not pd.isna(median_trade) else np.nan,
-            "DD_pct": float(dd_pct),
+            "Win_Ratio": win_ratio,
+            "Avg_Trade": avg_trade,
+            "Median_Trade": median_trade,
+            "DD_pct": dd_pct,
             "Sharpe": sharpe_ratio,
-            "sim_balance_history": port.get("sim_balance_history", []),
-            # Mantengo el nombre anterior 'duration_m' pero el valor está en DÍAS
-            "duration_m": float(duration_days) if not pd.isna(duration_days) else np.nan
+            "sim_balance_history": port.get("sim_balance_history", {}),
+            "duration_m": duration_days  # En días, no minutos (nombre legacy)
         })
         records.append(row)
-
+    
     return records
 
 
+def _calculate_duration_optimized(trade_log):
 
+    if trade_log is None or not isinstance(trade_log, pd.DataFrame) or trade_log.empty:
+        return np.nan
+    
+    if 'buy_time' not in trade_log.columns or 'sell_time' not in trade_log.columns:
+        return np.nan
+    
+    try:
+        # Ya son datetime64 desde run_grid_backtest, no necesitan conversión
+        durations_sec = (trade_log['sell_time'] - trade_log['buy_time']).dt.total_seconds()
+        
+        # Filtrar valores válidos (positivos)
+        valid_durations = durations_sec[durations_sec > 0]
+        
+        if len(valid_durations) == 0:
+            return np.nan
+        
+        # Convertir segundos a días
+        return float(valid_durations.mean() / 86400.0)
+    
+    except Exception:
+        return np.nan
+
+
+def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True):
+
+    if not save:
+        print("⚠️ save=False, no se guardará el archivo de trades")
+        return
+    
+    all_trades_records = []
+    
+    for comb, results in tqdm(grid_results_list, desc="📊 Procesando trades"):
+        port = results.get("__PORTFOLIO__", None)
+        if port is None:
+            continue
+        
+        trade_log = port.get('trade_log', None)
+        if trade_log is None or (isinstance(trade_log, pd.DataFrame) and trade_log.empty):
+            continue
+        
+        # Convertir a DataFrame si es necesario
+        if isinstance(trade_log, pd.DataFrame):
+            tl_df = trade_log.copy()
+        elif isinstance(trade_log, dict):
+            tl_df = pd.DataFrame(trade_log)
+        else:
+            continue
+        
+        # Añadir columnas de parámetros
+        for param_name, param_value in zip(param_names, comb):
+            tl_df[param_name] = param_value
+        
+        all_trades_records.append(tl_df)
+    
+    if all_trades_records:
+        # Concatenar todos los trades
+        all_trades_df = pd.concat(all_trades_records, ignore_index=True)
+        
+        # Reordenar columnas (parámetros primero)
+        param_cols = param_names
+        trade_cols = [col for col in all_trades_df.columns if col not in param_names]
+        all_trades_df = all_trades_df[param_cols + trade_cols]
+        
+        # Crear carpeta si no existe (igual que save_results)
+        folder = os.path.dirname(filename)
+        if folder and not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+
+        # Guardar
+        all_trades_df.to_excel(filename, index=False, engine='openpyxl')
+        
+        file_size_mb = os.path.getsize(filename) / 1024 / 1024
+        print(f"✅ Saved {len(all_trades_df):,} trades en: {filename}")
+        print(f"   📦 Size: {file_size_mb:.2f} MB")
+    else:
+        print("⚠️ No hay trades para guardar")
+
+        
+def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):
+    
+    if save:
+        folder = os.path.dirname(filename)
+        if folder and not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+
+        grid_results_df.to_excel(filename, index=False)
+        print(f"📂 File saved successfully as: {filename}")
 
 def compile_MC_results(result, param_dict, path_idx, initial_balance, dtype=np.float64):
 

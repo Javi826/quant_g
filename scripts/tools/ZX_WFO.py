@@ -8,9 +8,9 @@ from collections import Counter
 
 
 def walk_forward_optimization(ohlcv_arr, param_ranges,
-                              length_train_set=2000, pct_train_set=0.8,
-                              anchored=True, 
-                              evaluate_fn=None,
+                              length_train_set, pct_train_set,
+                              anchored, 
+                              evaluate_fn,
                               n_jobs=-1):
 
     if evaluate_fn is None:
@@ -24,6 +24,12 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     best_params_list   = []
     best_criteria_list = []  
     window_idx         = 1
+
+    # 🔹 Nuevas listas SOLO para fechas de train y test
+    train_start_dates  = []
+    train_end_dates    = []
+    test_start_dates   = []
+    test_end_dates     = []
 
     start = 0
     end   = length_train_set
@@ -73,24 +79,23 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         # Prepare base arrays
         # -----------------------------------------------------------
         base_arrays = {}
-        for sym, (t0, t1) in train_indices.items():
+        for sym, (t0_sym, t1_sym) in train_indices.items():
             arr_dict = ohlcv_arr[sym]
         
             base_arrays[sym] = {
-                'ts': arr_dict['ts'][t0:t1],
-                'open': arr_dict['open'][t0:t1],
-                'high': arr_dict['high'][t0:t1],
-                'low': arr_dict['low'][t0:t1],
-                'close': arr_dict['close'][t0:t1],
-                'volume_quote': arr_dict.get('volume_quote', arr_dict['close']*0)[t0:t1],
-                'low_time': arr_dict['low_time'][t0:t1],
-                'high_time': arr_dict['high_time'][t0:t1],
+                'ts': arr_dict['ts'][t0_sym:t1_sym],
+                'open': arr_dict['open'][t0_sym:t1_sym],
+                'high': arr_dict['high'][t0_sym:t1_sym],
+                'low': arr_dict['low'][t0_sym:t1_sym],
+                'close': arr_dict['close'][t0_sym:t1_sym],
+                'volume_quote': arr_dict.get('volume_quote', arr_dict['close']*0)[t0_sym:t1_sym],
+                'low_time': arr_dict['low_time'][t0_sym:t1_sym],
+                'high_time': arr_dict['high_time'][t0_sym:t1_sym],
             }
 
         # -----------------------------------------------------------
         # Parallel evaluation
         # -----------------------------------------------------------
-        print(f"\n🧠 Window {window_idx}: evaluating {len(dict_combinations)} combinations...\n")
 
         with tqdm_joblib(
             tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
@@ -104,7 +109,13 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         # -----------------------------------------------------------
         best_criterion, best_params = max(results, key=lambda x: x[0])
         best_params_list.append(best_params)
-        best_criteria_list.append(best_criterion)  # ✅ store best criterion
+        best_criteria_list.append(best_criterion)
+
+        # Guardamos fechas de train y test
+        train_start_dates.append(ref_ts[t0] if t0 < len(ref_ts) else None)
+        train_end_dates.append(ref_ts[t1 - 1] if t1 - 1 < len(ref_ts) else None)
+        test_start_dates.append(ref_ts[test0] if test0 < len(ref_ts) else None)
+        test_end_dates.append(ref_ts[test1 - 1] if test1 - 1 < len(ref_ts) else None)
 
         window_idx += 1
         if is_last_window:
@@ -113,26 +124,76 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         if anchored:
             end += length_test
         else:
-            start += length_train_set + length_test
+            start += length_test
             end = start + length_train_set
     
-    # DataFrame de ejemplo
+    # -----------------------------------------------------------
+    # Resumen de parámetros finales
+    # -----------------------------------------------------------
     df_params = pd.DataFrame(best_params_list)
     
     # Calculamos la "moda" de cada columna manualmente
     final_params = {}
     for col in df_params.columns:
-        # Contamos ocurrencias de cada valor en la columna
         counts = Counter(df_params[col])
-        # Tomamos el valor con más ocurrencias
         most_common_val, _ = counts.most_common(1)[0]
         
-        # Convertimos a int si es numérico y no termina en "_MAX"
         if isinstance(most_common_val, (int, float)) and not str(col).endswith("_MAX"):
             final_params[col] = int(round(most_common_val))
         else:
             final_params[col] = most_common_val
-    
 
     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
+      
+# =============================================================================
+#     # -----------------------------------------------------------
+#     # Resumen de parámetros finales (usando la MEDIA en lugar de la MODA)
+#     # -----------------------------------------------------------
+#     df_params = pd.DataFrame(best_params_list)
+#     
+#     # Calculamos la "media" de cada columna manualmente
+#     final_params = {}
+#     for col in df_params.columns:
+#         # Filtramos NaN por seguridad
+#         col_vals = df_params[col].dropna()
+#     
+#         # Si la columna es numérica, calculamos la media
+#         if np.issubdtype(col_vals.dtype, np.number):
+#             mean_val = col_vals.mean()
+#     
+#             if not str(col).endswith("_MAX"):
+#                 final_params[col] = int(round(mean_val))
+#             else:
+#                 final_params[col] = float(mean_val)
+#         else:
+#             # Si no es numérica (por ejemplo, strings o categorías), usamos el valor más común (moda)
+#             counts = Counter(col_vals)
+#             most_common_val, _ = counts.most_common(1)[0]
+#             final_params[col] = most_common_val
+#     
+#     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
+# =============================================================================
+    # -----------------------------------------------------------
+    # 📊 DataFrame final con fechas de train, test, parámetros y criterio
+    # -----------------------------------------------------------
+    # 🔹 Convertimos a solo fecha (sin hora)
+    train_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_start_dates]
+    train_end_dates   = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
+    test_start_dates  = [pd.to_datetime(d).date() if d is not None else None for d in test_start_dates]
+    test_end_dates    = [pd.to_datetime(d).date() if d is not None else None for d in test_end_dates]
+
+    df_results = pd.DataFrame(best_params_list)
+    df_results.insert(0, 'train_start', train_start_dates)
+    df_results.insert(1, 'train_end', train_end_dates)
+# =============================================================================
+#     df_results.insert(2, 'test_start', test_start_dates)
+#     df_results.insert(3, 'test_end', test_end_dates)
+# =============================================================================
+    df_results['best_criterion'] = best_criteria_list
+
+    print("\n📊 Resumen final de parámetros, criterio y fechas de train y test por ventana:")
+    print(df_results)
+    
+    print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
+
     return final_params

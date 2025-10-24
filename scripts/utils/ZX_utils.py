@@ -101,36 +101,24 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
 
     return ohlcv_data, filtered_symbols
 
-def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="symbols_live"):
+def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="live_trading/symbols_live"):
 
     if save_symbols:
         os.makedirs(folder, exist_ok=True)  
         df_symbols   = pd.DataFrame({"Filtered_symbols": filtered_symbols})
         path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
         df_symbols.to_excel(path_symbols, index=False)   
-        print(f"📂 {len(filtered_symbols)} símbolos filtrados guardados en '{path_symbols}'")
-
-    
-def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):
-    
-    if save:
-        # Crear directorio si no existe
-        folder = os.path.dirname(filename)
-        if folder and not os.path.exists(folder):
-            os.makedirs(folder, exist_ok=True)
-
-        grid_results_df.to_excel(filename, index=False)
-        print(f"📂 File saved successfully as: {filename}")
+        print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
         
 def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
     """
     Imprime la configuración final del backtesting y los parámetros del grid alineados.
     """
     print(f'\n== {strategy} ==\n')
-    print(f"DATA_FOLDER       : {data_folder}")
-    print(f"TIMEFRAME         : {timeframe}")
-    print(f"MIN_VOL_USDT      : {min_vol_usdt}")
-    print(f"ORDER_AMOUNT      : {order_amount}")
+    print(f"DATA_FOLDER         : {data_folder}")
+    print(f"TIMEFRAME           : {timeframe}")
+    print(f"MIN_VOL_USDT        : {min_vol_usdt}")
+    print(f"ORDER_AMOUNT        : {order_amount}")
 
     # Calcular longitud máxima de los nombres base para alinear los prints
     max_len = max(len(name) for name in param_names)

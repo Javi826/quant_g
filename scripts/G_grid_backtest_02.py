@@ -8,9 +8,10 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_results, save_filtered_symbols,final_prints
+from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
 from Z_add_signals_02 import explosive_signal_02
 
 start_time         = time.time()
@@ -97,6 +98,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + TIMING
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
+save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME}.xlsx", save=False)
+
 final_prints(strategy=f" 🥇Grid_Backest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
 

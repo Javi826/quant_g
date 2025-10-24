@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
 MIN_PRICE       = 0.0001
-INITIAL_BALANCE = 2_000
+INITIAL_BALANCE = 10_000
 COMISION        = 0.06
 
 # ============================
@@ -224,7 +224,7 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
 
 
 # ============================
-# update_sim_balance - vectorizado
+# update_sim_balance
 # ============================
 def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_balance_cols):
 
@@ -271,10 +271,9 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     cash -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        # Cierre automático 30 días después de la compra
-        sell_time_dt_target = d['ts'][buy_idx] + np.timedelta64(15, 'D')
-        sell_idx = np.searchsorted(d['ts'], sell_time_dt_target, side='right') - 1
-        sell_idx = min(sell_idx, d['len'] - 1)
+        n_velas = 100 #VELAS  
+        sell_idx = min(buy_idx + n_velas, d['len'] - 1)
+
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
 
@@ -466,14 +465,14 @@ def build_results_dict(symbols, trades, trade_times,
 def run_grid_backtest(
     ohlcv_arrays,
     sell_after,
-    tp_pct=0.0,
-    sl_pct=0.0,
-    order_amount=100 
+    tp_pct,
+    sl_pct,
+    order_amount 
 ):
 
     # Constantes
-    comi_factor = float(COMISION) / 100.0
-    cash = float(INITIAL_BALANCE)
+    comi_factor     = float(COMISION) / 100.0
+    cash            = float(INITIAL_BALANCE)
     initial_balance = INITIAL_BALANCE
     
 
