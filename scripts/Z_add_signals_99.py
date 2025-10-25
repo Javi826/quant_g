@@ -1,23 +1,33 @@
-# === FILE: add_signals04.py ===
+# === FILE: add_signals03.py ===
 # ---------------------------------
-import warnings
 import logging
-import pandas as pd
+import warnings
 import numpy as np
-from utils.ZX_indicators import rolling_entropy_numba, delta_numba
-
-warnings.filterwarnings("ignore")
+from numba import njit
+from utils.ZX_indicators import rolling_entropy_numba,delta_numba,second_diff,ewm_numba
 logging.basicConfig(level=logging.INFO)
-
-import numpy as np
-
-def explosive_signal_99(high, close, live=False):
-    signal = np.zeros_like(close)
-    if len(signal) > 0:
-        signal[0] = 1  # Comprar en el primer timestamp
-    return signal
+warnings.filterwarnings("ignore")
 
 
 
+@njit
+def explosive_signal_01(close, m_accel, entropia_max, live=False):
 
+    # --- Cálculo de indicadores ---
+    delta     = delta_numba(close)
+    entropia  = rolling_entropy_numba(delta, 5, 10)
+    accel_raw = second_diff(close)
+    accel     = ewm_numba(accel_raw, m_accel)
+
+    # --- Señal explosiva ---
+    signal = (entropia < entropia_max) & (accel > 0)
+
+    if not live:
+        signal_shifted = np.empty_like(signal)
+        signal_shifted[0] = False
+        signal_shifted[1:] = signal[:-1]
+        signal = signal_shifted
+
+    # Convertir booleanos a enteros 0/1
+    return signal.astype(np.int8)
 

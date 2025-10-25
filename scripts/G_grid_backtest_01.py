@@ -7,49 +7,51 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
-from Z_add_signals_01 import explosive_signal_01
+from Z_add_signals_01 import explosive_signal_08
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False
-STRATEGY           ="entropy"
+STRATEGY           ="candle_pair"
 N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 DATA_FOLDER         = "data/crypto_2022_OOS"
-#DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '4H'
+TIMEFRAME           = '1D'
 ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
+ORDER_AMOUNT        = 5_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
-ACCEL_SPAN_LIST    = [5,10,15,20,25]
+SELL_AFTER_LIST     = [0]
+LOOKBACK_LIST       = [5,10,20,30,40,50,60]
+BODY_TOLERANCE_LIST = [5,10,15,20,25]
+LOW_TOLERANCE_LIST  = [5,10,15,20,25]
 
-TP_PCT_LIST        = [5,10,15,20]
-SL_PCT_LIST        = [5,10,15,20]
+TP_PCT_LIST         = [5,10,20,30,50,100]
+SL_PCT_LIST         = [5,10,15,20]
 
-# =============================================================================
-SELL_AFTER_LIST    = [30]
-ENTROPY_MAX_LIST   = [0.2]
-ACCEL_SPAN_LIST    = [5]
+SELL_AFTER_LIST     = [0]
+LOOKBACK_LIST       = [10]
+BODY_TOLERANCE_LIST = [20]
+LOW_TOLERANCE_LIST  = [5]
 
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [10]
-# =============================================================================
+TP_PCT_LIST         = [100]
+SL_PCT_LIST         = [5]
 
-param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
+
+param_names    = ['SELL_AFTER', 'LOOKBACK', 'BODY_TOLERANCE','LOW_TOLERANCE', 'TP_PCT', 'SL_PCT']
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
@@ -71,10 +73,19 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = explosive_signal_01(arrs['close'],
-                                     m_accel=params.get('ACCEL_SPAN'),
-                                     entropia_max=params.get('ENTROPY_MAX'),
-                                     live=False)
+        open_array = arrs["open"]
+        close_array = arrs["close"]
+        low_array = arrs["low"]
+
+        signal = explosive_signal_08(
+            open_prices=open_array,
+            close_prices=close_array,
+            low_prices=low_array,
+            lookback=params["LOOKBACK"],
+            body_tolerance=params["BODY_TOLERANCE"] / 100,  
+            low_tolerance=params["LOW_TOLERANCE"] / 100,   
+            live=False,
+        )
         
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 

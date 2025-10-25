@@ -92,9 +92,9 @@ def prepare_data(ohlcv_arrays):
     return sym_data, signals_by_time, all_timestamps_int, all_timestamps_dt, symbol_order, ts_int_arrays, close_arrays
 
 # ============================
-# Helper: detect_intrabar_exit
+# Helper: detect_intrabar_exit - MODIFICADO PARA SHORT
 # ============================
-def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
+def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=False):
     intravela_detected = False
     chosen_idx = None
     exit_reason = None
@@ -111,65 +111,120 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price):
     high_slice = d['high'][start:end+1]
     low_slice = d['low'][start:end+1]
 
-    tp_hits = np.where(high_slice >= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
-    sl_hits = np.where(low_slice <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+    if is_short:
+        # Para SHORT: TP se alcanza cuando el precio BAJA (low <= tp_price)
+        # SL se alcanza cuando el precio SUBE (high >= sl_price)
+        tp_hits = np.where(low_slice <= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
+        sl_hits = np.where(high_slice >= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+        
+        tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
+        sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
 
-    tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-    sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+        if tp_first is not None and sl_first is not None:
+            tp_time_val = d['low_time'][tp_first]  # Para SHORT usamos low_time para TP
+            sl_time_val = d['high_time'][sl_first]  # Para SHORT usamos high_time para SL
 
-    if tp_first is not None and sl_first is not None:
-        tp_time_val = d['high_time'][tp_first]
-        sl_time_val = d['low_time'][sl_first]
-
-        if tp_first == sl_first:
-            if tp_time_val <= sl_time_val:
-                chosen_idx = tp_first
-                exit_reason = 'TP'
-                exec_price = tp_price
+            if tp_first == sl_first:
+                if tp_time_val <= sl_time_val:
+                    chosen_idx = tp_first
+                    exit_reason = 'TP'
+                    exec_price = tp_price
+                else:
+                    chosen_idx = sl_first
+                    exit_reason = 'SL'
+                    exec_price = sl_price
             else:
-                chosen_idx = sl_first
-                exit_reason = 'SL'
-                exec_price = sl_price
-        else:
-            if sl_first < tp_first:
-                chosen_idx = sl_first
-                exit_reason = 'SL'
-                exec_price = sl_price
+                if sl_first < tp_first:
+                    chosen_idx = sl_first
+                    exit_reason = 'SL'
+                    exec_price = sl_price
+                else:
+                    chosen_idx = tp_first
+                    exit_reason = 'TP'
+                    exec_price = tp_price
+
+            intravela_detected = True
+
+        elif sl_first is not None:
+            chosen_idx = sl_first
+            exit_reason = 'SL'
+            exec_price = sl_price
+            intravela_detected = True
+
+        elif tp_first is not None:
+            chosen_idx = tp_first
+            exit_reason = 'TP'
+            exec_price = tp_price
+            intravela_detected = True
+    else:
+        # LONG (lógica original)
+        tp_hits = np.where(high_slice >= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
+        sl_hits = np.where(low_slice <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+
+        tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
+        sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+
+        if tp_first is not None and sl_first is not None:
+            tp_time_val = d['high_time'][tp_first]
+            sl_time_val = d['low_time'][sl_first]
+
+            if tp_first == sl_first:
+                if tp_time_val <= sl_time_val:
+                    chosen_idx = tp_first
+                    exit_reason = 'TP'
+                    exec_price = tp_price
+                else:
+                    chosen_idx = sl_first
+                    exit_reason = 'SL'
+                    exec_price = sl_price
             else:
-                chosen_idx = tp_first
-                exit_reason = 'TP'
-                exec_price = tp_price
+                if sl_first < tp_first:
+                    chosen_idx = sl_first
+                    exit_reason = 'SL'
+                    exec_price = sl_price
+                else:
+                    chosen_idx = tp_first
+                    exit_reason = 'TP'
+                    exec_price = tp_price
 
-        intravela_detected = True
+            intravela_detected = True
 
-    elif sl_first is not None:
-        chosen_idx = sl_first
-        exit_reason = 'SL'
-        exec_price = sl_price
-        intravela_detected = True
+        elif sl_first is not None:
+            chosen_idx = sl_first
+            exit_reason = 'SL'
+            exec_price = sl_price
+            intravela_detected = True
 
-    elif tp_first is not None:
-        chosen_idx = tp_first
-        exit_reason = 'TP'
-        exec_price = tp_price
-        intravela_detected = True
+        elif tp_first is not None:
+            chosen_idx = tp_first
+            exit_reason = 'TP'
+            exec_price = tp_price
+            intravela_detected = True
 
     return intravela_detected, chosen_idx, exit_reason, exec_price
 
 
 # ============================
-# Helper: close_position (sin cambios)
+# Helper: close_position - MODIFICADO PARA SHORT
 # ============================
 def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, 
                    trades, trade_times, trade_log_cols, cash):
     qty = pos['qty']
     buy_price = pos['buy_price']
+    is_short = pos.get('is_short', False)
 
     commission_buy = pos.get('commission_buy')
     commission_sell = qty * exec_price * comi_factor
 
-    cash += qty * exec_price - commission_sell
-    profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
+    if is_short:
+        # SHORT: vendimos al inicio, compramos al final
+        # profit = (buy_price - exec_price) * qty - comisiones
+        cash -= qty * exec_price + commission_sell  # Compramos para cerrar
+        profit = (buy_price - exec_price) * qty - commission_buy - commission_sell
+    else:
+        # LONG: compramos al inicio, vendemos al final
+        cash += qty * exec_price - commission_sell
+        profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
 
     sym = pos['symbol']
     trades[sym].append(profit)
@@ -185,12 +240,13 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor,
     trade_log_cols['exit_reason'].append(exit_reason)
     trade_log_cols['commission_buy'].append(commission_buy)
     trade_log_cols['commission_sell'].append(commission_sell)
+    trade_log_cols['position_type'].append('SHORT' if is_short else 'LONG')
 
     return cash
 
 
 # ============================
-# close_expired_positions - inline y sin lookups
+# close_expired_positions - MODIFICADO PARA SHORT
 # ============================
 def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arrays,
                                   comi_factor, trades, trade_times, trade_log_cols, cash):
@@ -224,7 +280,7 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
 
 
 # ============================
-# update_sim_balance
+# update_sim_balance - MODIFICADO PARA SHORT
 # ============================
 def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_balance_cols):
 
@@ -233,24 +289,40 @@ def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_
         sim_balance_cols['balance'].append(cash)
         return sim_balance_cols
     
+    # Agrupar posiciones por símbolo
+    symbol_qty_long = {}
+    symbol_qty_short = {}
     
-    symbol_qty = {}
     for _, _, pos in open_heap:
         if pos.get('closed', False):
             continue
         sym = pos['symbol']
-        symbol_qty[sym] = symbol_qty.get(sym, 0.0) + pos['qty']
+        is_short = pos.get('is_short', False)
+        
+        if is_short:
+            symbol_qty_short[sym] = symbol_qty_short.get(sym, 0.0) + pos['qty']
+        else:
+            symbol_qty_long[sym] = symbol_qty_long.get(sym, 0.0) + pos['qty']
     
-   
+    # Calcular valor total
     total_value = 0.0
-    for sym, qty_sum in symbol_qty.items():
+    
+    # Valor de posiciones LONG
+    for sym, qty_sum in symbol_qty_long.items():
         ts_arr = ts_int_arrays[sym]
         close_arr = close_arrays[sym]
-        
-        
         idx = np.searchsorted(ts_arr, t_int, side='right') - 1
         price = float(close_arr[idx] if idx >= 0 else close_arr[0])
         total_value += qty_sum * price
+    
+    # Valor de posiciones SHORT (el valor es negativo del precio actual)
+    for sym, qty_sum in symbol_qty_short.items():
+        ts_arr = ts_int_arrays[sym]
+        close_arr = close_arrays[sym]
+        idx = np.searchsorted(ts_arr, t_int, side='right') - 1
+        price = float(close_arr[idx] if idx >= 0 else close_arr[0])
+        # Para SHORT: valor = -(qty * precio_actual)
+        total_value -= qty_sum * price
     
     sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
     sim_balance_cols['balance'].append(cash + total_value)
@@ -258,30 +330,41 @@ def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_
 
 
 # ============================
-# execute_signal - inline y fast
+# execute_signal - MODIFICADO PARA SHORT
 # ============================
 def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
-                        sym_data, counter, open_heap, tp_pct, sl_pct):
+                        sym_data, counter, open_heap, tp_pct, sl_pct, is_short=False):
 
     d = sym_data[sym]
     price_t = float(d['close'][buy_idx])
     qty = order_amount / price_t
 
     commission_buy = float(order_amount * comi_factor)
-    cash -= (order_amount + commission_buy)
+    
+    if is_short:
+        # SHORT: vendemos al inicio, recibimos cash
+        cash += order_amount - commission_buy
+    else:
+        # LONG: compramos al inicio, gastamos cash
+        cash -= (order_amount + commission_buy)
 
     if sell_after == 0:
         n_velas = 100 #VELAS  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
-
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
 
     sell_time_dt = d['ts'][sell_idx]
     sell_time_int = int(d['ts_int'][sell_idx])
 
-    tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else np.inf
-    sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -np.inf
+    if is_short:
+        # Para SHORT: TP está ABAJO (precio baja), SL está ARRIBA (precio sube)
+        tp_price = price_t * (1.0 - tp_pct / 100.0) if tp_pct != 0.0 else -np.inf
+        sl_price = price_t * (1.0 + sl_pct / 100.0) if sl_pct != 0.0 else np.inf
+    else:
+        # Para LONG: TP está ARRIBA, SL está ABAJO
+        tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else np.inf
+        sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -np.inf
 
     position = {
         'symbol': sym,
@@ -290,11 +373,12 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         'buy_time': np.datetime64(int(d['ts_int'][buy_idx]), 'ns'),
         'sell_time': sell_time_dt,
         'sell_time_int': sell_time_int,
-        'commission_buy': commission_buy
+        'commission_buy': commission_buy,
+        'is_short': is_short
     }
 
     intravela_detected, chosen_idx, exit_reason, exec_price = detect_intrabar_exit(
-        d, buy_idx, sell_idx, tp_price, sl_price
+        d, buy_idx, sell_idx, tp_price, sl_price, is_short
     )
 
     if intravela_detected:
@@ -315,7 +399,7 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
 
 
 # ============================
-# Bucle principal 
+# Bucle principal - MODIFICADO PARA SHORT
 # ============================
 def run_backtest_loop(
     all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
@@ -354,11 +438,9 @@ def run_backtest_loop(
                 for sym, buy_idx in events_sorted:
                     # --- Validación inline mejorada ---
                     if sa > 0:
-                        
                         if buy_idx + sa > len(ca[sym]):
                             continue
                     else:
-                        
                         if buy_idx + 30 >= len(ca[sym]):
                             continue
                     # --- Fin de validación ---
@@ -367,9 +449,15 @@ def run_backtest_loop(
                     if cash < oa:
                         break
                     
+                    # Determinar dirección según la señal: 1 → long, -1 → short
+                    signal_value = sd[sym]['signal'][buy_idx]
+                    if signal_value == 0:
+                        continue  # ignorar si no hay señal
+                    is_short = signal_value < 0
+
                     # Ejecutar señal
                     cash, counter = execute_signal(
-                        sym, buy_idx, cash, cf, oa, sa, sd, counter, open_heap, tp, sp
+                        sym, buy_idx, cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
                     )
                     num_signals_executed += 1
         
@@ -383,7 +471,7 @@ def run_backtest_loop(
 
 
 # ============================
-# Métricas (sin cambios
+# Métricas (sin cambios)
 # ============================
 def compute_annualized_sharpe(equity_arr, time_index_int64):
     if equity_arr is None or equity_arr.size < 2:
@@ -460,14 +548,14 @@ def build_results_dict(symbols, trades, trade_times,
 
 
 # ============================
-# FUNCIÓN PRINCIPAL 
+# FUNCIÓN PRINCIPAL - MODIFICADO PARA SOPORTAR LONG/SHORT
 # ============================
 def run_grid_backtest(
     ohlcv_arrays,
     sell_after,
     tp_pct,
     sl_pct,
-    order_amount 
+    order_amount  # NUEVO PARÁMETRO: 'long' o 'short'
 ):
 
     # Constantes
@@ -493,10 +581,10 @@ def run_grid_backtest(
     trade_times = {sym: [] for sym in symbols}
     trade_log_cols = {k: [] for k in [
         'symbol','buy_time','buy_price','sell_time','sell_price',
-        'qty','profit','exit_reason','commission_buy','commission_sell']}
+        'qty','profit','exit_reason','commission_buy','commission_sell','position_type']}
     sim_balance_cols = {'timestamp': [], 'balance': []}
     
-    # Ejecutar backtest 
+    # Ejecutar backtest con el tipo de posición especificado
     cash, num_signals_executed = run_backtest_loop(
         all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
         cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,

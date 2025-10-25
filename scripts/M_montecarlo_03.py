@@ -10,15 +10,14 @@ from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols, final_prints
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
-from Z_add_signals_03 import explosive_signal_03,explosive_signal_99
+from Z_add_signals_03 import explosive_signal_03,explosive_signal_39
 
 DTYPE = np.float32
 start_time = time.time()
-
+N_JOBS            = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -27,8 +26,6 @@ TIMEFRAME_MAJOR   = '1D'
 TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 5_00
 MIN_VOL_USDT      = 10_000_000
-N_JOBS            = -1
-STRATEGY          = "trends_tf"
 
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
@@ -109,7 +106,7 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
             arrs_minor = ohlcv_arrays_minor[sym]
             arrs_major = ohlcv_arrays_major[sym]
 
-            signal = explosive_signal_99(
+            signal = explosive_signal_03(
                 high_mayor=arrs_major['high'],
                 close_mayor=arrs_major['close'],
                 high_menor=arrs_minor['high'],

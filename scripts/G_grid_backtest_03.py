@@ -7,8 +7,7 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
@@ -83,7 +82,7 @@ def process_combo(comb):
         arr_minor = ohlcv_arr_minor[sym]
         arr_major = ohlcv_arr_major[sym]
 
-        signal = explosive_signal_99(
+        signal = explosive_signal_03(
             high_mayor=arr_major['high'],
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],
