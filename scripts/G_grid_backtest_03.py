@@ -7,23 +7,25 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
-from Z_add_signals_03 import explosive_signal_03
+from Z_add_signals_03 import explosive_signal_03,explosive_signal_99
+
 
 start_time = time.time()
 SAVE_SYMBOLS = False
-STRATEGY = "trends"
+STRATEGY = "trends_tf"
 N_JOBS = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
-#DATA_FOLDER       = "data/crypto_2021_OOS"
-#DATA_FOLDER       = "data/crypto_2022_OOS"
+DATA_FOLDER       = "data/crypto_2021_OOS"
+DATA_FOLDER       = "data/crypto_2022_OOS"
 #DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
 TIMEFRAME_MINOR   = '4H'
@@ -35,18 +37,18 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3]      
+LOOKBACK_MINOR_LIST = [1,2,3] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1]      
+LOOKBACK_MAJOR_LIST = [2]      
 LOOKBACK_MINOR_LIST = [1] 
 
-TP_PCT_LIST         = [6]
-SL_PCT_LIST         = [5]
+TP_PCT_LIST         = [3.5]
+SL_PCT_LIST         = [2.0]
 
 param_names = ['SELL_AFTER','LOOKBACK_MAJOR','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 lists_for_grid = [SELL_AFTER_LIST, LOOKBACK_MAJOR_LIST, LOOKBACK_MINOR_LIST, TP_PCT_LIST, SL_PCT_LIST]
@@ -81,7 +83,7 @@ def process_combo(comb):
         arr_minor = ohlcv_arr_minor[sym]
         arr_major = ohlcv_arr_major[sym]
 
-        signal = explosive_signal_03(
+        signal = explosive_signal_99(
             high_mayor=arr_major['high'],
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],

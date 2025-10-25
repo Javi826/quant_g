@@ -46,20 +46,22 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0,10,15,20,25,30]
-ENTROPY_MAX_LIST   = [0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
-ACCEL_SPAN_LIST    = [5,10,15,20]
+SELL_AFTER_LIST    = [10,15,20,25,30]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
+ACCEL_SPAN_LIST    = [5,10,15,20,25]
 
-TP_PCT_LIST        = [0,5,10,15,20,50,100]
-SL_PCT_LIST        = [5,10,15,20]
+TP_PCT_LIST        = [0,5,10,20]
+SL_PCT_LIST        = [5,10,20]
 
 # =============================================================================
-SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [0.2]
-ACCEL_SPAN_LIST    = [20]
-
-TP_PCT_LIST        = [100]
-SL_PCT_LIST        = [20]
+# =============================================================================
+# SELL_AFTER_LIST    = [0]
+# ENTROPY_MAX_LIST   = [0.2]
+# ACCEL_SPAN_LIST    = [20]
+# 
+# TP_PCT_LIST        = [100]
+# SL_PCT_LIST        = [20]
+# =============================================================================
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']

@@ -18,7 +18,7 @@ start_time = time.time()
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
 TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_000
+ORDER_AMOUNT      = 5_00
 MIN_VOL_USDT      = 10_000_000
 N_JOBS            = -1
 STRATEGY          = "trends_tf"
@@ -41,8 +41,8 @@ elif TIMEFRAME_MINOR == '1D':
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3]      
+LOOKBACK_MINOR_LIST = [1,2,3] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
@@ -187,7 +187,7 @@ grid_results_list  = [(param_values_tuple, final_results)]
 grid_records       = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df    = pd.DataFrame(grid_records)
 
-final_prints(f"🎯 WFO Multi-TF {STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
+final_prints(f"🎯 WFO  {STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
 df_portfolio, mi_series = report_backtesting(grid_results_df, param_names, DATA_FOLDER, INITIAL_BALANCE)
 
 

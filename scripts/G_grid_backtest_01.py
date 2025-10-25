@@ -7,8 +7,8 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+#from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
@@ -22,33 +22,31 @@ N_JOBS             =-1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
+DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1H'
-ORDER_AMOUNT        = 5000
-MIN_VOL_USDT        = 200_000_000
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME           = '4H'
+ORDER_AMOUNT        = 500
+MIN_VOL_USDT        = 50_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]
-ACCEL_SPAN_LIST    = [5,10,15,20,25,30,35,40,50]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
+ACCEL_SPAN_LIST    = [5,10,15,20,25]
 
-TP_PCT_LIST        = [5,10,15,20,100]
+TP_PCT_LIST        = [5,10,15,20]
 SL_PCT_LIST        = [5,10,15,20]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [0]
-# ENTROPY_MAX_LIST   = [0.2]
-# ACCEL_SPAN_LIST    = [20]
-# 
-# TP_PCT_LIST        = [100]
-# SL_PCT_LIST        = [20]
-# =============================================================================
+SELL_AFTER_LIST    = [30]
+ENTROPY_MAX_LIST   = [0.2]
+ACCEL_SPAN_LIST    = [5]
+
+TP_PCT_LIST        = [0]
+SL_PCT_LIST        = [10]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']

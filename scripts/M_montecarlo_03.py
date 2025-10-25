@@ -10,10 +10,11 @@ from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols, final_prints
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
-from Z_add_signals_03 import explosive_signal_03
+from Z_add_signals_03 import explosive_signal_03,explosive_signal_99
 
 DTYPE = np.float32
 start_time = time.time()
@@ -24,7 +25,7 @@ start_time = time.time()
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
 TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_000
+ORDER_AMOUNT      = 5_00
 MIN_VOL_USDT      = 10_000_000
 N_JOBS            = -1
 STRATEGY          = "trends_tf"
@@ -47,18 +48,20 @@ TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3]      
+LOOKBACK_MINOR_LIST = [1,2,3] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 
-SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1]
-LOOKBACK_MINOR_LIST = [1]
-
-TP_PCT_LIST         = [6]
-SL_PCT_LIST         = [5]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]
+# LOOKBACK_MAJOR_LIST = [1]
+# LOOKBACK_MINOR_LIST = [1]
+# 
+# TP_PCT_LIST         = [3.5]
+# SL_PCT_LIST         = [3.5]
+# =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -106,7 +109,7 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
             arrs_minor = ohlcv_arrays_minor[sym]
             arrs_major = ohlcv_arrays_major[sym]
 
-            signal = explosive_signal_03(
+            signal = explosive_signal_99(
                 high_mayor=arrs_major['high'],
                 close_mayor=arrs_major['close'],
                 high_menor=arrs_minor['high'],
