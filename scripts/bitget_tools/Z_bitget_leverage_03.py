@@ -3,18 +3,16 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import time
-from ZX_connect_live import send_request_01, PRODUCT_TYPE
-from parquet_process.Z_parquet_extraction import get_futures_symbols_from_api  # or your symbol-fetching function
+from live_trading.ZX_connect_live import send_request_01, PRODUCT_TYPE
+from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api  # or your symbol-fetching function
 
 
 # =====================================
 # CONFIGURATION
 # =====================================
-LEVERAGE_TARGET = 5
+LEVERAGE_TARGET = 10
 MARGIN_COIN     = "USDT"
 MARGIN_MODE     = "isolated" 
-STRATEGY        = "entropy"
-
 
 # =====================================
 # FUNCTIONS

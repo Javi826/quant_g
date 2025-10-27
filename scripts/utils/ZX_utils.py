@@ -70,9 +70,13 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             if df is not None:
                 n_rows = len(df)
                 if timeframe == "1H":
-                    min_bars = 4000
+                    min_bars = 4320
                 elif timeframe == "4H":
-                    min_bars = 1000
+                    min_bars = 1080
+                elif timeframe == "6H":
+                    min_bars = 720
+                elif timeframe == "12H":
+                    min_bars = 360
                 elif timeframe == "1D":
                     min_bars = 180
                 else:

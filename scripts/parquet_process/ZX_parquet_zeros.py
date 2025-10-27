@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 # 📁 Carpeta con los archivos Parquet
 BASE_DIR = Path(__file__).resolve().parent.parent
-input_folder = BASE_DIR / "data" / "crypto_2021_copy_clean"
+input_folder = BASE_DIR / "data" / "crypto_2021_clean"
 
 def parse_filename(filename):
     """Extrae símbolo del nombre del archivo (ej: BTCUSDT_1D.parquet → BTCUSDT)."""

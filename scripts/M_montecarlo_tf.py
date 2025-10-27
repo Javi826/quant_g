@@ -13,7 +13,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
-from Z_add_signals_tf import explosive_signal_tf,explosive_signal_39
+#from Z_add_signals_tf import explosive_signal_tf
+from Z_add_signals_tf import explosive_signal_tf_short
 
 DTYPE = np.float32
 start_time = time.time()
@@ -37,6 +38,10 @@ if TIMEFRAME_MINOR == '1H':
     FINAL_N_OBS_PER_PATH = 4000
 elif TIMEFRAME_MINOR == '4H':
     FINAL_N_OBS_PER_PATH = 1000
+elif TIMEFRAME_MINOR == '6H':
+    FINAL_N_OBS_PER_PATH = 720
+elif TIMEFRAME_MINOR == '12H':
+    FINAL_N_OBS_PER_PATH = 360
 elif TIMEFRAME_MINOR == '1D':
     FINAL_N_OBS_PER_PATH = 180
 
@@ -57,8 +62,8 @@ SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8
 # LOOKBACK_MAJOR_LIST = [1]      
 # LOOKBACK_MINOR_LIST = [1] 
 # 
-# TP_PCT_LIST         = [8]
-# SL_PCT_LIST         = [10]
+# TP_PCT_LIST         = [3]
+# SL_PCT_LIST         = [2]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
@@ -104,20 +109,22 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
             if sym not in ohlcv_arrays_major:
                 continue
 
-            arrs_minor = ohlcv_arrays_minor[sym]
-            arrs_major = ohlcv_arrays_major[sym]
+            arr_minor = ohlcv_arrays_minor[sym]
+            arr_major = ohlcv_arrays_major[sym]
 
-            signal = explosive_signal_tf(
-                high_mayor=arrs_major['high'],
-                close_mayor=arrs_major['close'],
-                high_menor=arrs_minor['high'],
-                close_menor=arrs_minor['close'],
+            signal = explosive_signal_tf_short(
+                high_mayor=arr_major['high'],
+                close_mayor=arr_major['close'],
+                high_menor=arr_minor['high'],
+                close_menor=arr_minor['close'],
+                low_mayor=arr_major['low'],
+                low_menor=arr_minor['low'],
                 lookback_mayor=param_dict.get('LOOKBACK_MAJOR'),
                 lookback_menor=param_dict.get('LOOKBACK_MINOR'),
                 live=False
             )
 
-            arrs_minor['signal'] = np.asarray(signal, dtype=DTYPE)
+            arr_minor['signal'] = np.asarray(signal, dtype=DTYPE)
 
         result = run_grid_backtest(
             ohlcv_arrays_minor,
@@ -142,10 +149,15 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # -----------------------------------------------------------------------------
 start_paths_time = time.time()
 paths_minor = generate_paths_for_all_symbols_functional(ohlcv_data_minor, n_paths=FINAL_N_PATHS, n_obs=FINAL_N_OBS_PER_PATH)
-if TIMEFRAME_MINOR == '4H':
+if TIMEFRAME_MINOR == '1H':
+    factor = 24
+elif TIMEFRAME_MINOR == '4H':
     factor = 6
-elif TIMEFRAME_MINOR == '1H':
-    factor = 4
+elif TIMEFRAME_MINOR == '6H':
+    factor =  4    
+elif TIMEFRAME_MINOR == '12H':
+    factor =  2   
+
 
 paths_major = {sym: derive_major_from_minor(paths_minor[sym], factor=factor) for sym in paths_minor.keys()}
 paths_major = {sym: derive_major_from_minor(paths_minor[sym], factor=factor) for sym in paths_minor.keys()}

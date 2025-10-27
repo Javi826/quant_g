@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import time
-from live_trading.ZX_connect_live import send_request_01, PRODUCT_TYPE
+from live_trading.ZX_connect_live import send_request_02, PRODUCT_TYPE
 from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api  # or your symbol-fetching function
 
 
@@ -37,7 +37,7 @@ def set_leverage(symbol: str, leverage: int = LEVERAGE_TARGET,
     else:
         body["leverage"] = str(leverage)
 
-    code, resp = send_request_01("POST", "/api/v2/mix/account/set-leverage", body=body)
+    code, resp = send_request_02("POST", "/api/v2/mix/account/set-leverage", body=body)
 
     if code == 200 and resp.get("code") == "00000":
         print(f"✅ {symbol}: Leverage set to {leverage}x successfully.")
@@ -52,7 +52,7 @@ def get_leverage(symbol: str, product_type: str = PRODUCT_TYPE, margin_coin: str
     Retrieves the current leverage for the symbol.
     """
     params = {"symbol": symbol, "productType": product_type, "marginCoin": margin_coin}
-    code, resp = send_request_01("GET", "/api/v2/mix/account/account", params=params)
+    code, resp = send_request_02("GET", "/api/v2/mix/account/account", params=params)
 
     if code == 200 and resp.get("code") == "00000":
         data = resp.get("data", {})

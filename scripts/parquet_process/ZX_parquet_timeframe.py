@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-input_folder = BASE_DIR / "data" / "crypto_2021"
+input_folder = BASE_DIR / "data" / "crypto_2023_IS"
 
 # Leer un símbolo cualquiera (elige uno que tengas)
 symbol = "BTCUSDT"  # Cambia si no tienes este

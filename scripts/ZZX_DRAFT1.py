@@ -1,71 +1,44 @@
-import os
-import sys
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-import pandas as pd
+# === FILE: add_signals03.py ===
+# ---------------------------------
+import numpy as np
 
-# Rutas y conexiones (ajusta si lo necesitas)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+def explosive_signal_tf(high_mayor, close_mayor, high_menor, close_menor, lookback_mayor, lookback_menor, live=False):
+    # Señales individuales
+    signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
+    signal_menor = np.zeros_like(close_menor, dtype=np.int8)
 
-from utils.ZZ_connect import connect_bitget_03
-from parquet_process.Z_parquet_extraction import _call_history_candles, to_dataframe_from_api
+    # Timeframe mayor
+    n_mayor = len(close_mayor)
+    for i in range(lookback_mayor, n_mayor):
+        window = high_mayor[i-lookback_mayor:i]
+        if np.all(window[:-1] > window[1:]):
+            max_window = np.max(window)
+            if close_mayor[i] > max_window:
+                signal_mayor[i] = 1
 
-# ===========================
-# CONFIGURACIÓN
-# ===========================
-MADRID_TZ = ZoneInfo("Europe/Madrid")
+    # Timeframe menor
+    n_menor = len(close_menor)
+    for i in range(lookback_menor, n_menor):
+        window = high_menor[i-lookback_menor:i]
+        if np.all(window[:-1] > window[1:]):
+            max_window = np.max(window)
+            if close_menor[i] > max_window:
+                signal_menor[i] = 1
 
-SYMBOL = "BTCUSDT"
-TIMEFRAME_MAJOR = "1D"
-TIMEFRAME_MINOR = "4H"
+    # Combinación multi-timeframe
+    factor = len(close_menor) // len(close_mayor)
+    signal_final = np.zeros_like(close_menor, dtype=np.int8)
 
+    for i, s_menor in enumerate(signal_menor):
+        idx_mayor = i // factor
+        if idx_mayor < len(signal_mayor) and s_menor == 1 and signal_mayor[idx_mayor] == 1:
+            signal_final[i] = 1
 
-# ===========================
-# FUNCIÓN PRINCIPAL
-# ===========================
-def check_candle_sync(symbol, tf_major, tf_minor):
-    exchange = connect_bitget_03()
+    # Shift 
+    if not live:
+        signal_shifted = np.empty_like(signal_final)
+        signal_shifted[0] = 0
+        signal_shifted[1:] = signal_final[:-1]
+        signal_final = signal_shifted
 
-    # Descarga las últimas velas
-    recent_major = _call_history_candles(symbol=symbol, granularity=tf_major, limit=5)
-    recent_minor = _call_history_candles(symbol=symbol, granularity=tf_minor, limit=5)
-
-    df_major = to_dataframe_from_api(recent_major)
-    df_minor = to_dataframe_from_api(recent_minor)
-
-    # Últimos timestamps
-    last_major_ts = pd.to_datetime(df_major.iloc[-1]["timestamp"]).astimezone(MADRID_TZ)
-    last_minor_ts = pd.to_datetime(df_minor.iloc[-1]["timestamp"]).astimezone(MADRID_TZ)
-    now = datetime.now(MADRID_TZ)
-
-    print(f"\n=== {symbol} ===")
-    print(f"🕒 Now:                {now.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"🔹 Last {tf_major} candle: {last_major_ts.strftime('%Y-%m-%d %H:%M:%S')}  ({(now - last_major_ts).total_seconds()/3600:.1f}h ago)")
-    print(f"🔹 Last {tf_minor} candle: {last_minor_ts.strftime('%Y-%m-%d %H:%M:%S')}  ({(now - last_minor_ts).total_seconds()/3600:.1f}h ago)")
-
-    # Chequeo de si la vela mayor está cerrada
-    if tf_major.endswith("D"):
-        major_duration = timedelta(days=1)
-    elif tf_major.endswith("H"):
-        major_duration = timedelta(hours=int(tf_major[:-1]))
-    elif tf_major.endswith("m"):
-        major_duration = timedelta(minutes=int(tf_major[:-1]))
-    else:
-        major_duration = timedelta(hours=24)
-
-    if now - last_major_ts < major_duration:
-        print(f"⚠️ La vela {tf_major} todavía está ABIERTA (incompleta)")
-    else:
-        print(f"✅ La vela {tf_major} está CERRADA (completa)")
-
-    if now - last_minor_ts < timedelta(hours=4):
-        print(f"⚠️ La vela {tf_minor} probablemente sigue ABIERTA")
-    else:
-        print(f"✅ La vela {tf_minor} está CERRADA")
-
-
-# ===========================
-# EJECUCIÓN
-# ===========================
-if __name__ == "__main__":
-    check_candle_sync(SYMBOL, TIMEFRAME_MAJOR, TIMEFRAME_MINOR)
+    return signal_final

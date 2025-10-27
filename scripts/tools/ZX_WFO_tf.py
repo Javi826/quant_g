@@ -163,8 +163,12 @@ def walk_forward_optimization_tf(
             start += length_test
             end = start + length_train_set
 
-    # Resumen de parámetros finales (moda)
+    # -----------------------------------------------------------
+    # Final parameter summary
+    # -----------------------------------------------------------
     df_params = pd.DataFrame(best_params_list)
+    
+    # Calculate "mode" of each column manually
     final_params = {}
     for col in df_params.columns:
         counts = Counter(df_params[col])
@@ -175,19 +179,42 @@ def walk_forward_optimization_tf(
         else:
             final_params[col] = most_common_val
 
-    # Convertir fechas
+    print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
+          
+    # -----------------------------------------------------------
+    # 📊 Final DataFrame with train/test dates, params, and criterion
+    # -----------------------------------------------------------
     train_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_start_dates]
-    train_end_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
-    test_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in test_start_dates]
-    test_end_dates = [pd.to_datetime(d).date() if d is not None else None for d in test_end_dates]
+    train_end_dates   = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
+    test_start_dates  = [pd.to_datetime(d).date() if d is not None else None for d in test_start_dates]
+    test_end_dates    = [pd.to_datetime(d).date() if d is not None else None for d in test_end_dates]
 
     df_results = pd.DataFrame(best_params_list)
     df_results.insert(0, 'train_start', train_start_dates)
     df_results.insert(1, 'train_end', train_end_dates)
+# =============================================================================
+#     df_results.insert(2, 'test_start', test_start_dates)
+#     df_results.insert(3, 'test_end', test_end_dates)
+# =============================================================================
     df_results['best_criterion'] = best_criteria_list
 
-    print("\n📊 Resumen final de parámetros, criterio y fechas de train por ventana:")
+    # -----------------------------------------------------------
+    # ➕ Add a row with the mean of best_params
+    # -----------------------------------------------------------
+    mean_row = df_results.drop(columns=['train_start', 'train_end', 'best_criterion'], errors='ignore').mean(numeric_only=True)
+    mean_row = mean_row.to_dict()
+    
+    # Fill descriptive fields for date and criterion
+    mean_row['train_start'] = 'MEAN'
+    mean_row['train_end'] = ''
+    mean_row['best_criterion'] = df_results['best_criterion'].mean() if 'best_criterion' in df_results else None
+    
+    # Append the mean row to the DataFrame
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
+
+    print("\n📊 Final summary of parameters, criterion, and train/test dates per window:")
     print(df_results)
+    
     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
 
     return final_params
