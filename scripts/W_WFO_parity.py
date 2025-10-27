@@ -5,12 +5,12 @@ import numpy as np
 import pandas as pd
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols,final_prints
-from Z_add_signals_01 import explosive_signal_01  
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-
+from Z_add_signals_02 import explosive_signal_02 
 start_time = time.time()
+STRATEGY            ="candle_pair"
 N_JOBS              = -1
 
 # -----------------------------------------------------------------------------
@@ -39,15 +39,15 @@ elif TIMEFRAME == '1D':
 # GRID: 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_LIST       = [5,10,20,30,40,50,60]
-BODY_TOLERANCE_LIST = [5,10,15,20,25]
-LOW_TOLERANCE_LIST  = [5,10,15,20,25]
+FACTOR_LIST         = [0.5,1,1.5,2.0,2.5]
+BODY_TOLERANCE_LIST = [5,10,15,20,25,30,35,40]
+CLOSE_TOLERANCE_LIST= [5,10,15,20]
 
-TP_PCT_LIST         = [5,10,20,30,50,100]
+TP_PCT_LIST         = [5,10,15,20,25,30,50]
 SL_PCT_LIST         = [5,10,15,20]
 
 
-param_names    = ['SELL_AFTER', 'LOOKBACK', 'BODY_TOLERANCE','LOW_TOLERANCE', 'TP_PCT', 'SL_PCT']
+param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']
 param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -69,14 +69,12 @@ def strategy_builder(params, base_arrays):
     for sym, arrs in base_arrays.items():
         open_array = arrs["open"]
         close_array = arrs["close"]
-        low_array = arrs["low"]
-        signal = explosive_signal_01(
+        signal = explosive_signal_02(
             open_prices=open_array,
             close_prices=close_array,
-            low_prices=low_array,
-            lookback=params["LOOKBACK"],
+            factor=params["FACTOR"],
             body_tolerance=params["BODY_TOLERANCE"] / 100,
-            low_tolerance=params["LOW_TOLERANCE"] / 100,
+            close_tolerance=params["CLOSE_TOLERANCE"] / 100,
             live=False,
         )
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
@@ -106,7 +104,6 @@ def metric_fn_default(results):
     dd_pct = float(port.get('max_dd', 0.0)) * 100.0
     
     metric_score    = (net_gain_pct - 2*dd_pct)
-    #metric_score    = net_gain_pct 
     #metric_score    = sharpe_ratio
    
     return metric_score
@@ -133,21 +130,19 @@ for name in param_names:
 # -----------------------------------------------------------------------------
 ohlcv_arrays = {}
 for sym, arrs in ohlcv_arr.items():
-    lookback = best_params_wfo["LOOKBACK"]
+    factor = best_params_wfo["FACTOR"]
     body_tol = best_params_wfo["BODY_TOLERANCE"] / 100
-    low_tol  = best_params_wfo["LOW_TOLERANCE"] / 100
+    close_tol  = best_params_wfo["CLOSE_TOLERANCE"] / 100
     
     open_array  = arrs["open"]
     close_array = arrs["close"]
-    low_array   = arrs["low"]
 
-    signal = explosive_signal_01(
+    signal = explosive_signal_02(
         open_prices=open_array,
         close_prices=close_array,
-        low_prices=low_array,
-        lookback=lookback,
+        factor=factor,
         body_tolerance=body_tol,
-        low_tolerance=low_tol,
+        close_tolerance=close_tol,
         live=False,
     )
     ohlcv_arrays[sym] = {**arrs, 'signal': signal}
@@ -168,7 +163,7 @@ grid_results_list  = [(param_values_tuple, final_results)]
 grid_records       = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df    = pd.DataFrame(grid_records)
 
-final_prints(strategy="🎯 WFO_backtest 🎯", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=[param_ranges[name] for name in param_names])
+final_prints(strategy="🎯 WFO_{STRATEGY} 🎯", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=[param_ranges[name] for name in param_names])
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

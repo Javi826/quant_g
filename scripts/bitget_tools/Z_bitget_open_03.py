@@ -2,7 +2,7 @@ import os
 import sys
 from typing import Dict, Any, List
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from live_trading.ZX_connect_live import get_open_positions_01
+from live_trading.ZX_connect_live import get_open_positions_03
 
 
 BASE_URL = "https://api.bitget.com"
@@ -47,7 +47,7 @@ def summarize_positions(positions: List[Dict[str, Any]]):
 # -----------------------------
 if __name__ == "__main__":
     try:
-        open_positions = get_open_positions_01(product_type="USDT-FUTURES")
+        open_positions = get_open_positions_03(product_type="USDT-FUTURES")
         summarize_positions(open_positions)
     except Exception as e:
         print(f"\n⚠️ Fallen: {e}")

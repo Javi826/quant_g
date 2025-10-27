@@ -1,13 +1,8 @@
 from pathlib import Path
 import pandas as pd
-import numpy as np
-import os
+
 import warnings
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
-from sklearn.feature_selection import mutual_info_regression
+
 
 DATA_FOLDER         = "data/crypto_2023_ISOLD"
 

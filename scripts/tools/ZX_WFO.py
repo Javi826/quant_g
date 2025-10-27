@@ -25,7 +25,7 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     best_criteria_list = []  
     window_idx         = 1
 
-    # 🔹 Nuevas listas SOLO para fechas de train y test
+    # 🔹 New lists ONLY for train/test dates
     train_start_dates  = []
     train_end_dates    = []
     test_start_dates   = []
@@ -111,7 +111,7 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         best_params_list.append(best_params)
         best_criteria_list.append(best_criterion)
 
-        # Guardamos fechas de train y test
+        # Store train/test dates
         train_start_dates.append(ref_ts[t0] if t0 < len(ref_ts) else None)
         train_end_dates.append(ref_ts[t1 - 1] if t1 - 1 < len(ref_ts) else None)
         test_start_dates.append(ref_ts[test0] if test0 < len(ref_ts) else None)
@@ -128,11 +128,11 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
             end = start + length_train_set
     
     # -----------------------------------------------------------
-    # Resumen de parámetros finales
+    # Final parameter summary
     # -----------------------------------------------------------
     df_params = pd.DataFrame(best_params_list)
     
-    # Calculamos la "moda" de cada columna manualmente
+    # Calculate "mode" of each column manually
     final_params = {}
     for col in df_params.columns:
         counts = Counter(df_params[col])
@@ -144,39 +144,10 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
             final_params[col] = most_common_val
 
     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
-      
-# =============================================================================
-#     # -----------------------------------------------------------
-#     # Resumen de parámetros finales (usando la MEDIA en lugar de la MODA)
-#     # -----------------------------------------------------------
-#     df_params = pd.DataFrame(best_params_list)
-#     
-#     # Calculamos la "media" de cada columna manualmente
-#     final_params = {}
-#     for col in df_params.columns:
-#         # Filtramos NaN por seguridad
-#         col_vals = df_params[col].dropna()
-#     
-#         # Si la columna es numérica, calculamos la media
-#         if np.issubdtype(col_vals.dtype, np.number):
-#             mean_val = col_vals.mean()
-#     
-#             if not str(col).endswith("_MAX"):
-#                 final_params[col] = int(round(mean_val))
-#             else:
-#                 final_params[col] = float(mean_val)
-#         else:
-#             # Si no es numérica (por ejemplo, strings o categorías), usamos el valor más común (moda)
-#             counts = Counter(col_vals)
-#             most_common_val, _ = counts.most_common(1)[0]
-#             final_params[col] = most_common_val
-#     
-#     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")
-# =============================================================================
+          
     # -----------------------------------------------------------
-    # 📊 DataFrame final con fechas de train, test, parámetros y criterio
+    # 📊 Final DataFrame with train/test dates, params, and criterion
     # -----------------------------------------------------------
-    # 🔹 Convertimos a solo fecha (sin hora)
     train_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_start_dates]
     train_end_dates   = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
     test_start_dates  = [pd.to_datetime(d).date() if d is not None else None for d in test_start_dates]
@@ -191,7 +162,21 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
 # =============================================================================
     df_results['best_criterion'] = best_criteria_list
 
-    print("\n📊 Resumen final de parámetros, criterio y fechas de train y test por ventana:")
+    # -----------------------------------------------------------
+    # ➕ Add a row with the mean of best_params
+    # -----------------------------------------------------------
+    mean_row = df_results.drop(columns=['train_start', 'train_end', 'best_criterion'], errors='ignore').mean(numeric_only=True)
+    mean_row = mean_row.to_dict()
+    
+    # Fill descriptive fields for date and criterion
+    mean_row['train_start'] = 'MEAN'
+    mean_row['train_end'] = ''
+    mean_row['best_criterion'] = df_results['best_criterion'].mean() if 'best_criterion' in df_results else None
+    
+    # Append the mean row to the DataFrame
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
+
+    print("\n📊 Final summary of parameters, criterion, and train/test dates per window:")
     print(df_results)
     
     print(f"\n✅ WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)\n")

@@ -4,27 +4,27 @@ from tqdm import tqdm
 from datetime import datetime, timedelta
 
 # -----------------------------
-# PARÁMETROS DE CONFIGURACIÓN
+# CONFIGURATION PARAMETERS
 # -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent  # sube un nivel
+BASE_DIR = Path(__file__).resolve().parent.parent  # go up one level
 input_folder = BASE_DIR / "data" / "crypto_2021_highlow"
-output_folder_is = BASE_DIR / "data" / "crypto_2022_OOS"
-output_folder_oos = BASE_DIR / "data" / "crypto_NNN"
+output_folder_is = BASE_DIR / "data" / "crypto_2023_IS"
+output_folder_oos = BASE_DIR / "data" / "crypto_2023_OOS"
 
-# Rango de fechas para IN-SAMPLE (IS)
-IS_START = "2022-01-01"
-IS_END = "2022-12-31"
+# Date range for IN-SAMPLE (IS)
+IS_START = "2023-01-01"
+IS_END = "2025-03-01"
 
-# OOS automático: desde IS_END hasta el final del archivo
+# Automatic OOS: from IS_END until the end of the file
 # OOS_START = IS_END
-# OOS_END = fin del archivo
+# OOS_END = end of file
 
 output_folder_is.mkdir(exist_ok=True, parents=True)
 output_folder_oos.mkdir(exist_ok=True, parents=True)
 
 
 def read_file(filepath):
-    """Lee archivo parquet o xlsx y devuelve DataFrame."""
+    """Reads parquet or xlsx file and returns a DataFrame."""
     try:
         if filepath.suffix == ".parquet":
             df = pd.read_parquet(filepath)
@@ -34,53 +34,53 @@ def read_file(filepath):
             return None
         return df
     except Exception as e:
-        print(f"❌ Error leyendo {filepath.name}: {e}")
+        print(f"❌ Error reading {filepath.name}: {e}")
         return None
 
 
 def write_file(df, filepath):
-    """Escribe DataFrame a parquet o xlsx con timestamp como índice."""
+    """Writes DataFrame to parquet or xlsx with timestamp as index."""
     try:
-        # Asegurarse de que hay columna 'timestamp'
+        # Ensure 'timestamp' column exists
         if 'timestamp' in df.columns:
-            # Convertir a datetime si no lo es
+            # Convert to datetime if not already
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            # Poner timestamp como índice
+            # Set timestamp as index
             df.set_index('timestamp', inplace=True)
         
-        # Guardar según extensión
+        # Save according to extension
         if filepath.suffix == ".parquet":
-            df.to_parquet(filepath, index=True)  # guardar índice
+            df.to_parquet(filepath, index=True)
         elif filepath.suffix == ".xlsx":
-            df.to_excel(filepath, index=True)    # guardar índice
+            df.to_excel(filepath, index=True)
     except Exception as e:
-        print(f"❌ Error escribiendo {filepath.name}: {e}")
+        print(f"❌ Error writing {filepath.name}: {e}")
 
 
 def split_is_oos(df, is_start, is_end):
     """
-    Divide DataFrame en dos:
-    - IS: desde is_start hasta is_end (exclusivo)
-    - OOS: desde is_end hasta el final
+    Splits DataFrame into two:
+    - IS: from is_start to is_end (exclusive)
+    - OOS: from is_end to the end
     """
-    # Identificar columna de timestamp
+    # Identify timestamp column
     if 'timestamp' in df.columns:
         time_col = 'timestamp'
     elif df.index.name == 'timestamp' or isinstance(df.index, pd.DatetimeIndex):
         df = df.reset_index()
         time_col = df.columns[0]
     else:
-        # Asumir que la primera columna es timestamp
+        # Assume first column is timestamp
         time_col = df.columns[0]
     
-    # Convertir a datetime si no lo es
+    # Convert to datetime if necessary
     df[time_col] = pd.to_datetime(df[time_col])
     
-    # Convertir fechas de filtro
+    # Convert filter dates
     start = pd.to_datetime(is_start)
     end = pd.to_datetime(is_end)
     
-    # Dividir en IS y OOS
+    # Split into IS and OOS
     mask_is = (df[time_col] >= start) & (df[time_col] < end)
     mask_oos = (df[time_col] >= end)
     
@@ -91,57 +91,57 @@ def split_is_oos(df, is_start, is_end):
 
 
 def process_files():
-    """Procesa todos los archivos en la carpeta input."""
+    """Processes all files in the input folder."""
     
-    # Obtener todos los archivos
+    # Get all files
     files = list(input_folder.glob("*.parquet")) + list(input_folder.glob("*.xlsx"))
     
     if len(files) == 0:
-        print(f"❌ No se encontraron archivos en {input_folder}")
+        print(f"❌ No files found in {input_folder}")
         return
     
-    # Calcular OOS_START automáticamente
+    # Automatically calculate OOS_START
     oos_start = pd.to_datetime(IS_END)
     
     print(f"\n{'='*60}")
-    print(f"DIVISIÓN IS / OOS")
+    print(f"IS / OOS SPLIT")
     print(f"{'='*60}")
     print(f"\n📅 IN-SAMPLE (IS):")
-    print(f"   Inicio: {IS_START}")
-    print(f"   Fin:    {IS_END}")
+    print(f"   Start: {IS_START}")
+    print(f"   End:   {IS_END}")
     print(f"\n📅 OUT-OF-SAMPLE (OOS):")
-    print(f"   Inicio: {IS_END}")
-    print(f"   Fin:    [fin del archivo]")
-    print(f"\n📁 Archivos a procesar: {len(files)}\n")
+    print(f"   Start: {IS_END}")
+    print(f"   End:   [end of file]")
+    print(f"\n📁 Files to process: {len(files)}\n")
     
     processed = 0
     skipped_is = 0
     skipped_oos = 0
     errors = 0
     
-    for file in tqdm(files, desc="Procesando archivos"):
-        # Leer archivo
+    for file in tqdm(files, desc="Processing files"):
+        # Read file
         df = read_file(file)
         
         if df is None:
             errors += 1
             continue
         
-        # Dividir en IS y OOS
+        # Split into IS and OOS
         try:
             df_is, df_oos = split_is_oos(df, IS_START, IS_END)
             
             has_is = len(df_is) > 0
             has_oos = len(df_oos) > 0
             
-            # Guardar IS
+            # Save IS
             if has_is:
                 output_file_is = output_folder_is / file.name
                 write_file(df_is, output_file_is)
             else:
                 skipped_is += 1
             
-            # Guardar OOS
+            # Save OOS
             if has_oos:
                 output_file_oos = output_folder_oos / file.name
                 write_file(df_oos, output_file_oos)
@@ -150,30 +150,30 @@ def process_files():
             
             if has_is or has_oos:
                 processed += 1
-                status_is = f"IS: {len(df_is)}" if has_is else "IS: 0 (omitido)"
-                status_oos = f"OOS: {len(df_oos)}" if has_oos else "OOS: 0 (omitido)"
+                status_is = f"IS: {len(df_is)}" if has_is else "IS: 0 (skipped)"
+                status_oos = f"OOS: {len(df_oos)}" if has_oos else "OOS: 0 (skipped)"
                 tqdm.write(f"✅ {file.name}: {status_is}, {status_oos}")
             else:
-                tqdm.write(f"⚠️  {file.name}: Sin datos en ningún rango")
+                tqdm.write(f"⚠️  {file.name}: No data in either range")
             
         except Exception as e:
             errors += 1
-            tqdm.write(f"❌ Error procesando {file.name}: {e}")
+            tqdm.write(f"❌ Error processing {file.name}: {e}")
             continue
     
     print(f"\n{'='*60}")
-    print(f"RESUMEN")
+    print(f"SUMMARY")
     print(f"{'='*60}")
-    print(f"✅ Archivos procesados: {processed}")
-    print(f"⚠️  Archivos sin datos IS: {skipped_is}")
-    print(f"⚠️  Archivos sin datos OOS: {skipped_oos}")
-    print(f"❌ Errores: {errors}")
+    print(f"✅ Files processed: {processed}")
+    print(f"⚠️  Files with no IS data: {skipped_is}")
+    print(f"⚠️  Files with no OOS data: {skipped_oos}")
+    print(f"❌ Errors: {errors}")
     print(f"📁 Total: {len(files)}")
-    print(f"\n📂 Carpetas de salida:")
+    print(f"\n📂 Output folders:")
     print(f"   IS:  {output_folder_is}")
     print(f"   OOS: {output_folder_oos}")
     print(f"\n{'='*60}")
-    print("✨ Proceso completado")
+    print("✨ Process completed")
     print(f"{'='*60}\n")
 
 

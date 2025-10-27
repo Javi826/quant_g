@@ -11,43 +11,43 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
-from Z_add_signals_03 import explosive_signal_03,explosive_signal_99
+from Z_add_signals_tf import explosive_signal_tf
 
 
-start_time = time.time()
+start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY = "trends_tf"
-N_JOBS = -1
+STRATEGY     = "trends_tf"
+N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
-DATA_FOLDER       = "data/crypto_2021_OOS"
-DATA_FOLDER       = "data/crypto_2022_OOS"
+#DATA_FOLDER       = "data/crypto_2021_OOS"
+#DATA_FOLDER       = "data/crypto_2022_OOS"
 #DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '1H'
 
 ORDER_AMOUNT      = 5_000
-MIN_VOL_USDT      = 10_000_000
+MIN_VOL_USDT      = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3]      
-LOOKBACK_MINOR_LIST = [1,2,3] 
+LOOKBACK_MAJOR_LIST = [1,2,3,4]      
+LOOKBACK_MINOR_LIST = [1,2,3,4] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [2]      
+LOOKBACK_MAJOR_LIST = [1]      
 LOOKBACK_MINOR_LIST = [1] 
 
-TP_PCT_LIST         = [3.5]
-SL_PCT_LIST         = [2.0]
+TP_PCT_LIST         = [1.5]
+SL_PCT_LIST         = [1.5]
 
 param_names = ['SELL_AFTER','LOOKBACK_MAJOR','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 lists_for_grid = [SELL_AFTER_LIST, LOOKBACK_MAJOR_LIST, LOOKBACK_MINOR_LIST, TP_PCT_LIST, SL_PCT_LIST]
@@ -82,7 +82,7 @@ def process_combo(comb):
         arr_minor = ohlcv_arr_minor[sym]
         arr_major = ohlcv_arr_major[sym]
 
-        signal = explosive_signal_03(
+        signal = explosive_signal_tf(
             high_mayor=arr_major['high'],
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],
@@ -124,7 +124,7 @@ grid_results_df = pd.DataFrame(grid_records)
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 
-final_prints(strategy=f" 🥇Grid_Backtest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(strategy=f" 🥇Grid_{STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

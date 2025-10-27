@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def explosive_signal_03(high_mayor, close_mayor, high_menor, close_menor, lookback_mayor, lookback_menor, live=False):
+def explosive_signal_tf(high_mayor, close_mayor, high_menor, close_menor, lookback_mayor, lookback_menor, live=False):
     # Señales individuales
     signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
     signal_menor = np.zeros_like(close_menor, dtype=np.int8)

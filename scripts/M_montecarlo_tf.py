@@ -13,19 +13,20 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
-from Z_add_signals_03 import explosive_signal_03,explosive_signal_39
+from Z_add_signals_tf import explosive_signal_tf,explosive_signal_39
 
 DTYPE = np.float32
 start_time = time.time()
 N_JOBS            = -1
+STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_00
-MIN_VOL_USDT      = 10_000_000
+TIMEFRAME_MINOR   = '1H'
+ORDER_AMOUNT      = 5_000
+MIN_VOL_USDT      = 1_000_000
 
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
@@ -53,11 +54,11 @@ SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8
 
 # =============================================================================
 # SELL_AFTER_LIST     = [0]
-# LOOKBACK_MAJOR_LIST = [1]
-# LOOKBACK_MINOR_LIST = [1]
+# LOOKBACK_MAJOR_LIST = [1]      
+# LOOKBACK_MINOR_LIST = [1] 
 # 
-# TP_PCT_LIST         = [3.5]
-# SL_PCT_LIST         = [3.5]
+# TP_PCT_LIST         = [8]
+# SL_PCT_LIST         = [10]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
@@ -106,7 +107,7 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
             arrs_minor = ohlcv_arrays_minor[sym]
             arrs_major = ohlcv_arrays_major[sym]
 
-            signal = explosive_signal_03(
+            signal = explosive_signal_tf(
                 high_mayor=arrs_major['high'],
                 close_mayor=arrs_major['close'],
                 high_menor=arrs_minor['high'],
@@ -147,12 +148,10 @@ elif TIMEFRAME_MINOR == '1H':
     factor = 4
 
 paths_major = {sym: derive_major_from_minor(paths_minor[sym], factor=factor) for sym in paths_minor.keys()}
-
 paths_major = {sym: derive_major_from_minor(paths_minor[sym], factor=factor) for sym in paths_minor.keys()}
 
 end_paths_time = time.time()
 print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time:.2f} seconds")
-
 
 # -----------------------------------------------------------------------------
 # EVALUATE MONTE CARLO PATHS
@@ -172,7 +171,7 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------------------------------------------------------
 # SUMMARY / REPORT
 # -----------------------------------------------------------------------------
-final_prints(strategy="🎰 MC_backtest 🎰", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(strategy=f"🎰 MC_{STRATEGY} 🎰", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
 

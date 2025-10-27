@@ -5,23 +5,22 @@ import numpy as np
 import pandas as pd
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, final_prints
-from Z_add_signals_03 import explosive_signal_03
+from Z_add_signals_tf import explosive_signal_tf
 from tools.ZX_WFO_tf import walk_forward_optimization_tf
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 
 start_time = time.time()
-
+N_JOBS            = -1
+STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_00
-MIN_VOL_USDT      = 10_000_000
-N_JOBS            = -1
-STRATEGY          = "trends_tf"
+TIMEFRAME_MINOR   = '1H'
+ORDER_AMOUNT      = 5_000
+MIN_VOL_USDT      = 1_000_000
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
@@ -81,7 +80,7 @@ def strategy_builder(params, base_arrays_minor, base_arrays_major):
         arr_minor = base_arrays_minor[sym]
         arr_major = base_arrays_major[sym]
         
-        signal = explosive_signal_03(
+        signal = explosive_signal_tf(
             high_mayor=arr_major['high'],
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],
@@ -119,9 +118,9 @@ def metric_fn_default(results):
 
     port            = results.get("__PORTFOLIO__", {}) 
     sharpe_ratio    = float(port.get('sharpe'))
-    net_gain        = np.sum(port.get('trades', []))
+    net_gain        = np.sum(port.get('trades'))
     net_gain_pct    = (net_gain / INITIAL_BALANCE) * 100.0 
-    dd_pct = float(port.get('max_dd', 0.0)) * 100.0
+    dd_pct          = float(port.get('max_dd')) * 100.0
     
     metric_score    = (net_gain_pct - 3*dd_pct)
     #metric_score    = net_gain_pct 
@@ -159,7 +158,7 @@ for sym in ohlcv_arr_minor.keys():
     arr_minor = ohlcv_arr_minor[sym]
     arr_major = ohlcv_arr_major[sym]
     
-    signal = explosive_signal_03(
+    signal = explosive_signal_tf(
         high_mayor=arr_major['high'],
         close_mayor=arr_major['close'],
         high_menor=arr_minor['high'],
@@ -187,7 +186,7 @@ grid_results_list  = [(param_values_tuple, final_results)]
 grid_records       = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df    = pd.DataFrame(grid_records)
 
-final_prints(f"🎯 WFO  {STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
+final_prints(f"🎯 WFO_{STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
 df_portfolio, mi_series = report_backtesting(grid_results_df, param_names, DATA_FOLDER, INITIAL_BALANCE)
 
 

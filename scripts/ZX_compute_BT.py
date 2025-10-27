@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore")
 
 MIN_PRICE       = 0.0001
 INITIAL_BALANCE = 10_000
-COMISION        = 0.06
+COMISION        = 0.08
 
 # ============================
 # prepare_data - 
@@ -45,13 +45,14 @@ def prepare_data(ohlcv_arrays):
         sym_data[sym] = {
             'ts': ts,
             'ts_int': ts_int,
+            'open': data['open'],
             'close': close_view,
-            'high': data.get('high'),
-            'low': data.get('low'),
+            'high': data['high'],
+            'low': data['low'],
             'signal': data['signal'],
             'len': len(ts),
-            'high_time': data.get('high_time'),
-            'low_time': data.get('low_time')
+            'high_time': data['high_time'],
+            'low_time': data['low_time']
         }
         
         # Referencias directas (evita lookups posteriores)
@@ -103,7 +104,7 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=Fals
     if tp_price is None and sl_price is None:
         return intravela_detected, chosen_idx, exit_reason, exec_price
 
-    start = buy_idx + 1
+    start = buy_idx #VELA
     end = sell_idx
     if end < start:
         return intravela_detected, chosen_idx, exit_reason, exec_price
@@ -336,7 +337,7 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
                         sym_data, counter, open_heap, tp_pct, sl_pct, is_short=False):
 
     d = sym_data[sym]
-    price_t = float(d['close'][buy_idx])
+    price_t = float(d['open'][buy_idx]) #OPEN
     qty = order_amount / price_t
 
     commission_buy = float(order_amount * comi_factor)

@@ -7,12 +7,11 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
-from Z_add_signals_01 import explosive_signal_01
+from Z_add_signals_99 import explosive_signal_99
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False
@@ -23,8 +22,8 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 DATA_FOLDER         = "data/crypto_2022_OOS"
-#DATA_FOLDER         = "data/crypto_2021_OOS"
-#DATA_FOLDER         = "data/crypto_2023_IS"
+DATA_FOLDER         = "data/crypto_2021_OOS"
+DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
@@ -41,12 +40,14 @@ TP_PCT_LIST        = [5,10,15,20]
 SL_PCT_LIST        = [5,10,15,20]
 
 # =============================================================================
-SELL_AFTER_LIST    = [30]
-ENTROPY_MAX_LIST   = [0.2]
-ACCEL_SPAN_LIST    = [5]
-
-TP_PCT_LIST        = [0]
-SL_PCT_LIST        = [10]
+# =============================================================================
+# SELL_AFTER_LIST    = [30]
+# ENTROPY_MAX_LIST   = [0.2]
+# ACCEL_SPAN_LIST    = [5]
+# 
+# TP_PCT_LIST        = [0]
+# SL_PCT_LIST        = [10]
+# =============================================================================
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -71,7 +72,7 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = explosive_signal_01(arrs['close'],
+        signal = explosive_signal_99(arrs['close'],
                                      m_accel=params.get('ACCEL_SPAN'),
                                      entropia_max=params.get('ENTROPY_MAX'),
                                      live=False)
