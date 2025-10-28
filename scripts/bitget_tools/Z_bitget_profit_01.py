@@ -1,10 +1,10 @@
 import os
 import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 from typing import List, Dict, Any
 from datetime import datetime
 from live_trading.ZX_connect_live import make_get_01
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.ZZ_connect import connect_bitget_01
 
 # -----------------------------
@@ -102,7 +102,7 @@ def calculate_winrate_from_history(history: List[Dict[str, Any]]):
 # -----------------------------
 if __name__ == "__main__":
 
-    start_date = "2025-10-24" 
+    start_date = "2025-10-26" 
     start_time = date_to_timestamp_ms(start_date)
     end_time   = int(datetime.now().timestamp() * 1000)
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
     final_capital     = get_usdt_balance_total(exchange)
     profitability_pct = ((final_capital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100 if INITIAL_CAPITAL > 0 else 0
-
+    print('\n01')
     print(f"\n💵 Initial capital    : {INITIAL_CAPITAL:.2f} USDT")
     print(f"💰 Final capital      : {final_capital:.2f} USDT")
     print(f"📊 Total profitability: {profitability_pct:.2f}%")

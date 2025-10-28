@@ -24,9 +24,10 @@ DATA_FOLDER         = "data/crypto_OOS"
 DATA_FOLDER         = "data/crypto_2022_OOS"
 DATA_FOLDER         = "data/crypto_2021_OOS"
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '6H'
+DATA_FOLDER         = "data/fixtimebars_parquet"
+TIMEFRAME           = '1H'
 ORDER_AMOUNT        = 500
-MIN_VOL_USDT        = 50_000
+MIN_VOL_USDT        = 5000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 

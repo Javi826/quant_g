@@ -48,7 +48,7 @@ def summarize_positions(positions: List[Dict[str, Any]]):
 if __name__ == "__main__":
     try:
         open_positions = get_open_positions_02(product_type="USDT-FUTURES")
-        print('\n03')
+        print('\n02')
         summarize_positions(open_positions)
     except Exception as e:
         print(f"\n⚠️ Fallen: {e}")
