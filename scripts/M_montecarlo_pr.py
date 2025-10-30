@@ -57,15 +57,13 @@ CLOSE_TOLERANCE_LIST= [5,10,15,20]
 TP_PCT_LIST         = [5,10,15,20,25,30,50]
 SL_PCT_LIST         = [5,10,15,20]
 
-# =============================================================================
-# SELL_AFTER_LIST     = [0]
-# FACTOR_LIST         = [1.0]
-# BODY_TOLERANCE_LIST = [40]
-# CLOSE_TOLERANCE_LIST= [20]
-# 
-# TP_PCT_LIST         = [20]
-# SL_PCT_LIST         = [20]
-# =============================================================================
+SELL_AFTER_LIST     = [0]
+FACTOR_LIST         = [1.0]
+BODY_TOLERANCE_LIST = [40]
+CLOSE_TOLERANCE_LIST= [20]
+
+TP_PCT_LIST         = [20]
+SL_PCT_LIST         = [20]
 
 param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

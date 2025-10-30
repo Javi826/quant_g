@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/live_trading/A_bit_get_01.py', 'scripts/live_trading/A_bit_get_03.py']
+recent_files = ['scripts/live_trading/A01__bit_trends_tf_1H.py', 'scripts/live_trading/A03_bit_trends_tf_4H.py', 'scripts/live_trading/B02_bit_trends_tf_6H.py', 'scripts/live_trading/B04_bit_trends_tf_12H.py']
 
 [main]
 version = 0.2.0

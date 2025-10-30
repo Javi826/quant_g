@@ -50,7 +50,7 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
 
     n_features     = data_array.shape[1]
     n_raw          = n_features - 6
-    n_features_out = 6 + n_raw
+    n_features_out = 7 + n_raw
 
     start_price     = float(df_features["open"].iloc[-1])
     start_timestamp = df_features.index[-1].value // 10**9
@@ -79,7 +79,15 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
         high_times = times + sampled[:, 5]
 
         # stack completo
-        base_cols = [open_prices, low_prices, high_prices, close_prices, low_times, high_times]
+        base_cols = [
+                open_prices, 
+                low_prices, 
+                high_prices, 
+                close_prices, 
+                low_times,      # Timestamp cuando ocurrió el low
+                high_times,     # Timestamp cuando ocurrió el high
+                times           # NUEVO: Timestamp de inicio de la vela
+            ]
         if n_raw > 0:
             for idx_col in range(n_raw):
                 base_cols.append(sampled[:, 6 + idx_col])
@@ -89,7 +97,6 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
 
 
 def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndarray:
-
     n_paths, n_obs, n_features = paths_minor.shape
     n_obs_major = n_obs // factor
     paths_major = np.empty((n_paths, n_obs_major, n_features), dtype=paths_minor.dtype)
@@ -97,16 +104,24 @@ def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndar
     for p in range(n_paths):
         path = paths_minor[p]
         for j in range(n_obs_major):
-            block = path[j*factor:(j+1)*factor]
-            if len(block) == 0:
-                continue
+            start_idx = j * factor
+            end_idx = (j + 1) * factor
+            block = path[start_idx:end_idx]
 
             open_ = block[0, 0]
-            low   = np.min(block[:, 1])
-            high  = np.max(block[:, 2])
             close = block[-1, 3]
-            low_t  = block[np.argmin(block[:, 1]), 4]
-            high_t = block[np.argmax(block[:, 2]), 5]
+
+            # High y low con timestamps CORRECTOS
+            high_idx = np.argmax(block[:, 2])
+            high = block[high_idx, 2]
+            high_t = block[high_idx, 5]  # Ya es timestamp absoluto
+
+            low_idx = np.argmin(block[:, 1])
+            low = block[low_idx, 1]
+            low_t = block[low_idx, 4]  # Ya es timestamp absoluto
+
+            # Timestamp del major = timestamp de inicio del bloque
+            major_timestamp = block[0, 6]  # Nueva columna 6
 
             paths_major[p, j, 0] = open_
             paths_major[p, j, 1] = low
@@ -114,9 +129,7 @@ def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndar
             paths_major[p, j, 3] = close
             paths_major[p, j, 4] = low_t
             paths_major[p, j, 5] = high_t
-
-            # si hay columnas extra, tomamos el promedio
-            if n_features > 6:
-                paths_major[p, j, 6:] = np.mean(block[:, 6:], axis=0)
+            paths_major[p, j, 6] = major_timestamp  # Timestamp del major
 
     return paths_major
+

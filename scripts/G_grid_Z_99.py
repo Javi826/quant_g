@@ -21,7 +21,8 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-
+DATA_FOLDER         = "data/crypto_OOS"
+DATA_FOLDER         = "data/crypto_2022_OOS"
 DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 500
@@ -39,14 +40,12 @@ TP_PCT_LIST        = [5,10,15,20,25]
 SL_PCT_LIST        = [5,10,15,20,25]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [30]
-# ENTROPY_MAX_LIST   = [0.2]
-# ACCEL_SPAN_LIST    = [5]
-# 
-# TP_PCT_LIST        = [0]
-# SL_PCT_LIST        = [10]
-# =============================================================================
+SELL_AFTER_LIST    = [30]
+ENTROPY_MAX_LIST   = [0.2]
+ACCEL_SPAN_LIST    = [5]
+
+TP_PCT_LIST        = [0]
+SL_PCT_LIST        = [10]
 # =============================================================================
 
 param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
@@ -110,7 +109,6 @@ save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"gri
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME}.xlsx", save=False)
 
 final_prints(strategy=f" 🥇 Grid_Backest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
-
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)

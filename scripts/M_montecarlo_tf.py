@@ -25,7 +25,7 @@ STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '12Hutc'
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
@@ -54,16 +54,16 @@ SELL_AFTER_LIST     = [0]
 LOOKBACK_MAJOR_LIST = [1,2,3,4]      
 LOOKBACK_MINOR_LIST = [1,2,3,4] 
 
-TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
+TP_PCT_LIST         = [2.5,5,10,15,20,25,30]
+SL_PCT_LIST         = [2.5,5,10,15,20]
 
 # =============================================================================
 # SELL_AFTER_LIST     = [0]
-# LOOKBACK_MAJOR_LIST = [1]      
+# LOOKBACK_MAJOR_LIST = [2]      
 # LOOKBACK_MINOR_LIST = [1] 
 # 
-# TP_PCT_LIST         = [10]
-# SL_PCT_LIST         = [10]
+# TP_PCT_LIST         = [15]
+# SL_PCT_LIST         = [30]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
@@ -83,6 +83,11 @@ ohlcv_data_minor, filtered_minor = filter_symbols(
     min_price=MIN_PRICE,
     vol_window=50
 )
+
+def tf_to_pandas_freq(tf):
+    tf = tf.lower().replace("utc", "")
+    return tf.upper()
+
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -111,15 +116,18 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
             arr_minor = ohlcv_arrays_minor[sym]
             arr_major = ohlcv_arrays_major[sym]
 
+            ts_minor = pd.date_range("2023-01-01", periods=len(arr_minor['close']), freq=tf_to_pandas_freq(TIMEFRAME_MINOR))
+            ts_major = pd.date_range("2023-01-01", periods=len(arr_major['close']), freq=tf_to_pandas_freq(TIMEFRAME_MAJOR))
+
             signal = explosive_signal_tf(
                 high_mayor=arr_major['high'],
                 close_mayor=arr_major['close'],
                 high_menor=arr_minor['high'],
                 close_menor=arr_minor['close'],
-                low_mayor=arr_major['low'],
-                low_menor=arr_minor['low'],
                 lookback_mayor=param_dict.get('LOOKBACK_MAJOR'),
                 lookback_menor=param_dict.get('LOOKBACK_MINOR'),
+                index_mayor=ts_major,
+                index_menor=ts_minor,
                 live=False
             )
 
@@ -137,6 +145,9 @@ def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
         all_results.append(portfolio_record)
 
     return all_results
+
+    return all_results
+
 
 
 def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
@@ -181,7 +192,7 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------------------------------------------------------
 # SUMMARY / REPORT
 # -----------------------------------------------------------------------------
-final_prints(strategy=f"🎰 MC_{STRATEGY} 🎰", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(f"🎰 MC_{STRATEGY} 🎰", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)

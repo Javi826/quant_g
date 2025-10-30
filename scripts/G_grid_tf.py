@@ -26,9 +26,10 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
 DATA_FOLDER       = "data/crypto_2022_OOS"
-DATA_FOLDER       = "data/crypto_2023_IS"
+#DATA_FOLDER       = "data/crypto_2021_OOS"
+#DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '1H'
 
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
@@ -37,20 +38,18 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3]      
+LOOKBACK_MINOR_LIST = [1,2,3] 
 
-TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
+TP_PCT_LIST         = [5,10,15,20,25,30]
+SL_PCT_LIST         = [5,10,15,20]
 
-# =============================================================================
-# SELL_AFTER_LIST     = [0]
-# LOOKBACK_MAJOR_LIST = [1]      
-# LOOKBACK_MINOR_LIST = [1] 
-# 
-# TP_PCT_LIST         = [8]
-# SL_PCT_LIST         = [8]
-# =============================================================================
+SELL_AFTER_LIST     = [0]
+LOOKBACK_MAJOR_LIST = [2]      
+LOOKBACK_MINOR_LIST = [1] 
+
+TP_PCT_LIST         = [15]
+SL_PCT_LIST         = [20]
 
 param_names = ['SELL_AFTER','LOOKBACK_MAJOR','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 lists_for_grid = [SELL_AFTER_LIST, LOOKBACK_MAJOR_LIST, LOOKBACK_MINOR_LIST, TP_PCT_LIST, SL_PCT_LIST]
@@ -97,7 +96,6 @@ def process_combo(comb):
             live=False
         )
 
-
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signal}
 
     results = run_grid_backtest(
@@ -130,7 +128,7 @@ grid_results_df = pd.DataFrame(grid_records)
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 
-final_prints(strategy=f" 🥇Grid_{STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME_MINOR, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

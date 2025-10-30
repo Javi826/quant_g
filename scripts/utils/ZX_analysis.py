@@ -17,7 +17,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
 
     
     df = df.copy()
-
+    print(data_folder)
     # -----------------------------
     # Métricas derivadas
     # -----------------------------

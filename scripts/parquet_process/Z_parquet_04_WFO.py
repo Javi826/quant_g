@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 BASE_DIR          = Path(__file__).resolve().parent.parent  
 input_folder      = BASE_DIR / "data" / "crypto_2021_highlow"
 output_folder_is  = BASE_DIR / "data" / "crypto_2021_OOS"
-output_folder_oos = BASE_DIR / "data" / "crypto_XNN_OOS"
+output_folder_oos = BASE_DIR / "data" / "cryptoXXX"
 
 # Date range for IN-SAMPLE (IS)
 IS_START = "2021-01-01"

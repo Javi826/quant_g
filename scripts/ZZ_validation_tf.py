@@ -85,9 +85,11 @@ def explosive_signal_tf(
 if __name__ == "__main__":
     # --- Timeframe mayor 1D (solo 3 días) ---
     major_data = [
-        ["2025-10-20", 100, 100],
-        ["2025-10-21", 100, 150],
-        ["2025-10-22", 100, 100],
+        ["2025-10-18", 100, 100], #0
+        ["2025-10-19", 100, 100], #0
+        ["2025-10-20", 100, 105], #0
+        ["2025-10-21", 100, 100], #1
+        ["2025-10-22", 100, 100], #2
     ]
     
     # Convertir a arrays como antes
@@ -97,24 +99,32 @@ if __name__ == "__main__":
 
     # --- Timeframe menor 4H ---
     minor_data = [
-        ["2025-10-20 04:00", 100, 100],
-        ["2025-10-20 08:00", 100, 100],
-        ["2025-10-20 12:00", 100, 100],
-        ["2025-10-20 16:00", 100, 100],
-        ["2025-10-20 20:00", 100, 100],
-        ["2025-10-21 00:00", 100, 100],
-        ["2025-10-21 04:00", 100, 100],
-        ["2025-10-21 08:00", 100, 100],
-        ["2025-10-21 12:00", 100, 100],
-        ["2025-10-21 16:00", 100, 100],
-        ["2025-10-21 20:00", 100, 105],
-        ["2025-10-22 00:00", 100, 100],
-        ["2025-10-22 04:00", 100, 100],
-        ["2025-10-22 08:00", 100, 100],
-        ["2025-10-22 12:00", 100, 100],
-        ["2025-10-22 16:00", 100, 100],
-        ["2025-10-22 20:00", 100, 100],
+        ["2025-10-19 00:00", 100, 100],  # 0
+        ["2025-10-19 04:00", 100, 100],  # 0
+        ["2025-10-19 08:00", 100, 100],  # 1
+        ["2025-10-19 12:00", 100, 100],  # 2
+        ["2025-10-19 16:00", 100, 100],  # 3
+        ["2025-10-19 20:00", 200, 100],  # 4
+        ["2025-10-20 00:00", 200, 100],  # 0
+        ["2025-10-20 04:00", 200, 105],  # 0
+        ["2025-10-20 08:00", 100, 105],  # 1
+        ["2025-10-20 12:00", 100, 105],  # 2
+        ["2025-10-20 16:00", 100, 100],  # 3
+        ["2025-10-20 20:00", 100, 100],  # 4
+        ["2025-10-21 00:00", 100, 100],  # 5
+        ["2025-10-21 04:00", 100, 105],  # 6
+        ["2025-10-21 08:00", 100, 100],  # 7
+        ["2025-10-21 12:00", 100, 100],  # 8
+        ["2025-10-21 16:00", 100, 100],  # 9
+        ["2025-10-21 20:00", 100, 100],  # 10
+        ["2025-10-22 00:00", 100, 100],  # 11
+        ["2025-10-22 04:00", 100, 100],  # 12
+        ["2025-10-22 08:00", 100, 100],  # 13
+        ["2025-10-22 12:00", 100, 100],  # 14
+        ["2025-10-22 16:00", 100, 100],  # 15
+        ["2025-10-22 20:00", 100, 100],  # 16
     ]
+
     
     # Convertir a numpy arrays separados si quieres usarlo igual que antes
     ts_menor = pd.to_datetime([row[0] for row in minor_data])
@@ -127,7 +137,7 @@ if __name__ == "__main__":
     res = explosive_signal_tf(
         high_mayor=high_mayor, close_mayor=close_mayor,
         high_menor=high_menor, close_menor=close_menor,
-        lookback_mayor=1, lookback_menor=1,
+        lookback_mayor=1, lookback_menor=5,
         index_mayor=ts_mayor, index_menor=ts_menor
     )
 
@@ -141,15 +151,15 @@ if __name__ == "__main__":
     # --- PRINT 1: Major ---
     print("=== Señales MAJOR (1D) ===")
     for j, ts in enumerate(ts_major):
-        print(f"{j:02d} | {ts.strftime('%Y-%m-%d')} | signal_major = {int(signal_major_array[j])}")
+        print(f"{j:02d} | {ts.strftime('%Y-%m-%d')} | signal_major = {int(signal_major_array[j])}  # {j}")
     print()
-
+    
     # --- PRINT 2: Minor ---
     print("=== Señales MINOR (4H) ===")
     for i, ts in enumerate(ts_minor):
-        print(f"{i:02d} | {ts.strftime('%Y-%m-%d %H:%M')} | signal_minor = {int(signal_minor_array[i])}")
+        print(f"{i:02d} | {ts.strftime('%Y-%m-%d %H:%M')} | signal_minor = {int(signal_minor_array[i])}  # {i}")
     print()
-
+    
     # --- PRINT 3: Asociaciones correctas (major primero) ---
     print("=== Asociaciones (major timestamp, minor timestamp, signal_major, signal_minor, signal_combinada) ===")
     for i, ts_minor_val in enumerate(ts_minor):
@@ -164,4 +174,4 @@ if __name__ == "__main__":
         ts_minor_str = ts_minor_val.strftime('%Y-%m-%d %H:%M')
         sig_minor = int(signal_minor_array[i])
         sig_comb = int(final_signal_minor[i])
-        print(f"major_ts={ts_major_str:10s} | minor_ts={ts_minor_str} | sig_major={sig_major} | sig_minor={sig_minor} | sig_comb={sig_comb}")
+        print(f"{i:02d} | major_ts={ts_major_str:10s} | minor_ts={ts_minor_str} | sig_major={sig_major} | sig_minor={sig_minor} | sig_comb={sig_comb}")

@@ -1,209 +1,119 @@
+# ============================================================
+# TEST DE SINCRONIZACIÓN Y SEÑALES PARA EXPLOSIVE_SIGNAL_TF
+# ============================================================
+
+import os
+import time
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from itertools import product
+from utils.ZX_utils import filter_symbols
+from ZX_compute_BT import MIN_PRICE
+from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
+from Z_add_signals_tf import explosive_signal_tf
 
-def explosive_signal_tf(high_mayor, close_mayor, high_menor, close_menor, 
-                        low_mayor, low_menor, 
-                        lookback_mayor, lookback_menor, live=False):
-    """Señales LONG con shift(1) en timeframe mayor y menor"""
+# -----------------------------------------------------------
+# CONFIGURACIÓN BÁSICA (igual que el main)
+# -----------------------------------------------------------
+DTYPE             = np.float32
+DATA_FOLDER       = "data/crypto_2023_IS"
+TIMEFRAME_MAJOR   = "1Dutc"
+TIMEFRAME_MINOR   = "12Hutc"
+MIN_VOL_USDT      = 100_000_000
+FINAL_N_PATHS     = 2
+FINAL_N_OBS_PER_PATH = 360  # para 12Hutc
+N_JOBS = -1
 
-    # Señales individuales
-    signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
-    signal_menor = np.zeros_like(close_menor, dtype=np.int8)
+# -----------------------------------------------------------
+# CARGA Y FILTRA DATOS
+# -----------------------------------------------------------
+symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER)
+                 if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-    # Timeframe mayor
-    n_mayor = len(close_mayor)
-    for i in range(lookback_mayor, n_mayor):
-        window = high_mayor[i-lookback_mayor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_mayor[i] > max_window:
-                signal_mayor[i] = 1
+ohlcv_data_minor, filtered_minor = filter_symbols(
+    symbols_minor,
+    min_vol_usdt=MIN_VOL_USDT,
+    timeframe=TIMEFRAME_MINOR,
+    data_folder=DATA_FOLDER,
+    min_price=MIN_PRICE,
+    vol_window=50
+)
 
-    # Timeframe menor
-    n_menor = len(close_menor)
-    for i in range(lookback_menor, n_menor):
-        window = high_menor[i-lookback_menor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_menor[i] > max_window:
-                signal_menor[i] = 1
+if not ohlcv_data_minor:
+    raise ValueError("No se cargaron símbolos, revisa el filtro de volumen o la carpeta de datos.")
 
-    # Shift(1) en ambos timeframes si no es en tiempo real
-    if not live:
-        # Shift mayor
-        signal_shifted_mayor = np.empty_like(signal_mayor)
-        signal_shifted_mayor[0] = 0
-        signal_shifted_mayor[1:] = signal_mayor[:-1]
-        signal_mayor = signal_shifted_mayor
+symbol = list(ohlcv_data_minor.keys())[0]
+df_hist = ohlcv_data_minor[symbol]
+print(f"\n📊 Usando símbolo: {symbol}, {len(df_hist)} velas")
 
-        # Shift menor
-        signal_shifted_menor = np.empty_like(signal_menor)
-        signal_shifted_menor[0] = 0
-        signal_shifted_menor[1:] = signal_menor[:-1]
-        signal_menor = signal_shifted_menor
+# -----------------------------------------------------------
+# GENERACIÓN DE MONTECARLO Y DERIVACIÓN DE MAYOR
+# -----------------------------------------------------------
+paths_minor = generate_multiple_paths(df_hist, n_paths=FINAL_N_PATHS, n_obs=FINAL_N_OBS_PER_PATH)
+print(f"✅ paths_minor.shape = {paths_minor.shape}")
 
-    # Combinación multi-timeframe usando ambas señales shiftadas
-    factor = len(close_menor) // len(close_mayor)
-    signal_final = np.zeros_like(close_menor, dtype=np.int8)
+factor = 2  # 12H → 1D
+paths_major = derive_major_from_minor(paths_minor, factor=factor)
+print(f"✅ paths_major.shape = {paths_major.shape}")
 
-    for i, s_menor in enumerate(signal_menor):
-        idx_mayor = i // factor
-        if idx_mayor < len(signal_mayor) and s_menor == 1 and signal_mayor[idx_mayor] == 1:
-            signal_final[i] = 1
+# -----------------------------------------------------------
+# SELECCIONAR UN PATH Y EXTRAER ARRAYS
+# -----------------------------------------------------------
+path_idx = 0
+arr_minor = paths_minor[path_idx]
+arr_major = paths_major[path_idx]
 
-    return signal_final
+# Extraemos columnas
+open_menor, low_menor, high_menor, close_menor = arr_minor[:, 0], arr_minor[:, 1], arr_minor[:, 2], arr_minor[:, 3]
+open_mayor, low_mayor, high_mayor, close_mayor = arr_major[:, 0], arr_major[:, 1], arr_major[:, 2], arr_major[:, 3]
 
+ts_menor = pd.to_datetime(arr_minor[:, 6], unit='s')
+ts_mayor = pd.to_datetime(arr_major[:, 6], unit='s')
 
-def explosive_signal_tf_corrected(high_mayor, close_mayor, high_menor, close_menor, 
-                                  low_mayor, low_menor, timestamp_mayor, timestamp_menor, 
-                                  lookback_mayor, lookback_menor, live=False):
-    """Versión corregida sin lookahead bias"""
-    signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
-    signal_menor = np.zeros_like(close_menor, dtype=np.int8)
-    
-    n_mayor = len(close_mayor)
-    for i in range(lookback_mayor, n_mayor):
-        window = high_mayor[i-lookback_mayor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_mayor[i] > max_window:
-                signal_mayor[i] = 1
-    
-    n_menor = len(close_menor)
-    for i in range(lookback_menor, n_menor):
-        window = high_menor[i-lookback_menor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_menor[i] > max_window:
-                signal_menor[i] = 1
-    
-    ts_mayor = pd.Series(timestamp_mayor)
-    ts_menor = pd.Series(timestamp_menor)
-    signal_final = np.zeros_like(close_menor, dtype=np.int8)
-    
-    for i, ts in enumerate(ts_menor):
-        # CORRECCIÓN: Buscar la última vela COMPLETAMENTE CERRADA del TF mayor
-        # side='left' nos da la vela que contiene ts, restamos 1 para la anterior
-        idx_mayor = ts_mayor.searchsorted(ts, side='left') - 1
-        
-        if idx_mayor >= 0:
-            # Ahora usamos la vela anterior que ya está cerrada
-            if signal_menor[i] == 1 and signal_mayor[idx_mayor] == 1:
-                signal_final[i] = 1
-    
-    if not live:
-        signal_shifted = np.zeros_like(signal_final)
-        signal_shifted[1:] = signal_final[:-1]
-        signal_final = signal_shifted
-    
-    return signal_final
+print("\n🕒 Rangos de tiempo:")
+print(f"Minor: {ts_menor.min()} → {ts_menor.max()}  ({len(ts_menor)} velas)")
+print(f"Major: {ts_mayor.min()} → {ts_mayor.max()}  ({len(ts_mayor)} velas)")
 
+# -----------------------------------------------------------
+# TEST DE SEÑALES
+# -----------------------------------------------------------
+lookback_mayor = 1
+lookback_menor = 1
 
-def test_lookahead_bias():
-    """Test que demuestra el lookahead bias"""
-    print("=" * 80)
-    print("TEST DE LOOKAHEAD BIAS EN SEÑAL MULTI-TIMEFRAME")
-    print("=" * 80)
-    
-    # Crear datos sintéticos: TF mayor = 1H, TF menor = 15min
-    start = datetime(2024, 1, 1, 0, 0)
-    
-    # TF Mayor (1H) - 10 velas
-    timestamps_mayor = [start + timedelta(hours=i) for i in range(10)]
-    high_mayor = np.array([110, 108, 106, 104, 102, 115, 113, 111, 109, 107])
-    close_mayor = np.array([105, 103, 101, 99, 97, 110, 108, 106, 104, 102])
-    low_mayor = np.array([100, 98, 96, 94, 92, 105, 103, 101, 99, 97])
-    
-    # TF Menor (15min) - 4 velas por hora = 40 velas
-    timestamps_menor = [start + timedelta(minutes=15*i) for i in range(40)]
-    high_menor = np.concatenate([
-        [109, 108, 107, 106],  # Hora 0
-        [107, 106, 105, 104],  # Hora 1
-        [105, 104, 103, 102],  # Hora 2
-        [103, 102, 101, 100],  # Hora 3
-        [101, 100, 99, 98],    # Hora 4
-        [114, 113, 112, 120],  # Hora 5 - SEÑAL SE GENERA AQUÍ
-        [118, 117, 116, 115],  # Hora 6
-        [116, 115, 114, 113],  # Hora 7
-        [114, 113, 112, 111],  # Hora 8
-        [112, 111, 110, 109],  # Hora 9
-    ])
-    close_menor = high_menor - 2
-    low_menor = high_menor - 5
-    
-    # Ejecutar ambas versiones
-    signal_original = explosive_signal_tf(
-        high_mayor, close_mayor, high_menor, close_menor,
-        low_mayor, low_menor, timestamps_mayor, timestamps_menor,
-        lookback_mayor=5, lookback_menor=5, live=False
-    )
-    
-    signal_corrected = explosive_signal_tf_corrected(
-        high_mayor, close_mayor, high_menor, close_menor,
-        low_mayor, low_menor, timestamps_mayor, timestamps_menor,
-        lookback_mayor=5, lookback_menor=5, live=False
-    )
-    
-    # Análisis detallado
-    print("\n📊 ANÁLISIS DE VELAS DEL TIMEFRAME MAYOR (1H)")
-    print("-" * 80)
-    for i, ts in enumerate(timestamps_mayor):
-        print(f"Vela {i}: {ts.strftime('%Y-%m-%d %H:%M')} | "
-              f"H={high_mayor[i]:>3} C={close_mayor[i]:>3} L={low_mayor[i]:>3}")
-    
-    print("\n📊 ANÁLISIS CRÍTICO: Hora 5 (Vela índice 23 del TF menor)")
-    print("-" * 80)
-    hora_5_idx = 20  # Inicio de hora 5
-    print(f"\nVelas del TF menor en hora 5 (índices {hora_5_idx} a {hora_5_idx+3}):")
-    for i in range(hora_5_idx, hora_5_idx + 4):
-        ts = timestamps_menor[i]
-        print(f"  Vela {i}: {ts.strftime('%Y-%m-%d %H:%M')} | "
-              f"H={high_menor[i]:>3} C={close_menor[i]:>3}")
-    
-    print(f"\n⚠️  PROBLEMA DE LOOKAHEAD BIAS:")
-    print(f"  • La vela 23 (15:45) está DENTRO de la hora 5")
-    print(f"  • La vela del TF mayor (hora 5) NO HA CERRADO todavía")
-    print(f"  • Pero el código original usa searchsorted(side='right')-1")
-    print(f"  • Esto devuelve idx_mayor=5 (la vela EN FORMACIÓN)")
-    
-    # Verificar qué índice devuelve cada método
-    ts_test = timestamps_menor[23]  # Vela a las 15:45 (dentro de hora 5)
-    ts_mayor_series = pd.Series(timestamps_mayor)
-    
-    idx_original = ts_mayor_series.searchsorted(ts_test, side='right') - 1
-    idx_corrected = ts_mayor_series.searchsorted(ts_test, side='left') - 1
-    
-    print(f"\n🔍 COMPARACIÓN DE ÍNDICES para vela menor en {ts_test.strftime('%H:%M')}:")
-    print(f"  • Método ORIGINAL (side='right')-1: {idx_original} → Vela {timestamps_mayor[idx_original].strftime('%H:%M')} (EN FORMACIÓN ❌)")
-    print(f"  • Método CORREGIDO (side='left')-1: {idx_corrected} → Vela {timestamps_mayor[idx_corrected].strftime('%H:%M')} (CERRADA ✓)")
-    
-    # Mostrar señales
-    print("\n📈 SEÑALES GENERADAS:")
-    print("-" * 80)
-    original_signals = np.where(signal_original == 1)[0]
-    corrected_signals = np.where(signal_corrected == 1)[0]
-    
-    print(f"Señales ORIGINALES (con lookahead bias): {len(original_signals)} señales")
-    for idx in original_signals:
-        print(f"  → Vela {idx}: {timestamps_menor[idx].strftime('%Y-%m-%d %H:%M')}")
-    
-    print(f"\nSeñales CORREGIDAS (sin lookahead bias): {len(corrected_signals)} señales")
-    for idx in corrected_signals:
-        print(f"  → Vela {idx}: {timestamps_menor[idx].strftime('%Y-%m-%d %H:%M')}")
-    
-    # Conclusión
-    print("\n" + "=" * 80)
-    print("🎯 CONCLUSIÓN:")
-    print("=" * 80)
-    print("✓ SÍ HAY LOOKAHEAD BIAS en la versión original")
-    print("✓ El problema está en usar searchsorted(side='right')-1")
-    print("✓ Esto hace que uses datos de la vela mayor que AÚN NO HA CERRADO")
-    print("\n📋 SOLUCIÓN:")
-    print("  Usa searchsorted(side='left')-1 para obtener la última vela COMPLETAMENTE CERRADA")
-    print("  O en live mode, verifica que solo uses velas completadas del TF mayor")
-    print("=" * 80)
+signal = explosive_signal_tf(
+    high_mayor=high_mayor,
+    close_mayor=close_mayor,
+    high_menor=high_menor,
+    close_menor=close_menor,
+    lookback_mayor=lookback_mayor,
+    lookback_menor=lookback_menor,
+    index_mayor=ts_mayor,
+    index_menor=ts_menor,
+    live=False
+)
 
+# -----------------------------------------------------------
+# VALIDACIONES / PRINTS DETALLADOS
+# -----------------------------------------------------------
+print("\n📈 Señales generadas:")
+print(f"Total = {len(signal)} | Señales = {np.sum(signal)} | Porcentaje = {100*np.mean(signal):.2f}%")
 
-if __name__ == "__main__":
-    test_lookahead_bias()
+print("\n🔍 Muestras de señal (índices y timestamps donde signal==1):")
+idxs = np.where(signal == 1)[0]
+if len(idxs) > 0:
+    for idx in idxs[:10]:
+        print(f"  idx={idx}  ts={ts_menor[idx]}  close_menor={close_menor[idx]:.2f}")
+else:
+    print("❌ Ninguna señal encontrada")
+
+# -----------------------------------------------------------
+# DEPURACIÓN ADICIONAL (comprobar coincidencias mayor-menor)
+# -----------------------------------------------------------
+print("\n🧠 Depuración de sincronización:")
+for i in range(0, len(ts_menor), len(ts_menor)//5):
+    ts_minor_now = ts_menor[i]
+    idx_major = np.where(ts_mayor + pd.Timedelta(hours=24) <= ts_minor_now)[0]
+    last_idx = idx_major[-1] if len(idx_major) > 0 else None
+    print(f"Minor[{i}]={ts_minor_now}, Última major cerrada idx={last_idx}")
+
+print("\n✅ Test finalizado correctamente.")

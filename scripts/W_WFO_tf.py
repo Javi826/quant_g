@@ -19,7 +19,7 @@ STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '12Hutc'
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
@@ -45,11 +45,11 @@ elif TIMEFRAME_MINOR == '1Dutc':
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3]      
+LOOKBACK_MINOR_LIST = [1,2,3] 
 
-TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
+TP_PCT_LIST         = [5,10,15,20,25,30]
+SL_PCT_LIST         = [5,10,15,20]
 
 # =============================================================================
 # SELL_AFTER_LIST     = [0]
@@ -101,6 +101,8 @@ def strategy_builder(params, base_arrays_minor, base_arrays_major):
             close_menor=arr_minor['close'],
             lookback_mayor=params.get('LOOKBACK_MAJOR'),
             lookback_menor=params.get('LOOKBACK_MINOR'),
+            index_mayor=arr_major['ts'],   
+            index_menor=arr_minor['ts'],   
             live=False
         )
         
@@ -172,6 +174,10 @@ for sym in ohlcv_arr_minor.keys():
     arr_minor = ohlcv_arr_minor[sym]
     arr_major = ohlcv_arr_major[sym]
     
+    # Asegurarse de que los timestamps sean pd.Timestamp
+    ts_minor = pd.to_datetime(arr_minor['ts'])
+    ts_major = pd.to_datetime(arr_major['ts'])
+    
     signal = explosive_signal_tf(
         high_mayor=arr_major['high'],
         close_mayor=arr_major['close'],
@@ -179,6 +185,8 @@ for sym in ohlcv_arr_minor.keys():
         close_menor=arr_minor['close'],
         lookback_mayor=best_params_wfo['LOOKBACK_MAJOR'],
         lookback_menor=best_params_wfo['LOOKBACK_MINOR'],
+        index_mayor=ts_major,
+        index_menor=ts_minor,
         live=False
     )
     
