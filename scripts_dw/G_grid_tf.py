@@ -23,32 +23,31 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER       = "data/crypto_OOS"
-#DATA_FOLDER       = "data/crypto_2022_OOS"
-#DATA_FOLDER       = "data/crypto_2023_IS"
-DATA_FOLDER       = "data/fixtimebars"
+DATA_FOLDER       = "data/darwinex_parquet"
 TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '12H'
+TIMEFRAME_MINOR   = '4H'
 
-ORDER_AMOUNT      = 5_000
+ORDER_AMOUNT      = 5_00
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3,4]      
-LOOKBACK_MINOR_LIST = [1,2,3,4] 
+LOOKBACK_MAJOR_LIST = [1,2,3,4,5]      
+LOOKBACK_MINOR_LIST = [1,2,3,4,5] 
 
-TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
+TP_PCT_LIST         = [3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0]
+SL_PCT_LIST         = [3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0]
 
-SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1]      
-LOOKBACK_MINOR_LIST = [1] 
-
-TP_PCT_LIST         = [4]
-SL_PCT_LIST         = [3]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]
+# LOOKBACK_MAJOR_LIST = [1]      
+# LOOKBACK_MINOR_LIST = [1] 
+# 
+# TP_PCT_LIST         = [4]
+# SL_PCT_LIST         = [3]
+# =============================================================================
 
 param_names = ['SELL_AFTER','LOOKBACK_MAJOR','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 lists_for_grid = [SELL_AFTER_LIST, LOOKBACK_MAJOR_LIST, LOOKBACK_MINOR_LIST, TP_PCT_LIST, SL_PCT_LIST]

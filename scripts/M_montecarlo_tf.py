@@ -14,20 +14,20 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
 from Z_add_signals_tf import explosive_signal_tf
-from Z_add_signals_tf import explosive_signal_tf_short
+#from Z_add_signals_tf import explosive_signal_tf_short
 
-DTYPE = np.float32
-start_time = time.time()
+DTYPE             = np.float32
+start_time        = time.time()
 N_JOBS            = -1
 STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '1H'
+TIMEFRAME_MAJOR   = '1Dutc'
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 5_000
-MIN_VOL_USDT      = 1_000_000
+MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
@@ -38,11 +38,11 @@ if TIMEFRAME_MINOR == '1H':
     FINAL_N_OBS_PER_PATH = 4000
 elif TIMEFRAME_MINOR == '4H':
     FINAL_N_OBS_PER_PATH = 1000
-elif TIMEFRAME_MINOR == '6H':
+elif TIMEFRAME_MINOR == '6Hutc':
     FINAL_N_OBS_PER_PATH = 720
-elif TIMEFRAME_MINOR == '12H':
+elif TIMEFRAME_MINOR == '12Hutc':
     FINAL_N_OBS_PER_PATH = 360
-elif TIMEFRAME_MINOR == '1D':
+elif TIMEFRAME_MINOR == '1Dutc':
     FINAL_N_OBS_PER_PATH = 180
 
 TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
@@ -51,8 +51,8 @@ TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3]      
-LOOKBACK_MINOR_LIST = [1,2,3] 
+LOOKBACK_MAJOR_LIST = [1,2,3,4]      
+LOOKBACK_MINOR_LIST = [1,2,3,4] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
@@ -62,8 +62,8 @@ SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8
 # LOOKBACK_MAJOR_LIST = [1]      
 # LOOKBACK_MINOR_LIST = [1] 
 # 
-# TP_PCT_LIST         = [3]
-# SL_PCT_LIST         = [2]
+# TP_PCT_LIST         = [10]
+# SL_PCT_LIST         = [10]
 # =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
@@ -94,7 +94,6 @@ def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_co
         if arr_paths is not None and arr_paths.shape[0] > 0:
             paths_per_symbol[symbol] = arr_paths
     return paths_per_symbol
-
 
 def process_path_IDX(path_idx, paths_minor, paths_major, param_dict_list):
     all_results = []
@@ -148,14 +147,14 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # GENERATE PATHS FOR MINOR TIMEFRAME AND DERIVE MAJOR
 # -----------------------------------------------------------------------------
 start_paths_time = time.time()
-paths_minor = generate_paths_for_all_symbols_functional(ohlcv_data_minor, n_paths=FINAL_N_PATHS, n_obs=FINAL_N_OBS_PER_PATH)
+paths_minor      = generate_paths_for_all_symbols_functional(ohlcv_data_minor, n_paths=FINAL_N_PATHS, n_obs=FINAL_N_OBS_PER_PATH)
 if TIMEFRAME_MINOR == '1H':
     factor = 24
 elif TIMEFRAME_MINOR == '4H':
     factor = 6
-elif TIMEFRAME_MINOR == '6H':
+elif TIMEFRAME_MINOR == '6Hutc':
     factor =  4    
-elif TIMEFRAME_MINOR == '12H':
+elif TIMEFRAME_MINOR == '12Hutc':
     factor =  2   
 
 paths_major = {sym: derive_major_from_minor(paths_minor[sym], factor=factor) for sym in paths_minor.keys()}
@@ -168,7 +167,7 @@ print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time
 # EVALUATE MONTE CARLO PATHS
 # -----------------------------------------------------------------------------
 start_eval_time = time.time()
-results_list = parallel_with_progress(
+results_list    = parallel_with_progress(
     [delayed(process_path_IDX)(path_idx, paths_minor, paths_major, param_dict_list)
      for path_idx in range(FINAL_N_PATHS)],
     desc="\n🔁 Evaluating Paths_IDX"

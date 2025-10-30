@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
@@ -20,25 +21,22 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
-DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2021_OOS"
+
 DATA_FOLDER         = "data/crypto_2023_IS"
-DATA_FOLDER         = "data/fixtimebars_parquet"
-TIMEFRAME           = '1H'
+TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 500
-MIN_VOL_USDT        = 5000_000
+MIN_VOL_USDT        = 500_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0]
-ACCEL_SPAN_LIST    = [5,10,15,20,25]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0,1.2,1.4]
+ACCEL_SPAN_LIST    = [5,10,15,20,25,30,35]
 
-TP_PCT_LIST        = [5,10,15,20]
-SL_PCT_LIST        = [5,10,15,20]
+TP_PCT_LIST        = [5,10,15,20,25]
+SL_PCT_LIST        = [5,10,15,20,25]
 
 # =============================================================================
 # =============================================================================

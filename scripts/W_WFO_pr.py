@@ -17,10 +17,10 @@ N_JOBS              = -1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '12H'
+TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
-ORDER_AMOUNT        = 5000
+ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -32,11 +32,11 @@ if TIMEFRAME == '1H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 24)   
 elif TIMEFRAME == '4H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 6)  
-elif TIMEFRAME == '6H':
+elif TIMEFRAME == '6Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 4)    
-elif TIMEFRAME == '12H':
+elif TIMEFRAME == '12Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 2)   
-elif TIMEFRAME == '1D':
+elif TIMEFRAME == '1Dutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365)        
 
 # -----------------------------------------------------------------------------
@@ -50,13 +50,15 @@ CLOSE_TOLERANCE_LIST= [5,10,15,20]
 TP_PCT_LIST         = [5,10,15,20,25,30,50]
 SL_PCT_LIST         = [5,10,15,20]
 
-SELL_AFTER_LIST     = [0]
-FACTOR_LIST         = [1.0]
-BODY_TOLERANCE_LIST = [40]
-CLOSE_TOLERANCE_LIST= [20]
-
-TP_PCT_LIST         = [20]
-SL_PCT_LIST         = [20]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]
+# FACTOR_LIST         = [1.0]
+# BODY_TOLERANCE_LIST = [40]
+# CLOSE_TOLERANCE_LIST= [20]
+# 
+# TP_PCT_LIST         = [20]
+# SL_PCT_LIST         = [20]
+# =============================================================================
 
 
 param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']

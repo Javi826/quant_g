@@ -22,20 +22,20 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
 #DATA_FOLDER         = "data/fixtimebars_parquet"
-TIMEFRAME           = '1H'
+TIMEFRAME           = '1Dutc'
 ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
-ORDER_AMOUNT        = 5_00
-MIN_VOL_USDT        = 100_000_000
+ORDER_AMOUNT        = 5_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST     = [0]
-FACTOR_LIST         = [0.5,1,1.5,2.0,2.5]
+FACTOR_LIST         = [1,1.5,2.0,2.5]
 BODY_TOLERANCE_LIST = [5,10,15,20,25,30,35,40]
 CLOSE_TOLERANCE_LIST= [5,10,15,20]
 
@@ -44,12 +44,12 @@ SL_PCT_LIST         = [5,10,15,20]
 
 # =============================================================================
 # SELL_AFTER_LIST     = [0]
-# FACTOR_LIST         = [1.0,1.5,2.0]
-# BODY_TOLERANCE_LIST = [5,10,15,20]
-# CLOSE_TOLERANCE_LIST= [5,10,15,20]
+# FACTOR_LIST         = [0.5]
+# BODY_TOLERANCE_LIST = [40]
+# CLOSE_TOLERANCE_LIST= [20]
 # 
-# TP_PCT_LIST         = [1.0,1.5,2.0]
-# SL_PCT_LIST         = [1.0,1.5,2.0]
+# TP_PCT_LIST         = [50]
+# SL_PCT_LIST         = [10]
 # =============================================================================
 
 

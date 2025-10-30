@@ -128,7 +128,7 @@ def place_order_01(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     # precio real de compra (long)
     buy_price = Decimal(str(resp_order['data'].get('price', last_price)))
     
-    print(f"⬆️ & 🎯 Position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+    print(f"🎯 & ⬆️ Position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
 
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
@@ -252,7 +252,7 @@ def place_order_03(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     # precio real de compra (long)
     buy_price = Decimal(str(resp_order['data'].get('price', last_price)))
     
-    print(f"⬆️ & 🎯 Position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+    print(f"🎯 & ⬆️ Position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
 
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
@@ -377,7 +377,7 @@ def place_order_02(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     # precio real de entrada (short)
     buy_price = Decimal(str(resp_order['data'].get('price', last_price)))
     
-    print(f"⬇️ & 🎯 Short position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+    print(f"🎯 & ⬇️ Short position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
 
@@ -503,6 +503,6 @@ def place_order_04(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     # precio real de entrada (short)
     buy_price = Decimal(str(resp_order['data'].get('price', last_price)))
     
-    print(f"⬇️ & 🎯 Short position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+    print(f"🎯 & ⬇️ Short position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}

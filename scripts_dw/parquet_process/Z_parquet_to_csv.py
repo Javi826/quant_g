@@ -4,8 +4,8 @@ from tqdm import tqdm
 
 # 📁 Base paths
 BASE_DIR = Path(__file__).resolve().parent.parent
-input_folder = BASE_DIR / "data" / "fixtimebars_csv"
-output_folder = BASE_DIR / "data" / "fixtimebars_parquet"
+input_folder = BASE_DIR / "data" / "darwinex"
+output_folder = BASE_DIR / "data" / "darwinex_parquet"
 
 # Create the output folder if it doesn't exist
 output_folder.mkdir(exist_ok=True)

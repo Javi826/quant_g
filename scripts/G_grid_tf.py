@@ -13,6 +13,7 @@ from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
 from Z_add_signals_tf import explosive_signal_tf
 #from Z_add_signals_tf import explosive_signal_tf_short
+#from Z_add_signals_tf import explosive_signal_tf_aligned
 
 
 start_time   = time.time()
@@ -24,11 +25,10 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
-#DATA_FOLDER       = "data/crypto_2022_OOS"
-#DATA_FOLDER       = "data/crypto_2023_IS"
-DATA_FOLDER       = "data/fixtimebars"
-TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '12H'
+DATA_FOLDER       = "data/crypto_2022_OOS"
+DATA_FOLDER       = "data/crypto_2023_IS"
+TIMEFRAME_MAJOR   = '1Dutc'
+TIMEFRAME_MINOR   = '4H'
 
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
@@ -43,12 +43,14 @@ LOOKBACK_MINOR_LIST = [1,2,3,4]
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 
-SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1]      
-LOOKBACK_MINOR_LIST = [1] 
-
-TP_PCT_LIST         = [4]
-SL_PCT_LIST         = [3]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]
+# LOOKBACK_MAJOR_LIST = [1]      
+# LOOKBACK_MINOR_LIST = [1] 
+# 
+# TP_PCT_LIST         = [8]
+# SL_PCT_LIST         = [8]
+# =============================================================================
 
 param_names = ['SELL_AFTER','LOOKBACK_MAJOR','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 lists_for_grid = [SELL_AFTER_LIST, LOOKBACK_MAJOR_LIST, LOOKBACK_MINOR_LIST, TP_PCT_LIST, SL_PCT_LIST]
@@ -88,12 +90,13 @@ def process_combo(comb):
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],
             close_menor=arr_minor['close'],
-            low_mayor=arr_major['low'],
-            low_menor=arr_minor['low'],
             lookback_mayor=params['LOOKBACK_MAJOR'],
             lookback_menor=params['LOOKBACK_MINOR'],
+            index_mayor=arr_major['ts'],
+            index_menor=arr_minor['ts'],
             live=False
         )
+
 
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signal}
 
@@ -118,7 +121,7 @@ with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinat
 # -----------------------------------------------------------------------------
 # COMPILE RESULTS INTO DATAFRAME
 # -----------------------------------------------------------------------------
-grid_records = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
+grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
 
 # -----------------------------------------------------------------------------

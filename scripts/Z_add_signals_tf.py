@@ -1,92 +1,60 @@
-# === FILE: add_signals03.py ===
-# ---------------------------------
 import numpy as np
+import pandas as pd
 
-def explosive_signal_tf(high_mayor, close_mayor, high_menor, close_menor, 
-                        low_mayor, low_menor, 
-                        lookback_mayor, lookback_menor, live=False):
-    """Señales LONG"""
-    # Señales individuales
-    signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
-    signal_menor = np.zeros_like(close_menor, dtype=np.int8)
+def get_last_closed_major_bar(ts_mayor, ts_minor_now):
+    """
+    Retorna el índice de la última vela del major que cerró 
+    ANTES de ts_minor_now
+    """
+    mask = ts_mayor < ts_minor_now
+    indices = np.where(mask)[0]
     
-    # Timeframe mayor
-    n_mayor = len(close_mayor)
-    for i in range(lookback_mayor, n_mayor):
-        window = high_mayor[i-lookback_mayor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_mayor[i] > max_window:
-                signal_mayor[i] = 1
+    if len(indices) == 0:
+        return None
     
-    # Timeframe menor
-    n_menor = len(close_menor)
-    for i in range(lookback_menor, n_menor):
-        window = high_menor[i-lookback_menor:i]
-        if np.all(window[:-1] > window[1:]):
-            max_window = np.max(window)
-            if close_menor[i] > max_window:
-                signal_menor[i] = 1
-    
-    # Combinación multi-timeframe
-    factor = len(close_menor) // len(close_mayor)
-    signal_final = np.zeros_like(close_menor, dtype=np.int8)
-    
-    for i, s_menor in enumerate(signal_menor):
-        idx_mayor = i // factor
-        if idx_mayor < len(signal_mayor) and s_menor == 1 and signal_mayor[idx_mayor] == 1:
-            signal_final[i] = 1
-    
-    # Shift 
-    if not live:
-        signal_shifted = np.empty_like(signal_final)
-        signal_shifted[0] = 0
-        signal_shifted[1:] = signal_final[:-1]
-        signal_final = signal_shifted
-    
-    return signal_final
+    return indices[-1]
 
 
-def explosive_signal_tf_short(high_mayor, close_mayor, high_menor, close_menor,
-                               low_mayor, low_menor,
-                               lookback_mayor, lookback_menor, live=False):
-    """Señales SHORT"""
-    # Señales individuales
-    signal_mayor = np.zeros_like(close_mayor, dtype=np.int8)
-    signal_menor = np.zeros_like(close_menor, dtype=np.int8)
+def explosive_signal_tf(
+    high_mayor, close_mayor,
+    high_menor, close_menor,
+    lookback_mayor=3, lookback_menor=3,
+    index_mayor=None, index_menor=None,
+    live=False
+):
+    high_mayor = np.array(high_mayor)
+    close_mayor = np.array(close_mayor)
+    high_menor = np.array(high_menor)
+    close_menor = np.array(close_menor)
+    ts_mayor = np.array(index_mayor)
+    ts_menor = np.array(index_menor)
     
-    # Timeframe mayor
-    n_mayor = len(close_mayor)
-    for i in range(lookback_mayor, n_mayor):
-        window = low_mayor[i-lookback_mayor:i]
-        if np.all(window[:-1] < window[1:]):
-            min_window = np.min(window)
-            if close_mayor[i] < min_window:
-                signal_mayor[i] = -1
+    n_minor = len(close_menor)
+    final_signal = np.zeros(n_minor, dtype=int)
     
-    # Timeframe menor
-    n_menor = len(close_menor)
-    for i in range(lookback_menor, n_menor):
-        window = low_menor[i-lookback_menor:i]
-        if np.all(window[:-1] < window[1:]):
-            min_window = np.min(window)
-            if close_menor[i] < min_window:
-                signal_menor[i] = -1
+    for i in range(1, n_minor):
+        ts_minor_now = ts_menor[i]
+        
+        # SEÑAL MINOR
+        if i - 1 < lookback_menor:
+            signal_minor = 0
+        else:
+            close_prev = close_menor[i - 1]
+            highs_prev = high_menor[i - 1 - lookback_menor:i - 1]
+            signal_minor = 1 if close_prev > np.max(highs_prev) else 0
+        
+        # SEÑAL MAJOR
+        idx_major = get_last_closed_major_bar(ts_mayor, ts_minor_now)
+        
+        if idx_major is None or idx_major < lookback_mayor:
+            signal_major = 0
+        else:
+            close_major = close_mayor[idx_major]
+            highs_major = high_mayor[idx_major - lookback_mayor:idx_major]
+            signal_major = 1 if close_major > np.max(highs_major) else 0
+        
+        # SEÑAL FINAL
+        final_signal[i] = 1 if (signal_minor == 1 and signal_major == 1) else 0
     
-    # Combinación multi-timeframe
-    factor = len(close_menor) // len(close_mayor)
-    signal_final = np.zeros_like(close_menor, dtype=np.int8)
-    
-    for i, s_menor in enumerate(signal_menor):
-        idx_mayor = i // factor
-        if idx_mayor < len(signal_mayor) and s_menor == -1 and signal_mayor[idx_mayor] == -1:
-            signal_final[i] = -1
-    
-    # Shift 
-    if not live:
-        signal_shifted = np.empty_like(signal_final)
-        signal_shifted[0] = 0
-        signal_shifted[1:] = signal_final[:-1]
-        signal_final = signal_shifted
-    
-    return signal_final
+    return final_signal
+

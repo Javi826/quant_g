@@ -22,7 +22,7 @@ N_JOBS              = -1
 # CONFIGURATION
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1H'
+TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 500
 MIN_VOL_USDT        = 50_000
 ORDER_AMOUNT        = 5000
@@ -37,11 +37,11 @@ if TIMEFRAME == '1H':
     FINAL_N_OBS_PER_PATH = 4320
 elif TIMEFRAME == '4H':
     FINAL_N_OBS_PER_PATH = 1080
-elif TIMEFRAME == '6H':
+elif TIMEFRAME == '6Hutc':
     FINAL_N_OBS_PER_PATH = 720
-elif TIMEFRAME == '12':
+elif TIMEFRAME == '12Hutc':
     FINAL_N_OBS_PER_PATH = 360
-elif TIMEFRAME == '1D':
+elif TIMEFRAME == '1Dutc':
     FINAL_N_OBS_PER_PATH = 180
     
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
@@ -57,13 +57,15 @@ CLOSE_TOLERANCE_LIST= [5,10,15,20]
 TP_PCT_LIST         = [5,10,15,20,25,30,50]
 SL_PCT_LIST         = [5,10,15,20]
 
-SELL_AFTER_LIST     = [0]
-FACTOR_LIST         = [1.0]
-BODY_TOLERANCE_LIST = [40]
-CLOSE_TOLERANCE_LIST= [20]
-
-TP_PCT_LIST         = [20]
-SL_PCT_LIST         = [20]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]
+# FACTOR_LIST         = [1.0]
+# BODY_TOLERANCE_LIST = [40]
+# CLOSE_TOLERANCE_LIST= [20]
+# 
+# TP_PCT_LIST         = [20]
+# SL_PCT_LIST         = [20]
+# =============================================================================
 
 param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

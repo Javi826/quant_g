@@ -113,7 +113,7 @@ while True:
             if signal:
                 detected_signals.append(signal)
 
-        print(f"🔔 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Signals detected: {len(detected_signals)}")
+        print(f"\n✨ {datetime.now(MADRID_TZ).strftime('%H:%M')} - Signals detected: {len(detected_signals)}")
 
         for signal in detected_signals:
             sym = signal['symbol']

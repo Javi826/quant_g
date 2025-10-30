@@ -11,17 +11,17 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from Z_add_signals_tf import explosive_signal_tf
 #from Z_add_signals_tf import explosive_signal_tf_short
 
-start_time = time.time()
+start_time        = time.time()
 N_JOBS            = -1
 STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '1H'
+TIMEFRAME_MAJOR   = '1Dutc'
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 5_000
-MIN_VOL_USDT      = 1_000_000
+MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
@@ -34,19 +34,19 @@ if TIMEFRAME_MINOR == '1H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 24)
 elif TIMEFRAME_MINOR == '4H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 6)
-elif TIMEFRAME_MINOR == '6H':
+elif TIMEFRAME_MINOR == '6Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 4)
-elif TIMEFRAME_MINOR == '12H':
+elif TIMEFRAME_MINOR == '12Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 2)
-elif TIMEFRAME_MINOR == '1D':
+elif TIMEFRAME_MINOR == '1Dutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365)
 
 # -----------------------------------------------------------------------------
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3]      
-LOOKBACK_MINOR_LIST = [1,2,3] 
+LOOKBACK_MAJOR_LIST = [1,2,3,4]      
+LOOKBACK_MINOR_LIST = [1,2,3,4] 
 
 TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
 SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
@@ -99,8 +99,6 @@ def strategy_builder(params, base_arrays_minor, base_arrays_major):
             close_mayor=arr_major['close'],
             high_menor=arr_minor['high'],
             close_menor=arr_minor['close'],
-            low_mayor=arr_major['low'],
-            low_menor=arr_minor['low'],
             lookback_mayor=params.get('LOOKBACK_MAJOR'),
             lookback_menor=params.get('LOOKBACK_MINOR'),
             live=False
@@ -158,7 +156,7 @@ best_params_wfo = walk_forward_optimization_tf(
     n_jobs=N_JOBS
 )
 
-# Redondear parámetros enteros
+# ROUNDING PARAMETERS
 for name in param_names:
     val = best_params_wfo.get(name)
     if isinstance(val, (int, float)) and not str(name).endswith("_MAX"):
@@ -179,8 +177,6 @@ for sym in ohlcv_arr_minor.keys():
         close_mayor=arr_major['close'],
         high_menor=arr_minor['high'],
         close_menor=arr_minor['close'],
-        low_mayor=arr_major['low'],
-        low_menor=arr_minor['low'],
         lookback_mayor=best_params_wfo['LOOKBACK_MAJOR'],
         lookback_menor=best_params_wfo['LOOKBACK_MINOR'],
         live=False
@@ -206,7 +202,6 @@ grid_results_df    = pd.DataFrame(grid_records)
 
 final_prints(f"🎯 WFO_{STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
 df_portfolio, mi_series = report_backtesting(grid_results_df, param_names, DATA_FOLDER, INITIAL_BALANCE)
-
 
 elapsed = int(time.time() - start_time)
 print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

@@ -65,11 +65,11 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                     min_bars = 4320
                 elif timeframe == "4H":
                     min_bars = 1080
-                elif timeframe == "6H":
+                elif timeframe == "6Hutc":
                     min_bars = 720
-                elif timeframe == "12H":
+                elif timeframe == "12Hutc":
                     min_bars = 360
-                elif timeframe == "1D":
+                elif timeframe == "1Dutc":
                     min_bars = 180
                 else:
                     min_bars = 999999999
@@ -87,7 +87,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         else:
             ohlcv_data[sym] = df
             filtered_symbols.append(sym)
-
+            
     # -------------------
     # Summary
     # -------------------
