@@ -11,22 +11,20 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
-from Z_add_signals_pr import explosive_signal_pr
+from Z_add_Zsignals_99 import explosive_signal_99
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False
-STRATEGY           ="candle_pair"
+STRATEGY           ="entropy"
 N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
+#DATA_FOLDER         = "data/crypto_2021_OOS"
 DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-#DATA_FOLDER         = "data/fixtimebars_parquet"
-TIMEFRAME           = '1Dutc'
-ORDER_AMOUNT        = 500
-MIN_VOL_USDT        = 50_000
+TIMEFRAME           = '12Hutc'
 ORDER_AMOUNT        = 5_000
 MIN_VOL_USDT        = 10_000_000
 
@@ -34,26 +32,23 @@ MIN_VOL_USDT        = 10_000_000
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST     = [0]
-FACTOR_LIST         = [1,1.5,2.0,2.5]
-BODY_TOLERANCE_LIST = [5,10,15,20,25,30,35,40]
-CLOSE_TOLERANCE_LIST= [5,10,15,20]
+SELL_AFTER_LIST    = [0]
+ENTROPY_MAX_LIST   = [0.2,0.4,0.6,0.8,1.0,1.2,1.4]
+ACCEL_SPAN_LIST    = [5,10,15,20,25,30,35]
 
-TP_PCT_LIST         = [5,10,15,20,25,30,50]
-SL_PCT_LIST         = [5,10,15,20]
+TP_PCT_LIST        = [5,10,15,20,25]
+SL_PCT_LIST        = [5,10,15,20,25]
 
 # =============================================================================
-# SELL_AFTER_LIST     = [0]
-# FACTOR_LIST         = [0.5]
-# BODY_TOLERANCE_LIST = [40]
-# CLOSE_TOLERANCE_LIST= [20]
-# 
-# TP_PCT_LIST         = [50]
-# SL_PCT_LIST         = [10]
+SELL_AFTER_LIST    = [0]
+ENTROPY_MAX_LIST   = [0.6]
+ACCEL_SPAN_LIST    = [15]
+
+TP_PCT_LIST        = [25]
+SL_PCT_LIST        = [20]
 # =============================================================================
 
-
-param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']
+param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'ACCEL_SPAN', 'TP_PCT', 'SL_PCT']
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
@@ -75,17 +70,10 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        open_array = arrs["open"]
-        close_array = arrs["close"]
-
-        signal = explosive_signal_pr(
-            open_prices=open_array,
-            close_prices=close_array,
-            factor=params["FACTOR"],
-            body_tolerance=params["BODY_TOLERANCE"] / 100,  
-            close_tolerance=params["CLOSE_TOLERANCE"] / 100,   
-            live=False,
-        )
+        signal = explosive_signal_99(arrs['close'],
+                                     m_accel=params.get('ACCEL_SPAN'),
+                                     entropia_max=params.get('ENTROPY_MAX'),
+                                     live=False)
         
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
@@ -121,7 +109,6 @@ save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"gri
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME}.xlsx", save=False)
 
 final_prints(strategy=f" 🥇 Grid_Backest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
-
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)

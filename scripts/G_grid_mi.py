@@ -11,10 +11,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
-from Z_add_signals_tf import explosive_signal_tf
-
-
-
+from Z_add_signals_mi import explosive_signal_tf_minor
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
@@ -26,36 +23,35 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
 DATA_FOLDER       = "data/crypto_2022_OOS"
-#DATA_FOLDER       = "data/crypto_2021_OOS"
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MAJOR   = '1Dutc'
+#DATA_FOLDER       = "data/crypto_2021_OOS"
 TIMEFRAME_MINOR   = '4H'
 
-ORDER_AMOUNT      = 5_00
+ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]  
-LOOKBACK_MINOR_LIST = [2,3,4,5,6] 
-N_CONSECUTIVE_LIST  = [2,3,4,5,6]
-FACTOR_LIST         = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
+LOOKBACK_MINOR_LIST = [1,2,3,4,5,6,7] 
+N_CONSECUTIVE_LIST  = [1,2,3,4,5,6,7]
+FACTOR_LIST         = [0.5,0.75,1,1.1,1.2,1.5,2.0]
 
 TP_PCT_LIST         = [5,10,15,20,25,30]
 SL_PCT_LIST         = [5,10,20]
 
-# =============================================================================
-# SELL_AFTER_LIST     = [0]    
-# LOOKBACK_MINOR_LIST = [3] 
-# N_CONSECUTIVE_LIST  = [1]
-# FACTOR_LIST         = [0.5]
-# 
-# TP_PCT_LIST         = [20]
-# SL_PCT_LIST         = [20]
-# =============================================================================
+SELL_AFTER_LIST     = [0]  
+LOOKBACK_MINOR_LIST = [3] 
+N_CONSECUTIVE_LIST  = [1]
+FACTOR_LIST         = [0.5]
 
+TP_PCT_LIST         = [10]
+SL_PCT_LIST         = [20]
+
+param_names    = ['SELL_AFTER','LOOKBACK_MINOR','FACTOR','TP_PCT','SL_PCT']
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','N_CONSECUTIVE','FACTOR','TP_PCT','SL_PCT']
+#param_names    = ['SELL_AFTER','LOOKBACK_MINOR','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -63,20 +59,12 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-symbols_major = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MAJOR}.parquet")]
-
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
-ohlcv_data_major, filtered_major = filter_symbols(symbols_major, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MAJOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
 
-common_symbols = list(set(filtered_minor).intersection(filtered_major))
 
-ohlcv_data_minor = {s: ohlcv_data_minor[s] for s in common_symbols}
-ohlcv_data_major = {s: ohlcv_data_major[s] for s in common_symbols}
-
-save_filtered_symbols(common_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+save_filtered_symbols(symbols_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
-ohlcv_arr_major = prepare_ohlcv_arrays(ohlcv_data_major)
 
 # -----------------------------------------------------------------------------
 # FUNCTION TO PROCESS ONE PARAMETER COMBINATION
@@ -87,17 +75,15 @@ def process_combo(comb):
 
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
-        arr_major = ohlcv_arr_major[sym]
 
-        # Llamada simplificada pasando todo el diccionario
-        signal = explosive_signal_tf(
-            arr_major=arr_major,
-            arr_minor=arr_minor,
-            lookback_minor=params['LOOKBACK_MINOR'],
+        signal = explosive_signal_tf_minor(
+            arr_minor,
+            lookback=params['LOOKBACK_MINOR'],
             n_consecutive=params['N_CONSECUTIVE'],
             factor=params['FACTOR'],
             backtest=True
         )
+
 
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signal}
 
@@ -109,7 +95,6 @@ def process_combo(comb):
         order_amount=ORDER_AMOUNT
     )
     return comb, results
-
 
 # -----------------------------------------------------------------------------
 # PARALLELIZED BACKTESTING
@@ -132,7 +117,7 @@ grid_results_df = pd.DataFrame(grid_records)
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 
-final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 
