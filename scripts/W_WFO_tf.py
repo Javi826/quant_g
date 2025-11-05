@@ -8,7 +8,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO_tf import walk_forward_optimization_tf
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_tf import explosive_signal_tf
+from Z_add_signals_tf import trends_tf_long
+from Z_add_signals_tf import trends_tf_short
 
 
 start_time        = time.time()
@@ -20,8 +21,22 @@ STRATEGY          = "trends_tf"
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
 TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_00
+ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
+
+# -----------------------------------------------------------------------------
+# GRID 
+# -----------------------------------------------------------------------------
+SELL_AFTER_LIST     = [0]  
+LOOKBACK_MINOR_LIST = [1,2,3,4,5,6] 
+N_CONSECUTIVE_LIST  = [1,2,3,4,5,6]
+FACTOR_LIST         = [0.2,0.4,0.6,0.8,1.0]
+
+TP_PCT_LIST         = [5,10,15,20,30]
+SL_PCT_LIST         = [5,10,20]
+
+param_names  = ['SELL_AFTER','LOOKBACK_MINOR','N_CONSECUTIVE','FACTOR','TP_PCT','SL_PCT']
+param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
@@ -40,20 +55,6 @@ elif TIMEFRAME_MINOR == '12Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 2)
 elif TIMEFRAME_MINOR == '1Dutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365)
-
-# -----------------------------------------------------------------------------
-# GRID 
-# -----------------------------------------------------------------------------
-SELL_AFTER_LIST     = [0]  
-LOOKBACK_MINOR_LIST = [2,3,4,5,6] 
-N_CONSECUTIVE_LIST  = [2,3,4,5,6]
-FACTOR_LIST         = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
-
-TP_PCT_LIST         = [5,10,15,20,25,30]
-SL_PCT_LIST         = [5,10,20]
-
-param_names  = ['SELL_AFTER','LOOKBACK_MINOR','N_CONSECUTIVE','FACTOR','TP_PCT','SL_PCT']
-param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
 # CARGA Y FILTRADO DE DATOS
@@ -86,7 +87,7 @@ def strategy_builder(params, base_arrays_minor, base_arrays_major):
         arr_major = base_arrays_major[sym]
         
         # Llamada simplificada pasando todo el diccionario
-        signal = explosive_signal_tf(
+        signal = trends_tf_long(
             arr_major=arr_major,
             arr_minor=arr_minor,
             lookback_minor=params.get('LOOKBACK_MINOR'), 
@@ -128,8 +129,8 @@ def metric_fn_default(results):
     net_gain_pct    = (net_gain / INITIAL_BALANCE) * 100.0 
     dd_pct          = float(port.get('max_dd')) * 100.0
     
-    metric_score    = (net_gain_pct - 1*dd_pct)
     metric_score    = net_gain_pct 
+    #metric_score    = (net_gain_pct - 1*dd_pct)
     #metric_score    = sharpe_ratio
     
     return metric_score
@@ -164,7 +165,7 @@ for sym in ohlcv_arr_minor.keys():
     arr_minor = ohlcv_arr_minor[sym]
     arr_major = ohlcv_arr_major[sym]
     
-    signal = explosive_signal_tf(
+    signal = trends_tf_long(
         arr_major=arr_major,
         arr_minor=arr_minor,
         lookback_minor=best_params_wfo['LOOKBACK_MINOR'],

@@ -48,16 +48,16 @@ def wait_for_next_candle(timeframe='4H'):
         minutes = int(timeframe[:-1]) * 60
     elif timeframe.endswith('m'):
         minutes = int(timeframe[:-1])
-    elif timeframe.endswith('D'):
-        minutes = int(timeframe[:-1]) * 24 * 60
+    elif timeframe.endswith('Dutc'):
+        minutes = int(timeframe[:-4]) * 24 * 60
     else:
-        raise ValueError("Invalid timeframe, use 'm', 'H', or 'D'.")
+        raise ValueError("Invalid timeframe, use 'm', 'H', or 'Dutc'.")
 
-    total_minutes = now.hour * 60 + now.minute
+    total_minutes      = now.hour * 60 + now.minute
     next_total_minutes = ((total_minutes // minutes) + 1) * minutes
-    delta_minutes = next_total_minutes - total_minutes
-    next_run = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
+    delta_minutes      = next_total_minutes - total_minutes
+    next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
     
-    sleep_seconds = (next_run - now).total_seconds()
+    sleep_seconds = (next_run - now).total_seconds() + 30
     print(f"🕒 Waiting for next candle: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
     time.sleep(sleep_seconds)

@@ -107,14 +107,18 @@ def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_sy
         print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
         
 def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
-    """
-    Imprime la configuración final del backtesting y los parámetros del grid alineados.
-    """
+
+    def format_number(n):
+        if isinstance(n, (int, float)):
+            # Usa formato con separador de miles y cambia coma por punto
+            return f"{n:,}".replace(",", ".")
+        return str(n)
+
     print(f'\n== {strategy} ==\n')
-    print(f"DATA_FOLDER         : {data_folder}")
-    print(f"TIMEFRAME           : {timeframe}")
-    print(f"ORDER_AMOUNT        : {order_amount}")
-    print(f"MIN_VOL_USDT        : {min_vol_usdt}")
+    print(f"DATA_FOLDER           : {data_folder}")
+    print(f"TIMEFRAME             : {timeframe}")
+    print(f"ORDER_AMOUNT          : {format_number(order_amount)}")
+    print(f"MIN_VOL_USDT          : {format_number(min_vol_usdt)}")
 
     # Calcular longitud máxima de los nombres base para alinear los prints
     max_len = max(len(name) for name in param_names)

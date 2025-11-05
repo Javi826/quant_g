@@ -17,12 +17,12 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
 
     
     df = df.copy()
-    print(data_folder)
+
     # -----------------------------
     # Métricas derivadas
     # -----------------------------
     df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
-    df["Gain_signal"] = df["Net_Gain"] / df["Num_Signals"]
+    df["Gain_signal"]  = df["Net_Gain"] / df["Num_Signals"]
     df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
 
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
@@ -31,7 +31,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     # Mutual Information + Pearson correlation
     # -----------------------------
     if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        print("\n⚠️ df_portfolio empty or <5 filas. Mutual Information y Pearson skipped.\n")
+        #print("\n⚠️ df_portfolio empty or <5 filas. Mutual Information y Pearson skipped.\n")
         mi_series = pd.Series([None]*len(parameters), index=parameters)
         pearson_series = pd.Series([None]*len(parameters), index=parameters)
     else:

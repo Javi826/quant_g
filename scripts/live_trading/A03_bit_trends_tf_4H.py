@@ -80,7 +80,7 @@ final_symbols  = load_final_symbols(all_symbols,strategy=STRATEGY,timeframe=TIME
 open_positions = []
 
 while True:
-    print('🧿 === trends_tf 4H strategy ===🧿')
+    print(f'🧿 === {STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     # --- sincronizar con el exchange: si no hay posiciones en el exchange, vaciamos open_positions ---

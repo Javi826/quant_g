@@ -13,9 +13,6 @@ from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
 from Z_add_signals_tf import explosive_signal_tf
 
-
-
-
 start_time   = time.time()
 SAVE_SYMBOLS = False
 STRATEGY     = "trends_tf"
@@ -24,34 +21,34 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER       = "data/crypto_OOS"
-DATA_FOLDER       = "data/crypto_2022_OOS"
+#DATA_FOLDER       = "data/crypto_OOS"
+#DATA_FOLDER       = "data/crypto_2022_OOS"
 #DATA_FOLDER       = "data/crypto_2021_OOS"
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
 TIMEFRAME_MINOR   = '4H'
 
-ORDER_AMOUNT      = 5_00
+ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]  
-LOOKBACK_MINOR_LIST = [2,3,4,5,6] 
-N_CONSECUTIVE_LIST  = [2,3,4,5,6]
-FACTOR_LIST         = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1]
+LOOKBACK_MINOR_LIST = [1,2,3,4,5,6] 
+N_CONSECUTIVE_LIST  = [1,2,3,4,5,6]
+FACTOR_LIST         = [0.2,0.4,0.6,0.8,1.0]
 
 TP_PCT_LIST         = [5,10,15,20,25,30]
 SL_PCT_LIST         = [5,10,20]
 
 # =============================================================================
 # SELL_AFTER_LIST     = [0]    
-# LOOKBACK_MINOR_LIST = [3] 
+# LOOKBACK_MINOR_LIST = [1] 
 # N_CONSECUTIVE_LIST  = [1]
-# FACTOR_LIST         = [0.5]
+# FACTOR_LIST         = [1.0]
 # 
-# TP_PCT_LIST         = [20]
+# TP_PCT_LIST         = [15]
 # SL_PCT_LIST         = [20]
 # =============================================================================
 
