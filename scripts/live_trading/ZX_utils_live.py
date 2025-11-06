@@ -4,6 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import os
 import time
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 BASE_URL     = "https://api.bitget.com"
@@ -12,6 +13,8 @@ PRODUCT_TYPE = 'usdt-futures'
 # =============================================================================
 # SYMBOLS & CANDLES
 # =============================================================================
+
+
 def normalize_live_ohlcv(df):
     if not isinstance(df.index, pd.DatetimeIndex):
         if 'timestamp' in df.columns:
@@ -24,6 +27,23 @@ def normalize_live_ohlcv(df):
             df[col] = pd.to_numeric(df[col], errors='coerce')
             
     return df
+
+def df_to_arrays_live(df):
+
+    if not np.issubdtype(df.index.dtype, np.datetime64):
+        df = df.copy()
+        df.index = pd.to_datetime(df.index)
+
+    arrays = {
+        'ts': df.index.to_numpy(dtype='datetime64[ns]'),
+        'open': df['open'].to_numpy(dtype=np.float64),
+        'high': df['high'].to_numpy(dtype=np.float64),
+        'low': df['low'].to_numpy(dtype=np.float64),
+        'close': df['close'].to_numpy(dtype=np.float64),
+        'volume_quote': df['volume_quote'].to_numpy(dtype=np.float64) if 'volume_quote' in df else np.zeros(len(df))
+    }
+
+    return arrays
 
 def load_final_symbols(all_symbols, strategy="_", timeframe="4H"):
     folder = os.path.join(os.path.dirname(__file__), "symbols_live")

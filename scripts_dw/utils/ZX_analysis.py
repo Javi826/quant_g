@@ -12,17 +12,15 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 
-
 def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=False, save_excel=False):
 
-    
     df = df.copy()
 
     # -----------------------------
     # Métricas derivadas
     # -----------------------------
     df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
-    df["Gain_signal"] = df["Net_Gain"] / df["Num_Signals"]
+    df["Gain_signal"]  = df["Net_Gain"] / df["Num_Signals"]
     df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
 
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
@@ -31,7 +29,6 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     # Mutual Information + Pearson correlation
     # -----------------------------
     if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        print("\n⚠️ df_portfolio empty or <5 filas. Mutual Information y Pearson skipped.\n")
         mi_series = pd.Series([None]*len(parameters), index=parameters)
         pearson_series = pd.Series([None]*len(parameters), index=parameters)
     else:
@@ -62,7 +59,6 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
     
-    # Incluir duration_m en las métricas mostradas (duration en minutos)
     metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals', 'duration_m']
 
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
@@ -112,7 +108,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
             plt.show()
             
     # -----------------------------
-    # PLOT: Net Gain % y DD vs Tiempo (con BTC siempre)
+    # PLOT: Net Gain % y DD vs Tiempo (sin BTC)
     # -----------------------------
     def plot_netgain_dd(equity_hist, initial_capital, title="Net Gain % y DD"):
         timestamps = pd.to_datetime(equity_hist['timestamp'])
@@ -132,27 +128,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Net_Gain_pct", color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
-        DATA_FOLDER=data_folder
-        # --- Línea Bitcoin ---
-        btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
-        btc_df = pd.read_parquet(btc_file)
-    
-        # Asegurarse de que haya columna timestamp
-        if 'timestamp' not in btc_df.columns:
-            if isinstance(btc_df.index, pd.DatetimeIndex):
-                btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
-            else:
-                raise ValueError("El parquet de BTC no tiene columna 'timestamp' ni índice datetime.")
-    
-        btc_df = btc_df[['timestamp', 'close']]
-        btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
-    
-        # Calcular BTC en porcentaje respecto al primer precio
-        btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
-    
-        # Graficar BTC
-        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], color='black', linewidth=0.3, label='BTC %')
-    
+
         # Drawdown %
         ax2 = ax1.twinx()
         ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
@@ -183,6 +159,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
          
     return df_portfolio, mi_series
+
 
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):

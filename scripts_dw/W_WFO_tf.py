@@ -8,20 +8,35 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO_tf import walk_forward_optimization_tf
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_tf import explosive_signal_tf
-#from Z_add_signals_tf import explosive_signal_tf_short
+from Z_add_signals_tf import trends_tf_long
+from Z_add_signals_tf import trends_tf_short
 
-start_time = time.time()
+
+start_time        = time.time()
 N_JOBS            = -1
 STRATEGY          = "trends_tf"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MAJOR   = '1D'
-TIMEFRAME_MINOR   = '1H'
+TIMEFRAME_MAJOR   = '1Dutc'
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 5_000
-MIN_VOL_USDT      = 1_000_000
+MIN_VOL_USDT      = 10_000_000
+
+# -----------------------------------------------------------------------------
+# GRID 
+# -----------------------------------------------------------------------------
+SELL_AFTER_LIST     = [0]  
+LOOKBACK_MINOR_LIST = [1,2,3,4,5,6] 
+N_CONSECUTIVE_LIST  = [1,2,3,4,5,6]
+FACTOR_LIST         = [0.2,0.4,0.6,0.8,1.0]
+
+TP_PCT_LIST         = [5,10,15,20,30]
+SL_PCT_LIST         = [5,10,20]
+
+param_names  = ['SELL_AFTER','LOOKBACK_MINOR','N_CONSECUTIVE','FACTOR','TP_PCT','SL_PCT']
+param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
@@ -34,34 +49,12 @@ if TIMEFRAME_MINOR == '1H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 24)
 elif TIMEFRAME_MINOR == '4H':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 6)
-elif TIMEFRAME_MINOR == '6H':
+elif TIMEFRAME_MINOR == '6Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 4)
-elif TIMEFRAME_MINOR == '12H':
+elif TIMEFRAME_MINOR == '12Hutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365 * 2)
-elif TIMEFRAME_MINOR == '1D':
+elif TIMEFRAME_MINOR == '1Dutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365)
-
-# -----------------------------------------------------------------------------
-# GRID 
-# -----------------------------------------------------------------------------
-SELL_AFTER_LIST     = [0]
-LOOKBACK_MAJOR_LIST = [1,2,3]      
-LOOKBACK_MINOR_LIST = [1,2,3] 
-
-TP_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-SL_PCT_LIST         = [1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0,5.5,6.0,6.5,7.0,7.5,8.0,8.5,9.0,9.5,10]
-
-# =============================================================================
-# SELL_AFTER_LIST     = [0]
-# LOOKBACK_MAJOR_LIST = [1]      
-# LOOKBACK_MINOR_LIST = [1] 
-# 
-# TP_PCT_LIST         = [1.5]
-# SL_PCT_LIST         = [1.5]
-# =============================================================================
-
-param_names  = ['SELL_AFTER', 'LOOKBACK_MAJOR', 'LOOKBACK_MINOR', 'TP_PCT', 'SL_PCT']
-param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
 # CARGA Y FILTRADO DE DATOS
@@ -84,7 +77,6 @@ print(f"✅ {len(common_symbols)} common in both TIMEFRAMES")
 # FUNCIONES PARA WFO
 # -----------------------------------------------------------------------------
 def strategy_builder(params, base_arrays_minor, base_arrays_major):
-
     ohlcv_arrays = {}
     
     for sym in base_arrays_minor.keys():
@@ -94,21 +86,20 @@ def strategy_builder(params, base_arrays_minor, base_arrays_major):
         arr_minor = base_arrays_minor[sym]
         arr_major = base_arrays_major[sym]
         
-        signal = explosive_signal_tf(
-            high_mayor=arr_major['high'],
-            close_mayor=arr_major['close'],
-            high_menor=arr_minor['high'],
-            close_menor=arr_minor['close'],
-            low_mayor=arr_major['low'],
-            low_menor=arr_minor['low'],
-            lookback_mayor=params.get('LOOKBACK_MAJOR'),
-            lookback_menor=params.get('LOOKBACK_MINOR'),
-            live=False
+        # Llamada simplificada pasando todo el diccionario
+        signal = trends_tf_long(
+            arr_major=arr_major,
+            arr_minor=arr_minor,
+            lookback_minor=params.get('LOOKBACK_MINOR'), 
+            n_consecutive=params.get('N_CONSECUTIVE'), 
+            factor=params.get('FACTOR'), 
+            backtest=True
         )
         
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signal}
     
     return ohlcv_arrays
+
 
 def backtest_runner_default(ohlcv_arrays, params):
 
@@ -138,8 +129,8 @@ def metric_fn_default(results):
     net_gain_pct    = (net_gain / INITIAL_BALANCE) * 100.0 
     dd_pct          = float(port.get('max_dd')) * 100.0
     
-    metric_score    = (net_gain_pct - 1*dd_pct)
     metric_score    = net_gain_pct 
+    #metric_score    = (net_gain_pct - 1*dd_pct)
     #metric_score    = sharpe_ratio
     
     return metric_score
@@ -158,7 +149,7 @@ best_params_wfo = walk_forward_optimization_tf(
     n_jobs=N_JOBS
 )
 
-# Redondear parámetros enteros
+# ROUNDING PARAMETERS
 for name in param_names:
     val = best_params_wfo.get(name)
     if isinstance(val, (int, float)) and not str(name).endswith("_MAX"):
@@ -174,19 +165,17 @@ for sym in ohlcv_arr_minor.keys():
     arr_minor = ohlcv_arr_minor[sym]
     arr_major = ohlcv_arr_major[sym]
     
-    signal = explosive_signal_tf(
-        high_mayor=arr_major['high'],
-        close_mayor=arr_major['close'],
-        high_menor=arr_minor['high'],
-        close_menor=arr_minor['close'],
-        low_mayor=arr_major['low'],
-        low_menor=arr_minor['low'],
-        lookback_mayor=best_params_wfo['LOOKBACK_MAJOR'],
-        lookback_menor=best_params_wfo['LOOKBACK_MINOR'],
-        live=False
+    signal = trends_tf_long(
+        arr_major=arr_major,
+        arr_minor=arr_minor,
+        lookback_minor=best_params_wfo['LOOKBACK_MINOR'],
+        n_consecutive=best_params_wfo['N_CONSECUTIVE'],
+        factor=best_params_wfo['FACTOR'],
+        backtest=True
     )
     
     ohlcv_arrays[sym] = {**arr_minor, 'signal': signal}
+
 
 final_results = run_grid_backtest(
     ohlcv_arrays,
@@ -206,7 +195,6 @@ grid_results_df    = pd.DataFrame(grid_records)
 
 final_prints(f"🎯 WFO_{STRATEGY} 🎯", DATA_FOLDER, f"{TIMEFRAME_MAJOR}/{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[name] for name in param_names])
 df_portfolio, mi_series = report_backtesting(grid_results_df, param_names, DATA_FOLDER, INITIAL_BALANCE)
-
 
 elapsed = int(time.time() - start_time)
 print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

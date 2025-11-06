@@ -6,14 +6,14 @@ from datetime import datetime, timedelta
 # -----------------------------
 # CONFIGURATION PARAMETERS
 # -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent  # go up one level
-input_folder = BASE_DIR / "data" / "crypto_2021_highlow"
-output_folder_is = BASE_DIR / "data" / "crypto_2022_OOS"
-output_folder_oos = BASE_DIR / "data" / "crypto_XNNN"
+BASE_DIR          = Path(__file__).resolve().parent.parent  
+input_folder      = BASE_DIR / "data" / "crypto_2021_highlow"
+output_folder_is  = BASE_DIR / "data" / "crypto_2021_OOS"
+output_folder_oos = BASE_DIR / "data" / "cryptoXXX"
 
 # Date range for IN-SAMPLE (IS)
-IS_START = "2022-01-01"
-IS_END = "2022-12-31"
+IS_START = "2021-01-01"
+IS_END   = "2021-12-31"
 
 # Automatic OOS: from IS_END until the end of the file
 # OOS_START = IS_END

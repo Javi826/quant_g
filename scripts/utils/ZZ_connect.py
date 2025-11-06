@@ -66,3 +66,17 @@ def connect_bitget_04():
     })
     exchange.load_markets()
     return exchange
+
+def connect_bitget_06():
+    exchange = ccxt.bitget({
+        'apiKey': BITGET_API_KEY_06,
+        'secret': BITGET_API_SECRET_06,
+        'password': BITGET_API_PASS_06,
+        'enableRateLimit': True,
+        'options': {
+            'defaultType': 'swap',      
+            'subAccount': 'entropia'    
+        }
+    })
+    exchange.load_markets()
+    return exchange

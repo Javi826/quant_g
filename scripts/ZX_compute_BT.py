@@ -349,7 +349,7 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         cash -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        n_velas = 99 #VELAS  
+        n_velas = 50 #VELAS  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
@@ -441,9 +441,9 @@ def run_backtest_loop(
                         if buy_idx + sa > len(ca[sym]):
                             continue
                     else:
-                        if buy_idx + 30 >= len(ca[sym]):
+                        if buy_idx + 50 >= len(ca[sym]):
                             continue
-                    # --- Fin de validación ---
+                    
 
                     # Verificar saldo suficiente
                     if cash < oa:

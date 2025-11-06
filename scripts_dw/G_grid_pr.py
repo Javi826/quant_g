@@ -7,83 +7,79 @@ from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols,final_prints
-from Z_add_signals_pr import explosive_signal_pr
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
+from Z_add_signals_pr import detect_parity_reversal_long
+from Z_add_signals_pr import detect_parity_reversal_short
 
-start_time         = time.time()
-SAVE_SYMBOLS       = False
-STRATEGY           ="candle_pair"
-N_JOBS             =-1
+
+start_time   = time.time()
+SAVE_SYMBOLS = False
+STRATEGY     = "parity_candles_short"
+N_JOBS       = -1
+
 # -----------------------------------------------------------------------------
-# CONFIGURACIÓN
+# CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/darwinex_parquet"
-TIMEFRAME           = '1D'
-ORDER_AMOUNT        = 500
-MIN_VOL_USDT        = 50_000
+TIMEFRAME_MINOR     = '1H'
 
+ORDER_AMOUNT        = 5_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
-# GRID: 
+# PARAMETER GRID
 # -----------------------------------------------------------------------------
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [10,20,50]
+PRICE_TOLERANCE_LIST = [1,2,3,4,10] 
 
-SELL_AFTER_LIST     = [0]
-FACTOR_LIST         = [0.5,1,1.5,2.0,2.5]
-BODY_TOLERANCE_LIST = [5,10,15,20,25,30,35,40]
-CLOSE_TOLERANCE_LIST= [5,10,15,20]
-
-TP_PCT_LIST         = [5,10,15,20,25,30,50]
-SL_PCT_LIST         = [5,10,15,20]
+TP_PCT_LIST          = [0.5,1.0,1.5,2.0]
+SL_PCT_LIST          = [0.5,1.0,1.5,2.0]
 
 # =============================================================================
-# SELL_AFTER_LIST     = [0]
-# FACTOR_LIST         = [1.0,1.5,2.0]
-# BODY_TOLERANCE_LIST = [5,10,15,20]
-# CLOSE_TOLERANCE_LIST= [5,10,15,20]
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_LIST        = [20]
+# PRICE_TOLERANCE_LIST = [10] 
 # 
-# TP_PCT_LIST         = [1.0,1.5,2.0]
-# SL_PCT_LIST         = [1.0,1.5,2.0]
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [5]
 # =============================================================================
 
-
-param_names    = ['SELL_AFTER', 'FACTOR', 'BODY_TOLERANCE','CLOSE_TOLERANCE', 'TP_PCT', 'SL_PCT']
-lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
-
-# -----------------------------------------------------------------------------
-# CARGA Y FILTRADO DE DATOS
-# -----------------------------------------------------------------------------
-symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
-
-ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
-
-save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME, save_symbols=SAVE_SYMBOLS)
-ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
-
+param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
+param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
+lists_for_grid = [param_ranges[name] for name in param_names]
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN DE PROCESO PARA UNA COMBINACIÓN
+# LOAD AND FILTER DATA
+# -----------------------------------------------------------------------------
+symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
+
+save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+
+ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
+
+# -----------------------------------------------------------------------------
+# FUNCTION TO PROCESS ONE PARAMETER COMBINATION
 # -----------------------------------------------------------------------------
 def process_combo(comb):
-    params       = dict(zip(param_names, comb))
+    params = dict(zip(param_names, comb))
     ohlcv_arrays = {}
 
-    for sym, arrs in ohlcv_arr.items():
-        open_array = arrs["open"]
-        close_array = arrs["close"]
+    for sym in ohlcv_arr_minor.keys():
+        arr_minor = ohlcv_arr_minor[sym]
 
-        signal = explosive_signal_pr(
-            open_prices=open_array,
-            close_prices=close_array,
-            factor=params["FACTOR"],
-            body_tolerance=params["BODY_TOLERANCE"] / 100,  
-            close_tolerance=params["CLOSE_TOLERANCE"] / 100,   
-            live=False,
+        signals = detect_parity_reversal_short(
+            arr=arr_minor,     
+            lookback=params['LOOKBACK'],  
+            tolerance=params['PRICE_TOLERANCE'],  
+            backtest=True
         )
-        
-        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
+
+        ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
 
     results = run_grid_backtest(
         ohlcv_arrays,
@@ -91,12 +87,11 @@ def process_combo(comb):
         tp_pct=params['TP_PCT'],
         sl_pct=params['SL_PCT'],
         order_amount=ORDER_AMOUNT
-        
     )
     return comb, results
 
 # -----------------------------------------------------------------------------
-# BACKTESTING PARALIZADO
+# PARALLELIZED BACKTESTING
 # -----------------------------------------------------------------------------
 all_combinations = list(product(*lists_for_grid))
 with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinations))) as progress:
@@ -105,20 +100,20 @@ with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinat
     )
 
 # -----------------------------------------------------------------------------
-# COMPILAR RESULTADOS A DATAFRAME
+# COMPILE RESULTS INTO DATAFRAME
 # -----------------------------------------------------------------------------
 grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
 
 # -----------------------------------------------------------------------------
-# SAVE RESULTS + TIMING
+# SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
-save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME}.xlsx",save=False)
-save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME}.xlsx", save=False)
+save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
+save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 
-final_prints(strategy=f" 🥇 Grid_Backest {STRATEGY} 🥇", data_folder=DATA_FOLDER, timeframe=TIMEFRAME, min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 
-df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names,data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
+df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)
 print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

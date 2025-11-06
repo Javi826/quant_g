@@ -14,6 +14,7 @@ from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API
 from utils.ZZ_connect import BITGET_API_KEY_03, BITGET_API_SECRET_03, BITGET_API_PASS_03
 from utils.ZZ_connect import BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02
 from utils.ZZ_connect import BITGET_API_KEY_04, BITGET_API_SECRET_04, BITGET_API_PASS_04
+from utils.ZZ_connect import BITGET_API_KEY_06, BITGET_API_SECRET_06, BITGET_API_PASS_06
 
 
 BASE_URL = "https://api.bitget.com"
@@ -25,7 +26,7 @@ def _body_to_str(body):
     return json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body else ""
 
 # =============================================================================
-# 01 TRENDS TF
+# 01 
 # =============================================================================
 def sign_request_01(timestamp, method, path, query_string, body_str):
     to_sign = timestamp + method.upper() + path
@@ -85,7 +86,7 @@ def send_request_01(method, path, params=None, body=None):
     except Exception as e:
         return 0, {"error": str(e)}
 # =============================================================================
-# 03 TRENDS_TF
+# 03 
 # =============================================================================
 def sign_request_03(timestamp, method, path, query_string, body_str):
     to_sign = timestamp + method.upper() + path
@@ -146,7 +147,7 @@ def send_request_03(method, path, params=None, body=None):
         return 0, {"error": str(e)}
     
 # =============================================================================
-# 02 TRENDS_TF
+# 02 
 # =============================================================================
 def sign_request_02(timestamp, method, path, query_string, body_str):
     to_sign = timestamp + method.upper() + path
@@ -207,7 +208,7 @@ def send_request_02(method, path, params=None, body=None):
         return 0, {"error": str(e)}
     
 # =============================================================================
-# 04 TRENDS_TF
+# 04 
 # =============================================================================
 def sign_request_04(timestamp, method, path, query_string, body_str):
     to_sign = timestamp + method.upper() + path
@@ -254,6 +255,68 @@ def send_request_04(method, path, params=None, body=None):
         "ACCESS-SIGN": sign,
         "ACCESS-TIMESTAMP": ts,
         "ACCESS-PASSPHRASE": BITGET_API_PASS_04,
+        "Content-Type": "application/json"
+    }
+    url = BASE_URL + path + (f"?{query_string}" if query_string else "")
+    try:
+        if method.upper() != "GET":
+            r = requests.post(url, headers=headers, data=body_str.encode('utf-8'), timeout=15)
+        else:
+            r = requests.get(url, headers=headers, timeout=15)
+        ct = r.headers.get("Content-Type", "")
+        return r.status_code, r.json() if ct.startswith("application/json") else r.text
+    except Exception as e:
+        return 0, {"error": str(e)}
+    
+    
+# =============================================================================
+# 06
+# =============================================================================
+def sign_request_06(timestamp, method, path, query_string, body_str):
+    to_sign = timestamp + method.upper() + path
+    if query_string:
+        to_sign += "?" + query_string
+    to_sign += body_str
+    digest = hmac.new(BITGET_API_SECRET_06.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
+    return base64.b64encode(digest).decode()
+
+def get_usdt_balance_06(exchange):
+    balance = exchange.fetch_balance()
+    return balance['free']['USDT']
+
+def get_open_positions_06(product_type: str = "USDT-FUTURES") -> List[Dict[str, Any]]:
+    endpoint = "/api/v2/mix/position/all-position"
+    params = {"productType": product_type}
+    response = make_get_06(endpoint, params)
+    return response.get("data", [])
+
+def make_get_06(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    qs = "&".join(f"{k}={v}" for k, v in params.items() if v not in [None, ""])
+    url = BASE_URL + endpoint + (f"?{qs}" if qs else "")
+    timestamp = str(int(time.time() * 1000))
+    sign = sign_request_06(timestamp, "GET", endpoint, qs, "")
+    headers = {
+        "ACCESS-KEY": BITGET_API_KEY_06,
+        "ACCESS-SIGN": sign,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_06,
+        "ACCESS-TIMESTAMP": timestamp,
+        "Content-Type": "application/json"
+    }
+    resp = requests.get(url, headers=headers, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def send_request_06(method, path, params=None, body=None):
+    ts = _now_ms()
+    query_string = urlencode(params) if params else ""
+    body_str = _body_to_str(body)
+    sign = sign_request_06(ts, method, path, query_string, body_str)
+    headers = {
+        "ACCESS-KEY": BITGET_API_KEY_06,
+        "ACCESS-SIGN": sign,
+        "ACCESS-TIMESTAMP": ts,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_06,
         "Content-Type": "application/json"
     }
     url = BASE_URL + path + (f"?{query_string}" if query_string else "")

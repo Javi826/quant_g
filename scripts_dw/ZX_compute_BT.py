@@ -245,7 +245,6 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor,
 
     return cash
 
-
 # ============================
 # close_expired_positions - MODIFICADO PARA SHORT
 # ============================
@@ -350,7 +349,7 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         cash -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        n_velas = 100 #VELAS  
+        n_velas = 99 #VELAS  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
