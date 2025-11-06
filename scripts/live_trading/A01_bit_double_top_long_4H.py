@@ -92,7 +92,7 @@ while True:
     if not open_positions:
         ohlcv_data = {}
         for sym in final_symbols:
-            recent_minor    = _call_history_candles(symbol=sym, granularity=TIMEFRAME_MINOR, limit=50)
+            recent_minor    = _call_history_candles(symbol=sym, granularity=TIMEFRAME_MINOR, limit=100)
             df_minor        = to_dataframe_from_api(recent_minor)
             ohlcv_data[sym] = {"minor": df_minor}
 

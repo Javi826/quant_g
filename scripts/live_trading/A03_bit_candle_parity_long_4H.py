@@ -6,26 +6,25 @@ from zoneinfo import ZoneInfo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
 
-from Z_add_signals_dt import detect_double_top_short
+from Z_add_signals_pr import detect_parity_reversal_long
 from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, PRODUCT_TYPE
-from utils.ZZ_connect import connect_bitget_02
-from ZX_place_orders import place_order_02
-from ZX_connect_live import get_usdt_balance_02, send_request_02, get_open_positions_02
+from utils.ZZ_connect import connect_bitget_03
+from ZX_place_orders import place_order_03
+from ZX_connect_live import get_usdt_balance_03, send_request_03, get_open_positions_03
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 # ----------------------
 # CONFIGURATION
 # ----------------------
-STRATEGY             = "double_top_short"
-TIMEFRAME_MINOR      = '1Dutc'
+STRATEGY             = "parity_candles_long"
+TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 500
 
 SELL_AFTER_N_CANDLES  = 99
 
-LOOKBACK_MINOR        = 2
+LOOKBACK              = 50
 PRICE_TOLERANCE       = 10
-TREND_TH              = 5
 
 TP_PCT                = 5
 SL_PCT                = 5
@@ -35,19 +34,18 @@ SL_PCT                = 5
 # ----------------------
 
 def check_latest_signal(df_minor, symbol):
-    
     df_minor  = normalize_live_ohlcv(df_minor)
     arr_minor = {
+        'open': df_minor['open'].values,
         'high': df_minor['high'].values,
         'low': df_minor['low'].values,
         'close': df_minor['close'].values
     }
     
-    signals = detect_double_top_short(
+    signals = detect_parity_reversal_long(
         arr_minor,
-        lookback_minor=LOOKBACK_MINOR,
-        price_tolerance=PRICE_TOLERANCE, 
-        trend_th=TREND_TH, 
+        tolerance=PRICE_TOLERANCE,
+        lookback=LOOKBACK,
         backtest=False
     )
 
@@ -61,9 +59,10 @@ def check_latest_signal(df_minor, symbol):
             'close': last['close'],
         }
 
+
 def has_open_positions_on_exchange(product_type: str = PRODUCT_TYPE) -> bool:   
     try:
-        pos_list = get_open_positions_02(product_type=product_type.upper())
+        pos_list = get_open_positions_03(product_type=product_type.upper())
         return bool(pos_list)
     except Exception as e:
         print(f"⚠️ Mistake checking positions: {e}")
@@ -72,7 +71,7 @@ def has_open_positions_on_exchange(product_type: str = PRODUCT_TYPE) -> bool:
 # ----------------------
 # MAIN LOOP
 # ----------------------
-exchange       = connect_bitget_02()
+exchange       = connect_bitget_03()
 all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
 final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR)
 open_positions = []
@@ -106,14 +105,14 @@ while True:
 
         for signal in detected_signals:
             sym = signal['symbol']
-            usdt_balance = get_usdt_balance_02(exchange)
+            usdt_balance = get_usdt_balance_03(exchange)
             now = datetime.now(MADRID_TZ).replace(second=0, microsecond=0) + timedelta(minutes=1)  
 
             if usdt_balance < ORDER_AMOUNT:
                 print(f"⚠️ {now} - USDT balance too low to place order for {sym}")
                 continue
 
-            order, tpsl_info = place_order_02(sym, usdt_amount=ORDER_AMOUNT, tp_percent=TP_PCT, sl_percent=SL_PCT)
+            order, tpsl_info = place_order_03(sym, usdt_amount=ORDER_AMOUNT, tp_percent=TP_PCT, sl_percent=SL_PCT)
 
             if order is not None:
                 buy_price     = float(order['data']['price']) if 'price' in order.get('data', {}) else signal['close']
@@ -127,7 +126,7 @@ while True:
                     'just_bought': True
                 })
 
-                usdt_balance_after = get_usdt_balance_02(exchange)
+                usdt_balance_after = get_usdt_balance_03(exchange)
                 print(f"💵 {now} - BUY executed: {sym} | Remaining USDT: {usdt_balance_after:.2f}\n")
                 time.sleep(2)
             else:
@@ -152,11 +151,11 @@ while True:
                     "symbol": pos['symbol'],
                     "productType": PRODUCT_TYPE
                 }
-                code, resp = send_request_02("POST", "/api/v2/mix/order/close-positions", body=body)
+                code, resp = send_request_03("POST", "/api/v2/mix/order/close-positions", body=body)
                 now = datetime.now(MADRID_TZ).replace(second=0, microsecond=0)
                 if code == 200 and resp.get("code") == "00000":
                     for success in resp['data']['successList']:
-                        code_ticker, resp_ticker = send_request_02(
+                        code_ticker, resp_ticker = send_request_03(
                             "GET",
                             "/api/v2/mix/market/ticker",
                             params={"productType": PRODUCT_TYPE, "symbol": success['symbol']}

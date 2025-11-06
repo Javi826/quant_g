@@ -11,12 +11,13 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
-from Z_add_signals_dt import detect_double_top_short
-from Z_add_signals_dt import detect_double_top_long
+from Z_add_signals_pr import detect_parity_reversal_long
+from Z_add_signals_pr import detect_parity_reversal_short
+
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
-STRATEGY     = "double_top_short"
+SAVE_SYMBOLS = True
+STRATEGY     = "parity_candles_short"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -29,28 +30,26 @@ DATA_FOLDER         = "data/crypto_OOS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 5_000
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,4] 
-PRICE_TOLERANCE_LIST = [10,20] 
-TREND_TH_LIST        = [10,20] 
+LOOKBACK_LIST        = [10,20,50]
+PRICE_TOLERANCE_LIST = [1,2,3,4,10] 
 
-TP_PCT_LIST          = [5,10,15,20,25,30]
+TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10,15,20]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [5] 
+LOOKBACK_LIST        = [20]
 PRICE_TOLERANCE_LIST = [10] 
-TREND_TH_LIST        = [5] 
 
-TP_PCT_LIST          = [15]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [5]
 
-param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -74,11 +73,10 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_double_top_long(
-            arr_minor,
-            lookback_minor=params['LOOKBACK_MINOR'],
-            price_tolerance=params['PRICE_TOLERANCE'], 
-            trend_th=params['TREND_TH'], 
+        signals = detect_parity_reversal_short(
+            arr=arr_minor,     
+            lookback=params['LOOKBACK'],  
+            tolerance=params['PRICE_TOLERANCE'],  
             backtest=True
         )
 

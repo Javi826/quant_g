@@ -8,17 +8,17 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_dt import detect_double_top_short
-from Z_add_signals_dt import detect_double_top_long
+from Z_add_signals_pr import detect_parity_reversal_long
+from Z_add_signals_pr import detect_parity_reversal_short
 
 start_time        = time.time()
 N_JOBS            = -1
-STRATEGY          = "double_top"
+STRATEGY          = "parity_candles"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '1Dutc'
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
@@ -26,14 +26,13 @@ MIN_VOL_USDT      = 10_000_000
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,5] 
-PRICE_TOLERANCE_LIST = [5,10,20] 
-TREND_TH_LIST        = [5,10,20] 
+LOOKBACK_LIST        = [10,20,50]
+PRICE_TOLERANCE_LIST = [1,2,3,4,10] 
 
-TP_PCT_LIST          = [5,10,15,25]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [5,10,15,20]
+SL_PCT_LIST          = [5,10,15,20]
 
-param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -70,11 +69,10 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_double_top_short(
-            arr_minor,
-            lookback_minor=params.get('LOOKBACK_MINOR'),
-            price_tolerance=params.get('PRICE_TOLERANCE'),
-            trend_th=params.get('TREND_TH'),
+        signals = detect_parity_reversal_short(
+            arr=arr_minor,
+            lookback=params.get('LOOKBACK'),
+            tolerance=params.get('PRICE_TOLERANCE'),
             backtest=True
         )
       
@@ -110,8 +108,8 @@ def metric_fn_default(results):
     net_gain_pct    = (net_gain / INITIAL_BALANCE) * 100.0 
     dd_pct          = float(port.get('max_dd')) * 100.0
     
-    #metric_score    = (net_gain_pct - 1*dd_pct)
     metric_score    = net_gain_pct 
+    #metric_score    = (net_gain_pct - 1*dd_pct)
     #metric_score    = sharpe_ratio
     
     return metric_score
@@ -142,14 +140,13 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_double_top_short(
-        arr_minor,
-        lookback_minor=best_params_wfo['LOOKBACK_MINOR'],
-        price_tolerance=best_params_wfo['PRICE_TOLERANCE'],
-        trend_th=best_params_wfo['TREND_TH'],
+    signals = detect_parity_reversal_short(
+        arr=arr_minor,
+        lookback=best_params_wfo['LOOKBACK'],
+        tolerance=best_params_wfo['PRICE_TOLERANCE'],
         backtest=True
     )
-    
+  
     ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
 
 final_results = run_grid_backtest(

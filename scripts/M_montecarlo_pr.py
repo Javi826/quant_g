@@ -13,14 +13,14 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths
-from Z_add_signals_dt import detect_double_top_short
-from Z_add_signals_dt import detect_double_top_long
+from Z_add_signals_pr import detect_parity_reversal_long
+from Z_add_signals_pr import detect_parity_reversal_short
 
 
 DTYPE             = np.float32
 start_time        = time.time()
 N_JOBS            = -1
-STRATEGY          = "double_top"
+STRATEGY          = "parity_candles"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -30,29 +30,23 @@ ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
-# GRID 
+# PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,5] 
-PRICE_TOLERANCE_LIST = [5,10,20] 
-TREND_TH_LIST        = [5,10,20] 
+LOOKBACK_LIST        = [10,20,50]
+PRICE_TOLERANCE_LIST = [1,2,3,4,10] 
 
-TP_PCT_LIST          = [5,10,15,25]
+TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
 
-# =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_MINOR_LIST  = [2] 
-# PRICE_TOLERANCE_LIST = [20] 
-# TREND_TH_LIST        = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [20]
+PRICE_TOLERANCE_LIST = [10] 
 
-param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [5]
+
+param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------
@@ -110,11 +104,10 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = detect_double_top_long(
+            signals = detect_parity_reversal_short(
                 arr_minor,
-                lookback_minor=param_dict.get('LOOKBACK_MINOR'),
-                price_tolerance=param_dict.get('PRICE_TOLERANCE'),
-                trend_th=param_dict.get('TREND_TH'),
+                lookback=param_dict.get('LOOKBACK'),
+                tolerance=param_dict.get('PRICE_TOLERANCE'),
                 backtest=True
             )
 

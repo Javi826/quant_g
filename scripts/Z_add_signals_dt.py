@@ -31,6 +31,7 @@ def _apply_shift(signal, entry_delay=1):
     
     shifted               = np.zeros_like(signal)
     shifted[entry_delay:] = signal[:-entry_delay]
+    
     return shifted
 
 # =========================================================
