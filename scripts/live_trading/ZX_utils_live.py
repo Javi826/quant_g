@@ -1,10 +1,11 @@
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import os
-import time
-import pandas as pd
 import numpy as np
+import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
+import time
+
 from datetime import datetime, timedelta
 
 BASE_URL     = "https://api.bitget.com"
@@ -29,8 +30,7 @@ def normalize_live_ohlcv(df):
     return df
 
 def df_to_arrays_live(df):
-
-    if not np.issubdtype(df.index.dtype, np.datetime64):
+    if not is_datetime64_any_dtype(df.index):
         df = df.copy()
         df.index = pd.to_datetime(df.index)
 
@@ -40,7 +40,11 @@ def df_to_arrays_live(df):
         'high': df['high'].to_numpy(dtype=np.float64),
         'low': df['low'].to_numpy(dtype=np.float64),
         'close': df['close'].to_numpy(dtype=np.float64),
-        'volume_quote': df['volume_quote'].to_numpy(dtype=np.float64) if 'volume_quote' in df else np.zeros(len(df))
+        'volume_quote': (
+            df['volume_quote'].to_numpy(dtype=np.float64)
+            if 'volume_quote' in df
+            else np.zeros(len(df))
+        )
     }
 
     return arrays

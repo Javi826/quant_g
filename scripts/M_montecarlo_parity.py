@@ -13,8 +13,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths
-from Z_add_signals_pr import detect_parity_reversal_long
-from Z_add_signals_pr import detect_parity_reversal_short
+from Z_add_signals_parity import detect_parity_reversal_long
+from Z_add_signals_parity import detect_parity_reversal_short
 
 DTYPE               = np.float32
 start_time          = time.time()
@@ -26,7 +26,7 @@ STRATEGY            = "parity_candles"
 DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 5_000
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -38,14 +38,12 @@ PRICE_TOLERANCE_LIST = [30,40,50,60,70]
 TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# PRICE_TOLERANCE_LIST = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [5]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [40]
+PRICE_TOLERANCE_LIST = [70] 
+
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [5]
 
 param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -53,12 +51,12 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 100
+FINAL_N_PATHS = 200
 
 if TIMEFRAME_MINOR == '1H':
-    FINAL_N_OBS_PER_PATH = 4000
+    FINAL_N_OBS_PER_PATH = 4320
 elif TIMEFRAME_MINOR == '4H':
-    FINAL_N_OBS_PER_PATH = 1000
+    FINAL_N_OBS_PER_PATH = 1080
 elif TIMEFRAME_MINOR == '6Hutc':
     FINAL_N_OBS_PER_PATH = 720
 elif TIMEFRAME_MINOR == '12Hutc':

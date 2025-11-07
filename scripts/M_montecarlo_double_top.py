@@ -61,9 +61,9 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 FINAL_N_PATHS = 100
 
 if TIMEFRAME_MINOR == '1H':
-    FINAL_N_OBS_PER_PATH = 4000
+    FINAL_N_OBS_PER_PATH = 4320
 elif TIMEFRAME_MINOR == '4H':
-    FINAL_N_OBS_PER_PATH = 1000
+    FINAL_N_OBS_PER_PATH = 1080
 elif TIMEFRAME_MINOR == '6Hutc':
     FINAL_N_OBS_PER_PATH = 720
 elif TIMEFRAME_MINOR == '12Hutc':

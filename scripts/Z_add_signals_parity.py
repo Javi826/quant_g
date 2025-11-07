@@ -1,5 +1,88 @@
 import numpy as np
 
+
+def detect_parity_reversal_long_gpt(arr, tolerance, lookback, shift_for_execution=False):
+
+    tolerance = tolerance / 100.0
+    open_, close, low = arr['open'], arr['close'], arr['low']
+    n = len(open_)
+    signal = np.zeros(n, dtype=np.int8)
+
+    completed_blocks = []
+    current_block = None
+    ref_body = None
+    ref_low = None
+
+
+    for idx in range(n):
+        dir_k = 1 if close[idx] > open_[idx] else -1
+        body_k = abs(close[idx] - open_[idx])
+        low_k = low[idx]
+
+        if current_block is None:
+            # iniciamos primer bloque con la vela idx
+            current_block = {
+                'dir': dir_k,
+                'start': idx,
+                'bodies': [body_k],
+                'lows': [low_k],
+                'close': close[idx]
+            }
+            continue
+
+        if current_block['dir'] == dir_k:
+
+            current_block['bodies'].append(body_k)
+            current_block['lows'].append(low_k)
+            current_block['close'] = close[idx]
+        else:
+
+            prev_block = {
+                'dir': current_block['dir'],
+                'start': current_block['start'],
+                'end': idx - 1,
+                'body_mean': np.mean(current_block['bodies']),
+                'low': min(current_block['lows']),
+                'close': current_block['close']
+            }
+            completed_blocks.append(prev_block)
+
+            # Si el bloque finalizado fue alcista, buscamos un bloque bajista previo similar
+            if prev_block['dir'] == 1:
+                start_idx = max(0, len(completed_blocks) - 1 - lookback)
+                for j in range(start_idx, len(completed_blocks) - 1):
+                    b_j = completed_blocks[j]
+                    if b_j['dir'] == -1:
+                        rel_diff = abs(prev_block['body_mean'] - b_j['body_mean']) / max(prev_block['body_mean'], b_j['body_mean'])
+                        if rel_diff <= tolerance:
+                            ref_body = prev_block['body_mean']
+                            ref_low = prev_block['low']
+                            break
+
+            if ref_body is not None and prev_block['dir'] == -1:
+                rel_diff_ref = abs(prev_block['body_mean'] - ref_body) / max(prev_block['body_mean'], ref_body)
+                rel_diff_low = abs(prev_block['close'] - ref_low) / ref_low if ref_low != 0 else float('inf')
+
+
+                exec_index = idx  
+                if rel_diff_ref <= tolerance and rel_diff_low <= tolerance and exec_index < n:
+                    signal[exec_index] = 1
+                    ref_body = None
+                    ref_low = None
+
+            # iniciamos nuevo bloque con la vela idx (ya cerrada)
+            current_block = {
+                'dir': dir_k,
+                'start': idx,
+                'bodies': [body_k],
+                'lows': [low_k],
+                'close': close[idx]
+            }
+
+
+    return signal
+
+
 def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=True):
 
     tolerance = tolerance / 100.0
@@ -7,24 +90,21 @@ def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=Tr
     n = len(open_)
     signal = np.zeros(n, dtype=np.int8)
     
-    # Historial de bloques completados
+
     completed_blocks = []
     
-    # Estado del bloque actual
     current_block = None
     
-    # Variables para tracking de paridad
     ref_body = None
     ref_low = None
     
     for i in range(n):
-        # Dirección de la vela actual
+
         dir_i = 1 if close[i] > open_[i] else -1
         body_i = abs(close[i] - open_[i])
         
-        # --- Inicializar o continuar bloque ---
         if current_block is None:
-            # Primer bloque
+
             current_block = {
                 'dir': dir_i,
                 'start': i,
@@ -33,12 +113,12 @@ def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=Tr
                 'close': close[i]
             }
         elif current_block['dir'] == dir_i:
-            # Continuar bloque actual
+
             current_block['bodies'].append(body_i)
             current_block['lows'].append(low[i])
             current_block['close'] = close[i]
         else:
-            # Cambio de dirección → cerrar bloque anterior
+
             prev_block = {
                 'dir': current_block['dir'],
                 'start': current_block['start'],
@@ -48,11 +128,9 @@ def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=Tr
                 'close': current_block['close']
             }
             completed_blocks.append(prev_block)
-            
-            # --- Buscar paridades con bloques previos ---
-            # Solo buscamos en bloques YA COMPLETADOS (sin lookahead)
-            if prev_block['dir'] == 1:  # Bloque verde recién completado
-                # Buscar bloque rojo similar en el historial
+
+            if prev_block['dir'] == 1:  
+
                 start_idx = max(0, len(completed_blocks) - 1 - lookback)
                 for j in range(start_idx, len(completed_blocks) - 1):
                     b_j = completed_blocks[j]
@@ -63,20 +141,17 @@ def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=Tr
                             ref_body = prev_block['body_mean']
                             ref_low = prev_block['low']
                             break
-            
-            # --- Verificar si el bloque anterior cumple condición de reversión ---
+
             if ref_body is not None and prev_block['dir'] == -1:
                 rel_diff_ref = abs(prev_block['body_mean'] - ref_body) / max(prev_block['body_mean'], ref_body)
                 rel_diff_low = abs(prev_block['close'] - ref_low) / ref_low if ref_low != 0 else float('inf')
                 
                 if rel_diff_ref <= tolerance and rel_diff_low <= tolerance:
-                    # SEÑAL: se genera al CIERRE del bloque rojo (i-1)
-                    # En livetrading, esta señal estaría disponible en la apertura de la barra i
+
                     signal[i - 1] = 1
                     ref_body = None
                     ref_low = None
             
-            # Iniciar nuevo bloque
             current_block = {
                 'dir': dir_i,
                 'start': i,
@@ -84,8 +159,7 @@ def detect_parity_reversal_long(arr, tolerance, lookback, shift_for_execution=Tr
                 'lows': [low[i]],
                 'close': close[i]
             }
-    
-    # --- Desplazamiento para backtest ---
+
     if shift_for_execution:
         shifted = np.zeros_like(signal)
         shifted[1:] = signal[:-1]
@@ -100,24 +174,22 @@ def detect_parity_reversal_short(arr, tolerance, lookback, shift_for_execution=T
     n = len(open_)
     signal = np.zeros(n, dtype=np.int8)
     
-    # Historial de bloques completados
+
     completed_blocks = []
     
-    # Estado del bloque actual
     current_block = None
     
-    # Variables para tracking de paridad
     ref_body = None
     ref_high = None
     
     for i in range(n):
-        # Dirección de la vela actual
+
         dir_i = 1 if close[i] > open_[i] else -1
         body_i = abs(close[i] - open_[i])
         
-        # --- Inicializar o continuar bloque ---
+
         if current_block is None:
-            # Primer bloque
+
             current_block = {
                 'dir': dir_i,
                 'start': i,
@@ -126,12 +198,12 @@ def detect_parity_reversal_short(arr, tolerance, lookback, shift_for_execution=T
                 'close': close[i]
             }
         elif current_block['dir'] == dir_i:
-            # Continuar bloque actual
+
             current_block['bodies'].append(body_i)
             current_block['highs'].append(high[i])
             current_block['close'] = close[i]
         else:
-            # Cambio de dirección → cerrar bloque anterior
+
             prev_block = {
                 'dir': current_block['dir'],
                 'start': current_block['start'],
@@ -142,34 +214,29 @@ def detect_parity_reversal_short(arr, tolerance, lookback, shift_for_execution=T
             }
             completed_blocks.append(prev_block)
             
-            # --- Buscar paridades con bloques previos ---
-            # Solo buscamos en bloques YA COMPLETADOS (sin lookahead)
-            if prev_block['dir'] == -1:  # Bloque rojo recién completado
-                # Buscar bloque verde similar en el historial
+            if prev_block['dir'] == -1: 
+
                 start_idx = max(0, len(completed_blocks) - 1 - lookback)
                 for j in range(start_idx, len(completed_blocks) - 1):
                     b_j = completed_blocks[j]
                     if b_j['dir'] == 1:
                         rel_diff = abs(prev_block['body_mean'] - b_j['body_mean']) / max(prev_block['body_mean'], b_j['body_mean'])
                         if rel_diff <= tolerance:
-                            # Paridad encontrada
+
                             ref_body = prev_block['body_mean']
                             ref_high = prev_block['high']
                             break
             
-            # --- Verificar si el bloque anterior cumple condición de reversión ---
             if ref_body is not None and prev_block['dir'] == 1:
                 rel_diff_ref = abs(prev_block['body_mean'] - ref_body) / max(prev_block['body_mean'], ref_body)
                 rel_diff_high = abs(prev_block['close'] - ref_high) / ref_high if ref_high != 0 else float('inf')
                 
                 if rel_diff_ref <= tolerance and rel_diff_high <= tolerance:
-                    # SEÑAL: se genera al CIERRE del bloque verde (i-1)
-                    # En livetrading, esta señal estaría disponible en la apertura de la barra i
+
                     signal[i - 1] = -1
                     ref_body = None
                     ref_high = None
             
-            # Iniciar nuevo bloque
             current_block = {
                 'dir': dir_i,
                 'start': i,
@@ -178,7 +245,6 @@ def detect_parity_reversal_short(arr, tolerance, lookback, shift_for_execution=T
                 'close': close[i]
             }
     
-    # --- Desplazamiento para backtest ---
     if shift_for_execution:
         shifted = np.zeros_like(signal)
         shifted[1:] = signal[:-1]

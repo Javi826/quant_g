@@ -10,7 +10,7 @@ from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_parity import detect_parity_reversal_long
 from Z_add_signals_parity import detect_parity_reversal_short
 
@@ -26,11 +26,11 @@ N_JOBS       = -1
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 5_000
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -42,14 +42,12 @@ PRICE_TOLERANCE_LIST = [1,2,3,4,10]
 TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10,15,20]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# PRICE_TOLERANCE_LIST = [70] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [5]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [40]
+PRICE_TOLERANCE_LIST = [70] 
+
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [5]
 
 param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -105,6 +103,7 @@ with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinat
 # -----------------------------------------------------------------------------
 # COMPILE RESULTS INTO DATAFRAME
 # -----------------------------------------------------------------------------
+save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY,save_file=True)
 grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
 

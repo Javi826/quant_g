@@ -19,7 +19,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 STRATEGY             = "entropy_short"
 TIMEFRAME_MINOR      = '4H'
-ORDER_AMOUNT         = 500
+ORDER_AMOUNT         = 50
 
 SELL_AFTER_N_CANDLES = 50
 

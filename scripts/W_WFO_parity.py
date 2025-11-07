@@ -8,8 +8,9 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_pr import detect_parity_reversal_long
-from Z_add_signals_pr import detect_parity_reversal_short
+from Z_add_signals_parity import detect_parity_reversal_long
+from Z_add_signals_parity import detect_parity_reversal_long_gpt
+from Z_add_signals_parity import detect_parity_reversal_short
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -27,7 +28,7 @@ MIN_VOL_USDT      = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [10,20,50]
-PRICE_TOLERANCE_LIST = [30,40,50,60,70] 
+PRICE_TOLERANCE_LIST = [10,20,30,40,50,60,70] 
 
 TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
@@ -69,7 +70,7 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_parity_reversal_long(
+        signals = detect_parity_reversal_long_gpt(
             arr=arr_minor,
             lookback=params.get('LOOKBACK'),
             tolerance=params.get('PRICE_TOLERANCE'),
@@ -140,7 +141,7 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_parity_reversal_long(
+    signals = detect_parity_reversal_long_gpt(
         arr=arr_minor,
         lookback=best_params_wfo['LOOKBACK'],
         tolerance=best_params_wfo['PRICE_TOLERANCE'],
