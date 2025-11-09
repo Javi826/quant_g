@@ -35,7 +35,7 @@ def _apply_shift(signal, entry_delay=1):
     return shifted
 
 # =========================================================
-# === LONG (DOBLE SUELO) ===
+# === LONG 
 # =========================================================
 
 def detect_double_top_long(
@@ -146,7 +146,7 @@ def _check_pattern_breakouts_long(active_patterns, close, signal, i):
 
 
 # =========================================================
-# === SHORT (DOBLE TECHO) ===
+# === SHORT 
 # =========================================================
 
 def detect_double_top_short(

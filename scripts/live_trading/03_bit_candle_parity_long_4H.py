@@ -21,13 +21,13 @@ STRATEGY             = "parity_candles_long"
 TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 500
 
-SELL_AFTER_N_CANDLES  = 50
+SELL_AFTER_N_CANDLES = 50
 
-LOOKBACK              = 40
-PRICE_TOLERANCE       = 70
+LOOKBACK             = 100
+TOLERANCE            = 30
 
-TP_PCT                = 5
-SL_PCT                = 5
+TP_PCT               = 5
+SL_PCT               = 10
 
 # ----------------------
 # FUNCTIONS
@@ -40,9 +40,9 @@ def check_latest_signal(df_minor, symbol):
 
     signals = detect_parity_reversal_long(
         arr_minor,
-        tolerance=PRICE_TOLERANCE,
         lookback=LOOKBACK,
-        shift_for_execution=True
+        tolerance=TOLERANCE,
+        live_trading=True
     )
 
     last_signal = signals[-1]
@@ -73,7 +73,7 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'🧿 === {STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
+    print(f'🧿 === 03_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     if not has_open_positions_on_exchange(PRODUCT_TYPE):

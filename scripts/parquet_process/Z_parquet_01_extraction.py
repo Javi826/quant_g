@@ -13,7 +13,7 @@ PRODUCT_TYPE           = "usdt-futures"
 
 TIMEFRAME              = "1Dutc"          
 LIMIT                  = 200           
-DATA_FOLDER            = "crypto_2024_utc"
+DATA_FOLDER            = "crypto_2024_DDD"
 START_DATE             = "2021-01-02"  
 REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06  

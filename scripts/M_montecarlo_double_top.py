@@ -13,9 +13,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths
-from Z_add_signals_dt import detect_double_top_short
-from Z_add_signals_dt import detect_double_top_long
-
+from Z_add_signals_double_top import detect_double_top_short
+from Z_add_signals_double_top import detect_double_top_long
 
 DTYPE             = np.float32
 start_time        = time.time()
@@ -25,7 +24,7 @@ STRATEGY          = "double_top"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '1Dutc'
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
@@ -37,7 +36,7 @@ LOOKBACK_MINOR_LIST  = [2,3,5]
 PRICE_TOLERANCE_LIST = [5,10,20,30,40,50] 
 TREND_TH_LIST        = [5,10,20] 
 
-TP_PCT_LIST          = [5,10,15,25]
+TP_PCT_LIST          = [5,10]
 SL_PCT_LIST          = [5,10]
 
 # =============================================================================
@@ -58,7 +57,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 100
+FINAL_N_PATHS = 500
 
 if TIMEFRAME_MINOR == '1H':
     FINAL_N_OBS_PER_PATH = 4320
@@ -110,7 +109,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = detect_double_top_long(
+            signals = detect_double_top_short(
                 arr_minor,
                 lookback_minor=param_dict.get('LOOKBACK_MINOR'),
                 price_tolerance=param_dict.get('PRICE_TOLERANCE'),

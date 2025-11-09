@@ -1,79 +1,191 @@
 import os
 import sys
-import time
-import pandas as pd
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 
-# --- rutas y dependencias locales ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utils.ZZ_connect import connect_bitget_01
-from parquet_process.Z_parquet_01_extraction import (
-    _call_history_candles,
-    to_dataframe_from_api,
-)
-from ZX_utils_live import wait_for_next_candle
+from parquet_process.Z_parquet_01_extraction import _call_history_candles, to_dataframe_from_api
 
-# --- CONFIGURACIÓN ---
-MADRID_TZ = ZoneInfo("Europe/Madrid")
+UTC_TZ = timezone.utc
 
-SYMBOL             = "BTCUSDT"   # 🔹 símbolo a inspeccionar
-TIMEFRAME_MAJOR    = "1Dutc"
-TIMEFRAME_MINOR    = "1H"
-OUTPUT_DIR         = "debug_excels"
-REFRESH_EACH_CANDLE = True       # True = espera nueva vela 1H, False = solo una descarga
+# ----------------------
+# CONFIGURACIÓN
+# ----------------------
+SYMBOL = 'BTCUSDT'
+TIMEFRAME = '1H'
 
-# --- FUNCIÓN AUXILIAR ---
-def save_candles_to_excel_single(symbol, df_minor, df_major, output_dir="debug_excels", prefix="candles_debug"):
-    import os
-    os.makedirs(output_dir, exist_ok=True)
+# ----------------------
+# VER ÚLTIMA VELA
+# ----------------------
+print("=" * 80)
+print("🕐 ÚLTIMA VELA RECIBIDA DE LA API")
+print("=" * 80)
 
-    # Quitar zona horaria antes de guardar (para evitar error de Excel)
-    for df in (df_minor, df_major):
-        if df is not None and not df.empty and 'timestamp' in df.columns:
-            if pd.api.types.is_datetime64tz_dtype(df['timestamp']):
-                df['timestamp'] = df['timestamp'].dt.tz_convert(None)
+# Hora actual
+now_utc = datetime.now(UTC_TZ)
 
-    timestamp_now = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = os.path.join(output_dir, f"{prefix}_{symbol}_{timestamp_now}.xlsx")
+print(f"\n⏰ Hora actual UTC: {now_utc.strftime('%Y-%m-%d %H:%M:%S')}")
+print(f"📊 Símbolo: {SYMBOL}")
+print(f"⏱️  Timeframe: {TIMEFRAME}")
+print("\n" + "-" * 80 + "\n")
 
-    with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-        if df_minor is not None and not df_minor.empty:
-            df_minor.to_excel(writer, sheet_name=f"{symbol}_minor", index=False)
-        if df_major is not None and not df_major.empty:
-            df_major.to_excel(writer, sheet_name=f"{symbol}_major", index=False)
-
-    print(f"💾 Guardadas velas en: {filename}")
-    print(f"🕒 Última minor: {df_minor['timestamp'].iloc[-1]}")
-    print(f"🕒 Última major: {df_major['timestamp'].iloc[-1]}")
-    print("-" * 60)
+# Recibir datos
+recent = _call_history_candles(symbol=SYMBOL, granularity=TIMEFRAME, limit=5)
+df = to_dataframe_from_api(recent)
 
 
+# Si hay columna timestamp, usarla
+if 'timestamp' in df.columns:
+    for idx, row in df.iterrows():
+        # Convertir timestamp a datetime
+        ts_val = row['timestamp']
+        if hasattr(ts_val, 'timestamp'):
+            # Ya es un Timestamp de pandas
+            ts_utc = ts_val.tz_convert(UTC_TZ).strftime('%Y-%m-%d %H:%M') if ts_val.tz else ts_val.strftime('%Y-%m-%d %H:%M')
+        else:
+            # Es un número (milisegundos)
+            dt = datetime.fromtimestamp(float(ts_val)/1000, tz=UTC_TZ)
+            ts_utc = dt.strftime('%Y-%m-%d %H:%M')
+        
+        color = '🟢' if float(row['close']) > float(row['open']) else '🔴'
+        print(f"   {ts_utc} | O: {float(row['open']):>9.2f} | H: {float(row['high']):>9.2f} | L: {float(row['low']):>9.2f} | C: {float(row['close']):>9.2f} {color}")
+else:
+    # Si el índice es DatetimeIndex
+    if hasattr(df.index, 'strftime'):
+        for idx, row in df.iterrows():
+            ts = idx.strftime('%Y-%m-%d %H:%M')
+            color = '🟢' if float(row['close']) > float(row['open']) else '🔴'
+            print(f"   {ts} | O: {float(row['open']):>9.2f} | H: {float(row['high']):>9.2f} | L: {float(row['low']):>9.2f} | C: {float(row['close']):>9.2f} {color}")
+    else:
+        for idx, row in df.iterrows():
+            color = '🟢' if float(row['close']) > float(row['open']) else '🔴'
+            print(f"   Índice {idx} | O: {float(row['open']):>9.2f} | H: {float(row['high']):>9.2f} | L: {float(row['low']):>9.2f} | C: {float(row['close']):>9.2f} {color}")
 
-# --- MAIN LOOP ---
-if __name__ == "__main__":
-    print(f"🚀 Iniciando debug de velas para {SYMBOL} ({TIMEFRAME_MAJOR} + {TIMEFRAME_MINOR})")
-    exchange = connect_bitget_01()
+print("\n" + "-" * 80 + "\n")
 
-    while True:
-        # 1️⃣ Descargamos velas
-        recent_major = _call_history_candles(symbol=SYMBOL, granularity=TIMEFRAME_MAJOR, limit=50)
-        recent_minor = _call_history_candles(symbol=SYMBOL, granularity=TIMEFRAME_MINOR, limit=50)
 
-        if not recent_major or not recent_minor:
-            print("⚠️ No se pudieron obtener velas.")
-            time.sleep(30)
-            continue
+last = df.iloc[-1]
+ts_val = last['timestamp'] if 'timestamp' in df.columns else df.index[-1]
 
-        df_major = to_dataframe_from_api(recent_major)
-        df_minor = to_dataframe_from_api(recent_minor)
+if hasattr(ts_val, 'timestamp'):
+    ts_utc = ts_val.tz_convert(UTC_TZ).strftime('%Y-%m-%d %H:%M:%S') if ts_val.tz else ts_val.strftime('%Y-%m-%d %H:%M:%S')
+else:
+    ts_utc = str(ts_val)
 
-        # 2️⃣ Guardamos en Excel
-        save_candles_to_excel_single(SYMBOL, df_minor, df_major, output_dir=OUTPUT_DIR)
 
-        # 3️⃣ Salimos o esperamos próxima vela
-        if not REFRESH_EACH_CANDLE:
-            break
-        print(f"⏳ Esperando siguiente cierre de {TIMEFRAME_MINOR}...\n")
-        wait_for_next_candle(TIMEFRAME_MINOR)
+
+# ----------------------
+# GENERAR SEÑALES PARA TODOS LOS SÍMBOLOS
+# ----------------------
+from Z_add_signals_parity import detect_parity_reversal_long
+from ZX_utils_live import load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
+from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api
+
+STRATEGY = "parity_candles_long"
+LOOKBACK = 100
+TOLERANCE = 30
+
+print("\n🔍 GENERANDO SEÑALES PARA TODOS LOS SÍMBOLOS")
+print("=" * 80)
+print(f"\n⏰ Hora actual UTC: {datetime.now(UTC_TZ).strftime('%Y-%m-%d %H:%M:%S')}")
+print(f"📊 Estrategia: {STRATEGY}")
+print(f"⏱️  Timeframe: {TIMEFRAME}")
+print("\n" + "-" * 80 + "\n")
+
+# Cargar símbolos
+all_symbols   = get_futures_symbols_from_api(PRODUCT_TYPE)
+final_symbols = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME)
+
+print(f"📋 Total símbolos a analizar: {len(final_symbols)}\n")
+print("-" * 80 + "\n")
+
+# Recopilar datos
+ohlcv_data = {}
+for sym in final_symbols:
+    try:
+        recent = _call_history_candles(symbol=sym, granularity=TIMEFRAME, limit=100)
+        df = to_dataframe_from_api(recent)
+        ohlcv_data[sym] = df
+    except Exception as e:
+        print(f"⚠️  Error obteniendo datos para {sym}: {e}")
+
+# Detectar señales
+signals_summary = []
+
+for sym, df_minor in ohlcv_data.items():
+    try:
+        # Normalizar y convertir
+        df_normalized = normalize_live_ohlcv(df_minor)
+        arr_minor = df_to_arrays_live(df_normalized)
+        
+        # Detectar señales con True y False
+        signals_true = detect_parity_reversal_long(
+            arr_minor,
+            lookback=LOOKBACK,
+            tolerance=TOLERANCE,
+            live_trading=True
+        )
+        
+        signals_false = detect_parity_reversal_long(
+            arr_minor,
+            lookback=LOOKBACK,
+            tolerance=TOLERANCE,
+            live_trading=False
+        )
+        
+        last_signal_true = signals_true[-1]
+        last_signal_false = signals_false[-1]
+        
+        # Obtener timestamp de última vela
+        last = df_normalized.iloc[-1]
+        ts_val = last.name if 'timestamp' not in df_normalized.columns else last['timestamp']
+        
+        if hasattr(ts_val, 'timestamp'):
+            ts_utc = ts_val.tz_convert(UTC_TZ).strftime('%Y-%m-%d %H:%M') if ts_val.tz else ts_val.strftime('%Y-%m-%d %H:%M')
+        else:
+            ts_utc = str(ts_val)
+        
+        signals_summary.append({
+            'symbol': sym,
+            'timestamp': ts_utc,
+            'signal_true': last_signal_true,
+            'signal_false': last_signal_false,
+            'close': float(last['close'])
+        })
+        
+    except Exception as e:
+        print(f"⚠️  Error procesando {sym}: {e}")
+
+# Mostrar resultados
+print("📊 RESUMEN DE SEÑALES (última vela de cada símbolo):\n")
+print(f"{'Símbolo':<15} | {'Timestamp UTC':<17} | {'True':<6} | {'False':<6} | {'Close':<10} | {'Estado'}")
+print("-" * 80)
+
+for item in signals_summary:
+    status = ""
+    if item['signal_true'] == 1 and item['signal_false'] == 0:
+        status = "⚠️  LOOK-AHEAD"
+    elif item['signal_true'] == 0 and item['signal_false'] == 1:
+        status = "✅ OPERABLE"
+    elif item['signal_true'] == 1 and item['signal_false'] == 1:
+        status = "🔵 AMBOS"
+    else:
+        status = ""
+    
+    print(f"{item['symbol']:<15} | {item['timestamp']:<17} | {item['signal_true']:<6} | {item['signal_false']:<6} | {item['close']:<10.2f} | {status}")
+
+# Resumen de señales detectadas
+total_true = sum(1 for item in signals_summary if item['signal_true'] == 1)
+total_false = sum(1 for item in signals_summary if item['signal_false'] == 1)
+only_true = sum(1 for item in signals_summary if item['signal_true'] == 1 and item['signal_false'] == 0)
+only_false = sum(1 for item in signals_summary if item['signal_true'] == 0 and item['signal_false'] == 1)
+
+print("\n" + "-" * 80)
+print(f"\n📈 ESTADÍSTICAS:")
+print(f"   Total símbolos analizados:          {len(signals_summary)}")
+print(f"   Señales con live_trading=True:      {total_true}")
+print(f"   Señales con live_trading=False:     {total_false}")
+print(f"   Solo True (look-ahead bias):        {only_true} ⚠️")
+print(f"   Solo False (operables correctas):   {only_false} ✅")
+
+print("\n" + "=" * 80)

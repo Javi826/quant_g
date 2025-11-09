@@ -19,7 +19,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 STRATEGY             = "double_top_short"
 TIMEFRAME_MINOR      = '1Dutc'
-ORDER_AMOUNT         = 500
+ORDER_AMOUNT         = 200
 
 SELL_AFTER_N_CANDLES  = 50
 
@@ -76,7 +76,7 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'🧿 === {STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
+    print(f'🧿 === 02_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     if not has_open_positions_on_exchange(PRODUCT_TYPE):

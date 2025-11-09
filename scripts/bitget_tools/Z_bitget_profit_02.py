@@ -1,10 +1,10 @@
 import os
 import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 from typing import List, Dict, Any
 from datetime import datetime
 from live_trading.ZX_connect_live import make_get_02
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.ZZ_connect import connect_bitget_02
 
 # -----------------------------

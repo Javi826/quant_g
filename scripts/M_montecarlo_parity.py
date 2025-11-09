@@ -24,7 +24,7 @@ STRATEGY            = "parity_candles"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 5_000
 MIN_VOL_USDT        = 10_000_000
 
@@ -32,26 +32,29 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [10,20,50]
-PRICE_TOLERANCE_LIST = [30,40,50,60,70] 
+LOOKBACK_LIST        = [50,100,150,200]
+TOLERANCE_LIST       = [5,10,20,30,40] 
 
 TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10]
+SL_PCT_LIST          = [5,7.5,10]
 
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [40]
-PRICE_TOLERANCE_LIST = [70] 
-
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [5]
-
-param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
+#===========================================================================
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [30] 
+# 
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [5]
+# =============================================================================
+# # =============================================================================
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 200
+FINAL_N_PATHS = 100
 
 if TIMEFRAME_MINOR == '1H':
     FINAL_N_OBS_PER_PATH = 4320
@@ -106,8 +109,8 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
             signals = detect_parity_reversal_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
-                tolerance=param_dict.get('PRICE_TOLERANCE'),
-                shift_for_execution=True
+                tolerance=param_dict.get('TOLERANCE'),
+                live_trading=False
             )
 
             arr_minor['signal'] = np.asarray(signals, dtype=DTYPE)

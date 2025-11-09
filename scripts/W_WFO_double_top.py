@@ -8,8 +8,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_dt import detect_double_top_short
-from Z_add_signals_dt import detect_double_top_long
+from Z_add_signals_double_top import detect_double_top_short
+from Z_add_signals_double_top import detect_double_top_long
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -30,8 +30,8 @@ LOOKBACK_MINOR_LIST  = [2,3,5]
 PRICE_TOLERANCE_LIST = [5,10,20,30,40,50] 
 TREND_TH_LIST        = [5,10,20] 
 
-TP_PCT_LIST          = [2.5,5.0,7.5,10]
-SL_PCT_LIST          = [2.5,5.0,7.5,10]
+TP_PCT_LIST          = [5,10]
+SL_PCT_LIST          = [5,10]
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

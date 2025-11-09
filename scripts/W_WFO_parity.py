@@ -9,8 +9,8 @@ from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from Z_add_signals_parity import detect_parity_reversal_long
-from Z_add_signals_parity import detect_parity_reversal_long_gpt
 from Z_add_signals_parity import detect_parity_reversal_short
+
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -19,7 +19,7 @@ STRATEGY          = "parity_candles"
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR     = '1Dutc'
 ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
@@ -27,13 +27,13 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [10,20,50]
-PRICE_TOLERANCE_LIST = [10,20,30,40,50,60,70] 
+LOOKBACK_LIST        = [50,100,150,200]
+TOLERANCE_LIST       = [5,10,20,30,40] 
 
 TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10]
+SL_PCT_LIST          = [5,7.5,10]
 
-param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -70,11 +70,11 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_parity_reversal_long_gpt(
+        signals = detect_parity_reversal_short(
             arr=arr_minor,
             lookback=params.get('LOOKBACK'),
-            tolerance=params.get('PRICE_TOLERANCE'),
-            shift_for_execution=True
+            tolerance=params.get('TOLERANCE'),
+            live_trading=False
         )
       
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
@@ -141,11 +141,11 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_parity_reversal_long_gpt(
+    signals = detect_parity_reversal_short(
         arr=arr_minor,
         lookback=best_params_wfo['LOOKBACK'],
-        tolerance=best_params_wfo['PRICE_TOLERANCE'],
-        shift_for_execution=True
+        tolerance=best_params_wfo['TOLERANCE'],
+        live_trading=False
     )
   
     ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}

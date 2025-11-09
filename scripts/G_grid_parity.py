@@ -17,7 +17,7 @@ from Z_add_signals_parity import detect_parity_reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "parity_candles_short"
+STRATEGY     = "parity_candles_long"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -36,20 +36,20 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [10,20,50]
-PRICE_TOLERANCE_LIST = [1,2,3,4,10] 
+LOOKBACK_LIST        = [25,50,100,150]
+SIZE_TOLERANCE_LIST  = [5,10,20,30,40] 
 
 TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10,15,20]
+SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [40]
-PRICE_TOLERANCE_LIST = [70] 
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [30] 
 
 TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
-param_names    = ['SELL_AFTER','LOOKBACK','PRICE_TOLERANCE','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -59,7 +59,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
 
-save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+#save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
 
@@ -73,11 +73,11 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_parity_reversal_short(
+        signals = detect_parity_reversal_long(
             arr=arr_minor,     
             lookback=params['LOOKBACK'],  
-            tolerance=params['PRICE_TOLERANCE'],  
-            shift_for_execution=True
+            tolerance=params['TOLERANCE'],  
+            live_trading=False
         )
 
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
@@ -103,13 +103,13 @@ with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinat
 # -----------------------------------------------------------------------------
 # COMPILE RESULTS INTO DATAFRAME
 # -----------------------------------------------------------------------------
-save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY,save_file=True)
 grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
 
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
+save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY,save_file=True)
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 
