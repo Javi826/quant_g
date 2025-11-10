@@ -23,7 +23,7 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
-DATA_FOLDER       = "data/crypto_2022_OOS"
+#DATA_FOLDER       = "data/crypto_2022_OOS"
 #DATA_FOLDER       = "data/crypto_2021_OOS"
 #DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
@@ -44,9 +44,9 @@ TP_PCT_LIST         = [5,10,15,20,25,30]
 SL_PCT_LIST         = [5,10,20]
 
 SELL_AFTER_LIST     = [0]    
-LOOKBACK_MINOR_LIST = [3] 
-N_CONSECUTIVE_LIST  = [1]
-FACTOR_LIST         = [0.8]
+LOOKBACK_MINOR_LIST = [1] 
+N_CONSECUTIVE_LIST  = [2]
+FACTOR_LIST         = [0.2]
 
 TP_PCT_LIST         = [15]
 SL_PCT_LIST         = [20]

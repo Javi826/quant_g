@@ -14,15 +14,13 @@ pd.set_option('display.max_colwidth', None)
 
 
 def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=False, save_excel=False):
-
-    
+  
     df = df.copy()
-
     # -----------------------------
     # Métricas derivadas
     # -----------------------------
-    df["Net_Gain_pct"] = df["Net_Gain"] / initial_capital * 100
-    df["Gain_signal"]  = df["Net_Gain"] / df["Num_Signals"]
+    df["Net_Gain_pct"]       = df["Net_Gain"] / initial_capital * 100
+    df["Gain_signal"]        = df["Net_Gain"] / df["Num_Signals"]
     df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
 
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
@@ -178,9 +176,11 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     equity_hist = best_row.get("sim_balance_history", None)
     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Net Gain")
  
-    best_row = df.loc[df["Sharpe"].idxmax()]
-    equity_hist = best_row.get("sim_balance_history", None)
-    plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
+# =============================================================================
+#     best_row = df.loc[df["Sharpe"].idxmax()]
+#     equity_hist = best_row.get("sim_balance_history", None)
+#     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
+# =============================================================================
          
     return df_portfolio, mi_series
 
@@ -260,20 +260,15 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     axes[1].set_title('Distribution: Drawdown per Path_IDX')
     axes[1].grid(True, linestyle='--', alpha=0.5)
     
-    plt.tight_layout()  # Ajusta automáticamente los espacios
+    plt.tight_layout()  
     plt.show()
     plt.close()
-    
-    # -----------------------------
-    # TOP 3 COMBOS
-    # -----------------------------
-    cols_to_show = [c for c in df_summary.columns if c not in ['Net_Gain_m','Rows']]
-    
+        
     # -----------------------------
     # MEJORES COMBOS POR MÉTRICA
     # -----------------------------
     SHARPE_ADJUSTMENT_FACTOR = 1e6
-    df_summary['Sharpe_m'] = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
+    df_summary['Sharpe_m']   = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
     
     # Determinar las mejores combinaciones por métrica
     best_netgain = df_summary.loc[df_summary['Net_Gain_pct_m'].idxmax()]
@@ -299,7 +294,6 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
 
     print(df_best.to_string(index=False))
 
-
     median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
     print(f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%")
 
@@ -315,8 +309,4 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
     print(f"Probability of Negative Path : {prob_negative:.2f}%")
 
-
     return df_summary
-
-
-

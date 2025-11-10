@@ -23,10 +23,10 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
+DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
-ORDER_AMOUNT        = 5_000
+ORDER_AMOUNT        = 5_00
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------

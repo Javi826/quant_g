@@ -23,8 +23,8 @@ ORDER_AMOUNT         = 500
 
 SELL_AFTER_N_CANDLES = 50
 
-LOOKBACK             = 100
-TOLERANCE            = 30
+LOOKBACK             = 50
+TOLERANCE            = 40
 
 TP_PCT               = 5
 SL_PCT               = 10

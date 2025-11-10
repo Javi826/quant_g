@@ -8,12 +8,12 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_parity import detect_parity_reversal_long
-from Z_add_signals_parity import detect_parity_reversal_short
+from Z_add_signals_reversal import trend_reversal_entry_long
+from Z_add_signals_reversal import trend_reversal_entry_short
 
 start_time        = time.time()
 N_JOBS            = -1
-STRATEGY          = "parity_candles"
+STRATEGY            = "pulls"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
@@ -26,13 +26,13 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150,200]
-TOLERANCE_LIST       = [5,10,20,30,40] 
+LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
+TOLERANCE_LIST       = [5,10,15,20,25,30]
 
 TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
 
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -69,9 +69,9 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_parity_reversal_long(
+        signals = trend_reversal_entry_short(
             arr=arr_minor,
-            lookback=params.get('LOOKBACK'),
+            left_lookback=params.get('LEFT_LOOKBACK'),
             tolerance=params.get('TOLERANCE'),
             live_trading=False
         )
@@ -140,9 +140,9 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_parity_reversal_long(
+    signals = trend_reversal_entry_short(
         arr=arr_minor,
-        lookback=best_params_wfo['LOOKBACK'],
+        left_lookback=best_params_wfo['LEFT_LOOKBACK'],
         tolerance=best_params_wfo['TOLERANCE'],
         live_trading=False
     )

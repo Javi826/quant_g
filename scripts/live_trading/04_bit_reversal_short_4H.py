@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
 
-from Z_add_signals_double_top import detect_double_top_short
+from Z_add_signals_reversal import trend_reversal_entry_short
 from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
 from utils.ZZ_connect import connect_bitget_02
 from ZX_place_orders import place_order_02
@@ -17,18 +17,16 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 # CONFIGURATION
 # ----------------------
-STRATEGY             = "double_top_short"
-TIMEFRAME_MINOR      = '1Dutc'
-ORDER_AMOUNT         = 200
+STRATEGY             = "reversal_short"
+TIMEFRAME_MINOR      = '4H'
+ORDER_AMOUNT         = 500
 
 SELL_AFTER_N_CANDLES  = 50
-
-LOOKBACK_MINOR        = 2
-PRICE_TOLERANCE       = 10
-TREND_TH              = 5
+LEFT_LOOKBACK         = 8
+TOLERANCE             = 30
 
 TP_PCT                = 5
-SL_PCT                = 5
+SL_PCT                = 10
 
 # ----------------------
 # FUNCTIONS
@@ -39,17 +37,16 @@ def check_latest_signal(df_minor, symbol):
     df_minor  = normalize_live_ohlcv(df_minor)
     arr_minor = df_to_arrays_live(df_minor)
 
-    signals = detect_double_top_short(
+    signals = trend_reversal_entry_short(
         arr_minor,
-        lookback_minor=LOOKBACK_MINOR,
-        price_tolerance=PRICE_TOLERANCE,
-        trend_th=TREND_TH,
+        left_lookback=LEFT_LOOKBACK,
+        tolerance=TOLERANCE,
         live_trading=True
     )
 
     last_signal = signals[-1]
 
-    # Si la última señal es válida (por ejemplo 1 o -1)
+   
     if last_signal != 0:
         last = df_minor.iloc[-1]
         return {
@@ -76,7 +73,7 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'🧿 === 02_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
+    print(f'🧿 === 04_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     if not has_open_positions_on_exchange(PRODUCT_TYPE):

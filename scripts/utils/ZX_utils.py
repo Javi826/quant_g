@@ -109,10 +109,10 @@ def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, p
         return str(n)
 
     print(f'\n== {strategy} ==\n')
-    print(f"DATA_FOLDER      : {data_folder}")
-    print(f"TIMEFRAME        : {timeframe}")
-    print(f"ORDER_AMOUNT     : {format_number(order_amount)}")
-    print(f"MIN_VOL_USDT     : {format_number(min_vol_usdt)}")
+    print(f"DATA_FOLDER         : {data_folder}")
+    print(f"TIMEFRAME           : {timeframe}")
+    print(f"ORDER_AMOUNT        : {format_number(order_amount)}")
+    print(f"MIN_VOL_USDT        : {format_number(min_vol_usdt)}")
 
     # Calcular longitud máxima de los nombres base para alinear los prints
     max_len = max(len(name) for name in param_names)

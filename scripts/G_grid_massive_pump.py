@@ -50,7 +50,6 @@ SL_PCT_LIST           = [10]
 # SL_PCT_LIST           = [20]
 # =============================================================================
 
-
 param_names = ['SELL_AFTER', 'WINDOW', 'PCT_VOLUME_INC', 'MAX_CLOSE_CHANGE', 'TP_PCT', 'SL_PCT']
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
@@ -110,7 +109,7 @@ with tqdm_joblib(tqdm(desc="🔁 Backtesting Grid... \n", total=len(all_combinat
 # COMPILAR RESULTADOS A DATAFRAME
 # -----------------------------------------------------------------------------
 save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY, save_file=False)
-grid_records = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
+grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
 
 # -----------------------------------------------------------------------------

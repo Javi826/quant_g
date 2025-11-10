@@ -48,13 +48,14 @@ elif TIMEFRAME_MINOR == '1Dutc':
 TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------------------------------------------------------
-# GRID
+# GRID 
+# -----------------------------------------------------------------------------
 SELL_AFTER_LIST     = [0]  
 LOOKBACK_MINOR_LIST = [1,2,3,4,5,6] 
 N_CONSECUTIVE_LIST  = [1,2,3,4,5,6]
 FACTOR_LIST         = [0.2,0.4,0.6,0.8,1.0]
 
-TP_PCT_LIST         = [5,10,15,20,25,30]
+TP_PCT_LIST         = [5,10,15,20,30]
 SL_PCT_LIST         = [5,10,20]
 # =============================================================================
 # SELL_AFTER_LIST     = [0]

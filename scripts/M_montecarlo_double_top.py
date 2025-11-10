@@ -24,8 +24,8 @@ STRATEGY          = "double_top"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '1Dutc'
-ORDER_AMOUNT      = 5_000
+TIMEFRAME_MINOR   = '4H'
+ORDER_AMOUNT      = 5_00
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -40,15 +40,13 @@ TP_PCT_LIST          = [5,10]
 SL_PCT_LIST          = [5,10]
 
 # =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_MINOR_LIST  = [2] 
-# PRICE_TOLERANCE_LIST = [20] 
-# TREND_TH_LIST        = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [5] 
+TREND_TH_LIST        = [10] 
+
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [5]
 # =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
@@ -57,7 +55,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 500
+FINAL_N_PATHS = 100
 
 if TIMEFRAME_MINOR == '1H':
     FINAL_N_OBS_PER_PATH = 4320

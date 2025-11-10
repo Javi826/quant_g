@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def detect_parity_reversal_long(arr, lookback, tolerance, live_trading=True):
     opens  = arr['open']
     closes = arr['close']
@@ -38,7 +39,12 @@ def detect_parity_reversal_long(arr, lookback, tolerance, live_trading=True):
                             diff_close = abs(close_red2 - close_red1) / abs(close_red1) * 100
                             
                             if diff_red2_red1 <= tolerance and diff_close <= tolerance:
-                                signals[i] = 1
+                                # Confirmación de tendencia con MA50
+                                if i >= 50:
+                                    ma50 = np.mean(closes[i-50:i])
+                                    if closes[i] > ma50:
+                                        signals[i] = 1
+                                # Si no hay suficientes datos, no genera señal
                                 break
                     
                     if signals[i] == 1:
@@ -62,16 +68,15 @@ def detect_parity_reversal_short(arr, lookback, tolerance, live_trading=True):
     
     for i in range(lookback, n):
         for j in range(1, lookback):
-            if i - j - 2 < 0:
+            if i - j - 1 < 0:
                 break
             
-            idx_green1 = i - j - 2
-            idx_red    = i - j
+            idx_green1 = i - j - 1
+            idx_red = i - j
             
-            # Primero buscamos la secuencia inicial verde → roja
             if is_green[idx_green1] and is_red[idx_red]:
                 size_green1 = body_sizes[idx_green1]
-                size_red    = body_sizes[idx_red]
+                size_red = body_sizes[idx_red]
                 
                 if size_green1 == 0:
                     continue
@@ -79,14 +84,22 @@ def detect_parity_reversal_short(arr, lookback, tolerance, live_trading=True):
                 diff_red_green1 = abs(size_red - size_green1) / size_green1 * 100
                 
                 if diff_red_green1 <= tolerance:
-                    # Buscamos una vela verde opcional entre idx_red+1 e i
                     for k in range(idx_red + 1, i):
                         if is_green[k]:
                             size_green2 = body_sizes[k]
-                            diff_green2_green1 = abs(size_green2 - size_green1) / size_green1 * 100
+                            close_green1 = closes[idx_green1]
+                            close_green2 = closes[k]
                             
-                            if diff_green2_green1 <= tolerance:
-                                signals[i] = -1
+                            diff_green2_green1 = abs(size_green2 - size_green1) / size_green1 * 100
+                            diff_close = abs(close_green2 - close_green1) / abs(close_green1) * 100
+                            
+                            if diff_green2_green1 <= tolerance and diff_close <= tolerance:
+                                # Confirmación de tendencia con MA50
+                                if i >= 50:
+                                    ma50 = np.mean(closes[i-50:i])
+                                    if closes[i] < ma50:
+                                        signals[i] = -1
+                                # Si no hay suficientes datos, no genera señal
                                 break
                     
                     if signals[i] == -1:
@@ -97,5 +110,3 @@ def detect_parity_reversal_short(arr, lookback, tolerance, live_trading=True):
         signals[0] = 0  
     
     return signals
-
-

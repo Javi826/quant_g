@@ -12,7 +12,7 @@ UTC_TZ = timezone.utc
 # CONFIGURACIÓN
 # ----------------------
 SYMBOL = 'BTCUSDT'
-TIMEFRAME = '1H'
+TIMEFRAME = '4H'
 
 # ----------------------
 # VER ÚLTIMA VELA
@@ -83,7 +83,7 @@ from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api
 
 STRATEGY = "parity_candles_long"
 LOOKBACK = 100
-TOLERANCE = 30
+TOLERANCE = 10
 
 print("\n🔍 GENERANDO SEÑALES PARA TODOS LOS SÍMBOLOS")
 print("=" * 80)
@@ -103,7 +103,7 @@ print("-" * 80 + "\n")
 ohlcv_data = {}
 for sym in final_symbols:
     try:
-        recent = _call_history_candles(symbol=sym, granularity=TIMEFRAME, limit=100)
+        recent = _call_history_candles(symbol=sym, granularity=TIMEFRAME, limit=200)
         df = to_dataframe_from_api(recent)
         ohlcv_data[sym] = df
     except Exception as e:
