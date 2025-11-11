@@ -19,7 +19,7 @@ from Z_add_signals_reversal import trend_reversal_entry_short
 DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
-STRATEGY            = "pulls"
+STRATEGY            = "reversal"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -106,7 +106,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = trend_reversal_entry_short(
+            signals = trend_reversal_entry_long(
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

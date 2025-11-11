@@ -103,7 +103,7 @@ def calculate_winrate_from_history(history: List[Dict[str, Any]]):
 
 if __name__ == "__main__":
 
-    start_date = "2025-11-10" 
+    start_date = "2025-11-11" 
     start_time = date_to_timestamp_ms(start_date)
     end_time   = int(datetime.now().timestamp() * 1000)
 

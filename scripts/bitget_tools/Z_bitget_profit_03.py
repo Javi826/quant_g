@@ -120,7 +120,7 @@ if __name__ == "__main__":
     final_capital     = get_usdt_balance_total(exchange)
     delta_capital     = final_capital - INITIAL_CAPITAL
     profitability_pct = ((final_capital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100 
-    print('\n02')
+    print('\n03')
     print(f"\n💵 Initial capital    : {INITIAL_CAPITAL:.2f} USDT")
     print(f"💰 Final capital      : {final_capital:.2f} USDT")
     print(f"📈 Delta (gain/loss)  : {delta_capital:+.2f} USDT")

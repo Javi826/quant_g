@@ -40,12 +40,14 @@ TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
 
 #===========================================================================
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50]
-TOLERANCE_LIST       = [40] 
-
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [10]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [40] 
+# 
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [10]
+# =============================================================================
 # # =============================================================================
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

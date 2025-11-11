@@ -42,7 +42,7 @@ TP_PCT_LIST          = [5,10,15,20,30,40,50]
 SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [8] 
+LEFT_LOOKBACK_LIST   = [3] 
 TOLERANCE_LIST       = [30]
 
 TP_PCT_LIST          = [5]
@@ -72,7 +72,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = trend_reversal_entry_short(
+        signals = trend_reversal_entry_long(
             arr_minor,
             left_lookback=params['LEFT_LOOKBACK'],
             tolerance=params['TOLERANCE'],

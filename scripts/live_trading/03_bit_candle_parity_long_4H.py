@@ -47,7 +47,6 @@ def check_latest_signal(df_minor, symbol):
 
     last_signal = signals[-1]
 
-
     if last_signal != 0:
         last = df_minor.iloc[-1]
         return {

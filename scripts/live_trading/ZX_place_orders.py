@@ -260,6 +260,7 @@ def place_order_03(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
 # =============================================================================
 # 02 
 # =============================================================================
+
 def place_order_02(symbol: str, usdt_amount: float = 100, tp_percent: float = 5, sl_percent: float = 5,
                 product_type: str = "USDT-FUTURES", margin_coin: str = "USDT", margin_mode: str = "isolated"):
 
@@ -330,9 +331,8 @@ def place_order_02(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
         return None, None
 
     # 5) calcular TP/SL y quantizar al tick del símbolo
-    # MOD: invertimos la lógica para SHORT (TP < precio, SL > precio)
-    tp_price = (last_price * (Decimal("1") - Decimal(str(tp_percent)) / 100)).quantize(price_tick, rounding=ROUND_DOWN)
-    sl_price = (last_price * (Decimal("1") + Decimal(str(sl_percent)) / 100)).quantize(price_tick, rounding=ROUND_UP)
+    tp_price = (last_price * (Decimal("1") + Decimal(str(tp_percent)) / 100)).quantize(price_tick, rounding=ROUND_DOWN)
+    sl_price = (last_price * (Decimal("1") - Decimal(str(sl_percent)) / 100)).quantize(price_tick, rounding=ROUND_DOWN)
 
     # 6) colocar orden market incluyendo preset TP/SL (pre-quantized)
     body_order = {
@@ -341,7 +341,7 @@ def place_order_02(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
         "marginMode": margin_mode,
         "marginCoin": margin_coin,
         "size": format(size_q, "f"),
-        "side": "sell",                     # MOD: abrir SHORT -> side = "sell"
+        "side": "buy",
         "tradeSide": "open",
         "orderType": "market",
         "clientOid": f"script-{int(time.time())}",
@@ -374,10 +374,11 @@ def place_order_02(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
         print("⚠️ After execution size_tpsl = 0. Aborting TP/SL.")
         return resp_order, None
     
-    # precio real de entrada (short)
+    # precio real de compra (long)
     buy_price = Decimal(str(resp_order['data'].get('price', last_price)))
     
-    print(f"🎯 & ⬇️ Short position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+    print(f"🎯 & ⬆️ Long Position for {symbol} | Size: {filled_amount} | Price: {buy_price} | TP: {tp_price} | SL: {sl_price}")
+
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
 

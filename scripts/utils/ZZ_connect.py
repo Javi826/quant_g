@@ -10,6 +10,20 @@ BASE_URL = "https://api.bitget.com"
 # -----------------------------
 # CONNECTION AND SYMBOLS
 # -----------------------------
+def connect_bitget_TT():
+    exchange = ccxt.bitget({
+        'apiKey': BITGET_API_KEY_TT,
+        'secret': BITGET_API_SECRET_TT,
+        'password': BITGET_API_PASS_TT,
+        'enableRateLimit': True,
+        'options': {
+            'defaultType': 'swap',      
+            'subAccount': 'entropia'    
+        }
+    })
+    exchange.load_markets()
+    return exchange
+
 def connect_bitget_01():
     exchange = ccxt.bitget({
         'apiKey': BITGET_API_KEY_01,

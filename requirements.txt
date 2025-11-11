@@ -140,6 +140,7 @@ propcache==0.4.1
 psutil==7.1.0
 ptyprocess==0.7.0
 pure_eval==0.2.3
+pyarrow==21.0.0
 pycares==4.11.0
 pycodestyle==2.12.1
 pycparser==2.23
@@ -189,8 +190,9 @@ rope==1.14.0
 rpds-py==0.27.1
 rtree==1.4.1
 ruff==0.14.0
--e git+https://github.com/Javi826/quant_g.git@ea5cc8f5fb09bcc46033389b3a27ce8a7c89dd97#egg=rust_backtest
--e git+https://github.com/Javi826/quant_g.git@ea5cc8f5fb09bcc46033389b3a27ce8a7c89dd97#egg=rust_backtest_helpers
+-e git+https://github.com/Javi826/quant_g.git@1ab67de1a48037ae2b41aa4eb35de8106e490f75#egg=rust_backtest
+# Editable install with no version control (rust_backtest_helpers==0.1.0)
+-e /home/javi/projects/quant/quant_g/scripts/rust_backtest_helpers
 scikit-learn==1.7.2
 scipy==1.16.2
 SecretStorage==3.4.0
