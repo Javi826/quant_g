@@ -207,24 +207,29 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=Fals
 
 # ============================
 # Helper: close_position - MODIFICADO PARA SHORT
+# Ahora actualiza BOTH: cash_bank (efectivo total) y blocked_cash (efectivo bloqueado por shorts)
 # ============================
 def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, 
-                   trades, trade_times, trade_log_cols, cash):
+                   trades, trade_times, trade_log_cols, cash_bank, blocked_cash):
     qty = pos['qty']
     buy_price = pos['buy_price']
     is_short = pos.get('is_short', False)
 
-    commission_buy = pos.get('commission_buy')
+    commission_buy = pos.get('commission_buy', 0.0)
     commission_sell = qty * exec_price * comi_factor
 
     if is_short:
-        # SHORT: vendimos al inicio, compramos al final
-        # profit = (buy_price - exec_price) * qty - comisiones
-        cash -= qty * exec_price + commission_sell  # Compramos para cerrar
+        # SHORT: vendimos al inicio (recibimos cash -> fue bloqueado), compramos al final (pagamos)
+        # cash_bank se reduce por el coste de recompra + comisión de salida
+        cash_bank -= qty * exec_price + commission_sell
+        # liberar el efectivo bloqueado asociado a esta posición
+        blocked_amount = pos.get('blocked_amount', 0.0)
+        blocked_cash -= blocked_amount
+        # beneficio/pérdida
         profit = (buy_price - exec_price) * qty - commission_buy - commission_sell
     else:
         # LONG: compramos al inicio, vendemos al final
-        cash += qty * exec_price - commission_sell
+        cash_bank += qty * exec_price - commission_sell
         profit = (exec_price - buy_price) * qty - commission_buy - commission_sell
 
     sym = pos['symbol']
@@ -243,13 +248,17 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor,
     trade_log_cols['commission_sell'].append(commission_sell)
     trade_log_cols['position_type'].append('SHORT' if is_short else 'LONG')
 
-    return cash
+    # evitar pequeños negativos por floating point
+    if blocked_cash < 0 and abs(blocked_cash) < 1e-12:
+        blocked_cash = 0.0
+
+    return cash_bank, blocked_cash
 
 # ============================
 # close_expired_positions - MODIFICADO PARA SHORT
 # ============================
 def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arrays,
-                                  comi_factor, trades, trade_times, trade_log_cols, cash):
+                                  comi_factor, trades, trade_times, trade_log_cols, cash_bank, blocked_cash):
 
     while open_heap and open_heap[0][0] <= t_int:
         _, _, pos = heapq.heappop(open_heap)
@@ -257,8 +266,9 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
             continue
             
         if 'exec_price' in pos and ('exec_time_int' in pos) and pos['exec_time_int'] <= t_int:
-            cash = close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'],
-                                  comi_factor, trades, trade_times, trade_log_cols, cash)
+            cash_bank, blocked_cash = close_position(pos, pos['exec_time'], pos['exec_price'], pos['exit_reason'],
+                                                     comi_factor, trades, trade_times, trade_log_cols,
+                                                     cash_bank, blocked_cash)
             pos['closed'] = True
         else:
             sym = pos['symbol']
@@ -272,21 +282,23 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
             
             exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
             
-            cash = close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER',
-                                  comi_factor, trades, trade_times, trade_log_cols, cash)
+            cash_bank, blocked_cash = close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER',
+                                                     comi_factor, trades, trade_times, trade_log_cols,
+                                                     cash_bank, blocked_cash)
             pos['closed'] = True
             
-    return cash
+    return cash_bank, blocked_cash
 
 
 # ============================
 # update_sim_balance - MODIFICADO PARA SHORT
+# Usa cash_bank (efectivo total) para calcular equity = cash_bank + valor_long - valor_short
 # ============================
-def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_balance_cols):
+def update_sim_balance(t_int, open_heap, cash_bank, ts_int_arrays, close_arrays, sim_balance_cols):
 
     if not open_heap:
         sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-        sim_balance_cols['balance'].append(cash)
+        sim_balance_cols['balance'].append(cash_bank)
         return sim_balance_cols
     
     # Agrupar posiciones por símbolo
@@ -325,14 +337,16 @@ def update_sim_balance(t_int, open_heap, cash, ts_int_arrays, close_arrays, sim_
         total_value -= qty_sum * price
     
     sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-    sim_balance_cols['balance'].append(cash + total_value)
+    sim_balance_cols['balance'].append(cash_bank + total_value)
     return sim_balance_cols
 
 
 # ============================
 # execute_signal - MODIFICADO PARA SHORT
+# Ahora actualiza cash_bank y blocked_cash. La lógica de LONGS queda intacta.
+# Cambiado: blocked_amount = proceeds + margin_required (antes solo proceeds)
 # ============================
-def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
+def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amount, sell_after,
                         sym_data, counter, open_heap, tp_pct, sl_pct, is_short=False):
 
     d = sym_data[sym]
@@ -342,14 +356,24 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
     commission_buy = float(order_amount * comi_factor)
     
     if is_short:
-        # SHORT: vendemos al inicio, recibimos cash
-        cash += order_amount - commission_buy
+        # SHORT: vendemos al inicio -> recibimos efectivo (proceeds), pero bloqueamos proceeds + margen requerido
+        proceeds = order_amount - commission_buy
+
+        # margen requerido = pérdida máxima esperada hasta SL
+        margin_required = order_amount * (sl_pct / 100.0) if sl_pct != 0.0 else np.inf
+
+        # bloqueamos proceeds + margin_required para que free_cash disminuya al abrir el short
+        blocked_amount = proceeds + margin_required
+
+        # añadir proceeds al cash_bank (efectivo total) y bloquear la cantidad
+        cash_bank += proceeds
     else:
-        # LONG: compramos al inicio, gastamos cash
-        cash -= (order_amount + commission_buy)
+        # LONG: compramos al inicio, gastamos cash (misma lógica previa)
+        blocked_amount = 0.0
+        cash_bank -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        n_velas = 99 #VELAS  
+        n_velas = 50 #VELAS  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
@@ -374,8 +398,13 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         'sell_time': sell_time_dt,
         'sell_time_int': sell_time_int,
         'commission_buy': commission_buy,
-        'is_short': is_short
+        'is_short': is_short,
+        'blocked_amount': blocked_amount
     }
+
+    # Si es short y hemos bloqueado algo, añadirlo al total bloqueado
+    if is_short and blocked_amount > 0:
+        blocked_cash += blocked_amount
 
     intravela_detected, chosen_idx, exit_reason, exec_price = detect_intrabar_exit(
         d, buy_idx, sell_idx, tp_price, sl_price, is_short
@@ -395,15 +424,17 @@ def execute_signal(sym, buy_idx, cash, comi_factor, order_amount, sell_after,
         heapq.heappush(open_heap, (sell_time_int, counter, position))
 
     counter += 1
-    return cash, counter
+    return cash_bank, blocked_cash, counter
 
 
 # ============================
 # Bucle principal - MODIFICADO PARA SHORT
+# cash_bank = efectivo total de la cuenta; blocked_cash = suma de los ingresos de shorts reservados
+# free_cash = cash_bank - blocked_cash (disponible para abrir nuevas posiciones)
 # ============================
 def run_backtest_loop(
     all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
-    cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
+    cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
     trades, trade_times, trade_log_cols, sim_balance_cols
 ):
 
@@ -424,9 +455,9 @@ def run_backtest_loop(
     
     for t_int in all_timestamps_int:
         
-        # Cerrar posiciones expiradas
-        cash = close_expired_positions(
-            t_int, open_heap, sd, tia, ca, cf, trades, trade_times, trade_log_cols, cash
+        # Cerrar posiciones expiradas -> ahora devuelve cash_bank y blocked_cash actualizados
+        cash_bank, blocked_cash = close_expired_positions(
+            t_int, open_heap, sd, tia, ca, cf, trades, trade_times, trade_log_cols, cash_bank, blocked_cash
         )
         
         # Si no hay posiciones abiertas, buscar nuevas señales
@@ -441,12 +472,14 @@ def run_backtest_loop(
                         if buy_idx + sa > len(ca[sym]):
                             continue
                     else:
-                        if buy_idx + 30 >= len(ca[sym]):
+                        if buy_idx + 50 >= len(ca[sym]):
                             continue
-                    # --- Fin de validación ---
+                    
 
-                    # Verificar saldo suficiente
-                    if cash < oa:
+                    # Calcular cash libre (no incluir ingresos bloqueados por shorts)
+                    free_cash = cash_bank - blocked_cash
+                    # Verificar saldo suficiente usando free_cash
+                    if free_cash < oa:
                         break
                     
                     # Determinar dirección según la señal: 1 → long, -1 → short
@@ -455,18 +488,31 @@ def run_backtest_loop(
                         continue  # ignorar si no hay señal
                     is_short = signal_value < 0
 
-                    # Ejecutar señal
-                    cash, counter = execute_signal(
-                        sym, buy_idx, cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
+                    # VALIDACIÓN ADICIONAL PARA SHORTS: si no hay SL (sp == 0) rechazamos porque riesgo ilimitado
+                    if is_short:
+                        if sp == 0.0:
+                            continue
+
+                        # pérdida máxima esperada = order_amount * (sl_pct/100)
+                        potential_max_loss = oa * (sp / 100.0)
+                        commission_buy = oa * cf
+                        # requerimos que free_cash cubra la pérdida máxima + comision de entrada
+                        if free_cash < (potential_max_loss + commission_buy):
+                            # no hay suficiente capital libre para cubrir la pérdida máxima estimada
+                            continue
+
+                    # Ejecutar señal (ahora devuelve cash_bank y blocked_cash)
+                    cash_bank, blocked_cash, counter = execute_signal(
+                        sym, buy_idx, cash_bank, blocked_cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
                     )
                     num_signals_executed += 1
         
-        # Actualizar balance simulado
+        # Actualizar balance simulado (usa cash_bank para calcular equity)
         sim_balance_cols = update_sim_balance(
-            t_int, open_heap, cash, tia, ca, sim_balance_cols
+            t_int, open_heap, cash_bank, tia, ca, sim_balance_cols
         )
     
-    return cash, num_signals_executed
+    return cash_bank, blocked_cash, num_signals_executed
 
 
 
@@ -549,18 +595,20 @@ def build_results_dict(symbols, trades, trade_times,
 
 # ============================
 # FUNCIÓN PRINCIPAL - MODIFICADO PARA SOPORTAR LONG/SHORT
+# Ahora inicializa cash_bank y blocked_cash y los pasa al loop
 # ============================
 def run_grid_backtest(
     ohlcv_arrays,
     sell_after,
     tp_pct,
     sl_pct,
-    order_amount  # NUEVO PARÁMETRO: 'long' o 'short'
+    order_amount  # NUEVO PARÁMETRO: monto por orden
 ):
 
     # Constantes
     comi_factor     = float(COMISION) / 100.0
-    cash            = float(INITIAL_BALANCE)
+    cash_bank       = float(INITIAL_BALANCE)   # efectivo total de la cuenta
+    blocked_cash    = 0.0                      # efectivo bloqueado (ingresos de shorts)
     initial_balance = INITIAL_BALANCE
     
 
@@ -585,9 +633,9 @@ def run_grid_backtest(
     sim_balance_cols = {'timestamp': [], 'balance': []}
     
     # Ejecutar backtest con el tipo de posición especificado
-    cash, num_signals_executed = run_backtest_loop(
+    cash_bank, blocked_cash, num_signals_executed = run_backtest_loop(
         all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
-        cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
+        cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
         trades, trade_times, trade_log_cols, sim_balance_cols
     )
     

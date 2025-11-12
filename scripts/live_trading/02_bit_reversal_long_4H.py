@@ -19,7 +19,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 STRATEGY             = "reversal_long"
 TIMEFRAME_MINOR      = '4H'
-ORDER_AMOUNT         = 500
+ORDER_AMOUNT         = 100
 
 SELL_AFTER_N_CANDLES  = 50
 

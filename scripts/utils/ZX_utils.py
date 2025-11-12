@@ -109,18 +109,28 @@ def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, p
         return str(n)
 
     print(f'\n== {strategy} ==\n')
-    print(f"DATA_FOLDER         : {data_folder}")
-    print(f"TIMEFRAME           : {timeframe}")
-    print(f"ORDER_AMOUNT        : {format_number(order_amount)}")
-    print(f"MIN_VOL_USDT        : {format_number(min_vol_usdt)}")
 
-    # Calcular longitud máxima de los nombres base para alinear los prints
-    max_len = max(len(name) for name in param_names)
+    # Diccionario con todas las claves y valores a imprimir
+    info = {
+        "DATA_FOLDER": data_folder,
+        "TIMEFRAME": timeframe,
+        "ORDER_AMOUNT": format_number(order_amount),
+        "MIN_VOL_USDT": format_number(min_vol_usdt),
+    }
 
-    # Imprimir las listas de parámetros alineadas
+    # Añadimos los parámetros dinámicos
     for name, values_list in zip(param_names, lists_for_grid):
-        print(f"{name + '_LIST':<{max_len + 6}} : {values_list}")
+        info[f"{name}_LIST"] = str(values_list)
+
+    # Calcular la longitud máxima de todas las claves
+    max_key_len = max(len(k) for k in info.keys())
+
+    # Imprimir todo alineado según la longitud máxima
+    for key, value in info.items():
+        print(f"{key:<{max_key_len}} : {value}")
+
     print()
+
 
 def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: int = 0, mod: int = 100000) -> int:
 

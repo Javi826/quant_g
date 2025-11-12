@@ -17,9 +17,9 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 # CONFIGURATION
 # ----------------------
-STRATEGY             = "double_top_long"
-TIMEFRAME_MINOR      = '4H'
-ORDER_AMOUNT         = 500
+STRATEGY              = "double_top_long"
+TIMEFRAME_MINOR       = '4H'
+ORDER_AMOUNT          = 100
 
 SELL_AFTER_N_CANDLES  = 50
 

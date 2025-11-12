@@ -55,6 +55,8 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 avg_vol = df['volume_quote'].tail(vol_window).mean()
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
+                    
+
 
             # -------------------
             # MIN BARS
@@ -97,14 +99,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
 
     return ohlcv_data, filtered_symbols
 
-def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="live_trading/symbols_live"):
-
-    if save_symbols:
-        os.makedirs(folder, exist_ok=True)  
-        df_symbols   = pd.DataFrame({"Filtered_symbols": filtered_symbols})
-        path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
-        df_symbols.to_excel(path_symbols, index=False)   
-        print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
         
 def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
 
@@ -115,10 +109,10 @@ def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, p
         return str(n)
 
     print(f'\n== {strategy} ==\n')
-    print(f"DATA_FOLDER           : {data_folder}")
-    print(f"TIMEFRAME             : {timeframe}")
-    print(f"ORDER_AMOUNT          : {format_number(order_amount)}")
-    print(f"MIN_VOL_USDT          : {format_number(min_vol_usdt)}")
+    print(f"DATA_FOLDER         : {data_folder}")
+    print(f"TIMEFRAME           : {timeframe}")
+    print(f"ORDER_AMOUNT        : {format_number(order_amount)}")
+    print(f"MIN_VOL_USDT        : {format_number(min_vol_usdt)}")
 
     # Calcular longitud máxima de los nombres base para alinear los prints
     max_len = max(len(name) for name in param_names)
@@ -159,5 +153,40 @@ def send_email(detected_cryptos):
     except Exception as e:
         print(f"⚠️ Error sending email: {e}")
 
+def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="live_trading/symbols_live"):
 
+    if save_symbols:
+        os.makedirs(folder, exist_ok=True)  
+        df_symbols   = pd.DataFrame({"Filtered_symbols": filtered_symbols})
+        path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
+        df_symbols.to_excel(path_symbols, index=False)   
+        print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
+
+def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_name,save_file=False):
+    
+    if save_file:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+    
+        all_dfs = []
+    
+        for comb, res in grid_results_list:
+            for name, r in res.items():
+                equity_hist = r['sim_balance_history']
+                if equity_hist is None or len(equity_hist['timestamp']) == 0:
+                    continue
+                df_eq = pd.DataFrame(equity_hist)
+                df_eq['net_gain_pct'] = (df_eq['balance'] - initial_capital) / initial_capital * 100
+                df_eq['strategy'] = strategy_name
+                df_eq['params'] = str(comb)
+                all_dfs.append(df_eq)
+    
+        if all_dfs:
+            final_df = pd.concat(all_dfs, ignore_index=True)
+            file_name = f"equity_summary_{strategy_name}.xlsx"
+            save_path = os.path.join(folder, file_name)
+            final_df.to_excel(save_path, index=False)
+            print(f"📂 Excel saved at {save_path}")
+        else:
+            print("⚠️ No equity data to save")
 

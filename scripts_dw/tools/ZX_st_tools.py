@@ -123,12 +123,12 @@ def _calculate_duration_optimized(trade_log):
 def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True):
 
     if not save:
-        print("⚠️ save=False, no se guardará el archivo de trades")
+        #print("⚠️ save=False, no se guardará el archivo de trades")
         return
     
     all_trades_records = []
     
-    for comb, results in tqdm(grid_results_list, desc="📊 Procesando trades"):
+    for comb, results in tqdm(grid_results_list, desc="📊 Processing trades"):
         port = results.get("__PORTFOLIO__", None)
         if port is None:
             continue
@@ -172,7 +172,7 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True
         print(f"✅ Saved {len(all_trades_df):,} trades en: {filename}")
         print(f"   📦 Size: {file_size_mb:.2f} MB")
     else:
-        print("⚠️ No hay trades para guardar")
+        print("⚠️ No trades to be saved")
 
         
 def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):

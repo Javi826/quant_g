@@ -17,29 +17,38 @@ def summarize_positions(positions: List[Dict[str, Any]]):
     
     print("\nOpen positions:")
     summary = []
+    total_pnl = 0.0  # acumulador de PnL
     for p in positions:
         symbol = p.get("symbol")
         side = p.get("holdSide", "?").upper()
-        size = float(p.get("total", 0))
-        entry = float(p.get("averageOpenPrice", 0))
-        mark = float(p.get("marketPrice", 0))
+        margin_size = float(p.get("marginSize", 0))
+        total_size = float(p.get("total", 0))
+        entry = float(p.get("openPriceAvg", 0))
         pnl = float(p.get("unrealizedPL", 0))
         leverage = p.get("leverage", "?")
-        liq = p.get("liquidationPrice", "-")
+
+        total_pnl += pnl  # acumula el PnL total
         
-        print(f" - {symbol:12} {side:>5} | Size: {size:<8} | Entry: {entry:<8.4f} | Mark: {mark:<8.4f} | "
-              f"PnL: {pnl:<8.2f} | Lev: {leverage}x | Liq: {liq}")
-        
+        print(f" - {symbol:12} {side:>5} | Margin: {margin_size:<8.1f} "
+              f"Size: {total_size:<8.1f} | Entry: {entry:<8.2f} "
+              f"PnL: {pnl:<8.2f} | Lev: {leverage}x")
+
         summary.append({
             "symbol": symbol,
             "side": side,
-            "size": size,
+            "margin_size": round(margin_size, 1),
+            "total_size": total_size,
             "entry_price": entry,
-            "mark_price": mark,
             "unrealized_pnl": pnl,
-            "leverage": leverage,
-            "liq_price": liq
+            "leverage": leverage
         })
+    
+    # --- resumen final ---
+    print("\n------------------------------------------")
+    print(f"Positions: {len(positions)}")
+    print(f"PnL      : {total_pnl:.2f}")
+    print("------------------------------------------")
+
     return summary
 
 # -----------------------------
