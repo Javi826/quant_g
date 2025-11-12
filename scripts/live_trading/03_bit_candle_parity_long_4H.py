@@ -23,10 +23,10 @@ ORDER_AMOUNT         = 500
 
 SELL_AFTER_N_CANDLES = 50
 
-LOOKBACK             = 50
+LOOKBACK             = 150
 TOLERANCE            = 40
 
-TP_PCT               = 5
+TP_PCT               = 3
 SL_PCT               = 10
 
 # ----------------------
@@ -86,7 +86,7 @@ while True:
     if not open_positions:
         ohlcv_data = {}
         for sym in final_symbols:
-            recent_minor    = _call_history_candles(symbol=sym, granularity=TIMEFRAME_MINOR, limit=100)
+            recent_minor    = _call_history_candles(symbol=sym, granularity=TIMEFRAME_MINOR, limit=180)
             df_minor        = to_dataframe_from_api(recent_minor)
             ohlcv_data[sym] = {"minor": df_minor}
 

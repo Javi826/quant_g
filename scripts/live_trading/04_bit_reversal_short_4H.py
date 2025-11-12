@@ -22,6 +22,7 @@ TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 500
 
 SELL_AFTER_N_CANDLES  = 50
+
 LEFT_LOOKBACK         = 8
 TOLERANCE             = 30
 

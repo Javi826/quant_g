@@ -28,7 +28,7 @@ DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 5_000
+ORDER_AMOUNT        = 5_00
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -58,7 +58,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
 
-#save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
 
@@ -72,7 +72,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_parity_reversal_long(
+        signals = detect_parity_reversal_short(
             arr=arr_minor,     
             lookback=params['LOOKBACK'],  
             tolerance=params['TOLERANCE'],  
@@ -108,9 +108,9 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
-save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY,save_file=False)
 save_results(grid_results_df.to_dict('records'), grid_results_df, filename=f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, filename=f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
+save_equity_to_excel(grid_results_list, folder="brief_equities", initial_capital=INITIAL_BALANCE, strategy_name=STRATEGY,save_file=True)
 
 final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

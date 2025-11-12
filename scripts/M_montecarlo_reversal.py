@@ -35,8 +35,8 @@ SELL_AFTER_LIST      = [0]
 LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
-TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 #===========================================================================
 # =============================================================================
@@ -106,7 +106,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = trend_reversal_entry_long(
+            signals = trend_reversal_entry_short(
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

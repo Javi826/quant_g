@@ -14,7 +14,6 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf import generate_multiple_paths
 from Z_add_signals_entropy import signal_99_long
-from Z_add_signals_entropy import signal_99_short
 
 start_time = time.time()
 DTYPE               = np.float32
@@ -25,34 +24,45 @@ N_JOBS              = -1
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
-ORDER_AMOUNT        = 500
+ORDER_AMOUNT        = 5000
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.8,3.0]
+SELL_AFTER_LIST = [0]
 
-TP_PCT_LIST        = [5,10,15,20,25]
-SL_PCT_LIST        = [10]
+SMA_CROS_LIST   = [True, False]
+RSI_14_LIST     = [True, False]
+MACD_CROSS_LIST = [True, False]
+MOMENTUM_LIST   = [True, False]
+STOCH_LIST      = [True, False]
+CCI_LIST        = [True, False]
+ADX_LIST        = [True, False]
+ROC_LIST        = [True, False]
+EMA_CROSS_LIST  = [True, False]
 
-# =============================================================================
-# =============================================================================
-# SELL_AFTER_LIST    = [50]
-# ENTROPY_MAX_LIST   = [1.6]
-# ACCEL_SPAN_LIST    = [5]
-# 
-# TP_PCT_LIST        = [5]
-# SL_PCT_LIST        = [10]
-# =============================================================================
-# =============================================================================
+TP_PCT_LIST     = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST     = [3,4,5,6,7,8,9,10]
+
+SMA_CROS_LIST   = [True]
+RSI_14_LIST     = [False]
+MACD_CROSS_LIST = [True]
+MOMENTUM_LIST   = [True]
+STOCH_LIST      = [False]
+CCI_LIST        = [True]
+ADX_LIST        = [True]
+ROC_LIST        = [True]
+EMA_CROSS_LIST  = [True]
+
+TP_PCT_LIST     = [3]
+SL_PCT_LIST     = [10]
 
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS        = 100
+FINAL_N_PATHS        = 50
 
 if TIMEFRAME == '1H':
     FINAL_N_OBS_PER_PATH = 4320
@@ -67,7 +77,10 @@ elif TIMEFRAME == '1Dutc':
     
 TS_INDEX        = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
-param_names     = ['SELL_AFTER', 'ENTROPY_MAX','TP_PCT', 'SL_PCT']
+param_names = [
+    'SELL_AFTER', 'SMA_CROS','RSI_14','MACD_CROSS','MOMENTUM',
+    'STOCH','CCI','ADX','ROC','EMA_CROSS','TP_PCT','SL_PCT'
+]
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
@@ -92,13 +105,20 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
         ohlcv_arrays = extract_ohlcv_from_path(paths_per_symbol, path_idx, dtype=DTYPE)
 
         for sym, arrs in ohlcv_arrays.items():
-            close_array = arrs["close"]
-        
-            signal = signal_99_short(
-                close_array,
-                entropia_max=param_dict.get("ENTROPY_MAX"),
-                live=False
-            )
+      
+            signal = signal_99_long(
+                arrs,
+                sma_cross=param_dict.get('SMA_CROS'),
+                rsi_14=param_dict.get('RSI_14'),
+                macd_cross=param_dict.get('MACD_CROSS'),
+                momentum=param_dict.get('MOMENTUM'),
+                stoch=param_dict.get('STOCH'),
+                cci=param_dict.get('CCI'),
+                adx=param_dict.get('ADX'),
+                roc=param_dict.get('ROC'),
+                ema_cross=param_dict.get('EMA_CROSS'),
+                live_trading=False
+                 )
         
             arrs['signal'] = np.asarray(signal, dtype=DTYPE)
 

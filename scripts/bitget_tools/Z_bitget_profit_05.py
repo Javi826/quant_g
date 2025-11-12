@@ -4,19 +4,19 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 from typing import List, Dict, Any
 from datetime import datetime
-from live_trading.ZX_connect_live import make_get_06
-from utils.ZZ_connect import connect_bitget_06
+from live_trading.ZX_connect_live import make_get_05
+from utils.ZZ_connect import connect_bitget_05
 
 # -----------------------------
 # BITGET CONFIGURATION
 # -----------------------------
 BASE_URL        = "https://api.bitget.com"
-INITIAL_CAPITAL = 1225.0  
+INITIAL_CAPITAL = 1157.84  
 
 # -----------------------------
 # Connect with CCXT
 # -----------------------------
-exchange = connect_bitget_06()
+exchange = connect_bitget_05()
 
 def get_usdt_balance_total(exchange):
     """Returns the total USDT balance including used in open positions"""
@@ -50,7 +50,7 @@ def fetch_all_history_positions(product_type: str = "USDT-FUTURES", symbol: str 
             "startTime": start_time,
             "endTime": end_time
         }
-        response = make_get_06(endpoint, params)
+        response = make_get_05(endpoint, params)
         data = response.get("data", {})
         items = data.get("list") or []
         end_id = data.get("endId")
@@ -102,7 +102,7 @@ def calculate_winrate_from_history(history: List[Dict[str, Any]]):
 # -----------------------------
 if __name__ == "__main__":
 
-    start_date = "2025-11-10" 
+    start_date = "2025-11-11" 
     start_time = date_to_timestamp_ms(start_date)
     end_time   = int(datetime.now().timestamp() * 1000)
 

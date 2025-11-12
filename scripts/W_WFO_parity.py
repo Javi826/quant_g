@@ -29,8 +29,8 @@ SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [50,100,150,200]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 
-TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -69,7 +69,7 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_parity_reversal_long(
+        signals = detect_parity_reversal_short(
             arr=arr_minor,
             lookback=params.get('LOOKBACK'),
             tolerance=params.get('TOLERANCE'),
@@ -140,7 +140,7 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_parity_reversal_long(
+    signals = detect_parity_reversal_short(
         arr=arr_minor,
         lookback=best_params_wfo['LOOKBACK'],
         tolerance=best_params_wfo['TOLERANCE'],

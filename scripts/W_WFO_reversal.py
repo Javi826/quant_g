@@ -13,7 +13,7 @@ from Z_add_signals_reversal import trend_reversal_entry_short
 
 start_time        = time.time()
 N_JOBS            = -1
-STRATEGY            = "pulls"
+STRATEGY            = "reversal"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
@@ -29,8 +29,8 @@ SELL_AFTER_LIST      = [0]
 LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
-TP_PCT_LIST          = [5,10,15,20]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

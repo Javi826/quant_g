@@ -44,11 +44,11 @@ SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [5] 
+PRICE_TOLERANCE_LIST = [20] 
 TREND_TH_LIST        = [10] 
 
 TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -74,7 +74,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_double_top_short(
+        signals = detect_double_top_long(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 

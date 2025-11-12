@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 FOLDER = "brief_equities"
-INITIAL_CAPITAL = 10000
+INITIAL_CAPITAL = 40000
 RESAMPLE_FREQ = '1D'  # Frecuencia común para composición
 
 def plot_netgain_dd(equity_hist, title="Net Gain % & DD"):

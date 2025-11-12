@@ -9,7 +9,6 @@ from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from Z_add_signals_entropy import signal_99_long
-from Z_add_signals_entropy import signal_99_short
 
 start_time = time.time()
 STRATEGY            ="entropy"
@@ -27,11 +26,20 @@ MIN_VOL_USDT        = 10_000_000
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST    = [0]
-ENTROPY_MAX_LIST   = [1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.8,3.0]
+SELL_AFTER_LIST = [0]
 
-TP_PCT_LIST        = [5,10,15,20,25]
-SL_PCT_LIST        = [5,10]
+SMA_CROS_LIST   = [True, False]
+RSI_14_LIST     = [True, False]
+MACD_CROSS_LIST = [True, False]
+MOMENTUM_LIST   = [True, False]
+STOCH_LIST      = [True, False]
+CCI_LIST        = [True, False]
+ADX_LIST        = [True, False]
+ROC_LIST        = [True, False]
+EMA_CROSS_LIST  = [True, False]
+
+TP_PCT_LIST     = [5,10,15,20,25,30]
+SL_PCT_LIST     = [5,10]
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
@@ -49,8 +57,10 @@ elif TIMEFRAME == '12Hutc':
 elif TIMEFRAME == '1Dutc':
     LENGTH_TRAIN_SET = int(YEARS_TRAIN * 365)    
 
-
-param_names    = ['SELL_AFTER', 'ENTROPY_MAX', 'TP_PCT', 'SL_PCT']
+param_names = [
+    'SELL_AFTER', 'SMA_CROS','RSI_14','MACD_CROSS','MOMENTUM',
+    'STOCH','CCI','ADX','ROC','EMA_CROSS','TP_PCT','SL_PCT'
+]
 param_ranges = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
@@ -71,9 +81,19 @@ def strategy_builder(params, base_arrays):
     ohlcv_arrays = {}
     for sym, arrs in base_arrays.items():
         
-        signal = signal_99_short(arrs['close'],
-                                     entropia_max=params.get('ENTROPY_MAX'),
-                                     live=False)
+        signal = signal_99_long(
+            arrs,
+            sma_cross=params.get('SMA_CROS'),
+            rsi_14=params.get('RSI_14'),
+            macd_cross=params.get('MACD_CROSS'),
+            momentum=params.get('MOMENTUM'),
+            stoch=params.get('STOCH'),
+            cci=params.get('CCI'),
+            adx=params.get('ADX'),
+            roc=params.get('ROC'),
+            ema_cross=params.get('EMA_CROSS'),
+            live_trading=False
+        )
         
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
     return ohlcv_arrays
@@ -130,10 +150,18 @@ for name in param_names:
 ohlcv_arrays = {}
 for sym, arrs in ohlcv_arr.items():
     # Construir la señal con los mejores parámetros encontrados por el WFO
-    signal = signal_99_short(
-        arrs['close'],
-        entropia_max=best_params_wfo['ENTROPY_MAX'],
-        live=False
+    signal = signal_99_long(
+            arrs,
+            sma_cross=best_params_wfo['SMA_CROS'],
+            rsi_14=best_params_wfo['RSI_14'],
+            macd_cross=best_params_wfo['MACD_CROSS'],
+            momentum=best_params_wfo['MOMENTUM'],
+            stoch=best_params_wfo['STOCH'],
+            cci=best_params_wfo['CCI'],
+            adx=best_params_wfo['ADX'],
+            roc=best_params_wfo['ROC'],
+            ema_cross=best_params_wfo['EMA_CROSS'],
+            live_trading=False
     )
     
     ohlcv_arrays[sym] = {**arrs, 'signal': signal}

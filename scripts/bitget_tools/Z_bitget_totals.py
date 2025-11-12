@@ -6,13 +6,13 @@ import requests
 import hashlib
 import base64
 import hmac
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from utils.ZZ_connect import BITGET_API_KEY_TT, BITGET_API_SECRET_TT, BITGET_API_PASS_TT
 
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
-INITIAL_CAPITAL = 4223  # Capital inicial
+INITIAL_CAPITAL = 5380  
 
 # -----------------------------
 # FIRMA DE PETICIONES

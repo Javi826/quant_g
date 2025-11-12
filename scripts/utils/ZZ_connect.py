@@ -81,11 +81,11 @@ def connect_bitget_04():
     exchange.load_markets()
     return exchange
 
-def connect_bitget_06():
+def connect_bitget_05():
     exchange = ccxt.bitget({
-        'apiKey': BITGET_API_KEY_06,
-        'secret': BITGET_API_SECRET_06,
-        'password': BITGET_API_PASS_06,
+        'apiKey': BITGET_API_KEY_05,
+        'secret': BITGET_API_SECRET_05,
+        'password': BITGET_API_PASS_05,
         'enableRateLimit': True,
         'options': {
             'defaultType': 'swap',      

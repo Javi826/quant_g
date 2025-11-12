@@ -14,7 +14,7 @@ from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API
 from utils.ZZ_connect import BITGET_API_KEY_03, BITGET_API_SECRET_03, BITGET_API_PASS_03
 from utils.ZZ_connect import BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02
 from utils.ZZ_connect import BITGET_API_KEY_04, BITGET_API_SECRET_04, BITGET_API_PASS_04
-from utils.ZZ_connect import BITGET_API_KEY_06, BITGET_API_SECRET_06, BITGET_API_PASS_06
+from utils.ZZ_connect import BITGET_API_KEY_05, BITGET_API_SECRET_05, BITGET_API_PASS_05
 
 
 BASE_URL = "https://api.bitget.com"
@@ -270,35 +270,35 @@ def send_request_04(method, path, params=None, body=None):
     
     
 # =============================================================================
-# 06
+# 05
 # =============================================================================
-def sign_request_06(timestamp, method, path, query_string, body_str):
+def sign_request_05(timestamp, method, path, query_string, body_str):
     to_sign = timestamp + method.upper() + path
     if query_string:
         to_sign += "?" + query_string
     to_sign += body_str
-    digest = hmac.new(BITGET_API_SECRET_06.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
+    digest = hmac.new(BITGET_API_SECRET_05.encode('utf-8'), to_sign.encode('utf-8'), hashlib.sha256).digest()
     return base64.b64encode(digest).decode()
 
-def get_usdt_balance_06(exchange):
+def get_usdt_balance_05(exchange):
     balance = exchange.fetch_balance()
     return balance['free']['USDT']
 
-def get_open_positions_06(product_type: str = "USDT-FUTURES") -> List[Dict[str, Any]]:
+def get_open_positions_05(product_type: str = "USDT-FUTURES") -> List[Dict[str, Any]]:
     endpoint = "/api/v2/mix/position/all-position"
     params = {"productType": product_type}
-    response = make_get_06(endpoint, params)
+    response = make_get_05(endpoint, params)
     return response.get("data", [])
 
-def make_get_06(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+def make_get_05(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
     qs = "&".join(f"{k}={v}" for k, v in params.items() if v not in [None, ""])
     url = BASE_URL + endpoint + (f"?{qs}" if qs else "")
     timestamp = str(int(time.time() * 1000))
-    sign = sign_request_06(timestamp, "GET", endpoint, qs, "")
+    sign = sign_request_05(timestamp, "GET", endpoint, qs, "")
     headers = {
-        "ACCESS-KEY": BITGET_API_KEY_06,
+        "ACCESS-KEY": BITGET_API_KEY_05,
         "ACCESS-SIGN": sign,
-        "ACCESS-PASSPHRASE": BITGET_API_PASS_06,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_05,
         "ACCESS-TIMESTAMP": timestamp,
         "Content-Type": "application/json"
     }
@@ -307,16 +307,16 @@ def make_get_06(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return resp.json()
 
 
-def send_request_06(method, path, params=None, body=None):
+def send_request_05(method, path, params=None, body=None):
     ts = _now_ms()
     query_string = urlencode(params) if params else ""
     body_str = _body_to_str(body)
-    sign = sign_request_06(ts, method, path, query_string, body_str)
+    sign = sign_request_05(ts, method, path, query_string, body_str)
     headers = {
-        "ACCESS-KEY": BITGET_API_KEY_06,
+        "ACCESS-KEY": BITGET_API_KEY_05,
         "ACCESS-SIGN": sign,
         "ACCESS-TIMESTAMP": ts,
-        "ACCESS-PASSPHRASE": BITGET_API_PASS_06,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_05,
         "Content-Type": "application/json"
     }
     url = BASE_URL + path + (f"?{query_string}" if query_string else "")

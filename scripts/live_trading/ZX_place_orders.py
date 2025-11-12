@@ -4,7 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import os
 import time
 from decimal import Decimal, ROUND_DOWN,ROUND_UP
-from ZX_connect_live import send_request_01,send_request_03,send_request_02,send_request_04,send_request_06
+from ZX_connect_live import send_request_01,send_request_03,send_request_02,send_request_04,send_request_05
 
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = 'usdt-futures'
@@ -509,13 +509,13 @@ def place_order_04(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
 
 # =============================================================================
-# 06 
+# 05 
 # =============================================================================
-def place_order_06(symbol: str, usdt_amount: float = 100, tp_percent: float = 5, sl_percent: float = 5,
+def place_order_05(symbol: str, usdt_amount: float = 100, tp_percent: float = 5, sl_percent: float = 5,
                 product_type: str = "USDT-FUTURES", margin_coin: str = "USDT", margin_mode: str = "isolated"):
 
     # 1) último precio
-    code, resp = send_request_06("GET", "/api/v2/mix/market/ticker", params={"productType": product_type, "symbol": symbol})
+    code, resp = send_request_05("GET", "/api/v2/mix/market/ticker", params={"productType": product_type, "symbol": symbol})
     if code != 200 or resp.get("code") != "00000":
         print("⚠️ Error for ticker:", resp)
         return None, None
@@ -526,7 +526,7 @@ def place_order_06(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
     size_base = (Decimal(str(usdt_amount)) / last_price)
 
     # 3) obtener metadata de símbolos para sizeScale y price tick (robusto)
-    code_info, resp_info = send_request_06("GET", "/api/v2/mix/market/symbols")
+    code_info, resp_info = send_request_05("GET", "/api/v2/mix/market/symbols")
     price_tick = None
     size_scale = None
     if code_info == 200 and resp_info.get("code") == "00000":
@@ -592,7 +592,7 @@ def place_order_06(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
         "marginMode": margin_mode,
         "marginCoin": margin_coin,
         "size": format(size_q, "f"),
-        "side": "sell",                     # MOD: abrir SHORT -> side = "sell"
+        "side": "sell",                    
         "tradeSide": "open",
         "orderType": "market",
         "clientOid": f"script-{int(time.time())}",
@@ -600,7 +600,7 @@ def place_order_06(symbol: str, usdt_amount: float = 100, tp_percent: float = 5,
         "presetStopLossPrice": format(sl_price, "f")
     }
 
-    code_order, resp_order = send_request_06("POST", "/api/v2/mix/order/place-order", body=body_order)
+    code_order, resp_order = send_request_05("POST", "/api/v2/mix/order/place-order", body=body_order)
     if code_order != 200 or resp_order.get("code") != "00000":
         # Si la API responde error por tick, imprimimos detalle adicional para depuración
         print("⚠️ Error in market order:", resp_order)

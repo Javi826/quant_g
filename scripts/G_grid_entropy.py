@@ -23,8 +23,8 @@ N_JOBS             =-1
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME           = '1Dutc'
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME           = '4H'
 ORDER_AMOUNT        = 5_000
 MIN_VOL_USDT        = 10_000_000
 
@@ -45,22 +45,20 @@ ROC_LIST        = [True, False]
 EMA_CROSS_LIST  = [True, False]
 
 TP_PCT_LIST     = [5,10,15,20,25,30]
-SL_PCT_LIST     = [5,10,15,20]
+SL_PCT_LIST     = [5,10]
 
-# =============================================================================
-# SMA_CROS_LIST   = [True]
-# RSI_14_LIST     = [False]
-# MACD_CROSS_LIST = [True]
-# MOMENTUM_LIST   = [True]
-# STOCH_LIST      = [False]
-# CCI_LIST        = [True]
-# ADX_LIST        = [True]
-# ROC_LIST        = [True]
-# EMA_CROSS_LIST  = [True]
-# 
-# TP_PCT_LIST     = [30]
-# SL_PCT_LIST     = [20]
-# =============================================================================
+SMA_CROS_LIST   = [True]
+RSI_14_LIST     = [True]
+MACD_CROSS_LIST = [True]
+MOMENTUM_LIST   = [True]
+STOCH_LIST      = [False]
+CCI_LIST        = [True]
+ADX_LIST        = [False]
+ROC_LIST        = [False]
+EMA_CROSS_LIST  = [False]
+
+TP_PCT_LIST     = [3]
+SL_PCT_LIST     = [10]
 
 param_names = [
     'SELL_AFTER', 'SMA_CROS','RSI_14','MACD_CROSS','MOMENTUM',
