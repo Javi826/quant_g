@@ -14,6 +14,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths
 from Z_add_signals_parity import detect_parity_reversal_long
+from Z_add_signals_parity import detect_parity_reversal_long_wo
 from Z_add_signals_parity import detect_parity_reversal_short
 
 
@@ -36,16 +37,17 @@ SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [50,100,150,200]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10,15,20]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10,15,20]
+TP_PCT_LIST          = [3,4,5,6,7,8,9]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 #===========================================================================
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
+# 
+# LOOKBACK_LIST        = [150]
 # TOLERANCE_LIST       = [40] 
 # 
-# TP_PCT_LIST          = [5]
+# TP_PCT_LIST          = [3]
 # SL_PCT_LIST          = [10]
 # =============================================================================
 # # =============================================================================
@@ -107,7 +109,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = detect_parity_reversal_short(
+            signals = detect_parity_reversal_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

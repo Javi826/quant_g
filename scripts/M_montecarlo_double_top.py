@@ -25,7 +25,7 @@ STRATEGY          = "double_top"
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 5_00
+ORDER_AMOUNT      = 5_000
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -36,17 +36,19 @@ LOOKBACK_MINOR_LIST  = [2,3,5]
 PRICE_TOLERANCE_LIST = [5,10,20,30,40,50] 
 TREND_TH_LIST        = [5,10,20] 
 
-TP_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [5,10,15,20]
 SL_PCT_LIST          = [5,10]
 
 # =============================================================================
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [5] 
-TREND_TH_LIST        = [10] 
-
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [5]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_MINOR_LIST  = [2] 
+# PRICE_TOLERANCE_LIST = [5] 
+# TREND_TH_LIST        = [10] 
+# 
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [5]
+# =============================================================================
 # =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']

@@ -1,7 +1,7 @@
 import ccxt
 
 BASE_URL = "https://api.bitget.com"
-#ENTROPY
+
 # -----------------------------
 # BITGET CONFIG
 # -----------------------------
