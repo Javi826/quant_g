@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
 MIN_PRICE       = 0.0001
-INITIAL_BALANCE = 10_00
+INITIAL_BALANCE = 800
 COMISION        = 0.08
 
 # ============================

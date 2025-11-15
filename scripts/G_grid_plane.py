@@ -28,7 +28,7 @@ DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 5_000
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -36,8 +36,11 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 
-TP_PCT_LIST          = [2.5,3.0,3.5,4.0,4.5,5.0,5.5,7.5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80]
+TP_PCT_LIST          = [2.5,3.0,3.5,4.0,4.5,5.0,5.5,7.5,10,15,20]
 SL_PCT_LIST          = [2.5,5.0,7.5,10]
+
+TP_PCT_LIST         = [3.0]
+SL_PCT_LIST         = [10]
 
 
 param_names    = ['SELL_AFTER','TP_PCT','SL_PCT']

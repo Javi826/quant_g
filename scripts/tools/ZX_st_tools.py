@@ -123,9 +123,18 @@ def _calculate_duration_optimized(trade_log):
 def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True):
 
     if not save:
-        #print("⚠️ save=False, no se guardará el archivo de trades")
         return
     
+    # Forzar que el archivo se guarde dentro de la carpeta "brief_trades"
+    folder = "brief_trades"
+    os.makedirs(folder, exist_ok=True)
+    
+    # Extraer solo el nombre del archivo (sin carpetas que pueda tener filename)
+    base_filename = os.path.basename(filename)
+    
+    # Construir la ruta final dentro de brief_trades
+    final_path = os.path.join(folder, base_filename)
+
     all_trades_records = []
     
     for comb, results in tqdm(grid_results_list, desc="📊 Processing trades"):
@@ -137,7 +146,6 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True
         if trade_log is None or (isinstance(trade_log, pd.DataFrame) and trade_log.empty):
             continue
         
-        # Convertir a DataFrame si es necesario
         if isinstance(trade_log, pd.DataFrame):
             tl_df = trade_log.copy()
         elif isinstance(trade_log, dict):
@@ -145,32 +153,23 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True
         else:
             continue
         
-        # Añadir columnas de parámetros
         for param_name, param_value in zip(param_names, comb):
             tl_df[param_name] = param_value
         
         all_trades_records.append(tl_df)
     
     if all_trades_records:
-        # Concatenar todos los trades
         all_trades_df = pd.concat(all_trades_records, ignore_index=True)
-        
-        # Reordenar columnas (parámetros primero)
+
         param_cols = param_names
         trade_cols = [col for col in all_trades_df.columns if col not in param_names]
         all_trades_df = all_trades_df[param_cols + trade_cols]
-        
-        # Crear carpeta si no existe (igual que save_results)
-        folder = os.path.dirname(filename)
-        if folder and not os.path.exists(folder):
-            os.makedirs(folder, exist_ok=True)
 
-        # Guardar
-        all_trades_df.to_excel(filename, index=False, engine='openpyxl')
+        all_trades_df.to_excel(final_path, index=False, engine='openpyxl')
         
-        file_size_mb = os.path.getsize(filename) / 1024 / 1024
-        print(f"✅ Saved {len(all_trades_df):,} trades en: {filename}")
-        print(f"   📦 Size: {file_size_mb:.2f} MB")
+        file_size_mb = os.path.getsize(final_path) / 1024 / 1024
+        print(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
+        print(f"📦 Size: {file_size_mb:.2f} MB")
     else:
         print("⚠️ No trades to be saved")
 

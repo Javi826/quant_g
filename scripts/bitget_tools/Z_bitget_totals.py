@@ -12,7 +12,7 @@ from utils.ZZ_connect import BITGET_API_KEY_TT, BITGET_API_SECRET_TT, BITGET_API
 
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
-INITIAL_CAPITAL = 5380  
+INITIAL_CAPITAL = 4087.90  
 
 # -----------------------------
 # FIRMA DE PETICIONES
