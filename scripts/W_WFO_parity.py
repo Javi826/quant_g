@@ -8,8 +8,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_parity import detect_parity_reversal_long
-from Z_add_signals_parity import detect_parity_reversal_short
+from Z_add_signals_parity import detect_parity_long
+from Z_add_signals_parity import detect_parity_short
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -69,7 +69,7 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = detect_parity_reversal_short(
+        signals = detect_parity_short(
             arr=arr_minor,
             lookback=params.get('LOOKBACK'),
             tolerance=params.get('TOLERANCE'),
@@ -140,7 +140,7 @@ for sym in ohlcv_arr_minor.keys():
         
     arr_minor = ohlcv_arr_minor[sym]
     
-    signals = detect_parity_reversal_short(
+    signals = detect_parity_short(
         arr=arr_minor,
         lookback=best_params_wfo['LOOKBACK'],
         tolerance=best_params_wfo['TOLERANCE'],

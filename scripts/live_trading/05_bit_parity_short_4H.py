@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api, _call_history_candles, to_dataframe_from_api
 
-from Z_add_signals_parity import detect_parity_reversal_short
+from Z_add_signals_parity import detect_parity_short
 from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
 from utils.ZZ_connect import connect_bitget_05
 from ZX_place_orders import place_order_05
@@ -17,7 +17,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 # CONFIGURATION
 # ----------------------
-STRATEGY             = "parity_candles_short"
+STRATEGY             = "parity_short"
 TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 80
 
@@ -38,7 +38,7 @@ def check_latest_signal(df_minor, symbol):
     df_minor  = normalize_live_ohlcv(df_minor)
     arr_minor = df_to_arrays_live(df_minor)
 
-    signals = detect_parity_reversal_short(
+    signals = detect_parity_short(
         arr_minor,
         lookback=LOOKBACK,
         tolerance=TOLERANCE,

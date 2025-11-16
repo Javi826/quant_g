@@ -2,11 +2,11 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
 
 FOLDER = "brief_equities"
-INITIAL_CAPITAL = 800  # capital for individual curves
-RESAMPLE_FREQ = '4H'   # Common frequency for composition
-
+INITIAL_CAPITAL = 800
+RESAMPLE_FREQ = '4h'
 DATA_FOLDER = "data/crypto_OOS"
 
 # -------------------------------------------------
@@ -47,7 +47,7 @@ def average_recovery_time(df):
     last_peak_index = 0
 
     for i in range(1, len(bal)):
-        if not underwater[i] and underwater[i - 1]:  
+        if not underwater[i] and underwater[i - 1]:
             recovery_times.append(i - last_peak_index)
         if not underwater[i]:
             last_peak_index = i
@@ -57,25 +57,46 @@ def average_recovery_time(df):
     return np.mean(recovery_times)
 
 # -------------------------------------------------
-# Function to compute metrics (expanded)
+# --- New Smoothness Metrics
+# -------------------------------------------------
+
+def ulcer_index(df):
+    balance = df["balance"].values
+    peaks = np.maximum.accumulate(balance)
+    dd = (balance - peaks) / peaks * 100
+    return np.sqrt(np.mean(dd**2))
+
+def rmse_trend(df):
+    df2 = df.reset_index(drop=True)
+    X = np.arange(len(df2)).reshape(-1, 1)
+    y = df2["balance"].values.reshape(-1, 1)
+
+    model = LinearRegression().fit(X, y)
+    trend = model.predict(X)
+    return np.sqrt(np.mean((y - trend) ** 2))
+
+# -------------------------------------------------
+# Function to compute metrics
 # -------------------------------------------------
 def compute_metrics(equity_df, capital, name="Equity"):
     df = equity_df.copy()
     df = df.sort_values('timestamp')
 
-    # Volatility + consistency (original)
     returns = df['balance'].pct_change().dropna()
     volatility = returns.std() * 100
+
     df['month'] = df['timestamp'].dt.to_period('M')
     monthly_returns = df.groupby('month')['balance'].last().pct_change()
     consistency = (monthly_returns > 0).mean() * 100
 
-    # New metrics
     tr  = total_return(df, capital)
     cg  = cagr(df, capital) * 100
     pos = positive_period_ratio(df)
     pf  = profit_factor(df)
     rt  = average_recovery_time(df) / 6
+
+    ui = ulcer_index(df)
+    rm = rmse_trend(df)
 
     return {
         "Curve": name,
@@ -85,11 +106,13 @@ def compute_metrics(equity_df, capital, name="Equity"):
         "CAGR_pct": round(cg, 2),
         "PPR_pct": round(pos, 2),
         "Profit_Factor": round(pf, 3) if pf != np.inf else np.inf,
-        "Rec_Time": round(rt, 2)
+        "Rec_Time": round(rt, 2),
+        "Ulcer_Index": round(ui, 3),
+        "RMSE": round(rm, 3),
     }
 
 # -------------------------------------------------
-# Plotting function (unchanged)
+# Plot function (unchanged)
 # -------------------------------------------------
 def plot_netgain_dd(equity_hist, capital, title="Net Gain % & DD"):
     timestamps = pd.to_datetime(equity_hist['timestamp'])
@@ -141,7 +164,7 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % & DD"):
     plt.show()
 
 # -------------------------------------------------
-# Read all files (unchanged)
+# Read all files
 # -------------------------------------------------
 dfs = []
 file_names = []
@@ -167,20 +190,21 @@ for file_name in os.listdir(FOLDER):
     df = df.sort_values('timestamp')
     df.set_index('timestamp', inplace=True)
     dfs.append(df)
-    file_names.append(file_name)
 
-    # For correlation calculation
-    correlation_data[file_name] = df['balance'].pct_change()
+    short_name = os.path.splitext(file_name)[0]
+    file_names.append(short_name)
+
+    correlation_data[short_name] = df['balance'].pct_change()
 
     plot_netgain_dd(df.reset_index(), capital=INITIAL_CAPITAL,
-                    title=f"Net Gain % & DD - {file_name}")
+                    title=f"Net Gain % & DD - {short_name}")
 
     metrics_table.append(
-        compute_metrics(df.reset_index(), capital=INITIAL_CAPITAL, name=file_name)
+        compute_metrics(df.reset_index(), capital=INITIAL_CAPITAL, name=short_name)
     )
 
 # -------------------------------------------------
-# Combined portfolio (unchanged)
+# Combined portfolio
 # -------------------------------------------------
 if dfs:
     start = min(df.index.min() for df in dfs)
@@ -232,20 +256,220 @@ except Exception as e:
     print(f"⚠️ Error computing BTC metrics: {e}")
 
 # -------------------------------------------------
-# Final metrics table
+# Final table
 # -------------------------------------------------
 metrics_df = pd.DataFrame(metrics_table)
-
-# Left align only 'Curve'
 metrics_df['Curve'] = metrics_df['Curve'].astype(str)
 
 print("\n📊 FINAL METRICS TABLE (ALL CURVES):\n")
-print(metrics_df.to_string(index=False))
+# Ajuste de la columna Curve para que quede alineada a la izquierda
+metrics_df_display = metrics_df.copy()
+max_len = metrics_df_display['Curve'].str.len().max()
+metrics_df_display['Curve'] = metrics_df_display['Curve'].apply(lambda x: x.ljust(max_len))
+
+print("\n📊 FINAL METRICS TABLE (ALL CURVES):\n")
+print(metrics_df_display.to_string(index=False))
+
 
 # -------------------------------------------------
-# Correlation matrix
+# COMBINATIONS SEARCH (unchanged)
 # -------------------------------------------------
-print("\n📈 CORRELATION MATRIX (returns):\n")
-corr_df = pd.DataFrame(correlation_data).corr().round(2)
-print(corr_df.to_string())
+from itertools import combinations
 
+
+combo_results = []
+named_dfs = dict(zip(file_names, dfs))
+
+for r in range(1, len(named_dfs) + 1):
+    for combo in combinations(named_dfs.keys(), r):
+
+        combo_dfs = [named_dfs[name] for name in combo]
+
+        start = min(df.index.min() for df in combo_dfs)
+        end   = max(df.index.max() for df in combo_dfs)
+        common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+        resampled = []
+        for df in combo_dfs:
+            df_r = df[['balance']].reindex(common_index)
+            df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+            resampled.append(df_r['balance'])
+
+        combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+        combined_df = pd.DataFrame({
+            'timestamp': common_index,
+            'balance': combined_balance
+        })
+
+        capital = INITIAL_CAPITAL * len(combo_dfs)
+
+        metrics = compute_metrics(
+            combined_df,
+            capital=capital,
+            name="+".join(combo)
+        )
+        combo_results.append(metrics)
+
+combo_df = pd.DataFrame(combo_results)
+combo_df = combo_df.sort_values("CAGR_pct", ascending=False)
+
+combo_df_display = combo_df.copy()
+max_len_combo = combo_df_display['Curve'].str.len().max()
+combo_df_display['Curve'] = combo_df_display['Curve'].apply(lambda x: x.ljust(max_len_combo))
+
+print("\n🏆 MEJORES COMBINACIONES (ordenadas por CAGR):\n")
+print(combo_df_display.to_string(index=False))
+
+
+
+best_name = combo_df.iloc[0]["Curve"]
+best_combo = best_name.split("+")
+
+best_dfs = [named_dfs[name] for name in best_combo]
+
+start = min(df.index.min() for df in best_dfs)
+end   = max(df.index.max() for df in best_dfs)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+resampled = []
+for df in best_dfs:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+best_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+
+best_capital = INITIAL_CAPITAL * len(best_dfs)
+
+plot_netgain_dd(best_df, capital=best_capital,
+                title=f"Best Combination: {best_name}")
+
+# -------------------------------------------------
+# Mejor combinación por CAGR
+# -------------------------------------------------
+best_name_cagr = combo_df.iloc[0]["Curve"]
+best_combo_cagr = best_name_cagr.split("+")
+
+best_dfs_cagr = [named_dfs[name] for name in best_combo_cagr]
+
+start = min(df.index.min() for df in best_dfs_cagr)
+end   = max(df.index.max() for df in best_dfs_cagr)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+resampled = []
+for df in best_dfs_cagr:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+best_df_cagr = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital = INITIAL_CAPITAL * len(best_dfs_cagr)
+
+plot_netgain_dd(best_df_cagr, capital=best_capital,
+                title=f"Best Combination by CAGR: {best_name_cagr}")
+
+
+# -------------------------------------------------
+# Mejor combinación por Ulcer Index (menor)
+# -------------------------------------------------
+best_name_ui = combo_df.loc[combo_df['Ulcer_Index'].idxmin(), "Curve"]
+best_combo_ui = best_name_ui.split("+")
+
+best_dfs_ui = [named_dfs[name] for name in best_combo_ui]
+
+start = min(df.index.min() for df in best_dfs_ui)
+end   = max(df.index.max() for df in best_dfs_ui)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+resampled = []
+for df in best_dfs_ui:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+best_df_ui = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital = INITIAL_CAPITAL * len(best_dfs_ui)
+
+plot_netgain_dd(best_df_ui, capital=best_capital,
+                title=f"Best Combination by Ulcer Index: {best_name_ui}")
+
+
+# -------------------------------------------------
+# Mejor combinación por RMSE (menor)
+# -------------------------------------------------
+best_name_rmse = combo_df.loc[combo_df['RMSE'].idxmin(), "Curve"]
+best_combo_rmse = best_name_rmse.split("+")
+
+best_dfs_rmse = [named_dfs[name] for name in best_combo_rmse]
+
+start = min(df.index.min() for df in best_dfs_rmse)
+end   = max(df.index.max() for df in best_dfs_rmse)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+resampled = []
+for df in best_dfs_rmse:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+best_df_rmse = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital = INITIAL_CAPITAL * len(best_dfs_rmse)
+
+plot_netgain_dd(best_df_rmse, capital=best_capital,
+                title=f"Best Combination by RMSE: {best_name_rmse}")
+
+# -------------------------------------------------
+# Print final personalizado para una combinación específica
+# -------------------------------------------------
+
+custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
+
+# Filtrar métricas del combo seleccionado
+custom_metrics = combo_df.loc[combo_df['Curve'] == custom_combo_name]
+
+if not custom_metrics.empty:
+    # Ajustamos la columna 'Curve' para que el texto empiece a la izquierda
+    custom_metrics_formatted = custom_metrics.copy()
+    custom_metrics_formatted['Curve'] = custom_metrics_formatted['Curve'].str.ljust(70)  # ajustar tamaño según convenga
+    
+    print("\n📊 METRICS TABLE - COMBINACIÓN PERSONALIZADA:\n")
+    print(custom_metrics_formatted.to_string(index=False))
+else:
+    print(f"⚠️ No se encontraron métricas para la combinación: {custom_combo_name}")
+
+# -------------------------------------------------
+# Plot personalizado para la misma combinación
+# -------------------------------------------------
+
+custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
+
+# Filtrar la lista de nombres que componen la combinación
+custom_combo_list = custom_combo_name.split("+")
+
+# Extraer los DataFrames correspondientes
+custom_dfs = [named_dfs[name] for name in custom_combo_list]
+
+# Crear índice común
+start = min(df.index.min() for df in custom_dfs)
+end   = max(df.index.max() for df in custom_dfs)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+# Interpolar y combinar balances
+resampled = []
+for df in custom_dfs:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+custom_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+
+custom_capital = INITIAL_CAPITAL * len(custom_dfs)
+
+# Generar plot
+plot_netgain_dd(custom_df, capital=custom_capital,
+                title=f"Custom Combination: {custom_combo_name}")

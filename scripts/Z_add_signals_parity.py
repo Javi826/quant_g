@@ -1,6 +1,6 @@
 import numpy as np
 
-def detect_parity_reversal_long(arr, lookback, tolerance, live_trading=True):
+def detect_parity_long(arr, lookback, tolerance, live_trading=True):
     opens  = arr['open']
     closes = arr['close']
     n      = len(closes)
@@ -55,7 +55,7 @@ def detect_parity_reversal_long(arr, lookback, tolerance, live_trading=True):
     
     return signals
 
-def detect_parity_reversal_short(arr, lookback, tolerance, live_trading=True):
+def detect_parity_short(arr, lookback, tolerance, live_trading=True):
     opens  = arr['open']
     closes = arr['close']
     n      = len(closes)

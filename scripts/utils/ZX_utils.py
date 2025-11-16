@@ -127,8 +127,6 @@ def filter_symbolskk(symbols, min_vol_usdt, timeframe=None, data_folder=None, ex
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-
-
             # -------------------
             # MIN BARS
             # -------------------
