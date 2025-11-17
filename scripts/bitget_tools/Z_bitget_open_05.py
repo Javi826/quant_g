@@ -27,6 +27,7 @@ def get_usdt_balance_total(exchange):
 # -----------------------------
 # Convert date to timestamp in ms
 # -----------------------------
+
 def date_to_timestamp_ms(date_str: str) -> int:
     dt = datetime.strptime(date_str, "%Y-%m-%d")
     return int(dt.timestamp() * 1000)

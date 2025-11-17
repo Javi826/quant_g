@@ -10,6 +10,7 @@ import base64
 import hmac
 from urllib.parse import urlencode
 from typing import Dict, Any, List
+from utils.ZZ_connect import BITGET_API_KEY_TT, BITGET_API_SECRET_TT, BITGET_API_PASS_TT
 from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
 from utils.ZZ_connect import BITGET_API_KEY_03, BITGET_API_SECRET_03, BITGET_API_PASS_03
 from utils.ZZ_connect import BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02
@@ -24,6 +25,52 @@ def _now_ms():
 
 def _body_to_str(body):
     return json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body else ""
+
+# -----------------------------
+# SIGNATURE
+# -----------------------------
+def sign_request_TT(timestamp: str, method: str, path: str, query_string: str, body_str: str) -> str:
+    to_sign = timestamp + method.upper() + path
+    if query_string:
+        to_sign += "?" + query_string
+    to_sign += body_str
+    digest = hmac.new(BITGET_API_SECRET_TT.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
+    return base64.b64encode(digest).decode()
+
+# -----------------------------
+# HTTP REQUESTS
+# -----------------------------
+def make_get_TT(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    qs = "&".join(f"{k}={v}" for k, v in params.items() if v not in [None, ""])
+    url = BASE_URL + endpoint + (f"?{qs}" if qs else "")
+    timestamp = str(int(time.time() * 1000))
+    sign = sign_request_TT(timestamp, "GET", endpoint, qs, "")
+    headers = {
+        "ACCESS-KEY": BITGET_API_KEY_TT,
+        "ACCESS-SIGN": sign,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_TT,
+        "ACCESS-TIMESTAMP": timestamp,
+        "Content-Type": "application/json"
+    }
+    resp = requests.get(url, headers=headers, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+def make_post_TT(endpoint: str, body: Dict[str, Any]) -> Dict[str, Any]:
+    body_str = json.dumps(body, separators=(',', ':'))
+    url = BASE_URL + endpoint
+    timestamp = str(int(time.time() * 1000))
+    sign = sign_request_TT(timestamp, "POST", endpoint, "", body_str)
+    headers = {
+        "ACCESS-KEY": BITGET_API_KEY_TT,
+        "ACCESS-SIGN": sign,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_TT,
+        "ACCESS-TIMESTAMP": timestamp,
+        "Content-Type": "application/json"
+    }
+    resp = requests.post(url, headers=headers, data=body_str, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
 # =============================================================================
 # 01 

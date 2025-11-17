@@ -1,48 +1,12 @@
 import os
 import sys
-import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import requests
-import hashlib
-import base64
-import hmac
-from typing import Dict, Any
-
-from utils.ZZ_connect import BITGET_API_KEY_TT, BITGET_API_SECRET_TT, BITGET_API_PASS_TT
+from live_trading.ZX_connect_live import  make_get_TT
 
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
 INITIAL_CAPITAL = 4087.90  
 
-# -----------------------------
-# FIRMA DE PETICIONES
-# -----------------------------
-def sign_request_TT(timestamp, method, path, query_string, body_str):
-    to_sign = timestamp + method.upper() + path
-    if query_string:
-        to_sign += "?" + query_string
-    to_sign += body_str
-    digest = hmac.new(BITGET_API_SECRET_TT.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
-    return base64.b64encode(digest).decode()
-
-# -----------------------------
-# PETICIÓN GET FIRMADA
-# -----------------------------
-def make_get_TT(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
-    qs = "&".join(f"{k}={v}" for k, v in params.items() if v not in [None, ""])
-    url = BASE_URL + endpoint + (f"?{qs}" if qs else "")
-    timestamp = str(int(time.time() * 1000))
-    sign = sign_request_TT(timestamp, "GET", endpoint, qs, "")
-    headers = {
-        "ACCESS-KEY": BITGET_API_KEY_TT,
-        "ACCESS-SIGN": sign,
-        "ACCESS-PASSPHRASE": BITGET_API_PASS_TT,
-        "ACCESS-TIMESTAMP": timestamp,
-        "Content-Type": "application/json"
-    }
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
 
 # -----------------------------
 # OBTENER TOTAL USDT EN SUBCUENTAS FUTURES
