@@ -18,8 +18,9 @@ from utils.ZZ_connect import BITGET_API_KEY_04, BITGET_API_SECRET_04, BITGET_API
 from utils.ZZ_connect import BITGET_API_KEY_05, BITGET_API_SECRET_05, BITGET_API_PASS_05
 
 
-BASE_URL = "https://api.bitget.com"
+BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = 'usdt-futures'
+
 def _now_ms():
     return str(int(time.time() * 1000))
 
@@ -27,7 +28,7 @@ def _body_to_str(body):
     return json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body else ""
 
 # -----------------------------
-# SIGNATURE
+# TT
 # -----------------------------
 def sign_request_TT(timestamp: str, method: str, path: str, query_string: str, body_str: str) -> str:
     to_sign = timestamp + method.upper() + path
@@ -37,9 +38,39 @@ def sign_request_TT(timestamp: str, method: str, path: str, query_string: str, b
     digest = hmac.new(BITGET_API_SECRET_TT.encode("utf-8"), to_sign.encode("utf-8"), hashlib.sha256).digest()
     return base64.b64encode(digest).decode()
 
-# -----------------------------
-# HTTP REQUESTS
-# -----------------------------
+def get_usdt_balance_TT(exchange):
+    balance = exchange.fetch_balance()
+    return balance['free']['USDT']
+
+def get_open_positions_TT(product_type: str = "USDT-FUTURES") -> List[Dict[str, Any]]:
+    endpoint = "/api/v2/mix/position/all-position"
+    params   = {"productType": product_type}
+    response = make_get_TT(endpoint, params)
+    return response.get("data", [])
+
+def send_request_TT(method, path, params=None, body=None):
+    ts = _now_ms()
+    query_string = urlencode(params) if params else ""
+    body_str = _body_to_str(body)
+    sign = sign_request_TT(ts, method, path, query_string, body_str)
+    headers = {
+        "ACCESS-KEY": BITGET_API_KEY_TT,
+        "ACCESS-SIGN": sign,
+        "ACCESS-TIMESTAMP": ts,
+        "ACCESS-PASSPHRASE": BITGET_API_PASS_TT,
+        "Content-Type": "application/json"
+    }
+    url = BASE_URL + path + (f"?{query_string}" if query_string else "")
+    try:
+        if method.upper() != "GET":
+            r = requests.post(url, headers=headers, data=body_str.encode('utf-8'), timeout=15)
+        else:
+            r = requests.get(url, headers=headers, timeout=15)
+        ct = r.headers.get("Content-Type", "")
+        return r.status_code, r.json() if ct.startswith("application/json") else r.text
+    except Exception as e:
+        return 0, {"error": str(e)}
+
 def make_get_TT(endpoint: str, params: Dict[str, Any]) -> Dict[str, Any]:
     qs = "&".join(f"{k}={v}" for k, v in params.items() if v not in [None, ""])
     url = BASE_URL + endpoint + (f"?{qs}" if qs else "")
@@ -132,6 +163,7 @@ def send_request_01(method, path, params=None, body=None):
         return r.status_code, r.json() if ct.startswith("application/json") else r.text
     except Exception as e:
         return 0, {"error": str(e)}
+    
 # =============================================================================
 # 03 
 # =============================================================================

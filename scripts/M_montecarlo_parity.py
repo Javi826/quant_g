@@ -16,17 +16,16 @@ from tools.ZX_optimize_MCf_tf import generate_multiple_paths
 from Z_add_signals_parity import detect_parity_long
 from Z_add_signals_parity import detect_parity_short
 
-
 DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
-STRATEGY            = "parity_candles"
+STRATEGY            = "parity"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
-ORDER_AMOUNT        = 5_000
+TIMEFRAME_MINOR     = '1H'
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -50,7 +49,7 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 # SL_PCT_LIST          = [10]
 # =============================================================================
 # # =============================================================================
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------

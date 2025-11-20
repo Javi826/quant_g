@@ -5,7 +5,7 @@ from live_trading.ZX_connect_live import  make_get_TT
 
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
-INITIAL_CAPITAL = 4087.90  
+INITIAL_CAPITAL = 4040.90  
 
 
 # -----------------------------

@@ -2,7 +2,7 @@ import os
 import sys
 import time
 from typing import Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from live_trading.ZX_connect_live import get_open_positions_04, make_get_04
 from utils.ZZ_connect import connect_bitget_04

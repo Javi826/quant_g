@@ -1,0 +1,52 @@
+{
+  "strategies": {
+    "A": [
+      {
+        "symbol": "BTCUSDT",
+        "order_id": "1375322506775900161",
+        "client_oid": "A-1763628357-55e835",
+        "size": 0.0001,
+        "buy_price": 50000.0,
+        "candles_to_sell": 1,
+        "direction": "short",
+        "opened_at": "2025-11-20T09:45:58.696594+01:00",
+        "just_bought": false
+      },
+      {
+        "symbol": "BNBUSDT",
+        "order_id": "1375322515676213250",
+        "client_oid": "A-1763628359-60eddd",
+        "size": 0.010000453494172598,
+        "buy_price": 600.0,
+        "candles_to_sell": 1,
+        "direction": "short",
+        "opened_at": "2025-11-20T09:46:00.832288+01:00",
+        "just_bought": false
+      }
+    ],
+    "B": [
+      {
+        "symbol": "BTCUSDT",
+        "order_id": "1375322571699531777",
+        "client_oid": "B-1763628372-ffe74d",
+        "size": 0.0001,
+        "buy_price": 50000.0,
+        "candles_to_sell": 2,
+        "direction": "short",
+        "opened_at": "2025-11-20T09:46:14.156541+01:00",
+        "just_bought": false
+      },
+      {
+        "symbol": "BNBUSDT",
+        "order_id": "1375322580750839809",
+        "client_oid": "B-1763628374-995846",
+        "size": 0.009999546505827399,
+        "buy_price": 600.0,
+        "candles_to_sell": 2,
+        "direction": "short",
+        "opened_at": "2025-11-20T09:46:16.326595+01:00",
+        "just_bought": false
+      }
+    ]
+  }
+}

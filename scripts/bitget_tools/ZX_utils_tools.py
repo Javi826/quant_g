@@ -1,16 +1,8 @@
 import os
 import sys
-import time
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from live_trading.ZX_connect_live import get_open_positions_01, make_get_01
-from utils.ZZ_connect import connect_bitget_01
-
-# -----------------------------
-# Connect with CCXT
-# -----------------------------
-exchange = connect_bitget_01()
 
 def ms_to_date(ms):
     if not ms:

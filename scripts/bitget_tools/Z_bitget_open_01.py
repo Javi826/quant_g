@@ -25,7 +25,7 @@ exchange = connect_bitget_01()
 def fetch_all_history_positions(product_type: str = "USDT-FUTURES", symbol: str = None,
                                 start_time: int = None, end_time: int = None) -> List[Dict[str, Any]]:
     endpoint = "/api/v2/mix/position/history-position"
-    limit = 100
+    limit = 200
     all_items: List[Dict[str, Any]] = []
     id_less_than = None
 
