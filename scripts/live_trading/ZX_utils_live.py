@@ -4,11 +4,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 import numpy as np
 import pandas as pd
+import json
+import uuid
+from decimal import Decimal
 from parquet_process.Z_parquet_A0_extraction import  _call_history_candles, to_dataframe_from_api
+from Z_add_signals_reversal import trend_reversal_entry_short
+from Z_add_signals_parity import detect_parity_short
 from ZX_place_orders import place_order
 from pandas.api.types import is_datetime64_any_dtype
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+STATE_FILE    = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 BASE_URL     = "https://api.bitget.com"
@@ -17,7 +23,21 @@ PRODUCT_TYPE = 'usdt-futures'
 # =============================================================================
 # SYMBOLS & CANDLES
 # =============================================================================
+def load_state(strategies, path=STATE_FILE):
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Error cargando estado: {e}")
+    return {'strategies': {s['id']: [] for s in strategies}}
 
+def save_state(state, path=STATE_FILE):
+    try:
+        with open(path, 'w') as f:
+            json.dump(state, f, indent=2, default=str)
+    except Exception as e:
+        print(f"⚠️ Error guardando estado: {e}")
 
 def normalize_live_ohlcv(df):
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -32,6 +52,164 @@ def normalize_live_ohlcv(df):
             
     return df
 
+def make_client_oid(strategy_id):
+    return f"{strategy_id}-{int(time.time())}-{uuid.uuid4().hex[:6]}"
+
+def extract_filled_size_from_resp(resp_order):
+    if not resp_order or 'data' not in resp_order:
+        return 0.0
+    data = resp_order.get('data') or {}
+    for k in ('size', 'filledSize', 'filledQty', 'filled_amount', 'filled_size'):
+        v = data.get(k)
+        if v is not None:
+            try:
+                return float(v)
+            except Exception:
+                try:
+                    return float(str(v))
+                except Exception:
+                    pass
+    try:
+        return float(data.get('size', 0) or 0)
+    except Exception:
+        return 0.0
+    
+def determine_side_for_open(direction):
+    return 'buy' if direction.lower() == 'long' else 'sell'
+
+def determine_side_for_close(direction):
+    return 'sell' if direction.lower() == 'long' else 'buy'
+def detect_signal_for_strategy(strategy, final_symbols):
+    """
+    Normaliza la salida de las funciones de señal y evita evaluar arrays directamente.
+    Devuelve lista de dicts {'symbol', 'timestamp', 'close'}.
+    """
+    detected = []
+    if not final_symbols:
+        return detected
+
+    ohlcv = fetch_ohlcv_data(final_symbols, strategy['timeframe'])
+    for sym, df in ohlcv.items():
+        if df is None or df.empty:
+            continue
+        df_norm = normalize_live_ohlcv(df)
+        arr = df_to_arrays_live(df_norm)
+
+        # obtener señales según estrategia
+        try:
+            if strategy['name'] == 'reversal_short':
+                signals = trend_reversal_entry_short(
+                    arr,
+                    left_lookback=strategy['left_lookback'],
+                    tolerance=strategy['tolerance'],
+                    live_trading=True
+                )
+            elif strategy['name'] == 'parity_short':
+                signals = detect_parity_short(
+                    arr,
+                    lookback=strategy['lookback'],
+                    tolerance=strategy['tolerance'],
+                    live_trading=True
+                )
+            else:
+                signals = None
+        except Exception as e:
+            print(f"⚠️ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            signals = None
+
+        # Normalizar signals para evitar truthiness ambiguo
+        if signals is None:
+            continue
+
+        # convertir a array numpy para inspección segura
+        try:
+            signals_arr = np.asarray(signals)
+        except Exception:
+            # fallback: intentar convertir a lista
+            try:
+                signals_arr = np.array(list(signals))
+            except Exception:
+                continue
+
+        if signals_arr.size == 0:
+            continue
+
+        # tomar el último elemento
+        last = signals_arr.flat[-1]
+
+        # convertir last a array/numpy para comprobar si hay valores no nulos
+        last_arr = np.asarray(last)
+
+        # si cualquier elemento del último valor es distinto de 0, consideramos señal
+        try:
+            has_signal = np.any(last_arr != 0)
+        except Exception:
+            # si comparación falla, intentar comparación escalar
+            try:
+                has_signal = (float(last_arr) != 0.0)
+            except Exception:
+                has_signal = False
+
+        if has_signal:
+            last_row = df_norm.iloc[-1]
+            detected.append({
+                'symbol': sym,
+                'timestamp': last_row.name if 'timestamp' not in df_norm.columns else last_row['timestamp'],
+                'close': float(last_row['close'])
+            })
+    #FAKE
+    now = datetime.now(MADRID_TZ).isoformat()
+    return [
+        {
+            'symbol': 'BTCUSDT',
+            'timestamp': now,
+            'close': 50000.0
+        },
+        {
+            'symbol': 'BNBUSDT',
+            'timestamp': now,
+            'close': 600.0
+        }
+    ]
+       
+    #return detected
+
+def get_contract_info(symbol, product_type, send_request_fn):
+
+    defaults = {
+        'min_trade': Decimal('0'),
+        'size_mult': Decimal('0.00000001'),
+        'volume_place': 8,
+        'max_market_order_qty': None
+    }
+
+    try:
+        path = f"/api/v2/mix/market/contracts?productType={product_type}&symbol={symbol}"
+        code_cfg, resp_cfg = send_request_fn('GET', path)
+
+        if code_cfg == 200 and resp_cfg.get('code') == '00000' and resp_cfg.get('data'):
+            data0 = resp_cfg['data'][0]
+
+            min_trade = Decimal(str(data0.get('minTradeNum', '0') or '0'))
+            size_mult = Decimal(str(data0.get('sizeMultiplier', '0.00000001') or '0.00000001'))
+            volume_place = int(data0.get('volumePlace', 8))
+            mmq = data0.get('maxMarketOrderQty')
+            max_market_order_qty = Decimal(str(mmq)) if mmq not in (None, '') else None
+
+            return {
+                'min_trade': min_trade,
+                'size_mult': size_mult,
+                'volume_place': volume_place,
+                'max_market_order_qty': max_market_order_qty
+            }
+
+    except Exception as e:
+        print(f"⚠️ Error obteniendo info del contrato para {symbol}: {e}")
+
+    return defaults
+#==============================================================================================
+#SUBACCOUNTS
+#==============================================================================================
 def df_to_arrays_live(df):
     if not is_datetime64_any_dtype(df.index):
         df = df.copy()
@@ -86,7 +264,9 @@ def wait_for_next_candle(timeframe='4H'):
     next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
     
     sleep_seconds = (next_run - now).total_seconds() + 45
-    print(f"🕒 Waiting for next candle: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    print('\n')
+    print(f"🔷 ===Waiting for next candle===: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    print('\n')
     time.sleep(sleep_seconds)
     
 # archivo utils_positions.py

@@ -145,7 +145,7 @@ def place_order(symbol: str,
     # Precio real de ejecución
     exec_price = Decimal(str(resp_order['data'].get('price', last_price)))
 
-    print(f"🎯 {'⬆️' if direction=='long' else '⬇️'} {direction.capitalize()} Position {symbol}     | "
-          f"Size: {filled_amount}     | Price: {exec_price}         | TP: {tp_price}     | SL: {sl_price}")
+    print(f"🎯 {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10} | TP: {tp_price:<10} | SL: {sl_price:<10}")
+
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}

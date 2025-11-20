@@ -1,50 +1,50 @@
 {
   "strategies": {
-    "A": [
+    "revers_short": [
       {
         "symbol": "BTCUSDT",
-        "order_id": "1375322506775900161",
-        "client_oid": "A-1763628357-55e835",
+        "order_id": "1375460923526500354",
+        "client_oid": "revers_short-1763661358-d480f3",
         "size": 0.0001,
         "buy_price": 50000.0,
         "candles_to_sell": 1,
         "direction": "short",
-        "opened_at": "2025-11-20T09:45:58.696594+01:00",
+        "opened_at": "2025-11-20T18:55:59.808630+01:00",
         "just_bought": false
       },
       {
         "symbol": "BNBUSDT",
-        "order_id": "1375322515676213250",
-        "client_oid": "A-1763628359-60eddd",
-        "size": 0.010000453494172598,
+        "order_id": "1375460932573614081",
+        "client_oid": "revers_short-1763661360-568506",
+        "size": 0.010002635046113309,
         "buy_price": 600.0,
         "candles_to_sell": 1,
         "direction": "short",
-        "opened_at": "2025-11-20T09:46:00.832288+01:00",
+        "opened_at": "2025-11-20T18:56:01.985638+01:00",
         "just_bought": false
       }
     ],
-    "B": [
+    "parity_short": [
       {
         "symbol": "BTCUSDT",
-        "order_id": "1375322571699531777",
-        "client_oid": "B-1763628372-ffe74d",
+        "order_id": "1375460993294553089",
+        "client_oid": "parity_short-1763661374-6f45fe",
         "size": 0.0001,
         "buy_price": 50000.0,
-        "candles_to_sell": 2,
+        "candles_to_sell": 3,
         "direction": "short",
-        "opened_at": "2025-11-20T09:46:14.156541+01:00",
+        "opened_at": "2025-11-20T18:56:16.481192+01:00",
         "just_bought": false
       },
       {
         "symbol": "BNBUSDT",
-        "order_id": "1375322580750839809",
-        "client_oid": "B-1763628374-995846",
-        "size": 0.009999546505827399,
+        "order_id": "1375461002731737164",
+        "client_oid": "parity_short-1763661377-9e2fcf",
+        "size": 0.009997364953886693,
         "buy_price": 600.0,
-        "candles_to_sell": 2,
+        "candles_to_sell": 3,
         "direction": "short",
-        "opened_at": "2025-11-20T09:46:16.326595+01:00",
+        "opened_at": "2025-11-20T18:56:18.733497+01:00",
         "just_bought": false
       }
     ]
