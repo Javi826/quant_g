@@ -1,8 +1,7 @@
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import os
 import time
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from decimal import Decimal, ROUND_DOWN,ROUND_UP
 
 BASE_URL     = "https://api.bitget.com"
@@ -38,37 +37,73 @@ def place_order(symbol: str,
     # 2) Tamaño base
     size_base = Decimal(str(usdt_amount)) / last_price
 
-    # 3) Obtener price tick y size scale desde la API
-    code_info, resp_info = send_request_func("GET", "/api/v2/mix/market/symbols")
+    # 3) Obtener price tick y size scale desde la API (usar /contracts)
     price_tick = None
     size_scale = None
-    if code_info == 200 and resp_info.get("code") == "00000":
-        for s in resp_info.get("data", []):
-            if s.get("symbol") == symbol:
-                # Price tick
-                if "priceScale" in s and isinstance(s.get("priceScale"), int):
-                    price_tick = Decimal(f"1e-{int(s.get('priceScale'))}")
-                elif "tickSize" in s:
-                    try:
-                        price_tick = Decimal(str(s.get("tickSize")))
-                    except:
-                        pass
-                elif "pricePrecision" in s:
-                    price_tick = Decimal(f"1e-{int(s.get('pricePrecision'))}")
-                # Size scale
-                if "sizeScale" in s:
-                    try:
-                        size_scale = int(s.get("sizeScale"))
-                    except:
-                        pass
-                elif "qtyScale" in s:
-                    try:
-                        size_scale = int(s.get("qtyScale"))
-                    except:
-                        pass
-                break
+    size_multiplier = None
+    min_trade_num = None
+    min_trade_usdt = None
+    max_market_order_qty = None
+    max_order_qty = None
 
-    # 3b) Fallback dinámico según magnitud
+    code_info, resp_info = send_request_func("GET", "/api/v2/mix/market/contracts",params={"productType": product_type, "symbol": symbol})
+    if code_info == 200 and resp_info.get("code") == "00000":
+        data_list = resp_info.get("data", [])
+        if data_list:
+            c = data_list[0]  # la entrada del símbolo solicitado
+            # price tick — preferimos pricePlace, fallback a priceEndStep
+            if "pricePlace" in c and c.get("pricePlace") is not None:
+                try:
+                    price_tick = Decimal(f"1e-{int(c.get('pricePlace'))}")
+                except Exception:
+                    pass
+            if price_tick is None and "priceEndStep" in c and c.get("priceEndStep") is not None:
+                try:
+                    price_tick = Decimal(str(c.get("priceEndStep")))
+                except Exception:
+                    pass
+            # size scale — preferimos volumePlace; si no existe, inferir de sizeMultiplier
+            if "volumePlace" in c and c.get("volumePlace") is not None:
+                try:
+                    size_scale = int(c.get("volumePlace"))
+                except Exception:
+                    pass
+            elif "sizeMultiplier" in c and c.get("sizeMultiplier") is not None:
+                try:
+                    sm = Decimal(str(c.get("sizeMultiplier")))
+                    size_multiplier = sm
+                    # inferimos cantidad de decimales de sizeMultiplier si es tipo 0.01 etc.
+                    if sm == sm.to_integral():  # entero
+                        size_scale = 0
+                    else:
+                        # número de decimales = -exponente de Decimal
+                        size_scale = max(0, -sm.as_tuple().exponent)
+                except Exception:
+                    pass
+
+            # otros campos útiles (no usados para preservar lógica, pero capturados)
+            try:
+                if c.get("minTradeNum") is not None:
+                    min_trade_num = Decimal(str(c.get("minTradeNum")))
+            except Exception:
+                pass
+            try:
+                if c.get("minTradeUSDT") is not None:
+                    min_trade_usdt = Decimal(str(c.get("minTradeUSDT")))
+            except Exception:
+                pass
+            try:
+                if c.get("maxMarketOrderQty") is not None:
+                    max_market_order_qty = Decimal(str(c.get("maxMarketOrderQty")))
+            except Exception:
+                pass
+            try:
+                if c.get("maxOrderQty") is not None:
+                    max_order_qty = Decimal(str(c.get("maxOrderQty")))
+            except Exception:
+                pass
+
+    # 3b) Fallback dinámico según magnitud (se mantiene como respaldo)
     if price_tick is None:
         if last_price >= 1000:
             price_tick = Decimal("0.1")

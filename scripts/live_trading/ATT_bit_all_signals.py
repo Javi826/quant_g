@@ -21,7 +21,7 @@ from decimal import Decimal, ROUND_DOWN, InvalidOperation, getcontext
 
 # --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
-from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, fetch_ohlcv_data
+from ZX_utils_live import wait_for_next_candle, load_final_symbols
 from ZX_utils_live import load_state,save_state,make_client_oid,extract_filled_size_from_resp,detect_signal_for_strategy,get_contract_info
 
 from utils.ZZ_connect import connect_bitget_TT
@@ -137,6 +137,7 @@ def maybe_open_orders_for_strategy(state, strat, final_symbols, exchange):
         time.sleep(0.3)
 
     return state
+
 def close_size_on_exchange(symbol, size_requested, direction,
                            send_request_fn=send_request_common,
                            get_open_fn=get_open_positions_common,
@@ -339,7 +340,7 @@ def manage_tracked_positions(state, strat, exchange):
             print(f"▶️ Intentando cerrar {size:.6f} de {sym} (estrat {strat_id})")
 
             # Obtener contract_info una sola vez
-            contract_info = get_contract_info(sym)
+            contract_info = get_contract_info(sym,PRODUCT_TYPE,send_request_common)
 
             ok, resp = close_size_on_exchange(
                 sym, size, direction,

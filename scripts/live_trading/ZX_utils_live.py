@@ -79,6 +79,7 @@ def determine_side_for_open(direction):
 
 def determine_side_for_close(direction):
     return 'sell' if direction.lower() == 'long' else 'buy'
+
 def detect_signal_for_strategy(strategy, final_symbols):
     """
     Normaliza la salida de las funciones de señal y evita evaluar arrays directamente.
