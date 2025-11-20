@@ -4,24 +4,24 @@
     "parity_short": [
       {
         "symbol": "BTCUSDT",
-        "order_id": "1375486083583332353",
-        "client_oid": "parity_short-1763667356-b99fa0",
+        "order_id": "1375507540292030465",
+        "client_oid": "parity_short-1763672472-ca9335",
         "size": 0.0001,
         "buy_price": 50000.0,
-        "candles_to_sell": 1,
+        "candles_to_sell": 2,
         "direction": "short",
-        "opened_at": "2025-11-20T20:35:58.499979+01:00",
+        "opened_at": "2025-11-20T22:01:14.116926+01:00",
         "just_bought": false
       },
       {
         "symbol": "BNBUSDT",
-        "order_id": "1375486092928241669",
-        "client_oid": "parity_short-1763667359-2d1474",
+        "order_id": "1375507548953268227",
+        "client_oid": "parity_short-1763672474-b3c506",
         "size": 0.01,
         "buy_price": 600.0,
-        "candles_to_sell": 1,
+        "candles_to_sell": 2,
         "direction": "short",
-        "opened_at": "2025-11-20T20:36:00.753829+01:00",
+        "opened_at": "2025-11-20T22:01:16.194965+01:00",
         "just_bought": false
       }
     ]
