@@ -2,11 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Script que integra dos estrategias (reversal_short y parity_short) operando en la misma cuenta
-pero desacopladas: cada estrategia rastrea sus propias órdenes/posiciones y cierra únicamente
-la porción (size) que ella abrió cuando toque sell_after_n_candles o cuando quiera cerrar.
-
-Genera y persiste un estado en tracked_orders_state.json para mapear order/client ids a cada
-estrategia y permitir reintentos/reconciliación con el exchange.
+de forma TOTALMENTE DESACOPLADA usando plan orders independientes para cada estrategia.
 """
 
 import os
@@ -16,22 +12,41 @@ import time
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from decimal import Decimal, ROUND_DOWN, InvalidOperation, getcontext
-
+from decimal import Decimal, ROUND_DOWN, ROUND_UP, InvalidOperation, getcontext
 
 # --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import wait_for_next_candle, load_final_symbols
-from ZX_utils_live import load_state,save_state,make_client_oid,extract_filled_size_from_resp,detect_signal_for_strategy,get_contract_info
-
+from ZX_utils_live import load_state, save_state, make_client_oid, detect_signal_for_strategy
 from utils.ZZ_connect import connect_bitget_TT
-from ZX_connect_live import get_usdt_balance_TT, send_request_TT, get_open_positions_TT
+from ZX_connect_live import get_usdt_balance_TT, send_request_TT
 from ZX_place_orders import place_order
 
-MADRID_TZ     = ZoneInfo('Europe/Madrid')
-STATE_FILE    = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
-PRODUCT_TYPE  = 'USDT-FUTURES'
+MADRID_TZ = ZoneInfo('Europe/Madrid')
+STATE_FILE = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
+PRODUCT_TYPE = 'USDT-FUTURES'
 MIN_TIMEFRAME = '5m'
+
+# ----------------------
+# TESTING: Señales Hardcodeadas
+# ----------------------
+USE_HARDCODED_SIGNALS = True
+
+def get_hardcoded_signals(strat_id):
+    symbols = ['BTCUSDT', 'BNBUSDT']
+    signals = []
+    for symbol in symbols:
+        code, resp = send_request_common("GET", "/api/v2/mix/market/ticker",
+                                         params={"productType": PRODUCT_TYPE, "symbol": symbol})
+        current_price = 50000.0
+        if code == 200 and isinstance(resp, dict) and resp.get("code") == "00000":
+            try:
+                current_price = float(resp['data'][0]['lastPr'])
+            except:
+                pass
+        signals.append({'symbol': symbol, 'close': current_price,
+                        'timestamp': datetime.now(MADRID_TZ).isoformat()})
+    return signals
 
 # ----------------------
 # Parámetros por estrategia
@@ -41,7 +56,6 @@ STRAT_A = {
     'name': 'reversal_short',
     'timeframe': '5m',
     'order_amount': 10,
-    'sell_after_n_candles': 2,
     'left_lookback': 8,
     'tolerance': 30,
     'tp_pct': 5,
@@ -54,376 +68,575 @@ STRAT_B = {
     'name': 'parity_short',
     'timeframe': '5m',
     'order_amount': 10,
-    'sell_after_n_candles': 4,
     'lookback': 150,
     'tolerance': 20,
-    'tp_pct': 10,
-    'sl_pct': 20,
+    'tp_pct': 1,
+    'sl_pct': 2,
     'direction': 'short'
 }
 
 STRATEGIES = [STRAT_A, STRAT_B]
 
-# Conexión y funciones comunes (misma cuenta)
+# Conexión y funciones comunes
 connect_common = connect_bitget_TT
 send_request_common = send_request_TT
 get_balance_common = get_usdt_balance_TT
-get_open_positions_common = get_open_positions_TT
 
+# ----------------------
+# Helpers para plan orders
+# ----------------------
+def get_pending_plan_orders(send_request_func, symbol=None, product_type='USDT-FUTURES', limit=200, plan_type=None):
+    """
+    Llama al endpoint orders-plan-pending y devuelve la lista 'entrustedList'.
+    plan_type: None (todas), 'normal_plan', 'track_plan', 'profit_loss'
+    """
+    endpoint = "/api/v2/mix/order/orders-plan-pending"
+    params = {
+        "productType": product_type,
+        "limit": limit
+    }
+    if symbol:
+        params["symbol"] = symbol
+    if plan_type:
+        params["planType"] = plan_type
 
+    status, resp = send_request_func("GET", endpoint, params=params)
 
-def maybe_open_orders_for_strategy(state, strat, final_symbols, exchange):
+    if status != 200 or not isinstance(resp, dict):
+        return []
+
+    if resp.get("code") != "00000":
+        return []
+
+    data = resp.get("data", {}) or {}
+    orders = data.get("entrustedList", []) or []
+    return orders
+
+def find_recent_plan_orders_for_position(send_request_func, symbol, hold_side, tp_str, sl_str):
+    """
+    Busca en las órdenes pendientes las órdenes cuyo trigger price coincida con tp_str o sl_str.
+    """
+    orders = get_pending_plan_orders(send_request_func, symbol=symbol, product_type=PRODUCT_TYPE, plan_type='profit_loss')
+    matched_ids = []
+    for o in orders:
+        try:
+            if o.get('posSide') and o.get('posSide').lower() != hold_side.lower():
+                continue
+        except:
+            pass
+
+        tp = o.get('stopSurplusTriggerPrice') or o.get('presetStopSurplusPrice')
+        sl = o.get('stopLossTriggerPrice') or o.get('presetStopLossPrice')
+
+        if tp and tp == str(tp_str):
+            matched_ids.append(o.get('orderId'))
+        if sl and sl == str(sl_str):
+            matched_ids.append(o.get('orderId'))
+    
+    return list({mid for mid in matched_ids if mid})
+
+# ----------------------
+# Helpers para precios
+# ----------------------
+def get_contract_info(send_request_func, product_type, symbol):
+    """Obtiene información del contrato: price_tick, price_scale"""
+    try:
+        code, resp = send_request_func(
+            "GET",
+            "/api/v2/mix/market/contracts",
+            params={"productType": product_type, "symbol": symbol}
+        )
+        if code == 200 and isinstance(resp, dict) and resp.get("code") == "00000":
+            data_list = resp.get("data", []) or []
+            if data_list:
+                c = data_list[0]
+                
+                price_tick = None
+                price_scale = None
+                if c.get("pricePlace") is not None:
+                    try:
+                        price_scale = int(c.get("pricePlace"))
+                        price_tick = Decimal(f"1e-{price_scale}")
+                    except Exception:
+                        price_tick = None
+                if price_tick is None and c.get("priceEndStep") is not None:
+                    try:
+                        price_tick = Decimal(str(c.get("priceEndStep")))
+                        if price_tick == price_tick.to_integral():
+                            price_scale = 0
+                        else:
+                            price_scale = max(0, -price_tick.as_tuple().exponent)
+                    except Exception:
+                        price_tick = None
+                if price_tick is None:
+                    price_tick = Decimal("0.01")
+                    price_scale = 2
+                
+                return price_tick, price_scale
+    except Exception as e:
+        print(f"⚠️ Error consultando contracts: {e}")
+    return Decimal("0.01"), 2
+
+def quantize_price_for_tick(price: Decimal, price_tick: Decimal, direction_rounding):
+    if direction_rounding == "down":
+        rnd = ROUND_DOWN
+    else:
+        rnd = ROUND_UP
+    scale = max(0, -price_tick.as_tuple().exponent)
+    quant = Decimal(f"1e-{scale}")
+    try:
+        q = price.quantize(quant, rounding=rnd)
+    except InvalidOperation:
+        q = price.quantize(quant, rounding=ROUND_DOWN)
+    return q
+
+def place_independent_tpsl_orders(symbol, size, exec_price, direction, tp_pct, sl_pct, 
+                                   send_request_func, product_type='USDT-FUTURES', 
+                                   margin_coin='USDT', client_oid_prefix=''):
+    """
+    Coloca TP y SL como órdenes PLAN INDEPENDIENTES usando stopSurplusSize/stopLossSize.
+    Retorna: (list_of_order_ids, response_data)
+    """
+    exec_price_d = Decimal(str(exec_price))
+
+    # Calcular precios de TP y SL
+    if direction.lower() == 'short':
+        tp_price_d = exec_price_d * (Decimal('1') - Decimal(str(tp_pct)) / Decimal('100'))
+        sl_price_d = exec_price_d * (Decimal('1') + Decimal(str(sl_pct)) / Decimal('100'))
+        hold_side = 'short'
+    else:
+        tp_price_d = exec_price_d * (Decimal('1') + Decimal(str(tp_pct)) / Decimal('100'))
+        sl_price_d = exec_price_d * (Decimal('1') - Decimal(str(sl_pct)) / Decimal('100'))
+        hold_side = 'long'
+
+    price_tick, price_scale = get_contract_info(send_request_func, product_type, symbol)
+    print(f"   price_tick={price_tick} scale={price_scale}")
+
+    # Cuantizar precios
+    if direction.lower() == 'short':
+        tp_q = quantize_price_for_tick(tp_price_d, price_tick, "down")
+        sl_q = quantize_price_for_tick(sl_price_d, price_tick, "up")
+    else:
+        tp_q = quantize_price_for_tick(tp_price_d, price_tick, "up")
+        sl_q = quantize_price_for_tick(sl_price_d, price_tick, "down")
+
+    fmt = f"{{0:.{price_scale}f}}"
+    tp_str = fmt.format(tp_q)
+    sl_str = fmt.format(sl_q)
+
+    # Formatear size
+    size_str = str(size)
+
+    print(f"▶️  Colocando TP/SL INDEPENDIENTES para {symbol}:")
+    print(f"   Size: {size_str}, Exec: {exec_price_d}")
+    print(f"   TP: {tp_str} ({tp_pct}%), SL: {sl_str} ({sl_pct}%)")
+
+    # Cliente OIDs únicos
+    tp_client_oid = f"{client_oid_prefix}_TP_{int(time.time() * 1000)}"
+    sl_client_oid = f"{client_oid_prefix}_SL_{int(time.time() * 1000)}"
+
+    # Usar place-pos-tpsl CON stopSurplusSize y stopLossSize
+    body = {
+        'symbol': symbol,
+        'productType': product_type,
+        'marginCoin': margin_coin,
+        'stopSurplusTriggerPrice': tp_str,
+        'stopSurplusTriggerType': 'mark_price',
+        'stopSurplusExecutePrice': None,
+        'stopSurplusSize': size_str,
+        'stopLossTriggerPrice': sl_str,
+        'stopLossTriggerType': 'mark_price',
+        'stopLossExecutePrice': None,
+        'stopLossSize': size_str,
+        'holdSide': hold_side,
+        'stopSurplusClientOid': tp_client_oid,
+        'stopLossClientOid': sl_client_oid
+    }
+
+    print(f"   📤 Colocando TP/SL con size específico...")
+    status, resp = send_request_func('POST', '/api/v2/mix/order/place-pos-tpsl', body=body)
+
+    if status == 200 and isinstance(resp, dict) and resp.get('code') == '00000':
+        data_list = resp.get('data', [])
+        order_ids = []
+        
+        if data_list:
+            # La API devuelve una lista con los plan orders creados
+            # Cada item puede tener orderId (si es un solo plan order) o múltiples IDs
+            for item in data_list:
+                order_id = item.get('orderId')
+                if order_id:
+                    order_ids.append(order_id)
+            
+            print(f"   ✅ TP/SL colocados. Plan order IDs: {order_ids}")
+            
+            # Si la API no devolvió los IDs individuales, intentamos buscarlos
+            if not order_ids:
+                time.sleep(0.5)
+                plan_ids = find_recent_plan_orders_for_position(send_request_func, symbol, hold_side, tp_str, sl_str)
+                print(f"   🔍 Buscados manualmente: {plan_ids}")
+                return plan_ids, resp
+            
+            return order_ids, resp
+        else:
+            print(f"   ⚠️ Respuesta exitosa pero sin data")
+            return [], resp
+    else:
+        error_msg = resp.get('msg', 'Unknown error') if isinstance(resp, dict) else str(resp)
+        print(f"   ❌ Error al colocar TP/SL: {error_msg}")
+        return [], resp
+
+# ----------------------
+# Lógica principal
+# ----------------------
+def get_filled_size_from_fills(order_id, symbol, send_request_func, product_type='USDT-FUTURES', max_retries=3):
+    for attempt in range(max_retries):
+        params = {'orderId': order_id, 'symbol': symbol, 'productType': product_type}
+        code, resp = send_request_func('GET', '/api/v2/mix/order/fills', params=params)
+        if code == 200 and isinstance(resp, dict) and resp.get('code') == '00000':
+            fill_list = resp.get('data', {}).get('fillList', [])
+            if fill_list:
+                total_filled = 0.0
+                for fill in fill_list:
+                    try:
+                        total_filled += float(fill.get('baseVolume', 0))
+                    except:
+                        continue
+                if total_filled > 0:
+                    print(f"▶️  Tamaño ejecutado obtenido de fills: {total_filled} ({len(fill_list)} fills)")
+                    return total_filled
+            else:
+                print(f"⏳ Intento {attempt + 1}/{max_retries}: Sin fills aún para orden {order_id}")
+        else:
+            err = resp.get('msg', 'Unknown') if isinstance(resp, dict) else str(resp)
+            print(f"⚠️ Error consultando fills: {err}")
+        if attempt < max_retries - 1:
+            time.sleep(0.5)
+    print(f"❌ No se pudieron obtener fills después de {max_retries} intentos")
+    return 0.0
+
+def maybe_open_orders_for_strategy(state, strat, final_symbols, exchange, use_hardcoded=False):
+    """
+    Abre nuevas posiciones para una estrategia específica.
+    Solo busca señales si NO hay ningún TP/SL activo de esta estrategia.
+    """
     strat_id = strat['id']
     tracked = state['strategies'].get(strat_id, [])
+
+    # NUEVO: Verificar si hay TP/SL activos para esta estrategia
     if tracked:
-        print(f"🛑 Estrategia {strat_id} tiene posiciones activas; no busca nuevas señales.")
+        print(f"⏸️  {strat_id} tiene {len(tracked)} posiciones con TP/SL activos")
+        print(f"   → Esperando cierre antes de buscar nuevas señales...")
         return state
 
+    print(f"✅ {strat_id} sin posiciones activas. Buscando señales...")
     print(f"▶️ Buscando señales para estrategia {strat_id} ({strat['name']})...")
-    signals = detect_signal_for_strategy(strat, final_symbols)
-    print(f"✨ {datetime.now(MADRID_TZ).strftime('%H:%M')} - Signals detected for {strat_id}: {len(signals)}")
+    if use_hardcoded:
+        signals = get_hardcoded_signals(strat_id)
+    else:
+        signals = detect_signal_for_strategy(strat, final_symbols)
+
+    print(f"✨ {datetime.now(MADRID_TZ).strftime('%H:%M')} - Señales detectadas para {strat_id}: {len(signals)}")
 
     for sig in signals:
         usdt_balance = get_balance_common(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"⚠️ Saldo USDT insuficiente ({usdt_balance:.2f}) para abrir {sig['symbol']} con estrategia {strat_id}")
+            print(f"⚠️ Saldo insuficiente ({usdt_balance:.2f} USDT) para {sig['symbol']}")
             continue
 
         client_oid = make_client_oid(strat_id)
-        resp_order, tpsl_info = place_order(
+        print(f"\n▶️  Abriendo posición {strat['direction']} en {sig['symbol']} para {strat_id}...")
+        resp_order = place_order(
             sig['symbol'],
             direction=strat['direction'],
             usdt_amount=strat['order_amount'],
-            tp_percent=strat['tp_pct'],
-            sl_percent=strat['sl_pct'],
             send_request_func=send_request_common,
             client_oid=client_oid
         )
 
         if resp_order is None:
-            print(f"⚠️ Orden no ejecutada para {sig['symbol']} (estrat {strat_id}).")
-            continue
-
-        filled = extract_filled_size_from_resp(resp_order)
-        if (not filled or filled <= 0) and tpsl_info and 'size_tpsl' in tpsl_info:
-            try:
-                filled = float(tpsl_info['size_tpsl'])
-            except Exception:
-                pass
-
-        if filled <= 0:
-            print(f"⚠️ No se detectó tamaño ejecutado para la orden en {sig['symbol']}. Ignorando.")
+            print(f"⚠️ Orden no ejecutada para {sig['symbol']}")
             continue
 
         order_id = resp_order.get('data', {}).get('orderId')
+        if not order_id:
+            print(f"⚠️ No se obtuvo orderId de la respuesta")
+            continue
+
+        print(f"▶️  Order ID: {order_id}")
+        time.sleep(1)
+
+        filled_size = get_filled_size_from_fills(order_id, sig['symbol'], send_request_common, PRODUCT_TYPE)
+
+        exec_price = sig['close']
+        params = {'orderId': order_id, 'symbol': sig['symbol'], 'productType': PRODUCT_TYPE}
+        code, resp = send_request_common('GET', '/api/v2/mix/order/fills', params=params)
+        if code == 200 and isinstance(resp, dict) and resp.get('code') == '00000':
+            fill_list = resp.get('data', {}).get('fillList', [])
+            if fill_list:
+                total_value = 0.0
+                total_qty = 0.0
+                for fill in fill_list:
+                    try:
+                        price = float(fill.get('price', 0))
+                        qty = float(fill.get('baseVolume', 0))
+                        total_value += price * qty
+                        total_qty += qty
+                    except:
+                        continue
+                if total_qty > 0:
+                    exec_price = total_value / total_qty
+
+        print(f"▶️  Orden ejecutada: {filled_size} @ {exec_price}")
+
+        if filled_size <= 0:
+            print(f"⚠️ No se detectó tamaño ejecutado para {sig['symbol']}")
+            continue
+
+        # Colocar TP/SL independientes
+        tpsl_order_ids, tpsl_data = place_independent_tpsl_orders(
+            sig['symbol'],
+            filled_size,
+            exec_price,
+            strat['direction'],
+            strat['tp_pct'],
+            strat['sl_pct'],
+            send_request_common,
+            client_oid_prefix=f"{strat_id}_{sig['symbol']}"
+        )
+
+        if not tpsl_order_ids or len(tpsl_order_ids) < 2:
+            print(f"🔶 No se pudieron crear ambos TP/SL para {sig['symbol']}")
+
+        # Separar TP y SL order IDs (asumiendo que el primero es TP y el segundo SL)
+        tp_order_id = tpsl_order_ids[0] if len(tpsl_order_ids) > 0 else None
+        sl_order_id = tpsl_order_ids[1] if len(tpsl_order_ids) > 1 else None
 
         tracked_entry = {
             'symbol': sig['symbol'],
             'order_id': order_id,
             'client_oid': client_oid,
-            'size': filled,
-            'buy_price': sig['close'],
-            'candles_to_sell': strat['sell_after_n_candles'],
+            'tp_order_id': tp_order_id,  # ID individual del TP
+            'sl_order_id': sl_order_id,  # ID individual del SL
+            'size': filled_size,
+            'exec_price': float(exec_price),
             'direction': strat['direction'],
             'opened_at': datetime.now(MADRID_TZ).isoformat(),
-            'just_bought': True
+            'tp_pct': strat['tp_pct'],
+            'sl_pct': strat['sl_pct']
         }
 
         state['strategies'].setdefault(strat_id, []).append(tracked_entry)
         save_state(state)
-        
+        print(f"▶️ Posición guardada en estado para {strat_id}")
 
-        # sleep pequeño para respetar rate-limit
-        time.sleep(0.3)
+        time.sleep(0.5)
 
     return state
 
-def close_size_on_exchange(symbol, size_requested, direction,
-                           send_request_fn=send_request_common,
-                           get_open_fn=get_open_positions_common,
-                           product_type=PRODUCT_TYPE,
-                           default_margin_mode='isolated',
-                           default_margin_coin='USDT',
-                           contract_info=None):
+def cancel_plan_order(order_id, symbol, send_request_func, product_type='USDT-FUTURES', margin_coin='USDT'):
     """
-    Cierra un tamaño de posición ajustando al múltiplo/decimales/min/max del contrato.
-    Si se pasa contract_info, se usa en vez de consultar la API.
+    Cancela una plan order específica.
     """
-
-    import time, uuid
-    getcontext().prec = 28
-
-    if contract_info is None:
-        contract_info = get_contract_info(symbol, product_type, send_request_fn)
-
-    min_trade = contract_info.get('min_trade', Decimal('0'))
-    size_mult = contract_info.get('size_mult', Decimal('0.00000001'))
-    volume_place = contract_info.get('volume_place', 8)
-    max_market_order_qty = contract_info.get('max_market_order_qty', None)
-
-    # Obtener posiciones abiertas
-    try:
-        exchange_positions = get_open_fn(product_type=product_type)
-    except Exception as e:
-        print(f"⚠️ Error obteniendo posiciones: {e}")
-        exchange_positions = []
-
-    holdside = 'long' if direction.lower() == 'long' else 'short'
-    available = Decimal('0')
-    chosen_margin_mode = default_margin_mode
-    chosen_margin_coin = default_margin_coin
-
-    for p in (exchange_positions or []):
-        if p.get('symbol') != symbol:
-            continue
-        if (p.get('holdSide') or '').lower() == holdside:
-            try:
-                available += Decimal(str(p.get('available', 0) or 0))
-            except Exception:
-                pass
-            if p.get('marginMode'):
-                chosen_margin_mode = p.get('marginMode')
-            if p.get('marginCoin'):
-                chosen_margin_coin = p.get('marginCoin')
-
-    if available <= Decimal('0'):
-        print(f"❌ No hay posición disponible para cerrar (available={available})")
-        return False, {'code': 22002, 'resp': {'code': '22002', 'msg': 'No position to close'}, 'min_trade': float(min_trade)}
-
-    # Ajuste de tamaño
-    try:
-        requested = Decimal(str(size_requested))
-    except InvalidOperation:
-        requested = Decimal('0')
-
-    size_to_close = min(requested, available)
-
-    if size_mult <= Decimal('0'):
-        size_mult = Decimal('0.00000001')
-
-    try:
-        multiples = (size_to_close / size_mult).to_integral_value(rounding=ROUND_DOWN)
-        adjusted = multiples * size_mult
-    except Exception:
-        adjusted = size_to_close.quantize(Decimal('1e-{}'.format(volume_place)), rounding=ROUND_DOWN)
-
-    quant = Decimal('1e-{}'.format(max(0, volume_place)))
-    try:
-        adjusted = adjusted.quantize(quant, rounding=ROUND_DOWN)
-    except Exception:
-        adjusted = Decimal(str(float(adjusted))).quantize(quant, rounding=ROUND_DOWN)
-
-    if max_market_order_qty is not None and adjusted > max_market_order_qty:
-        multiples = (max_market_order_qty / size_mult).to_integral_value(rounding=ROUND_DOWN)
-        adjusted = multiples * size_mult
-        adjusted = adjusted.quantize(quant, rounding=ROUND_DOWN)
-
-    if adjusted < min_trade:
-        adjusted = min_trade
-
-    size_str = format(adjusted, 'f')
-
     body = {
+        'orderIdList': [
+            {
+                'orderId': order_id,
+                'clientOid': ''
+            }
+        ],
         'symbol': symbol,
         'productType': product_type,
-        'size': size_str,
-        'side': 'sell' if direction.lower() == 'short' else 'buy',
-        'tradeSide': 'close',
-        'orderType': 'market',
-        'clientOid': f"close-{int(time.time())}-{uuid.uuid4().hex[:6]}",
-        'marginMode': chosen_margin_mode,
-        'marginCoin': chosen_margin_coin
+        'marginCoin': margin_coin
     }
-
-    print(f"▶️ Enviando orden de cierre: size={body['size']}, side={body['side']}")
-    code, resp = send_request_fn('POST', '/api/v2/mix/order/place-order', body=body)
-
-    if code == 200 and resp.get('code') == '00000':
-        closed_size = float(adjusted)
-        print(f"🎯 Orden de cierre ejecutada: {closed_size} unidades")
-        return True, {'code': code, 'resp': resp, 'closed_size': closed_size}
+    
+    print(f"      📤 Cancelando order_id={order_id} en {symbol}...")
+    status, resp = send_request_func('POST', '/api/v2/mix/order/cancel-plan-order', body=body)
+    
+    if status == 200 and isinstance(resp, dict) and resp.get('code') == '00000':
+        data = resp.get('data', {})
+        success_list = data.get('successList', [])
+        failure_list = data.get('failureList', [])
+        
+        if success_list:
+            print(f"      ✅ Plan order {order_id} cancelada exitosamente")
+            return True
+        elif failure_list:
+            error_msg = failure_list[0].get('errorMsg', 'Unknown') if failure_list else 'Unknown'
+            print(f"      ⚠️ Error al cancelar {order_id}: {error_msg}")
+            return False
+        else:
+            # Listas vacías = orden ya no existe (probablemente ya ejecutada)
+            # Consideramos esto como éxito ya que el objetivo (eliminar la orden) se cumplió
+            print(f"      ✅ Orden {order_id} ha venido lilsta vacia")
+            return True
     else:
         error_msg = resp.get('msg', 'Unknown error') if isinstance(resp, dict) else str(resp)
-        print(f"❌ Error al cerrar: {error_msg}")
-        return False, {'code': code, 'resp': resp, 'min_trade': float(min_trade)}
+        print(f"      ❌ Error de API al cancelar {order_id}: {error_msg}")
+        return False
 
-
-
-def reconcile_with_exchange(state, product_type=PRODUCT_TYPE, 
-                           send_request_fn=send_request_common, 
-                           get_open_fn=get_open_positions_common):
+def check_and_clean_executed_positions(state, strat):
     """
-    Reconcilia el estado local con las posiciones reales del exchange.
-    Actualiza los tamaños trackeados proporcionalmente si hay diferencias.
+    Verifica las posiciones de una estrategia y elimina las que ya se cerraron.
     """
-    try:
-        exchange_positions = get_open_fn(product_type=product_type)
-    except Exception as e:
-        print(f"⚠️ Error obteniendo posiciones: {e}")
-        return state
-
-    # Mapear posiciones del exchange
-    exch_map = {}
-    for p in exchange_positions or []:
-        sym = p.get('symbol')
-        hold = p.get('holdSide', '').lower()
-        try:
-            available_size = float(p.get('available', 0) or 0)
-        except Exception:
-            available_size = 0.0
-        
-        if sym not in exch_map:
-            exch_map[sym] = {'long': 0.0, 'short': 0.0}
-        exch_map[sym][hold] = available_size
-
-    # Para cada símbolo, calcular el total trackeado por todas las estrategias
-    tracked_totals = {}
-    for strat_id, tracked in state['strategies'].items():
-        for t in tracked:
-            sym = t.get('symbol')
-            dirn = t.get('direction', '').lower()
-            size = float(t.get('size', 0) or 0)
-            
-            key = (sym, dirn)
-            if key not in tracked_totals:
-                tracked_totals[key] = {'total': 0.0, 'entries': []}
-            tracked_totals[key]['total'] += size
-            tracked_totals[key]['entries'].append((strat_id, t))
-
-    # Ajustar proporcionalmente si hay diferencias
-    for (sym, dirn), info in tracked_totals.items():
-        holdside = 'long' if dirn == 'long' else 'short'
-        exch_size = exch_map.get(sym, {}).get(holdside, 0.0)
-        tracked_total = info['total']
-        
-        if exch_size <= 1e-8:
-            # No hay posición en el exchange, marcar todas como cerradas
-            print(f"🔁 {sym} ({dirn}): No existe en exchange, removiendo {len(info['entries'])} entradas")
-            for strat_id, entry in info['entries']:
-                try:
-                    state['strategies'][strat_id].remove(entry)
-                except:
-                    pass
-        elif abs(exch_size - tracked_total) > 1e-6:
-            # Hay diferencia, ajustar proporcionalmente
-            ratio = exch_size / tracked_total if tracked_total > 0 else 0
-            print(f"▶️ Ajuste proporcional {sym} ({dirn}): exchange={exch_size:.6f}, tracked={tracked_total:.6f}, ratio={ratio:.4f}")
-            
-            for strat_id, entry in info['entries']:
-                old_size = float(entry.get('size', 0))
-                new_size = old_size * ratio
-                entry['size'] = new_size
-                print(f"   Estrat {strat_id}: {old_size:.6f} -> {new_size:.6f}")
-
-    return state
-
-def manage_tracked_positions(state, strat, exchange):
     strat_id = strat['id']
     tracked = state['strategies'].get(strat_id, [])
+
     if not tracked:
         return state
 
+    print(f"\n🔍 Verificando {len(tracked)} posiciones de {strat_id}...")
+
     to_remove = []
 
-    for idx, t in enumerate(tracked):
-        if t.get('just_bought', False):
-            t['just_bought'] = False
+    symbols = {pos['symbol'] for pos in tracked}
+    pending_by_symbol = {}
+    for s in symbols:
+        pending_by_symbol[s] = get_pending_plan_orders(send_request_common, symbol=s, product_type=PRODUCT_TYPE, plan_type='profit_loss')
+
+    for idx, pos in enumerate(tracked):
+        symbol = pos['symbol']
+        tp_order_id = pos.get('tp_order_id')
+        sl_order_id = pos.get('sl_order_id')
+
+        # Obtener IDs de órdenes pendientes para este símbolo
+        pending_list_for_symbol = pending_by_symbol.get(symbol, []) or []
+        pending_ids = {p.get('orderId') for p in pending_list_for_symbol if p.get('orderId')}
+
+        # Verificar estado individual de TP y SL
+        tp_active = tp_order_id in pending_ids if tp_order_id else False
+        sl_active = sl_order_id in pending_ids if sl_order_id else False
+
+        print(f"   {symbol} ({strat_id}): TP={'✅' if tp_active else '❌'} | SL={'✅' if sl_active else '❌'}")
+
+        # Caso 1: Ambos activos → todo normal
+        if tp_active and sl_active:
+            print(f"      ✓ Ambas órdenes activas")
             continue
 
-        t['candles_to_sell'] = int(t.get('candles_to_sell', strat['sell_after_n_candles'])) - 1
-
-        if t['candles_to_sell'] <= 0:
-            sym = t['symbol']
-            size = float(t['size'])
-            direction = t['direction']
-
-            print(f"▶️ Intentando cerrar {size:.6f} de {sym} (estrat {strat_id})")
-
-            # Obtener contract_info una sola vez
-            contract_info = get_contract_info(sym,PRODUCT_TYPE,send_request_common)
-
-            ok, resp = close_size_on_exchange(
-                sym, size, direction,
-                send_request_fn=send_request_common,
-                product_type=PRODUCT_TYPE,
-                contract_info=contract_info
-            )
-
-            now = datetime.now(MADRID_TZ).strftime('%Y-%m-%d %H:%M:%S')
-
-            if ok:
-                closed = resp.get('closed_size', 0)
-                remaining = size - closed
-                min_trade = float(contract_info.get('min_trade', 0))
-
-                if remaining >= min_trade:
-                    t['size'] = remaining
-                    print(f"▶️ {now} - Estrat {strat_id} cerró parcialmente {closed:.6f} de {sym}, queda {remaining:.6f}")
+        # Caso 2: Uno ejecutado, el otro activo → cancelar el restante
+        if tp_active and not sl_active:
+            print(f"      🎯 SL ejecutado! Cancelando TP restante (ID: {tp_order_id})...")
+            # Verificar que realmente esté en pending antes de cancelar
+            time.sleep(0.3)  # Pequeño delay para sincronización
+            success = cancel_plan_order(tp_order_id, symbol, send_request_common, PRODUCT_TYPE)
+            if success:
+                print(f"      ✓ TP cancelado exitosamente")
+            to_remove.append(idx)
+        elif sl_active and not tp_active:
+            print(f"      🛑 TP ejecutado! Cancelando SL restante (ID: {sl_order_id})...")
+            # Re-verificar que el SL aún existe antes de intentar cancelar
+            print(f"      🔍 Verificando si SL {sl_order_id} aún está pendiente...")
+            current_pending = get_pending_plan_orders(send_request_common, symbol=symbol, product_type=PRODUCT_TYPE, plan_type='profit_loss')
+            current_ids = {p.get('orderId') for p in current_pending if p.get('orderId')}
+            
+            if sl_order_id in current_ids:
+                print(f"      ✓ SL confirmado como pendiente, procediendo a cancelar...")
+                success = cancel_plan_order(sl_order_id, symbol, send_request_common, PRODUCT_TYPE)
+                if success:
+                    print(f"      ✓ SL cancelado exitosamente")
                 else:
-                    to_remove.append(idx)
-                    print(f"▶️ {now} - Estrat {strat_id} cerró totalmente {sym}, remaining {remaining:.6f} < min_trade {min_trade:.6f}")
+                    print(f"      ⚠️ Fallo al cancelar, pero removiendo de tracking")
             else:
-                error_code = resp.get('resp', {}).get('code', 'unknown')
-                error_msg = resp.get('resp', {}).get('msg', 'unknown')
-                print(f"⚠️ {now} - Estrat {strat_id} error al cerrar {sym}: [{error_code}] {error_msg}")
-                if error_code == '22002':
-                    to_remove.append(idx)
+                print(f"      ℹ️ SL {sl_order_id} ya no está pendiente (ejecutado automáticamente)")
+            
+            to_remove.append(idx)
+        
+        # Caso 3: Ambos ejecutados o cancelados → remover posición
+        elif not tp_active and not sl_active:
+            print(f"      ✓ Ambas órdenes ejecutadas/canceladas")
+            to_remove.append(idx)
 
     for i in reversed(to_remove):
-        del tracked[i]
+        removed = tracked.pop(i)
+        print(f"🗑️ Removida posición: {removed['symbol']} de {strat_id}")
 
-    save_state(state)
+    if to_remove:
+        save_state(state)
+        print(f"💾 Estado actualizado para {strat_id}")
+
     return state
 
-
-
 # ----------------------
-# MAIN
+# MAIN LOOP
 # ----------------------
 def main_loop():
-    exchange       = connect_common()
-    all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
+    print("🚀 Iniciando bot con TP/SL independientes por estrategia...")
+    exchange = connect_common()
+    all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
+
     final_by_strat = {}
     for strat in STRATEGIES:
-        final_by_strat[strat['id']] = load_final_symbols(all_symbols, strategy=strat['name'], timeframe=strat['timeframe'])
+        final_by_strat[strat['id']] = load_final_symbols(
+            all_symbols,
+            strategy=strat['name'],
+            timeframe=strat['timeframe']
+        )
+        print(f"📊 Estrategia {strat['id']}: {len(final_by_strat[strat['id']])} símbolos")
 
     state = load_state(STRATEGIES)
-    print("▶️ Iniciando loop principal (ambas estrategias desacopladas)...")
+    print("✅ Estado cargado\n")
+    print("=" * 60)
 
     while True:
         try:
             wait_for_next_candle(MIN_TIMEFRAME)
-            state = reconcile_with_exchange(state, product_type=PRODUCT_TYPE, send_request_fn=send_request_common, get_open_fn=get_open_positions_common)
+            now = datetime.now(MADRID_TZ).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"\n{'=' * 60}")
+            print(f"⏰ {now}")
+            print(f"{'=' * 60}")
 
-            # Abrir nuevas posiciones si hay señales
             for strat in STRATEGIES:
-                state = maybe_open_orders_for_strategy(state, strat, final_by_strat.get(strat['id'], []), exchange)
+                strat_id = strat['id']
+                print(f"\n{'─' * 40}")
+                print(f"🔄 Procesando estrategia: {strat_id}")
+                print(f"{'─' * 40}")
 
-            # Cerrar posiciones según candles_to_sell
-            for strat in STRATEGIES:
-                state = manage_tracked_positions(state, strat, exchange)
+                state = check_and_clean_executed_positions(state, strat)
+                state = maybe_open_orders_for_strategy(
+                    state,
+                    strat,
+                    final_by_strat.get(strat_id, []),
+                    exchange,
+                    use_hardcoded=USE_HARDCODED_SIGNALS
+                )
 
-            # Mostrar posiciones restantes POR ESTRATEGIA después de procesar los cierres
+            all_pending = []
+            try:
+                all_pending = get_pending_plan_orders(send_request_common, product_type=PRODUCT_TYPE, plan_type='profit_loss')
+            except:
+                pass
+
+            print(f"\n📌 Plan orders activas totales: {len(all_pending)}")
+
+            print(f"\n{'=' * 60}")
+            print("📊 RESUMEN DE POSICIONES ACTIVAS:")
+            total_positions = 0
             for strat in STRATEGIES:
                 strat_id = strat['id']
                 tracked = state['strategies'].get(strat_id, [])
-                for t in tracked:
-                    print(f"▶️ Estrat {strat_id} - {t['symbol']} -> candles_left: {t.get('candles_to_sell')}")
-
-            # Resumen rápido
-            summary = {s['id']: len(state['strategies'].get(s['id'], [])) for s in STRATEGIES}
-            print(f"▶️ Posiciones activas por estrategia: {summary}")
-
-            save_state(state)
+                total_positions += len(tracked)
+                print(f"   {strat_id}: {len(tracked)} posiciones")
+                for pos in tracked:
+                    tp_id = pos.get('tp_order_id', 'N/A')
+                    sl_id = pos.get('sl_order_id', 'N/A')
+                    print(f"      └─ {pos['symbol']} ({pos['direction']}) @ {pos['exec_price']}")
+                    print(f"         TP: {tp_id}")
+                    print(f"         SL: {sl_id}")
+            print(f"   TOTAL: {total_positions} posiciones activas")
+            print(f"{'=' * 60}\n")
 
         except KeyboardInterrupt:
-            print("🚨 Interrumpido por usuario. Guardando estado y saliendo...")
+            print("\n🚨 Interrumpido por usuario. Guardando estado...")
             save_state(state)
+            print("✅ Estado guardado. Saliendo...")
             break
+
         except Exception as e:
-            print(f"⚠️ Error en el loop principal: {e}")
-            time.sleep(2)
+            print(f"\n⚠️ Error en el loop principal: {e}")
+            import traceback
+            traceback.print_exc()
+            time.sleep(5)
 
 if __name__ == '__main__':
     main_loop()
-

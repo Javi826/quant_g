@@ -10,7 +10,7 @@ from decimal import Decimal
 from parquet_process.Z_parquet_A0_extraction import  _call_history_candles, to_dataframe_from_api
 from Z_add_signals_reversal import trend_reversal_entry_short
 from Z_add_signals_parity import detect_parity_short
-from ZX_place_orders import place_order
+from ZX_place_orders_sub import place_order
 from pandas.api.types import is_datetime64_any_dtype
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -208,6 +208,35 @@ def get_contract_info(symbol, product_type, send_request_fn):
         print(f"⚠️ Error obteniendo info del contrato para {symbol}: {e}")
 
     return defaults
+
+def get_order_detail(symbol, order_id=None, client_oid=None, product_type='USDT-FUTURES', send_request_fn=None):
+    """
+    Consulta el detalle de una orden para obtener información completa de ejecución.
+    """
+    if not send_request_fn:
+        return None
+    
+    params = {
+        "symbol": symbol,
+        "productType": product_type
+    }
+    
+    if order_id:
+        params["orderId"] = order_id
+    elif client_oid:
+        params["clientOid"] = client_oid
+    else:
+        return None
+    
+    try:
+        code, resp = send_request_fn("GET", "/api/v2/mix/order/detail", params=params)
+        
+        if code == 200 and resp.get("code") == "00000":
+            return resp.get("data", {})
+    except Exception as e:
+        print(f"⚠️ Error consultando detalle de orden: {e}")
+    
+    return None
 #==============================================================================================
 #SUBACCOUNTS
 #==============================================================================================

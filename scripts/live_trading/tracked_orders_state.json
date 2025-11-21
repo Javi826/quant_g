@@ -1,28 +1,46 @@
 {
   "strategies": {
-    "revers_short": [],
+    "revers_short": [
+      {
+        "symbol": "BTCUSDT",
+        "order_id": "1375881142505984011",
+        "client_oid": "revers_short-1763761546-346bff",
+        "tp_order_id": "1375881152506703872",
+        "sl_order_id": "1375881152586395648",
+        "size": 0.0001,
+        "exec_price": 85150.90000000001,
+        "direction": "short",
+        "opened_at": "2025-11-21T22:45:50.229158+01:00",
+        "tp_pct": 5,
+        "sl_pct": 10
+      }
+    ],
     "parity_short": [
       {
         "symbol": "BTCUSDT",
-        "order_id": "1375507540292030465",
-        "client_oid": "parity_short-1763672472-ca9335",
+        "order_id": "1375893736788742145",
+        "client_oid": "parity_short-1763764548-5a0c00",
+        "tp_order_id": "1375893747474993152",
+        "sl_order_id": "1375893747537907712",
         "size": 0.0001,
-        "buy_price": 50000.0,
-        "candles_to_sell": 2,
+        "exec_price": 84302.29999999999,
         "direction": "short",
-        "opened_at": "2025-11-20T22:01:14.116926+01:00",
-        "just_bought": false
+        "opened_at": "2025-11-21T23:35:53.138880+01:00",
+        "tp_pct": 1,
+        "sl_pct": 2
       },
       {
         "symbol": "BNBUSDT",
-        "order_id": "1375507548953268227",
-        "client_oid": "parity_short-1763672474-b3c506",
+        "order_id": "1375893758498459650",
+        "client_oid": "parity_short-1763764553-9eb296",
+        "tp_order_id": "1375893768990429184",
+        "sl_order_id": "1375893769049149440",
         "size": 0.01,
-        "buy_price": 600.0,
-        "candles_to_sell": 2,
+        "exec_price": 825.3300000000002,
         "direction": "short",
-        "opened_at": "2025-11-20T22:01:16.194965+01:00",
-        "just_bought": false
+        "opened_at": "2025-11-21T23:35:58.223239+01:00",
+        "tp_pct": 1,
+        "sl_pct": 2
       }
     ]
   }

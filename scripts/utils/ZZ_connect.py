@@ -6,7 +6,6 @@ BASE_URL = "https://api.bitget.com"
 # BITGET CONFIG
 # -----------------------------
 
-
 # -----------------------------
 # CONNECTION AND SYMBOLS
 # -----------------------------
