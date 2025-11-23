@@ -18,8 +18,7 @@ def compute_size_base(usdt_amount, last_price):
 
 
 def fetch_contracts(send_request_func, product_type, symbol):
-    code_info, resp_info = send_request_func("GET", "/api/v2/mix/market/contracts",
-                                             params={"productType": product_type, "symbol": symbol})
+    code_info, resp_info = send_request_func("GET", "/api/v2/mix/market/contracts",params={"productType": product_type, "symbol": symbol})
     if code_info == 200 and resp_info.get("code") == "00000":
         data_list = resp_info.get("data", [])
         if data_list:

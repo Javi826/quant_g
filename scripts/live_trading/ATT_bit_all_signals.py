@@ -26,7 +26,7 @@ MADRID_TZ = ZoneInfo('Europe/Madrid')
 PRODUCT_TYPE = 'USDT-FUTURES'
 MIN_TIMEFRAME = '5m'
 CHECK_INTERVAL = 60  # segundos
-PAUSE_TPSL_AROUND_SIGNALS = True  # Pausar TP/SL durante búsqueda de señales
+PAUSE_TPSL_AROUND_SIGNALS = False  # 
 
 # Archivo de estado
 STATE_FILE = 'bot_state.json'
@@ -92,18 +92,16 @@ STRAT_B = {
 STRATEGIES = [STRAT_A, STRAT_B]
 
 # Funciones comunes
-connect_common = connect_bitget_TT
+connect_common      = connect_bitget_TT
 send_request_common = send_request_TT
-get_balance_common = get_usdt_balance_TT
+get_balance_common  = get_usdt_balance_TT
 
 # ----------------------
 # Registro de posiciones abiertas por estrategia
 # ----------------------
 OPEN_POSITIONS = {}
 POSITIONS_LOCK = threading.Lock()
-
-# Flag para detener threads
-STOP_THREADS = False
+STOP_THREADS   = False
 
 
 # ==============================
@@ -138,17 +136,17 @@ def load_state():
                 })
         
         total_positions = sum(len(positions) for positions in OPEN_POSITIONS.values())
-        print(f"✅ Estado cargado: {total_positions} posiciones recuperadas")
+        print(f"🔹Estado cargado: {total_positions} posiciones recuperadas")
         
         # Mostrar resumen
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
-                print(f"   📌 {strat_id}: {len(positions)} posiciones")
+                print(f"   ▶️ {strat_id}: {len(positions)} posiciones")
                 for pos in positions:
                     print(f"      - {pos['symbol']} | Size: {pos['size']} | Entry: {pos['entry_price']}")
         
     except Exception as e:
-        print(f"⚠️ Error cargando estado: {e}")
+        print(f"🔶 Error cargando estado: {e}")
         import traceback
         traceback.print_exc()
 
@@ -178,7 +176,7 @@ def save_state():
             json.dump(serializable_data, f, indent=2)
         
     except Exception as e:
-        print(f"⚠️ Error guardando estado: {e}")
+        print(f"🔶 Error guardando estado: {e}")
         import traceback
         traceback.print_exc()
 
@@ -210,14 +208,14 @@ def get_current_price(symbol, send_request_func):
         if code == 200 and resp.get("code") == "00000":
             return Decimal(str(resp['data'][0]['lastPr']))
     except Exception as e:
-        print(f"⚠️ Error obteniendo precio de {symbol}: {e}")
+        print(f"🔶 Error obteniendo precio de {symbol}: {e}")
     return None
 
 
 def close_position(symbol, size, direction, reason="TP/SL"):
     """Cierra una posición con orden market en HEDGE MODE"""
     try:
-        close_side = "buy" if direction.lower() == "short" else "sell"
+        close_side = "sell" if direction.lower() == "short" else "buy"
         
         body = {
             "symbol": symbol,
@@ -234,10 +232,10 @@ def close_position(symbol, size, direction, reason="TP/SL"):
         code, resp = send_request_common("POST", "/api/v2/mix/order/place-order", body=body)
         
         if code == 200 and resp.get("code") == "00000":
-            print(f"✅ Posición cerrada por {reason}: {symbol} | Size: {size}")
+            print(f"▶️ Posición cerrada por {reason}: {symbol} | Size: {size}")
             return True
         else:
-            print(f"⚠️ Error cerrando posición {symbol}: {resp}")
+            print(f"🔶 Error cerrando posición {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removiendo del registro local (posición inexistente)")
                 return True
@@ -265,7 +263,7 @@ def check_tp_sl_for_strategy(strat_id):
         current_price = get_current_price(symbol, send_request_func=send_request_common)
         
         if current_price is None:
-            print(f"  ⚠️ No se pudo obtener precio para {symbol}")
+            print(f"🔶 No se pudo obtener precio para {symbol}")
             continue
         
         direction = pos['direction']
@@ -303,13 +301,13 @@ def check_tp_sl_for_strategy(strat_id):
             hit_sl = current_price >= sl_price
         
         if hit_tp:
-            print(f"\n🎯 TP ALCANZADO para {symbol} ({strat_id})")
+            print(f"\n🌟 TP ALCANZADO para {symbol} ({strat_id})")
             print(f"   Entry: {entry_price} | Current: {current_price} | TP: {tp_price}")
             if close_position(symbol, pos['size'], direction, reason="TP"):
                 positions_to_remove.append(i)
         
         elif hit_sl:
-            print(f"\n🛑 SL ALCANZADO para {symbol} ({strat_id})")
+            print(f"\n🔻 SL ALCANZADO para {symbol} ({strat_id})")
             print(f"   Entry: {entry_price} | Current: {current_price} | SL: {sl_price}")
             if close_position(symbol, pos['size'], direction, reason="SL"):
                 positions_to_remove.append(i)
@@ -356,7 +354,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
 
 def tpsl_monitor_thread():
     """Thread que chequea TP/SL cada CHECK_INTERVAL segundos"""
-    print(f"🔍 Thread de monitoreo TP/SL iniciado (cada {CHECK_INTERVAL}s)")
+    print(f"▶️ Thread de monitoreo TP/SL iniciado (cada {CHECK_INTERVAL}s)")
     
     while not STOP_THREADS:
         try:
@@ -368,7 +366,7 @@ def tpsl_monitor_thread():
             
             now = datetime.now(MADRID_TZ).strftime('%Y-%m-%d %H:%M:%S')
             print(f"\n{'─' * 60}")
-            print(f"🔍 Chequeo TP/SL - {now}")
+            print(f"🔎 Chequeo TP/SL - {now}")
             print(f"{'─' * 60}")
             
             for strat in STRATEGIES:
@@ -377,13 +375,13 @@ def tpsl_monitor_thread():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                 
                 if num_positions > 0:
-                    print(f"\n📌 Estrategia {strat_id}: {num_positions} posiciones abiertas")
+                    print(f"\n🔹Estrategia {strat_id}: {num_positions} posiciones abiertas")
                     check_tp_sl_for_strategy(strat_id)
             
             time.sleep(CHECK_INTERVAL)
             
         except Exception as e:
-            print(f"⚠️ Error en thread de monitoreo TP/SL: {e}")
+            print(f"🔶 Error en thread de monitoreo TP/SL: {e}")
             import traceback
             traceback.print_exc()
             time.sleep(5)
@@ -410,10 +408,10 @@ def process_strategy(strat, final_symbols, exchange, use_hardcoded=False):
         # Verificar saldo disponible
         usdt_balance = get_balance_common(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"⚠️ Saldo insuficiente ({usdt_balance:.2f} USDT) para {sig['symbol']}")
+            print(f"🔶 Saldo insuficiente ({usdt_balance:.2f} USDT) para {sig['symbol']}")
             continue
         
-        print(f"\n▶️  Abriendo {strat['direction']} en {sig['symbol']} para {strat_id}...")
+        print(f"\n▶️ Abriendo {strat['direction']} en {sig['symbol']} para {strat_id}...")
         
         # Colocar orden
         resp_order = place_order(
@@ -446,7 +444,7 @@ def process_strategy(strat, final_symbols, exchange, use_hardcoded=False):
                 size = filled_size
                 entry_price = entry_price_from_fills if entry_price_from_fills is not None else Decimal(str(sig.get('close', 0)))
             
-            print(f"✅ Orden ejecutada - ID: {order_id}")
+            print(f"▶️ Orden ejecutada - ID: {order_id}")
             
             # Registrar posición (esto también guarda el estado)
             add_position(
@@ -460,7 +458,7 @@ def process_strategy(strat, final_symbols, exchange, use_hardcoded=False):
                 order_id=order_id
             )
         else:
-            print(f"⚠️ Orden ejecutada pero sin orderId en respuesta")
+            print(f"🔶 Orden ejecutada pero sin orderId en respuesta")
         
         time.sleep(0.5)
 
@@ -468,7 +466,7 @@ def process_strategy(strat, final_symbols, exchange, use_hardcoded=False):
 def signals_loop(final_by_strat, exchange):
     """Loop que busca señales en cada nueva vela"""
     global TPSL_PAUSED
-    print("📊 Thread de búsqueda de señales iniciado")
+    print("▶️ Thread de búsqueda de señales iniciado")
     
     while not STOP_THREADS:
         try:
@@ -476,14 +474,14 @@ def signals_loop(final_by_strat, exchange):
             if PAUSE_TPSL_AROUND_SIGNALS:
                 with TPSL_PAUSE_LOCK:
                     TPSL_PAUSED = True
-                print("⏸️  TP/SL pausado para búsqueda de señales")
+                print("⏸️ TP/SL pausado para búsqueda de señales")
                 time.sleep(CHECK_INTERVAL)  # Espera equivalente a -1 ciclo
             
             wait_for_next_candle(MIN_TIMEFRAME)
             
             now = datetime.now(MADRID_TZ).strftime('%Y-%m-%d %H:%M:%S')
             print(f"\n{'=' * 60}")
-            print(f"⏰ Búsqueda de señales - {now}")
+            print(f"📡 Búsqueda de señales - {now}")
             print(f"{'=' * 60}")
             
             for strat in STRATEGIES:
@@ -493,7 +491,7 @@ def signals_loop(final_by_strat, exchange):
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                 
                 if num_positions > 0:
-                    print(f"⏳ Saltando búsqueda de señales para {strat_id} (tiene {num_positions} posiciones abiertas)")
+                    print(f"🚫 Saltando búsqueda de señales para {strat_id} (tiene {num_positions} posiciones abiertas)")
                     continue
                 
                 try:
@@ -504,24 +502,24 @@ def signals_loop(final_by_strat, exchange):
                         use_hardcoded=USE_HARDCODED_SIGNALS
                     )
                 except Exception as e:
-                    print(f"⚠️ Error procesando {strat_id}: {e}")
+                    print(f"🔶 Error procesando {strat_id}: {e}")
                     import traceback
                     traceback.print_exc()
             
             print(f"\n{'=' * 60}")
-            print("✅ Ciclo de señales completado")
+            print("🔷 Ciclo de señales completado")
             print(f"{'=' * 60}\n")
             
             # Mantener pausado después de buscar señales
             if PAUSE_TPSL_AROUND_SIGNALS:
-                print("⏸️  TP/SL pausado post-señales")
+                print("⏸️ TP/SL pausado post-señales")
                 time.sleep(CHECK_INTERVAL)  # Espera equivalente a +1 ciclo
                 with TPSL_PAUSE_LOCK:
                     TPSL_PAUSED = False
-                print("▶️  TP/SL reanudado")
+                print("▶️ TP/SL reanudado")
             
         except Exception as e:
-            print(f"⚠️ Error en loop de señales: {e}")
+            print(f"🔶 Error en loop de señales: {e}")
             import traceback
             traceback.print_exc()
             time.sleep(5)
@@ -550,9 +548,9 @@ def main_loop():
             strategy=strat['name'],
             timeframe=strat['timeframe']
         )
-        print(f"📊 Estrategia {strat['id']}: {len(final_by_strat[strat['id']])} símbolos")
+        print(f"▶️ Estrategia {strat['id']}: {len(final_by_strat[strat['id']])} símbolos")
     
-    print("✅ Inicialización completada\n")
+    print("▶️ Inicialización completada\n")
     print("=" * 60)
     
     # Iniciar thread de monitoreo TP/SL
@@ -581,7 +579,7 @@ def main_loop():
         
         tpsl_thread.join(timeout=5)
         signals_thread.join(timeout=5)
-        print("✅ Bot detenido correctamente")
+        print("▶️ Bot detenido correctamente")
 
 
 if __name__ == '__main__':
