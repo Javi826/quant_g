@@ -6,7 +6,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 
 from Z_add_signals_reversal import trend_reversal_entry_long
-from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, manage_open_positions,has_open_positions_on_exchange,process_signals_and_buy,PRODUCT_TYPE
+from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
+from ZX_utils_sub import  manage_open_positions,has_open_positions_on_exchange,process_signals_and_buy
 from utils.ZZ_connect import connect_bitget_02
 from ZX_connect_live import get_usdt_balance_02, send_request_02, get_open_positions_02
 
