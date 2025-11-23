@@ -50,5 +50,5 @@ if __name__ == "__main__":
     print("\n📈 Brief:")
     print(f"▶️ INITIAL CAPITAL : {INITIAL_CAPITAL:.2f} USDT")
     print(f"▶️ CURRENT CAPITAL : {total_usdt:.2f} USDT")
-    print(f"💵 Delta           : {delta:+.2f} USDT")
+    print(f"💵 Delta          : {delta:+.2f} USDT")
     print(f"▶️ Profit %        : {profitability_pct:+.2f}%")

@@ -190,7 +190,7 @@ rope==1.14.0
 rpds-py==0.27.1
 rtree==1.4.1
 ruff==0.14.0
--e git+https://github.com/Javi826/quant_g.git@1ab67de1a48037ae2b41aa4eb35de8106e490f75#egg=rust_backtest
+-e git+https://github.com/Javi826/quant_g.git@d4d768867135d862ca9543cc13ada7d59d53f266#egg=rust_backtest
 # Editable install with no version control (rust_backtest_helpers==0.1.0)
 -e /home/javi/projects/quant/quant_g/scripts/rust_backtest_helpers
 scikit-learn==1.7.2
@@ -216,6 +216,7 @@ spyder-kernels==3.1.0
 SQLAlchemy==2.0.43
 stack-data==0.6.3
 superqt==0.7.6
+ta==0.11.0
 terminado==0.18.1
 text-unidecode==1.3
 textdistance==4.6.3

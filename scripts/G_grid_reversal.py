@@ -41,10 +41,10 @@ TP_PCT_LIST          = [3.5,10,15,20,30,40,50]
 SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [5] 
+LEFT_LOOKBACK_LIST   = [8] 
 TOLERANCE_LIST       = [30]
 
-TP_PCT_LIST          = [3]
+TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
@@ -71,7 +71,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = trend_reversal_entry_long(
+        signals = trend_reversal_entry_short(
             arr_minor,
             left_lookback=params['LEFT_LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -109,7 +109,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
+save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
 
 final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

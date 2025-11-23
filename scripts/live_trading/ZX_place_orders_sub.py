@@ -3,8 +3,7 @@ import time
 
 
 def fetch_ticker(send_request_func, product_type, symbol):
-    code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",
-                                   params={"productType": product_type, "symbol": symbol})
+    code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",params={"productType": product_type, "symbol": symbol})
     if code != 200 or resp.get("code") != "00000":
         print("⚠️ Error ticker:", resp)
         return None, None
@@ -169,8 +168,8 @@ def get_exec_price(resp_order, last_price):
 def place_order(symbol: str,
                 direction: str,
                 usdt_amount: float = 100,
-                tp_percent: float = 5,
-                sl_percent: float = 5,
+                tp_percent: float = 0,
+                sl_percent: float = 0,
                 product_type: str = "USDT-FUTURES",
                 margin_coin: str = "USDT",
                 margin_mode: str = "isolated",
@@ -195,7 +194,7 @@ def place_order(symbol: str,
 
     # 3b) Fallback dinámico según magnitud (se mantiene como respaldo)
     price_tick, size_scale = fallback_params(price_tick, size_scale, last_price)
-    precision_size = Decimal(f"1e-{size_scale}")
+    precision_size         = Decimal(f"1e-{size_scale}")
 
     # 4) Quantizar tamaño
     size_q, precision_size = quantize_size(size_base, size_scale)

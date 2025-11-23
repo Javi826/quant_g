@@ -14,71 +14,79 @@ from ZX_place_orders_sub import place_order
 from pandas.api.types import is_datetime64_any_dtype
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-STATE_FILE    = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 
-MADRID_TZ = ZoneInfo("Europe/Madrid")
+STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
+MADRID_TZ    = ZoneInfo("Europe/Madrid")
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = 'usdt-futures'
 
 # =============================================================================
-# SYMBOLS & CANDLES
+# TT
 # =============================================================================
-def load_state(strategies, path=STATE_FILE):
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"⚠️ Error cargando estado: {e}")
-    return {'strategies': {s['id']: [] for s in strategies}}
-
-def save_state(state, path=STATE_FILE):
-    try:
-        with open(path, 'w') as f:
-            json.dump(state, f, indent=2, default=str)
-    except Exception as e:
-        print(f"⚠️ Error guardando estado: {e}")
-
-def normalize_live_ohlcv(df):
-    if not isinstance(df.index, pd.DatetimeIndex):
-        if 'timestamp' in df.columns:
-            df.index = pd.to_datetime(df['timestamp'])
-        else:
-            df.index = pd.to_datetime(df.index)
-
-    for col in ['open', 'high', 'low', 'close', 'volume_base', 'volume_quote']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-    return df
-
-def make_client_oid(strategy_id):
-    return f"{strategy_id}-{int(time.time())}-{uuid.uuid4().hex[:6]}"
-
-def extract_filled_size_from_resp(resp_order):
-    if not resp_order or 'data' not in resp_order:
-        return 0.0
-    data = resp_order.get('data') or {}
-    for k in ('size', 'filledSize', 'filledQty', 'filled_amount', 'filled_size'):
-        v = data.get(k)
-        if v is not None:
-            try:
-                return float(v)
-            except Exception:
-                try:
-                    return float(str(v))
-                except Exception:
-                    pass
-    try:
-        return float(data.get('size', 0) or 0)
-    except Exception:
-        return 0.0
+def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.5):
+    """
+    Consulta los fills de una orden y devuelve:
+        filled_size: Decimal
+        entry_price: Decimal
+    Parámetros:
+        - order_id: ID de la orden a consultar
+        - symbol: símbolo del par (ej: BTCUSDT)
+        - product_type: tipo de producto (USDT-FUTURES, etc.)
+        - send_request_func: función para enviar requests al API
+        - retries: número de reintentos
+        - delay: tiempo entre reintentos (s)
+    """
+    if send_request_func is None:
+        raise ValueError("Se necesita send_request_func para hacer la consulta")
     
-def determine_side_for_open(direction):
-    return 'buy' if direction.lower() == 'long' else 'sell'
+    for attempt in range(retries):
+        try:
+            code, resp = send_request_func(
+                "GET",
+                "/api/v2/mix/order/fills",
+                params={"productType": product_type, "orderId": order_id, "symbol": symbol}
+            )
+            if code == 200 and resp.get("code") == "00000":
+                data = resp.get("data") or {}
+                fill_list = data.get("fillList") or []
+                if fill_list:
+                    total_base = Decimal('0')
+                    weighted = Decimal('0')
+                    for f in fill_list:
+                        bv = None
+                        for k in ("baseVolume", "filledQty", "size", "filledSize", "sz", "filled_amount"):
+                            if k in f and f[k] is not None:
+                                bv = f[k]
+                                break
+                        price = f.get("price") or f.get("execPrice") or f.get("avgPrice") or None
+                        try:
+                            bv_d = Decimal(str(bv)) if bv is not None else Decimal('0')
+                        except Exception:
+                            bv_d = Decimal('0')
+                        total_base += bv_d
+                        if price is not None:
+                            try:
+                                p_d = Decimal(str(price))
+                                weighted += p_d * bv_d
+                            except Exception:
+                                pass
+                    entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
+                    return total_base, entry_price
+        except Exception as e:
+            print(f"⚠️ Error consultando fills (attempt {attempt+1}): {e}")
+        time.sleep(delay)
+    return None, None
 
-def determine_side_for_close(direction):
-    return 'sell' if direction.lower() == 'long' else 'buy'
+def get_current_price(symbol, send_request_func):
+    """Obtiene el precio actual del mercado usando send_request_func"""
+    try:
+        code, resp = send_request_func("GET","/api/v2/mix/market/ticker",params={"productType": "USDT-FUTURES", "symbol": symbol})
+        if code == 200 and resp.get("code") == "00000":
+            return Decimal(str(resp['data'][0]['lastPr']))
+    except Exception as e:
+        print(f"⚠️ Error obteniendo precio de {symbol}: {e}")
+    return None
+
 
 def detect_signal_for_strategy(strategy, final_symbols):
     """
@@ -158,88 +166,41 @@ def detect_signal_for_strategy(strategy, final_symbols):
                 'timestamp': last_row.name if 'timestamp' not in df_norm.columns else last_row['timestamp'],
                 'close': float(last_row['close'])
             })
-    #FAKE
-    now = datetime.now(MADRID_TZ).isoformat()
-    return [
-        {
-            'symbol': 'BTCUSDT',
-            'timestamp': now,
-            'close': 50000.0
-        },
-        {
-            'symbol': 'BNBUSDT',
-            'timestamp': now,
-            'close': 600.0
-        }
-    ]
+
        
-    #return detected
+    return detected
 
-def get_contract_info(symbol, product_type, send_request_fn):
 
-    defaults = {
-        'min_trade': Decimal('0'),
-        'size_mult': Decimal('0.00000001'),
-        'volume_place': 8,
-        'max_market_order_qty': None
-    }
-
-    try:
-        path = f"/api/v2/mix/market/contracts?productType={product_type}&symbol={symbol}"
-        code_cfg, resp_cfg = send_request_fn('GET', path)
-
-        if code_cfg == 200 and resp_cfg.get('code') == '00000' and resp_cfg.get('data'):
-            data0 = resp_cfg['data'][0]
-
-            min_trade = Decimal(str(data0.get('minTradeNum', '0') or '0'))
-            size_mult = Decimal(str(data0.get('sizeMultiplier', '0.00000001') or '0.00000001'))
-            volume_place = int(data0.get('volumePlace', 8))
-            mmq = data0.get('maxMarketOrderQty')
-            max_market_order_qty = Decimal(str(mmq)) if mmq not in (None, '') else None
-
-            return {
-                'min_trade': min_trade,
-                'size_mult': size_mult,
-                'volume_place': volume_place,
-                'max_market_order_qty': max_market_order_qty
-            }
-
-    except Exception as e:
-        print(f"⚠️ Error obteniendo info del contrato para {symbol}: {e}")
-
-    return defaults
-
-def get_order_detail(symbol, order_id=None, client_oid=None, product_type='USDT-FUTURES', send_request_fn=None):
-    """
-    Consulta el detalle de una orden para obtener información completa de ejecución.
-    """
-    if not send_request_fn:
-        return None
+def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
+    """Calcula los precios de TP y SL basados en el precio de entrada"""
+    entry = Decimal(str(entry_price))
+    tp_decimal = Decimal(str(tp_pct)) / Decimal('100')
+    sl_decimal = Decimal(str(sl_pct)) / Decimal('100')
     
-    params = {
-        "symbol": symbol,
-        "productType": product_type
-    }
+    if direction.lower() == 'long':
+        tp_price = entry * (Decimal('1') + tp_decimal)
+        sl_price = entry * (Decimal('1') - sl_decimal)
+    else:  # short
+        tp_price = entry * (Decimal('1') - tp_decimal)
+        sl_price = entry * (Decimal('1') + sl_decimal)
     
-    if order_id:
-        params["orderId"] = order_id
-    elif client_oid:
-        params["clientOid"] = client_oid
-    else:
-        return None
-    
-    try:
-        code, resp = send_request_fn("GET", "/api/v2/mix/order/detail", params=params)
-        
-        if code == 200 and resp.get("code") == "00000":
-            return resp.get("data", {})
-    except Exception as e:
-        print(f"⚠️ Error consultando detalle de orden: {e}")
-    
-    return None
+    return tp_price, sl_price
 #==============================================================================================
 #SUBACCOUNTS
 #==============================================================================================
+def normalize_live_ohlcv(df):
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if 'timestamp' in df.columns:
+            df.index = pd.to_datetime(df['timestamp'])
+        else:
+            df.index = pd.to_datetime(df.index)
+
+    for col in ['open', 'high', 'low', 'close', 'volume_base', 'volume_quote']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+    return df
+
 def df_to_arrays_live(df):
     if not is_datetime64_any_dtype(df.index):
         df = df.copy()
@@ -425,4 +386,3 @@ def manage_open_positions(open_positions, send_request_fn, product_type=PRODUCT_
                     pass
 
             time.sleep(1.1)
-

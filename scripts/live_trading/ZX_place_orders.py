@@ -1,10 +1,10 @@
+
 from decimal import Decimal, ROUND_DOWN
 import time
 
 
 def fetch_ticker(send_request_func, product_type, symbol):
-    code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",
-                                   params={"productType": product_type, "symbol": symbol})
+    code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",params={"productType": product_type, "symbol": symbol})
     if code != 200 or resp.get("code") != "00000":
         print("⚠️ Error ticker:", resp)
         return None, None
@@ -157,7 +157,7 @@ def place_order(symbol: str,
     if size_q is None:
         return None
 
-    side = "buy" if direction.lower() == "long" else "sell"
+    side       = "buy" if direction.lower() == "long" else "sell"
     body_order = build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, side, client_oid)
 
     code_order, resp_order = place_market_order(send_request_func, body_order)
@@ -166,7 +166,7 @@ def place_order(symbol: str,
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
-    exec_price = get_exec_price(resp_order, last_price)
+    exec_price    = get_exec_price(resp_order, last_price)
 
     print(f"🎯 {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
 
