@@ -163,7 +163,7 @@ def build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, sid
 def place_market_order(send_request_func, body_order):
     code_order, resp_order = send_request_func("POST", "/api/v2/mix/order/place-order", body=body_order)
     if code_order != 200 or resp_order.get("code") != "00000":
-        print("🔶 Error order:", resp_order)
+        print("⚠ Error order:", resp_order)
         return None, None
     return code_order, resp_order
 
@@ -218,7 +218,7 @@ def place_order(symbol: str,
 
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"🔶 Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
+        print(f"⚠ Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
@@ -267,7 +267,7 @@ def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_requ
                     entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
                     return total_base, entry_price
         except Exception as e:
-            print(f"🔶 Error consultando fills (attempt {attempt+1}): {e}")
+            print(f"⚠ Error consultando fills (attempt {attempt+1}): {e}")
         time.sleep(delay)
     return None, None
 
@@ -278,7 +278,7 @@ def get_current_price(symbol, send_request_func):
         if code == 200 and resp.get("code") == "00000":
             return Decimal(str(resp['data'][0]['lastPr']))
     except Exception as e:
-        print(f"🔶 Error getting price of {symbol}: {e}")
+        print(f"⚠ Error getting price of {symbol}: {e}")
     return None
 
 def close_position(symbol, size, direction, send_request_func, reason="NO INFO"):
@@ -297,22 +297,22 @@ def close_position(symbol, size, direction, send_request_func, reason="NO INFO")
             "orderType": "market"
         }
         
-        print(f"▶️ Closing {direction} position on {symbol}:")   
+        print(f"➡ Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(1.0)
 
         if code == 200 and resp.get("code") == "00000":
-            print(f"▶️ Position closed due to {reason}: {symbol} | Size: {size}")
+            print(f"➡️ Position closed due to {reason}: {symbol} | Size: {size}")
             return True
         else:
-            print(f"🔶 Error closing position {symbol}: {resp}")
+            print(f"⚠ Error closing position {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removing from local record (nonexistent position)")
                 return True
             return False
             
     except Exception as e:
-        print(f"🔶 Error closing position {symbol}: {e}")
+        print(f"⚠ Error closing position {symbol}: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -377,14 +377,14 @@ def load_state(state_file):
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ▶️ {strat_id}: {len(positions)} positions | Candles: {candles}")
+                print(f"   ➡️ {strat_id}: {len(positions)} positions | Candles: {candles}")
                 for pos in positions:
                     print(f"      - {pos['symbol']} | Size: {pos['size']} | Entry: {pos['entry_price']}")
 
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
     except Exception as e:
-        print(f"🔶 Error loading state: {e}")
+        print(f"⚠ Error loading state: {e}")
         traceback.print_exc()
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
@@ -419,7 +419,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
             json.dump(state_data, f, indent=2)
 
     except Exception as e:
-        print(f"🔶 Error saving state: {e}")
+        print(f"⚠ Error saving state: {e}")
         import traceback
         traceback.print_exc()
         
@@ -483,7 +483,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
     open_positions[strat_id].append(position)
     
 # =============================================================================
-#     print(f"▶️ Posición registrada:")
+#     print(f"➡️ Posición registrada:")
 #     print(f"  Symbol: {symbol} | Size: {size} | Entry: {entry_price}")
 #     print(f"  TP: {tp_price} | SL: {sl_price}")
 # =============================================================================
@@ -507,9 +507,9 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
     if not positions:
         return
 
-    print(f"\n⏰ TIMEOUT REACHED for strategy {strat_id}")
-    print(f"▶️ Candles ongoing         : {candles_elapsed}/{sell_after_ncandles}")
-    print(f"▶️ Closing {len(positions)} positions...")
+    print(f"\n⏱ TIMEOUT REACHED for strategy {strat_id}")
+    print(f"➡ Candles ongoing         : {candles_elapsed}/{sell_after_ncandles}")
+    print(f"➡️ Closing {len(positions)} positions...")
 
     all_closed = True
     for pos in positions:
@@ -536,7 +536,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         current_price = get_current_price(symbol, send_request_func=send_request_func)
         
         if current_price is None:
-            print(f"🔶 No price for {symbol}")
+            print(f"⚠ No price for {symbol}")
             continue
         
         direction = pos['direction']
@@ -568,7 +568,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
         
         if hit_tp:
-            print(f"\n🌟 TP REACHED for {symbol} ({strat_id})")
+            print(f"\n💫 TP REACHED for {symbol} ({strat_id})")
             if close_position(symbol, pos['size'], direction, send_request_func, reason="TP"):
                 positions_to_remove.append(i)
         elif hit_sl:
@@ -627,7 +627,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"✨ Signals detected for {strat_id}: {len(signals)}")
+    print(f"🔔 Signals detected for {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -639,10 +639,10 @@ def process_strategy(
     for sig in signals:
         usdt_balance = get_balance_func(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"🔶 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
+            print(f"⚠ Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
             continue
 
-        print(f"\n▶️ Opening {strat['direction']} on {sig['symbol']} for {strat_id}...")
+        print(f"\n➡ Opening {strat['direction']} on {sig['symbol']} for {strat_id}...")
 
         resp_order = place_order(
             symbol=sig['symbol'],
@@ -652,7 +652,7 @@ def process_strategy(
         )
 
         if resp_order is None:
-            print(f"🔶 Error placing order for {sig['symbol']}")
+            print(f"⚠ Error placing order for {sig['symbol']}")
             continue
 
         data = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
@@ -673,7 +673,7 @@ def process_strategy(
                 size = filled_size
                 entry_price = entry_price_from_fills if entry_price_from_fills is not None else Decimal(str(sig.get('close', 0)))
 
-            #print(f"▶️ Orden ejecutada - ID: {order_id}")
+            #print(f"➡️ Orden ejecutada - ID: {order_id}")
 
             # Registrar posición usando la función local add_position (que espera open_positions, strategy_candles, state_file, hour_zone)
             add_position(
@@ -691,7 +691,7 @@ def process_strategy(
                 hour_zone=hour_zone
             )
         else:
-            print(f"🔶 Order executed but no orderId in response")
+            print(f"⚠ Order executed but no orderId in response")
 
         time.sleep(0.5)
         

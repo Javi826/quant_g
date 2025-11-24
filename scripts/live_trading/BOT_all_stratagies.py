@@ -177,7 +177,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             else:
                 signals = None
         except Exception as e:
-            print(f"🔶 Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            print(f"⚠ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
             signals = None
 
 
@@ -238,9 +238,9 @@ def main_loop():
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
-        print(f"▶️ Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
+        print(f"➡ Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
-    print("▶️ Initialization completed\n")
+    print("➡️ Initialization completed\n")
     print("=" * 60)
     
     # Calcular la próxima vela
@@ -273,7 +273,7 @@ def main_loop():
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
 
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"▶️ {strat_id}: {candles}/{strat['sell_after_ncandles']} candles")
+                        print(f"➡️ {strat_id}: {candles}/{strat['sell_after_ncandles']} candles")
                         check_candles_timeout_for_strategy(strat_id, strat['sell_after_ncandles'], OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
 
                 
@@ -303,12 +303,12 @@ def main_loop():
                                     )
 
                     except Exception as e:
-                        print(f"🔶 Error procesando {strat_id}: {e}")
+                        print(f"⚠ Error procesando {strat_id}: {e}")
                         import traceback
                         traceback.print_exc()
                 
                 print(f"\n{'=' * 60}")
-                print("🔷 Ciclo de señales completado")
+                print("🔷 Signal cycle completed")
                 print(f"{'=' * 60}\n")
                 
                 # Calcular la siguiente vela & Resetear el tiempo del último chequeo TP/SL

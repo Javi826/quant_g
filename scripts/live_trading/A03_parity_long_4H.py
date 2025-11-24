@@ -69,7 +69,7 @@ while True:
     # Si no hay posiciones activas en el exchange → limpiar estado interno
     if not has_open_positions_on_exchange(get_open_positions_03, PRODUCT_TYPE):
         if open_positions:
-            print("🔁 All closed positions detected on the exchange. Resetting internal state.")
+            print("🔄 All closed positions detected on the exchange. Resetting internal state.")
         open_positions = []
 
     # -------------------------------
@@ -100,5 +100,5 @@ while True:
     manage_open_positions(open_positions, send_request_fn=send_request_03)
     
     if not has_open_positions_on_exchange(get_open_positions_03, PRODUCT_TYPE):
-        print("🔁 All positions have been closed on the exchange — returning to look for signals now.")
+        print("🔄 All positions have been closed on the exchange — returning to look for signals now.")
         open_positions.clear()

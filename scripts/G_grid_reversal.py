@@ -93,7 +93,7 @@ def process_combo(comb):
 # PARALLELIZED BACKTESTING
 # -----------------------------------------------------------------------------
 all_combinations = list(product(*lists_for_grid))
-with tqdm_joblib(tqdm(desc="🏧 Backtesting Grid... \n", total=len(all_combinations))) as progress:
+with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=N_JOBS)(
         delayed(process_combo)(comb) for comb in all_combinations
     )

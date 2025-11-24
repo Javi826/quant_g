@@ -157,7 +157,7 @@ start_eval_time = time.time()
 results_list = parallel_with_progress(
     [delayed(process_path_IDX)(path_idx, paths_minor, param_dict_list)
      for path_idx in range(FINAL_N_PATHS)],
-    desc="\n🔁 Evaluating Paths_IDX"
+    desc="\n🔄 Evaluating Paths_IDX"
 )
 end_eval_time = time.time()
 print(f"\n🕒 Paths evaluation: {end_eval_time - start_eval_time:.2f} seconds")
@@ -168,7 +168,7 @@ df_portfolio = pd.DataFrame(all_results)
 # -----------------------------------------------------------------------------
 # SUMMARY / REPORT
 # -----------------------------------------------------------------------------
-final_prints(f"🎰 MC_{STRATEGY} 🎰", DATA_FOLDER, f"{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+final_prints(f"🎲 MC_{STRATEGY} 🎲", DATA_FOLDER, f"{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)
