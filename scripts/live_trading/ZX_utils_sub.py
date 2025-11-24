@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from ZX_utils_live import fetch_ohlcv_data
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import json
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 MADRID_TZ    = ZoneInfo("Europe/Madrid")
@@ -224,7 +225,7 @@ def place_order_sub(symbol: str,
 
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"   📊 Debug: last_price={last_price}, price_tick={price_tick}, tp={tp_price}, sl={sl_price}")
+        print(f"   ➡ Debug: last_price={last_price}, price_tick={price_tick}, tp={tp_price}, sl={sl_price}")
         return None, None
 
     # 7) Cantidad ejecutada
@@ -361,3 +362,23 @@ def manage_open_positions(open_positions, send_request_fn, product_type=PRODUCT_
                     pass
 
             time.sleep(1.1)
+            
+
+def load_state(strategy_name):
+    if not os.path.exists(STATE_FILE):
+        return None
+    with open(STATE_FILE, "r") as f:
+        state = json.load(f)
+    return state.get(strategy_name)
+
+def save_state(strategy_name, candles_remaining):
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r") as f:
+            state = json.load(f)
+    else:
+        state = {}
+
+    state[strategy_name] = candles_remaining
+
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=4)

@@ -83,15 +83,15 @@ if __name__ == "__main__":
 
         total_positions = sum(info["total"] for info in stats.values())
         total_winners   = sum(info["positive"] for info in stats.values())
-        print(f"\nTotal winrate    : {total_winrate:.2f}% ({total_winners}/{total_positions})")
+        print(f"\n➡Total winrate     : {total_winrate:.2f}% ({total_winners}/{total_positions})")
 
         final_capital     = get_usdt_balance_total(exchange)
         delta_capital     = final_capital - INITIAL_CAPITAL
         profitability_pct = ((final_capital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100 
-        print(f"Initial capital  : {INITIAL_CAPITAL:.2f} USDT")
-        print(f"Final capital    : {final_capital:.2f} USDT")
-        print(f"Delta (gain/loss): {delta_capital:+.2f} USDT")
-        print(f"Profitability    : {profitability_pct:.2f}%")
+        print(f"➡Initial capital   : {INITIAL_CAPITAL:.2f} USDT")
+        print(f"➡Final capital     : {final_capital:.2f} USDT")
+        print(f"{'💵' if delta_capital >= 0 else '⭕'} Delta (gain/loss): {delta_capital:+.2f} USDT")
+        print(f"➡Profitability     : {profitability_pct:.2f}%")
 
     except Exception as e:
         print(f"\n⚠️ Fallen retrieving history or calculating stats: {e}")

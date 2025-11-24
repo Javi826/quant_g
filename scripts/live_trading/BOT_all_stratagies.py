@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Bot multi-estrategia con monitoreo activo de TP/SL y persistencia de estado.
-Versión con un solo bucle principal (sin threads).
 """
 
 import os
@@ -327,7 +326,7 @@ def main_loop():
     except KeyboardInterrupt:
         print("\n🚩 Interrupted by user. Saving state...")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
-        print("📴 BOT Stopped")
+        print("🛑 BOT Stopped")
 
 
 if __name__ == '__main__':

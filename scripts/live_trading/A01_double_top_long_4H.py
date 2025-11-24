@@ -8,6 +8,7 @@ from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from Z_add_signals_double_top import detect_double_top_long
 from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
 from ZX_utils_sub import  manage_open_positions,has_open_positions_on_exchange,process_signals_and_buy
+
 from utils.ZZ_connect import connect_bitget_01
 from ZX_connect_live import get_usdt_balance_01, send_request_01, get_open_positions_01
 
