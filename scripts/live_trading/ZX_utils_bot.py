@@ -7,12 +7,9 @@ import copy
 import os
 import traceback
 from datetime import datetime
-import numpy as np
 from decimal import Decimal, ROUND_DOWN
 from ZX_utils_live import fetch_ohlcv_data,normalize_live_ohlcv,df_to_arrays_live
-from Z_add_signals_reversal import trend_reversal_entry_short
-from Z_add_signals_parity import detect_parity_short
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
@@ -391,11 +388,12 @@ def load_state(state_file):
         traceback.print_exc()
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
-def save_state(open_positions, strategy_candles, state_file, lock):
+
+def save_state_local(open_positions, strategy_candles, state_file):
+    """Guarda el estado sin usar lock (versión para bucle único)"""
     try:
-        with lock:
-            positions_copy = copy.deepcopy(open_positions)
-            strategy_candles_copy = copy.deepcopy(strategy_candles)
+        positions_copy = copy.deepcopy(open_positions)
+        strategy_candles_copy = copy.deepcopy(strategy_candles)
 
         serializable_positions = {}
         for strat_id, positions in positions_copy.items():
@@ -424,3 +422,300 @@ def save_state(open_positions, strategy_candles, state_file, lock):
         print(f"🔶 Error guardando estado: {e}")
         import traceback
         traceback.print_exc()
+        
+
+def calculate_next_candle_time(timeframe='4H', hour_zone=None):
+    now = datetime.now(hour_zone)
+    
+    if timeframe.endswith('H'):
+        minutes = int(timeframe[:-1]) * 60
+    elif timeframe.endswith('m'):
+        minutes = int(timeframe[:-1])
+    elif timeframe.endswith('Dutc'):
+        minutes = int(timeframe[:-4]) * 24 * 60
+    else:
+        raise ValueError("Invalid timeframe, use 'm', 'H', or 'Dutc'.")
+    
+    total_minutes      = now.hour * 60 + now.minute
+    next_total_minutes = ((total_minutes // minutes) + 1) * minutes
+    delta_minutes      = next_total_minutes - total_minutes
+    next_candle        = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
+    
+    # Añadir 45 segundos de margen
+    next_candle = next_candle + timedelta(seconds=45)
+    
+    return next_candle
+
+
+
+def increment_strategy_candles(strat_id, strategy_candles, open_positions, state_file):
+    if strat_id not in strategy_candles:
+        strategy_candles[strat_id] = 0
+
+    strategy_candles[strat_id] += 1
+    save_state_local(open_positions, strategy_candles, state_file)
+    
+def reset_strategy_candles(strat_id, strategy_candles, open_positions, state_file):
+    strategy_candles[strat_id] = 0
+    save_state_local(open_positions, strategy_candles, state_file)
+
+# ZX_utils_bot.py (o módulo nuevo)
+def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct, order_id,
+                 open_positions, strategy_candles, state_file,hour_zone):
+    """Registra una nueva posición abierta en open_positions y guarda estado"""
+    
+    if strat_id not in open_positions:
+        open_positions[strat_id] = []
+
+    tp_price, sl_price = calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct)
+    
+    position = {
+        'symbol': symbol,
+        'size': size,
+        'entry_price': entry_price,
+        'direction': direction,
+        'tp': tp_price,
+        'sl': sl_price,
+        'order_id': order_id,
+        'opened_at': datetime.now(hour_zone)
+    }
+    
+    open_positions[strat_id].append(position)
+    
+    print(f"▶️ Posición registrada:")
+    print(f"  Symbol: {symbol} | Size: {size} | Entry: {entry_price}")
+    print(f"  TP: {tp_price} | SL: {sl_price}")
+    
+    # Guardar estado actualizado
+    save_state_local(open_positions, strategy_candles, state_file)
+
+def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
+                                       open_positions, strategy_candles,
+                                       state_file, send_request_func):
+    """Cierra todas las posiciones de una estrategia si superan el límite de velas"""
+    candles_elapsed = strategy_candles.get(strat_id, 0)
+    if candles_elapsed < sell_after_ncandles:
+        return
+
+    if strat_id not in open_positions or not open_positions[strat_id]:
+        return
+
+    positions = open_positions[strat_id][:]
+
+    if not positions:
+        return
+
+    print(f"\n▶️ TIMEOUT ALCANZADO para estrategia {strat_id}")
+    print(f"▶️ Velas transcurridas: {candles_elapsed}/{sell_after_ncandles}")
+    print(f"▶️ Cerrando {len(positions)} posiciones...")
+
+    all_closed = True
+    for pos in positions:
+        if not close_position(pos['symbol'], pos['size'], pos['direction'],
+                              send_request_func, reason="TIMEOUT"):
+            all_closed = False
+
+    if all_closed:
+        open_positions[strat_id] = []
+        strategy_candles[strat_id] = 0
+        save_state_local(open_positions, strategy_candles, state_file)
+
+# ZX_utils_bot.py u otro módulo
+def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func):
+    """Comprueba TP/SL para todas las posiciones de una estrategia"""
+    if strat_id not in open_positions or not open_positions[strat_id]:
+        return
+    
+    positions = open_positions[strat_id][:]
+    positions_to_remove = []
+    
+    for i, pos in enumerate(positions):
+        symbol = pos['symbol']
+        current_price = get_current_price(symbol, send_request_func=send_request_func)
+        
+        if current_price is None:
+            print(f"🔶 No se pudo obtener precio para {symbol}")
+            continue
+        
+        direction = pos['direction']
+        tp_price = pos['tp']
+        sl_price = pos['sl']
+        entry_price = pos['entry_price']
+        
+        current_price = Decimal(str(current_price))
+        
+        # Calcular distancias al TP y SL
+        if direction.lower() == 'short':
+            dist_to_tp = float(current_price - tp_price)
+            dist_to_sl = float(sl_price - current_price)
+            tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+            sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+        else:  # long
+            dist_to_tp = float(tp_price - current_price)
+            dist_to_sl = float(current_price - sl_price)
+            tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+            sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+        
+# =============================================================================
+#         print(f"  [{symbol}] {direction.upper()}")
+#         print(f"    Current: {current_price} | Entry: {entry_price}")
+#         print(f"    TP: {tp_price} (Δ {tp_pct_away:+.3f}%) | SL: {sl_price} (Δ {sl_pct_away:+.3f}%)")
+# =============================================================================
+        
+        hit_tp = current_price >= tp_price if direction.lower() == 'long' else current_price <= tp_price
+        hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
+        
+        if hit_tp:
+            print(f"\n🌟 TP ALCANZADO para {symbol} ({strat_id})")
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="TP"):
+                positions_to_remove.append(i)
+        elif hit_sl:
+            print(f"\n🔻 SL ALCANZADO para {symbol} ({strat_id})")
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="SL"):
+                positions_to_remove.append(i)
+    
+    if positions_to_remove:
+        for i in reversed(positions_to_remove):
+            if i < len(open_positions[strat_id]):
+                open_positions[strat_id].pop(i)
+                
+        save_state_local(open_positions, strategy_candles, state_file)
+
+
+def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, send_request_func, hour_zone):
+    """Chequea TP/SL para todas las estrategias"""
+    now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
+    print(f"\n{'─' * 60}")
+    print(f"🔎 Chequeo TP/SL - {now}")
+    print(f"{'─' * 60}")
+    
+    for strat in strategies:
+        strat_id = strat['id']
+        num_positions = len(open_positions.get(strat_id, []))
+        
+        if num_positions > 0:
+            print(f"\n🔹Estrategia {strat_id}: {num_positions} posiciones abiertas")
+            check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func)
+
+def process_strategy(
+    strat,
+    final_symbols,
+    exchange,
+    open_positions,
+    strategy_candles,
+    state_file,
+    send_request_func,
+    get_balance_func,
+    hour_zone,
+    use_hardcoded=False,
+    detect_signal_func=None
+):
+    """Procesa una estrategia: busca señales y abre posiciones.
+    Usa las utilidades locales del módulo (place_order, get_fills_for_order, add_position, reset_strategy_candles, etc.).
+    Recibe las estructuras y funciones externas como parámetros para poder importarla.
+    """
+    strat_id = strat['id']
+
+    print(f"\n{'─' * 40}")
+    print(f"🔄 Procesando estrategia: {strat_id}")
+    print(f"{'─' * 40}")
+
+    # Detectar señales
+    if use_hardcoded:
+        signals = get_hardcoded_signals(strat_id, send_request_func, hour_zone)
+    else:
+        if detect_signal_func is None:
+            raise ValueError("No se proporcionó detect_signal_func")
+        signals = detect_signal_func(strat, final_symbols)
+
+    print(f"✨ Señales detectadas para {strat_id}: {len(signals)}")
+
+    if not signals:
+        return
+
+    # Resetear contador de velas al abrir nuevas posiciones
+    reset_strategy_candles(strat_id, strategy_candles, open_positions, state_file)
+
+    # Procesar cada señal
+    for sig in signals:
+        usdt_balance = get_balance_func(exchange)
+        if usdt_balance < strat['order_amount']:
+            print(f"🔶 Saldo insuficiente ({usdt_balance:.2f} USDT) para {sig['symbol']}")
+            continue
+
+        print(f"\n▶️ Abriendo {strat['direction']} en {sig['symbol']} para {strat_id}...")
+
+        resp_order = place_order(
+            symbol=sig['symbol'],
+            direction=strat['direction'],
+            usdt_amount=strat['order_amount'],
+            send_request_func=send_request_func
+        )
+
+        if resp_order is None:
+            print(f"❌ Error al colocar orden para {sig['symbol']}")
+            continue
+
+        data = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
+        order_id = data.get('orderId')
+
+        if order_id:
+            filled_size, entry_price_from_fills = get_fills_for_order(
+                order_id=order_id,
+                symbol=sig['symbol'],
+                send_request_func=send_request_func
+            )
+            time.sleep(0.5)
+
+            if filled_size is None or filled_size == 0:
+                size = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
+                entry_price = Decimal(str(data.get('price', sig.get('close', 0))))
+            else:
+                size = filled_size
+                entry_price = entry_price_from_fills if entry_price_from_fills is not None else Decimal(str(sig.get('close', 0)))
+
+            #print(f"▶️ Orden ejecutada - ID: {order_id}")
+
+            # Registrar posición usando la función local add_position (que espera open_positions, strategy_candles, state_file, hour_zone)
+            add_position(
+                strat_id=strat_id,
+                symbol=sig['symbol'],
+                size=size,
+                entry_price=entry_price,
+                direction=strat['direction'],
+                tp_pct=strat['tp_pct'],
+                sl_pct=strat['sl_pct'],
+                order_id=order_id,
+                open_positions=open_positions,
+                strategy_candles=strategy_candles,
+                state_file=state_file,
+                hour_zone=hour_zone
+            )
+        else:
+            print(f"🔶 Orden ejecutada pero sin orderId en respuesta")
+
+        time.sleep(0.5)
+        
+def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
+    """Genera señales de prueba para testing"""
+    symbols = ['BTCUSDT', 'BNBUSDT']
+    signals = []
+    for symbol in symbols:
+        code, resp = send_request_func(
+            "GET",
+            "/api/v2/mix/market/ticker",
+            params={"productType": PRODUCT_TYPE, "symbol": symbol}
+        )
+        current_price = 50000.0
+        if code == 200 and isinstance(resp, dict) and resp.get("code") == "00000":
+            try:
+                current_price = float(resp['data'][0]['lastPr'])
+            except Exception:
+                pass
+        signals.append({
+            'symbol': symbol,
+            'close': current_price,
+            'timestamp': datetime.now(hour_zone).isoformat()
+        })
+    return signals
+

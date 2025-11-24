@@ -4,23 +4,23 @@ import time
 from typing import Dict, Any, List
 from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from live_trading.ZX_connect_live import get_open_positions_TT, make_get_TT
-from utils.ZZ_connect import connect_bitget_TT
+from live_trading.ZX_connect_live import get_open_positions_00, make_get_00
+from utils.ZZ_connect import connect_bitget_00
 from ZX_utils_tools import get_usdt_balance_total,date_to_timestamp_ms,summarize_positions,calculate_winrate_from_history
 
 # -----------------------------
 # CONFIG
 # -----------------------------
 BASE_URL              = "https://api.bitget.com"
-INITIAL_CAPITAL       = 800.00 
-STRATEGY              = "TT"
+INITIAL_CAPITAL       = 2078.00 
+STRATEGY              = "BOT_strategies"
 TIMEFRAME_MINOR       = '4H'
 SELL_AFTER_N_CANDLES  = 45
 
 # -----------------------------
 # Connect with CCXT
 # -----------------------------
-exchange = connect_bitget_TT()
+exchange = connect_bitget_00()
 # -----------------------------
 # Fetch complete history with pagination
 # -----------------------------
@@ -40,7 +40,7 @@ def fetch_all_history_positions(product_type: str = "USDT-FUTURES", symbol: str 
             "startTime": start_time,
             "endTime": end_time
         }
-        response = make_get_TT(endpoint, params)
+        response = make_get_00(endpoint, params)
         data = response.get("data", {})
         items = data.get("list") or []
         end_id = data.get("endId")
@@ -64,8 +64,8 @@ def fetch_all_history_positions(product_type: str = "USDT-FUTURES", symbol: str 
 if __name__ == "__main__":
     try:       
         # --- OPEN POSITIONS ---
-        open_positions = get_open_positions_TT(product_type="USDT-FUTURES")
-        print(f"\nTT_{STRATEGY}")
+        open_positions = get_open_positions_00(product_type="USDT-FUTURES")
+        print(f"\n00_{STRATEGY}")
         summarize_positions(open_positions, SELL_AFTER_N_CANDLES, TIMEFRAME_MINOR)
     except Exception as e:
         print(f"\n⚠️ Fallen retrieving open positions: {e}")

@@ -12,7 +12,7 @@ from ZX_utils_tools import get_usdt_balance_total,date_to_timestamp_ms,summarize
 # CONFIG
 # -----------------------------
 BASE_URL              = "https://api.bitget.com"
-INITIAL_CAPITAL       = 800.00 
+INITIAL_CAPITAL       = 750.00   
 STRATEGY              = "parity_short"
 TIMEFRAME_MINOR       = '4H'
 SELL_AFTER_N_CANDLES  = 50

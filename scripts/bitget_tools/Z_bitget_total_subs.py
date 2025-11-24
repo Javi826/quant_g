@@ -1,11 +1,11 @@
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from live_trading.ZX_connect_live import  make_get_TT
+from live_trading.ZX_connect_live import  make_get_00
 
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
-INITIAL_CAPITAL = 4040.90  
+INITIAL_CAPITAL = 3750.00  
 
 
 # -----------------------------
@@ -14,7 +14,7 @@ INITIAL_CAPITAL = 4040.90
 def get_subaccounts_usdt_total(product_type: str = "USDT-FUTURES"):
     endpoint = "/api/v2/mix/account/sub-account-assets"
     params = {"productType": product_type}
-    response = make_get_TT(endpoint, params)
+    response = make_get_00(endpoint, params)
 
     data = response.get("data", [])
     total_usdt = 0.0

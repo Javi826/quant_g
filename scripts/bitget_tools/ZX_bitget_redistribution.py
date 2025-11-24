@@ -1,9 +1,10 @@
 import os
 import sys
 import uuid
+import time
 from typing import Dict, Any, List, Tuple
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from live_trading.ZX_connect_live import  make_get_TT,make_post_TT
+from live_trading.ZX_connect_live import make_get_TT, make_post_TT
 
 BASE_URL = "https://api.bitget.com"
 PRODUCT_TYPE = "USDT-FUTURES"
@@ -12,10 +13,6 @@ PRODUCT_TYPE = "USDT-FUTURES"
 # EXTRACT FREE MARGIN
 # -----------------------------
 def extract_available_from_asset(asset: Dict[str, Any]) -> float:
-    """
-    Detects possible field names that could represent 'free margin' in USDT.
-    Returns 0.0 if none is found.
-    """
     candidates = [
         "available", "availableBalance", "availableBalanceUsdt",
         "availableMargin", "availableEquity", "free", "freeMargin",
@@ -32,10 +29,6 @@ def extract_available_from_asset(asset: Dict[str, Any]) -> float:
     return 0.0
 
 def get_subaccounts_free_margin(product_type: str = PRODUCT_TYPE) -> Tuple[float, List[Dict[str, Any]]]:
-    """
-    Calls /api/v2/mix/account/sub-account-assets and extracts free USDT margin.
-    Returns (total_free_usdt, [ {userId, available_usdt}, ... ])
-    """
     endpoint = "/api/v2/mix/account/sub-account-assets"
     params = {"productType": product_type}
     resp = make_get_TT(endpoint, params)
@@ -65,10 +58,6 @@ def get_subaccounts_free_margin(product_type: str = PRODUCT_TYPE) -> Tuple[float
 # PLAN REDISTRIBUTION
 # -----------------------------
 def plan_redistribution(balances: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Given balances = [ {userId, available_usdt}, ... ]
-    Returns a list of transfers: [{fromUserId,toUserId,amount}, ...]
-    """
     EPS = 1e-8
     items = [{"userId": b["userId"], "amt": float(b["available_usdt"])} for b in balances]
     n = len(items)
@@ -122,17 +111,14 @@ def plan_redistribution(balances: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # -----------------------------
 def execute_transfer(from_user: str, to_user: str, amount: float,
                      fromType: str = "usdt_futures", toType: str = "usdt_futures", coin: str = "USDT") -> Dict[str, Any]:
-    """
-    Executes a transfer between subaccounts using the parent's API.
-    Calls: /api/v2/spot/wallet/subaccount-transfer
-    """
     endpoint = "/api/v2/spot/wallet/subaccount-transfer"
+    amount_str = f"{round(amount, 2):.2f}"  # redondeo a 2 decimales
     body = {
         "fromUserId": str(from_user),
         "toUserId": str(to_user),
         "fromType": fromType,
         "toType": toType,
-        "amount": str(amount),
+        "amount": amount_str,
         "coin": coin,
         "clientOid": str(uuid.uuid4())
     }
@@ -175,12 +161,13 @@ def redistribute_all_equal(dry_run: bool = True):
         try:
             r = execute_transfer(t["fromUserId"], t["toUserId"], t["amount"])
             results.append({"transfer": t, "result": r})
-            print(f"  ✅ {t['fromUserId']} -> {t['toUserId']}: {t['amount']:.8f} OK")
+            print(f"  ✅ {t['fromUserId']} -> {t['toUserId']}: {round(t['amount'],2):.2f} OK")
         except Exception as e:
-            print(f"  ❌ Error sending {t['amount']:.8f} from {t['fromUserId']} to {t['toUserId']}: {e}")
+            print(f"  ❌ Error sending {round(t['amount'],2):.2f} from {t['fromUserId']} to {t['toUserId']}: {e}")
             results.append({"transfer": t, "error": str(e)})
+        time.sleep(0.1)  # respeta rate limit
 
     return results
 
 if __name__ == "__main__":
-    redistribute_all_equal(dry_run=True)
+    redistribute_all_equal(dry_run=False)
