@@ -317,7 +317,7 @@ def process_signals_and_buy(
             })
 
             usdt_after = get_balance_fn(exchange)
-            print(f"💵 {now} - ORDER executed: {sym} | Remaining USDT: {usdt_after:.2f}\n")
+            print(f"▶ {now} - ORDER executed: {sym} | Remaining USDT: {usdt_after:.2f}\n")
             time.sleep(2)
 
         else:

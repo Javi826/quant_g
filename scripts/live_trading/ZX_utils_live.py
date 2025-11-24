@@ -60,7 +60,7 @@ def load_final_symbols(all_symbols, strategy="_", timeframe="4H"):
         live_symbols = set(df_live.iloc[:, 0].dropna().astype(str))
         final_symbols = set(all_symbols) & live_symbols
 
-        print(f"🔹 Symbols for Live: {len(final_symbols)}")
+        #print(f"🔹 Symbols for Live: {len(final_symbols)}")
         return sorted(final_symbols)
 
     except Exception as e:

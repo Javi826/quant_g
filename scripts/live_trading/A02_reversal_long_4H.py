@@ -63,7 +63,7 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'🧿 === 02_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🧿')
+    print(f'🔷 === 02_{STRATEGY}_{TIMEFRAME_MINOR} strategy ===🔷')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     # Si no hay posiciones activas en el exchange → limpiar estado interno
@@ -92,7 +92,7 @@ while True:
         )
 
     else:
-        print(f"⛔ {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
+        print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
 
     # -------------------------------
     # ORDERS MANAGEMENT

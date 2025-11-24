@@ -30,7 +30,7 @@ from ZX_connect_live import get_usdt_balance_00, send_request_00
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
 MIN_TIMEFRAME             = '4H'
-CHECK_INTERVAL            = 30   
+CHECK_INTERVAL            = 30  
 USE_HARDCODED_SIGNALS     = False
 
 # Archivo de estado
@@ -177,7 +177,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             else:
                 signals = None
         except Exception as e:
-            print(f"⚠️ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            print(f"🔶 Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
             signals = None
 
 
@@ -227,7 +227,7 @@ def main_loop():
     """Loop principal del bot - versión sin threads"""
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print("🚀 Iniciando bot multi-estrategia con persistencia de estado...")
+    print("🚀 Starting multi-strategy bot with state persistence...")
     
     # Cargar estado previo
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
@@ -238,9 +238,9 @@ def main_loop():
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
-        print(f"▶️ Estrategia {strat['id']}: {len(final_by_strat[strat['id']])} símbolos")
+        print(f"▶️ Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
-    print("▶️ Inicialización completada\n")
+    print("▶️ Initialization completed\n")
     print("=" * 60)
     
     # Calcular la próxima vela
@@ -256,12 +256,12 @@ def main_loop():
             # Verificar si llegó el momento de buscar señales (nueva vela)
             if now_datetime >= next_candle_time:
                 print('\n')
-                print(f"🔷 === Nueva vela detectada ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(f"🔷 === New candle detected ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print('\n')
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
                 print(f"\n{'=' * 60}")
-                print(f"📡 Búsqueda de señales - {now}")
+                print(f"📡 Signal search - {now}")
                 print(f"{'=' * 60}")
                 
                 # Incrementar contador de velas y chequear timeouts
@@ -273,7 +273,7 @@ def main_loop():
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
 
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"▶️ {strat_id}: {candles}/{strat['sell_after_ncandles']} velas")
+                        print(f"▶️ {strat_id}: {candles}/{strat['sell_after_ncandles']} candles")
                         check_candles_timeout_for_strategy(strat_id, strat['sell_after_ncandles'], OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
 
                 
@@ -283,7 +283,8 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Saltando búsqueda de señales para {strat_id} (tiene {num_positions} posiciones abiertas)")
+                        print(f"🚫 Skipping signal search for {strat_id} (it has {num_positions} open positions)")
+
                         continue
                     
                     try:
@@ -311,7 +312,7 @@ def main_loop():
                 print(f"{'=' * 60}\n")
                 
                 # Calcular la siguiente vela & Resetear el tiempo del último chequeo TP/SL
-                next_candle_time = calculate_next_candle_time(MIN_TIMEFRAME)               
+                next_candle_time = calculate_next_candle_time(MIN_TIMEFRAME, hour_zone=HOUR_ZONE)             
                 last_tpsl_check  = time.time()
             
             # Chequeo periódico de TP/SL cada CHECK_INTERVAL segundos
@@ -324,9 +325,9 @@ def main_loop():
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🚨 Interrumpido por usuario. Guardando estado...")
+        print("\n🚩 Interrupted by user. Saving state...")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
-        print("▶️ Bot detenido correctamente")
+        print("📴 BOT Stopped")
 
 
 if __name__ == '__main__':
