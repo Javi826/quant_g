@@ -95,8 +95,8 @@ def wait_for_next_candle(timeframe='4H'):
 def fetch_ohlcv_data(symbols, timeframe):
     ohlcv_data = {}
     for sym in symbols:
-        recent_minor = _call_history_candles(symbol=sym, granularity=timeframe, limit=180)
-        df_minor = to_dataframe_from_api(recent_minor)
+        recent_minor    = _call_history_candles(symbol=sym, granularity=timeframe, limit=180)
+        df_minor        = to_dataframe_from_api(recent_minor)
         ohlcv_data[sym] = df_minor
     return ohlcv_data
 
