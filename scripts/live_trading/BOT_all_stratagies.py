@@ -223,10 +223,10 @@ def detect_signal_for_strategy(strategy, final_symbols):
 # ==========================================================================  
 
 def main_loop():
-    """Loop principal del bot - versión sin threads"""
+
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print("🚀 Starting multi-strategy bot with state persistence...")
+    print("\n🚀=== Starting multi-strategy bot... ===")
     
     # Cargar estado previo
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
@@ -239,7 +239,7 @@ def main_loop():
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
         print(f"➡ Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
-    print("➡️ Initialization completed\n")
+    print("✅ Initialization completed\n")
     print("=" * 60)
     
     # Calcular la próxima vela
@@ -324,7 +324,7 @@ def main_loop():
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🚩 Interrupted by user. Saving state...")
+        print("\n🔚 Interrupted by user. Saving state...")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
         print("🛑 BOT Stopped")
 

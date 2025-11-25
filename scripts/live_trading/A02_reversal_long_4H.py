@@ -6,8 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 
 from Z_add_signals_reversal import trend_reversal_entry_long
-from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
-from ZX_utils_sub import  manage_open_positions,has_open_positions_on_exchange,process_signals_and_buy
+from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
+from ZX_utils_sub import load_state,save_state,sync_positions_with_exchange,process_signals_and_buy,manage_open_positions
+
 from utils.ZZ_connect import connect_bitget_02
 from ZX_connect_live import get_usdt_balance_02, send_request_02, get_open_positions_02
 
@@ -18,15 +19,16 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 # ----------------------
 STRATEGY             = "reversal_long"
 TIMEFRAME_MINOR      = '4H'
-ORDER_AMOUNT          = 80
+ORDER_AMOUNT         = 80
+STATE_FILE           = "robot_state_{STRATEGY}.json"
 
-SELL_AFTER_N_CANDLES  = 45
+SELL_AFTER_N_CANDLES = 45
 
-LEFT_LOOKBACK         = 5
-TOLERANCE             = 30
+LEFT_LOOKBACK        = 5
+TOLERANCE            = 30
 
-TP_PCT                = 3
-SL_PCT                = 10
+TP_PCT               = 3
+SL_PCT               = 10
 
 # ----------------------
 # FUNCTIONS
@@ -60,17 +62,24 @@ def check_latest_signal(df_minor, symbol):
 exchange       = connect_bitget_02()
 all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
 final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR)
-open_positions = []
+
+# 🔄 CARGAR ESTADO AL INICIAR
+open_positions = load_state(STATE_FILE)
+
+if open_positions:
+    print(f"🔄 Bot reiniciado con {len(open_positions)} posiciones activas:")
+    for pos in open_positions:
+        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
 
 while True:
-    print(f'🔷 === 02_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
+    print(f'🔷 === 01_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
-    # Si no hay posiciones activas en el exchange → limpiar estado interno
-    if not has_open_positions_on_exchange(get_open_positions_02, PRODUCT_TYPE):
-        if open_positions:
-            print("🔄 All closed positions detected on the exchange. Resetting internal state.")
-        open_positions = []
+    # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
+    sync_positions_with_exchange(open_positions, get_open_positions_02, PRODUCT_TYPE)
+    
+    # 💾 Guardar estado después de sincronizar
+    save_state(open_positions, STATE_FILE)
 
     # -------------------------------
     # SEÑALES Y COMPRAS
@@ -85,11 +94,15 @@ while True:
             sell_after_n_candles=SELL_AFTER_N_CANDLES,
             tp_pct=TP_PCT,
             sl_pct=SL_PCT,
-            direction="long", 
+            direction="long",
             send_request_fn=send_request_02,
             get_balance_fn=get_usdt_balance_02,
             check_signal_fn=check_latest_signal
         )
+        
+        # 💾 GUARDAR ESTADO después de comprar
+        if open_positions:
+            save_state(open_positions, STATE_FILE)
 
     else:
         print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
@@ -97,9 +110,8 @@ while True:
     # -------------------------------
     # ORDERS MANAGEMENT
     # -------------------------------
-    manage_open_positions(open_positions, send_request_fn=send_request_02)
+    manage_open_positions(open_positions, send_request_fn=send_request_02, product_type=PRODUCT_TYPE)
     
-    if not has_open_positions_on_exchange(get_open_positions_02, PRODUCT_TYPE):
-        print("🔄 All positions have been closed on the exchange — returning to look for signals now.")
-        open_positions.clear()
+    # 💾 GUARDAR ESTADO después de gestionar posiciones
+    save_state(open_positions, STATE_FILE)
 

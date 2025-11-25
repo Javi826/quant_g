@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from ZX_utils_live import fetch_ohlcv_data
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import os
 import json
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
@@ -364,21 +365,69 @@ def manage_open_positions(open_positions, send_request_fn, product_type=PRODUCT_
             time.sleep(1.1)
             
 
-def load_state(strategy_name):
-    if not os.path.exists(STATE_FILE):
-        return None
-    with open(STATE_FILE, "r") as f:
-        state = json.load(f)
-    return state.get(strategy_name)
+# ============================================
+# ZX_utils_sub.py - FUNCIONES A AÑADIR
+# ============================================
+import os
+from zoneinfo import ZoneInfo
 
-def save_state(strategy_name, candles_remaining):
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "r") as f:
+MADRID_TZ = ZoneInfo("Europe/Madrid")
+
+# ----------------------
+# PERSISTENCIA DE ESTADO
+# ----------------------
+
+def load_state(state_file):
+    """Carga el estado guardado desde el archivo JSON"""
+    if not os.path.exists(state_file):
+        return []
+    
+    try:
+        with open(state_file, "r") as f:
             state = json.load(f)
-    else:
-        state = {}
+        print(f"✅ Estado cargado: {len(state)} posiciones")
+        return state
+    except Exception as e:
+        print(f"⚠️ Error cargando estado: {e}")
+        return []
 
-    state[strategy_name] = candles_remaining
+def save_state(open_positions, state_file):
+    """Guarda el estado actual en el archivo JSON"""
+    try:
+        with open(state_file, "w") as f:
+            json.dump(open_positions, f, indent=4)
+    except Exception as e:
+        print(f"⚠️ Error guardando estado: {e}")
 
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=4)
+# ----------------------
+# SINCRONIZACIÓN CON EXCHANGE
+# ----------------------
+
+def sync_positions_with_exchange(open_positions, get_open_fn, product_type: str):
+    """Sincroniza el estado interno con las posiciones reales del exchange"""
+    try:
+        exchange_positions = get_open_fn(product_type=product_type.upper())
+        
+        if not exchange_positions:
+            if open_positions:
+                print("🔄 No positions on exchange, clearing internal state (TP/SL hit)")
+                open_positions.clear()
+            return
+        
+        exchange_symbols = {pos['symbol'] for pos in exchange_positions}
+        
+        positions_to_remove = []
+        for pos in open_positions:
+            if pos['symbol'] not in exchange_symbols:
+                positions_to_remove.append(pos)
+                now = datetime.now(MADRID_TZ).replace(second=0, microsecond=0)
+                print(f"🎯 {now} - Position {pos['symbol']} closed on exchange (TP/SL hit)")
+        
+        for pos in positions_to_remove:
+            open_positions.remove(pos)
+        
+        if positions_to_remove:
+            print(f"✅ Removed {len(positions_to_remove)} closed positions from internal state")
+            
+    except Exception as e:
+        print(f"⚠️ Error syncing positions: {e}")

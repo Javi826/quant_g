@@ -6,18 +6,110 @@ import json
 import copy
 import os
 import traceback
+import pandas as pd
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from ZX_utils_live import fetch_ohlcv_data,normalize_live_ohlcv,df_to_arrays_live
 from datetime import datetime, timedelta
 
-
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
-#MADRID_TZ    = ZoneInfo("Europe/Madrid")
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = 'usdt-futures'
 
+# ==========================================================================
+# STATE MANAGEMENT
+# ========================================================================== 
 
+def load_state(state_file):
+    """
+    Carga el estado desde el archivo JSON y devuelve dos estructuras:
+      (open_positions_dict, strategy_candles_dict)
+    Mantiene la misma lógica de parsing que tenías en el script original.
+    """
+    OPEN_POSITIONS = {}
+    STRATEGY_CANDLES = {}
+
+    if not os.path.exists(state_file):
+        print("📂 No previous state file found")
+        return OPEN_POSITIONS, STRATEGY_CANDLES
+
+    try:
+        with open(state_file, 'r') as f:
+            data = json.load(f)
+
+        # Cargar contador de velas por estrategia
+        STRATEGY_CANDLES = data.get('strategy_candles', {})
+
+        # Convertir strings a Decimal donde sea necesario
+        positions_data = data.get('positions', {})
+        for strat_id, positions in positions_data.items():
+            OPEN_POSITIONS[strat_id] = []
+            for pos in positions:
+                OPEN_POSITIONS[strat_id].append({
+                    'symbol': pos.get('symbol'),
+                    'size': Decimal(pos.get('size')),
+                    'entry_price': Decimal(pos.get('entry_price')),
+                    'direction': pos.get('direction'),
+                    'tp': Decimal(pos.get('tp')),
+                    'sl': Decimal(pos.get('sl')),
+                    'order_id': pos.get('order_id'),
+                    'opened_at': datetime.fromisoformat(pos.get('opened_at')),
+                    'usdt_amount': float(pos.get('usdt_amount', 0)) 
+                })
+
+        total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
+        print(f"🔹State loaded: {total_positions} positions recovered")
+
+        # Resumen por estrategia
+        for strat_id, positions in OPEN_POSITIONS.items():
+            if positions:
+                candles = STRATEGY_CANDLES.get(strat_id, 0)
+                print(f"   ➡️ {strat_id}: {len(positions)} positions | Candles: {candles}")
+                for pos in positions:
+                    print(f"      - {pos['symbol']:<8} | Size: {pos['size']:<10} | Entry: {pos['entry_price']:<10}")
+
+        return OPEN_POSITIONS, STRATEGY_CANDLES
+
+    except Exception as e:
+        print(f"⚠ Error loading state: {e}")
+        traceback.print_exc()
+        return OPEN_POSITIONS, STRATEGY_CANDLES
+
+
+def save_state_local(open_positions, strategy_candles, state_file):
+    """Guarda el estado sin usar lock (versión para bucle único)"""
+    try:
+        positions_copy = copy.deepcopy(open_positions)
+        strategy_candles_copy = copy.deepcopy(strategy_candles)
+
+        serializable_positions = {}
+        for strat_id, positions in positions_copy.items():
+            serializable_positions[strat_id] = []
+            for pos in positions:
+                serializable_positions[strat_id].append({
+                    'symbol': pos['symbol'],
+                    'size': str(pos['size']),
+                    'entry_price': str(pos['entry_price']),
+                    'direction': pos['direction'],
+                    'tp': str(pos['tp']),
+                    'sl': str(pos['sl']),
+                    'order_id': pos['order_id'],
+                    'opened_at': pos['opened_at'].isoformat(),
+                    'usdt_amount': float(pos.get('usdt_amount', 0))  # ⭐ AÑADIR ESTA LÍNEA
+                })
+
+        state_data = {
+            'positions': serializable_positions,
+            'strategy_candles': strategy_candles_copy
+        }
+
+        with open(state_file, 'w') as f:
+            json.dump(state_data, f, indent=2)
+
+    except Exception as e:
+        print(f"⚠ Error saving state: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ==========================================================================
 # PLACE ORDER
@@ -230,7 +322,7 @@ def place_order(symbol: str,
 
 
 # ==========================================================================
-# HELPERS
+# PRICING
 # ==========================================================================   
 def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.5):
 
@@ -281,44 +373,6 @@ def get_current_price(symbol, send_request_func):
         print(f"⚠ Error getting price of {symbol}: {e}")
     return None
 
-def close_position(symbol, size, direction, send_request_func, reason="NO INFO"):
-    """Cierra una posición con orden market en HEDGE MODE"""
-    try:
-        close_side = "sell" if direction.lower() == "short" else "buy"
-        
-        body = {
-            "symbol": symbol,
-            "productType": PRODUCT_TYPE,
-            "marginMode": "isolated",
-            "marginCoin": "USDT",
-            "size": format(size, "f"),
-            "side": close_side,
-            "tradeSide": "close",
-            "orderType": "market"
-        }
-        
-        print(f"➡ Closing {direction} position on {symbol}:")   
-        code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
-        time.sleep(1.0)
-
-        if code == 200 and resp.get("code") == "00000":
-            print(f"➡️ Position closed due to {reason}: {symbol} | Size: {size}")
-            return True
-        else:
-            print(f"⚠ Error closing position {symbol}: {resp}")
-            if resp.get("code") == "22002":
-                print(f"   → Removing from local record (nonexistent position)")
-                return True
-            return False
-            
-    except Exception as e:
-        print(f"⚠ Error closing position {symbol}: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
     """Calcula los precios de TP y SL basados en el precio de entrada"""
     entry = Decimal(str(entry_price))
@@ -333,96 +387,10 @@ def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
         sl_price = entry * (Decimal('1') + sl_decimal)
     
     return tp_price, sl_price
-
-def load_state(state_file):
-    """
-    Carga el estado desde el archivo JSON y devuelve dos estructuras:
-      (open_positions_dict, strategy_candles_dict)
-    Mantiene la misma lógica de parsing que tenías en el script original.
-    """
-    OPEN_POSITIONS = {}
-    STRATEGY_CANDLES = {}
-
-    if not os.path.exists(state_file):
-        print("📂 No previous state file found")
-        return OPEN_POSITIONS, STRATEGY_CANDLES
-
-    try:
-        with open(state_file, 'r') as f:
-            data = json.load(f)
-
-        # Cargar contador de velas por estrategia
-        STRATEGY_CANDLES = data.get('strategy_candles', {})
-
-        # Convertir strings a Decimal donde sea necesario
-        positions_data = data.get('positions', {})
-        for strat_id, positions in positions_data.items():
-            OPEN_POSITIONS[strat_id] = []
-            for pos in positions:
-                OPEN_POSITIONS[strat_id].append({
-                    'symbol': pos.get('symbol'),
-                    'size': Decimal(pos.get('size')),
-                    'entry_price': Decimal(pos.get('entry_price')),
-                    'direction': pos.get('direction'),
-                    'tp': Decimal(pos.get('tp')),
-                    'sl': Decimal(pos.get('sl')),
-                    'order_id': pos.get('order_id'),
-                    'opened_at': datetime.fromisoformat(pos.get('opened_at'))
-                })
-
-        total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
-        print(f"🔹State loaded: {total_positions} positions recovered")
-
-        # Resumen por estrategia
-        for strat_id, positions in OPEN_POSITIONS.items():
-            if positions:
-                candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ➡️ {strat_id}: {len(positions)} positions | Candles: {candles}")
-                for pos in positions:
-                    print(f"      - {pos['symbol']} | Size: {pos['size']} | Entry: {pos['entry_price']}")
-
-        return OPEN_POSITIONS, STRATEGY_CANDLES
-
-    except Exception as e:
-        print(f"⚠ Error loading state: {e}")
-        traceback.print_exc()
-        return OPEN_POSITIONS, STRATEGY_CANDLES
-
-
-def save_state_local(open_positions, strategy_candles, state_file):
-    """Guarda el estado sin usar lock (versión para bucle único)"""
-    try:
-        positions_copy = copy.deepcopy(open_positions)
-        strategy_candles_copy = copy.deepcopy(strategy_candles)
-
-        serializable_positions = {}
-        for strat_id, positions in positions_copy.items():
-            serializable_positions[strat_id] = []
-            for pos in positions:
-                serializable_positions[strat_id].append({
-                    'symbol': pos['symbol'],
-                    'size': str(pos['size']),
-                    'entry_price': str(pos['entry_price']),
-                    'direction': pos['direction'],
-                    'tp': str(pos['tp']),
-                    'sl': str(pos['sl']),
-                    'order_id': pos['order_id'],
-                    'opened_at': pos['opened_at'].isoformat()
-                })
-
-        state_data = {
-            'positions': serializable_positions,
-            'strategy_candles': strategy_candles_copy
-        }
-
-        with open(state_file, 'w') as f:
-            json.dump(state_data, f, indent=2)
-
-    except Exception as e:
-        print(f"⚠ Error saving state: {e}")
-        import traceback
-        traceback.print_exc()
         
+ # ==========================================================================
+ # CANDLES
+ # ==========================================================================        
 
 def calculate_next_candle_time(timeframe='4H', hour_zone=None):
     now = datetime.now(hour_zone)
@@ -459,38 +427,6 @@ def reset_strategy_candles(strat_id, strategy_candles, open_positions, state_fil
     strategy_candles[strat_id] = 0
     save_state_local(open_positions, strategy_candles, state_file)
 
-# ZX_utils_bot.py (o módulo nuevo)
-def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct, order_id,
-                 open_positions, strategy_candles, state_file,hour_zone):
-    """Registra una nueva posición abierta en open_positions y guarda estado"""
-    
-    if strat_id not in open_positions:
-        open_positions[strat_id] = []
-
-    tp_price, sl_price = calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct)
-    
-    position = {
-        'symbol': symbol,
-        'size': size,
-        'entry_price': entry_price,
-        'direction': direction,
-        'tp': tp_price,
-        'sl': sl_price,
-        'order_id': order_id,
-        'opened_at': datetime.now(hour_zone)
-    }
-    
-    open_positions[strat_id].append(position)
-    
-# =============================================================================
-#     print(f"➡️ Posición registrada:")
-#     print(f"  Symbol: {symbol} | Size: {size} | Entry: {entry_price}")
-#     print(f"  TP: {tp_price} | SL: {sl_price}")
-# =============================================================================
-    
-    # Guardar estado actualizado
-    save_state_local(open_positions, strategy_candles, state_file)
-
 def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
                                        open_positions, strategy_candles,
                                        state_file, send_request_func):
@@ -513,8 +449,14 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 
     all_closed = True
     for pos in positions:
+        position_data = {
+            'opened_at': pos['opened_at'],
+            'strategy_id': strat_id,
+            'usdt_amount': pos.get('usdt_amount', 0),
+            'entry_price': pos['entry_price']
+        }
         if not close_position(pos['symbol'], pos['size'], pos['direction'],
-                              send_request_func, reason="TIMEOUT"):
+                              send_request_func, reason="TIMEOUT", position_data=position_data):
             all_closed = False
 
     if all_closed:
@@ -522,7 +464,9 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
 
-# ZX_utils_bot.py u otro módulo
+# ==========================================================================
+# TP/SL CHECKINGS
+# ========================================================================== 
 def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func):
     """Comprueba TP/SL para todas las posiciones de una estrategia"""
     if strat_id not in open_positions or not open_positions[strat_id]:
@@ -569,11 +513,24 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         
         if hit_tp:
             print(f"\n💫 TP REACHED for {symbol} ({strat_id})")
-            if close_position(symbol, pos['size'], direction, send_request_func, reason="TP"):
+            position_data = {
+                'opened_at': pos['opened_at'],
+                'strategy_id': strat_id,
+                'usdt_amount': pos.get('usdt_amount', 0),
+                'entry_price': pos['entry_price']
+            }
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="TP", position_data=position_data):
                 positions_to_remove.append(i)
+                
         elif hit_sl:
             print(f"\n🔻 SL REACHED for {symbol} ({strat_id})")
-            if close_position(symbol, pos['size'], direction, send_request_func, reason="SL"):
+            position_data = {
+                'opened_at': pos['opened_at'],
+                'strategy_id': strat_id,
+                'usdt_amount': pos.get('usdt_amount', 0),
+                'entry_price': pos['entry_price']
+            }
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="SL", position_data=position_data):
                 positions_to_remove.append(i)
     
     if positions_to_remove:
@@ -588,7 +545,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, se
     """Chequea TP/SL para todas las estrategias"""
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
     print(f"\n{'-' * 60}")
-    print(f"🔎 Checking TP/SL - {now}")
+    print(f"🏧 Checking TP/SL - {now}")
     print(f"{'-' * 60}")
     for strat in strategies:
         strat_id = strat['id']
@@ -596,6 +553,9 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, se
         print(f"🔹Strategy {strat_id:<16}: {num_positions} open positions")
         check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func)
 
+# ==========================================================================
+# STRATEGY MANAGMENT
+# ========================================================================== 
 def process_strategy(
     strat,
     final_symbols,
@@ -616,7 +576,7 @@ def process_strategy(
     strat_id = strat['id']
 
     print(f"\n{'─' * 40}")
-    print(f"🔂 Processing strategy: {strat_id}")
+    print(f"🔄 Processing strategy: {strat_id}")
     print(f"{'─' * 40}")
 
     # Detectar señales
@@ -688,7 +648,8 @@ def process_strategy(
                 open_positions=open_positions,
                 strategy_candles=strategy_candles,
                 state_file=state_file,
-                hour_zone=hour_zone
+                hour_zone=hour_zone,
+                usdt_amount=strat['order_amount']  
             )
         else:
             print(f"⚠ Order executed but no orderId in response")
@@ -718,3 +679,150 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
         })
     return signals
 
+# ==========================================================================
+# POSITIONS MANAGEMENT
+# ========================================================================== 
+
+def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",position_data=None):
+    """Cierra una posición con orden market en HEDGE MODE"""
+    try:
+        close_side = "sell" if direction.lower() == "short" else "buy"
+        
+        body = {
+            "symbol": symbol,
+            "productType": PRODUCT_TYPE,
+            "marginMode": "isolated",
+            "marginCoin": "USDT",
+            "size": format(size, "f"),
+            "side": close_side,
+            "tradeSide": "close",
+            "orderType": "market"
+        }
+        
+        print(f"➡ Closing {direction} position on {symbol}:")   
+        code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
+        time.sleep(1.0)
+
+        if code == 200 and resp.get("code") == "00000":
+            print(f"➡️ Position closed due to {reason}: {symbol} | Size: {size}")
+            # ⭐ REGISTRAR EN EXCEL
+            if position_data:
+                current_price = get_current_price(symbol, send_request_func)
+                if current_price:
+                   log_closed_position(opened_at=position_data.get('opened_at'), strategy_id=position_data.get('strategy_id'), symbol=symbol, direction=direction, usdt_amount=position_data.get('usdt_amount', 0), entry_price=position_data.get('entry_price'), close_price=current_price, reason=reason,size=size)
+ 
+            return True
+        else:
+            print(f"⚠ Error closing position {symbol}: {resp}")
+            if resp.get("code") == "22002":
+                print(f"   → Removing from local record (nonexistent position)")
+                # ⭐ REGISTRAR EN EXCEL
+                if position_data:
+                    current_price = get_current_price(symbol, send_request_func)
+                    if current_price:
+                       log_closed_position(opened_at=position_data.get('opened_at'), strategy_id=position_data.get('strategy_id'), symbol=symbol, direction=direction, usdt_amount=position_data.get('usdt_amount', 0), entry_price=position_data.get('entry_price'), close_price=current_price, reason="OUT_OF_MARGIN",size=size)
+     
+                return True
+            return False
+            
+    except Exception as e:
+        print(f"⚠ Error closing position {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    
+def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct, order_id,
+                 open_positions, strategy_candles, state_file,hour_zone,usdt_amount=0):
+    """Registra una nueva posición abierta en open_positions y guarda estado"""
+    
+    if strat_id not in open_positions:
+        open_positions[strat_id] = []
+
+    tp_price, sl_price = calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct)
+    
+    position = {
+        'symbol': symbol,
+        'size': size,
+        'entry_price': entry_price,
+        'direction': direction,
+        'tp': tp_price,
+        'sl': sl_price,
+        'order_id': order_id,
+        'opened_at': datetime.now(hour_zone),
+        'usdt_amount': usdt_amount  # ⭐ AÑADIR ESTE CAMPO
+    }
+    
+    open_positions[strat_id].append(position)
+    
+# =============================================================================
+#     print(f"➡️ Posición registrada:")
+#     print(f"  Symbol: {symbol} | Size: {size} | Entry: {entry_price}")
+#     print(f"  TP: {tp_price} | SL: {sl_price}")
+# =============================================================================
+    
+    # Guardar estado actualizado
+    save_state_local(open_positions, strategy_candles, state_file)
+    
+def log_closed_position(
+    opened_at,
+    strategy_id,
+    symbol,
+    direction,
+    usdt_amount,
+    entry_price,
+    close_price,
+    reason,
+    size=None,  # ⭐ AÑADIR ESTE PARÁMETRO
+    excel_file='trading_log.xlsx'
+):
+
+    try:
+        # Convertir Decimals a float
+        entry_price = float(entry_price)
+        close_price = float(close_price)
+        usdt_amount = float(usdt_amount)
+        
+        # ⭐ SI USDT_AMOUNT ES 0, CALCULARLO DESDE SIZE
+        if usdt_amount == 0 and size is not None:
+            size_float = float(size)
+            usdt_amount = size_float * entry_price
+        
+        # Calcular profit
+        if direction.lower() == 'long':
+            profit = (close_price - entry_price) * (usdt_amount / entry_price)
+            profit_pct = ((close_price - entry_price) / entry_price) * 100
+        else:  # short
+            profit = (entry_price - close_price) * (usdt_amount / entry_price)
+            profit_pct = ((entry_price - close_price) / entry_price) * 100
+        
+        # Crear registro
+        new_record = {
+            'OPEN_AT': opened_at if isinstance(opened_at, str) else opened_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'CLOSE_AT': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'STRATEGY': strategy_id,
+            'SYMBOL': symbol,
+            'DIRECTION': direction.upper(),
+            'USDT_AMOUNT': round(usdt_amount, 2),
+            'PRICE_ENTRY': round(entry_price, 6),
+            'PRICE_CLOSE': round(close_price, 6),
+            'PROFIT': round(profit, 2),
+            'PROFIT_PCT': round(profit_pct, 2),
+            'REASON_OUT': reason
+        }
+        
+        # Cargar o crear DataFrame
+        if os.path.exists(excel_file):
+            df = pd.read_excel(excel_file)
+            df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
+        else:
+            df = pd.DataFrame([new_record])
+        
+        # Guardar en Excel
+        df.to_excel(excel_file, index=False, engine='openpyxl')
+        
+        print(f"📥 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%)")
+        
+    except Exception as e:
+        print(f"⚠ Error logging trade to Excel: {e}")
+        import traceback
+        traceback.print_exc()

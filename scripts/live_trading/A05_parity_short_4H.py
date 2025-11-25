@@ -6,8 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 
 from Z_add_signals_parity import detect_parity_short
-from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv,df_to_arrays_live, PRODUCT_TYPE
-from ZX_utils_sub import  manage_open_positions,has_open_positions_on_exchange,process_signals_and_buy
+from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
+from ZX_utils_sub import load_state,save_state,sync_positions_with_exchange,process_signals_and_buy,manage_open_positions
+
 from utils.ZZ_connect import connect_bitget_05
 from ZX_connect_live import get_usdt_balance_05, send_request_05, get_open_positions_05
 
@@ -19,6 +20,7 @@ MADRID_TZ = ZoneInfo("Europe/Madrid")
 STRATEGY             = "parity_short"
 TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 80
+STATE_FILE           = "robot_state_{STRATEGY}.json"
 
 SELL_AFTER_N_CANDLES = 45
 
@@ -63,7 +65,7 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
+    print(f'\n🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     # Si no hay posiciones activas en el exchange → limpiar estado interno
@@ -93,6 +95,7 @@ while True:
 
     else:
         print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
+        print('\n')
 
     # -------------------------------
     # ORDERS MANAGEMENT
