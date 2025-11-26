@@ -17,11 +17,11 @@ from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols,fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from ZX_utils_bot import increment_strategy_candles,process_strategy,check_all_tp_sl
 from ZX_utils_bot import load_state,save_state_local,calculate_next_candle_time,check_candles_timeout_for_strategy
-from Z_add_signals_double_top import detect_double_top_long
-from Z_add_signals_reversal import trend_reversal_entry_long
-from Z_add_signals_parity import detect_parity_long
-from Z_add_signals_reversal import trend_reversal_entry_short
-from Z_add_signals_parity import detect_parity_short
+from Z_add_signals_double_top import double_top_long
+from Z_add_signals_reversal import reversal_long
+from Z_add_signals_parity import parity_long
+from Z_add_signals_reversal import reversal_short
+from Z_add_signals_parity import parity_short
 
 from utils.ZZ_connect import connect_bitget_00
 from ZX_connect_live import get_usdt_balance_00, send_request_00
@@ -138,7 +138,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
         # obtener señales según estrategia
         try:
             if strategy['name'] == 'double_top_long':
-                signals = detect_double_top_long(
+                signals = double_top_long(
                     arr,
                     lookback_minor=strategy['lookback'],
                     price_tolerance=strategy['tolerance'],
@@ -146,28 +146,28 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     live_trading=True
                 )
             elif strategy['name'] == 'reversal_long':
-                signals = trend_reversal_entry_long(
+                signals = reversal_long(
                     arr,
                     left_lookback=strategy['left_lookback'],
                     tolerance=strategy['tolerance'],
                     live_trading=True
                 )
             elif strategy['name'] == 'parity_long':
-                signals = detect_parity_long(
+                signals = parity_long(
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     live_trading=True
                 )
             elif strategy['name'] == 'reversal_short':
-                signals = trend_reversal_entry_short(
+                signals = reversal_short(
                     arr,
                     left_lookback=strategy['left_lookback'],
                     tolerance=strategy['tolerance'],
                     live_trading=True
                 )
             elif strategy['name'] == 'parity_short':
-                signals = detect_parity_short(
+                signals = parity_short(
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
@@ -176,7 +176,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             else:
                 signals = None
         except Exception as e:
-            print(f"⚠ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            print(f"🟡 Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
             signals = None
 
 
@@ -226,7 +226,7 @@ def main_loop():
 
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print("\n🚀=== Starting multi-strategy bot... ===")
+    print("\n🚀 === Starting multi-strategy bot... ===")
     
     # Cargar estado previo
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
@@ -302,7 +302,7 @@ def main_loop():
                                     )
 
                     except Exception as e:
-                        print(f"⚠ Error procesando {strat_id}: {e}")
+                        print(f"🟡 Error procesando {strat_id}: {e}")
                         import traceback
                         traceback.print_exc()
                 
@@ -324,9 +324,9 @@ def main_loop():
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🔚 Interrupted by user. Saving state...")
+        print("\n🔚 Interrupted by user.")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
-        print("🛑 BOT Stopped")
+        print("⛔ BOT Stopped")
 
 
 if __name__ == '__main__':

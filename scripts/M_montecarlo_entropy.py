@@ -13,7 +13,7 @@ from utils.ZX_utils import filter_symbols,final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf import generate_multiple_paths
-from Z_add_signals_entropy import signal_99_long
+from Z_add_signals_entropy import signal_99_long,signal_99_short
 
 start_time = time.time()
 DTYPE               = np.float32
@@ -24,7 +24,7 @@ N_JOBS              = -1
 # -----------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME           = '4H'
-ORDER_AMOUNT        = 5000
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -43,21 +43,23 @@ ADX_LIST        = [True, False]
 ROC_LIST        = [True, False]
 EMA_CROSS_LIST  = [True, False]
 
-TP_PCT_LIST     = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST     = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST     = [5,10,15,20,25,30]
+SL_PCT_LIST     = [5,10]
 
-SMA_CROS_LIST   = [True]
-RSI_14_LIST     = [False]
-MACD_CROSS_LIST = [True]
-MOMENTUM_LIST   = [True]
-STOCH_LIST      = [False]
-CCI_LIST        = [True]
-ADX_LIST        = [True]
-ROC_LIST        = [True]
-EMA_CROSS_LIST  = [True]
-
-TP_PCT_LIST     = [3]
-SL_PCT_LIST     = [10]
+# =============================================================================
+# SMA_CROS_LIST   = [False]
+# RSI_14_LIST     = [True]
+# MACD_CROSS_LIST = [False]
+# MOMENTUM_LIST   = [False]
+# STOCH_LIST      = [True]
+# CCI_LIST        = [False]
+# ADX_LIST        = [True]
+# ROC_LIST        = [False]
+# EMA_CROSS_LIST  = [False]
+# 
+# TP_PCT_LIST     = [30]
+# SL_PCT_LIST     = [10]
+# =============================================================================
 
 # -----------------------------
 # MONTECARLO SETTINGS

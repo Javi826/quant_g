@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 
-from Z_add_signals_reversal import trend_reversal_entry_short
+from Z_add_signals_reversal import reversal_short
 from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
 from ZX_utils_sub import load_state,save_state,sync_positions_with_exchange,process_signals_and_buy,manage_open_positions
 
@@ -39,7 +39,7 @@ def check_latest_signal(df_minor, symbol):
     df_minor  = normalize_live_ohlcv(df_minor)
     arr_minor = df_to_arrays_live(df_minor)
 
-    signals = trend_reversal_entry_short(
+    signals = reversal_short(
         arr_minor,
         left_lookback=LEFT_LOOKBACK,
         tolerance=TOLERANCE,
@@ -94,7 +94,7 @@ while True:
             sell_after_n_candles=SELL_AFTER_N_CANDLES,
             tp_pct=TP_PCT,
             sl_pct=SL_PCT,
-            direction="long",
+            direction="short",
             send_request_fn=send_request_04,
             get_balance_fn=get_usdt_balance_04,
             check_signal_fn=check_latest_signal

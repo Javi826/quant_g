@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     try:
         # --- HISTORIAL Y WINRATE ---  
-        start_date = "2025-11-24"
+        start_date = "2025-11-25"
         start_time = date_to_timestamp_ms(start_date)
         end_time   = int(datetime.now().timestamp() * 1000)
 

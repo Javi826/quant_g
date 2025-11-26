@@ -58,7 +58,7 @@ def load_state(state_file):
                 })
 
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
-        print(f"🔹State loaded: {total_positions} positions recovered")
+        print(f"✅  State loaded: {total_positions} positions recovered")
 
         # Resumen por estrategia
         for strat_id, positions in OPEN_POSITIONS.items():
@@ -71,7 +71,7 @@ def load_state(state_file):
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
     except Exception as e:
-        print(f"⚠ Error loading state: {e}")
+        print(f"🟡 Error loading state: {e}")
         traceback.print_exc()
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
@@ -105,9 +105,9 @@ def save_state_local(open_positions, strategy_candles, state_file):
 
         with open(state_file, 'w') as f:
             json.dump(state_data, f, indent=2)
-
+        print(f"💾 Saving state...")
     except Exception as e:
-        print(f"⚠ Error saving state: {e}")
+        print(f"🟡 Error saving state: {e}")
         import traceback
         traceback.print_exc()
 
@@ -117,7 +117,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
 def fetch_ticker(send_request_func, product_type, symbol):
     code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",params={"productType": product_type, "symbol": symbol})
     if code != 200 or resp.get("code") != "00000":
-        print("⚠️ Error ticker:", resp)
+        print("🟡 Error ticker:", resp)
         return None, None
     last_price = Decimal(str(resp['data'][0]['lastPr']))
     time.sleep(0.5)
@@ -232,7 +232,7 @@ def quantize_size(size_base, size_scale):
     if size_q == 0:
         size_q = size_base.quantize(Decimal("1e-6"), rounding=ROUND_DOWN)
     if size_q == 0:
-        print("⚠️ Size = 0")
+        print("🟡 Size = 0")
         return None, precision_size
     return size_q, precision_size
 
@@ -255,7 +255,7 @@ def build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, sid
 def place_market_order(send_request_func, body_order):
     code_order, resp_order = send_request_func("POST", "/api/v2/mix/order/place-order", body=body_order)
     if code_order != 200 or resp_order.get("code") != "00000":
-        print("⚠ Error order:", resp_order)
+        print("🟡 Error order:", resp_order)
         return None, None
     return code_order, resp_order
 
@@ -310,13 +310,13 @@ def place_order(symbol: str,
 
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"⚠ Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
+        print(f"🟡 Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
     exec_price    = get_exec_price(resp_order, last_price)
 
-    print(f"🎯 {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
+    print(f"✅ {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
 
     return resp_order
 
@@ -359,7 +359,7 @@ def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_requ
                     entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
                     return total_base, entry_price
         except Exception as e:
-            print(f"⚠ Error consultando fills (attempt {attempt+1}): {e}")
+            print(f"🟡 Error consultando fills (attempt {attempt+1}): {e}")
         time.sleep(delay)
     return None, None
 
@@ -370,7 +370,7 @@ def get_current_price(symbol, send_request_func):
         if code == 200 and resp.get("code") == "00000":
             return Decimal(str(resp['data'][0]['lastPr']))
     except Exception as e:
-        print(f"⚠ Error getting price of {symbol}: {e}")
+        print(f"🟡 Error getting price of {symbol}: {e}")
     return None
 
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
@@ -480,7 +480,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         current_price = get_current_price(symbol, send_request_func=send_request_func)
         
         if current_price is None:
-            print(f"⚠ No price for {symbol}")
+            print(f"🟡 No price for {symbol}")
             continue
         
         direction = pos['direction']
@@ -512,7 +512,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
         
         if hit_tp:
-            print(f"\n💫 TP REACHED for {symbol} ({strat_id})")
+            print(f"\n💲 TP REACHED for {symbol} ({strat_id})")
             position_data = {
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
@@ -545,7 +545,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, se
     """Chequea TP/SL para todas las estrategias"""
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
     print(f"\n{'-' * 60}")
-    print(f"🏧 Checking TP/SL - {now}")
+    print(f"🔷 Checking TP/SL - {now}")
     print(f"{'-' * 60}")
     for strat in strategies:
         strat_id = strat['id']
@@ -587,7 +587,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"🔔 Signals detected for {strat_id}: {len(signals)}")
+    print(f"🔊 Signals detected for {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -599,7 +599,7 @@ def process_strategy(
     for sig in signals:
         usdt_balance = get_balance_func(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"⚠ Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
+            print(f"🟡 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
             continue
 
         print(f"\n➡ Opening {strat['direction']} on {sig['symbol']} for {strat_id}...")
@@ -612,7 +612,7 @@ def process_strategy(
         )
 
         if resp_order is None:
-            print(f"⚠ Error placing order for {sig['symbol']}")
+            print(f"🟡 Error placing order for {sig['symbol']}")
             continue
 
         data = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
@@ -652,7 +652,7 @@ def process_strategy(
                 usdt_amount=strat['order_amount']  
             )
         else:
-            print(f"⚠ Order executed but no orderId in response")
+            print(f"🟡 Order executed but no orderId in response")
 
         time.sleep(0.5)
         
@@ -705,7 +705,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
 
         if code == 200 and resp.get("code") == "00000":
             print(f"➡️ Position closed due to {reason}: {symbol} | Size: {size}")
-            # ⭐ REGISTRAR EN EXCEL
+            #  REGISTRAR EN EXCEL
             if position_data:
                 current_price = get_current_price(symbol, send_request_func)
                 if current_price:
@@ -713,10 +713,9 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
  
             return True
         else:
-            print(f"⚠ Error closing position {symbol}: {resp}")
+            print(f"🟡 Error closing position {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removing from local record (nonexistent position)")
-                # ⭐ REGISTRAR EN EXCEL
                 if position_data:
                     current_price = get_current_price(symbol, send_request_func)
                     if current_price:
@@ -726,7 +725,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             return False
             
     except Exception as e:
-        print(f"⚠ Error closing position {symbol}: {e}")
+        print(f"🟡 Error closing position {symbol}: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -772,17 +771,16 @@ def log_closed_position(
     entry_price,
     close_price,
     reason,
-    size=None,  # ⭐ AÑADIR ESTE PARÁMETRO
-    excel_file='trading_log.xlsx'
+    size=None,
+    excel_file='bot_trading_log.xlsx'
 ):
-
     try:
         # Convertir Decimals a float
         entry_price = float(entry_price)
         close_price = float(close_price)
         usdt_amount = float(usdt_amount)
         
-        # ⭐ SI USDT_AMOUNT ES 0, CALCULARLO DESDE SIZE
+        # SI USDT_AMOUNT ES 0, CALCULARLO DESDE SIZE
         if usdt_amount == 0 and size is not None:
             size_float = float(size)
             usdt_amount = size_float * entry_price
@@ -795,18 +793,36 @@ def log_closed_position(
             profit = (entry_price - close_price) * (usdt_amount / entry_price)
             profit_pct = ((entry_price - close_price) / entry_price) * 100
         
+        # Tiempo de cierre
+        closed_at = datetime.now()
+        
+        # Calcular delta en días - NORMALIZAR TIMEZONES
+        if isinstance(opened_at, str):
+            opened_at_dt = datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')
+        else:
+            opened_at_dt = opened_at
+        
+        # Eliminar timezone info de ambos datetimes para hacerlos compatibles
+        if opened_at_dt.tzinfo is not None:
+            opened_at_dt = opened_at_dt.replace(tzinfo=None)
+        if closed_at.tzinfo is not None:
+            closed_at = closed_at.replace(tzinfo=None)
+        
+        delta_days = (closed_at - opened_at_dt).total_seconds() / (3600*24)  # días como float
+        
         # Crear registro
         new_record = {
-            'OPEN_AT': opened_at if isinstance(opened_at, str) else opened_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'CLOSE_AT': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'OPEN_AT': opened_at_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            'CLOSE_AT': closed_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'DURATION_DAYS': round(delta_days, 4),  # 4 decimales para días
             'STRATEGY': strategy_id,
             'SYMBOL': symbol,
             'DIRECTION': direction.upper(),
-            'USDT_AMOUNT': round(usdt_amount, 2),
-            'PRICE_ENTRY': round(entry_price, 6),
-            'PRICE_CLOSE': round(close_price, 6),
-            'PROFIT': round(profit, 2),
-            'PROFIT_PCT': round(profit_pct, 2),
+            'USDT_AMOUNT': round(usdt_amount, 2),  # 2 decimales para USDT
+            'PRICE_ENTRY': round(entry_price, 6),  # 6 decimales para precios
+            'PRICE_CLOSE': round(close_price, 6),  # 6 decimales para precios
+            'PROFIT': round(profit, 2),  
+            'PROFIT_PCT': round(profit_pct, 1),  
             'REASON_OUT': reason
         }
         
@@ -820,9 +836,9 @@ def log_closed_position(
         # Guardar en Excel
         df.to_excel(excel_file, index=False, engine='openpyxl')
         
-        print(f"📥 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%)")
+        print(f"📥 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
         
     except Exception as e:
-        print(f"⚠ Error logging trade to Excel: {e}")
+        print(f"🟡 Error logging trade to Excel: {e}")
         import traceback
         traceback.print_exc()

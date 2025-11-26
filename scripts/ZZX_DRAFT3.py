@@ -1,121 +1,23 @@
-import os
-import sys
-import json
+import psutil
 import time
-from datetime import datetime
-from zoneinfo import ZoneInfo
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
+import os
 
-from Z_add_signals_double_top import detect_double_top_long
-from ZX_utils_live import wait_for_next_candle, load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE, fetch_ohlcv_data
-from ZX_utils_sub import place_order_sub,load_state,save_state,sync_positions_with_exchange,process_signals_and_buy,manage_open_positions
+def monitor_cpu(interval=1):
+    """
+    Muestra el uso de todos los núcleos en tiempo real,
+    cada núcleo en una línea separada.
+    """
+    try:
+        while True:
+            usage_per_core = psutil.cpu_percent(interval=interval, percpu=True)
+            # Limpiar la pantalla para actualizar en “live”
+            os.system('clear')
+            print("🖥️ CPU usage per core:")
+            for i, u in enumerate(usage_per_core):
+                print(f"Core {i}: {u:5.1f}%")
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\n🔚 Monitor detenido")
 
-
-from utils.ZZ_connect import connect_bitget_01
-from ZX_connect_live import get_usdt_balance_01, send_request_01, get_open_positions_01
-
-MADRID_TZ = ZoneInfo("Europe/Madrid")
-
-# ----------------------
-# CONFIGURATION
-# ----------------------
-STRATEGY              = "double_top_long"
-TIMEFRAME_MINOR       = '4H'
-ORDER_AMOUNT          = 80
-
-SELL_AFTER_N_CANDLES  = 45
-
-LOOKBACK_MINOR        = 2
-PRICE_TOLERANCE       = 20
-TREND_TH              = 10
-
-TP_PCT                = 5
-SL_PCT                = 10
-
-STATE_FILE            = "robot_state_{STRATEGY}.json"
-
-# ----------------------
-# FUNCTIONS
-# ----------------------
-
-def check_latest_signal(df_minor, symbol):
-    df_minor  = normalize_live_ohlcv(df_minor)
-    arr_minor = df_to_arrays_live(df_minor)
-
-    signals = detect_double_top_long(
-        arr_minor,
-        lookback_minor=LOOKBACK_MINOR,
-        price_tolerance=PRICE_TOLERANCE,
-        trend_th=TREND_TH,
-        live_trading=True
-    )
-
-    last_signal = signals[-1]
-
-    if last_signal != 0:
-        last = df_minor.iloc[-1]
-        return {
-            'symbol': symbol,
-            'timestamp': last.name if 'timestamp' not in df_minor.columns else last['timestamp'],
-            'close': last['close'],
-        }
-
-# ----------------------
-# MAIN LOOP
-# ----------------------
-exchange       = connect_bitget_01()
-all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
-final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR)
-
-# 🔄 CARGAR ESTADO AL INICIAR
-open_positions = load_state(STATE_FILE)
-
-if open_positions:
-    print(f"🔄 Bot reiniciado con {len(open_positions)} posiciones activas:")
-    for pos in open_positions:
-        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
-
-while True:
-    print(f'🔷 === 01_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
-    wait_for_next_candle(TIMEFRAME_MINOR)
-
-    # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
-    sync_positions_with_exchange(open_positions, get_open_positions_01, PRODUCT_TYPE)
-    
-    # 💾 Guardar estado después de sincronizar
-    save_state(open_positions, STATE_FILE)
-
-    # -------------------------------
-    # SEÑALES Y COMPRAS
-    # -------------------------------
-    if not open_positions:
-        open_positions = process_signals_and_buy(
-            final_symbols=final_symbols,
-            exchange=exchange,
-            open_positions=open_positions,
-            order_amount=ORDER_AMOUNT,
-            timeframe_minor=TIMEFRAME_MINOR,
-            sell_after_n_candles=SELL_AFTER_N_CANDLES,
-            tp_pct=TP_PCT,
-            sl_pct=SL_PCT,
-            direction="long",
-            send_request_fn=send_request_01,
-            get_balance_fn=get_usdt_balance_01,
-            check_signal_fn=check_latest_signal
-        )
-        
-        # 💾 GUARDAR ESTADO después de comprar
-        if open_positions:
-            save_state(open_positions, STATE_FILE)
-
-    else:
-        print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
-
-    # -------------------------------
-    # ORDERS MANAGEMENT
-    # -------------------------------
-    manage_open_positions(open_positions, send_request_fn=send_request_01, product_type=PRODUCT_TYPE)
-    
-    # 💾 GUARDAR ESTADO después de gestionar posiciones
-    save_state(open_positions, STATE_FILE)
+# Ejemplo de uso:
+monitor_cpu(interval=1)

@@ -1,6 +1,6 @@
 import numpy as np
 
-def trend_reversal_entry_long(arr, left_lookback, tolerance, live_trading=True):
+def reversal_long(arr, left_lookback, tolerance, live_trading=True):
     high  = arr['high']
     low   = arr['low']
     close = arr['close']
@@ -51,9 +51,7 @@ def trend_reversal_entry_long(arr, left_lookback, tolerance, live_trading=True):
 
     return signal
 
-import numpy as np
-
-def trend_reversal_entry_short(arr, left_lookback, tolerance, live_trading=True):
+def reversal_short(arr, left_lookback, tolerance, live_trading=True):
     high  = arr['high']
     low   = arr['low']
     close = arr['close']

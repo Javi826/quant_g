@@ -38,7 +38,7 @@ def _apply_shift(signal, entry_delay=1):
 # === LONG 
 # =========================================================
 
-def detect_double_top_long(
+def double_top_long(
     arr,
     lookback_minor,
     price_tolerance,
@@ -149,7 +149,7 @@ def _check_pattern_breakouts_long(active_patterns, close, signal, i):
 # === SHORT 
 # =========================================================
 
-def detect_double_top_short(
+def double_top_short(
     arr,
     lookback_minor,
     price_tolerance,

@@ -81,17 +81,6 @@
         "usdt_amount": 0.0
       },
       {
-        "symbol": "SUIUSDT",
-        "size": "52.3",
-        "entry_price": "1.5285",
-        "direction": "long",
-        "tp": "1.574355",
-        "sl": "1.37565",
-        "order_id": "1376942023209799681",
-        "opened_at": "2025-11-24T20:01:22.315600+00:00",
-        "usdt_amount": 0.0
-      },
-      {
         "symbol": "XRPUSDT",
         "size": "35",
         "entry_price": "2.2348",
@@ -182,17 +171,6 @@
         "usdt_amount": 0.0
       },
       {
-        "symbol": "SUIUSDT",
-        "size": "52.3",
-        "entry_price": "1.5286",
-        "direction": "long",
-        "tp": "1.574458",
-        "sl": "1.37574",
-        "order_id": "1376942218492399621",
-        "opened_at": "2025-11-24T20:02:08.869194+00:00",
-        "usdt_amount": 0.0
-      },
-      {
         "symbol": "XRPUSDT",
         "size": "35",
         "entry_price": "2.233",
@@ -280,17 +258,6 @@
         "sl": "2.30824",
         "order_id": "1376881922780319757",
         "opened_at": "2025-11-24T16:02:33.401748+00:00",
-        "usdt_amount": 0.0
-      },
-      {
-        "symbol": "ZENUSDT",
-        "size": "6.4",
-        "entry_price": "12.324",
-        "direction": "short",
-        "tp": "11.70780",
-        "sl": "13.5564",
-        "order_id": "1376881936751546376",
-        "opened_at": "2025-11-24T16:02:36.638361+00:00",
         "usdt_amount": 0.0
       }
     ],
@@ -461,17 +428,6 @@
         "usdt_amount": 0.0
       },
       {
-        "symbol": "TAOUSDT",
-        "size": "0.277",
-        "entry_price": "288.35",
-        "direction": "short",
-        "tp": "273.9325",
-        "sl": "317.185",
-        "order_id": "1376882343611617287",
-        "opened_at": "2025-11-24T16:04:13.641680+00:00",
-        "usdt_amount": 0.0
-      },
-      {
         "symbol": "WIFUSDT",
         "size": "228",
         "entry_price": "0.3508",
@@ -503,25 +459,14 @@
         "order_id": "1376882386003447809",
         "opened_at": "2025-11-24T16:04:23.809024+00:00",
         "usdt_amount": 0.0
-      },
-      {
-        "symbol": "ZENUSDT",
-        "size": "6.4",
-        "entry_price": "12.355",
-        "direction": "short",
-        "tp": "11.73725",
-        "sl": "13.5905",
-        "order_id": "1376882399962091521",
-        "opened_at": "2025-11-24T16:04:27.166242+00:00",
-        "usdt_amount": 0.0
       }
     ]
   },
   "strategy_candles": {
-    "double_top_long": 6,
-    "revers_long": 5,
-    "parity_long": 5,
-    "revers_short": 6,
-    "parity_short": 6
+    "double_top_long": 10,
+    "revers_long": 9,
+    "parity_long": 9,
+    "revers_short": 10,
+    "parity_short": 10
   }
 }

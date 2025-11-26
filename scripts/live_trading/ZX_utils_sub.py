@@ -396,6 +396,8 @@ def save_state(open_positions, state_file):
     try:
         with open(state_file, "w") as f:
             json.dump(open_positions, f, indent=4)
+            
+        print(f"💾 Saving state...")
     except Exception as e:
         print(f"⚠️ Error guardando estado: {e}")
 
@@ -421,7 +423,7 @@ def sync_positions_with_exchange(open_positions, get_open_fn, product_type: str)
             if pos['symbol'] not in exchange_symbols:
                 positions_to_remove.append(pos)
                 now = datetime.now(MADRID_TZ).replace(second=0, microsecond=0)
-                print(f"🎯 {now} - Position {pos['symbol']} closed on exchange (TP/SL hit)")
+                print(f"✅ {now} - Position {pos['symbol']} closed on exchange (TP/SL hit)")
         
         for pos in positions_to_remove:
             open_positions.remove(pos)
