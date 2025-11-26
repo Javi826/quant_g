@@ -5,12 +5,12 @@ from tqdm import tqdm
 # -----------------------------
 # CONFIGURATION PARAMETERS
 # -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent  # go up one level
-input_folder = BASE_DIR / "data" / "crypto_2021_utc"
-output_folder = BASE_DIR / "data" / "crypto_2021_highlow"
+BASE_DIR      = Path(__file__).resolve().parent.parent  # go up one level
+input_folder  = BASE_DIR / "data" / "crypto_2025_scalping"
+output_folder = BASE_DIR / "data" / "crypto_2025_scalping_hl"
 
 # Pair of timeframes to process: [higher_timeframe, intrabar_timeframe]
-timeframes_to_consider = ["1Dutc", "4H"]
+timeframes_to_consider = ["5m", "1m"]
 
 output_folder.mkdir(exist_ok=True, parents=True)
 
@@ -170,7 +170,7 @@ def process_files():
             print(f"⚠️  {symbol}: Missing file {tf_low}{extension} (intrabar)")
             continue
         
-        print(f"\n📊 {symbol}_{tf_high}{extension} (using {tf_low}{extension} as intrabar)")
+        print(f"\n{symbol}_{tf_high}{extension} (using {tf_low}{extension} as intrabar)")
         
         # Read files
         file_high = symbol_timeframe_files[key_high]

@@ -15,45 +15,59 @@ BASE_URL       = "https://api.bitget.com"
 PRODUCT_TYPE   = 'usdt-futures'  
 
 symbols_to_exclude = {}
+symbols_to_include = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]  # Tu lista de símbolos únicos
 
-def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50):
-
+def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50, my_symbols=False):
     ohlcv_data = {}
     filtered_symbols = []
     removed_symbols = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
-
+    
+    # ---- Filtro de inclusión ----
+    if my_symbols:
+        symbols = [s for s in symbols if s in symbols_to_include]
+    # -----------------------------
+    
     for sym in symbols:
         
         # ---- Exclusión manual ----
         if sym in symbols_to_exclude:
             removed_symbols.append(sym)
-
             continue
         # --------------------------
-
+        
+        # ---- Si my_symbols=True, solo cargar sin filtros ----
+        if my_symbols:
+            file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
+            if os.path.exists(file_path):
+                df = pd.read_parquet(file_path)
+                if not df.empty:
+                    ohlcv_data[sym] = df
+                    filtered_symbols.append(sym)
+                else:
+                    removed_symbols.append(sym)
+            else:
+                removed_symbols.append(sym)
+            continue
+        # -----------------------------------------------------
+        
         df = None
         reasons = []
-
         file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
-
         if not os.path.exists(file_path):
             reasons.append("File missing")
         else:
             df = pd.read_parquet(file_path)
             if df.empty:
                 reasons.append("No data")
-
             if df is not None and min_price is not None:
                 last_close = df['close'].iloc[-1]
                 if last_close <= min_price:
                     reasons.append("Last close too low")
-
             if df is not None:
                 avg_vol = df['volume_quote'].tail(vol_window).mean()
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
-
             if df is not None:
                 n_rows = len(df)
                 if timeframe == "1H":
@@ -68,10 +82,8 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                     min_bars = 180
                 else:
                     min_bars = 999999999
-
                 if n_rows < min_bars:
                     reasons.append("Not enough bars")
-
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:
@@ -79,11 +91,9 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         else:
             ohlcv_data[sym] = df
             filtered_symbols.append(sym)
-
     print(f"\n🔹Total symbols BROKER   : {len(symbols)}")
     print(f"🔹Symbols removed total  : {len(removed_symbols)}")
     print(f"🔹Symbols remaining      : {len(filtered_symbols)}\n")
-
     return ohlcv_data, filtered_symbols
 
 def filter_symbolskk(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50):

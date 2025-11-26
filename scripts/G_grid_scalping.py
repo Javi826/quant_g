@@ -11,7 +11,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_entropy import signal_99_long,signal_99_short
+from Z_add_signals_scalping import signal_99_long,signal_99_short
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False
@@ -20,11 +20,8 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_2021_OOS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
-#DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '1Dutc'
+DATA_FOLDER         = "data/crypto_2025_scalping_IS"
+TIMEFRAME_MINOR     = '5m'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
@@ -34,31 +31,19 @@ MIN_VOL_USDT        = 10_000_000
 
 SELL_AFTER_LIST = [0]
 
-SMA_CROS_LIST   = [True, False]
-RSI_14_LIST     = [True, False]
-MACD_CROSS_LIST = [True, False]
-MOMENTUM_LIST   = [True, False]
-STOCH_LIST      = [True, False]
-CCI_LIST        = [True, False]
-ADX_LIST        = [True, False]
-ROC_LIST        = [True, False]
-EMA_CROSS_LIST  = [True, False]
+SMA_CROS_LIST   = [True]
+RSI_14_LIST     = [True]
+MACD_CROSS_LIST = [True]
+MOMENTUM_LIST   = [True]
+STOCH_LIST      = [True]
+CCI_LIST        = [True]
+ADX_LIST        = [True]
+ROC_LIST        = [True]
+EMA_CROSS_LIST  = [True]
 
 TP_PCT_LIST     = [5,10,15,20,25,30]
 SL_PCT_LIST     = [5,10]
 
-SMA_CROS_LIST   = [False]
-RSI_14_LIST     = [True]
-MACD_CROSS_LIST = [True]
-MOMENTUM_LIST   = [False]
-STOCH_LIST      = [True]
-CCI_LIST        = [False]
-ADX_LIST        = [False]
-ROC_LIST        = [False]
-EMA_CROSS_LIST  = [False]
-
-TP_PCT_LIST     = [30]
-SL_PCT_LIST     = [10]
 
 
 param_names = [
@@ -73,7 +58,7 @@ lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 # -----------------------------------------------------------------------------
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
+ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
 
 save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)

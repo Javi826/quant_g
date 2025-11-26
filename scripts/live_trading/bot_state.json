@@ -274,17 +274,6 @@
         "usdt_amount": 0.0
       },
       {
-        "symbol": "APTUSDT",
-        "size": "35.137",
-        "entry_price": "2.2774",
-        "direction": "short",
-        "tp": "2.163530",
-        "sl": "2.50514",
-        "order_id": "1376882030146113537",
-        "opened_at": "2025-11-24T16:02:58.933335+00:00",
-        "usdt_amount": 0.0
-      },
-      {
         "symbol": "ARBUSDT",
         "size": "384.61",
         "entry_price": "0.2079",
@@ -463,10 +452,10 @@
     ]
   },
   "strategy_candles": {
-    "double_top_long": 10,
-    "revers_long": 9,
-    "parity_long": 9,
-    "revers_short": 10,
-    "parity_short": 10
+    "double_top_long": 12,
+    "revers_long": 11,
+    "parity_long": 11,
+    "revers_short": 12,
+    "parity_short": 12
   }
 }

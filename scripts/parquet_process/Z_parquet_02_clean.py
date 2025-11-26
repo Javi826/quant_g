@@ -5,8 +5,8 @@ from tqdm import tqdm
 
 # 📁 Folders with the files
 BASE_DIR = Path(__file__).resolve().parent.parent
-input_folder = BASE_DIR / "data" / "crypto_2021"
-output_folder = BASE_DIR / "data" / "crypto_2021_clean"
+input_folder = BASE_DIR / "data" / "crypto_2024_scalping"
+output_folder = BASE_DIR / "data" / "crypto_2024_scalping_clean"
 
 output_folder.mkdir(exist_ok=True)  # Create output folder if it doesn't exist
 

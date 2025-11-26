@@ -14,13 +14,16 @@ from ZX_connect_live import get_usdt_balance_05, send_request_05, get_open_posit
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
+ROBOTS_JSON_DIR = os.path.join(os.path.dirname(__file__), "sub_states")
+os.makedirs(ROBOTS_JSON_DIR, exist_ok=True)
+
 # ----------------------
 # CONFIGURATION
 # ----------------------
 STRATEGY             = "parity_short"
 TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 80
-STATE_FILE           = "robot_state_{STRATEGY}.json"
+STATE_FILE           = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
 SELL_AFTER_N_CANDLES = 45
 
@@ -65,14 +68,14 @@ final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TI
 open_positions = []
 
 while True:
-    print(f'\n🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
+    print(f'🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
-    # Si no hay posiciones activas en el exchange → limpiar estado interno
-    if not has_open_positions_on_exchange(get_open_positions_05, PRODUCT_TYPE):
-        if open_positions:
-            print("🔄 All closed positions detected on the exchange. Resetting internal state.")
-        open_positions = []
+    # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
+    sync_positions_with_exchange(open_positions, get_open_positions_05, PRODUCT_TYPE)
+    
+    # 💾 Guardar estado después de sincronizar
+    save_state(open_positions, STATE_FILE)
 
     # -------------------------------
     # SEÑALES Y COMPRAS
@@ -87,21 +90,23 @@ while True:
             sell_after_n_candles=SELL_AFTER_N_CANDLES,
             tp_pct=TP_PCT,
             sl_pct=SL_PCT,
-            direction="short", 
+            direction="long",
             send_request_fn=send_request_05,
             get_balance_fn=get_usdt_balance_05,
             check_signal_fn=check_latest_signal
         )
+        
+        # 💾 GUARDAR ESTADO después de comprar
+        if open_positions:
+            save_state(open_positions, STATE_FILE)
 
     else:
         print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
-        print('\n')
 
     # -------------------------------
     # ORDERS MANAGEMENT
     # -------------------------------
-    manage_open_positions(open_positions, send_request_fn=send_request_05)
+    manage_open_positions(open_positions, send_request_fn=send_request_05, product_type=PRODUCT_TYPE)
     
-    if not has_open_positions_on_exchange(get_open_positions_05, PRODUCT_TYPE):
-        print("🔄 All positions have been closed on the exchange — returning to look for signals now.")
-        open_positions.clear()
+    # 💾 GUARDAR ESTADO después de gestionar posiciones
+    save_state(open_positions, STATE_FILE)

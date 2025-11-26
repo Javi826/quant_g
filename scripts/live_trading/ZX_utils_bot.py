@@ -6,6 +6,8 @@ import json
 import copy
 import os
 import traceback
+import logging
+import builtins
 import pandas as pd
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
@@ -71,7 +73,7 @@ def load_state(state_file):
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
     except Exception as e:
-        print(f"🟡 Error loading state: {e}")
+        print(f"❌ Error loading state: {e}")
         traceback.print_exc()
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
@@ -107,7 +109,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
             json.dump(state_data, f, indent=2)
         print(f"💾 Saving state...")
     except Exception as e:
-        print(f"🟡 Error saving state: {e}")
+        print(f"❌ Error saving state: {e}")
         import traceback
         traceback.print_exc()
 
@@ -117,7 +119,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
 def fetch_ticker(send_request_func, product_type, symbol):
     code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",params={"productType": product_type, "symbol": symbol})
     if code != 200 or resp.get("code") != "00000":
-        print("🟡 Error ticker:", resp)
+        print("🔔 No fecth of ticker:", resp)
         return None, None
     last_price = Decimal(str(resp['data'][0]['lastPr']))
     time.sleep(0.5)
@@ -232,7 +234,7 @@ def quantize_size(size_base, size_scale):
     if size_q == 0:
         size_q = size_base.quantize(Decimal("1e-6"), rounding=ROUND_DOWN)
     if size_q == 0:
-        print("🟡 Size = 0")
+        print("🔔 Size = 0")
         return None, precision_size
     return size_q, precision_size
 
@@ -255,7 +257,7 @@ def build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, sid
 def place_market_order(send_request_func, body_order):
     code_order, resp_order = send_request_func("POST", "/api/v2/mix/order/place-order", body=body_order)
     if code_order != 200 or resp_order.get("code") != "00000":
-        print("🟡 Error order:", resp_order)
+        print("❌ Error order:", resp_order)
         return None, None
     return code_order, resp_order
 
@@ -310,7 +312,7 @@ def place_order(symbol: str,
 
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"🟡 Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
+        print(f"🔔 Debug: last_price={last_price}, price_tick={price_tick},min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
@@ -359,7 +361,7 @@ def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_requ
                     entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
                     return total_base, entry_price
         except Exception as e:
-            print(f"🟡 Error consultando fills (attempt {attempt+1}): {e}")
+            print(f"🔔 Error consulting fills (attempt {attempt+1}): {e}")
         time.sleep(delay)
     return None, None
 
@@ -370,7 +372,7 @@ def get_current_price(symbol, send_request_func):
         if code == 200 and resp.get("code") == "00000":
             return Decimal(str(resp['data'][0]['lastPr']))
     except Exception as e:
-        print(f"🟡 Error getting price of {symbol}: {e}")
+        print(f"🔔 No price of {symbol}: {e}")
     return None
 
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
@@ -480,7 +482,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         current_price = get_current_price(symbol, send_request_func=send_request_func)
         
         if current_price is None:
-            print(f"🟡 No price for {symbol}")
+            print(f"🔔 No price for {symbol}")
             continue
         
         direction = pos['direction']
@@ -599,7 +601,7 @@ def process_strategy(
     for sig in signals:
         usdt_balance = get_balance_func(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"🟡 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
+            print(f"🔔 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
             continue
 
         print(f"\n➡ Opening {strat['direction']} on {sig['symbol']} for {strat_id}...")
@@ -612,7 +614,7 @@ def process_strategy(
         )
 
         if resp_order is None:
-            print(f"🟡 Error placing order for {sig['symbol']}")
+            print(f"❌ Error placing order for {sig['symbol']}")
             continue
 
         data = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
@@ -652,7 +654,7 @@ def process_strategy(
                 usdt_amount=strat['order_amount']  
             )
         else:
-            print(f"🟡 Order executed but no orderId in response")
+            print(f"🔔 Order executed but no orderId in response")
 
         time.sleep(0.5)
         
@@ -661,11 +663,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
     symbols = ['BTCUSDT', 'BNBUSDT']
     signals = []
     for symbol in symbols:
-        code, resp = send_request_func(
-            "GET",
-            "/api/v2/mix/market/ticker",
-            params={"productType": PRODUCT_TYPE, "symbol": symbol}
-        )
+        code, resp = send_request_func("GET","/api/v2/mix/market/ticker",params={"productType": PRODUCT_TYPE, "symbol": symbol})
         current_price = 50000.0
         if code == 200 and isinstance(resp, dict) and resp.get("code") == "00000":
             try:
@@ -704,7 +702,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         time.sleep(1.0)
 
         if code == 200 and resp.get("code") == "00000":
-            print(f"➡️ Position closed due to {reason}: {symbol} | Size: {size}")
+            print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
             #  REGISTRAR EN EXCEL
             if position_data:
                 current_price = get_current_price(symbol, send_request_func)
@@ -713,7 +711,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
  
             return True
         else:
-            print(f"🟡 Error closing position {symbol}: {resp}")
+            print(f"🔔 No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removing from local record (nonexistent position)")
                 if position_data:
@@ -725,7 +723,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             return False
             
     except Exception as e:
-        print(f"🟡 Error closing position {symbol}: {e}")
+        print(f"❌ Error closing position {symbol}: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -748,7 +746,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
         'sl': sl_price,
         'order_id': order_id,
         'opened_at': datetime.now(hour_zone),
-        'usdt_amount': usdt_amount  # ⭐ AÑADIR ESTE CAMPO
+        'usdt_amount': usdt_amount
     }
     
     open_positions[strat_id].append(position)
@@ -762,6 +760,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
     # Guardar estado actualizado
     save_state_local(open_positions, strategy_candles, state_file)
     
+
 def log_closed_position(
     opened_at,
     strategy_id,
@@ -772,73 +771,106 @@ def log_closed_position(
     close_price,
     reason,
     size=None,
-    excel_file='bot_trading_log.xlsx'
+    excel_file='bot_trading_trades.xlsx'
 ):
     try:
+        # Carpeta 'files' en el mismo directorio que excel_file
+        base_dir = os.path.dirname(os.path.abspath(excel_file))
+        files_dir = os.path.join(base_dir, 'files')
+        os.makedirs(files_dir, exist_ok=True)  # crea la carpeta si no existe
+        
+        # Excel final en la carpeta 'files'
+        excel_file_path = os.path.join(files_dir, os.path.basename(excel_file))
+        
         # Convertir Decimals a float
         entry_price = float(entry_price)
         close_price = float(close_price)
         usdt_amount = float(usdt_amount)
         
-        # SI USDT_AMOUNT ES 0, CALCULARLO DESDE SIZE
         if usdt_amount == 0 and size is not None:
-            size_float = float(size)
-            usdt_amount = size_float * entry_price
+            usdt_amount = float(size) * entry_price
         
         # Calcular profit
         if direction.lower() == 'long':
             profit = (close_price - entry_price) * (usdt_amount / entry_price)
             profit_pct = ((close_price - entry_price) / entry_price) * 100
-        else:  # short
+        else:
             profit = (entry_price - close_price) * (usdt_amount / entry_price)
             profit_pct = ((entry_price - close_price) / entry_price) * 100
         
-        # Tiempo de cierre
         closed_at = datetime.now()
         
-        # Calcular delta en días - NORMALIZAR TIMEZONES
         if isinstance(opened_at, str):
             opened_at_dt = datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')
         else:
             opened_at_dt = opened_at
         
-        # Eliminar timezone info de ambos datetimes para hacerlos compatibles
         if opened_at_dt.tzinfo is not None:
             opened_at_dt = opened_at_dt.replace(tzinfo=None)
         if closed_at.tzinfo is not None:
             closed_at = closed_at.replace(tzinfo=None)
         
-        delta_days = (closed_at - opened_at_dt).total_seconds() / (3600*24)  # días como float
+        delta_days = (closed_at - opened_at_dt).total_seconds() / (3600*24)
         
-        # Crear registro
         new_record = {
             'OPEN_AT': opened_at_dt.strftime('%Y-%m-%d %H:%M:%S'),
             'CLOSE_AT': closed_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'DURATION_DAYS': round(delta_days, 4),  # 4 decimales para días
+            'DURATION_DAYS': round(delta_days, 4),
             'STRATEGY': strategy_id,
             'SYMBOL': symbol,
             'DIRECTION': direction.upper(),
-            'USDT_AMOUNT': round(usdt_amount, 2),  # 2 decimales para USDT
-            'PRICE_ENTRY': round(entry_price, 6),  # 6 decimales para precios
-            'PRICE_CLOSE': round(close_price, 6),  # 6 decimales para precios
+            'USDT_AMOUNT': round(usdt_amount, 2),
+            'PRICE_ENTRY': round(entry_price, 6),
+            'PRICE_CLOSE': round(close_price, 6),
             'PROFIT': round(profit, 2),  
             'PROFIT_PCT': round(profit_pct, 1),  
             'REASON_OUT': reason
         }
         
         # Cargar o crear DataFrame
-        if os.path.exists(excel_file):
-            df = pd.read_excel(excel_file)
+        if os.path.exists(excel_file_path):
+            df = pd.read_excel(excel_file_path)
             df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
         else:
             df = pd.DataFrame([new_record])
         
-        # Guardar en Excel
-        df.to_excel(excel_file, index=False, engine='openpyxl')
+        df.to_excel(excel_file_path, index=False, engine='openpyxl')
         
-        print(f"📥 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
+        print(f"📋 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
         
     except Exception as e:
-        print(f"🟡 Error logging trade to Excel: {e}")
+        print(f"❌ Error logging trade to Excel: {e}")
         import traceback
         traceback.print_exc()
+
+        
+    
+def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
+    """
+    Configura un logger que duplica print() al archivo y a consola.
+    """
+    
+    # Crear carpeta
+    os.makedirs(logdir, exist_ok=True)
+    logfile = os.path.join(logdir, logfile_name)
+    
+    logger = logging.getLogger('bot_logger')
+    logger.setLevel(logging.INFO)
+    
+    fh = logging.FileHandler(logfile, encoding='utf-8')
+    fh.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+    
+    # Evitar múltiples handlers si se llama varias veces
+    if not logger.handlers:
+        logger.addHandler(fh)
+    
+    # Reemplazar print
+    old_print = builtins.print
+    
+    def _print_and_log(*args, **kwargs):
+        old_print(*args, **kwargs)
+    
+        text = kwargs.get("sep", " ").join(str(a) for a in args)
+        logger.info(text)
+    
+    builtins.print = _print_and_log

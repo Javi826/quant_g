@@ -15,12 +15,16 @@ from ZX_connect_live import get_usdt_balance_01, send_request_01, get_open_posit
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
+ROBOTS_JSON_DIR = os.path.join(os.path.dirname(__file__), "sub_states")
+os.makedirs(ROBOTS_JSON_DIR, exist_ok=True)
+
 # ----------------------
 # CONFIGURATION
 # ----------------------
 STRATEGY              = "double_top_long"
 TIMEFRAME_MINOR       = '4H'
 ORDER_AMOUNT          = 80
+STATE_FILE            = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
 SELL_AFTER_N_CANDLES  = 45
 
@@ -30,8 +34,6 @@ TREND_TH              = 10
 
 TP_PCT                = 5
 SL_PCT                = 10
-
-STATE_FILE            = "robot_state_{STRATEGY}.json"
 
 # ----------------------
 # FUNCTIONS
@@ -72,7 +74,7 @@ open_positions = load_state(STATE_FILE)
 if open_positions:
     print(f"🔄 Bot reiniciado con {len(open_positions)} posiciones activas:")
     for pos in open_positions:
-        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
+        print(f"   - {pos['symbol']}")
 
 while True:
     print(f'🔷 === 01_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')

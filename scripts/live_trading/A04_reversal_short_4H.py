@@ -14,13 +14,16 @@ from ZX_connect_live import get_usdt_balance_04, send_request_04, get_open_posit
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
+ROBOTS_JSON_DIR = os.path.join(os.path.dirname(__file__), "sub_states")
+os.makedirs(ROBOTS_JSON_DIR, exist_ok=True)
+
 # ----------------------
 # CONFIGURATION
 # ----------------------
 STRATEGY             = "reversal_short"
 TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 80
-STATE_FILE           = "robot_state_{STRATEGY}.json"
+STATE_FILE           = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
 SELL_AFTER_N_CANDLES  = 45
 
@@ -72,7 +75,7 @@ if open_positions:
         print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
 
 while True:
-    print(f'🔷 === 01_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
+    print(f'🔷 === 04_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
     wait_for_next_candle(TIMEFRAME_MINOR)
 
     # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)

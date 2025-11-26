@@ -4,6 +4,8 @@
 Bot multi-estrategia con monitoreo activo de TP/SL y persistencia de estado.
 """
 
+
+
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -15,13 +17,15 @@ from zoneinfo import ZoneInfo
 # --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols,fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from ZX_utils_bot import increment_strategy_candles,process_strategy,check_all_tp_sl
+from ZX_utils_bot import increment_strategy_candles,process_strategy,check_all_tp_sl,setup_print_logger
 from ZX_utils_bot import load_state,save_state_local,calculate_next_candle_time,check_candles_timeout_for_strategy
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long
 from Z_add_signals_parity import parity_long
 from Z_add_signals_reversal import reversal_short
 from Z_add_signals_parity import parity_short
+logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/files')
+setup_print_logger(logdir)
 
 from utils.ZZ_connect import connect_bitget_00
 from ZX_connect_live import get_usdt_balance_00, send_request_00
@@ -176,7 +180,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             else:
                 signals = None
         except Exception as e:
-            print(f"🟡 Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            print(f"❌ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
             signals = None
 
 
@@ -237,7 +241,7 @@ def main_loop():
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
-        print(f"➡ Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
+        print(f"🔹 Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
     print("✅ Initialization completed\n")
     print("=" * 60)
@@ -255,7 +259,7 @@ def main_loop():
             # Verificar si llegó el momento de buscar señales (nueva vela)
             if now_datetime >= next_candle_time:
                 print('\n')
-                print(f"🔷 === New candle detected ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(f"🔀 === New candle detected ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print('\n')
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
@@ -302,12 +306,12 @@ def main_loop():
                                     )
 
                     except Exception as e:
-                        print(f"🟡 Error procesando {strat_id}: {e}")
+                        print(f"🚸 Error procesando {strat_id}: {e}")
                         import traceback
                         traceback.print_exc()
                 
                 print(f"\n{'=' * 60}")
-                print("🔷 Signal cycle completed")
+                print("🔂 Signal cycle completed")
                 print(f"{'=' * 60}\n")
                 
                 # Calcular la siguiente vela & Resetear el tiempo del último chequeo TP/SL

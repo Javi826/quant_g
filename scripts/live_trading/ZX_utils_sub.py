@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 import os
 import json
 
-STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 MADRID_TZ    = ZoneInfo("Europe/Madrid")
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = 'usdt-futures'
@@ -240,7 +239,7 @@ def place_order_sub(symbol: str,
     # Precio real de ejecución
     exec_price = get_exec_price(resp_order, last_price)
 
-    print(f"🎯 {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10} | TP: {tp_price:<10} | SL: {sl_price:<10}")
+    print(f"✅ {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10} | TP: {tp_price:<10} | SL: {sl_price:<10}")
 
     return resp_order, {"size_tpsl": format(size_tpsl, "f"), "tp_price": format(tp_price, "f"), "sl_price": format(sl_price, "f")}
 

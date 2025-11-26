@@ -85,7 +85,7 @@ def wait_for_next_candle(timeframe='4H'):
     next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
     
     sleep_seconds = (next_run - now).total_seconds() + 45
-    print(f"🔷 === Waiting for next candle ===: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+    print(f"🔀 === Waiting for next candle ===: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
     time.sleep(sleep_seconds)
     
 

@@ -11,14 +11,17 @@ from datetime import datetime, timezone
 BASE_URL               = "https://api.bitget.com"
 PRODUCT_TYPE           = "usdt-futures"
 
-TIMEFRAME              = "1Dutc"          
+TIMEFRAME              = "1m"          
 LIMIT                  = 200           
-DATA_FOLDER            = "crypto_2024_DDD"
-START_DATE             = "2021-01-02"  
+DATA_FOLDER            = "crypto_2025_scalping"
+START_DATE             = "2025-01-01"  
 REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06  
 MAX_ITER_PER_SYMBOL    = 2000     
-MAX_RETRIES            = 3                
+MAX_RETRIES            = 3      
+
+SELECTED_SYMBOLS = ["BTCUSDT"]
+# SELECTED_SYMBOLS = None        
 # ----------------------------------------
 
 MS_90_DAYS = 90 * 24 * 60 * 60 * 1000
@@ -286,10 +289,21 @@ def process_all_symbols(start_date_str=START_DATE, timeframe=TIMEFRAME):
     start_ms_requested = int(start_dt.timestamp() * 1000)
     gran_ms = parse_timeframe_to_ms(timeframe)
     os.makedirs(DATA_FOLDER, exist_ok=True)
+    
     symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     if not symbols:
         print("⚠️ No symbols. Aborting.")
         return
+    
+    # ---- Filtrar símbolos si SELECTED_SYMBOLS está definido ----
+    if SELECTED_SYMBOLS is not None:
+        symbols = [s for s in symbols if s in SELECTED_SYMBOLS]
+        if not symbols:
+            print("⚠️ No symbols found from selected list. Aborting.")
+            return
+        print(f"📋 Using selected symbols: {symbols}")
+    # ------------------------------------------------------------
+    
     print(f"🔁 Will be donwloaded candles from {start_dt.isoformat()} (UTC) until for {len(symbols)} símbolos.")
     for i, sym in enumerate(symbols, start=1):
         print(f"\n[{i}/{len(symbols)}] Processing {sym} ...")
