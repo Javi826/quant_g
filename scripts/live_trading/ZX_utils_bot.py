@@ -66,7 +66,7 @@ def load_state(state_file):
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ➡️ {strat_id}: {len(positions)} positions | Candles: {candles}")
+                print(f"   ➡️  {strat_id}: {len(positions)} positions | Candles: {candles}")
                 for pos in positions:
                     print(f"      - {pos['symbol']:<8} | Size: {pos['size']:<10} | Entry: {pos['entry_price']:<10}")
 

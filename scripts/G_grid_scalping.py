@@ -20,7 +20,7 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2025_scalping_IS"
+DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
 TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
@@ -38,8 +38,14 @@ LOOKBACK_LIST   = [5,10,20]
 TP_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 SL_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 
-TP_PCT_LIST     = [0.0,2.5]
-SL_PCT_LIST     = [0.0,2.5]
+SELL_AFTER_LIST = [10]
+
+EMA_SHORT_LIST  = [25]
+EMA_LONG_LIST   = [55]
+LOOKBACK_LIST   = [20]
+
+TP_PCT_LIST     = [0.0]
+SL_PCT_LIST     = [10]
 
 
 param_names = ['SELL_AFTER','EMA_SHORT','EMA_LONG','LOOKBACK','TP_PCT','SL_PCT']

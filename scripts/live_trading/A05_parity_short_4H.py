@@ -71,9 +71,9 @@ open_positions = []
 open_positions = load_state(STATE_FILE)
 
 if open_positions:
-    print(f"🔄 Bot reiniciado con {len(open_positions)} posiciones activas:")
+    print(f"🔄 roBOT restarted with {len(open_positions)} active positions:")
     for pos in open_positions:
-        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
+        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} candles remaining")
 
 try:
     while True:
@@ -123,4 +123,4 @@ try:
 except KeyboardInterrupt:
     print("\n🔚 Interrupted by user.")
     save_state(open_positions, STATE_FILE)
-    print("⛔ BOT Stopped")
+    print("⛔ roBOT Stopped")

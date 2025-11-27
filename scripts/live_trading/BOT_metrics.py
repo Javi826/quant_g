@@ -3,7 +3,7 @@ import pandas as pd
 
 # Configuration
 INITIAL_CAPITAL = 2070
-FILE_NAME = os.path.join("bot_files", "bot_trading_trades.xlsx") 
+FILE_NAME       = os.path.join("bot_files", "bot_trading_trades.xlsx") 
 
 # Read Excel file
 df = pd.read_excel(FILE_NAME)
@@ -68,8 +68,8 @@ df_results = pd.DataFrame(results)
 
 # Custom table printing with left-aligned headers for Strategy and date_fo
 col_widths = {
-    'Strategy':15,
-    'date_fo': 12,
+    'Strategy':12,
+    'date_fo': 10,
     'Trades_num': 11,
     'Trades_pct': 11,
     'Total Profit': 12,
@@ -115,8 +115,8 @@ pct_profit            = (total_profit_general / INITIAL_CAPITAL * 100) if INITIA
 avg_duration_total    = df['DURATION'].mean()
 
 print(f"🧮 Trades_num   : {num_trades_total}")
+print(f"⏱ Avg_duration : {avg_duration_total:.1f} days")
 print(f"🎯 Trades_pct   : {pct_positive_total:.2f} %")
-print(f"💵 Total profit : {total_profit_general:.2f} $")
 print(f"💱 Profit_pct   : {pct_profit:.2f} %")
-print(f"⏱ Avg duration : {avg_duration_total:.1f} days")
+print(f"{'💵' if total_profit_general >= 0 else '⭕'} TOTAL_profit : {total_profit_general:.2f} $")
 print("=" * 80)
