@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/live_trading/BOT_all_stratagies.py', 'scripts/live_trading/ZX_utils_bot.py', 'scripts/live_trading/BOT_metrics.py']
+recent_files = ['scripts/live_trading/A01_double_top_long_4H.py', 'scripts/live_trading/A02_reversal_long_4H.py', 'scripts/live_trading/A03_parity_long_4H.py', 'scripts/live_trading/A04_reversal_short_4H.py', 'scripts/live_trading/A05_parity_short_4H.py', 'scripts/live_trading/BOT_metrics.py', 'scripts/live_trading/BOT_all_stratagies.py']
 
 [main]
 version = 0.2.0

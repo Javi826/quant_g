@@ -9813,3 +9813,52 @@
 2025-11-27 09:00:45,089 🔂 Signal cycle completed
 2025-11-27 09:00:45,089 ============================================================
 
+2025-11-27 12:23:18,621 
+🔚 Interrupted by user.
+2025-11-27 12:23:18,623 💾 Saving state...
+2025-11-27 12:23:18,623 ⛔ BOT Stopped
+2025-11-27 12:23:27,397 
+🚀 === Starting multi-strategy bot... ===
+2025-11-27 12:23:27,397 ✅  State loaded: 29 positions recovered
+2025-11-27 12:23:27,397    ➡️ double_top_long: 1 positions | Candles: 16
+2025-11-27 12:23:27,397       - NEARUSDT | Size: 41         | Entry: 1.9253    
+2025-11-27 12:23:27,397    ➡️ revers_long: 4 positions | Candles: 15
+2025-11-27 12:23:27,397       - ARBUSDT  | Size: 364.46     | Entry: 0.2195    
+2025-11-27 12:23:27,397       - DOGEUSDT | Size: 524        | Entry: 0.15249   
+2025-11-27 12:23:27,397       - HBARUSDT | Size: 541        | Entry: 0.14762   
+2025-11-27 12:23:27,397       - XRPUSDT  | Size: 35         | Entry: 2.2348    
+2025-11-27 12:23:27,397    ➡️ parity_long: 4 positions | Candles: 15
+2025-11-27 12:23:27,397       - ARBUSDT  | Size: 364.29     | Entry: 0.2196    
+2025-11-27 12:23:27,397       - DOGEUSDT | Size: 525        | Entry: 0.15235   
+2025-11-27 12:23:27,397       - HBARUSDT | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-27 12:23:27,397       - XRPUSDT  | Size: 35         | Entry: 2.233     
+2025-11-27 12:23:27,397    ➡️ revers_short: 6 positions | Candles: 16
+2025-11-27 12:23:27,397       - BGBUSDT  | Size: 22         | Entry: 3.493     
+2025-11-27 12:23:27,397       - BNBUSDT  | Size: 0.09       | Entry: 844.23    
+2025-11-27 12:23:27,397       - BTCUSDT  | Size: 0.0009     | Entry: 86724.9   
+2025-11-27 12:23:27,397       - HBARUSDT | Size: 561        | Entry: 0.14262   
+2025-11-27 12:23:27,397       - LTCUSDT  | Size: 0.9        | Entry: 84.19     
+2025-11-27 12:23:27,397       - XRPUSDT  | Size: 38         | Entry: 2.0984    
+2025-11-27 12:23:27,397    ➡️ parity_short: 14 positions | Candles: 16
+2025-11-27 12:23:27,397       - ADAUSDT  | Size: 192        | Entry: 0.4149    
+2025-11-27 12:23:27,397       - ARBUSDT  | Size: 384.61     | Entry: 0.2079    
+2025-11-27 12:23:27,397       - BGBUSDT  | Size: 22         | Entry: 3.497     
+2025-11-27 12:23:27,397       - BNBUSDT  | Size: 0.09       | Entry: 849.13    
+2025-11-27 12:23:27,397       - DOGEUSDT | Size: 541        | Entry: 0.14775   
+2025-11-27 12:23:27,397       - ETHUSDT  | Size: 0.02       | Entry: 2859.94   
+2025-11-27 12:23:27,397       - HBARUSDT | Size: 557        | Entry: 0.14349   
+2025-11-27 12:23:27,397       - LINKUSDT | Size: 6          | Entry: 12.685    
+2025-11-27 12:23:27,397       - LTCUSDT  | Size: 0.9        | Entry: 84.59     
+2025-11-27 12:23:27,397       - ONDOUSDT | Size: 166.1      | Entry: 0.4815    
+2025-11-27 12:23:27,397       - SEIUSDT  | Size: 596        | Entry: 0.13395   
+2025-11-27 12:23:27,397       - SOLUSDT  | Size: 0.6        | Entry: 132.404   
+2025-11-27 12:23:27,398       - WLDUSDT  | Size: 129        | Entry: 0.6185    
+2025-11-27 12:23:27,398       - XRPUSDT  | Size: 38         | Entry: 2.1024    
+2025-11-27 12:23:31,325 🔹 Strategy double_top_long: 32 symbols
+2025-11-27 12:23:31,329 🔹 Strategy revers_long: 32 symbols
+2025-11-27 12:23:31,334 🔹 Strategy parity_long: 32 symbols
+2025-11-27 12:23:31,338 🔹 Strategy revers_short: 32 symbols
+2025-11-27 12:23:31,343 🔹 Strategy parity_short: 32 symbols
+2025-11-27 12:23:31,343 ✅ Initialization completed
+
+2025-11-27 12:23:31,343 ============================================================

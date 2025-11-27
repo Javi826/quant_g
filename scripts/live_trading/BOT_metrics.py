@@ -36,6 +36,9 @@ for strategy in df['STRATEGY'].unique():
     profit_pct      = (total_profit / capital_per_strategy * 100) if capital_per_strategy > 0 else 0
     avg_duration    = round(df_strategy['DURATION'].mean(), 2)
     
+    # Get the date of the first order (earliest OPEN_AT)
+    date_fo = df_strategy['OPEN_AT'].min()
+    
     # Count closing reasons
     total_reasons = len(df_strategy)
     tp_count      = len(df_strategy[df_strategy['REASON_OUT'].str.contains('TP', na=False)])
@@ -49,6 +52,7 @@ for strategy in df['STRATEGY'].unique():
     # Add results to the list
     results.append({
         'Strategy': strategy,
+        'date_fo': date_fo.strftime('%Y-%m-%d'),
         'Trades_num': num_trades,
         'Trades_pct': round(pct_positive, 2),
         'Total Profit': round(total_profit, 2),
@@ -62,8 +66,41 @@ for strategy in df['STRATEGY'].unique():
 # Create DataFrame with results
 df_results = pd.DataFrame(results)
 
-# Display table
-print(df_results.to_string(index=False))
+# Custom table printing with left-aligned headers for Strategy and date_fo
+col_widths = {
+    'Strategy':15,
+    'date_fo': 12,
+    'Trades_num': 11,
+    'Trades_pct': 11,
+    'Total Profit': 12,
+    'Profit_pct': 11,
+    'TP_pct': 6,
+    'SL_pct': 6,
+    'OOM_pct': 7,
+    'Avg_days': 8
+}
+
+# Print header
+header_parts = []
+for col in df_results.columns:
+    width = col_widths.get(col, 10)
+    if col in ['Strategy', 'date_fo']:
+        header_parts.append(f'{col:<{width}}')
+    else:
+        header_parts.append(f'{col:>{width}}')
+print('  '.join(header_parts))
+
+# Print rows
+for _, row in df_results.iterrows():
+    row_parts = []
+    for col in df_results.columns:
+        width = col_widths.get(col, 10)
+        value = row[col]
+        if col in ['Strategy', 'date_fo']:
+            row_parts.append(f'{value:<{width}}')
+        else:
+            row_parts.append(f'{value:>{width}}')
+    print('  '.join(row_parts))
 
 print("\n" + "=" * 80)
 print("📊 TOTAL SUMMARY")

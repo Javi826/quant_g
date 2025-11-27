@@ -447,7 +447,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 
     print(f"\n⏱ TIMEOUT REACHED for strategy {strat_id}")
     print(f"➡ Candles ongoing         : {candles_elapsed}/{sell_after_ncandles}")
-    print(f"➡️ Closing {len(positions)} positions...")
+    print(f"→  Closing {len(positions)} positions...")
 
     all_closed = True
     for pos in positions:
@@ -699,7 +699,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             "orderType": "market"
         }
         
-        print(f"➡️  Closing {direction} position on {symbol}:")   
+        print(f"→   Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(1.0)
 

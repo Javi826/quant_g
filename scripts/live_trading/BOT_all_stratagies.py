@@ -100,7 +100,7 @@ STRAT_E = {
     'id': 'parity_short',
     'name': 'parity_short',
     'timeframe': '4H',
-    'sell_after_ncandles': 45,
+    'sell_after_ncandles': 40,
     'order_amount': 80,
     'lookback': 150,
     'tolerance': 20,

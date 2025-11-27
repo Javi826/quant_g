@@ -10,7 +10,7 @@ input_folder  = BASE_DIR / "data" / "crypto_2025_scalping"
 output_folder = BASE_DIR / "data" / "crypto_2025_scalping_hl"
 
 # Pair of timeframes to process: [higher_timeframe, intrabar_timeframe]
-timeframes_to_consider = ["15m", "5m"]
+timeframes_to_consider = ["4H", "1H"]
 
 output_folder.mkdir(exist_ok=True, parents=True)
 
