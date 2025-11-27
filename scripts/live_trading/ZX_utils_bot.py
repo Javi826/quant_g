@@ -113,6 +113,63 @@ def save_state_local(open_positions, strategy_candles, state_file):
         import traceback
         traceback.print_exc()
 
+def sync_broker(open_positions, strategy_candles, state_file, send_request_func):
+    """
+    Verifica si las posiciones locales existen en el broker.
+    Si no existen, las elimina del registro local. Nada más.
+    """
+    print(f"{'-' * 60}")
+    print("🌐 Syncronizing positions in broker...")
+    print(f"{'-' * 60}")
+    total_removed = 0
+    
+    for strat_id, positions in list(open_positions.items()):
+        positions_to_remove = []
+        
+        for i, pos in enumerate(positions):
+            try:
+                # Consultar si la posición existe en el broker
+                code, resp = send_request_func("GET", "/api/v2/mix/position/single-position",
+                    params={
+                        "productType": "USDT-FUTURES",
+                        "symbol": pos['symbol'],
+                        "marginCoin": "USDT"
+                    }
+                )
+                
+                if code != 200 or resp.get("code") != "00000":
+                    continue
+                
+                data = resp.get("data", [])
+                
+                # Si no existe la posición, marcarla para eliminar
+                if not data or float(data[0].get('total', 0)) == 0:
+                    print(f"→ Position {pos['symbol']} doesn't exist in broker - removing from {strat_id}")
+                    positions_to_remove.append(i)
+                    total_removed += 1
+                
+                time.sleep(0.2)  # Rate limiting
+                
+            except Exception as e:
+                print(f"❌ Error checking {pos['symbol']}: {e}")
+        
+        # Eliminar posiciones que no existen
+        for i in reversed(positions_to_remove):
+            if i < len(open_positions[strat_id]):
+                open_positions[strat_id].pop(i)
+        
+        # Si no quedan posiciones, resetear contador de velas
+        if not open_positions[strat_id]:
+            if strategy_candles.get(strat_id, 0) > 0:
+                strategy_candles[strat_id] = 0
+    
+    # Guardar estado solo si hubo cambios
+    if total_removed > 0:
+        save_state_local(open_positions, strategy_candles, state_file)
+        print(f"✅ Sync completed: {total_removed} position(s) removed")
+    else:
+        print(f"✅ Sync completed: All positions exist in broker")
+        
 # ==========================================================================
 # PLACE ORDER
 # ==========================================================================   
@@ -327,6 +384,8 @@ def place_order(symbol: str,
 # PRICING
 # ==========================================================================   
 def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.5):
+    
+    time.sleep(delay)
 
     if send_request_func is None:
         raise ValueError("Se necesita send_request_func para hacer la consulta")

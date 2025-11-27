@@ -3,147 +3,147 @@
         "symbol": "1000BONKUSDT",
         "buy_price": 0.009941,
         "amount": 8047.480132783422,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "AAVEUSDT",
         "buy_price": 186.92,
         "amount": 0.4279905842071475,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "ADAUSDT",
         "buy_price": 0.4335,
         "amount": 184.5444059976932,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "ARBUSDT",
         "buy_price": 0.2195,
         "amount": 364.4646924829157,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "BGBUSDT",
         "buy_price": 3.607,
         "amount": 22.179096201829775,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "BNBUSDT",
         "buy_price": 895.54,
         "amount": 0.08933157647899592,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "BTCUSDT",
         "buy_price": 89807.0,
         "amount": 0.0008907991581947955,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "DOGEUSDT",
         "buy_price": 0.15599,
         "amount": 512.8533880376948,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "ENAUSDT",
         "buy_price": 0.2817,
         "amount": 283.99006034788783,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "ETHUSDT",
         "buy_price": 3029.6,
         "amount": 0.026406126221283337,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "FORMUSDT",
         "buy_price": 0.3968,
         "amount": 201.61290322580646,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "HBARUSDT",
         "buy_price": 0.14861,
         "amount": 538.3217818450979,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "LINKUSDT",
         "buy_price": 13.432,
         "amount": 5.955926146515783,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "ONDOUSDT",
         "buy_price": 0.5168,
         "amount": 154.7987616099071,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "SEIUSDT",
         "buy_price": 0.14149,
         "amount": 565.4109831083468,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "SOLUSDT",
         "buy_price": 144.217,
         "amount": 0.554719623900095,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "SUIUSDT",
         "buy_price": 1.5446,
         "amount": 51.79334455522466,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "TAOUSDT",
         "buy_price": 310.61,
         "amount": 0.25755770902417824,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "WIFUSDT",
         "buy_price": 0.3905,
         "amount": 204.86555697823303,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "WLDUSDT",
         "buy_price": 0.6553,
         "amount": 122.0814893941706,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     },
     {
         "symbol": "XRPUSDT",
         "buy_price": 2.2336,
         "amount": 35.816618911174785,
-        "candles_to_sell": 42,
+        "candles_to_sell": 40,
         "just_bought": false
     }
 ]

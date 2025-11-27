@@ -406,7 +406,7 @@ def save_state(open_positions, state_file):
 
 def sync_positions_with_exchange(open_positions, get_open_fn, product_type: str):
     """Sincroniza el estado interno con las posiciones reales del exchange"""
-    print(f"⚙ Syncronicing with broker...")
+    print(f"🌐 Syncronicing with broker...")
     try:
         exchange_positions = get_open_fn(product_type=product_type.upper())
         

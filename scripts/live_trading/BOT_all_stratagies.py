@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 # --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols,fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from ZX_utils_bot import increment_strategy_candles,process_strategy,check_all_tp_sl,setup_print_logger
+from ZX_utils_bot import increment_strategy_candles,process_strategy,check_all_tp_sl,setup_print_logger,sync_broker
 from ZX_utils_bot import load_state,save_state_local,calculate_next_candle_time,check_candles_timeout_for_strategy
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long
@@ -240,7 +240,7 @@ def main_loop():
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
         print(f"🔹 Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
-    print("✅ Initialization completed\n")
+    print("✅ BOT Initialization completed\n")
     print("=" * 60)
     
     # Calcular la próxima vela
@@ -258,6 +258,9 @@ def main_loop():
                 print('\n')
                 print(f"🔀 === New candle detected ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print('\n')
+
+                sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
+
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
                 print(f"\n{'=' * 60}")
