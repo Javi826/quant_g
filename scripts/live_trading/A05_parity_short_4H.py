@@ -67,46 +67,60 @@ all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
 final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR)
 open_positions = []
 
-while True:
-    print(f'🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
-    wait_for_next_candle(TIMEFRAME_MINOR)
+# 🔄 CARGAR ESTADO AL INICIAR
+open_positions = load_state(STATE_FILE)
 
-    # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
-    sync_positions_with_exchange(open_positions, get_open_positions_05, PRODUCT_TYPE)
+if open_positions:
+    print(f"🔄 Bot reiniciado con {len(open_positions)} posiciones activas:")
+    for pos in open_positions:
+        print(f"   - {pos['symbol']}: {pos['candles_to_sell']} velas restantes")
+
+try:
+    while True:
+        print(f'\n🔷 === 05_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
+        wait_for_next_candle(TIMEFRAME_MINOR)
     
-    # 💾 Guardar estado después de sincronizar
-    save_state(open_positions, STATE_FILE)
-
-    # -------------------------------
-    # SEÑALES Y COMPRAS
-    # -------------------------------
-    if not open_positions:
-        open_positions = process_signals_and_buy(
-            final_symbols=final_symbols,
-            exchange=exchange,
-            open_positions=open_positions,
-            order_amount=ORDER_AMOUNT,
-            timeframe_minor=TIMEFRAME_MINOR,
-            sell_after_n_candles=SELL_AFTER_N_CANDLES,
-            tp_pct=TP_PCT,
-            sl_pct=SL_PCT,
-            direction="long",
-            send_request_fn=send_request_05,
-            get_balance_fn=get_usdt_balance_05,
-            check_signal_fn=check_latest_signal
-        )
+        # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
+        sync_positions_with_exchange(open_positions, get_open_positions_05, PRODUCT_TYPE)
         
-        # 💾 GUARDAR ESTADO después de comprar
-        if open_positions:
-            save_state(open_positions, STATE_FILE)
-
-    else:
-        print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
-
-    # -------------------------------
-    # ORDERS MANAGEMENT
-    # -------------------------------
-    manage_open_positions(open_positions, send_request_fn=send_request_05, product_type=PRODUCT_TYPE)
+        # 💾 Guardar estado después de sincronizar
+        save_state(open_positions, STATE_FILE)
     
-    # 💾 GUARDAR ESTADO después de gestionar posiciones
+        # -------------------------------
+        # SEÑALES Y COMPRAS
+        # -------------------------------
+        if not open_positions:
+            open_positions = process_signals_and_buy(
+                final_symbols=final_symbols,
+                exchange=exchange,
+                open_positions=open_positions,
+                order_amount=ORDER_AMOUNT,
+                timeframe_minor=TIMEFRAME_MINOR,
+                sell_after_n_candles=SELL_AFTER_N_CANDLES,
+                tp_pct=TP_PCT,
+                sl_pct=SL_PCT,
+                direction="short",
+                send_request_fn=send_request_05,
+                get_balance_fn=get_usdt_balance_05,
+                check_signal_fn=check_latest_signal
+            )
+            
+            # 💾 GUARDAR ESTADO después de comprar
+            if open_positions:
+                save_state(open_positions, STATE_FILE)
+    
+        else:
+            print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
+    
+        # -------------------------------
+        # ORDERS MANAGEMENT
+        # -------------------------------
+        manage_open_positions(open_positions, send_request_fn=send_request_05, product_type=PRODUCT_TYPE)
+        
+        # 💾 GUARDAR ESTADO después de gestionar posiciones
+        save_state(open_positions, STATE_FILE)
+
+except KeyboardInterrupt:
+    print("\n🔚 Interrupted by user.")
     save_state(open_positions, STATE_FILE)
+    print("⛔ BOT Stopped")

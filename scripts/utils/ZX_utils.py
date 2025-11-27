@@ -15,7 +15,7 @@ BASE_URL       = "https://api.bitget.com"
 PRODUCT_TYPE   = 'usdt-futures'  
 
 symbols_to_exclude = {}
-symbols_to_include = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]  # Tu lista de símbolos únicos
+symbols_to_include = ["BTCUSDT"]  # Tu lista de símbolos únicos
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50, my_symbols=False):
     ohlcv_data = {}

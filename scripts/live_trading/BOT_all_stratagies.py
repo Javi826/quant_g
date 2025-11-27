@@ -3,9 +3,6 @@
 """
 Bot multi-estrategia con monitoreo activo de TP/SL y persistencia de estado.
 """
-
-
-
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -24,7 +21,7 @@ from Z_add_signals_reversal import reversal_long
 from Z_add_signals_parity import parity_long
 from Z_add_signals_reversal import reversal_short
 from Z_add_signals_parity import parity_short
-logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/files')
+logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
 from utils.ZZ_connect import connect_bitget_00
@@ -50,7 +47,7 @@ STRAT_A = {
     'id': 'double_top_long',
     'name': 'double_top_long',
     'timeframe': '4H',
-    'sell_after_ncandles': 45,
+    'sell_after_ncandles': 40,
     'order_amount': 80,
     'lookback': 2,
     'tolerance': 20,
@@ -64,7 +61,7 @@ STRAT_B = {
     'id': 'revers_long',
     'name': 'reversal_long',
     'timeframe': '4H',
-    'sell_after_ncandles': 45,
+    'sell_after_ncandles': 40,
     'order_amount': 80,
     'left_lookback': 5,
     'tolerance': 30,
@@ -77,7 +74,7 @@ STRAT_C = {
     'id': 'parity_long',
     'name': 'parity_long',
     'timeframe': '4H',
-    'sell_after_ncandles': 45,
+    'sell_after_ncandles': 40,
     'order_amount': 80,
     'lookback': 150,
     'tolerance': 40,
@@ -90,7 +87,7 @@ STRAT_D = {
     'id': 'revers_short',
     'name': 'reversal_short',
     'timeframe': '4H',
-    'sell_after_ncandles': 45,
+    'sell_after_ncandles': 40,
     'order_amount': 80,
     'left_lookback': 8,
     'tolerance': 30,

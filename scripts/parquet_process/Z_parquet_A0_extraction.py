@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 BASE_URL               = "https://api.bitget.com"
 PRODUCT_TYPE           = "usdt-futures"
 
-TIMEFRAME              = "1m"          
+TIMEFRAME              = "1H"          
 LIMIT                  = 200           
 DATA_FOLDER            = "crypto_2025_scalping"
 START_DATE             = "2025-01-01"  

@@ -10,7 +10,7 @@ input_folder  = BASE_DIR / "data" / "crypto_2025_scalping"
 output_folder = BASE_DIR / "data" / "crypto_2025_scalping_hl"
 
 # Pair of timeframes to process: [higher_timeframe, intrabar_timeframe]
-timeframes_to_consider = ["5m", "1m"]
+timeframes_to_consider = ["15m", "5m"]
 
 output_folder.mkdir(exist_ok=True, parents=True)
 
@@ -198,7 +198,7 @@ def process_files():
         processed.add(combo_key)
     
     print(f"\n{'='*60}")
-    print("✨ Process completed")
+    print("🏁 Process completed")
     print(f"{'='*60}")
 
 

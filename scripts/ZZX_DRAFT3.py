@@ -2,7 +2,7 @@ import psutil
 import time
 import os
 
-def monitor_cpu(interval=1):
+def monitor_cpu(interval=0.01):
     """
     Muestra el uso de todos los núcleos en tiempo real,
     cada núcleo en una línea separada.

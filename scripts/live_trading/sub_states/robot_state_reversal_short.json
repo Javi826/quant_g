@@ -1,0 +1,30 @@
+[
+    {
+        "symbol": "DOTUSDT",
+        "buy_price": 2.36,
+        "amount": 33.898305084745765,
+        "candles_to_sell": 42,
+        "just_bought": false
+    },
+    {
+        "symbol": "FETUSDT",
+        "buy_price": 0.2652,
+        "amount": 301.65912518853696,
+        "candles_to_sell": 42,
+        "just_bought": false
+    },
+    {
+        "symbol": "LTCUSDT",
+        "buy_price": 86.55,
+        "amount": 0.9243212016175621,
+        "candles_to_sell": 42,
+        "just_bought": false
+    },
+    {
+        "symbol": "NEARUSDT",
+        "buy_price": 1.9414,
+        "amount": 41.207376120325534,
+        "candles_to_sell": 42,
+        "just_bought": false
+    }
+]

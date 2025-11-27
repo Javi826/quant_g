@@ -13,7 +13,7 @@ output_folder_oos = BASE_DIR / "data" / "crypto_2025_scalping_OOS"
 
 # Date range for IN-SAMPLE (IS)
 IS_START = "2025-01-01"
-IS_END   = "2025-06-30"
+IS_END   = "2025-08-31"
 
 # Automatic OOS: from IS_END until the end of the file
 # OOS_START = IS_END
@@ -165,15 +165,15 @@ def process_files():
     print(f"SUMMARY")
     print(f"{'='*60}")
     print(f"✅ Files processed: {processed}")
-    print(f"⚠️  Files with no IS data: {skipped_is}")
-    print(f"⚠️  Files with no OOS data: {skipped_oos}")
+    print(f"⚠️ Files with no IS data: {skipped_is}")
+    print(f"⚠️ Files with no OOS data: {skipped_oos}")
     print(f"❌ Errors: {errors}")
     print(f"📁 Total: {len(files)}")
     print(f"\n📂 Output folders:")
     print(f"   IS:  {output_folder_is}")
     print(f"   OOS: {output_folder_oos}")
     print(f"\n{'='*60}")
-    print("✨ Process completed")
+    print("🏁 Process completed")
     print(f"{'='*60}\n")
 
 

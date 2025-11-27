@@ -546,13 +546,15 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, send_request_func, hour_zone):
     """Chequea TP/SL para todas las estrategias"""
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
-    print(f"\n{'-' * 60}")
-    print(f"🔷 Checking TP/SL - {now}")
-    print(f"{'-' * 60}")
+# =============================================================================
+#     print(f"\n{'-' * 60}")
+#     print(f"🔷 Checking TP/SL - {now}")
+#     print(f"{'-' * 60}")
+# =============================================================================
     for strat in strategies:
         strat_id = strat['id']
         num_positions = len(open_positions.get(strat_id, []))
-        print(f"🔹Strategy {strat_id:<16}: {num_positions} open positions")
+        #print(f"🔹Strategy {strat_id:<16}: {num_positions} open positions")
         check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func)
 
 # ==========================================================================
@@ -697,7 +699,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             "orderType": "market"
         }
         
-        print(f"➡ Closing {direction} position on {symbol}:")   
+        print(f"➡️  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(1.0)
 
@@ -776,7 +778,7 @@ def log_closed_position(
     try:
         # Carpeta 'files' en el mismo directorio que excel_file
         base_dir = os.path.dirname(os.path.abspath(excel_file))
-        files_dir = os.path.join(base_dir, 'files')
+        files_dir = os.path.join(base_dir, 'bot_files')
         os.makedirs(files_dir, exist_ok=True)  # crea la carpeta si no existe
         
         # Excel final en la carpeta 'files'

@@ -318,7 +318,7 @@ def process_signals_and_buy(
             })
 
             usdt_after = get_balance_fn(exchange)
-            print(f"▶ {now} - ORDER executed: {sym} | Remaining USDT: {usdt_after:.2f}\n")
+            print(f"➡ {now} - ORDER executed: {sym} | Remaining USDT: {usdt_after:.2f}\n")
             time.sleep(2)
 
         else:
@@ -406,6 +406,7 @@ def save_state(open_positions, state_file):
 
 def sync_positions_with_exchange(open_positions, get_open_fn, product_type: str):
     """Sincroniza el estado interno con las posiciones reales del exchange"""
+    print(f"⚙ Syncronicing with broker...")
     try:
         exchange_positions = get_open_fn(product_type=product_type.upper())
         
