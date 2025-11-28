@@ -68,7 +68,7 @@ def load_state(state_file):
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
                 print(f"   ➡️  {strat_id}: {len(positions)} positions | Candles: {candles}")
                 for pos in positions:
-                    print(f"      - {pos['symbol']:<8} | Size: {pos['size']:<10} | Entry: {pos['entry_price']:<10}")
+                    print(f"      - {pos['symbol']:<12} | Size: {pos['size']:<10} | Entry: {pos['entry_price']:<10}")
 
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
@@ -524,17 +524,177 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
+        
+        
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+from rich.text import Text
+from rich.console import Group
+
+console = Console()
+
+# Variable global para mantener el Live activo
+_live_display = None
+
+# ==========================================================================
+# HELPER FUNCTIONS
+# ==========================================================================
+def format_price(price):
+    """Formatea precios con decimales apropiados según su magnitud"""
+    price_float = float(price)
+    if price_float < 0.01:
+        return f"{price_float:.6f}"
+    elif price_float < 1:
+        return f"{price_float:.4f}"
+    elif price_float < 100:
+        return f"{price_float:.2f}"
+    else:
+        return f"{price_float:.1f}"
+
+
+def get_pnl_arrow(direction, entry_price, current_price):
+    """Determina la flecha según si la posición está en profit o loss"""
+    entry_float = float(entry_price)
+    current_float = float(current_price)
+    
+    if direction.lower() == 'long':
+        # Para LONG: profit si current > entry
+        if current_float > entry_float:
+            return "[bold green]↑[/bold green]"
+        else:
+            return "[bold red]↓[/bold red]"
+    else:  # short
+        # Para SHORT: profit si current < entry
+        if current_float < entry_float:
+            return "[bold green]↑[/bold green]"
+        else:
+            return "[bold red]↓[/bold red]"
+
+
+def calculate_pnl(direction, entry_price, current_price, size):
+    """Calcula el PnL en USDT de una posición"""
+    entry_float = float(entry_price)
+    current_float = float(current_price)
+    size_float = float(size)
+    
+    if direction.lower() == 'long':
+        pnl = (current_float - entry_float) * size_float
+    else:  # short
+        pnl = (entry_float - current_float) * size_float
+    
+    return pnl
+
+
+def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
+    """Añade una fila de posición a la tabla de Rich"""
+    direction = pos['direction']
+    tp_price = pos['tp']
+    sl_price = pos['sl']
+    entry_price = pos['entry_price']
+    symbol = pos['symbol']
+    size = pos['size']
+    
+    # Calcular distancias al TP y SL
+    if direction.lower() == 'short':
+        dist_to_tp = float(current_price - tp_price)
+        dist_to_sl = float(sl_price - current_price)
+        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+    else:  # long
+        dist_to_tp = float(tp_price - current_price)
+        dist_to_sl = float(current_price - sl_price)
+        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+    
+    direction_style = "white"
+    pnl_arrow = get_pnl_arrow(direction, entry_price, current_price)
+    
+    # Calcular PnL numérico
+    pnl = calculate_pnl(direction, entry_price, current_price, size)
+    pnl_accumulator['total'] += pnl
+    
+    # Formatear PnL con color
+    pnl_color = "bold green" if pnl >= 0 else "bold red"
+    pnl_text = f"[{pnl_color}]{pnl:+.2f}[/{pnl_color}]"
+    
+    # Extraer opened_at y formatear solo la fecha
+    opened_at = pos.get('opened_at', '')
+    if opened_at:
+        # Si es datetime, convertir a string con solo fecha
+        if hasattr(opened_at, 'strftime'):
+            opened_at_str = opened_at.strftime('%Y-%m-%d')
+        # Si es string, extraer solo YYYY-MM-DD
+        elif isinstance(opened_at, str):
+            opened_at_str = opened_at.split('T')[0] if 'T' in opened_at else opened_at[:10]
+        else:
+            opened_at_str = str(opened_at)[:10]
+    else:
+        opened_at_str = '-'
+    
+    # Obtener candles elapsed y sell_after_ncandles
+    candles_elapsed = strategy_candles.get(strat_id, 0)
+    candles_str = f"{candles_elapsed}/{sell_after_ncandles}" if sell_after_ncandles else f"{candles_elapsed}"
+    
+    table.add_row(
+        strat_id,
+        f"[{direction_style}]{symbol}[/{direction_style}]",
+        f"[{direction_style}]{direction.upper()}[/{direction_style}]",
+        f"[white]{opened_at_str}[/white]",
+        f"[white]{candles_str}[/white]",
+        f"{format_price(entry_price)}",
+        f"[yellow]{format_price(current_price)}[/yellow]",
+        pnl_arrow,
+        pnl_text,
+        f"[white]{format_price(tp_price)}[/white] [cyan](Δ {tp_pct_away:+.2f}%)[/cyan]",
+        f"[white]{format_price(sl_price)}[/white] [magenta](Δ {sl_pct_away:+.2f}%)[/magenta]"
+    )
+
+
+def create_tp_sl_display(now, total_pnl=None):
+    """Crea el header y la tabla para el display de TP/SL"""
+    # Crear el header con PnL total si se proporciona
+    header = Text()
+    header.append(f"{'─' * 60}\n", style="blue")
+    header.append(f"🔷 Checking TP/SL - {now}\n", style="bold cyan")
+    
+    if total_pnl is not None:
+        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
+        header.append(f"💰 Total PnL: ", style="white")
+        header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
+    
+    header.append(f"{'─' * 60}\n", style="blue")
+    
+    # Crear tabla con columnas adicionales: opened_at y candles
+    table = Table(show_header=True, header_style="bold white", border_style="white")
+    table.add_column("Strategy", style="white", width=15)
+    table.add_column("Symbol", style="bold", width=11)
+    table.add_column("Side", justify="center", width=5)
+    table.add_column("Opened", style="white", width=10)
+    table.add_column("Candles", justify="center", width=8)
+    table.add_column("Entry", justify="right", width=8)
+    table.add_column("Current", justify="right", width=8)
+    table.add_column("↕", justify="center", width=1)
+    table.add_column("PnL (USDT)", justify="right", width=11)
+    table.add_column("TP", justify="center", width=20) 
+    table.add_column("SL", justify="center", width=20)
+    
+    return header, table
+
 
 # ==========================================================================
 # TP/SL CHECKINGS
 # ========================================================================== 
-def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func):
+def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_candles, state_file, send_request_func, table=None, pnl_accumulator=None):
     """Comprueba TP/SL para todas las posiciones de una estrategia"""
     if strat_id not in open_positions or not open_positions[strat_id]:
         return
     
     positions = open_positions[strat_id][:]
     positions_to_remove = []
+    
+    # Obtener sell_after_ncandles de la configuración de estrategia
+    sell_after_ncandles = strat_config.get('sell_after_ncandles') if strat_config else None
     
     for i, pos in enumerate(positions):
         symbol = pos['symbol']
@@ -551,29 +711,16 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
         
         current_price = Decimal(str(current_price))
         
-        # Calcular distancias al TP y SL
-        if direction.lower() == 'short':
-            dist_to_tp = float(current_price - tp_price)
-            dist_to_sl = float(sl_price - current_price)
-            tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-            sl_pct_away = (dist_to_sl / float(entry_price)) * 100
-        else:  # long
-            dist_to_tp = float(tp_price - current_price)
-            dist_to_sl = float(current_price - sl_price)
-            tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-            sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+        # Añadir fila a la tabla si se proporciona
+        if table and pnl_accumulator is not None:
+            add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles)
         
-# =============================================================================
-#         print(f"  [{symbol}] {direction.upper()}")
-#         print(f"    Current: {current_price} | Entry: {entry_price}")
-#         print(f"    TP: {tp_price} (Δ {tp_pct_away:+.3f}%) | SL: {sl_price} (Δ {sl_pct_away:+.3f}%)")
-# =============================================================================
-        
+        # Verificar si se alcanzó TP o SL
         hit_tp = current_price >= tp_price if direction.lower() == 'long' else current_price <= tp_price
         hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
         
         if hit_tp:
-            print(f"\n💲 TP REACHED for {symbol} ({strat_id})")
+            console.print(f"\n💲 TP REACHED for {symbol} ({strat_id})", style="bold green")
             position_data = {
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
@@ -584,7 +731,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
                 positions_to_remove.append(i)
                 
         elif hit_sl:
-            print(f"\n🔻 SL REACHED for {symbol} ({strat_id})")
+            console.print(f"\n🔻 SL REACHED for {symbol} ({strat_id})", style="bold red")
             position_data = {
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
@@ -594,6 +741,7 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
             if close_position(symbol, pos['size'], direction, send_request_func, reason="SL", position_data=position_data):
                 positions_to_remove.append(i)
     
+    # Eliminar posiciones cerradas
     if positions_to_remove:
         for i in reversed(positions_to_remove):
             if i < len(open_positions[strat_id]):
@@ -604,18 +752,49 @@ def check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_f
 
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, send_request_func, hour_zone):
     """Chequea TP/SL para todas las estrategias"""
+    global _live_display
+    
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
-# =============================================================================
-#     print(f"\n{'-' * 60}")
-#     print(f"🔷 Checking TP/SL - {now}")
-#     print(f"{'-' * 60}")
-# =============================================================================
-    for strat in strategies:
+    
+    # Acumulador para el PnL total
+    pnl_accumulator = {'total': 0.0}
+    
+    # Crear header y tabla (sin total aún)
+    header, table = create_tp_sl_display(now)
+    
+    # Crear un diccionario de estrategias por ID para acceso rápido
+    strat_dict = {strat['id']: strat for strat in strategies}
+    
+    # Llenar la tabla con todas las estrategias
+    for idx, strat in enumerate(strategies):
         strat_id = strat['id']
         num_positions = len(open_positions.get(strat_id, []))
-        #print(f"🔹Strategy {strat_id:<16}: {num_positions} open positions")
-        check_tp_sl_for_strategy(strat_id, open_positions, strategy_candles, state_file, send_request_func)
-
+        
+        if num_positions > 0:
+            check_tp_sl_for_strategy(strat_id, strat, open_positions, strategy_candles, state_file, send_request_func, table, pnl_accumulator)
+            
+            # Añadir fila vacía entre estrategias (excepto la última)
+            if idx < len(strategies) - 1:
+                next_has_positions = any(
+                    len(open_positions.get(strategies[next_idx]['id'], [])) > 0 
+                    for next_idx in range(idx + 1, len(strategies))
+                )
+                if next_has_positions:
+                    table.add_row("", "", "", "", "", "", "", "", "", "", "")
+    
+    # Recrear header con el total PnL calculado
+    header, _ = create_tp_sl_display(now, pnl_accumulator['total'])
+    
+    # Combinar header + tabla
+    display = Group(header, table)
+    
+    # Inicializar o actualizar Live display
+    if _live_display is None:
+        _live_display = Live(display, console=console, refresh_per_second=4)
+        _live_display.start()
+    else:
+        _live_display.update(display)
+        
 # ==========================================================================
 # STRATEGY MANAGMENT
 # ========================================================================== 
