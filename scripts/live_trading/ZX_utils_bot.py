@@ -676,8 +676,8 @@ def create_tp_sl_display(now, total_pnl=None):
     table.add_column("Current", justify="right", width=8)
     table.add_column("↕", justify="center", width=1)
     table.add_column("PnL (USDT)", justify="right", width=11)
-    table.add_column("TP", justify="center", width=20) 
-    table.add_column("SL", justify="center", width=20)
+    table.add_column("TP", justify="right", width=20) 
+    table.add_column("SL", justify="right", width=20)
     
     return header, table
 
