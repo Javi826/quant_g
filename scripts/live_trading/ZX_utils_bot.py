@@ -9,6 +9,12 @@ import traceback
 import logging
 import builtins
 import pandas as pd
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+from rich.text import Text
+from rich.console import Group
+
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from ZX_utils_live import fetch_ohlcv_data,normalize_live_ohlcv,df_to_arrays_live
@@ -107,7 +113,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
 
         with open(state_file, 'w') as f:
             json.dump(state_data, f, indent=2)
-        print(f"💾 Saving state...")
+        #print(f"💾 Saving state...")
     except Exception as e:
         print(f"❌ Error saving state: {e}")
         import traceback
@@ -524,22 +530,12 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        
-        
-from rich.console import Console
-from rich.live import Live
-from rich.table import Table
-from rich.text import Text
-from rich.console import Group
-
-console = Console()
-
-# Variable global para mantener el Live activo
-_live_display = None
 
 # ==========================================================================
 # HELPER FUNCTIONS
 # ==========================================================================
+console       = Console()
+_live_display = None
 def format_price(price):
     """Formatea precios con decimales apropiados según su magnitud"""
     price_float = float(price)
@@ -588,12 +584,12 @@ def calculate_pnl(direction, entry_price, current_price, size):
 
 def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
     """Añade una fila de posición a la tabla de Rich"""
-    direction = pos['direction']
-    tp_price = pos['tp']
-    sl_price = pos['sl']
+    direction   = pos['direction']
+    tp_price    = pos['tp']
+    sl_price    = pos['sl']
     entry_price = pos['entry_price']
-    symbol = pos['symbol']
-    size = pos['size']
+    symbol      = pos['symbol']
+    size        = pos['size']
     
     # Calcular distancias al TP y SL
     if direction.lower() == 'short':
@@ -636,6 +632,15 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
     candles_elapsed = strategy_candles.get(strat_id, 0)
     candles_str = f"{candles_elapsed}/{sell_after_ncandles}" if sell_after_ncandles else f"{candles_elapsed}"
     
+    # Formatear TP con color condicional
+    tp_color = "bold green" if tp_pct_away < 1 else "cyan"
+    tp_text = f"[white]{format_price(tp_price)}[/white] [{tp_color}](Δ {tp_pct_away:+.2f}%)[/{tp_color}]"
+    
+    # Formatear SL con color condicional
+    sl_color = "bold red" if sl_pct_away < 1 else "magenta"
+    sl_text = f"[white]{format_price(sl_price)}[/white] [{sl_color}](Δ {sl_pct_away:+.2f}%)[/{sl_color}]"
+    
+    # En el table.add_row, reemplaza las últimas dos líneas por:
     table.add_row(
         strat_id,
         f"[{direction_style}]{symbol}[/{direction_style}]",
@@ -646,8 +651,8 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
         f"[yellow]{format_price(current_price)}[/yellow]",
         pnl_arrow,
         pnl_text,
-        f"[white]{format_price(tp_price)}[/white] [cyan](Δ {tp_pct_away:+.2f}%)[/cyan]",
-        f"[white]{format_price(sl_price)}[/white] [magenta](Δ {sl_pct_away:+.2f}%)[/magenta]"
+        tp_text,
+        sl_text
     )
 
 
@@ -675,7 +680,7 @@ def create_tp_sl_display(now, total_pnl=None):
     table.add_column("Entry", justify="right", width=8)
     table.add_column("Current", justify="right", width=8)
     table.add_column("↕", justify="center", width=1)
-    table.add_column("PnL (USDT)", justify="right", width=11)
+    table.add_column("PnL (USDT)", justify="right", width=10)
     table.add_column("TP", justify="right", width=20) 
     table.add_column("SL", justify="right", width=20)
     
@@ -720,7 +725,6 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
         
         if hit_tp:
-            console.print(f"\n💲 TP REACHED for {symbol} ({strat_id})", style="bold green")
             position_data = {
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
@@ -731,7 +735,6 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
                 positions_to_remove.append(i)
                 
         elif hit_sl:
-            console.print(f"\n🔻 SL REACHED for {symbol} ({strat_id})", style="bold red")
             position_data = {
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
@@ -921,7 +924,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # POSITIONS MANAGEMENT
 # ========================================================================== 
 
-def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",position_data=None):
+def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None):
     """Cierra una posición con orden market en HEDGE MODE"""
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
@@ -937,18 +940,35 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             "orderType": "market"
         }
         
+        # Mensajes ANTES de cerrar - PRINTS NORMALES
+        if reason == "TP":
+            print(f"\n💲 TP REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
+        elif reason == "SL":
+            print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
+        
+        
         print(f"→   Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(1.0)
-
+        
         if code == 200 and resp.get("code") == "00000":
             print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
-            #  REGISTRAR EN EXCEL
+            
+            # REGISTRAR EN EXCEL
             if position_data:
                 current_price = get_current_price(symbol, send_request_func)
                 if current_price:
-                   log_closed_position(opened_at=position_data.get('opened_at'), strategy_id=position_data.get('strategy_id'), symbol=symbol, direction=direction, usdt_amount=position_data.get('usdt_amount', 0), entry_price=position_data.get('entry_price'), close_price=current_price, reason=reason,size=size)
- 
+                    log_closed_position(
+                        opened_at=position_data.get('opened_at'), 
+                        strategy_id=position_data.get('strategy_id'), 
+                        symbol=symbol, 
+                        direction=direction, 
+                        usdt_amount=position_data.get('usdt_amount', 0), 
+                        entry_price=position_data.get('entry_price'), 
+                        close_price=current_price, 
+                        reason=reason,
+                        size=size
+                    )
             return True
         else:
             print(f"🔔 No closing position available {symbol}: {resp}")
@@ -957,8 +977,17 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                 if position_data:
                     current_price = get_current_price(symbol, send_request_func)
                     if current_price:
-                       log_closed_position(opened_at=position_data.get('opened_at'), strategy_id=position_data.get('strategy_id'), symbol=symbol, direction=direction, usdt_amount=position_data.get('usdt_amount', 0), entry_price=position_data.get('entry_price'), close_price=current_price, reason="OUT_OF_MARGIN",size=size)
-     
+                        log_closed_position(
+                            opened_at=position_data.get('opened_at'), 
+                            strategy_id=position_data.get('strategy_id'), 
+                            symbol=symbol, 
+                            direction=direction, 
+                            usdt_amount=position_data.get('usdt_amount', 0), 
+                            entry_price=position_data.get('entry_price'), 
+                            close_price=current_price, 
+                            reason="OUT_OF_MARGIN",
+                            size=size
+                        )
                 return True
             return False
             

@@ -24,7 +24,7 @@ N_JOBS              = -1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2025_scalping_IS"
-TIMEFRAME           = '5m'
+TIMEFRAME           = '15m'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -32,31 +32,29 @@ MIN_VOL_USDT        = 10_000_000
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST = [2,3,4,5,6,7,8,9,10]
+SELL_AFTER_LIST = [0]
 
-EMA_SHORT_LIST  = [25,30,35]
-EMA_LONG_LIST   = [45,50,55]
-LOOKBACK_LIST   = [5,10,20]
+RSI_LIST        = [15,20,25]
+ADX_LIST        = [25,30,35]
+LOOKBACK_LIST   = [10,20,30,40,50]
+TOLERANCE_LIST  = [2,5,10,15]
 
-TP_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
-SL_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
-
-TP_PCT_LIST     = [0.0]
-SL_PCT_LIST     = [10]
+TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
+SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
-FINAL_N_PATHS        = 50
+FINAL_N_PATHS        = 100
 
-if TIMEFRAME == '1H':
-    FINAL_N_OBS_PER_PATH = 4320
-elif TIMEFRAME == '5m':
-    FINAL_N_OBS_PER_PATH = 8640
+if TIMEFRAME == '5m':
+    FINAL_N_OBS_PER_PATH = 34560
 elif TIMEFRAME == '15m':
-    FINAL_N_OBS_PER_PATH = 8640
+    FINAL_N_OBS_PER_PATH = 17280
 elif TIMEFRAME == '30m':
     FINAL_N_OBS_PER_PATH = 8640
+elif TIMEFRAME == '1H':
+    FINAL_N_OBS_PER_PATH = 4320
 elif TIMEFRAME == '4H':
     FINAL_N_OBS_PER_PATH = 1080
 elif TIMEFRAME == '6Hutc':
@@ -65,10 +63,11 @@ elif TIMEFRAME == '12Hutc':
     FINAL_N_OBS_PER_PATH = 360
 elif TIMEFRAME == '1Dutc':
     FINAL_N_OBS_PER_PATH = 180
-    
-TS_INDEX        = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
-param_names = ['SELL_AFTER','EMA_SHORT','EMA_LONG','LOOKBACK','TP_PCT','SL_PCT']
+    
+TS_INDEX    = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
+param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
@@ -96,9 +95,10 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
       
             signal = scalping_long(
                 arrs,
-                ema_short=param_dict.get('EMA_SHORT'),
-                ema_long=param_dict.get('EMA_LONG'),
+                rsi_max=param_dict.get('RSI'),
+                adx_min=param_dict.get('ADX'),
                 lookback=param_dict.get('LOOKBACK'),
+                tolerance=param_dict.get('TOLERANCE'),
                 live_trading=False
                  )
         

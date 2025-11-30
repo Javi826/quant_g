@@ -396,7 +396,7 @@ def save_state(open_positions, state_file):
         with open(state_file, "w") as f:
             json.dump(open_positions, f, indent=4)
             
-        print(f"💾 Saving state...")
+        #print(f"💾 Saving state...")
     except Exception as e:
         print(f"⚠️ Error guardando estado: {e}")
 

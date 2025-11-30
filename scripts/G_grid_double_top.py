@@ -11,8 +11,8 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_double_top import detect_double_top_short
-from Z_add_signals_double_top import detect_double_top_long
+from Z_add_signals_double_top import double_top_short
+from Z_add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
@@ -45,10 +45,10 @@ SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [20] 
+PRICE_TOLERANCE_LIST = [5] 
 TREND_TH_LIST        = [10] 
 
-TP_PCT_LIST          = [5]
+TP_PCT_LIST          = [3]
 SL_PCT_LIST          = [10]
 
 
@@ -76,7 +76,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_double_top_long(
+        signals = double_top_short(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 

@@ -25,11 +25,11 @@ N_JOBS       = -1
 DATA_FOLDER       = "data/crypto_OOS"
 #DATA_FOLDER       = "data/crypto_2022_OOS"
 #DATA_FOLDER       = "data/crypto_2021_OOS"
-#DATA_FOLDER       = "data/crypto_2023_IS"
+DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
 TIMEFRAME_MINOR   = '4H'
 
-ORDER_AMOUNT      = 5_000
+ORDER_AMOUNT      = 400
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -41,15 +41,17 @@ N_CONSECUTIVE_LIST  = [1,2,3,4,5,6]
 FACTOR_LIST         = [0.2,0.4,0.6,0.8,1.0]
 
 TP_PCT_LIST         = [5,10,15,20,25,30]
-SL_PCT_LIST         = [5,10,20]
+SL_PCT_LIST         = [5,10]
 
-SELL_AFTER_LIST     = [0]    
-LOOKBACK_MINOR_LIST = [1] 
-N_CONSECUTIVE_LIST  = [2]
-FACTOR_LIST         = [0.2]
-
-TP_PCT_LIST         = [15]
-SL_PCT_LIST         = [20]
+# =============================================================================
+# SELL_AFTER_LIST     = [0]    
+# LOOKBACK_MINOR_LIST = [1] 
+# N_CONSECUTIVE_LIST  = [2]
+# FACTOR_LIST         = [0.2]
+# 
+# TP_PCT_LIST         = [15]
+# SL_PCT_LIST         = [20]
+# =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','N_CONSECUTIVE','FACTOR','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

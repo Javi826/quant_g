@@ -25,7 +25,7 @@ TIMEFRAME_MINOR      = '4H'
 ORDER_AMOUNT         = 80
 STATE_FILE           = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
-SELL_AFTER_N_CANDLES = 45
+SELL_AFTER_N_CANDLES = 50
 
 LEFT_LOOKBACK        = 5
 TOLERANCE            = 30
@@ -115,9 +115,8 @@ try:
         # ORDERS MANAGEMENT
         # -------------------------------
         manage_open_positions(open_positions, send_request_fn=send_request_02, product_type=PRODUCT_TYPE)
-        
-        # 💾 GUARDAR ESTADO después de gestionar posiciones
         save_state(open_positions, STATE_FILE)
+        print("🔂 Signal cycle completed")
 
 except KeyboardInterrupt:
     print("\n🔚 Interrupted by user.")

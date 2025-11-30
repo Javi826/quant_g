@@ -12,16 +12,17 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_scalping import scalping_long
+from Z_add_signals_scalping import scalping_short
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False
-STRATEGY           ="indicators"
+STRATEGY           ="scalping"
 N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
-TIMEFRAME_MINOR     = '1H'
+DATA_FOLDER         = "data/crypto_2025_scalping_IS"
+TIMEFRAME_MINOR     = '30m'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -29,26 +30,30 @@ MIN_VOL_USDT        = 10_000_000
 # GRID: 
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST = [2,3,4,5,6,7,8,9,10]
+SELL_AFTER_LIST = [0]
 
-EMA_SHORT_LIST  = [25,30,35]
-EMA_LONG_LIST   = [45,50,55]
-LOOKBACK_LIST   = [5,10,20]
+RSI_LIST        = [75,80,85]
+ADX_LIST        = [25,30,35]
+LOOKBACK_LIST   = [10,20,30,40,50]
+TORELANCE_LIST  = [2,5,10,15]
 
-TP_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
-SL_PCT_LIST     = [0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0]
+TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
+SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 
-SELL_AFTER_LIST = [10]
+# =============================================================================
+# SELL_AFTER_LIST = [0]
+# 
+# RSI_LIST        = [15]
+# ADX_LIST        = [35]
+# LOOKBACK_LIST   = [50]
+# TORELANCE_LIST  = [2]
+# 
+# TP_PCT_LIST     = [3.5]
+# SL_PCT_LIST     = [5]
+# =============================================================================
 
-EMA_SHORT_LIST  = [25]
-EMA_LONG_LIST   = [55]
-LOOKBACK_LIST   = [20]
 
-TP_PCT_LIST     = [0.0]
-SL_PCT_LIST     = [10]
-
-
-param_names = ['SELL_AFTER','EMA_SHORT','EMA_LONG','LOOKBACK','TP_PCT','SL_PCT']
+param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TORELANCE','TP_PCT','SL_PCT']
 
 lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
@@ -71,11 +76,12 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = scalping_long(
+        signal = scalping_short(
             arrs,
-            ema_short=params.get('EMA_SHORT'),
-            ema_long=params.get('EMA_LONG'),
+            rsi_max=params.get('RSI'),
+            adx_min=params.get('ADX'),
             lookback=params.get('LOOKBACK'),
+            tolerance=params.get('TORELANCE'),
             live_trading=False
         )
 

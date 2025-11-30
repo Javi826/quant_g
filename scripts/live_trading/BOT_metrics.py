@@ -68,7 +68,7 @@ df_results = pd.DataFrame(results)
 
 # Custom table printing with left-aligned headers for Strategy and date_fo
 col_widths = {
-    'Strategy':12,
+    'Strategy':15,
     'date_fo': 10,
     'Trades_num': 11,
     'Trades_pct': 11,

@@ -13797,3 +13797,856 @@
 2025-11-28 15:08:40,837 ✅ BOT Initialization completed
 
 2025-11-28 15:08:40,837 ============================================================
+2025-11-28 15:15:51,044 →   Closing long position on HYPEUSDT:
+2025-11-28 15:15:52,490 ✅ Position closed due to TP: HYPEUSDT | Size: 2.3
+2025-11-28 15:15:52,921 📋 Trade logged: HYPEUSDT | Profit: 4.02 USDT (+5.03%) | Duration: 0.9681 days
+2025-11-28 15:15:55,574 💾 Saving state...
+2025-11-28 18:12:08,975 
+🚀 === Starting multi-strategy bot... ===
+2025-11-28 18:12:08,975 ✅  State loaded: 41 positions recovered
+2025-11-28 18:12:08,975    ➡️  double_top_long: 14 positions | Candles: 5
+2025-11-28 18:12:08,975       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-28 18:12:08,975       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-28 18:12:08,975       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-28 18:12:08,975       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-28 18:12:08,975       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-28 18:12:08,975       - ENAUSDT      | Size: 280        | Entry: 0.2854    
+2025-11-28 18:12:08,975       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-28 18:12:08,975       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-28 18:12:08,975       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-28 18:12:08,975       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-28 18:12:08,975       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-28 18:12:08,975       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-28 18:12:08,975       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-28 18:12:08,975       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-28 18:12:08,975    ➡️  revers_long: 4 positions | Candles: 22
+2025-11-28 18:12:08,975       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-28 18:12:08,975       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-28 18:12:08,975       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-28 18:12:08,975       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-28 18:12:08,975    ➡️  parity_long: 4 positions | Candles: 22
+2025-11-28 18:12:08,975       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-28 18:12:08,975       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-28 18:12:08,975       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-28 18:12:08,975       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-28 18:12:08,975    ➡️  revers_short: 6 positions | Candles: 23
+2025-11-28 18:12:08,975       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-28 18:12:08,975       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-28 18:12:08,975       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-28 18:12:08,975       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-28 18:12:08,975       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-28 18:12:08,975       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-28 18:12:08,975    ➡️  parity_short: 13 positions | Candles: 23
+2025-11-28 18:12:08,975       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-28 18:12:08,975       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-28 18:12:08,975       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-28 18:12:08,975       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-28 18:12:08,975       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-28 18:12:08,975       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-28 18:12:08,975       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-28 18:12:08,975       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-28 18:12:08,975       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-28 18:12:08,975       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-28 18:12:08,975       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-28 18:12:08,975       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-28 18:12:08,975       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-28 18:12:12,674 🔹 Strategy double_top_long: 32 symbols
+2025-11-28 18:12:12,677 🔹 Strategy revers_long: 32 symbols
+2025-11-28 18:12:12,679 🔹 Strategy parity_long: 32 symbols
+2025-11-28 18:12:12,682 🔹 Strategy revers_short: 32 symbols
+2025-11-28 18:12:12,685 🔹 Strategy parity_short: 32 symbols
+2025-11-28 18:12:12,685 ✅ BOT Initialization completed
+
+2025-11-28 18:12:12,685 ============================================================
+2025-11-28 21:00:45,628 
+
+2025-11-28 21:00:45,648 🔀 === New candle detected ===: 2025-11-28 20:00:45 UTC
+2025-11-28 21:00:45,688 
+
+2025-11-28 21:00:45,708 ------------------------------------------------------------
+2025-11-28 21:00:45,728 🌐 Syncronizing positions in broker...
+2025-11-28 21:00:45,747 ------------------------------------------------------------
+2025-11-28 21:01:09,182 ✅ Sync completed: All positions exist in broker
+2025-11-28 21:01:09,222 
+============================================================
+2025-11-28 21:01:09,241 📡 Signal search - 2025-11-28 20:01:09
+2025-11-28 21:01:09,261 ============================================================
+2025-11-28 21:01:09,281 💾 Saving state...
+2025-11-28 21:01:09,300 ➡️ double_top_long: 6/40 candles
+2025-11-28 21:01:09,321 💾 Saving state...
+2025-11-28 21:01:09,340 ➡️ revers_long: 23/40 candles
+2025-11-28 21:01:09,360 💾 Saving state...
+2025-11-28 21:01:09,399 ➡️ parity_long: 23/40 candles
+2025-11-28 21:01:09,419 💾 Saving state...
+2025-11-28 21:01:09,438 ➡️ revers_short: 24/40 candles
+2025-11-28 21:01:09,458 💾 Saving state...
+2025-11-28 21:01:09,477 ➡️ parity_short: 24/40 candles
+2025-11-28 21:01:09,496 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-28 21:01:09,515 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-28 21:01:09,534 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-28 21:01:09,553 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-28 21:01:09,573 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-28 21:01:09,611 
+============================================================
+2025-11-28 21:01:09,630 🔂 Signal cycle completed
+2025-11-28 21:01:09,687 ============================================================
+
+2025-11-29 01:00:50,601 
+
+2025-11-29 01:00:50,621 🔀 === New candle detected ===: 2025-11-29 00:00:50 UTC
+2025-11-29 01:00:50,659 
+
+2025-11-29 01:00:50,678 ------------------------------------------------------------
+2025-11-29 01:00:50,697 🌐 Syncronizing positions in broker...
+2025-11-29 01:00:50,716 ------------------------------------------------------------
+2025-11-29 01:01:13,743 ✅ Sync completed: All positions exist in broker
+2025-11-29 01:01:13,782 
+============================================================
+2025-11-29 01:01:13,802 📡 Signal search - 2025-11-29 00:01:13
+2025-11-29 01:01:13,822 ============================================================
+2025-11-29 01:01:13,842 💾 Saving state...
+2025-11-29 01:01:13,918 ➡️ double_top_long: 7/40 candles
+2025-11-29 01:01:13,938 💾 Saving state...
+2025-11-29 01:01:13,957 ➡️ revers_long: 24/40 candles
+2025-11-29 01:01:13,977 💾 Saving state...
+2025-11-29 01:01:13,996 ➡️ parity_long: 24/40 candles
+2025-11-29 01:01:14,015 💾 Saving state...
+2025-11-29 01:01:14,034 ➡️ revers_short: 25/40 candles
+2025-11-29 01:01:14,053 💾 Saving state...
+2025-11-29 01:01:14,073 ➡️ parity_short: 25/40 candles
+2025-11-29 01:01:14,094 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-29 01:01:14,113 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-29 01:01:14,133 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-29 01:01:14,153 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-29 01:01:14,172 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-29 01:01:14,230 
+============================================================
+2025-11-29 01:01:14,249 🔂 Signal cycle completed
+2025-11-29 01:01:14,286 ============================================================
+
+2025-11-29 04:20:34,214 🔔 No price for XRPUSDT
+2025-11-29 04:20:54,484 🔔 No price for BGBUSDT
+2025-11-29 04:21:14,531 🔔 No price for BNBUSDT
+2025-11-29 04:21:34,570 🔔 No price for BTCUSDT
+2025-11-29 04:21:55,543 🔔 No price for HBARUSDT
+2025-11-29 04:22:20,032 🔔 No price for LTCUSDT
+2025-11-29 04:22:45,183 🔔 No price for XRPUSDT
+2025-11-29 04:23:08,128 🔔 No price for ADAUSDT
+2025-11-29 04:23:33,941 🔔 No price for ARBUSDT
+2025-11-29 04:23:57,327 🔔 No price for BGBUSDT
+2025-11-29 04:24:24,022 🔔 No price for BNBUSDT
+2025-11-29 04:24:46,967 🔔 No price for DOGEUSDT
+2025-11-29 04:25:12,119 🔔 No price for ETHUSDT
+2025-11-29 04:25:34,401 🔔 No price for HBARUSDT
+                                                   2025-11-29 08:52:19,402 
+🚀 === Starting multi-strategy bot... ===
+2025-11-29 08:52:19,402 ✅  State loaded: 41 positions recovered
+2025-11-29 08:52:19,402    ➡️  double_top_long: 14 positions | Candles: 7
+2025-11-29 08:52:19,402       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-29 08:52:19,402       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-29 08:52:19,402       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-29 08:52:19,402       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-29 08:52:19,402       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-29 08:52:19,402       - ENAUSDT      | Size: 280        | Entry: 0.2854    
+2025-11-29 08:52:19,402       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-29 08:52:19,402       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-29 08:52:19,402       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-29 08:52:19,402       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-29 08:52:19,402       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-29 08:52:19,402       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-29 08:52:19,402       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-29 08:52:19,403       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-29 08:52:19,403    ➡️  revers_long: 4 positions | Candles: 24
+2025-11-29 08:52:19,403       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-29 08:52:19,403       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-29 08:52:19,403       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-29 08:52:19,403       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-29 08:52:19,403    ➡️  parity_long: 4 positions | Candles: 24
+2025-11-29 08:52:19,403       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-29 08:52:19,403       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-29 08:52:19,403       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-29 08:52:19,403       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-29 08:52:19,403    ➡️  revers_short: 6 positions | Candles: 25
+2025-11-29 08:52:19,403       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-29 08:52:19,403       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-29 08:52:19,403       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-29 08:52:19,403       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-29 08:52:19,403       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-29 08:52:19,403       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-29 08:52:19,403    ➡️  parity_short: 13 positions | Candles: 25
+2025-11-29 08:52:19,403       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-29 08:52:19,403       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-29 08:52:19,403       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-29 08:52:19,403       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-29 08:52:19,403       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-29 08:52:19,403       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-29 08:52:19,403       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-29 08:52:19,403       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-29 08:52:19,403       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-29 08:52:19,403       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-29 08:52:19,403       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-29 08:52:19,403       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-29 08:52:19,403       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-29 08:52:22,458 🔹 Strategy double_top_long: 32 symbols
+2025-11-29 08:52:22,461 🔹 Strategy revers_long: 32 symbols
+2025-11-29 08:52:22,464 🔹 Strategy parity_long: 32 symbols
+2025-11-29 08:52:22,467 🔹 Strategy revers_short: 32 symbols
+2025-11-29 08:52:22,469 🔹 Strategy parity_short: 32 symbols
+2025-11-29 08:52:22,470 ✅ BOT Initialization completed
+
+2025-11-29 08:52:22,470 ============================================================
+2025-11-29 09:00:46,011 
+
+2025-11-29 09:00:46,031 🔀 === New candle detected ===: 2025-11-29 08:00:45 UTC
+2025-11-29 09:00:46,069 
+
+2025-11-29 09:00:46,087 ------------------------------------------------------------
+2025-11-29 09:00:46,106 🌐 Syncronizing positions in broker...
+2025-11-29 09:00:46,125 ------------------------------------------------------------
+2025-11-29 09:01:08,850 ✅ Sync completed: All positions exist in broker
+2025-11-29 09:01:08,886 
+============================================================
+2025-11-29 09:01:08,904 📡 Signal search - 2025-11-29 08:01:08
+2025-11-29 09:01:08,922 ============================================================
+2025-11-29 09:01:08,960 💾 Saving state...
+2025-11-29 09:01:08,979 ➡️ double_top_long: 8/40 candles
+2025-11-29 09:01:08,997 💾 Saving state...
+2025-11-29 09:01:09,016 ➡️ revers_long: 25/40 candles
+2025-11-29 09:01:09,034 💾 Saving state...
+2025-11-29 09:01:09,053 ➡️ parity_long: 25/40 candles
+2025-11-29 09:01:09,071 💾 Saving state...
+2025-11-29 09:01:09,090 ➡️ revers_short: 26/40 candles
+2025-11-29 09:01:09,109 💾 Saving state...
+2025-11-29 09:01:09,128 ➡️ parity_short: 26/40 candles
+2025-11-29 09:01:09,147 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-29 09:01:09,166 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-29 09:01:09,186 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-29 09:01:09,224 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-29 09:01:09,243 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-29 09:01:09,281 
+============================================================
+2025-11-29 09:01:09,299 🔂 Signal cycle completed
+2025-11-29 09:01:09,336 ============================================================
+
+2025-11-29 10:34:23,621 🔔 No price for DOGEUSDT
+2025-11-29 10:35:37,553 🔔 No price for ENAUSDT
+2025-11-29 10:42:15,873 
+🚀 === Starting multi-strategy bot... ===
+2025-11-29 10:42:15,874 ✅  State loaded: 41 positions recovered
+2025-11-29 10:42:15,874    ➡️  double_top_long: 14 positions | Candles: 8
+2025-11-29 10:42:15,874       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-29 10:42:15,874       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-29 10:42:15,874       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-29 10:42:15,874       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-29 10:42:15,874       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-29 10:42:15,874       - ENAUSDT      | Size: 280        | Entry: 0.2854    
+2025-11-29 10:42:15,874       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-29 10:42:15,874       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-29 10:42:15,874       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-29 10:42:15,874       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-29 10:42:15,874       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-29 10:42:15,874       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-29 10:42:15,874       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-29 10:42:15,874       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-29 10:42:15,874    ➡️  revers_long: 4 positions | Candles: 25
+2025-11-29 10:42:15,874       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-29 10:42:15,874       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-29 10:42:15,874       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-29 10:42:15,874       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-29 10:42:15,874    ➡️  parity_long: 4 positions | Candles: 25
+2025-11-29 10:42:15,874       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-29 10:42:15,874       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-29 10:42:15,874       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-29 10:42:15,874       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-29 10:42:15,874    ➡️  revers_short: 6 positions | Candles: 26
+2025-11-29 10:42:15,874       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-29 10:42:15,874       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-29 10:42:15,874       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-29 10:42:15,874       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-29 10:42:15,874       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-29 10:42:15,874       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-29 10:42:15,874    ➡️  parity_short: 13 positions | Candles: 26
+2025-11-29 10:42:15,874       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-29 10:42:15,874       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-29 10:42:15,874       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-29 10:42:15,874       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-29 10:42:15,874       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-29 10:42:15,874       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-29 10:42:15,874       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-29 10:42:15,874       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-29 10:42:15,874       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-29 10:42:15,874       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-29 10:42:15,874       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-29 10:42:15,874       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-29 10:42:15,874       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-29 10:42:19,487 🔹 Strategy double_top_long: 32 symbols
+2025-11-29 10:42:19,489 🔹 Strategy revers_long: 32 symbols
+2025-11-29 10:42:19,492 🔹 Strategy parity_long: 32 symbols
+2025-11-29 10:42:19,494 🔹 Strategy revers_short: 32 symbols
+2025-11-29 10:42:19,497 🔹 Strategy parity_short: 32 symbols
+2025-11-29 10:42:19,497 ✅ BOT Initialization completed
+
+2025-11-29 10:42:19,497 ============================================================
+2025-11-29 10:52:54,551 
+🔚 Interrupted by user.
+2025-11-29 10:52:54,573 💾 Saving state...
+2025-11-29 10:52:54,594 ⛔ BOT Stopped
+2025-11-29 10:52:56,792 
+🚀 === Starting multi-strategy bot... ===
+2025-11-29 10:52:56,792 ✅  State loaded: 41 positions recovered
+2025-11-29 10:52:56,792    ➡️  double_top_long: 14 positions | Candles: 8
+2025-11-29 10:52:56,792       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-29 10:52:56,792       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-29 10:52:56,792       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-29 10:52:56,792       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-29 10:52:56,792       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-29 10:52:56,792       - ENAUSDT      | Size: 280        | Entry: 0.2854    
+2025-11-29 10:52:56,792       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-29 10:52:56,792       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-29 10:52:56,792       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-29 10:52:56,792       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-29 10:52:56,792       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-29 10:52:56,792       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-29 10:52:56,792       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-29 10:52:56,792       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-29 10:52:56,792    ➡️  revers_long: 4 positions | Candles: 25
+2025-11-29 10:52:56,792       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-29 10:52:56,792       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-29 10:52:56,792       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-29 10:52:56,792       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-29 10:52:56,793    ➡️  parity_long: 4 positions | Candles: 25
+2025-11-29 10:52:56,793       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-29 10:52:56,793       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-29 10:52:56,793       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-29 10:52:56,793       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-29 10:52:56,793    ➡️  revers_short: 6 positions | Candles: 26
+2025-11-29 10:52:56,793       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-29 10:52:56,793       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-29 10:52:56,793       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-29 10:52:56,793       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-29 10:52:56,793       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-29 10:52:56,793       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-29 10:52:56,793    ➡️  parity_short: 13 positions | Candles: 26
+2025-11-29 10:52:56,793       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-29 10:52:56,793       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-29 10:52:56,793       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-29 10:52:56,793       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-29 10:52:56,793       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-29 10:52:56,793       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-29 10:52:56,793       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-29 10:52:56,793       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-29 10:52:56,793       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-29 10:52:56,793       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-29 10:52:56,793       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-29 10:52:56,793       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-29 10:52:56,793       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-29 10:53:00,182 🔹 Strategy double_top_long: 32 symbols
+2025-11-29 10:53:00,185 🔹 Strategy revers_long: 32 symbols
+2025-11-29 10:53:00,187 🔹 Strategy parity_long: 32 symbols
+2025-11-29 10:53:00,189 🔹 Strategy revers_short: 32 symbols
+2025-11-29 10:53:00,192 🔹 Strategy parity_short: 32 symbols
+2025-11-29 10:53:00,192 ✅ BOT Initialization completed
+
+2025-11-29 10:53:00,192 ============================================================
+2025-11-29 13:00:54,830 
+
+2025-11-29 13:00:54,875 🔀 === New candle detected ===: 2025-11-29 12:00:54 UTC
+2025-11-29 13:00:54,963 
+
+2025-11-29 13:00:55,047 ------------------------------------------------------------
+2025-11-29 13:00:55,087 🌐 Syncronizing positions in broker...
+2025-11-29 13:00:55,124 ------------------------------------------------------------
+2025-11-29 13:01:19,072 ✅ Sync completed: All positions exist in broker
+2025-11-29 13:01:19,146 
+============================================================
+2025-11-29 13:01:19,181 📡 Signal search - 2025-11-29 12:01:19
+2025-11-29 13:01:19,225 ============================================================
+2025-11-29 13:01:19,262 💾 Saving state...
+2025-11-29 13:01:19,334 ➡️ double_top_long: 9/42 candles
+2025-11-29 13:01:19,379 💾 Saving state...
+2025-11-29 13:01:19,421 ➡️ revers_long: 26/42 candles
+2025-11-29 13:01:19,542 💾 Saving state...
+2025-11-29 13:01:19,585 ➡️ parity_long: 26/42 candles
+2025-11-29 13:01:19,657 💾 Saving state...
+2025-11-29 13:01:19,698 ➡️ revers_short: 27/42 candles
+2025-11-29 13:01:19,736 💾 Saving state...
+2025-11-29 13:01:19,770 ➡️ parity_short: 27/42 candles
+2025-11-29 13:01:19,804 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-29 13:01:19,839 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-29 13:01:19,924 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-29 13:01:19,971 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-29 13:01:20,015 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-29 13:01:20,100 
+============================================================
+2025-11-29 13:01:20,143 🔂 Signal cycle completed
+2025-11-29 13:01:20,274 ============================================================
+
+2025-11-29 16:20:58,290 
+🚀 === Starting multi-strategy bot... ===
+2025-11-29 16:20:58,290 ✅  State loaded: 41 positions recovered
+2025-11-29 16:20:58,290    ➡️  double_top_long: 14 positions | Candles: 9
+2025-11-29 16:20:58,290       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-29 16:20:58,290       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-29 16:20:58,290       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-29 16:20:58,290       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-29 16:20:58,290       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-29 16:20:58,290       - ENAUSDT      | Size: 280        | Entry: 0.2854    
+2025-11-29 16:20:58,290       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-29 16:20:58,290       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-29 16:20:58,290       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-29 16:20:58,291       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-29 16:20:58,291       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-29 16:20:58,291       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-29 16:20:58,291       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-29 16:20:58,291       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-29 16:20:58,291    ➡️  revers_long: 4 positions | Candles: 26
+2025-11-29 16:20:58,291       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-29 16:20:58,291       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-29 16:20:58,291       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-29 16:20:58,291       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-29 16:20:58,291    ➡️  parity_long: 4 positions | Candles: 26
+2025-11-29 16:20:58,291       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-29 16:20:58,291       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-29 16:20:58,291       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-29 16:20:58,291       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-29 16:20:58,291    ➡️  revers_short: 6 positions | Candles: 27
+2025-11-29 16:20:58,291       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-29 16:20:58,291       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-29 16:20:58,291       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-29 16:20:58,291       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-29 16:20:58,291       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-29 16:20:58,291       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-29 16:20:58,291    ➡️  parity_short: 13 positions | Candles: 27
+2025-11-29 16:20:58,291       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-29 16:20:58,291       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-29 16:20:58,291       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-29 16:20:58,291       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-29 16:20:58,291       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-29 16:20:58,291       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-29 16:20:58,291       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-29 16:20:58,291       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-29 16:20:58,291       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-29 16:20:58,291       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-29 16:20:58,291       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-29 16:20:58,291       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-29 16:20:58,291       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-29 16:21:01,982 🔹 Strategy double_top_long: 32 symbols
+2025-11-29 16:21:01,988 🔹 Strategy revers_long: 32 symbols
+2025-11-29 16:21:01,992 🔹 Strategy parity_long: 32 symbols
+2025-11-29 16:21:01,996 🔹 Strategy revers_short: 32 symbols
+2025-11-29 16:21:02,001 🔹 Strategy parity_short: 32 symbols
+2025-11-29 16:21:02,001 ✅ BOT Initialization completed
+
+2025-11-29 16:21:02,001 ============================================================
+2025-11-29 17:00:56,331 
+
+2025-11-29 17:00:56,351 🔀 === New candle detected ===: 2025-11-29 16:00:56 UTC
+2025-11-29 17:00:56,390 
+
+2025-11-29 17:00:56,410 ------------------------------------------------------------
+2025-11-29 17:00:56,430 🌐 Syncronizing positions in broker...
+2025-11-29 17:00:56,451 ------------------------------------------------------------
+2025-11-29 17:01:19,831 ✅ Sync completed: All positions exist in broker
+2025-11-29 17:01:19,894 
+============================================================
+2025-11-29 17:01:19,914 📡 Signal search - 2025-11-29 16:01:19
+2025-11-29 17:01:19,935 ============================================================
+2025-11-29 17:01:19,956 💾 Saving state...
+2025-11-29 17:01:19,976 ➡️ double_top_long: 10/42 candles
+2025-11-29 17:01:19,997 💾 Saving state...
+2025-11-29 17:01:20,017 ➡️ revers_long: 27/42 candles
+2025-11-29 17:01:20,037 💾 Saving state...
+2025-11-29 17:01:20,056 ➡️ parity_long: 27/42 candles
+2025-11-29 17:01:20,076 💾 Saving state...
+2025-11-29 17:01:20,096 ➡️ revers_short: 28/42 candles
+2025-11-29 17:01:20,116 💾 Saving state...
+2025-11-29 17:01:20,154 ➡️ parity_short: 28/42 candles
+2025-11-29 17:01:20,174 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-29 17:01:20,194 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-29 17:01:20,214 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-29 17:01:20,234 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-29 17:01:20,254 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-29 17:01:20,293 
+============================================================
+2025-11-29 17:01:20,312 🔂 Signal cycle completed
+2025-11-29 17:01:20,352 ============================================================
+
+2025-11-29 21:01:00,645 
+
+2025-11-29 21:01:00,688 🔀 === New candle detected ===: 2025-11-29 20:01:00 UTC
+2025-11-29 21:01:00,773 
+
+2025-11-29 21:01:00,814 ------------------------------------------------------------
+2025-11-29 21:01:00,850 🌐 Syncronizing positions in broker...
+2025-11-29 21:01:00,932 ------------------------------------------------------------
+2025-11-29 21:01:25,262 ✅ Sync completed: All positions exist in broker
+2025-11-29 21:01:25,350 
+============================================================
+2025-11-29 21:01:25,395 📡 Signal search - 2025-11-29 20:01:25
+2025-11-29 21:01:25,439 ============================================================
+2025-11-29 21:01:25,527 💾 Saving state...
+2025-11-29 21:01:25,574 ➡️ double_top_long: 11/42 candles
+2025-11-29 21:01:25,616 💾 Saving state...
+2025-11-29 21:01:25,654 ➡️ revers_long: 28/42 candles
+2025-11-29 21:01:25,693 💾 Saving state...
+2025-11-29 21:01:25,737 ➡️ parity_long: 28/42 candles
+2025-11-29 21:01:25,782 💾 Saving state...
+2025-11-29 21:01:25,868 ➡️ revers_short: 29/42 candles
+2025-11-29 21:01:25,915 💾 Saving state...
+2025-11-29 21:01:25,959 ➡️ parity_short: 29/42 candles
+2025-11-29 21:01:26,003 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-29 21:01:26,047 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-29 21:01:26,091 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-29 21:01:26,177 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-29 21:01:26,221 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-29 21:01:26,296 
+============================================================
+2025-11-29 21:01:26,340 🔂 Signal cycle completed
+2025-11-29 21:01:26,427 ============================================================
+
+2025-11-30 01:00:45,765 
+
+2025-11-30 01:00:45,852 🔀 === New candle detected ===: 2025-11-30 00:00:45 UTC
+2025-11-30 01:00:45,941 
+
+2025-11-30 01:00:45,985 ------------------------------------------------------------
+2025-11-30 01:00:46,029 🌐 Syncronizing positions in broker...
+2025-11-30 01:00:46,072 ------------------------------------------------------------
+2025-11-30 01:01:11,624 ✅ Sync completed: All positions exist in broker
+2025-11-30 01:01:11,706 
+============================================================
+2025-11-30 01:01:11,749 📡 Signal search - 2025-11-30 00:01:11
+2025-11-30 01:01:11,793 ============================================================
+2025-11-30 01:01:11,838 💾 Saving state...
+2025-11-30 01:01:11,929 ➡️ double_top_long: 12/42 candles
+2025-11-30 01:01:11,975 💾 Saving state...
+2025-11-30 01:01:12,019 ➡️ revers_long: 29/42 candles
+2025-11-30 01:01:12,064 💾 Saving state...
+2025-11-30 01:01:12,108 ➡️ parity_long: 29/42 candles
+2025-11-30 01:01:12,153 💾 Saving state...
+2025-11-30 01:01:12,240 ➡️ revers_short: 30/42 candles
+2025-11-30 01:01:12,286 💾 Saving state...
+2025-11-30 01:01:12,330 ➡️ parity_short: 30/42 candles
+2025-11-30 01:01:12,374 🚫 Skipping signal search for double_top_long (it has 14 open positions)
+2025-11-30 01:01:12,455 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 01:01:12,542 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 01:01:12,588 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 01:01:12,632 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 01:01:12,714 
+============================================================
+2025-11-30 01:01:12,752 🔂 Signal cycle completed
+2025-11-30 01:01:12,862 ============================================================
+
+2025-11-30 04:46:19,181 
+💲 TP REACHED for ENAUSDT (double_top_long)
+2025-11-30 04:46:19,225 →   Closing long position on ENAUSDT:
+2025-11-30 04:46:20,652 ✅ Position closed due to TP: ENAUSDT | Size: 280
+2025-11-30 04:46:21,140 📋 Trade logged: ENAUSDT | Profit: 4.20 USDT (+5.26%) | Duration: 2.5310 days
+2025-11-30 04:46:23,952 💾 Saving state...
+2025-11-30 05:00:47,246 
+
+2025-11-30 05:00:47,290 🔀 === New candle detected ===: 2025-11-30 04:00:47 UTC
+2025-11-30 05:00:47,376 
+
+2025-11-30 05:00:47,419 ------------------------------------------------------------
+2025-11-30 05:00:47,504 🌐 Syncronizing positions in broker...
+2025-11-30 05:00:47,548 ------------------------------------------------------------
+2025-11-30 05:01:09,629 ✅ Sync completed: All positions exist in broker
+2025-11-30 05:01:09,716 
+============================================================
+2025-11-30 05:01:09,760 📡 Signal search - 2025-11-30 04:01:09
+2025-11-30 05:01:09,803 ============================================================
+2025-11-30 05:01:09,906 💾 Saving state...
+2025-11-30 05:01:09,950 ➡️ double_top_long: 13/42 candles
+2025-11-30 05:01:09,992 💾 Saving state...
+2025-11-30 05:01:10,030 ➡️ revers_long: 30/42 candles
+2025-11-30 05:01:10,069 💾 Saving state...
+2025-11-30 05:01:10,105 ➡️ parity_long: 30/42 candles
+2025-11-30 05:01:10,142 💾 Saving state...
+2025-11-30 05:01:10,211 ➡️ revers_short: 31/42 candles
+2025-11-30 05:01:10,253 💾 Saving state...
+2025-11-30 05:01:10,295 ➡️ parity_short: 31/42 candles
+2025-11-30 05:01:10,339 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-11-30 05:01:10,382 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 05:01:10,426 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 05:01:10,470 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 05:01:10,544 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 05:01:10,631 
+============================================================
+2025-11-30 05:01:10,675 🔂 Signal cycle completed
+2025-11-30 05:01:10,789 ============================================================
+
+2025-11-30 09:00:53,722 
+
+2025-11-30 09:00:53,789 🔀 === New candle detected ===: 2025-11-30 08:00:53 UTC
+2025-11-30 09:00:53,855 
+
+2025-11-30 09:00:53,878 ------------------------------------------------------------
+2025-11-30 09:00:53,925 🌐 Syncronizing positions in broker...
+2025-11-30 09:00:53,948 ------------------------------------------------------------
+2025-11-30 09:01:16,636 ✅ Sync completed: All positions exist in broker
+2025-11-30 09:01:16,721 
+============================================================
+2025-11-30 09:01:16,764 📡 Signal search - 2025-11-30 08:01:16
+2025-11-30 09:01:16,807 ============================================================
+2025-11-30 09:01:16,892 💾 Saving state...
+2025-11-30 09:01:16,933 ➡️ double_top_long: 14/42 candles
+2025-11-30 09:01:16,972 💾 Saving state...
+2025-11-30 09:01:17,009 ➡️ revers_long: 31/42 candles
+2025-11-30 09:01:17,046 💾 Saving state...
+2025-11-30 09:01:17,082 ➡️ parity_long: 31/42 candles
+2025-11-30 09:01:17,122 💾 Saving state...
+2025-11-30 09:01:17,204 ➡️ revers_short: 32/42 candles
+2025-11-30 09:01:17,247 💾 Saving state...
+2025-11-30 09:01:17,290 ➡️ parity_short: 32/42 candles
+2025-11-30 09:01:17,332 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-11-30 09:01:17,375 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 09:01:17,418 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 09:01:17,484 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 09:01:17,527 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 09:01:17,648 
+============================================================
+2025-11-30 09:01:17,691 🔂 Signal cycle completed
+2025-11-30 09:01:17,799 ============================================================
+
+2025-11-30 13:00:57,658 
+
+2025-11-30 13:00:57,696 🔀 === New candle detected ===: 2025-11-30 12:00:57 UTC
+2025-11-30 13:00:57,769 
+
+2025-11-30 13:00:57,806 ------------------------------------------------------------
+2025-11-30 13:00:57,843 🌐 Syncronizing positions in broker...
+2025-11-30 13:00:57,934 ------------------------------------------------------------
+2025-11-30 13:01:21,308 ✅ Sync completed: All positions exist in broker
+2025-11-30 13:01:21,381 
+============================================================
+2025-11-30 13:01:21,417 📡 Signal search - 2025-11-30 12:01:21
+2025-11-30 13:01:21,453 ============================================================
+2025-11-30 13:01:21,489 💾 Saving state...
+2025-11-30 13:01:21,526 ➡️ double_top_long: 15/42 candles
+2025-11-30 13:01:21,587 💾 Saving state...
+2025-11-30 13:01:21,622 ➡️ revers_long: 32/42 candles
+2025-11-30 13:01:21,659 💾 Saving state...
+2025-11-30 13:01:21,695 ➡️ parity_long: 32/42 candles
+2025-11-30 13:01:21,732 💾 Saving state...
+2025-11-30 13:01:21,768 ➡️ revers_short: 33/42 candles
+2025-11-30 13:01:21,807 💾 Saving state...
+2025-11-30 13:01:21,880 ➡️ parity_short: 33/42 candles
+2025-11-30 13:01:21,919 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-11-30 13:01:21,956 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 13:01:21,994 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 13:01:22,032 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 13:01:22,069 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 13:01:22,180 
+============================================================
+2025-11-30 13:01:22,218 🔂 Signal cycle completed
+2025-11-30 13:01:22,291 ============================================================
+
+2025-11-30 17:00:45,978 
+
+2025-11-30 17:00:46,018 🔀 === New candle detected ===: 2025-11-30 16:00:45 UTC
+2025-11-30 17:00:46,060 
+
+2025-11-30 17:00:46,080 ------------------------------------------------------------
+2025-11-30 17:00:46,100 🌐 Syncronizing positions in broker...
+2025-11-30 17:00:46,120 ------------------------------------------------------------
+2025-11-30 17:01:09,885 ✅ Sync completed: All positions exist in broker
+2025-11-30 17:01:09,924 
+============================================================
+2025-11-30 17:01:09,944 📡 Signal search - 2025-11-30 16:01:09
+2025-11-30 17:01:09,963 ============================================================
+2025-11-30 17:01:10,013 💾 Saving state...
+2025-11-30 17:01:10,036 ➡️ double_top_long: 16/42 candles
+2025-11-30 17:01:10,060 💾 Saving state...
+2025-11-30 17:01:10,082 ➡️ revers_long: 33/42 candles
+2025-11-30 17:01:10,103 💾 Saving state...
+2025-11-30 17:01:10,126 ➡️ parity_long: 33/42 candles
+2025-11-30 17:01:10,147 💾 Saving state...
+2025-11-30 17:01:10,168 ➡️ revers_short: 34/42 candles
+2025-11-30 17:01:10,190 💾 Saving state...
+2025-11-30 17:01:10,211 ➡️ parity_short: 34/42 candles
+2025-11-30 17:01:10,231 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-11-30 17:01:10,273 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 17:01:10,294 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 17:01:10,315 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 17:01:10,338 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 17:01:10,383 
+============================================================
+2025-11-30 17:01:10,403 🔂 Signal cycle completed
+2025-11-30 17:01:10,444 ============================================================
+
+2025-11-30 17:04:31,219 
+🔚 Interrupted by user.
+2025-11-30 17:04:31,265 💾 Saving state...
+2025-11-30 17:04:31,287 ⛔ BOT Stopped
+2025-11-30 17:04:55,100 
+🚀 === Starting multi-strategy bot... ===
+2025-11-30 17:04:55,100 ✅  State loaded: 40 positions recovered
+2025-11-30 17:04:55,100    ➡️  double_top_long: 13 positions | Candles: 16
+2025-11-30 17:04:55,100       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-30 17:04:55,100       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-30 17:04:55,100       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-30 17:04:55,100       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-30 17:04:55,100       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-30 17:04:55,100       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-30 17:04:55,100       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-30 17:04:55,100       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-30 17:04:55,100       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-30 17:04:55,100       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-30 17:04:55,100       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-30 17:04:55,100       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-30 17:04:55,100       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-30 17:04:55,100    ➡️  revers_long: 4 positions | Candles: 33
+2025-11-30 17:04:55,100       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-30 17:04:55,100       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-30 17:04:55,100       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-30 17:04:55,100       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-30 17:04:55,100    ➡️  parity_long: 4 positions | Candles: 33
+2025-11-30 17:04:55,100       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-30 17:04:55,100       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-30 17:04:55,100       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-30 17:04:55,100       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-30 17:04:55,100    ➡️  revers_short: 6 positions | Candles: 34
+2025-11-30 17:04:55,100       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-30 17:04:55,100       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-30 17:04:55,100       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-30 17:04:55,100       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-30 17:04:55,100       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-30 17:04:55,100       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-30 17:04:55,100    ➡️  parity_short: 13 positions | Candles: 34
+2025-11-30 17:04:55,100       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-30 17:04:55,100       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-30 17:04:55,100       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-30 17:04:55,100       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-30 17:04:55,100       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-30 17:04:55,100       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-30 17:04:55,100       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-30 17:04:55,100       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-30 17:04:55,100       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-30 17:04:55,100       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-30 17:04:55,100       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-30 17:04:55,100       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-30 17:04:55,100       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-30 17:04:58,714 🔹 Strategy double_top_long: 32 symbols
+2025-11-30 17:04:58,716 🔹 Strategy revers_long: 32 symbols
+2025-11-30 17:04:58,719 🔹 Strategy parity_long: 32 symbols
+2025-11-30 17:04:58,722 🔹 Strategy revers_short: 32 symbols
+2025-11-30 17:04:58,725 🔹 Strategy parity_short: 32 symbols
+2025-11-30 17:04:58,725 ✅ BOT Initialization completed
+
+2025-11-30 17:04:58,725 ============================================================
+2025-11-30 17:06:35,682 
+🚀 === Starting multi-strategy bot... ===
+2025-11-30 17:06:35,683 ✅  State loaded: 40 positions recovered
+2025-11-30 17:06:35,683    ➡️  double_top_long: 13 positions | Candles: 16
+2025-11-30 17:06:35,683       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-30 17:06:35,683       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-30 17:06:35,683       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-30 17:06:35,683       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-30 17:06:35,683       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-30 17:06:35,683       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-30 17:06:35,683       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-30 17:06:35,683       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-30 17:06:35,683       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-30 17:06:35,683       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-30 17:06:35,683       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-30 17:06:35,683       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-30 17:06:35,683       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-30 17:06:35,683    ➡️  revers_long: 4 positions | Candles: 33
+2025-11-30 17:06:35,683       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-30 17:06:35,683       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-30 17:06:35,683       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-30 17:06:35,683       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-30 17:06:35,683    ➡️  parity_long: 4 positions | Candles: 33
+2025-11-30 17:06:35,683       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-30 17:06:35,683       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-30 17:06:35,683       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-30 17:06:35,683       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-30 17:06:35,683    ➡️  revers_short: 6 positions | Candles: 34
+2025-11-30 17:06:35,683       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-30 17:06:35,683       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-30 17:06:35,683       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-30 17:06:35,683       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-30 17:06:35,683       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-30 17:06:35,683       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-30 17:06:35,683    ➡️  parity_short: 13 positions | Candles: 34
+2025-11-30 17:06:35,683       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-30 17:06:35,683       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-30 17:06:35,683       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-30 17:06:35,683       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-30 17:06:35,683       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-30 17:06:35,683       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-30 17:06:35,683       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-30 17:06:35,683       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-30 17:06:35,683       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-30 17:06:35,683       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-30 17:06:35,683       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-30 17:06:35,683       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-30 17:06:35,683       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-30 17:06:39,273 🔹 Strategy double_top_long: 32 symbols
+2025-11-30 17:06:39,276 🔹 Strategy revers_long: 32 symbols
+2025-11-30 17:06:39,278 🔹 Strategy parity_long: 32 symbols
+2025-11-30 17:06:39,281 🔹 Strategy revers_short: 32 symbols
+2025-11-30 17:06:39,284 🔹 Strategy parity_short: 32 symbols
+2025-11-30 17:06:39,284 ✅ BOT Initialization completed
+
+2025-11-30 17:06:39,284 ============================================================
+2025-11-30 19:11:09,693 
+🔚 Interrupted by user.
+2025-11-30 19:11:09,713 ⛔ BOT Stopped
+2025-11-30 19:11:16,427 
+🚀 === Starting multi-strategy bot... ===
+2025-11-30 19:11:16,427 ✅  State loaded: 40 positions recovered
+2025-11-30 19:11:16,427    ➡️  double_top_long: 13 positions | Candles: 16
+2025-11-30 19:11:16,427       - 1000BONKUSDT | Size: 8010       | Entry: 0.00999   
+2025-11-30 19:11:16,427       - AAVEUSDT     | Size: 0.4        | Entry: 185.29    
+2025-11-30 19:11:16,427       - ADAUSDT      | Size: 184        | Entry: 0.4329    
+2025-11-30 19:11:16,427       - AVAXUSDT     | Size: 5.3        | Entry: 14.951    
+2025-11-30 19:11:16,427       - DOGEUSDT     | Size: 520        | Entry: 0.15379   
+2025-11-30 19:11:16,427       - HBARUSDT     | Size: 547        | Entry: 0.14632   
+2025-11-30 19:11:16,427       - LINKUSDT     | Size: 5          | Entry: 13.463    
+2025-11-30 19:11:16,427       - PENGUUSDT    | Size: 6973       | Entry: 0.011475  
+2025-11-30 19:11:16,427       - SOLUSDT      | Size: 0.5        | Entry: 142.086   
+2025-11-30 19:11:16,427       - SUIUSDT      | Size: 51.5       | Entry: 1.5497    
+2025-11-30 19:11:16,427       - WIFUSDT      | Size: 207.4      | Entry: 0.3857    
+2025-11-30 19:11:16,427       - WLDUSDT      | Size: 121        | Entry: 0.6588    
+2025-11-30 19:11:16,427       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-11-30 19:11:16,427    ➡️  revers_long: 4 positions | Candles: 33
+2025-11-30 19:11:16,427       - ARBUSDT      | Size: 364.46     | Entry: 0.2195    
+2025-11-30 19:11:16,427       - DOGEUSDT     | Size: 524        | Entry: 0.15249   
+2025-11-30 19:11:16,427       - HBARUSDT     | Size: 541        | Entry: 0.14762   
+2025-11-30 19:11:16,427       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-11-30 19:11:16,427    ➡️  parity_long: 4 positions | Candles: 33
+2025-11-30 19:11:16,427       - ARBUSDT      | Size: 364.29     | Entry: 0.2196    
+2025-11-30 19:11:16,427       - DOGEUSDT     | Size: 525        | Entry: 0.15235   
+2025-11-30 19:11:16,427       - HBARUSDT     | Size: 542        | Entry: 0.1475222878228782287822878229
+2025-11-30 19:11:16,427       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-11-30 19:11:16,427    ➡️  revers_short: 6 positions | Candles: 34
+2025-11-30 19:11:16,427       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-11-30 19:11:16,427       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-11-30 19:11:16,427       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-11-30 19:11:16,427       - HBARUSDT     | Size: 561        | Entry: 0.14262   
+2025-11-30 19:11:16,427       - LTCUSDT      | Size: 0.9        | Entry: 84.19     
+2025-11-30 19:11:16,427       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-11-30 19:11:16,427    ➡️  parity_short: 13 positions | Candles: 34
+2025-11-30 19:11:16,427       - ADAUSDT      | Size: 192        | Entry: 0.4149    
+2025-11-30 19:11:16,427       - ARBUSDT      | Size: 384.61     | Entry: 0.2079    
+2025-11-30 19:11:16,427       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-11-30 19:11:16,428       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-11-30 19:11:16,428       - DOGEUSDT     | Size: 541        | Entry: 0.14775   
+2025-11-30 19:11:16,428       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-11-30 19:11:16,428       - HBARUSDT     | Size: 557        | Entry: 0.14349   
+2025-11-30 19:11:16,428       - LINKUSDT     | Size: 6          | Entry: 12.685    
+2025-11-30 19:11:16,428       - LTCUSDT      | Size: 0.9        | Entry: 84.59     
+2025-11-30 19:11:16,428       - SEIUSDT      | Size: 596        | Entry: 0.13395   
+2025-11-30 19:11:16,428       - SOLUSDT      | Size: 0.6        | Entry: 132.404   
+2025-11-30 19:11:16,428       - WLDUSDT      | Size: 129        | Entry: 0.6185    
+2025-11-30 19:11:16,428       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-11-30 19:11:19,987 🔹 Strategy double_top_long: 32 symbols
+2025-11-30 19:11:19,990 🔹 Strategy revers_long: 32 symbols
+2025-11-30 19:11:19,993 🔹 Strategy parity_long: 32 symbols
+2025-11-30 19:11:19,995 🔹 Strategy revers_short: 32 symbols
+2025-11-30 19:11:19,998 🔹 Strategy parity_short: 32 symbols
+2025-11-30 19:11:19,998 ✅ BOT Initialization completed
+
+2025-11-30 19:11:19,998 ============================================================
