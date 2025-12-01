@@ -22,9 +22,10 @@ N_JOBS             =-1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2025_scalping_IS"
-TIMEFRAME_MINOR     = '30m'
+DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 400
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
@@ -32,13 +33,13 @@ MIN_VOL_USDT        = 10_000_000
 
 SELL_AFTER_LIST = [0]
 
-RSI_LIST        = [75,80,85]
+RSI_LIST        = [30,40,50]
 ADX_LIST        = [25,30,35]
 LOOKBACK_LIST   = [10,20,30,40,50]
 TORELANCE_LIST  = [2,5,10,15]
 
 TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
-SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
+SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0,7.5,10]
 
 # =============================================================================
 # SELL_AFTER_LIST = [0]
@@ -62,7 +63,7 @@ lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 # -----------------------------------------------------------------------------
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
+ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=False)
 
 save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
@@ -76,7 +77,7 @@ def process_combo(comb):
     ohlcv_arrays = {}
 
     for sym, arrs in ohlcv_arr.items():
-        signal = scalping_short(
+        signal = scalping_long(
             arrs,
             rsi_max=params.get('RSI'),
             adx_min=params.get('ADX'),

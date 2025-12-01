@@ -110,13 +110,14 @@ try:
     
         else:
             print(f"🚫 {datetime.now(MADRID_TZ).strftime('%H:%M')} - Trades ongoing...")
+            print(f"🔹 Currently open positions: {len(open_positions)}")
     
         # -------------------------------
         # ORDERS MANAGEMENT
         # -------------------------------
         manage_open_positions(open_positions, send_request_fn=send_request_02, product_type=PRODUCT_TYPE)
         save_state(open_positions, STATE_FILE)
-        print("🔂 Signal cycle completed")
+        print("🔂 === Signal cycle completed ===")
 
 except KeyboardInterrupt:
     print("\n🔚 Interrupted by user.")

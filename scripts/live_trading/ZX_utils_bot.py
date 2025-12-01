@@ -124,9 +124,7 @@ def sync_broker(open_positions, strategy_candles, state_file, send_request_func)
     Verifica si las posiciones locales existen en el broker.
     Si no existen, las elimina del registro local. Nada más.
     """
-    print(f"{'-' * 60}")
     print("🌐 Syncronizing positions in broker...")
-    print(f"{'-' * 60}")
     total_removed = 0
     
     for strat_id, positions in list(open_positions.items()):
@@ -512,7 +510,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 
     print(f"\n⏱ TIMEOUT REACHED for strategy {strat_id}")
     print(f"➡ Candles ongoing         : {candles_elapsed}/{sell_after_ncandles}")
-    print(f"→  Closing {len(positions)} positions...")
+    print(f"→ Closing {len(positions)} positions...")
 
     all_closed = True
     for pos in positions:
@@ -532,7 +530,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         save_state_local(open_positions, strategy_candles, state_file)
 
 # ==========================================================================
-# HELPER FUNCTIONS
+# DISPLAY
 # ==========================================================================
 console       = Console()
 _live_display = None
@@ -660,7 +658,7 @@ def create_tp_sl_display(now, total_pnl=None):
     """Crea el header y la tabla para el display de TP/SL"""
     # Crear el header con PnL total si se proporciona
     header = Text()
-    header.append(f"{'─' * 60}\n", style="blue")
+    header.append(f"{'─' *100}\n", style="blue")
     header.append(f"🔷 Checking TP/SL - {now}\n", style="bold cyan")
     
     if total_pnl is not None:
@@ -668,7 +666,7 @@ def create_tp_sl_display(now, total_pnl=None):
         header.append(f"💰 Total PnL: ", style="white")
         header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
     
-    header.append(f"{'─' * 60}\n", style="blue")
+    header.append(f"{'─' * 100}\n", style="blue")
     
     # Crear tabla con columnas adicionales: opened_at y candles
     table = Table(show_header=True, header_style="bold white", border_style="white")
@@ -820,9 +818,7 @@ def process_strategy(
     """
     strat_id = strat['id']
 
-    print(f"\n{'─' * 40}")
     print(f"🔄 Processing strategy: {strat_id}")
-    print(f"{'─' * 40}")
 
     # Detectar señales
     if use_hardcoded:
@@ -947,7 +943,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
         
         
-        print(f"→   Closing {direction} position on {symbol}:")   
+        print(f"→  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(1.0)
         

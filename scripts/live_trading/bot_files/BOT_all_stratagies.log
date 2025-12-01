@@ -14650,3 +14650,486 @@
 2025-11-30 19:11:19,998 ✅ BOT Initialization completed
 
 2025-11-30 19:11:19,998 ============================================================
+2025-11-30 21:00:55,507 
+
+2025-11-30 21:00:55,525 🔀 === New candle detected ===: 2025-11-30 20:00:55 UTC
+2025-11-30 21:00:55,581 
+
+2025-11-30 21:00:55,600 ------------------------------------------------------------
+2025-11-30 21:00:55,619 🌐 Syncronizing positions in broker...
+2025-11-30 21:00:55,638 ------------------------------------------------------------
+2025-11-30 21:01:29,514 ✅ Sync completed: All positions exist in broker
+2025-11-30 21:01:29,555 
+============================================================
+2025-11-30 21:01:29,574 📡 Signal search - 2025-11-30 20:01:29
+2025-11-30 21:01:29,594 ============================================================
+2025-11-30 21:01:29,614 ➡️ double_top_long: 17/50 candles
+2025-11-30 21:01:29,655 ➡️ revers_long: 34/50 candles
+2025-11-30 21:01:29,674 ➡️ parity_long: 34/50 candles
+2025-11-30 21:01:29,694 ➡️ revers_short: 35/50 candles
+2025-11-30 21:01:29,713 ➡️ parity_short: 35/50 candles
+2025-11-30 21:01:29,736 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-11-30 21:01:29,755 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-11-30 21:01:29,775 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-11-30 21:01:29,794 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-11-30 21:01:29,814 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-11-30 21:01:29,893 
+============================================================
+2025-11-30 21:01:29,930 🔂 Signal cycle completed
+2025-11-30 21:01:29,967 ============================================================
+
+2025-11-30 22:38:48,938 🔔 No price for HBARUSDT
+2025-12-01 01:00:58,845 
+
+2025-12-01 01:00:58,863 🔀 === New candle detected ===: 2025-12-01 00:00:58 UTC
+2025-12-01 01:00:58,899 
+
+2025-12-01 01:00:58,917 ------------------------------------------------------------
+2025-12-01 01:00:58,935 🌐 Syncronizing positions in broker...
+2025-12-01 01:00:58,953 ------------------------------------------------------------
+2025-12-01 01:01:21,380 ✅ Sync completed: All positions exist in broker
+2025-12-01 01:01:21,421 
+============================================================
+2025-12-01 01:01:21,441 📡 Signal search - 2025-12-01 00:01:21
+2025-12-01 01:01:21,480 ============================================================
+2025-12-01 01:01:21,500 ➡️ double_top_long: 18/50 candles
+2025-12-01 01:01:21,520 ➡️ revers_long: 35/50 candles
+2025-12-01 01:01:21,540 ➡️ parity_long: 35/50 candles
+2025-12-01 01:01:21,560 ➡️ revers_short: 36/50 candles
+2025-12-01 01:01:21,579 ➡️ parity_short: 36/50 candles
+2025-12-01 01:01:21,598 🚫 Skipping signal search for double_top_long (it has 13 open positions)
+2025-12-01 01:01:21,617 🚫 Skipping signal search for revers_long (it has 4 open positions)
+2025-12-01 01:01:21,635 🚫 Skipping signal search for parity_long (it has 4 open positions)
+2025-12-01 01:01:21,654 🚫 Skipping signal search for revers_short (it has 6 open positions)
+2025-12-01 01:01:21,672 🚫 Skipping signal search for parity_short (it has 13 open positions)
+2025-12-01 01:01:21,709 
+============================================================
+2025-12-01 01:01:21,728 🔂 Signal cycle completed
+2025-12-01 01:01:21,787 ============================================================
+
+2025-12-01 01:09:11,446 
+💲 TP REACHED for LTCUSDT (parity_short)
+2025-12-01 01:09:11,465 →   Closing short position on LTCUSDT:
+2025-12-01 01:09:12,807 ✅ Position closed due to TP: LTCUSDT | Size: 0.9
+2025-12-01 01:09:13,162 📋 Trade logged: LTCUSDT | Profit: 3.91 USDT (+5.13%) | Duration: 6.3788 days
+2025-12-01 01:10:39,173 
+💲 TP REACHED for LTCUSDT (revers_short)
+2025-12-01 01:10:39,191 →   Closing short position on LTCUSDT:
+2025-12-01 01:10:40,572 ✅ Position closed due to TP: LTCUSDT | Size: 0.9
+2025-12-01 01:10:40,927 📋 Trade logged: LTCUSDT | Profit: 3.74 USDT (+4.94%) | Duration: 6.3807 days
+2025-12-01 01:11:01,925 
+🔻 SL REACHED for AVAXUSDT (double_top_long)
+2025-12-01 01:11:01,944 →   Closing long position on AVAXUSDT:
+2025-12-01 01:11:03,299 🔔 No closing position available AVAXUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764547862122, 'data': None}
+2025-12-01 01:11:03,336    → Removing from local record (nonexistent position)
+2025-12-01 01:11:03,756 📋 Trade logged: AVAXUSDT | Profit: -8.06 USDT (-10.07%) | Duration: 3.3816 days
+2025-12-01 01:11:05,087 
+🔻 SL REACHED for PENGUUSDT (double_top_long)
+2025-12-01 01:11:05,106 →   Closing long position on PENGUUSDT:
+2025-12-01 01:11:06,474 🔔 No closing position available PENGUUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764547865291, 'data': None}
+2025-12-01 01:11:06,494    → Removing from local record (nonexistent position)
+2025-12-01 01:11:06,833 📋 Trade logged: PENGUUSDT | Profit: -7.99 USDT (-9.99%) | Duration: 3.3813 days
+2025-12-01 01:19:07,489 
+🔻 SL REACHED for 1000BONKUSDT (double_top_long)
+2025-12-01 01:19:07,507 →   Closing long position on 1000BONKUSDT:
+2025-12-01 01:19:08,883 🔔 No closing position available 1000BONKUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764548347688, 'data': None}
+2025-12-01 01:19:08,901    → Removing from local record (nonexistent position)
+2025-12-01 01:19:09,228 📋 Trade logged: 1000BONKUSDT | Profit: -8.12 USDT (-10.15%) | Duration: 3.3873 days
+2025-12-01 01:19:12,507 
+🔻 SL REACHED for WLDUSDT (double_top_long)
+2025-12-01 01:19:12,543 →   Closing long position on WLDUSDT:
+2025-12-01 01:19:13,900 🔔 No closing position available WLDUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764548352733, 'data': None}
+2025-12-01 01:19:13,917    → Removing from local record (nonexistent position)
+2025-12-01 01:19:14,346 📋 Trade logged: WLDUSDT | Profit: -8.12 USDT (-10.15%) | Duration: 3.3868 days
+2025-12-01 01:29:26,410 
+💲 TP REACHED for HBARUSDT (parity_short)
+2025-12-01 01:29:26,429 →   Closing short position on HBARUSDT:
+2025-12-01 01:29:27,798 ✅ Position closed due to TP: HBARUSDT | Size: 557
+2025-12-01 01:29:28,136 📋 Trade logged: HBARUSDT | Profit: 4.07 USDT (+5.09%) | Duration: 6.3930 days
+2025-12-01 01:29:49,653 
+🔻 SL REACHED for WIFUSDT (double_top_long)
+2025-12-01 01:29:49,672 →   Closing long position on WIFUSDT:
+2025-12-01 01:29:51,038 🔔 No closing position available WIFUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764548989856, 'data': None}
+2025-12-01 01:29:51,055    → Removing from local record (nonexistent position)
+2025-12-01 01:29:51,381 📋 Trade logged: WIFUSDT | Profit: -7.94 USDT (-9.93%) | Duration: 3.3942 days
+2025-12-01 01:32:28,570 
+💲 TP REACHED for WLDUSDT (parity_short)
+2025-12-01 01:32:28,585 →   Closing short position on WLDUSDT:
+2025-12-01 01:32:29,963 ✅ Position closed due to TP: WLDUSDT | Size: 129
+2025-12-01 01:32:30,330 📋 Trade logged: WLDUSDT | Profit: 3.93 USDT (+4.93%) | Duration: 6.3946 days
+2025-12-01 01:33:58,494 
+💲 TP REACHED for DOGEUSDT (parity_short)
+2025-12-01 01:33:58,509 →   Closing short position on DOGEUSDT:
+2025-12-01 01:33:59,871 ✅ Position closed due to TP: DOGEUSDT | Size: 541
+2025-12-01 01:34:00,222 📋 Trade logged: DOGEUSDT | Profit: 3.98 USDT (+4.98%) | Duration: 6.3963 days
+2025-12-01 01:35:27,974 
+💲 TP REACHED for HBARUSDT (revers_short)
+2025-12-01 01:35:27,989 →   Closing short position on HBARUSDT:
+2025-12-01 01:35:29,369 ✅ Position closed due to TP: HBARUSDT | Size: 561
+2025-12-01 01:35:29,720 📋 Trade logged: HBARUSDT | Profit: 4.08 USDT (+5.10%) | Duration: 6.3980 days
+2025-12-01 01:38:32,514 
+💲 TP REACHED for ADAUSDT (parity_short)
+2025-12-01 01:38:32,528 →   Closing short position on ADAUSDT:
+2025-12-01 01:38:33,897 ✅ Position closed due to TP: ADAUSDT | Size: 192
+2025-12-01 01:38:34,248 📋 Trade logged: ADAUSDT | Profit: 4.05 USDT (+5.09%) | Duration: 6.3998 days
+2025-12-01 01:51:08,433 
+🔻 SL REACHED for SUIUSDT (double_top_long)
+2025-12-01 01:51:08,447 →   Closing long position on SUIUSDT:
+2025-12-01 01:51:09,828 🔔 No closing position available SUIUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764550268621, 'data': None}
+2025-12-01 01:51:09,843    → Removing from local record (nonexistent position)
+2025-12-01 01:51:10,191 📋 Trade logged: SUIUSDT | Profit: -8.03 USDT (-10.04%) | Duration: 3.4091 days
+2025-12-01 01:51:10,893 
+🔻 SL REACHED for ARBUSDT (revers_long)
+2025-12-01 01:51:10,906 →   Closing long position on ARBUSDT:
+2025-12-01 01:51:12,287 🔔 No closing position available ARBUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764550271093, 'data': None}
+2025-12-01 01:51:12,317    → Removing from local record (nonexistent position)
+2025-12-01 01:51:12,740 📋 Trade logged: ARBUSDT | Profit: -8.09 USDT (-10.11%) | Duration: 6.2432 days
+2025-12-01 01:51:14,063 
+🔻 SL REACHED for ARBUSDT (parity_long)
+2025-12-01 01:51:14,076 →   Closing long position on ARBUSDT:
+2025-12-01 01:51:15,460 🔔 No closing position available ARBUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764550274261, 'data': None}
+2025-12-01 01:51:15,476    → Removing from local record (nonexistent position)
+2025-12-01 01:51:15,907 📋 Trade logged: ARBUSDT | Profit: -8.12 USDT (-10.15%) | Duration: 6.2427 days
+2025-12-01 01:51:18,774 
+💲 TP REACHED for ARBUSDT (parity_short)
+2025-12-01 01:51:18,787 →   Closing short position on ARBUSDT:
+2025-12-01 01:51:20,170 ✅ Position closed due to TP: ARBUSDT | Size: 384.61
+2025-12-01 01:51:20,533 📋 Trade logged: ARBUSDT | Profit: 4.12 USDT (+5.15%) | Duration: 6.4085 days
+2025-12-01 01:53:38,658 
+🔻 SL REACHED for SOLUSDT (double_top_long)
+2025-12-01 01:53:38,671 →   Closing long position on SOLUSDT:
+2025-12-01 01:53:40,050 🔔 No closing position available SOLUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764550418867, 'data': None}
+2025-12-01 01:53:40,063    → Removing from local record (nonexistent position)
+2025-12-01 01:53:40,497 📋 Trade logged: SOLUSDT | Profit: -7.96 USDT (-9.95%) | Duration: 3.4109 days
+2025-12-01 01:56:42,053 
+🔻 SL REACHED for ADAUSDT (double_top_long)
+2025-12-01 01:56:42,065 →   Closing long position on ADAUSDT:
+2025-12-01 01:56:43,450 🔔 No closing position available ADAUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764550602248, 'data': None}
+2025-12-01 01:56:43,462    → Removing from local record (nonexistent position)
+2025-12-01 01:56:43,795 📋 Trade logged: ADAUSDT | Profit: -8.06 USDT (-10.07%) | Duration: 3.4133 days
+2025-12-01 03:48:43,770 
+🔻 SL REACHED for DOGEUSDT (double_top_long)
+2025-12-01 03:48:43,781 →   Closing long position on DOGEUSDT:
+2025-12-01 03:48:45,176 🔔 No closing position available DOGEUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764557323959, 'data': None}
+2025-12-01 03:48:45,188    → Removing from local record (nonexistent position)
+2025-12-01 03:48:45,518 📋 Trade logged: DOGEUSDT | Profit: -8.02 USDT (-10.03%) | Duration: 3.4910 days
+2025-12-01 04:08:13,091 
+💲 TP REACHED for SEIUSDT (parity_short)
+2025-12-01 04:08:13,105 →   Closing short position on SEIUSDT:
+2025-12-01 04:08:14,499 ✅ Position closed due to TP: SEIUSDT | Size: 596
+2025-12-01 04:08:14,836 📋 Trade logged: SEIUSDT | Profit: 4.08 USDT (+5.11%) | Duration: 6.5029 days
+2025-12-01 04:39:37,574 
+🔻 SL REACHED for LINKUSDT (double_top_long)
+2025-12-01 04:39:37,585 →   Closing long position on LINKUSDT:
+2025-12-01 04:39:38,974 🔔 No closing position available LINKUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764560377760, 'data': None}
+2025-12-01 04:39:38,984    → Removing from local record (nonexistent position)
+2025-12-01 04:39:39,318 📋 Trade logged: LINKUSDT | Profit: -8.01 USDT (-10.01%) | Duration: 3.5262 days
+2025-12-01 04:39:40,040 
+🔻 SL REACHED for DOGEUSDT (revers_long)
+2025-12-01 04:39:40,063 →   Closing long position on DOGEUSDT:
+2025-12-01 04:39:41,431 🔔 No closing position available DOGEUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764560380232, 'data': None}
+2025-12-01 04:39:41,441    → Removing from local record (nonexistent position)
+2025-12-01 04:39:41,776 📋 Trade logged: DOGEUSDT | Profit: -8.09 USDT (-10.13%) | Duration: 6.3602 days
+2025-12-01 04:39:42,701 
+🔻 SL REACHED for DOGEUSDT (parity_long)
+2025-12-01 04:39:42,713 →   Closing long position on DOGEUSDT:
+2025-12-01 04:39:44,094 🔔 No closing position available DOGEUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764560382886, 'data': None}
+2025-12-01 04:39:44,106    → Removing from local record (nonexistent position)
+2025-12-01 04:39:44,542 📋 Trade logged: DOGEUSDT | Profit: -8.03 USDT (-10.04%) | Duration: 6.3597 days
+2025-12-01 04:47:45,513 
+🔻 SL REACHED for AAVEUSDT (double_top_long)
+2025-12-01 04:47:45,523 →   Closing long position on AAVEUSDT:
+2025-12-01 04:47:46,915 🔔 No closing position available AAVEUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764560865688, 'data': None}
+2025-12-01 04:47:46,924    → Removing from local record (nonexistent position)
+2025-12-01 04:47:47,263 📋 Trade logged: AAVEUSDT | Profit: -8.03 USDT (-10.04%) | Duration: 3.5322 days
+2025-12-01 05:00:45,707 
+
+2025-12-01 05:00:45,715 🔀 === New candle detected ===: 2025-12-01 04:00:45 UTC
+2025-12-01 05:00:45,732 
+
+2025-12-01 05:00:45,750 ------------------------------------------------------------
+2025-12-01 05:00:45,759 🌐 Syncronizing positions in broker...
+2025-12-01 05:00:45,767 ------------------------------------------------------------
+2025-12-01 05:00:46,108 → Position HBARUSDT doesn't exist in broker - removing from double_top_long
+2025-12-01 05:00:47,105 → Position HBARUSDT doesn't exist in broker - removing from revers_long
+2025-12-01 05:00:48,158 → Position HBARUSDT doesn't exist in broker - removing from parity_long
+2025-12-01 05:00:54,100 ✅ Sync completed: 3 position(s) removed
+2025-12-01 05:00:54,117 
+============================================================
+2025-12-01 05:00:54,127 📡 Signal search - 2025-12-01 04:00:54
+2025-12-01 05:00:54,135 ============================================================
+2025-12-01 05:00:54,144 ➡️ double_top_long: 19/50 candles
+2025-12-01 05:00:54,153 ➡️ revers_long: 36/50 candles
+2025-12-01 05:00:54,162 ➡️ parity_long: 36/50 candles
+2025-12-01 05:00:54,170 ➡️ revers_short: 37/50 candles
+2025-12-01 05:00:54,179 ➡️ parity_short: 37/50 candles
+2025-12-01 05:00:54,188 🚫 Skipping signal search for double_top_long (it has 1 open positions)
+2025-12-01 05:00:54,196 🚫 Skipping signal search for revers_long (it has 1 open positions)
+2025-12-01 05:00:54,205 🚫 Skipping signal search for parity_long (it has 1 open positions)
+2025-12-01 05:00:54,214 🚫 Skipping signal search for revers_short (it has 4 open positions)
+2025-12-01 05:00:54,223 🚫 Skipping signal search for parity_short (it has 6 open positions)
+2025-12-01 05:00:54,242 
+============================================================
+2025-12-01 05:00:54,251 🔂 Signal cycle completed
+2025-12-01 05:00:54,269 ============================================================
+
+2025-12-01 06:20:33,875 
+💲 TP REACHED for SOLUSDT (parity_short)
+2025-12-01 06:20:33,882 →   Closing short position on SOLUSDT:
+2025-12-01 06:20:35,379 ✅ Position closed due to TP: SOLUSDT | Size: 0.6
+2025-12-01 06:20:35,731 📋 Trade logged: SOLUSDT | Profit: 3.99 USDT (+5.02%) | Duration: 6.5948 days
+2025-12-01 06:38:55,912 
+💲 TP REACHED for LINKUSDT (parity_short)
+2025-12-01 06:38:55,919 →   Closing short position on LINKUSDT:
+2025-12-01 06:38:57,314 ✅ Position closed due to TP: LINKUSDT | Size: 6
+2025-12-01 06:38:57,769 📋 Trade logged: LINKUSDT | Profit: 3.86 USDT (+5.08%) | Duration: 6.6078 days
+2025-12-01 09:00:45,030 
+
+2025-12-01 09:00:45,037 🔀 === New candle detected ===: 2025-12-01 08:00:45 UTC
+2025-12-01 09:00:45,050 
+
+2025-12-01 09:00:45,056 ------------------------------------------------------------
+2025-12-01 09:00:45,063 🌐 Syncronizing positions in broker...
+2025-12-01 09:00:45,069 ------------------------------------------------------------
+2025-12-01 09:00:51,280 ✅ Sync completed: All positions exist in broker
+2025-12-01 09:00:51,293 
+============================================================
+2025-12-01 09:00:51,300 📡 Signal search - 2025-12-01 08:00:51
+2025-12-01 09:00:51,306 ============================================================
+2025-12-01 09:00:51,313 ➡️ double_top_long: 20/50 candles
+2025-12-01 09:00:51,321 ➡️ revers_long: 37/50 candles
+2025-12-01 09:00:51,328 ➡️ parity_long: 37/50 candles
+2025-12-01 09:00:51,334 ➡️ revers_short: 38/50 candles
+2025-12-01 09:00:51,341 ➡️ parity_short: 38/50 candles
+2025-12-01 09:00:51,347 🚫 Skipping signal search for double_top_long (it has 1 open positions)
+2025-12-01 09:00:51,355 🚫 Skipping signal search for revers_long (it has 1 open positions)
+2025-12-01 09:00:51,361 🚫 Skipping signal search for parity_long (it has 1 open positions)
+2025-12-01 09:00:51,367 🚫 Skipping signal search for revers_short (it has 4 open positions)
+2025-12-01 09:00:51,373 🚫 Skipping signal search for parity_short (it has 4 open positions)
+2025-12-01 09:00:51,386 
+============================================================
+2025-12-01 09:00:51,392 🔂 Signal cycle completed
+2025-12-01 09:00:51,412 ============================================================
+
+2025-12-01 09:34:46,906 
+🔚 Interrupted by user.
+2025-12-01 09:34:46,914 ⛔ BOT Stopped
+2025-12-01 09:34:53,663 
+🚀 === Starting multi-strategy bot... ===
+2025-12-01 09:34:53,663 ✅  State loaded: 11 positions recovered
+2025-12-01 09:34:53,664    ➡️  double_top_long: 1 positions | Candles: 20
+2025-12-01 09:34:53,664       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-12-01 09:34:53,664    ➡️  revers_long: 1 positions | Candles: 37
+2025-12-01 09:34:53,664       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-12-01 09:34:53,664    ➡️  parity_long: 1 positions | Candles: 37
+2025-12-01 09:34:53,664       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-12-01 09:34:53,664    ➡️  revers_short: 4 positions | Candles: 38
+2025-12-01 09:34:53,664       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-01 09:34:53,664       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-01 09:34:53,664       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-01 09:34:53,664       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-12-01 09:34:53,664    ➡️  parity_short: 4 positions | Candles: 38
+2025-12-01 09:34:53,664       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-01 09:34:53,664       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-12-01 09:34:53,664       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-01 09:34:53,664       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-12-01 09:34:57,221 🔹 Strategy double_top_long: 32 symbols
+2025-12-01 09:34:57,224 🔹 Strategy revers_long: 32 symbols
+2025-12-01 09:34:57,226 🔹 Strategy parity_long: 32 symbols
+2025-12-01 09:34:57,229 🔹 Strategy revers_short: 32 symbols
+2025-12-01 09:34:57,232 🔹 Strategy parity_short: 32 symbols
+2025-12-01 09:34:57,232 ✅ BOT Initialization completed
+
+2025-12-01 09:34:57,232 ============================================================
+2025-12-01 09:45:49,891 
+🔚 Interrupted by user.
+2025-12-01 09:45:49,899 ⛔ BOT Stopped
+2025-12-01 09:45:52,291 
+🚀 === Starting multi-strategy bot... ===
+2025-12-01 09:45:52,291 ✅  State loaded: 11 positions recovered
+2025-12-01 09:45:52,291    ➡️  double_top_long: 1 positions | Candles: 20
+2025-12-01 09:45:52,291       - XRPUSDT      | Size: 36         | Entry: 2.2032    
+2025-12-01 09:45:52,291    ➡️  revers_long: 1 positions | Candles: 37
+2025-12-01 09:45:52,291       - XRPUSDT      | Size: 35         | Entry: 2.2348    
+2025-12-01 09:45:52,291    ➡️  parity_long: 1 positions | Candles: 37
+2025-12-01 09:45:52,291       - XRPUSDT      | Size: 35         | Entry: 2.233     
+2025-12-01 09:45:52,291    ➡️  revers_short: 4 positions | Candles: 38
+2025-12-01 09:45:52,291       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-01 09:45:52,291       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-01 09:45:52,292       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-01 09:45:52,292       - XRPUSDT      | Size: 38         | Entry: 2.0984    
+2025-12-01 09:45:52,292    ➡️  parity_short: 4 positions | Candles: 38
+2025-12-01 09:45:52,292       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-01 09:45:52,292       - BNBUSDT      | Size: 0.09       | Entry: 849.13    
+2025-12-01 09:45:52,292       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-01 09:45:52,292       - XRPUSDT      | Size: 38         | Entry: 2.1024    
+2025-12-01 09:45:55,663 🔹 Strategy double_top_long: 32 symbols
+2025-12-01 09:45:55,665 🔹 Strategy revers_long: 32 symbols
+2025-12-01 09:45:55,668 🔹 Strategy parity_long: 32 symbols
+2025-12-01 09:45:55,670 🔹 Strategy revers_short: 32 symbols
+2025-12-01 09:45:55,672 🔹 Strategy parity_short: 32 symbols
+2025-12-01 09:45:55,672 ✅ BOT Initialization completed
+
+2025-12-01 09:45:55,672 ============================================================
+2025-12-01 13:00:45,336 
+============================================================
+2025-12-01 13:00:45,343 🔀 === New candle detected ===: 2025-12-01 12:00:45 UTC
+2025-12-01 13:00:45,349 ============================================================
+2025-12-01 13:00:45,356 🌐 Syncronizing positions in broker...
+2025-12-01 13:00:51,349 ✅ Sync completed: All positions exist in broker
+2025-12-01 13:00:51,364 
+------------------------------------------------------------
+2025-12-01 13:00:51,372 📡 Signal search - 2025-12-01 12:00:51
+2025-12-01 13:00:51,379 ------------------------------------------------------------
+2025-12-01 13:00:51,387 ➡️  double_top_long: 21/50 candles
+2025-12-01 13:00:51,397 ➡️  revers_long: 38/50 candles
+2025-12-01 13:00:51,405 ➡️  parity_long: 38/50 candles
+2025-12-01 13:00:51,412 ➡️  revers_short: 39/50 candles
+2025-12-01 13:00:51,420 ➡️  parity_short: 39/50 candles
+2025-12-01 13:00:51,427 🚫 Skipping signal search for double_top_long (it has 1 open positions)
+2025-12-01 13:00:51,434 🚫 Skipping signal search for revers_long (it has 1 open positions)
+2025-12-01 13:00:51,440 🚫 Skipping signal search for parity_long (it has 1 open positions)
+2025-12-01 13:00:51,447 🚫 Skipping signal search for revers_short (it has 4 open positions)
+2025-12-01 13:00:51,454 🚫 Skipping signal search for parity_short (it has 4 open positions)
+2025-12-01 13:00:51,467 
+============================================================
+2025-12-01 13:00:51,473 🔂 Signal cycle completed
+2025-12-01 13:00:51,486 ============================================================
+
+2025-12-01 13:47:59,792 
+🔻 SL REACHED for XRPUSDT (revers_long)
+2025-12-01 13:47:59,805 →   Closing long position on XRPUSDT:
+2025-12-01 13:48:01,188 🔔 No closing position available XRPUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764593280002, 'data': None}
+2025-12-01 13:48:01,203    → Removing from local record (nonexistent position)
+2025-12-01 13:48:01,655 📋 Trade logged: XRPUSDT | Profit: -7.82 USDT (-10.00%) | Duration: 6.7407 days
+2025-12-01 13:48:29,908 
+🔻 SL REACHED for XRPUSDT (parity_long)
+2025-12-01 13:48:29,921 →   Closing long position on XRPUSDT:
+2025-12-01 13:48:31,291 🔔 No closing position available XRPUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1764593310124, 'data': None}
+2025-12-01 13:48:31,305    → Removing from local record (nonexistent position)
+2025-12-01 13:48:31,750 📋 Trade logged: XRPUSDT | Profit: -7.87 USDT (-10.07%) | Duration: 6.7405 days
+2025-12-01 16:34:28,599 
+💲 TP REACHED for XRPUSDT (revers_short)
+2025-12-01 16:34:28,605 →   Closing short position on XRPUSDT:
+2025-12-01 16:34:30,006 ✅ Position closed due to TP: XRPUSDT | Size: 38
+2025-12-01 16:34:30,353 📋 Trade logged: XRPUSDT | Profit: 4.09 USDT (+5.13%) | Duration: 7.0222 days
+2025-12-01 16:34:31,158 
+💲 TP REACHED for BNBUSDT (parity_short)
+2025-12-01 16:34:31,163 →   Closing short position on BNBUSDT:
+2025-12-01 16:34:32,565 ✅ Position closed due to TP: BNBUSDT | Size: 0.09
+2025-12-01 16:34:33,020 📋 Trade logged: BNBUSDT | Profit: 4.11 USDT (+5.38%) | Duration: 7.0218 days
+2025-12-01 16:34:33,821 
+💲 TP REACHED for XRPUSDT (parity_short)
+2025-12-01 16:34:33,826 →   Closing short position on XRPUSDT:
+2025-12-01 16:34:35,225 ✅ Position closed due to TP: XRPUSDT | Size: 38
+2025-12-01 16:34:35,575 📋 Trade logged: XRPUSDT | Profit: 4.33 USDT (+5.42%) | Duration: 7.0210 days
+2025-12-01 17:00:47,711 
+============================================================
+2025-12-01 17:00:47,719 🔀 === New candle detected ===: 2025-12-01 16:00:47 UTC
+2025-12-01 17:00:47,727 ============================================================
+2025-12-01 17:00:47,736 🌐 Syncronizing positions in broker...
+2025-12-01 17:00:48,058 → Position XRPUSDT doesn't exist in broker - removing from double_top_long
+2025-12-01 17:00:51,025 ✅ Sync completed: 1 position(s) removed
+2025-12-01 17:00:51,042 
+------------------------------------------------------------
+2025-12-01 17:00:51,050 📡 Signal search - 2025-12-01 16:00:51
+2025-12-01 17:00:51,067 ------------------------------------------------------------
+2025-12-01 17:00:51,077 ➡️  revers_short: 40/50 candles
+2025-12-01 17:00:51,086 ➡️  parity_short: 40/50 candles
+2025-12-01 17:00:51,103 
+────────────────────────────────────────
+2025-12-01 17:00:51,111 🔄 Processing strategy: double_top_long
+2025-12-01 17:00:51,119 ────────────────────────────────────────
+2025-12-01 17:01:03,300 🔊 Signals detected for double_top_long: 0
+2025-12-01 17:01:03,316 
+────────────────────────────────────────
+2025-12-01 17:01:03,324 🔄 Processing strategy: revers_long
+2025-12-01 17:01:03,333 ────────────────────────────────────────
+2025-12-01 17:01:15,843 🔊 Signals detected for revers_long: 0
+2025-12-01 17:01:15,860 
+────────────────────────────────────────
+2025-12-01 17:01:15,868 🔄 Processing strategy: parity_long
+2025-12-01 17:01:15,876 ────────────────────────────────────────
+2025-12-01 17:01:28,476 🔊 Signals detected for parity_long: 0
+2025-12-01 17:01:28,484 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-01 17:01:28,492 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-01 17:01:28,508 
+============================================================
+2025-12-01 17:01:28,516 🔂 Signal cycle completed
+2025-12-01 17:01:28,533 ============================================================
+
+2025-12-01 17:04:29,796 
+🔚 Interrupted by user.
+2025-12-01 17:04:29,803 ⛔ BOT Stopped
+2025-12-01 17:04:36,291 
+🚀 === Starting multi-strategy bot... ===
+2025-12-01 17:04:36,291 ✅  State loaded: 5 positions recovered
+2025-12-01 17:04:36,291    ➡️  revers_short: 3 positions | Candles: 40
+2025-12-01 17:04:36,291       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-01 17:04:36,292       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-01 17:04:36,292       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-01 17:04:36,292    ➡️  parity_short: 2 positions | Candles: 40
+2025-12-01 17:04:36,292       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-01 17:04:36,292       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-01 17:04:39,893 🔹 Strategy double_top_long: 32 symbols
+2025-12-01 17:04:39,898 🔹 Strategy revers_long: 32 symbols
+2025-12-01 17:04:39,902 🔹 Strategy parity_long: 32 symbols
+2025-12-01 17:04:39,906 🔹 Strategy revers_short: 32 symbols
+2025-12-01 17:04:39,911 🔹 Strategy parity_short: 32 symbols
+2025-12-01 17:04:39,911 ✅ BOT Initialization completed
+
+2025-12-01 17:04:39,912 ____________________________________________________________________________________________________
+2025-12-01 17:05:40,761 
+🔚 Interrupted by user.
+2025-12-01 17:05:40,768 ⛔ BOT Stopped
+2025-12-01 17:05:44,290 
+🚀 === Starting multi-strategy bot... ===
+2025-12-01 17:05:44,290 ✅  State loaded: 5 positions recovered
+2025-12-01 17:05:44,290    ➡️  revers_short: 3 positions | Candles: 40
+2025-12-01 17:05:44,290       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-01 17:05:44,290       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-01 17:05:44,290       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-01 17:05:44,291    ➡️  parity_short: 2 positions | Candles: 40
+2025-12-01 17:05:44,291       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-01 17:05:44,291       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-01 17:05:48,161 🔹 Strategy double_top_long: 32 symbols
+2025-12-01 17:05:48,165 🔹 Strategy revers_long: 32 symbols
+2025-12-01 17:05:48,170 🔹 Strategy parity_long: 32 symbols
+2025-12-01 17:05:48,174 🔹 Strategy revers_short: 32 symbols
+2025-12-01 17:05:48,178 🔹 Strategy parity_short: 32 symbols
+2025-12-01 17:05:48,178 ✅ BOT Initialization completed
+
+2025-12-01 17:05:48,178 ____________________________________________________________________________________________________
+2025-12-01 21:00:45,236 
+====================================================================================================
+2025-12-01 21:00:45,239 🔀 === New candle detected ===: 2025-12-01 20:00:45 UTC
+2025-12-01 21:00:45,242 ====================================================================================================
+2025-12-01 21:00:45,246 🌐 Syncronizing positions in broker...
+2025-12-01 21:00:48,089 ✅ Sync completed: All positions exist in broker
+2025-12-01 21:00:48,095 
+----------------------------------------------------------------------------------------------------
+2025-12-01 21:00:48,099 📡 Signal search - 2025-12-01 20:00:48
+2025-12-01 21:00:48,102 ----------------------------------------------------------------------------------------------------
+2025-12-01 21:00:48,105 ➡️  revers_short: 41/50 candles
+2025-12-01 21:00:48,109 ➡️  parity_short: 41/50 candles
+2025-12-01 21:00:48,112 🔄 Processing strategy: double_top_long
+2025-12-01 21:01:00,183 🔊 Signals detected for double_top_long: 0
+2025-12-01 21:01:00,187 🔄 Processing strategy: revers_long
+2025-12-01 21:01:12,390 🔊 Signals detected for revers_long: 0
+2025-12-01 21:01:12,393 🔄 Processing strategy: parity_long
+2025-12-01 21:01:24,386 🔊 Signals detected for parity_long: 1
+2025-12-01 21:01:24,759 
+➡ Opening long on FARTCOINUSDT for parity_long...
+2025-12-01 21:01:26,390 ✅ ⬆️ Long   FARTCOINUSDT | Size: 254.3    | Price: 0.3145    
+2025-12-01 21:01:28,317 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-01 21:01:28,321 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-01 21:01:28,327 
+====================================================================================================
+2025-12-01 21:01:28,334 🔂 Signal cycle completed
+2025-12-01 21:01:28,340 ====================================================================================================
+
+2025-12-01 21:05:30,811 
+💲 TP REACHED for FARTCOINUSDT (parity_long)
+2025-12-01 21:05:30,817 →  Closing long position on FARTCOINUSDT:
+2025-12-01 21:05:32,146 ✅ Position closed due to TP: FARTCOINUSDT | Size: 254.3
+2025-12-01 21:05:32,527 📋 Trade logged: FARTCOINUSDT | Profit: 2.36 USDT (+2.95%) | Duration: 0.0445 days
