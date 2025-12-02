@@ -19,7 +19,7 @@ os.makedirs(ROBOTS_JSON_DIR, exist_ok=True)
 # ----------------------
 STRATEGY              = "double_top_long"
 TIMEFRAME_MINOR       = '4H'
-ORDER_AMOUNT          = 80
+ORDER_AMOUNT          = 50
 STATE_FILE            = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
 SELL_AFTER_N_CANDLES  = 50
@@ -36,6 +36,7 @@ SL_PCT                = 10
 def check_latest_signal(df_minor, symbol):
     df_minor  = normalize_live_ohlcv(df_minor)
     arr_minor = df_to_arrays_live(df_minor)
+    
     signals = double_top_long(
         arr_minor,
         lookback_minor=LOOKBACK_MINOR,

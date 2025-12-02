@@ -1,16 +1,93 @@
 [
     {
-        "symbol": "BNBUSDT",
-        "buy_price": 865.44,
-        "amount": 0.0924385283786282,
-        "candles_to_sell": 19,
-        "just_bought": false
+        "symbol": "1000BONKUSDT",
+        "buy_price": 0.009526,
+        "amount": 5248.792777661138,
+        "candles_to_sell": 50,
+        "just_bought": true
     },
     {
-        "symbol": "XRPUSDT",
-        "buy_price": 2.1684,
-        "amount": 36.89356207341819,
-        "candles_to_sell": 19,
-        "just_bought": false
+        "symbol": "AAVEUSDT",
+        "buy_price": 180.53,
+        "amount": 0.2769622777377721,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "ADAUSDT",
+        "buy_price": 0.4212,
+        "amount": 118.70845204178536,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "ARBUSDT",
+        "buy_price": 0.2098,
+        "amount": 238.32221163012395,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "AVAXUSDT",
+        "buy_price": 13.569,
+        "amount": 3.684869924091679,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "BNBUSDT",
+        "buy_price": 867.33,
+        "amount": 0.05764818465866509,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "DOGEUSDT",
+        "buy_price": 0.14462,
+        "amount": 345.7336467985064,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "DOTUSDT",
+        "buy_price": 2.206,
+        "amount": 22.665457842248415,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "ENAUSDT",
+        "buy_price": 0.2522,
+        "amount": 198.25535289452816,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "ETHUSDT",
+        "buy_price": 2970.05,
+        "amount": 0.016834733421996262,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "FARTCOINUSDT",
+        "buy_price": 0.3546,
+        "amount": 141.00394811054707,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "FETUSDT",
+        "buy_price": 0.2521,
+        "amount": 198.33399444664818,
+        "candles_to_sell": 50,
+        "just_bought": true
+    },
+    {
+        "symbol": "FORMUSDT",
+        "buy_price": 0.3466,
+        "amount": 144.25851125216386,
+        "candles_to_sell": 50,
+        "just_bought": true
     }
 ]

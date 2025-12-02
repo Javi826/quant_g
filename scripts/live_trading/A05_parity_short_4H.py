@@ -22,7 +22,7 @@ os.makedirs(ROBOTS_JSON_DIR, exist_ok=True)
 # ----------------------
 STRATEGY             = "parity_short"
 TIMEFRAME_MINOR      = '4H'
-ORDER_AMOUNT         = 80
+ORDER_AMOUNT         = 50
 STATE_FILE           = os.path.join(ROBOTS_JSON_DIR, f"robot_state_{STRATEGY}.json")
 
 SELL_AFTER_N_CANDLES = 50

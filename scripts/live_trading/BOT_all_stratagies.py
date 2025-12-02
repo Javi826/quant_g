@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 import numpy as np
 from zoneinfo import ZoneInfo
+from BOT_metrics import bot_metrics
 
 # --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
@@ -231,6 +232,8 @@ def main_loop():
     
     # Cargar estado previo
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
+    bot_metrics()
+
     exchange = connect_common()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
@@ -306,7 +309,7 @@ def main_loop():
                                     )
 
                     except Exception as e:
-                        print(f"🚸 Error procesando {strat_id}: {e}")
+                        print(f"❌ Error procesando {strat_id}: {e}")
                         import traceback
                         traceback.print_exc()
                 

@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/G_grid_scalping.py', 'scripts/Z_add_signals_scalping.py', 'scripts/live_trading/ZX_utils_bot.py']
+recent_files = ['scripts/live_trading/BOT_metrics.py', 'scripts/live_trading/ZX_utils_bot.py', 'scripts/live_trading/BOT_all_stratagies.py', 'scripts/utils/ZX_analysis.py']
 
 [main]
 version = 0.2.0

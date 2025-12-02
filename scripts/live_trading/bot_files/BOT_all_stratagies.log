@@ -15133,3 +15133,1088 @@
 2025-12-01 21:05:30,817 →  Closing long position on FARTCOINUSDT:
 2025-12-01 21:05:32,146 ✅ Position closed due to TP: FARTCOINUSDT | Size: 254.3
 2025-12-01 21:05:32,527 📋 Trade logged: FARTCOINUSDT | Profit: 2.36 USDT (+2.95%) | Duration: 0.0445 days
+2025-12-02 01:00:45,900 
+====================================================================================================
+2025-12-02 01:00:45,903 🔀 === New candle detected ===: 2025-12-02 00:00:45 UTC
+2025-12-02 01:00:45,907 ====================================================================================================
+2025-12-02 01:00:45,910 🌐 Syncronizing positions in broker...
+2025-12-02 01:00:48,574 ✅ Sync completed: All positions exist in broker
+2025-12-02 01:00:48,581 
+----------------------------------------------------------------------------------------------------
+2025-12-02 01:00:48,584 📡 Signal search - 2025-12-02 00:00:48
+2025-12-02 01:00:48,587 ----------------------------------------------------------------------------------------------------
+2025-12-02 01:00:48,591 ➡️  revers_short: 42/50 candles
+2025-12-02 01:00:48,594 ➡️  parity_short: 42/50 candles
+2025-12-02 01:00:48,597 🔄 Processing strategy: double_top_long
+2025-12-02 01:01:00,050 🔊 Signals detected for double_top_long: 11
+2025-12-02 01:01:00,060 🚸 Error procesando double_top_long: bitget GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES
+2025-12-02 01:01:00,067 Traceback (most recent call last):
+
+2025-12-02 01:01:00,070   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,073   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,076   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connection.py", line 565, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,079   File "/usr/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+
+2025-12-02 01:01:00,082   File "/usr/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,085   File "/usr/lib/python3.12/http/client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+
+2025-12-02 01:01:00,088 http.client.RemoteDisconnected: Remote end closed connection without response
+
+2025-12-02 01:01:00,091 
+During handling of the above exception, another exception occurred:
+
+
+2025-12-02 01:01:00,094 Traceback (most recent call last):
+
+2025-12-02 01:01:00,097   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,100   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,103   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/util/retry.py", line 474, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,106   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+
+2025-12-02 01:01:00,109   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,112   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,115   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connection.py", line 565, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,118   File "/usr/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+
+2025-12-02 01:01:00,122   File "/usr/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,125   File "/usr/lib/python3.12/http/client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+
+2025-12-02 01:01:00,128 urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+2025-12-02 01:01:00,132 
+During handling of the above exception, another exception occurred:
+
+
+2025-12-02 01:01:00,135 Traceback (most recent call last):
+
+2025-12-02 01:01:00,138   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 556, in fetch
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,141   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,144   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,147   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+
+2025-12-02 01:01:00,150 requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+2025-12-02 01:01:00,153 
+The above exception was the direct cause of the following exception:
+
+
+2025-12-02 01:01:00,156 Traceback (most recent call last):
+
+2025-12-02 01:01:00,159   File "/home/javi/projects/quant/quant_g/scripts/live_trading/BOT_all_stratagies.py", line 294, in main_loop
+    process_strategy(
+
+2025-12-02 01:01:00,162   File "/home/javi/projects/quant/quant_g/scripts/live_trading/ZX_utils_bot.py", line 841, in process_strategy
+    usdt_balance = get_balance_func(exchange)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,166   File "/home/javi/projects/quant/quant_g/scripts/live_trading/ZX_connect_live.py", line 42, in get_usdt_balance_00
+    balance = exchange.fetch_balance()
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,169   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/bitget.py", line 4224, in fetch_balance
+    response = self.privateMixGetV2MixAccountAccounts(self.extend(request, params))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,172   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/types.py", line 35, in unbound_method
+    return _self.request(self.path, self.api, self.method, params, config=self.config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,175   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4716, in request
+    return self.fetch2(path, api, method, params, headers, body, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,178   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4710, in fetch2
+    raise e
+
+2025-12-02 01:01:00,181   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4701, in fetch2
+    return self.fetch(request['url'], request['method'], request['headers'], request['body'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 01:01:00,184   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 611, in fetch
+    raise NetworkError(details) from e
+
+2025-12-02 01:01:00,187 ccxt.base.errors.NetworkError: bitget GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES
+
+2025-12-02 01:01:00,190 🔄 Processing strategy: revers_long
+2025-12-02 01:01:11,135 🔊 Signals detected for revers_long: 0
+2025-12-02 01:01:11,138 🔄 Processing strategy: parity_long
+2025-12-02 01:01:22,417 🔊 Signals detected for parity_long: 1
+2025-12-02 01:01:22,785 
+➡ Opening long on FARTCOINUSDT for parity_long...
+2025-12-02 01:01:24,319 ✅ ⬆️ Long   FARTCOINUSDT | Size: 248.3    | Price: 0.3221    
+2025-12-02 01:01:26,136 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 01:01:26,140 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 01:01:26,146 
+====================================================================================================
+2025-12-02 01:01:26,149 🔂 Signal cycle completed
+2025-12-02 01:01:26,155 ====================================================================================================
+
+2025-12-02 04:57:36,747 
+💲 TP REACHED for FARTCOINUSDT (parity_long)
+2025-12-02 04:57:36,752 →  Closing long position on FARTCOINUSDT:
+2025-12-02 04:57:38,147 ✅ Position closed due to TP: FARTCOINUSDT | Size: 248.3
+2025-12-02 04:57:38,496 📋 Trade logged: FARTCOINUSDT | Profit: 2.43 USDT (+3.04%) | Duration: 0.2057 days
+2025-12-02 05:00:45,887 
+====================================================================================================
+2025-12-02 05:00:45,890 🔀 === New candle detected ===: 2025-12-02 04:00:45 UTC
+2025-12-02 05:00:45,893 ====================================================================================================
+2025-12-02 05:00:45,896 🌐 Syncronizing positions in broker...
+2025-12-02 05:00:48,532 ✅ Sync completed: All positions exist in broker
+2025-12-02 05:00:48,540 
+----------------------------------------------------------------------------------------------------
+2025-12-02 05:00:48,544 📡 Signal search - 2025-12-02 04:00:48
+2025-12-02 05:00:48,548 ----------------------------------------------------------------------------------------------------
+2025-12-02 05:00:48,552 ➡️  revers_short: 43/50 candles
+2025-12-02 05:00:48,562 ➡️  parity_short: 43/50 candles
+2025-12-02 05:00:48,565 🔄 Processing strategy: double_top_long
+2025-12-02 05:00:59,186 🔊 Signals detected for double_top_long: 2
+2025-12-02 05:00:59,196 🚸 Error procesando double_top_long: bitget GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES
+2025-12-02 05:00:59,199 Traceback (most recent call last):
+
+2025-12-02 05:00:59,203   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,205   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,208   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connection.py", line 565, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,211   File "/usr/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+
+2025-12-02 05:00:59,215   File "/usr/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,218   File "/usr/lib/python3.12/http/client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+
+2025-12-02 05:00:59,221 http.client.RemoteDisconnected: Remote end closed connection without response
+
+2025-12-02 05:00:59,224 
+During handling of the above exception, another exception occurred:
+
+
+2025-12-02 05:00:59,227 Traceback (most recent call last):
+
+2025-12-02 05:00:59,231   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,234   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,237   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/util/retry.py", line 474, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,240   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+
+2025-12-02 05:00:59,244   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,247   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,250   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/urllib3/connection.py", line 565, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,253   File "/usr/lib/python3.12/http/client.py", line 1428, in getresponse
+    response.begin()
+
+2025-12-02 05:00:59,257   File "/usr/lib/python3.12/http/client.py", line 331, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,260   File "/usr/lib/python3.12/http/client.py", line 300, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+
+2025-12-02 05:00:59,263 urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+2025-12-02 05:00:59,266 
+During handling of the above exception, another exception occurred:
+
+
+2025-12-02 05:00:59,269 Traceback (most recent call last):
+
+2025-12-02 05:00:59,273   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 556, in fetch
+    response = self.session.request(
+               ^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,276   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,279   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,282   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/requests/adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+
+2025-12-02 05:00:59,285 requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+2025-12-02 05:00:59,289 
+The above exception was the direct cause of the following exception:
+
+
+2025-12-02 05:00:59,292 Traceback (most recent call last):
+
+2025-12-02 05:00:59,295   File "/home/javi/projects/quant/quant_g/scripts/live_trading/BOT_all_stratagies.py", line 294, in main_loop
+    process_strategy(
+
+2025-12-02 05:00:59,298   File "/home/javi/projects/quant/quant_g/scripts/live_trading/ZX_utils_bot.py", line 841, in process_strategy
+    usdt_balance = get_balance_func(exchange)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,301   File "/home/javi/projects/quant/quant_g/scripts/live_trading/ZX_connect_live.py", line 42, in get_usdt_balance_00
+    balance = exchange.fetch_balance()
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,304   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/bitget.py", line 4224, in fetch_balance
+    response = self.privateMixGetV2MixAccountAccounts(self.extend(request, params))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,308   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/types.py", line 35, in unbound_method
+    return _self.request(self.path, self.api, self.method, params, config=self.config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,311   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4716, in request
+    return self.fetch2(path, api, method, params, headers, body, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,314   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4710, in fetch2
+    raise e
+
+2025-12-02 05:00:59,317   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 4701, in fetch2
+    return self.fetch(request['url'], request['method'], request['headers'], request['body'])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+2025-12-02 05:00:59,320   File "/home/javi/projects/quant/env_quant/lib/python3.12/site-packages/ccxt/base/exchange.py", line 611, in fetch
+    raise NetworkError(details) from e
+
+2025-12-02 05:00:59,323 ccxt.base.errors.NetworkError: bitget GET https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES
+
+2025-12-02 05:00:59,326 🔄 Processing strategy: revers_long
+2025-12-02 05:01:09,660 🔊 Signals detected for revers_long: 1
+2025-12-02 05:01:10,041 
+➡ Opening long on FARTCOINUSDT for revers_long...
+2025-12-02 05:01:11,678 ✅ ⬆️ Long   FARTCOINUSDT | Size: 241.6    | Price: 0.3311    
+2025-12-02 05:01:13,498 🔄 Processing strategy: parity_long
+2025-12-02 05:01:24,114 🔊 Signals detected for parity_long: 1
+2025-12-02 05:01:24,480 
+➡ Opening long on FARTCOINUSDT for parity_long...
+2025-12-02 05:01:25,912 ✅ ⬆️ Long   FARTCOINUSDT | Size: 241.4    | Price: 0.3314    
+2025-12-02 05:01:27,732 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 05:01:27,735 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 05:01:27,741 
+====================================================================================================
+2025-12-02 05:01:27,744 🔂 Signal cycle completed
+2025-12-02 05:01:27,750 ====================================================================================================
+
+2025-12-02 08:44:11,043 
+🔚 Interrupted by user.
+2025-12-02 08:44:11,048 ⛔ BOT Stopped
+2025-12-02 08:44:18,262 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 08:44:18,262 ✅  State loaded: 7 positions recovered
+2025-12-02 08:44:18,262    ➡️  revers_long: 1 positions | Candles: 0
+2025-12-02 08:44:18,263       - FARTCOINUSDT | Size: 241.6      | Entry: 0.3314    
+2025-12-02 08:44:18,263    ➡️  parity_long: 1 positions | Candles: 0
+2025-12-02 08:44:18,263       - FARTCOINUSDT | Size: 241.4      | Entry: 0.3318    
+2025-12-02 08:44:18,263    ➡️  revers_short: 3 positions | Candles: 43
+2025-12-02 08:44:18,263       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 08:44:18,263       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 08:44:18,263       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 08:44:18,263    ➡️  parity_short: 2 positions | Candles: 43
+2025-12-02 08:44:18,263       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 08:44:18,263       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 08:44:21,731 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 08:44:21,734 🔹 Strategy revers_long: 32 symbols
+2025-12-02 08:44:21,736 🔹 Strategy parity_long: 32 symbols
+2025-12-02 08:44:21,738 🔹 Strategy revers_short: 32 symbols
+2025-12-02 08:44:21,741 🔹 Strategy parity_short: 32 symbols
+2025-12-02 08:44:21,741 ✅ BOT Initialization completed
+
+2025-12-02 08:44:21,741 ____________________________________________________________________________________________________
+2025-12-02 09:00:45,912 
+====================================================================================================
+2025-12-02 09:00:45,918 🔀 === New candle detected ===: 2025-12-02 08:00:45 UTC
+2025-12-02 09:00:45,924 ====================================================================================================
+2025-12-02 09:00:45,929 🌐 Syncronizing positions in broker...
+2025-12-02 09:00:49,721 ✅ Sync completed: All positions exist in broker
+2025-12-02 09:00:49,731 
+----------------------------------------------------------------------------------------------------
+2025-12-02 09:00:49,736 📡 Signal search - 2025-12-02 08:00:49
+2025-12-02 09:00:49,740 ----------------------------------------------------------------------------------------------------
+2025-12-02 09:00:49,745 ➡️  revers_long: 1/50 candles
+2025-12-02 09:00:49,750 ➡️  parity_long: 1/50 candles
+2025-12-02 09:00:49,755 ➡️  revers_short: 44/50 candles
+2025-12-02 09:00:49,760 ➡️  parity_short: 44/50 candles
+2025-12-02 09:00:49,765 🔄 Processing strategy: double_top_long
+2025-12-02 09:01:01,624 ✨ Signals detected for double_top_long: 3
+2025-12-02 09:01:02,019 
+➡ Opening long on APTUSDT for double_top_long...
+2025-12-02 09:01:03,550 ✅ ⬆️ Long   APTUSDT    | Size: 41.273   | Price: 1.9383    
+2025-12-02 09:01:05,704 
+➡ Opening long on HYPEUSDT for double_top_long...
+2025-12-02 09:01:07,236 ✅ ⬆️ Long   HYPEUSDT   | Size: 2.52     | Price: 31.623    
+2025-12-02 09:01:09,395 
+➡ Opening long on NEARUSDT for double_top_long...
+2025-12-02 09:01:10,922 ✅ ⬆️ Long   NEARUSDT   | Size: 47       | Price: 1.6807    
+2025-12-02 09:01:12,743 🚫 Skipping signal search for revers_long (it has 1 open positions)
+2025-12-02 09:01:12,747 🚫 Skipping signal search for parity_long (it has 1 open positions)
+2025-12-02 09:01:12,752 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 09:01:12,756 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 09:01:12,765 
+====================================================================================================
+2025-12-02 09:01:12,770 🔂 Signal cycle completed
+2025-12-02 09:01:12,778 ====================================================================================================
+
+2025-12-02 13:00:45,933 
+====================================================================================================
+2025-12-02 13:00:45,939 🔀 === New candle detected ===: 2025-12-02 12:00:45 UTC
+2025-12-02 13:00:45,945 ====================================================================================================
+2025-12-02 13:00:45,951 🌐 Syncronizing positions in broker...
+2025-12-02 13:00:51,549 ✅ Sync completed: All positions exist in broker
+2025-12-02 13:00:51,561 
+----------------------------------------------------------------------------------------------------
+2025-12-02 13:00:51,567 📡 Signal search - 2025-12-02 12:00:51
+2025-12-02 13:00:51,573 ----------------------------------------------------------------------------------------------------
+2025-12-02 13:00:51,579 ➡️  double_top_long: 1/50 candles
+2025-12-02 13:00:51,586 ➡️  revers_long: 2/50 candles
+2025-12-02 13:00:51,592 ➡️  parity_long: 2/50 candles
+2025-12-02 13:00:51,598 ➡️  revers_short: 45/50 candles
+2025-12-02 13:00:51,605 ➡️  parity_short: 45/50 candles
+2025-12-02 13:00:51,611 🚫 Skipping signal search for double_top_long (it has 3 open positions)
+2025-12-02 13:00:51,617 🚫 Skipping signal search for revers_long (it has 1 open positions)
+2025-12-02 13:00:51,623 🚫 Skipping signal search for parity_long (it has 1 open positions)
+2025-12-02 13:00:51,629 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 13:00:51,635 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 13:00:51,647 
+====================================================================================================
+2025-12-02 13:00:51,653 🔂 Signal cycle completed
+2025-12-02 13:00:51,665 ====================================================================================================
+
+2025-12-02 14:17:08,806 
+💲 TP REACHED for NEARUSDT (double_top_long)
+2025-12-02 14:17:08,812 →  Closing long position on NEARUSDT:
+2025-12-02 14:17:10,148 ✅ Position closed due to TP: NEARUSDT | Size: 47
+2025-12-02 14:17:10,472 📋 Trade logged: NEARUSDT | Profit: 4.04 USDT (+5.05%) | Duration: 0.2611 days
+2025-12-02 14:17:10,813 
+💲 TP REACHED for FARTCOINUSDT (revers_long)
+2025-12-02 14:17:10,820 →  Closing long position on FARTCOINUSDT:
+2025-12-02 14:17:12,123 ✅ Position closed due to TP: FARTCOINUSDT | Size: 241.6
+2025-12-02 14:17:12,456 📋 Trade logged: FARTCOINUSDT | Profit: 2.39 USDT (+2.99%) | Duration: 0.4278 days
+2025-12-02 14:17:39,246 
+💲 TP REACHED for FARTCOINUSDT (parity_long)
+2025-12-02 14:17:39,252 →  Closing long position on FARTCOINUSDT:
+2025-12-02 14:17:40,573 ✅ Position closed due to TP: FARTCOINUSDT | Size: 241.4
+2025-12-02 14:17:40,929 📋 Trade logged: FARTCOINUSDT | Profit: 2.72 USDT (+3.41%) | Duration: 0.4279 days
+2025-12-02 14:51:59,960 
+🔚 Interrupted by user.
+2025-12-02 14:51:59,966 ⛔ BOT Stopped
+2025-12-02 14:52:07,602 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 14:52:07,602 ✅  State loaded: 7 positions recovered
+2025-12-02 14:52:07,602    ➡️  double_top_long: 2 positions | Candles: 1
+2025-12-02 14:52:07,602       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 14:52:07,602       - HYPEUSDT     | Size: 2.52       | Entry: 31.648    
+2025-12-02 14:52:07,602    ➡️  revers_short: 3 positions | Candles: 45
+2025-12-02 14:52:07,602       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 14:52:07,602       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 14:52:07,602       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 14:52:07,602    ➡️  parity_short: 2 positions | Candles: 45
+2025-12-02 14:52:07,602       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 14:52:07,602       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 14:52:10,825 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 14:52:10,828 🔹 Strategy revers_long: 32 symbols
+2025-12-02 14:52:10,831 🔹 Strategy parity_long: 32 symbols
+2025-12-02 14:52:10,833 🔹 Strategy revers_short: 32 symbols
+2025-12-02 14:52:10,836 🔹 Strategy parity_short: 32 symbols
+2025-12-02 14:52:10,836 ✅ BOT Initialization completed
+
+2025-12-02 14:52:10,836 ____________________________________________________________________________________________________
+2025-12-02 15:07:55,401 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 15:07:55,401 ✅  State loaded: 7 positions recovered
+2025-12-02 15:07:55,401    ➡️  double_top_long: 2 positions | Candles: 1
+2025-12-02 15:07:55,401       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 15:07:55,401       - HYPEUSDT     | Size: 2.52       | Entry: 31.648    
+2025-12-02 15:07:55,401    ➡️  revers_short: 3 positions | Candles: 45
+2025-12-02 15:07:55,401       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 15:07:55,401       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 15:07:55,401       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 15:07:55,401    ➡️  parity_short: 2 positions | Candles: 45
+2025-12-02 15:07:55,401       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 15:07:55,401       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 15:07:58,722 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 15:07:58,725 🔹 Strategy revers_long: 32 symbols
+2025-12-02 15:07:58,727 🔹 Strategy parity_long: 32 symbols
+2025-12-02 15:07:58,730 🔹 Strategy revers_short: 32 symbols
+2025-12-02 15:07:58,733 🔹 Strategy parity_short: 32 symbols
+2025-12-02 15:07:58,733 ✅ BOT Initialization completed
+
+2025-12-02 15:07:58,733 ____________________________________________________________________________________________________
+2025-12-02 15:47:13,746 
+🔚 Interrupted by user.
+2025-12-02 15:47:13,751 ⛔ BOT Stopped
+2025-12-02 15:47:29,114 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 15:47:29,114 ✅  State loaded: 7 positions recovered
+2025-12-02 15:47:29,114    ➡️  double_top_long: 2 positions | Candles: 1
+2025-12-02 15:47:29,114       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 15:47:29,114       - HYPEUSDT     | Size: 2.52       | Entry: 31.648    
+2025-12-02 15:47:29,114    ➡️  revers_short: 3 positions | Candles: 45
+2025-12-02 15:47:29,114       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 15:47:29,114       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 15:47:29,114       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 15:47:29,114    ➡️  parity_short: 2 positions | Candles: 45
+2025-12-02 15:47:29,114       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 15:47:29,114       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 15:47:32,620 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 15:47:32,623 🔹 Strategy revers_long: 32 symbols
+2025-12-02 15:47:32,625 🔹 Strategy parity_long: 32 symbols
+2025-12-02 15:47:32,627 🔹 Strategy revers_short: 32 symbols
+2025-12-02 15:47:32,630 🔹 Strategy parity_short: 32 symbols
+2025-12-02 15:47:32,630 ✅ BOT Initialization completed
+
+2025-12-02 15:47:32,630 ____________________________________________________________________________________________________
+2025-12-02 17:00:45,480 
+====================================================================================================
+2025-12-02 17:00:45,484 🔀 === New candle detected ===: 2025-12-02 16:00:45 UTC
+2025-12-02 17:00:45,489 ====================================================================================================
+2025-12-02 17:00:45,493 🌐 Syncronizing positions in broker...
+2025-12-02 17:00:49,225 ✅ Sync completed: All positions exist in broker
+2025-12-02 17:00:49,235 
+----------------------------------------------------------------------------------------------------
+2025-12-02 17:00:49,239 📡 Signal search - 2025-12-02 16:00:49
+2025-12-02 17:00:49,244 ----------------------------------------------------------------------------------------------------
+2025-12-02 17:00:49,249 ➡️  double_top_long: 2/50 candles
+2025-12-02 17:00:49,259 ➡️  revers_short: 46/50 candles
+2025-12-02 17:00:49,269 ➡️  parity_short: 46/50 candles
+2025-12-02 17:00:49,273 🚫 Skipping signal search for double_top_long (it has 2 open positions)
+2025-12-02 17:00:49,278 🔄 Processing strategy: revers_long
+2025-12-02 17:00:59,431 ✨ Signals detected for revers_long: 10
+2025-12-02 17:00:59,732 
+➡ Opening long on ADAUSDT for revers_long...
+2025-12-02 17:01:01,149 ✅ ⬆️ Long   ADAUSDT    | Size: 186      | Price: 0.4296    
+2025-12-02 17:01:03,275 
+➡ Opening long on BTCUSDT for revers_long...
+2025-12-02 17:01:04,696 ✅ ⬆️ Long   BTCUSDT    | Size: 0.0008   | Price: 91027.9   
+2025-12-02 17:01:06,779 
+➡ Opening long on ETHUSDT for revers_long...
+2025-12-02 17:01:08,270 ✅ ⬆️ Long   ETHUSDT    | Size: 0.02     | Price: 3010.76   
+2025-12-02 17:01:10,350 
+➡ Opening long on FARTCOINUSDT for revers_long...
+2025-12-02 17:01:11,821 ✅ ⬆️ Long   FARTCOINUSDT | Size: 210.6    | Price: 0.3797    
+2025-12-02 17:01:13,932 
+➡ Opening long on LINKUSDT for revers_long...
+2025-12-02 17:01:15,327 ✅ ⬆️ Long   LINKUSDT   | Size: 5        | Price: 13.349    
+2025-12-02 17:01:17,400 
+➡ Opening long on PENGUUSDT for revers_long...
+2025-12-02 17:01:18,782 ✅ ⬆️ Long   PENGUUSDT  | Size: 6624     | Price: 0.012076  
+2025-12-02 17:01:20,869 
+➡ Opening long on SEIUSDT for revers_long...
+2025-12-02 17:01:22,397 ✅ ⬆️ Long   SEIUSDT    | Size: 566      | Price: 0.14132   
+2025-12-02 17:01:24,487 
+➡ Opening long on SUIUSDT for revers_long...
+2025-12-02 17:01:25,949 ✅ ⬆️ Long   SUIUSDT    | Size: 49.2     | Price: 1.6237    
+2025-12-02 17:01:28,035 
+➡ Opening long on WIFUSDT for revers_long...
+2025-12-02 17:01:29,427 ✅ ⬆️ Long   WIFUSDT    | Size: 200.9    | Price: 0.3982    
+2025-12-02 17:01:31,536 
+➡ Opening long on WLDUSDT for revers_long...
+2025-12-02 17:01:33,143 ✅ ⬆️ Long   WLDUSDT    | Size: 121      | Price: 0.6606    
+2025-12-02 17:01:34,943 🔄 Processing strategy: parity_long
+2025-12-02 17:01:45,101 ✨ Signals detected for parity_long: 13
+2025-12-02 17:01:45,383 
+➡ Opening long on AAVEUSDT for parity_long...
+2025-12-02 17:01:46,869 ✅ ⬆️ Long   AAVEUSDT   | Size: 0.4      | Price: 184.75    
+2025-12-02 17:01:48,972 
+➡ Opening long on ADAUSDT for parity_long...
+2025-12-02 17:01:50,400 ✅ ⬆️ Long   ADAUSDT    | Size: 186      | Price: 0.4298    
+2025-12-02 17:01:52,458 
+➡ Opening long on BNBUSDT for parity_long...
+2025-12-02 17:01:53,897 ✅ ⬆️ Long   BNBUSDT    | Size: 0.09     | Price: 873.39    
+2025-12-02 17:01:55,982 
+➡ Opening long on BTCUSDT for parity_long...
+2025-12-02 17:01:57,425 ✅ ⬆️ Long   BTCUSDT    | Size: 0.0008   | Price: 90969.8   
+2025-12-02 17:01:59,500 
+➡ Opening long on ETHUSDT for parity_long...
+2025-12-02 17:02:00,911 ✅ ⬆️ Long   ETHUSDT    | Size: 0.02     | Price: 3014.1    
+2025-12-02 17:02:02,994 
+➡ Opening long on FARTCOINUSDT for parity_long...
+2025-12-02 17:02:04,426 ✅ ⬆️ Long   FARTCOINUSDT | Size: 212.2    | Price: 0.3769    
+2025-12-02 17:02:06,503 
+➡ Opening long on LINKUSDT for parity_long...
+2025-12-02 17:02:08,050 ✅ ⬆️ Long   LINKUSDT   | Size: 5        | Price: 13.369    
+2025-12-02 17:02:10,125 
+➡ Opening long on ONDOUSDT for parity_long...
+2025-12-02 17:02:11,576 ✅ ⬆️ Long   ONDOUSDT   | Size: 155.9    | Price: 0.513     
+2025-12-02 17:02:13,653 
+➡ Opening long on PENGUUSDT for parity_long...
+2025-12-02 17:02:15,064 ✅ ⬆️ Long   PENGUUSDT  | Size: 6624     | Price: 0.012077  
+2025-12-02 17:02:17,171 
+➡ Opening long on SEIUSDT for parity_long...
+2025-12-02 17:02:18,586 ✅ ⬆️ Long   SEIUSDT    | Size: 567      | Price: 0.14089   
+2025-12-02 17:02:20,664 
+➡ Opening long on SUIUSDT for parity_long...
+2025-12-02 17:02:22,128 ✅ ⬆️ Long   SUIUSDT    | Size: 49.4     | Price: 1.6186    
+2025-12-02 17:02:24,243 
+➡ Opening long on WIFUSDT for parity_long...
+2025-12-02 17:02:25,730 ✅ ⬆️ Long   WIFUSDT    | Size: 201.4    | Price: 0.3971    
+2025-12-02 17:02:27,880 
+➡ Opening long on WLDUSDT for parity_long...
+2025-12-02 17:02:29,320 ✅ ⬆️ Long   WLDUSDT    | Size: 120      | Price: 0.6619    
+2025-12-02 17:02:31,141 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 17:02:31,145 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 17:02:31,155 
+====================================================================================================
+2025-12-02 17:02:31,159 🔂 Signal cycle completed
+2025-12-02 17:02:31,169 ====================================================================================================
+
+2025-12-02 17:04:02,131 
+💲 TP REACHED for HYPEUSDT (double_top_long)
+2025-12-02 17:04:02,147 →  Closing long position on HYPEUSDT:
+2025-12-02 17:04:03,488 ✅ Position closed due to TP: HYPEUSDT | Size: 2.52
+2025-12-02 17:04:03,830 📋 Trade logged: HYPEUSDT | Profit: 4.00 USDT (+5.01%) | Duration: 0.3770 days
+2025-12-02 17:10:33,676 
+🔚 Interrupted by user.
+2025-12-02 17:10:33,694 ⛔ BOT Stopped
+2025-12-02 17:10:45,114 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 17:10:45,114 ✅  State loaded: 29 positions recovered
+2025-12-02 17:10:45,114    ➡️  double_top_long: 1 positions | Candles: 2
+2025-12-02 17:10:45,114       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 17:10:45,114    ➡️  revers_long: 10 positions | Candles: 0
+2025-12-02 17:10:45,114       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 17:10:45,114       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 17:10:45,114       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 17:10:45,114       - FARTCOINUSDT | Size: 210.6      | Entry: 0.3804    
+2025-12-02 17:10:45,115       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 17:10:45,115       - PENGUUSDT    | Size: 6624       | Entry: 0.012092  
+2025-12-02 17:10:45,115       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 17:10:45,115       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 17:10:45,115       - WIFUSDT      | Size: 200.9      | Entry: 0.3984    
+2025-12-02 17:10:45,115       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 17:10:45,115    ➡️  parity_long: 13 positions | Candles: 0
+2025-12-02 17:10:45,115       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 17:10:45,115       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 17:10:45,115       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 17:10:45,115       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 17:10:45,115       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 17:10:45,115       - FARTCOINUSDT | Size: 212.2      | Entry: 0.3790360037700282752120640905
+2025-12-02 17:10:45,115       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 17:10:45,115       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 17:10:45,115       - PENGUUSDT    | Size: 6624       | Entry: 0.012074  
+2025-12-02 17:10:45,115       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 17:10:45,115       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 17:10:45,115       - WIFUSDT      | Size: 201.4      | Entry: 0.3974    
+2025-12-02 17:10:45,115       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 17:10:45,115    ➡️  revers_short: 3 positions | Candles: 46
+2025-12-02 17:10:45,115       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 17:10:45,115       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 17:10:45,115       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 17:10:45,115    ➡️  parity_short: 2 positions | Candles: 46
+2025-12-02 17:10:45,115       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 17:10:45,115       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 17:10:48,384 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 17:10:48,387 🔹 Strategy revers_long: 32 symbols
+2025-12-02 17:10:48,390 🔹 Strategy parity_long: 32 symbols
+2025-12-02 17:10:48,392 🔹 Strategy revers_short: 32 symbols
+2025-12-02 17:10:48,395 🔹 Strategy parity_short: 32 symbols
+2025-12-02 17:10:48,396 ✅ BOT Initialization completed
+
+2025-12-02 17:10:48,396 ____________________________________________________________________________________________________
+2025-12-02 17:11:55,714 
+💲 TP REACHED for PENGUUSDT (parity_long)
+2025-12-02 17:11:55,730 →  Closing long position on PENGUUSDT:
+2025-12-02 17:11:57,116 ✅ Position closed due to TP: PENGUUSDT | Size: 6624
+2025-12-02 17:11:57,458 📋 Trade logged: PENGUUSDT | Profit: 2.67 USDT (+3.34%) | Duration: 0.0484 days
+2025-12-02 17:29:24,707 
+🔚 Interrupted by user.
+2025-12-02 17:29:24,722 ⛔ BOT Stopped
+2025-12-02 17:29:34,324 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 17:29:34,324 ✅  State loaded: 28 positions recovered
+2025-12-02 17:29:34,324    ➡️  double_top_long: 1 positions | Candles: 2
+2025-12-02 17:29:34,324       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 17:29:34,324    ➡️  revers_long: 10 positions | Candles: 0
+2025-12-02 17:29:34,324       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 17:29:34,324       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 17:29:34,324       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 17:29:34,324       - FARTCOINUSDT | Size: 210.6      | Entry: 0.3804    
+2025-12-02 17:29:34,324       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 17:29:34,324       - PENGUUSDT    | Size: 6624       | Entry: 0.012092  
+2025-12-02 17:29:34,324       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 17:29:34,324       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 17:29:34,324       - WIFUSDT      | Size: 200.9      | Entry: 0.3984    
+2025-12-02 17:29:34,324       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 17:29:34,324    ➡️  parity_long: 12 positions | Candles: 0
+2025-12-02 17:29:34,324       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 17:29:34,324       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 17:29:34,324       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 17:29:34,324       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 17:29:34,324       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 17:29:34,324       - FARTCOINUSDT | Size: 212.2      | Entry: 0.3790360037700282752120640905
+2025-12-02 17:29:34,324       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 17:29:34,324       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 17:29:34,324       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 17:29:34,324       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 17:29:34,324       - WIFUSDT      | Size: 201.4      | Entry: 0.3974    
+2025-12-02 17:29:34,324       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 17:29:34,324    ➡️  revers_short: 3 positions | Candles: 46
+2025-12-02 17:29:34,324       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 17:29:34,324       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 17:29:34,324       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 17:29:34,324    ➡️  parity_short: 2 positions | Candles: 46
+2025-12-02 17:29:34,324       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 17:29:34,324       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 17:29:37,278 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 17:29:37,281 🔹 Strategy revers_long: 32 symbols
+2025-12-02 17:29:37,283 🔹 Strategy parity_long: 32 symbols
+2025-12-02 17:29:37,286 🔹 Strategy revers_short: 32 symbols
+2025-12-02 17:29:37,288 🔹 Strategy parity_short: 32 symbols
+2025-12-02 17:29:37,288 ✅ BOT Initialization completed
+
+2025-12-02 17:29:37,288 ____________________________________________________________________________________________________
+2025-12-02 17:38:25,187 
+💲 TP REACHED for WIFUSDT (parity_long)
+2025-12-02 17:38:25,217 →  Closing long position on WIFUSDT:
+2025-12-02 17:38:25,657 ✅ Position closed due to TP: WIFUSDT | Size: 201.4
+2025-12-02 17:38:25,992 📋 Trade logged: WIFUSDT | Profit: 2.56 USDT (+3.20%) | Duration: 0.0667 days
+2025-12-02 17:41:54,901 
+💲 TP REACHED for WIFUSDT (revers_long)
+2025-12-02 17:41:54,915 →  Closing long position on WIFUSDT:
+2025-12-02 17:41:55,344 ✅ Position closed due to TP: WIFUSDT | Size: 200.9
+2025-12-02 17:41:55,669 📋 Trade logged: WIFUSDT | Profit: 2.55 USDT (+3.19%) | Duration: 0.0697 days
+2025-12-02 18:05:14,598 
+💲 TP REACHED for PENGUUSDT (revers_long)
+2025-12-02 18:05:14,611 →  Closing long position on PENGUUSDT:
+2025-12-02 18:05:15,095 ✅ Position closed due to TP: PENGUUSDT | Size: 6624
+2025-12-02 18:05:15,532 📋 Trade logged: PENGUUSDT | Profit: 3.17 USDT (+3.96%) | Duration: 0.0861 days
+2025-12-02 19:22:53,363 🔔 No price for SUIUSDT
+2025-12-02 19:44:20,325 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 19:44:20,326 ✅  State loaded: 25 positions recovered
+2025-12-02 19:44:20,326    ➡️  double_top_long: 1 positions | Candles: 2
+2025-12-02 19:44:20,326       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 19:44:20,326    ➡️  revers_long: 8 positions | Candles: 0
+2025-12-02 19:44:20,326       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 19:44:20,326       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 19:44:20,326       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 19:44:20,326       - FARTCOINUSDT | Size: 210.6      | Entry: 0.3804    
+2025-12-02 19:44:20,326       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 19:44:20,326       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 19:44:20,326       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 19:44:20,326       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 19:44:20,326    ➡️  parity_long: 11 positions | Candles: 0
+2025-12-02 19:44:20,326       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 19:44:20,326       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 19:44:20,326       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 19:44:20,326       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 19:44:20,326       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 19:44:20,326       - FARTCOINUSDT | Size: 212.2      | Entry: 0.3790360037700282752120640905
+2025-12-02 19:44:20,326       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 19:44:20,326       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 19:44:20,326       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 19:44:20,326       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 19:44:20,326       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 19:44:20,326    ➡️  revers_short: 3 positions | Candles: 46
+2025-12-02 19:44:20,326       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 19:44:20,326       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 19:44:20,326       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 19:44:20,326    ➡️  parity_short: 2 positions | Candles: 46
+2025-12-02 19:44:20,326       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 19:44:20,326       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 19:44:23,544 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 19:44:23,547 🔹 Strategy revers_long: 32 symbols
+2025-12-02 19:44:23,549 🔹 Strategy parity_long: 32 symbols
+2025-12-02 19:44:23,552 🔹 Strategy revers_short: 32 symbols
+2025-12-02 19:44:23,554 🔹 Strategy parity_short: 32 symbols
+2025-12-02 19:44:23,554 ✅ BOT Initialization completed
+
+2025-12-02 19:44:23,554 ____________________________________________________________________________________________________
+2025-12-02 20:26:24,369 
+🔚 Interrupted by user.
+2025-12-02 20:26:24,381 ⛔ BOT Stopped
+2025-12-02 20:26:30,632 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 20:26:30,632 ✅  State loaded: 25 positions recovered
+2025-12-02 20:26:30,632    ➡️  double_top_long: 1 positions | Candles: 2
+2025-12-02 20:26:30,633       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 20:26:30,633    ➡️  revers_long: 8 positions | Candles: 0
+2025-12-02 20:26:30,633       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 20:26:30,633       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 20:26:30,633       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 20:26:30,633       - FARTCOINUSDT | Size: 210.6      | Entry: 0.3804    
+2025-12-02 20:26:30,633       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 20:26:30,633       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 20:26:30,633       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 20:26:30,633       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 20:26:30,633    ➡️  parity_long: 11 positions | Candles: 0
+2025-12-02 20:26:30,633       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 20:26:30,633       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 20:26:30,633       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 20:26:30,633       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 20:26:30,633       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 20:26:30,633       - FARTCOINUSDT | Size: 212.2      | Entry: 0.3790360037700282752120640905
+2025-12-02 20:26:30,633       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 20:26:30,633       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 20:26:30,633       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 20:26:30,633       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 20:26:30,633       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 20:26:30,633    ➡️  revers_short: 3 positions | Candles: 46
+2025-12-02 20:26:30,633       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 20:26:30,633       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 20:26:30,633       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 20:26:30,633    ➡️  parity_short: 2 positions | Candles: 46
+2025-12-02 20:26:30,633       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 20:26:30,633       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 20:26:33,629 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 20:26:33,631 🔹 Strategy revers_long: 32 symbols
+2025-12-02 20:26:33,634 🔹 Strategy parity_long: 32 symbols
+2025-12-02 20:26:33,636 🔹 Strategy revers_short: 32 symbols
+2025-12-02 20:26:33,639 🔹 Strategy parity_short: 32 symbols
+2025-12-02 20:26:33,639 ✅ BOT Initialization completed
+
+2025-12-02 20:26:33,639 ____________________________________________________________________________________________________
+2025-12-02 21:00:45,243 
+====================================================================================================
+2025-12-02 21:00:45,257 🔀 === New candle detected ===: 2025-12-02 20:00:45 UTC
+2025-12-02 21:00:45,271 ====================================================================================================
+2025-12-02 21:00:45,284 🌐 Syncronizing positions in broker...
+2025-12-02 21:00:47,326 → Position FARTCOINUSDT doesn't exist in broker - removing from revers_long
+2025-12-02 21:00:51,393 → Position FARTCOINUSDT doesn't exist in broker - removing from parity_long
+2025-12-02 21:00:55,632 ✅ Sync completed: 2 position(s) removed
+2025-12-02 21:00:55,656 
+----------------------------------------------------------------------------------------------------
+2025-12-02 21:00:55,670 📡 Signal search - 2025-12-02 20:00:55
+2025-12-02 21:00:55,697 ----------------------------------------------------------------------------------------------------
+2025-12-02 21:00:55,710 ➡️  double_top_long: 3/50 candles
+2025-12-02 21:00:55,724 ➡️  revers_long: 1/50 candles
+2025-12-02 21:00:55,738 ➡️  parity_long: 1/50 candles
+2025-12-02 21:00:55,752 ➡️  revers_short: 47/50 candles
+2025-12-02 21:00:55,765 ➡️  parity_short: 47/50 candles
+2025-12-02 21:00:55,778 🚫 Skipping signal search for double_top_long (it has 1 open positions)
+2025-12-02 21:00:55,791 🚫 Skipping signal search for revers_long (it has 7 open positions)
+2025-12-02 21:00:55,803 🚫 Skipping signal search for parity_long (it has 10 open positions)
+2025-12-02 21:00:55,817 🚫 Skipping signal search for revers_short (it has 3 open positions)
+2025-12-02 21:00:55,829 🚫 Skipping signal search for parity_short (it has 2 open positions)
+2025-12-02 21:00:55,855 
+====================================================================================================
+2025-12-02 21:00:55,867 🔂 Signal cycle completed
+2025-12-02 21:00:55,892 ====================================================================================================
+
+2025-12-02 21:19:47,399 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 21:19:47,400 ✅  State loaded: 23 positions recovered
+2025-12-02 21:19:47,400    ➡️  double_top_long: 1 positions | Candles: 3
+2025-12-02 21:19:47,400       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 21:19:47,400    ➡️  revers_long: 7 positions | Candles: 1
+2025-12-02 21:19:47,400       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 21:19:47,400       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 21:19:47,400       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 21:19:47,400       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 21:19:47,400       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 21:19:47,400       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 21:19:47,400       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 21:19:47,400    ➡️  parity_long: 10 positions | Candles: 1
+2025-12-02 21:19:47,400       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 21:19:47,400       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 21:19:47,400       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 21:19:47,400       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 21:19:47,400       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 21:19:47,400       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 21:19:47,400       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 21:19:47,400       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 21:19:47,400       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 21:19:47,400       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 21:19:47,400    ➡️  revers_short: 3 positions | Candles: 47
+2025-12-02 21:19:47,400       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 21:19:47,400       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 21:19:47,400       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 21:19:47,400    ➡️  parity_short: 2 positions | Candles: 47
+2025-12-02 21:19:47,400       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 21:19:47,400       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 21:19:47,400 
+📊 Loading historical performance...
+2025-12-02 21:19:47,447 
+2025-12-02 21:19:47,447 [1;94m===================================================================================================================[0m
+2025-12-02 21:19:47,447 [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-02 21:19:47,447 [1;94m===================================================================================================================[0m
+2025-12-02 21:19:47,452 [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-02 21:19:47,452 [0;93mparity_short   [0m  2025-11-24           16         75.0  [1;92m       16.33[0m         2.04    75.0     0.0     25.0      5.15
+2025-12-02 21:19:47,452 [0;93mparity_long    [0m  2025-11-24           12         75.0  [1;91m       -2.75[0m        -0.34    75.0     0.0     25.0      2.36
+2025-12-02 21:19:47,452 [0;93mrevers_long    [0m  2025-11-24            9        66.67  [1;91m       -9.49[0m        -1.19   66.67     0.0    33.33       2.9
+2025-12-02 21:19:47,452 [0;93mrevers_short   [0m  2025-11-24            4         75.0  [1;92m        3.86[0m         0.48    75.0     0.0     25.0      5.54
+2025-12-02 21:19:47,452 [0;93mdouble_top_long[0m  2025-11-27           15        26.67  [1;91m      -72.08[0m        -9.01   26.67     0.0    73.33      2.79
+2025-12-02 21:19:47,452 
+2025-12-02 21:19:47,452 [1;94m===================================================================================================================[0m
+2025-12-02 21:19:47,452 [1;94m📊 TOTAL SUMMARY[0m
+2025-12-02 21:19:47,452 [1;94m===================================================================================================================[0m
+2025-12-02 21:19:47,452 [1;94m🧮 Trades_num   :[0m 56
+2025-12-02 21:19:47,452 [1;94m⏱ Avg_duration :[0m 3.6 days
+2025-12-02 21:19:47,452 [1;94m🎯 Trades_pct   :[0m 60.71 %
+2025-12-02 21:19:47,452 [1;94m💱 Profit_pct   :[0m -1.60 %
+2025-12-02 21:19:47,452 ⭕ [1;94mTOTAL_profit :[0m [1;91m-64.13 $[0m
+2025-12-02 21:19:47,452 [1;94m===================================================================================================================[0m
+2025-12-02 21:19:47,452 
+2025-12-02 21:19:52,023 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 21:19:52,025 🔹 Strategy revers_long: 32 symbols
+2025-12-02 21:19:52,028 🔹 Strategy parity_long: 32 symbols
+2025-12-02 21:19:52,030 🔹 Strategy revers_short: 32 symbols
+2025-12-02 21:19:52,033 🔹 Strategy parity_short: 32 symbols
+2025-12-02 21:19:52,033 ✅ BOT Initialization completed
+
+2025-12-02 21:19:52,033 ____________________________________________________________________________________________________
+2025-12-02 21:24:21,549 
+🔚 Interrupted by user.
+2025-12-02 21:24:21,572 ⛔ BOT Stopped
+2025-12-02 21:24:27,030 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 21:24:27,030 ✅  State loaded: 23 positions recovered
+2025-12-02 21:24:27,030    ➡️  double_top_long: 1 positions | Candles: 3
+2025-12-02 21:24:27,030       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 21:24:27,030    ➡️  revers_long: 7 positions | Candles: 1
+2025-12-02 21:24:27,030       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 21:24:27,030       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 21:24:27,030       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 21:24:27,030       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 21:24:27,030       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 21:24:27,030       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 21:24:27,030       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 21:24:27,030    ➡️  parity_long: 10 positions | Candles: 1
+2025-12-02 21:24:27,030       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 21:24:27,030       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 21:24:27,030       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 21:24:27,030       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 21:24:27,030       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 21:24:27,030       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 21:24:27,030       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 21:24:27,030       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 21:24:27,030       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 21:24:27,030       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 21:24:27,030    ➡️  revers_short: 3 positions | Candles: 47
+2025-12-02 21:24:27,030       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 21:24:27,030       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 21:24:27,030       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 21:24:27,030    ➡️  parity_short: 2 positions | Candles: 47
+2025-12-02 21:24:27,031       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 21:24:27,031       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 21:24:27,031 
+📊 Loading historical performance...
+2025-12-02 21:24:27,077 
+2025-12-02 21:24:27,078 [1;94m===================================================================================================================[0m
+2025-12-02 21:24:27,078 [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-02 21:24:27,078 [1;94m===================================================================================================================[0m
+2025-12-02 21:24:27,082 [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-02 21:24:27,082 [0;93mparity_short   [0m  2025-11-24           16         75.0  [1;92m       16.33[0m         2.04    75.0     0.0     25.0      5.15
+2025-12-02 21:24:27,082 [0;93mparity_long    [0m  2025-11-24           12         75.0  [1;91m       -2.75[0m        -0.34    75.0     0.0     25.0      2.36
+2025-12-02 21:24:27,082 [0;93mrevers_long    [0m  2025-11-24            9        66.67  [1;91m       -9.49[0m        -1.19   66.67     0.0    33.33       2.9
+2025-12-02 21:24:27,082 [0;93mrevers_short   [0m  2025-11-24            4         75.0  [1;92m        3.86[0m         0.48    75.0     0.0     25.0      5.54
+2025-12-02 21:24:27,082 [0;93mdouble_top_long[0m  2025-11-27           15        26.67  [1;91m      -72.08[0m        -9.01   26.67     0.0    73.33      2.79
+2025-12-02 21:24:27,082 
+2025-12-02 21:24:27,082 [1;94m===================================================================================================================[0m
+2025-12-02 21:24:27,082 [1;94m📊 TOTAL SUMMARY[0m
+2025-12-02 21:24:27,082 [1;94m===================================================================================================================[0m
+2025-12-02 21:24:27,082 [1;94m🧮 Trades_num   :[0m 56
+2025-12-02 21:24:27,082 [1;94m⏱ Avg_duration :[0m 3.6 days
+2025-12-02 21:24:27,083 [1;94m🎯 Trades_pct   :[0m 60.71 %
+2025-12-02 21:24:27,083 [1;94m💱 Profit_pct   :[0m -1.60 %
+2025-12-02 21:24:27,083 ⭕ [1;94mTOTAL_profit :[0m [1;91m-64.13 $[0m
+2025-12-02 21:24:27,083 [1;94m===================================================================================================================[0m
+2025-12-02 21:24:27,083 
+2025-12-02 21:24:30,345 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 21:24:30,347 🔹 Strategy revers_long: 32 symbols
+2025-12-02 21:24:30,349 🔹 Strategy parity_long: 32 symbols
+2025-12-02 21:24:30,352 🔹 Strategy revers_short: 32 symbols
+2025-12-02 21:24:30,354 🔹 Strategy parity_short: 32 symbols
+2025-12-02 21:24:30,354 ✅ BOT Initialization completed
+
+2025-12-02 21:24:30,354 ____________________________________________________________________________________________________
+2025-12-02 21:25:06,340 
+🔚 Interrupted by user.
+2025-12-02 21:25:06,342 ⛔ BOT Stopped
+2025-12-02 21:25:08,332 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 21:25:08,332 ✅  State loaded: 23 positions recovered
+2025-12-02 21:25:08,332    ➡️  double_top_long: 1 positions | Candles: 3
+2025-12-02 21:25:08,333       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 21:25:08,333    ➡️  revers_long: 7 positions | Candles: 1
+2025-12-02 21:25:08,333       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 21:25:08,333       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 21:25:08,333       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 21:25:08,333       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 21:25:08,333       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 21:25:08,333       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 21:25:08,333       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 21:25:08,333    ➡️  parity_long: 10 positions | Candles: 1
+2025-12-02 21:25:08,333       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 21:25:08,333       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 21:25:08,333       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 21:25:08,333       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 21:25:08,333       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 21:25:08,333       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 21:25:08,333       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 21:25:08,333       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 21:25:08,333       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 21:25:08,333       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 21:25:08,333    ➡️  revers_short: 3 positions | Candles: 47
+2025-12-02 21:25:08,333       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 21:25:08,333       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 21:25:08,333       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 21:25:08,333    ➡️  parity_short: 2 positions | Candles: 47
+2025-12-02 21:25:08,333       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 21:25:08,333       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 21:25:08,333 
+📊 Loading historical performance...
+2025-12-02 21:25:08,380 
+2025-12-02 21:25:08,380 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:08,380 [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-02 21:25:08,380 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:08,384 [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-02 21:25:08,384 [0;93mparity_short   [0m  2025-11-24           16         75.0  [1;92m       16.33[0m         2.04    75.0     0.0     25.0      5.15
+2025-12-02 21:25:08,384 [0;93mparity_long    [0m  2025-11-24           12         75.0  [1;91m       -2.75[0m        -0.34    75.0     0.0     25.0      2.36
+2025-12-02 21:25:08,384 [0;93mrevers_long    [0m  2025-11-24            9        66.67  [1;91m       -9.49[0m        -1.19   66.67     0.0    33.33       2.9
+2025-12-02 21:25:08,384 [0;93mrevers_short   [0m  2025-11-24            4         75.0  [1;92m        3.86[0m         0.48    75.0     0.0     25.0      5.54
+2025-12-02 21:25:08,384 [0;93mdouble_top_long[0m  2025-11-27           15        26.67  [1;91m      -72.08[0m        -9.01   26.67     0.0    73.33      2.79
+2025-12-02 21:25:08,385 
+2025-12-02 21:25:08,385 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:08,385 [1;94m📊 TOTAL SUMMARY[0m
+2025-12-02 21:25:08,385 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:08,385 [1;94m🧮 Trades_num   :[0m 56
+2025-12-02 21:25:08,385 [1;94m⏱  Avg_duration :[0m 3.6 days
+2025-12-02 21:25:08,385 [1;94m🎯 Trades_pct   :[0m 60.71 %
+2025-12-02 21:25:08,385 [1;94m💱 Profit_pct   :[0m -1.60 %
+2025-12-02 21:25:08,385 ⭕ [1;94mTOTAL_profit :[0m [1;91m-64.13 $[0m
+2025-12-02 21:25:08,385 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:08,385 
+2025-12-02 21:25:11,465 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 21:25:11,467 🔹 Strategy revers_long: 32 symbols
+2025-12-02 21:25:11,470 🔹 Strategy parity_long: 32 symbols
+2025-12-02 21:25:11,472 🔹 Strategy revers_short: 32 symbols
+2025-12-02 21:25:11,475 🔹 Strategy parity_short: 32 symbols
+2025-12-02 21:25:11,475 ✅ BOT Initialization completed
+
+2025-12-02 21:25:11,475 ____________________________________________________________________________________________________
+2025-12-02 21:25:48,831 
+🚀 === Starting multi-strategy bot... ===
+2025-12-02 21:25:48,831 ✅  State loaded: 23 positions recovered
+2025-12-02 21:25:48,831    ➡️  double_top_long: 1 positions | Candles: 3
+2025-12-02 21:25:48,831       - APTUSDT      | Size: 41.273     | Entry: 1.939339849296150025440360526
+2025-12-02 21:25:48,831    ➡️  revers_long: 7 positions | Candles: 1
+2025-12-02 21:25:48,831       - ADAUSDT      | Size: 186        | Entry: 0.4294    
+2025-12-02 21:25:48,831       - BTCUSDT      | Size: 0.0008     | Entry: 91018.9   
+2025-12-02 21:25:48,831       - ETHUSDT      | Size: 0.02       | Entry: 3010.96   
+2025-12-02 21:25:48,831       - LINKUSDT     | Size: 5          | Entry: 13.348    
+2025-12-02 21:25:48,832       - SEIUSDT      | Size: 566        | Entry: 0.14128   
+2025-12-02 21:25:48,832       - SUIUSDT      | Size: 49.2       | Entry: 1.6231    
+2025-12-02 21:25:48,832       - WLDUSDT      | Size: 121        | Entry: 0.6613    
+2025-12-02 21:25:48,832    ➡️  parity_long: 10 positions | Candles: 1
+2025-12-02 21:25:48,832       - AAVEUSDT     | Size: 0.4        | Entry: 184.83    
+2025-12-02 21:25:48,832       - ADAUSDT      | Size: 186        | Entry: 0.4295    
+2025-12-02 21:25:48,832       - BNBUSDT      | Size: 0.09       | Entry: 873.56    
+2025-12-02 21:25:48,832       - BTCUSDT      | Size: 0.0008     | Entry: 90986.9   
+2025-12-02 21:25:48,832       - ETHUSDT      | Size: 0.02       | Entry: 3013.69   
+2025-12-02 21:25:48,832       - LINKUSDT     | Size: 5          | Entry: 13.364    
+2025-12-02 21:25:48,832       - ONDOUSDT     | Size: 155.9      | Entry: 0.514     
+2025-12-02 21:25:48,832       - SEIUSDT      | Size: 567        | Entry: 0.14087   
+2025-12-02 21:25:48,832       - SUIUSDT      | Size: 49.4       | Entry: 1.6185    
+2025-12-02 21:25:48,832       - WLDUSDT      | Size: 120        | Entry: 0.6619    
+2025-12-02 21:25:48,832    ➡️  revers_short: 3 positions | Candles: 47
+2025-12-02 21:25:48,832       - BGBUSDT      | Size: 22         | Entry: 3.493     
+2025-12-02 21:25:48,832       - BNBUSDT      | Size: 0.09       | Entry: 844.23    
+2025-12-02 21:25:48,832       - BTCUSDT      | Size: 0.0009     | Entry: 86724.9   
+2025-12-02 21:25:48,832    ➡️  parity_short: 2 positions | Candles: 47
+2025-12-02 21:25:48,832       - BGBUSDT      | Size: 22         | Entry: 3.497     
+2025-12-02 21:25:48,832       - ETHUSDT      | Size: 0.02       | Entry: 2859.94   
+2025-12-02 21:25:48,832 
+📊 Loading historical performance...
+2025-12-02 21:25:48,879 
+2025-12-02 21:25:48,879 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:48,879 [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-02 21:25:48,879 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:48,883 [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-02 21:25:48,883 [0;93mparity_short   [0m  2025-11-24           16         75.0  [1;92m       16.33[0m         2.04    75.0     0.0     25.0      5.15
+2025-12-02 21:25:48,883 [0;93mparity_long    [0m  2025-11-24           12         75.0  [1;91m       -2.75[0m        -0.34    75.0     0.0     25.0      2.36
+2025-12-02 21:25:48,883 [0;93mrevers_long    [0m  2025-11-24            9        66.67  [1;91m       -9.49[0m        -1.19   66.67     0.0    33.33       2.9
+2025-12-02 21:25:48,883 [0;93mrevers_short   [0m  2025-11-24            4         75.0  [1;92m        3.86[0m         0.48    75.0     0.0     25.0      5.54
+2025-12-02 21:25:48,883 [0;93mdouble_top_long[0m  2025-11-27           15        26.67  [1;91m      -72.08[0m        -9.01   26.67     0.0    73.33      2.79
+2025-12-02 21:25:48,884 
+2025-12-02 21:25:48,884 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:48,884 [1;94m📊 TOTAL SUMMARY[0m
+2025-12-02 21:25:48,884 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:48,884 [1;94m🧮 Trades_num   :[0m 56
+2025-12-02 21:25:48,884 [1;94m⏱  Avg_duration :[0m 3.6 days
+2025-12-02 21:25:48,884 [1;94m🎯 Trades_pct   :[0m 60.71 %
+2025-12-02 21:25:48,884 [1;94m💱 Profit_pct   :[0m -1.60 %
+2025-12-02 21:25:48,884 ⭕ [1;94mTOTAL_profit :[0m [1;91m-64.13 $[0m
+2025-12-02 21:25:48,884 [1;94m===================================================================================================================[0m
+2025-12-02 21:25:48,884 
+2025-12-02 21:25:52,122 🔹 Strategy double_top_long: 32 symbols
+2025-12-02 21:25:52,124 🔹 Strategy revers_long: 32 symbols
+2025-12-02 21:25:52,127 🔹 Strategy parity_long: 32 symbols
+2025-12-02 21:25:52,129 🔹 Strategy revers_short: 32 symbols
+2025-12-02 21:25:52,132 🔹 Strategy parity_short: 32 symbols
+2025-12-02 21:25:52,132 ✅ BOT Initialization completed
+
+2025-12-02 21:25:52,132 ____________________________________________________________________________________________________

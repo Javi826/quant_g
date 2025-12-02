@@ -14,6 +14,7 @@ from rich.live import Live
 from rich.table import Table
 from rich.text import Text
 from rich.console import Group
+from BOT_metrics import bot_metrics
 
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
@@ -152,7 +153,7 @@ def sync_broker(open_positions, strategy_candles, state_file, send_request_func)
                     positions_to_remove.append(i)
                     total_removed += 1
                 
-                time.sleep(0.2)  # Rate limiting
+                time.sleep(0.1)  # Rate limiting
                 
             except Exception as e:
                 print(f"❌ Error checking {pos['symbol']}: {e}")
@@ -183,7 +184,7 @@ def fetch_ticker(send_request_func, product_type, symbol):
         print("🔔 No fecth of ticker:", resp)
         return None, None
     last_price = Decimal(str(resp['data'][0]['lastPr']))
-    time.sleep(0.5)
+    time.sleep(0.1)
     return last_price, resp
 
 
@@ -387,7 +388,7 @@ def place_order(symbol: str,
 # ==========================================================================
 # PRICING
 # ==========================================================================   
-def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.5):
+def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.1):
     
     time.sleep(delay)
 
@@ -528,7 +529,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-
+        bot_metrics()
 # ==========================================================================
 # DISPLAY
 # ==========================================================================
@@ -609,7 +610,7 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
     pnl_accumulator['total'] += pnl
     
     # Formatear PnL con color
-    pnl_color = "bold green" if pnl >= 0 else "bold red"
+    pnl_color = "green" if pnl >= 0 else "red"
     pnl_text = f"[{pnl_color}]{pnl:+.2f}[/{pnl_color}]"
     
     # Extraer opened_at y formatear solo la fecha
@@ -828,7 +829,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"🔊 Signals detected for {strat_id}: {len(signals)}")
+    print(f"✨ Signals detected for {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -865,7 +866,7 @@ def process_strategy(
                 symbol=sig['symbol'],
                 send_request_func=send_request_func
             )
-            time.sleep(0.5)
+            time.sleep(0.1)
 
             if filled_size is None or filled_size == 0:
                 size = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
@@ -895,7 +896,7 @@ def process_strategy(
         else:
             print(f"🔔 Order executed but no orderId in response")
 
-        time.sleep(0.5)
+        time.sleep(0.1)
         
 def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
     """Genera señales de prueba para testing"""
@@ -919,6 +920,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 # POSITIONS MANAGEMENT
 # ========================================================================== 
+
 
 def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None):
     """Cierra una posición con orden market en HEDGE MODE"""
@@ -945,7 +947,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         
         print(f"→  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
-        time.sleep(1.0)
+        time.sleep(0.1)
         
         if code == 200 and resp.get("code") == "00000":
             print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
@@ -965,6 +967,8 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                         reason=reason,
                         size=size
                     )
+                        
+            bot_metrics()
             return True
         else:
             print(f"🔔 No closing position available {symbol}: {resp}")
@@ -1043,40 +1047,60 @@ def log_closed_position(
         base_dir = os.path.dirname(os.path.abspath(excel_file))
         files_dir = os.path.join(base_dir, 'bot_files')
         os.makedirs(files_dir, exist_ok=True)  # crea la carpeta si no existe
-        
+
         # Excel final en la carpeta 'files'
         excel_file_path = os.path.join(files_dir, os.path.basename(excel_file))
-        
-        # Convertir Decimals a float
+
+        # Convertir precios y montos a float
         entry_price = float(entry_price)
         close_price = float(close_price)
         usdt_amount = float(usdt_amount)
-        
-        if usdt_amount == 0 and size is not None:
-            usdt_amount = float(size) * entry_price
-        
-        # Calcular profit
-        if direction.lower() == 'long':
-            profit = (close_price - entry_price) * (usdt_amount / entry_price)
-            profit_pct = ((close_price - entry_price) / entry_price) * 100
+
+        # Intentar convertir size a float si viene
+        size_val = None
+        if size is not None:
+            try:
+                size_val = float(size)
+            except Exception:
+                size_val = None
+
+        # Si no hay usdt_amount pero sí size, calcular usdt_amount = size * entry_price (valor de la posición)
+        if usdt_amount == 0 and size_val is not None:
+            usdt_amount = size_val * entry_price
+
+        # Calcular profit priorizando el uso de 'size' (más exacto).
+        # Si size está disponible usamos: profit_usdt = (close - entry) * size  (ya en USDT)
+        # Si no hay size, hacemos el cálculo antiguo usando usdt_amount / entry_price para obtener unidades.
+        if size_val is not None:
+            if direction.lower() == 'long':
+                profit = (close_price - entry_price) * size_val
+                profit_pct = ((close_price - entry_price) / entry_price) * 100
+            else:
+                profit = (entry_price - close_price) * size_val
+                profit_pct = ((entry_price - close_price) / entry_price) * 100
         else:
-            profit = (entry_price - close_price) * (usdt_amount / entry_price)
-            profit_pct = ((entry_price - close_price) / entry_price) * 100
-        
+            # Fallback al método anterior (usdt_amount derivado de tamaño)
+            if direction.lower() == 'long':
+                profit = (close_price - entry_price) * (usdt_amount / entry_price)
+                profit_pct = ((close_price - entry_price) / entry_price) * 100
+            else:
+                profit = (entry_price - close_price) * (usdt_amount / entry_price)
+                profit_pct = ((entry_price - close_price) / entry_price) * 100
+
         closed_at = datetime.now()
-        
+
         if isinstance(opened_at, str):
             opened_at_dt = datetime.strptime(opened_at, '%Y-%m-%d %H:%M:%S')
         else:
             opened_at_dt = opened_at
-        
+
         if opened_at_dt.tzinfo is not None:
             opened_at_dt = opened_at_dt.replace(tzinfo=None)
         if closed_at.tzinfo is not None:
             closed_at = closed_at.replace(tzinfo=None)
-        
+
         delta_days = (closed_at - opened_at_dt).total_seconds() / (3600*24)
-        
+
         new_record = {
             'OPEN_AT': opened_at_dt.strftime('%Y-%m-%d %H:%M:%S'),
             'CLOSE_AT': closed_at.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1087,28 +1111,27 @@ def log_closed_position(
             'USDT_AMOUNT': round(usdt_amount, 2),
             'PRICE_ENTRY': round(entry_price, 6),
             'PRICE_CLOSE': round(close_price, 6),
-            'PROFIT': round(profit, 2),  
-            'PROFIT_PCT': round(profit_pct, 1),  
+            'PROFIT': round(profit, 2),
+            'PROFIT_PCT': round(profit_pct, 1),
             'REASON_OUT': reason
         }
-        
+
         # Cargar o crear DataFrame
         if os.path.exists(excel_file_path):
             df = pd.read_excel(excel_file_path)
             df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
         else:
             df = pd.DataFrame([new_record])
-        
+
         df.to_excel(excel_file_path, index=False, engine='openpyxl')
-        
+
         print(f"📋 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
-        
+
     except Exception as e:
         print(f"❌ Error logging trade to Excel: {e}")
         import traceback
         traceback.print_exc()
 
-        
     
 def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
     """
