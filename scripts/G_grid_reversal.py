@@ -11,12 +11,12 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_reversal import trend_reversal_entry_long
-from Z_add_signals_reversal import trend_reversal_entry_short
+from Z_add_signals_reversal import reversal_long
+from Z_add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "reversal_short"
+STRATEGY     = "reversal_long"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -41,10 +41,10 @@ TP_PCT_LIST          = [3.5,10,15,20,30,40,50]
 SL_PCT_LIST          = [5,10]
 
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [8] 
+LEFT_LOOKBACK_LIST   = [5] 
 TOLERANCE_LIST       = [30]
 
-TP_PCT_LIST          = [5]
+TP_PCT_LIST          = [3]
 SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
@@ -71,7 +71,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = trend_reversal_entry_short(
+        signals = reversal_long(
             arr_minor,
             left_lookback=params['LEFT_LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -109,9 +109,9 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
+save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
-final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
+final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

@@ -23,8 +23,10 @@ from datetime import datetime, timedelta
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 BASE_URL     = "https://api.bitget.com"
-PRODUCT_TYPE = 'usdt-futures'
-
+PRODUCT_TYPE = "USDT-FUTURES"
+MARGIN_MODE  = "isolated"
+BLUE_BOLD    = "\033[1;94m"
+RESET        = "\033[0m"
 # ==========================================================================
 # STATE MANAGEMENT
 # ========================================================================== 
@@ -88,7 +90,7 @@ def load_state(state_file):
 def save_state_local(open_positions, strategy_candles, state_file):
     """Guarda el estado sin usar lock (versión para bucle único)"""
     try:
-        positions_copy = copy.deepcopy(open_positions)
+        positions_copy        = copy.deepcopy(open_positions)
         strategy_candles_copy = copy.deepcopy(strategy_candles)
 
         serializable_positions = {}
@@ -104,7 +106,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
                     'sl': str(pos['sl']),
                     'order_id': pos['order_id'],
                     'opened_at': pos['opened_at'].isoformat(),
-                    'usdt_amount': float(pos.get('usdt_amount', 0))  # ⭐ AÑADIR ESTA LÍNEA
+                    'usdt_amount': float(pos.get('usdt_amount', 0))  
                 })
 
         state_data = {
@@ -203,65 +205,27 @@ def fetch_contracts(send_request_func, product_type, symbol):
 
 def extract_contract_params(c, last_price):
     """Extrae parámetros de configuración del contrato"""
-    price_tick = None
-    size_scale = None
-    min_trade_num = None
-    size_multiplier = None
-    min_trade_usdt = None
-
     if c is None:
+        return None, None, None, None, None
+    
+    try:
+        # pricePlace siempre existe en la respuesta
+        price_tick = Decimal(f"1e-{int(c['pricePlace'])}")
+        
+        # volumePlace siempre existe
+        size_scale = int(c['volumePlace'])
+        
+        # Estos tres siempre existen como strings
+        min_trade_num = Decimal(c['minTradeNum'])
+        size_multiplier = Decimal(c['sizeMultiplier'])
+        min_trade_usdt = Decimal(c['minTradeUSDT'])
+        
         return price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt
-
-    # Extraer pricePlace
-    if "pricePlace" in c and c.get("pricePlace") is not None:
-        try:
-            price_tick = Decimal(f"1e-{int(c.get('pricePlace'))}")
-        except Exception:
-            pass
-    if price_tick is None and "priceEndStep" in c and c.get("priceEndStep") is not None:
-        try:
-            price_tick = Decimal(str(c.get("priceEndStep")))
-        except Exception:
-            pass
-
-    # Extraer volumePlace
-    if "volumePlace" in c and c.get("volumePlace") is not None:
-        try:
-            size_scale = int(c.get("volumePlace"))
-        except Exception:
-            pass
-    elif "sizeMultiplier" in c and c.get("sizeMultiplier") is not None:
-        try:
-            sm = Decimal(str(c.get("sizeMultiplier")))
-            if sm == sm.to_integral():
-                size_scale = 0
-            else:
-                size_scale = max(0, -sm.as_tuple().exponent)
-        except Exception:
-            pass
-
-    # Extraer minTradeNum
-    if "minTradeNum" in c and c.get("minTradeNum") is not None:
-        try:
-            min_trade_num = Decimal(str(c.get("minTradeNum")))
-        except Exception:
-            pass
-
-    # Extraer sizeMultiplier
-    if "sizeMultiplier" in c and c.get("sizeMultiplier") is not None:
-        try:
-            size_multiplier = Decimal(str(c.get("sizeMultiplier")))
-        except Exception:
-            pass
-
-    # Extraer minTradeUSDT
-    if "minTradeUSDT" in c and c.get("minTradeUSDT") is not None:
-        try:
-            min_trade_usdt = Decimal(str(c.get("minTradeUSDT")))
-        except Exception:
-            pass
-
-    return price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt
+        
+    except (KeyError, ValueError, TypeError) as e:
+        # Solo si hay un error inesperado en los datos
+        print(f"Error extrayendo parámetros del contrato: {e}")
+        return None, None, None, None, None
 
 
 def fallback_params(price_tick, size_scale, last_price, min_trade_num=None, min_trade_usdt=None):
@@ -347,9 +311,9 @@ def get_exec_price(resp_order, last_price):
 def place_order(symbol: str,
                 direction: str,
                 usdt_amount: float = 100,
-                product_type: str = "USDT-FUTURES",
+                product_type: str = PRODUCT_TYPE,
                 margin_coin: str = "USDT",
-                margin_mode: str = "isolated",
+                margin_mode: str = MARGIN_MODE,
                 send_request_func=None,
                 client_oid: str = None):
 
@@ -361,7 +325,7 @@ def place_order(symbol: str,
         return None
 
     size_base = compute_size_base(usdt_amount, last_price)
-    c = fetch_contracts(send_request_func, product_type, symbol)
+    c         = fetch_contracts(send_request_func, product_type, symbol)
     price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt = extract_contract_params(c, last_price)
     price_tick, size_scale, min_trade_num, min_trade_usdt = fallback_params(price_tick, size_scale, last_price, min_trade_num, min_trade_usdt)
 
@@ -380,7 +344,7 @@ def place_order(symbol: str,
     filled_amount = extract_filled_amount(resp_order, size_q)
     exec_price    = get_exec_price(resp_order, last_price)
 
-    print(f"✅ {('⬆️' if direction=='long' else '⬇️'):2} {direction.capitalize():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
+    print(f"✅ {('⬆️ ' if direction=='long' else '⬇️ '):2} {direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
 
     return resp_order
 
@@ -388,12 +352,9 @@ def place_order(symbol: str,
 # ==========================================================================
 # PRICING
 # ==========================================================================   
-def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_request_func=None, retries=5, delay=0.1):
+def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_request_func=None, retries=5, delay=0.1):
     
     time.sleep(delay)
-
-    if send_request_func is None:
-        raise ValueError("Se necesita send_request_func para hacer la consulta")
     
     for attempt in range(retries):
         try:
@@ -405,23 +366,21 @@ def get_fills_for_order(order_id, symbol, product_type='USDT-FUTURES', send_requ
                     total_base = Decimal('0')
                     weighted = Decimal('0')
                     for f in fill_list:
-                        bv = None
-                        for k in ("baseVolume", "filledQty", "size", "filledSize", "sz", "filled_amount"):
-                            if k in f and f[k] is not None:
-                                bv = f[k]
-                                break
-                        price = f.get("price") or f.get("execPrice") or f.get("avgPrice") or None
+                        # Usar campos documentados directamente
+                        bv = f.get("baseVolume")
+                        price = f.get("price")
+                        
+                        if bv is None or price is None:
+                            continue
+                        
                         try:
-                            bv_d = Decimal(str(bv)) if bv is not None else Decimal('0')
+                            bv_d = Decimal(str(bv))
+                            p_d = Decimal(str(price))
+                            total_base += bv_d
+                            weighted += p_d * bv_d
                         except Exception:
-                            bv_d = Decimal('0')
-                        total_base += bv_d
-                        if price is not None:
-                            try:
-                                p_d = Decimal(str(price))
-                                weighted += p_d * bv_d
-                            except Exception:
-                                pass
+                            pass
+                    
                     entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
                     return total_base, entry_price
         except Exception as e:
@@ -659,15 +618,17 @@ def create_tp_sl_display(now, total_pnl=None):
     """Crea el header y la tabla para el display de TP/SL"""
     # Crear el header con PnL total si se proporciona
     header = Text()
-    header.append(f"{'─' *100}\n", style="blue")
-    header.append(f"🔷 Checking TP/SL - {now}\n", style="bold cyan")
+
+    header.append(f"{BLUE_BOLD}{'─'*115}\n")
+    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
+
     
     if total_pnl is not None:
         pnl_color = "bold green" if total_pnl >= 0 else "bold red"
         header.append(f"💰 Total PnL: ", style="white")
         header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
     
-    header.append(f"{'─' * 100}\n", style="blue")
+    header.append(f"{BLUE_BOLD}{'─'*115}\n")
     
     # Crear tabla con columnas adicionales: opened_at y candles
     table = Table(show_header=True, header_style="bold white", border_style="white")
@@ -819,7 +780,7 @@ def process_strategy(
     """
     strat_id = strat['id']
 
-    print(f"🔄 Processing strategy: {strat_id}")
+    print(f"\n🔄 Processing strategy: {strat_id}")
 
     # Detectar señales
     if use_hardcoded:
@@ -844,8 +805,6 @@ def process_strategy(
             print(f"🔔 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
             continue
 
-        print(f"\n➡ Opening {strat['direction']} on {sig['symbol']} for {strat_id}...")
-
         resp_order = place_order(
             symbol=sig['symbol'],
             direction=strat['direction'],
@@ -861,11 +820,7 @@ def process_strategy(
         order_id = data.get('orderId')
 
         if order_id:
-            filled_size, entry_price_from_fills = get_fills_for_order(
-                order_id=order_id,
-                symbol=sig['symbol'],
-                send_request_func=send_request_func
-            )
+            filled_size, entry_price_from_fills = get_fills_for_order(order_id=order_id,symbol=sig['symbol'],send_request_func=send_request_func)
             time.sleep(0.1)
 
             if filled_size is None or filled_size == 0:
@@ -938,12 +893,11 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             "orderType": "market"
         }
         
-        # Mensajes ANTES de cerrar - PRINTS NORMALES
+        # Mensajes ANTES de cerrar
         if reason == "TP":
             print(f"\n💲 TP REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
         elif reason == "SL":
             print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
-        
         
         print(f"→  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
@@ -952,21 +906,37 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         if code == 200 and resp.get("code") == "00000":
             print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
             
-            # REGISTRAR EN EXCEL
+            # ⭐ OBTENER PRECIO REAL DE EJECUCIÓN
             if position_data:
-                current_price = get_current_price(symbol, send_request_func)
-                if current_price:
-                    log_closed_position(
-                        opened_at=position_data.get('opened_at'), 
-                        strategy_id=position_data.get('strategy_id'), 
-                        symbol=symbol, 
-                        direction=direction, 
-                        usdt_amount=position_data.get('usdt_amount', 0), 
-                        entry_price=position_data.get('entry_price'), 
-                        close_price=current_price, 
-                        reason=reason,
-                        size=size
+                data = resp.get('data', {})
+                order_id = data.get('orderId')
+                
+                # Obtener precio real desde fills (igual que al abrir)
+                if order_id:
+                    _, close_price_from_fills = get_fills_for_order(
+                        order_id=order_id,
+                        symbol=symbol,
+                        send_request_func=send_request_func
                     )
+                    
+                    # Si no hay fills, usar el precio del response o ticker como fallback
+                    if close_price_from_fills is None:
+                        close_price_from_fills = Decimal(str(data.get('price', 0)))
+                        if close_price_from_fills == 0:
+                            close_price_from_fills = get_current_price(symbol, send_request_func)
+                    
+                    if close_price_from_fills:
+                        log_closed_position(
+                            opened_at=position_data.get('opened_at'), 
+                            strategy_id=position_data.get('strategy_id'), 
+                            symbol=symbol, 
+                            direction=direction, 
+                            usdt_amount=position_data.get('usdt_amount', 0), 
+                            entry_price=position_data.get('entry_price'), 
+                            close_price=close_price_from_fills,  # ⭐ PRECIO REAL
+                            reason=reason,
+                            size=size
+                        )
                         
             bot_metrics()
             return True
@@ -1039,7 +1009,7 @@ def log_closed_position(
     entry_price,
     close_price,
     reason,
-    size=None,
+    size,
     excel_file='bot_trading_trades.xlsx'
 ):
     try:
@@ -1109,6 +1079,7 @@ def log_closed_position(
             'SYMBOL': symbol,
             'DIRECTION': direction.upper(),
             'USDT_AMOUNT': round(usdt_amount, 2),
+            'SIZE': round(size_val, 6),
             'PRICE_ENTRY': round(entry_price, 6),
             'PRICE_CLOSE': round(close_price, 6),
             'PROFIT': round(profit, 2),

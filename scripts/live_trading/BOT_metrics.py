@@ -178,7 +178,7 @@ def bot_metrics(
         print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
         
         print(f"{BLUE_BOLD}🧮 Trades_num   :{RESET} {num_trades_total}")
-        print(f"{BLUE_BOLD}⏱  Avg_duration :{RESET} {avg_duration_total:.1f} days")
+        print(f"{BLUE_BOLD}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
         print(f"{BLUE_BOLD}🎯 Trades_pct   :{RESET} {pct_positive_total:.2f} %")
         print(f"{BLUE_BOLD}💱 Profit_pct   :{RESET} {pct_profit:.2f} %")
         

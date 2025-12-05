@@ -17,9 +17,9 @@ PRODUCT_TYPE   = 'usdt-futures'
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50):
 
-    ohlcv_data = {}
+    ohlcv_data       = {}
     filtered_symbols = []
-    removed_symbols = []
+    removed_symbols  = []
 
     # Contadores por motivo de eliminación
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
@@ -55,9 +55,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 avg_vol = df['volume_quote'].tail(vol_window).mean()
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
-                    
-
-
             # -------------------
             # MIN BARS
             # -------------------
@@ -98,7 +95,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     print(f"🔹Symbols remaining      : {len(filtered_symbols)}\n")
 
     return ohlcv_data, filtered_symbols
-
         
 def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
 

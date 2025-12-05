@@ -178,7 +178,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             else:
                 signals = None
         except Exception as e:
-            print(f"❌ Error ejecutando la función de señales para {sym} ({strategy['name']}): {e}")
+            print(f"❌ Error looking for signals {sym} ({strategy['name']}): {e}")
             signals = None
 
 
@@ -232,9 +232,8 @@ def main_loop():
     
     # Cargar estado previo
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
-    bot_metrics()
 
-    exchange = connect_common()
+    exchange    = connect_common()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
     # Cargar símbolos finales por estrategia
@@ -244,7 +243,7 @@ def main_loop():
         print(f"🔹 Strategy {strat['id']}: {len(final_by_strat[strat['id']])} symbols")
     
     print("✅ BOT Initialization completed\n")
-    print("_" * 100)
+    bot_metrics()
     
     # Calcular la próxima vela
     next_candle_time = calculate_next_candle_time(MIN_TIMEFRAME, hour_zone=HOUR_ZONE)
@@ -258,17 +257,17 @@ def main_loop():
             
             # Verificar si llegó el momento de buscar señales (nueva vela)
             if now_datetime >= next_candle_time:
-                print(f"\n{'=' * 100}")
+                print(f"\n{'=' * 115}")
                 print(f"🔀 === New candle detected ===: {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-                print(f"{'=' * 100}")
+                print(f"{'=' * 115}")
 
                 sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
 
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"\n{'-' * 100}")
+                print('\n')
                 print(f"📡 Signal search - {now}")
-                print(f"{'-' * 100}")
+                print(f"{'-' * 115}")
                 
                 # Incrementar contador de velas y chequear timeouts
                 for strat in STRATEGIES:
@@ -313,9 +312,9 @@ def main_loop():
                         import traceback
                         traceback.print_exc()
                 
-                print(f"\n{'=' * 100}")
+                print(f"\n{'=' * 115}")
                 print("🔂 Signal cycle completed")
-                print(f"{'=' * 100}\n")
+                print(f"{'=' * 115}\n")
                 
                 # Calcular la siguiente vela & Resetear el tiempo del último chequeo TP/SL
                 next_candle_time = calculate_next_candle_time(MIN_TIMEFRAME, hour_zone=HOUR_ZONE)             

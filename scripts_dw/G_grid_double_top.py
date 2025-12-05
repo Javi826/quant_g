@@ -11,8 +11,8 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_double_top import detect_double_top_short
-from Z_add_signals_double_top import detect_double_top_long
+from Z_add_signals_double_top import double_top_short
+from Z_add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
@@ -25,7 +25,7 @@ N_JOBS       = -1
 DATA_FOLDER         = "data/darwinex_parquet"
 TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 5_000
+ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -36,8 +36,8 @@ LOOKBACK_MINOR_LIST  = [2,3,4,5,6]
 PRICE_TOLERANCE_LIST = [5,10,15,20] 
 TREND_TH_LIST        = [5,10,15,20] 
 
-TP_PCT_LIST          = [0.25,0.5,0.75,1.0,1.25,1.5,2.0]
-SL_PCT_LIST          = [0.25,0.5,0.75,1.0,1.25,1.5,2.0]
+TP_PCT_LIST          = [0.05,0.15,0.25,0.5,0.75,1.0,1.25,1.5,2.0]
+SL_PCT_LIST          = [0.05,0.15,0.25,0.5,0.75,1.0,1.25,1.5,2.0]
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -63,7 +63,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = detect_double_top_long(
+        signals = double_top_long(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 

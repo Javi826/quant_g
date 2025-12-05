@@ -25,7 +25,7 @@ STRATEGY          = "double_top"
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 80
+ORDER_AMOUNT      = 400
 MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ PRICE_TOLERANCE_LIST = [5,10,20,30,40,50]
 TREND_TH_LIST        = [5,10,20] 
 
 TP_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
-SL_PCT_LIST          = [5,10]
+SL_PCT_LIST          = [5,10,15,20]
 
 # =============================================================================
 # =============================================================================
@@ -109,7 +109,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = double_top_short(
+            signals = double_top_long(
                 arr_minor,
                 lookback_minor=param_dict.get('LOOKBACK_MINOR'),
                 price_tolerance=param_dict.get('PRICE_TOLERANCE'),
