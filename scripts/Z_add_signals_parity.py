@@ -1,4 +1,5 @@
 import numpy as np
+from utils.ZX_indicators import delta_numba, rolling_entropy_numba
 
 def parity_long(arr, lookback, tolerance, live_trading=True):
     opens  = arr['open']
@@ -42,6 +43,66 @@ def parity_long(arr, lookback, tolerance, live_trading=True):
                                 if i >= 50:
                                     ma50 = np.mean(closes[i-50:i])
                                     if closes[i] > ma50:
+                                        signals[i] = 1
+                                # Si no hay suficientes datos, no genera señal
+                                break
+                    
+                    if signals[i] == 1:
+                        break
+    
+    if not live_trading:
+        signals = np.roll(signals, 1)
+        signals[0] = 0  
+    
+    return signals
+
+def parity_long_s(arr, lookback, tolerance, live_trading=True):
+    opens  = arr['open']
+    closes = arr['close']
+    n      = len(closes)
+    
+    signals    = np.zeros(n, dtype=np.int8)
+    body_sizes = np.abs(closes - opens)
+    is_red     = closes < opens
+    is_green   = closes > opens
+    
+    # Calcular entropía
+    delta = delta_numba(closes)
+    entropy = rolling_entropy_numba(delta, window=5, bins=10)
+    
+    for i in range(lookback, n):
+        for j in range(1, lookback):
+            if i - j - 1 < 0:
+                break
+            
+            idx_red1 = i - j - 1
+            idx_green = i - j
+            
+            if is_red[idx_red1] and is_green[idx_green]:
+                size_red1 = body_sizes[idx_red1]
+                size_green = body_sizes[idx_green]
+                
+                if size_red1 == 0:
+                    continue
+                
+                diff_green_red1 = abs(size_green - size_red1) / size_red1 * 100
+                
+                if diff_green_red1 <= tolerance:
+                    for k in range(idx_green + 1, i):
+                        if is_red[k]:
+                            size_red2 = body_sizes[k]
+                            close_red1 = closes[idx_red1]
+                            close_red2 = closes[k]
+                            
+                            diff_red2_red1 = abs(size_red2 - size_red1) / size_red1 * 100
+                            diff_close = abs(close_red2 - close_red1) / abs(close_red1) * 100
+                            
+                            if diff_red2_red1 <= tolerance and diff_close <= tolerance:
+                                # Confirmación de tendencia con MA50
+                                if i >= 50:
+                                    ma50 = np.mean(closes[i-50:i])
+                                    # Filtro de entropía: señal solo si entropía < 1.5
+                                    if closes[i] > ma50 and entropy[i] < 1.0:
                                         signals[i] = 1
                                 # Si no hay suficientes datos, no genera señal
                                 break

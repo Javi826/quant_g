@@ -12,6 +12,7 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_a
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_parity import parity_long
+from Z_add_signals_parity import parity_long_s
 from Z_add_signals_parity import parity_short
 
 start_time   = time.time()
@@ -24,8 +25,8 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '1Dutc'
 
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
@@ -41,14 +42,12 @@ TOLERANCE_LIST       = [5,10,20,30,40]
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [40] 
-# 
-# TP_PCT_LIST          = [3]
-# SL_PCT_LIST          = [20]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [50]
+TOLERANCE_LIST       = [30] 
+
+TP_PCT_LIST          = [15]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

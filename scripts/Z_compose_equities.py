@@ -4,10 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-FOLDER = "brief_equities"
-INITIAL_CAPITAL = 800
-RESAMPLE_FREQ = '4h'
-DATA_FOLDER = "data/crypto_OOS"
+FOLDER              = "brief_equities"
+INITIAL_CAPITAL     = 800
+RESAMPLE_FREQ       = '4h'
+DATA_FOLDER         = "data/crypto_2022_OOS"
 
 # -------------------------------------------------
 # --- Additional Metrics Functions

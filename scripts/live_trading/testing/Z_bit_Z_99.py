@@ -2,17 +2,19 @@ import os
 import sys
 from datetime import datetime, timezone
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import os, sys
 
-from parquet_process.Z_parquet_01_extraction import _call_history_candles, to_dataframe_from_api
+# situar la raíz de proyecto tres niveles arriba
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+from parquet_process.Z_parquet_A0_extraction import _call_history_candles, to_dataframe_from_api
 
 UTC_TZ = timezone.utc
 
 # ----------------------
 # CONFIGURACIÓN
 # ----------------------
-SYMBOL = 'BTCUSDT'
-TIMEFRAME = '4H'
+SYMBOL    = 'BTCUSDT'
+TIMEFRAME = '5m'
 
 # ----------------------
 # VER ÚLTIMA VELA
@@ -77,9 +79,9 @@ else:
 # ----------------------
 # GENERAR SEÑALES PARA TODOS LOS SÍMBOLOS
 # ----------------------
-from Z_add_signals_parity import detect_parity_reversal_long
+from Z_add_signals_parity import parity_long
 from ZX_utils_live import load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
-from parquet_process.Z_parquet_01_extraction import get_futures_symbols_from_api
+from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 
 STRATEGY = "parity_candles_long"
 LOOKBACK = 100

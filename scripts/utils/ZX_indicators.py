@@ -1,4 +1,4 @@
-# === FILE: indicators.py ===
+# === FILE: ZX_indicators.py ===
 # ---------------------------------
 import logging
 import warnings

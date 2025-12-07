@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore")
 
 MIN_PRICE       = 0.0001
 INITIAL_BALANCE = 800
-COMISION        = 0.08
+COMISION        = 0.1
 
 # ============================
 # prepare_data - 

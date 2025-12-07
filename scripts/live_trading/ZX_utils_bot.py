@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.console import Group
 from BOT_metrics import bot_metrics
+from collections import defaultdict
 
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
@@ -24,33 +25,25 @@ from datetime import datetime, timedelta
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = "USDT-FUTURES"
-MARGIN_MODE  = "isolated"
+MARGIN_MODE  = "crossed"
 BLUE_BOLD    = "\033[1;94m"
 RESET        = "\033[0m"
+
 # ==========================================================================
 # STATE MANAGEMENT
 # ========================================================================== 
 
 def load_state(state_file):
-    """
-    Carga el estado desde el archivo JSON y devuelve dos estructuras:
-      (open_positions_dict, strategy_candles_dict)
-    Mantiene la misma lógica de parsing que tenías en el script original.
-    """
     OPEN_POSITIONS = {}
     STRATEGY_CANDLES = {}
-
     if not os.path.exists(state_file):
         print("📂 No previous state file found")
         return OPEN_POSITIONS, STRATEGY_CANDLES
-
     try:
         with open(state_file, 'r') as f:
             data = json.load(f)
-
         # Cargar contador de velas por estrategia
         STRATEGY_CANDLES = data.get('strategy_candles', {})
-
         # Convertir strings a Decimal donde sea necesario
         positions_data = data.get('positions', {})
         for strat_id, positions in positions_data.items():
@@ -67,20 +60,17 @@ def load_state(state_file):
                     'opened_at': datetime.fromisoformat(pos.get('opened_at')),
                     'usdt_amount': float(pos.get('usdt_amount', 0)) 
                 })
-
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         print(f"✅  State loaded: {total_positions} positions recovered")
-
-        # Resumen por estrategia
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
                 print(f"   ➡️  {strat_id}: {len(positions)} positions | Candles: {candles}")
                 for pos in positions:
-                    print(f"      - {pos['symbol']:<12} | Size: {pos['size']:<10} | Entry: {pos['entry_price']:<10}")
-
+                    size_str = f"{float(pos['size']):.6f}".rstrip('0').rstrip('.')
+                    entry_str = f"{float(pos['entry_price']):.6f}".rstrip('0').rstrip('.')
+                    print(f"      - {pos['symbol']:<12} | Size: {size_str:<10} | Entry: {entry_str:<10}")
         return OPEN_POSITIONS, STRATEGY_CANDLES
-
     except Exception as e:
         print(f"❌ Error loading state: {e}")
         traceback.print_exc()
@@ -88,7 +78,6 @@ def load_state(state_file):
 
 
 def save_state_local(open_positions, strategy_candles, state_file):
-    """Guarda el estado sin usar lock (versión para bucle único)"""
     try:
         positions_copy        = copy.deepcopy(open_positions)
         strategy_candles_copy = copy.deepcopy(strategy_candles)
@@ -123,10 +112,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
         traceback.print_exc()
 
 def sync_broker(open_positions, strategy_candles, state_file, send_request_func):
-    """
-    Verifica si las posiciones locales existen en el broker.
-    Si no existen, las elimina del registro local. Nada más.
-    """
+
     print("🌐 Syncronizing positions in broker...")
     total_removed = 0
     
@@ -365,10 +351,14 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
                 if fill_list:
                     total_base = Decimal('0')
                     weighted = Decimal('0')
+                    total_profit = Decimal('0')
+                    total_fee = Decimal('0')  # ⭐ NUEVO
+                    
                     for f in fill_list:
-                        # Usar campos documentados directamente
                         bv = f.get("baseVolume")
                         price = f.get("price")
+                        profit = f.get("profit")
+                        fee_detail = f.get("feeDetail", [])  # ⭐ NUEVO
                         
                         if bv is None or price is None:
                             continue
@@ -378,15 +368,26 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
                             p_d = Decimal(str(price))
                             total_base += bv_d
                             weighted += p_d * bv_d
+                            
+                            if profit is not None:
+                                total_profit += Decimal(str(profit))
+                            
+                            # ⭐ SUMAR totalFee de cada elemento en feeDetail
+                            for fee_item in fee_detail:
+                                total_fee_val = fee_item.get("totalFee")
+                                if total_fee_val is not None:
+                                    total_fee += abs(Decimal(str(total_fee_val)))  # abs porque viene negativo
+                                    
                         except Exception:
                             pass
                     
                     entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
-                    return total_base, entry_price
+                    return total_base, entry_price, total_profit, total_fee  # ⭐ RETORNAR FEE
+                
         except Exception as e:
             print(f"🔔 Error consulting fills (attempt {attempt+1}): {e}")
         time.sleep(delay)
-    return None, None
+    return None, None, None, None  # ⭐ CUATRO VALORES
 
 def get_current_price(symbol, send_request_func):
     """Obtiene el precio actual del mercado usando send_request_func"""
@@ -414,7 +415,7 @@ def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
     return tp_price, sl_price
         
  # ==========================================================================
- # CANDLES
+ # TIMEFRMES & CANDLES
  # ==========================================================================        
 
 def calculate_next_candle_time(timeframe='4H', hour_zone=None):
@@ -438,6 +439,18 @@ def calculate_next_candle_time(timeframe='4H', hour_zone=None):
     next_candle = next_candle + timedelta(seconds=45)
     
     return next_candle
+
+def group_strategies_by_timeframe(strategies):
+    """Agrupa estrategias por timeframe."""
+    grouped = defaultdict(list)
+    for strat in strategies:
+        grouped[strat['timeframe']].append(strat)
+    return grouped
+
+
+def get_unique_timeframes(strategies):
+    """Obtiene lista de timeframes únicos."""
+    return list(set(s['timeframe'] for s in strategies))
 
 
 
@@ -820,7 +833,11 @@ def process_strategy(
         order_id = data.get('orderId')
 
         if order_id:
-            filled_size, entry_price_from_fills = get_fills_for_order(order_id=order_id,symbol=sig['symbol'],send_request_func=send_request_func)
+            filled_size, entry_price_from_fills, _, _ = get_fills_for_order(
+                    order_id=order_id,
+                    symbol=sig['symbol'],
+                    send_request_func=send_request_func
+                )
             time.sleep(0.1)
 
             if filled_size is None or filled_size == 0:
@@ -833,21 +850,8 @@ def process_strategy(
             #print(f"➡️ Orden ejecutada - ID: {order_id}")
 
             # Registrar posición usando la función local add_position (que espera open_positions, strategy_candles, state_file, hour_zone)
-            add_position(
-                strat_id=strat_id,
-                symbol=sig['symbol'],
-                size=size,
-                entry_price=entry_price,
-                direction=strat['direction'],
-                tp_pct=strat['tp_pct'],
-                sl_pct=strat['sl_pct'],
-                order_id=order_id,
-                open_positions=open_positions,
-                strategy_candles=strategy_candles,
-                state_file=state_file,
-                hour_zone=hour_zone,
-                usdt_amount=strat['order_amount']  
-            )
+            add_position(strat_id=strat_id, symbol=sig['symbol'], size=size, entry_price=entry_price, direction=strat['direction'], tp_pct=strat['tp_pct'], sl_pct=strat['sl_pct'], order_id=order_id, open_positions=open_positions, strategy_candles=strategy_candles, state_file=state_file, hour_zone=hour_zone, usdt_amount=strat['order_amount'])
+
         else:
             print(f"🔔 Order executed but no orderId in response")
 
@@ -913,7 +917,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                 
                 # Obtener precio real desde fills (igual que al abrir)
                 if order_id:
-                    _, close_price_from_fills = get_fills_for_order(
+                    _, close_price_from_fills, profit_from_api, fee_from_api = get_fills_for_order(
                         order_id=order_id,
                         symbol=symbol,
                         send_request_func=send_request_func
@@ -933,9 +937,11 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             direction=direction, 
                             usdt_amount=position_data.get('usdt_amount', 0), 
                             entry_price=position_data.get('entry_price'), 
-                            close_price=close_price_from_fills,  # ⭐ PRECIO REAL
+                            close_price=close_price_from_fills,     
                             reason=reason,
-                            size=size
+                            size=size,
+                            profit_from_api=profit_from_api,
+                            fee_from_api=fee_from_api
                         )
                         
             bot_metrics()
@@ -956,7 +962,9 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             entry_price=position_data.get('entry_price'), 
                             close_price=current_price, 
                             reason="OUT_OF_MARGIN",
-                            size=size
+                            size=size,
+                            profit_from_api=None,
+                            fee_from_api=None
                         )
                 return True
             return False
@@ -991,7 +999,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
     open_positions[strat_id].append(position)
     
 # =============================================================================
-#     print(f"➡️ Posición registrada:")
+#     print(f"➡️ Registered position:")
 #     print(f"  Symbol: {symbol} | Size: {size} | Entry: {entry_price}")
 #     print(f"  TP: {tp_price} | SL: {sl_price}")
 # =============================================================================
@@ -1010,6 +1018,8 @@ def log_closed_position(
     close_price,
     reason,
     size,
+    profit_from_api=None,
+    fee_from_api=None,
     excel_file='bot_trading_trades.xlsx'
 ):
     try:
@@ -1038,24 +1048,35 @@ def log_closed_position(
         if usdt_amount == 0 and size_val is not None:
             usdt_amount = size_val * entry_price
 
-        # Calcular profit priorizando el uso de 'size' (más exacto).
-        # Si size está disponible usamos: profit_usdt = (close - entry) * size  (ya en USDT)
-        # Si no hay size, hacemos el cálculo antiguo usando usdt_amount / entry_price para obtener unidades.
-        if size_val is not None:
-            if direction.lower() == 'long':
-                profit = (close_price - entry_price) * size_val
-                profit_pct = ((close_price - entry_price) / entry_price) * 100
+        # ⭐ PRIORIZAR PROFIT DEL API
+        if profit_from_api is not None:
+            profit_gross = float(profit_from_api)
+            fee = float(fee_from_api) if fee_from_api is not None else 0
+            fee = 2*fee
+            profit = profit_gross - fee  # ⭐ PROFIT NETO
+            
+            # Calcular profit_pct basado en el profit neto
+            if usdt_amount > 0:
+                profit_pct = (profit / usdt_amount) * 100
             else:
-                profit = (entry_price - close_price) * size_val
-                profit_pct = ((entry_price - close_price) / entry_price) * 100
+                profit_pct = 0
         else:
-            # Fallback al método anterior (usdt_amount derivado de tamaño)
-            if direction.lower() == 'long':
-                profit = (close_price - entry_price) * (usdt_amount / entry_price)
-                profit_pct = ((close_price - entry_price) / entry_price) * 100
+            # Fallback al cálculo manual
+            if size_val is not None:
+                if direction.lower() == 'long':
+                    profit = (close_price - entry_price) * size_val
+                    profit_pct = ((close_price - entry_price) / entry_price) * 100
+                else:
+                    profit = (entry_price - close_price) * size_val
+                    profit_pct = ((entry_price - close_price) / entry_price) * 100
             else:
-                profit = (entry_price - close_price) * (usdt_amount / entry_price)
-                profit_pct = ((entry_price - close_price) / entry_price) * 100
+                if direction.lower() == 'long':
+                    profit = (close_price - entry_price) * (usdt_amount / entry_price)
+                    profit_pct = ((close_price - entry_price) / entry_price) * 100
+                else:
+                    profit = (entry_price - close_price) * (usdt_amount / entry_price)
+                    profit_pct = ((entry_price - close_price) / entry_price) * 100
+
 
         closed_at = datetime.now()
 
@@ -1083,6 +1104,7 @@ def log_closed_position(
             'PRICE_ENTRY': round(entry_price, 6),
             'PRICE_CLOSE': round(close_price, 6),
             'PROFIT': round(profit, 2),
+            'FEE': round(fee, 4) if profit_from_api is not None else 0,
             'PROFIT_PCT': round(profit_pct, 1),
             'REASON_OUT': reason
         }
@@ -1107,6 +1129,7 @@ def log_closed_position(
 def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
     """
     Configura un logger que duplica print() al archivo y a consola.
+    Solo muestra el print normal en consola, sin prefijos.
     """
     
     # Crear carpeta
@@ -1115,9 +1138,10 @@ def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
     
     logger = logging.getLogger('bot_logger')
     logger.setLevel(logging.INFO)
+    logger.propagate = False  # ⭐ IMPORTANTE: Evita que propague a otros handlers
     
     fh = logging.FileHandler(logfile, encoding='utf-8')
-    fh.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+    fh.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
     
     # Evitar múltiples handlers si se llama varias veces
     if not logger.handlers:
@@ -1127,8 +1151,10 @@ def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
     old_print = builtins.print
     
     def _print_and_log(*args, **kwargs):
+        # ⭐ PRIMERO: Imprimir SOLO en consola (sin logger)
         old_print(*args, **kwargs)
-    
+        
+        # ⭐ DESPUÉS: Escribir solo en el archivo (sin mostrar en consola)
         text = kwargs.get("sep", " ").join(str(a) for a in args)
         logger.info(text)
     
