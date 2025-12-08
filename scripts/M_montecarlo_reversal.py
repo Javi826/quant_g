@@ -35,7 +35,7 @@ SELL_AFTER_LIST      = [0]
 LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
-TP_PCT_LIST          = [2.0,2.5,3.0,3.5,4,5,6,7,8,9,10,15]
+TP_PCT_LIST          = [2.0,2.5,3.0,3.5,4,5,6,7,8,9,10]
 SL_PCT_LIST          = [5,10]
 
 #===========================================================================
@@ -73,14 +73,7 @@ TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-ohlcv_data_minor, filtered_minor = filter_symbols(
-    symbols_minor,
-    min_vol_usdt=MIN_VOL_USDT,
-    timeframe=TIMEFRAME_MINOR,
-    data_folder=DATA_FOLDER,
-    min_price=MIN_PRICE,
-    vol_window=50
-)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
 
 def tf_to_pandas_freq(tf):
     tf = tf.lower().replace("utc", "")
@@ -106,7 +99,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_long(
+            signals = reversal_short(
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

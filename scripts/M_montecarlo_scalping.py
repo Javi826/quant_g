@@ -24,7 +24,7 @@ N_JOBS              = -1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2025_scalping_IS"
-TIMEFRAME           = '15m'
+TIMEFRAME           = '5m'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 

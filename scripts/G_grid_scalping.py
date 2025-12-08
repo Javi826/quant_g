@@ -22,9 +22,9 @@ N_JOBS             =-1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2025_scalping_IS"
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '1H'
-ORDER_AMOUNT        = 400
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '15m'
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
@@ -42,15 +42,15 @@ TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0,7.5,10]
 
 # =============================================================================
-# SELL_AFTER_LIST = [0]
+# SELL_AFTER_LIST = [1,2,3,4,5,6,7,8,9,10]
 # 
 # RSI_LIST        = [15]
 # ADX_LIST        = [35]
 # LOOKBACK_LIST   = [50]
 # TORELANCE_LIST  = [2]
 # 
-# TP_PCT_LIST     = [3.5]
-# SL_PCT_LIST     = [5]
+# TP_PCT_LIST     = [0]
+# SL_PCT_LIST     = [0]
 # =============================================================================
 
 
@@ -63,7 +63,7 @@ lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 # -----------------------------------------------------------------------------
 symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=False)
+ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
 
 save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)

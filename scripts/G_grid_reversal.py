@@ -23,7 +23,7 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
-DATA_FOLDER         = "data/crypto_2022_OOS"
+#DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 

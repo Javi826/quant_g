@@ -879,8 +879,6 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 # POSITIONS MANAGEMENT
 # ========================================================================== 
-
-
 def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None):
     """Cierra una posición con orden market en HEDGE MODE"""
     try:
@@ -899,10 +897,10 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         
         # Mensajes ANTES de cerrar
         if reason == "TP":
-            print(f"\n💲 TP REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
+            print(f"\n💲 TP REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
         elif reason == "SL":
-            print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'})")
-        
+            print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
+
         print(f"→  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(0.1)

@@ -14,7 +14,6 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths
 from Z_add_signals_parity import parity_long
-from Z_add_signals_parity import parity_long_s
 from Z_add_signals_parity import parity_short
 
 DTYPE               = np.float32
@@ -25,7 +24,7 @@ STRATEGY            = "parity"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '1Dutc'
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -36,7 +35,7 @@ SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [50,100,150,200]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 
-TP_PCT_LIST          = [2.0,2.5,3.0,3.5,4,5,6,7,8,9,10,15]
+TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10,15]
 SL_PCT_LIST          = [5,10]
 
 #===========================================================================
@@ -101,7 +100,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_long(
+            signals = parity_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

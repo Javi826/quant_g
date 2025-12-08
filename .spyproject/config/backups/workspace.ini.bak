@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/G_grid_parity.py', 'scripts/G_grid_reversal.py', 'scripts/live_trading/ZX_utils_bot.py', 'scripts/Z_add_signals_parity.py', 'scripts/ZX_compute_BT.py', 'scripts/live_trading/BOT_all_stratagies.py']
+recent_files = ['scripts/G_grid_scalping.py', 'scripts/utils/ZX_utils.py', 'scripts/live_trading/ZX_utils_bot.py', 'scripts/Z_add_signals_parity.py', 'scripts/M_montecarlo_parity.py', 'scripts/M_montecarlo_double_top.py', 'scripts/ZZX_DRAFT6.py']
 
 [main]
 version = 0.2.0
