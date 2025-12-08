@@ -3,6 +3,25 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
+def tf_to_pandas_freq(tf):
+    tf = tf.lower().replace("utc", "")
+    return tf.upper()
+
+def get_n_obs(timeframe: str) -> int:
+    mapping = {
+        '5m'     : 34560,
+        '15m'    : 17280,
+        '30m'    : 8640,
+        '1H'     : 4320,
+        '4H'     : 1080,
+        '6Hutc'  : 720,
+        '12Hutc' : 360,
+        '1Dutc'  : 180
+    }
+    if timeframe not in mapping:
+        raise ValueError(f"Timeframe no in Mapping: {timeframe}")
+    return mapping[timeframe]
+
 def prepare_ohlcv_arrays(ohlcv_data):
     ohlcv_arr = {}
     for sym, df in ohlcv_data.items():

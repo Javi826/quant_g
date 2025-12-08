@@ -11,8 +11,8 @@ from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
-from tools.ZX_optimize_MCf_tf import generate_multiple_paths
+from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
+from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_reversal import reversal_long
 from Z_add_signals_reversal import reversal_short
 
@@ -38,7 +38,7 @@ TOLERANCE_LIST       = [5,10,15,20,25,30]
 TP_PCT_LIST          = [2.0,2.5,3.0,3.5,4,5,6,7,8,9,10]
 SL_PCT_LIST          = [5,10]
 
-#===========================================================================
+
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
 # LEFT_LOOKBACK_LIST   = [6] 
@@ -47,7 +47,7 @@ SL_PCT_LIST          = [5,10]
 # TP_PCT_LIST          = [5]
 # SL_PCT_LIST          = [10]
 # =============================================================================
-# # =============================================================================
+
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
@@ -55,19 +55,9 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
 FINAL_N_PATHS = 100
+FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
+TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
-if TIMEFRAME_MINOR == '1H':
-    FINAL_N_OBS_PER_PATH = 4320
-elif TIMEFRAME_MINOR == '4H':
-    FINAL_N_OBS_PER_PATH = 1080
-elif TIMEFRAME_MINOR == '6Hutc':
-    FINAL_N_OBS_PER_PATH = 720
-elif TIMEFRAME_MINOR == '12Hutc':
-    FINAL_N_OBS_PER_PATH = 360
-elif TIMEFRAME_MINOR == '1Dutc':
-    FINAL_N_OBS_PER_PATH = 180
-
-TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------------------------------------------------------
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
@@ -75,21 +65,9 @@ symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(
 
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
 
-def tf_to_pandas_freq(tf):
-    tf = tf.lower().replace("utc", "")
-    return tf.upper()
-
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
-def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
-    paths_per_symbol = {}
-    for symbol, df_hist in ohlcv_data.items():
-        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
-        if arr_paths is not None and arr_paths.shape[0] > 0:
-            paths_per_symbol[symbol] = arr_paths
-    return paths_per_symbol
-
 def process_path_IDX(path_idx, paths_minor, param_dict_list):
     all_results = []
     for param_dict in param_dict_list:
@@ -99,7 +77,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_short(
+            signals = reversal_long(
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

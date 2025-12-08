@@ -37,8 +37,8 @@ def reversal_long(arr, left_lookback, tolerance, live_trading=True):
                 if close[t] > last_break_level:
                     
                     # Confirmación de tendencia con MA50
-                    if t >= 200:  # asegurarse de tener suficientes datos
-                        ma50 = np.mean(close[t-200:t])
+                    if t >= 50:  # asegurarse de tener suficientes datos
+                        ma50 = np.mean(close[t-50:t])
                         if close[t] > ma50:
                             signal[t] = 1
                     else:
@@ -81,8 +81,8 @@ def reversal_short(arr, left_lookback, tolerance, live_trading=True):
              
                 if close[t] < last_break_level:
                 
-                    if t >= 200: 
-                        ma50 = np.mean(close[t-200:t])
+                    if t >= 50: 
+                        ma50 = np.mean(close[t-50:t])
                         if close[t] < ma50:
                             signal[t] = -1
                     else:

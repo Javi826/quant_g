@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
+from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_multiple_paths, derive_major_from_minor
 from Z_add_signals_trends import trends_tf_long
 from Z_add_signals_trends import trends_tf_short
@@ -83,11 +83,6 @@ ohlcv_data_minor, filtered_minor = filter_symbols(
     min_price=MIN_PRICE,
     vol_window=50
 )
-
-def tf_to_pandas_freq(tf):
-    tf = tf.lower().replace("utc", "")
-    return tf.upper()
-
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------------------

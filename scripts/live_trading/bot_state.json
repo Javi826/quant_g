@@ -483,17 +483,6 @@
         "usdt_amount": 80.0
       },
       {
-        "symbol": "ONDOUSDT",
-        "size": "173.4",
-        "entry_price": "0.461",
-        "direction": "short",
-        "tp": "0.43795",
-        "sl": "0.5071",
-        "order_id": "1380928484691038210",
-        "opened_at": "2025-12-05T20:02:08.480093+00:00",
-        "usdt_amount": 80.0
-      },
-      {
         "symbol": "SEIUSDT",
         "size": "633",
         "entry_price": "0.12635",
@@ -562,10 +551,10 @@
     ]
   },
   "strategy_candles": {
-    "double_top_long": 27,
-    "revers_long": 2,
-    "parity_long": 0,
-    "revers_short": 19,
-    "parity_short": 16
+    "double_top_long": 29,
+    "revers_long": 4,
+    "parity_long": 2,
+    "revers_short": 21,
+    "parity_short": 18
   }
 }

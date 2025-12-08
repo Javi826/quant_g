@@ -86,3 +86,11 @@ def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], ba
         paths_array[i, :, :] = np.column_stack(base_cols)
 
     return paths_array.astype(DTYPE, copy=False)
+
+def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
+    paths_per_symbol = {}
+    for symbol, df_hist in ohlcv_data.items():
+        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
+        if arr_paths is not None and arr_paths.shape[0] > 0:
+            paths_per_symbol[symbol] = arr_paths
+    return paths_per_symbol

@@ -28,7 +28,7 @@ from ZX_connect_live import get_usdt_balance_00, send_request_00
 
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
-CHECK_INTERVAL            = 15  
+CHECK_INTERVAL            = 10  
 USE_HARDCODED_SIGNALS     = False
 
 # Archivo de estado
@@ -199,7 +199,9 @@ def detect_signal_for_strategy(strategy, final_symbols):
 def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print("\n🚀 === Starting multi-strategy multi-timeframe bot... ===")
+    print(f"\n{'=' * 115}")
+    print("🤖 === Starting multi-strategy multi-timeframe bot... ===")
+    print(f"{'=' * 115}")
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
     exchange    = connect_common()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
@@ -242,9 +244,8 @@ def main_loop():
             # Si al menos un timeframe cerró vela, procesar
             if closed_timeframes:
                 print(f"\n{'=' * 115}")
-                print(f"🔀 === New candle(s) detected === {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-                print(f"🔹     Timeframes: {', '.join(closed_timeframes)}")
-                print(f"{'=' * 115}")
+                print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
 
                 # Sincronizar con broker una sola vez
                 sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
@@ -318,7 +319,6 @@ def main_loop():
                         except Exception as e2:
                             print(f"❌ Retry failed for {strat_id}: {e2}")
                 
-                print(f"\n{'=' * 115}")
                 print("🔂 Signal cycle completed")
                 print(f"{'=' * 115}\n")
                 
@@ -343,7 +343,6 @@ def main_loop():
         print("\n🔚 Interrupted by user.")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
         print("⛔ BOT Stopped")
-
 
 if __name__ == '__main__':
     main_loop()

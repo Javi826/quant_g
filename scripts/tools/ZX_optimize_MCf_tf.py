@@ -133,3 +133,10 @@ def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndar
 
     return paths_major
 
+def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
+    paths_per_symbol = {}
+    for symbol, df_hist in ohlcv_data.items():
+        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
+        if arr_paths is not None and arr_paths.shape[0] > 0:
+            paths_per_symbol[symbol] = arr_paths
+    return paths_per_symbol

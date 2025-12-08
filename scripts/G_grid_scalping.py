@@ -25,7 +25,7 @@ DATA_FOLDER         = "data/crypto_2025_scalping_IS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '15m'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # GRID: 
