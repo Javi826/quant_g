@@ -127,17 +127,6 @@
         "usdt_amount": 80.0
       },
       {
-        "symbol": "ADAUSDT",
-        "size": "185",
-        "entry_price": "0.4312",
-        "direction": "long",
-        "tp": "0.444136",
-        "sl": "0.38808",
-        "order_id": "1381894650049744897",
-        "opened_at": "2025-12-08T12:01:20.411321+00:00",
-        "usdt_amount": 80.0
-      },
-      {
         "symbol": "ARBUSDT",
         "size": "378.96",
         "entry_price": "0.211",
@@ -529,10 +518,10 @@
     ]
   },
   "strategy_candles": {
-    "double_top_long": 32,
-    "revers_long": 7,
-    "parity_long": 5,
-    "revers_short": 24,
-    "parity_short": 21
+    "double_top_long": 33,
+    "revers_long": 8,
+    "parity_long": 6,
+    "revers_short": 25,
+    "parity_short": 22
   }
 }

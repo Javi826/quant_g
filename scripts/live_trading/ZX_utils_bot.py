@@ -134,7 +134,31 @@ def sync_broker(open_positions, strategy_candles, state_file, send_request_func)
                 
                 # Si no existe la posición, marcarla para eliminar
                 if not data or float(data[0].get('total', 0)) == 0:
-                    print(f"→ Position {pos['symbol']} doesn't exist in broker - removing from {strat_id}")
+                    print(f"→ Position {pos['symbol']} doesn't exist in broker - treating as SL")
+                    
+                    # Obtener precio actual para el logging
+                    current_price = get_current_price(pos['symbol'], send_request_func)
+                    if current_price:
+                        position_data = {
+                            'opened_at': pos['opened_at'],
+                            'strategy_id': strat_id,
+                            'usdt_amount': pos.get('usdt_amount', 0),
+                            'entry_price': pos['entry_price']
+                        }
+                        log_closed_position(
+                            opened_at=position_data['opened_at'],
+                            strategy_id=position_data['strategy_id'],
+                            symbol=pos['symbol'],
+                            direction=pos['direction'],
+                            usdt_amount=position_data['usdt_amount'],
+                            entry_price=position_data['entry_price'],
+                            close_price=current_price,
+                            reason="NOT_FOUND",  # ⭐ Tratada como SL
+                            size=pos['size'],
+                            profit_from_api=None,
+                            fee_from_api=None
+                        )
+                    
                     positions_to_remove.append(i)
                     total_removed += 1
                 
@@ -648,7 +672,7 @@ def create_tp_sl_display(now, total_pnl=None):
     table.add_column("Size", justify="right", width=7)  # Nueva columna
     table.add_column("Current", justify="right", width=8)
     table.add_column("↕", justify="center", width=1)
-    table.add_column("PnL (USDT)", justify="right", width=10)
+    table.add_column("PnL (USDT)", justify="right", width=6)
     table.add_column("TP", justify="right", width=20)
     table.add_column("SL", justify="right", width=20)
     

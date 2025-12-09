@@ -14,7 +14,6 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_parity import parity_long
-from Z_add_signals_parity import parity_long_s
 from Z_add_signals_parity import parity_short
 
 DTYPE               = np.float32
@@ -79,7 +78,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_long_s(
+            signals = parity_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

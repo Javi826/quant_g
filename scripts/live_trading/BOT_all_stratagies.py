@@ -25,7 +25,9 @@ setup_print_logger(logdir)
 
 from utils.ZZ_connect import connect_bitget_00
 from ZX_connect_live import get_usdt_balance_00, send_request_00
-
+BLUE_BOLD    = "\033[1;94m"
+YELLOW_BOLD  = "\033[0;93m"
+RESET        = "\033[0m"
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
 CHECK_INTERVAL            = 10  
@@ -199,9 +201,9 @@ def detect_signal_for_strategy(strategy, final_symbols):
 def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print(f"\n{'=' * 115}")
-    print("🤖 === Starting multi-strategy multi-timeframe bot... ===")
-    print(f"{'=' * 115}")
+    print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+    print(f"{BLUE_BOLD}🤖 === STARTING MULTI-STRATEGY & MULTI-TIMEFRAME BOT 🤖 ==={RESET}")
+    print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
     exchange    = connect_common()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
@@ -337,7 +339,7 @@ def main_loop():
                     last_tpsl_check = current_time
             
             # Pequeña pausa para no saturar el CPU
-            time.sleep(1)
+            time.sleep(0.5)
             
     except KeyboardInterrupt:
         print("\n🔚 Interrupted by user.")

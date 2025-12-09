@@ -12,7 +12,7 @@ RESET        = "\033[0m"
 
 def bot_metrics(
     excel_file='bot_trading_trades.xlsx',
-    initial_capital=4000,
+    initial_capital=3946,
     show_table=True,
     return_data=False
 ):
@@ -208,6 +208,6 @@ if __name__ == '__main__':
     # Ejemplo de uso directo
     bot_metrics(
         excel_file='bot_trading_trades.xlsx',
-        initial_capital=4000,
+        initial_capital=3946,
         show_table=True
     )

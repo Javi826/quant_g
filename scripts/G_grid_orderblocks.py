@@ -12,6 +12,7 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_a
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_orderblocks import orderblocks_long
+from Z_add_signals_orderblocks import orderblocks_long_s
 from Z_add_signals_orderblocks import orderblocks_short
 
 start_time   = time.time()
@@ -76,7 +77,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = orderblocks_long(
+        signals = orderblocks_long_s(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
