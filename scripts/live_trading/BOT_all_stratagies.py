@@ -19,7 +19,7 @@ from ZX_utils_bot import group_strategies_by_timeframe,get_unique_timeframes
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
-
+#SAVE DATE 09-12-2025 EMPIEZA CON POSICIONES.
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
@@ -49,7 +49,7 @@ STRAT_A = {
     'name': 'double_top_long',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 80,
+    'order_amount': 50,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -63,7 +63,7 @@ STRAT_B = {
     'name': 'reversal_long',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 80,
+    'order_amount': 50,
     'left_lookback': 5,
     'tolerance': 30,
     'tp_pct': 3,
@@ -76,7 +76,7 @@ STRAT_C = {
     'name': 'parity_long',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 80,
+    'order_amount': 50,
     'lookback': 150,
     'tolerance': 40,
     'tp_pct': 3,  
@@ -89,7 +89,7 @@ STRAT_D = {
     'name': 'reversal_short',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 80,
+    'order_amount': 50,
     'left_lookback': 8,
     'tolerance': 30,
     'tp_pct': 5,
@@ -102,7 +102,7 @@ STRAT_E = {
     'name': 'parity_short',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 10,
+    'order_amount': 50,
     'lookback': 150,
     'tolerance': 20,
     'tp_pct': 5,  
