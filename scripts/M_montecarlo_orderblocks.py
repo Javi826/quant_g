@@ -14,7 +14,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_orderblocks import orderblocks_long
-from Z_add_signals_orderblocks import orderblocks_long_s
+from Z_add_signals_orderblocks import orderblocks_long
 from Z_add_signals_orderblocks import orderblocks_short
 
 DTYPE               = np.float32
@@ -56,9 +56,9 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 100
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
-TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
+TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------------------------------------------------------
 # LOAD AND FILTER DATA
@@ -83,7 +83,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = orderblocks_long_s(
+            signals = orderblocks_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

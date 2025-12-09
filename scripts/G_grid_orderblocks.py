@@ -12,7 +12,6 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_a
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_orderblocks import orderblocks_long
-from Z_add_signals_orderblocks import orderblocks_long_s
 from Z_add_signals_orderblocks import orderblocks_short
 
 start_time   = time.time()
@@ -43,14 +42,22 @@ IMPULSE_LIST         = [0.1,1.0,10]
 TP_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
 SL_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
 
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [50]
+TOLERANCE_LIST       = [20] 
+IMPULSE_LIST         = [0.1] 
+
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [10]
+
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
+# LOOKBACK_LIST        = [100]
 # TOLERANCE_LIST       = [40] 
-# IMPULSE_LIST         = [1] 
+# IMPULSE_LIST         = [1.0] 
 # 
-# TP_PCT_LIST          = [6]
-# SL_PCT_LIST          = [10]
+# TP_PCT_LIST          = [4]
+# SL_PCT_LIST          = [9]
 # =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
@@ -77,7 +84,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = orderblocks_long_s(
+        signals = orderblocks_long(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -116,7 +123,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
+save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

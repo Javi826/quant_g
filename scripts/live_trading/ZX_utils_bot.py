@@ -109,7 +109,6 @@ def save_state_local(open_positions, strategy_candles, state_file):
         traceback.print_exc()
 
 def sync_broker(open_positions, strategy_candles, state_file, send_request_func):
-
     print("🌐 Syncronizing positions in broker...")
     total_removed = 0
     
@@ -136,28 +135,28 @@ def sync_broker(open_positions, strategy_candles, state_file, send_request_func)
                 if not data or float(data[0].get('total', 0)) == 0:
                     print(f"→ Position {pos['symbol']} doesn't exist in broker - treating as SL")
                     
-                    # Obtener precio actual para el logging
-                    current_price = get_current_price(pos['symbol'], send_request_func)
-                    if current_price:
-                        position_data = {
-                            'opened_at': pos['opened_at'],
-                            'strategy_id': strat_id,
-                            'usdt_amount': pos.get('usdt_amount', 0),
-                            'entry_price': pos['entry_price']
-                        }
-                        log_closed_position(
-                            opened_at=position_data['opened_at'],
-                            strategy_id=position_data['strategy_id'],
-                            symbol=pos['symbol'],
-                            direction=pos['direction'],
-                            usdt_amount=position_data['usdt_amount'],
-                            entry_price=position_data['entry_price'],
-                            close_price=current_price,
-                            reason="NOT_FOUND",  # ⭐ Tratada como SL
-                            size=pos['size'],
-                            profit_from_api=None,
-                            fee_from_api=None
-                        )
+                    # ⭐ Usar el precio del SL en lugar del precio actual
+                    sl_price = pos['sl']
+                    
+                    position_data = {
+                        'opened_at': pos['opened_at'],
+                        'strategy_id': strat_id,
+                        'usdt_amount': pos.get('usdt_amount', 0),
+                        'entry_price': pos['entry_price']
+                    }
+                    log_closed_position(
+                        opened_at=position_data['opened_at'],
+                        strategy_id=position_data['strategy_id'],
+                        symbol=pos['symbol'],
+                        direction=pos['direction'],
+                        usdt_amount=position_data['usdt_amount'],
+                        entry_price=position_data['entry_price'],
+                        close_price=sl_price,  
+                        reason="NOT_FOUND",  
+                        size=pos['size'],
+                        profit_from_api=None,
+                        fee_from_api=None
+                    )
                     
                     positions_to_remove.append(i)
                     total_removed += 1

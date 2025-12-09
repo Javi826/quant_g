@@ -27,17 +27,14 @@ def prepare_data(ohlcv_arrays):
     ts_int_arrays = {}
     close_arrays = {}
     all_ts_int_lists = []
-    
-    
+      
     for sym in symbols:
         data = ohlcv_arrays[sym]
-        
-        
+                
         ts = data['ts']
         if ts.dtype.kind != 'M':
             ts = ts.astype('datetime64[ns]')
-        
-        
+          
         ts_int = ts.view('int64')
         close_view = data['close']  
         
@@ -96,9 +93,9 @@ def prepare_data(ohlcv_arrays):
 # ============================
 def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=False):
     intravela_detected = False
-    chosen_idx = None
+    chosen_idx  = None
     exit_reason = None
-    exec_price = None
+    exec_price  = None
 
     if tp_price is None and sl_price is None:
         return intravela_detected, chosen_idx, exit_reason, exec_price
