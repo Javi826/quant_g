@@ -125,6 +125,7 @@ def equity_curve(
     if show_plot or save_plot:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), 
                                         gridspec_kw={'height_ratios': [3, 1]})
+        fig.patch.set_facecolor('#d0d0d0')
         
         # Gráfico de equity
         ax1.plot(equity_df['date'], equity_df['equity'], 
@@ -143,7 +144,7 @@ def equity_curve(
                         where=(equity_df['equity'] < initial_capital),
                         alpha=0.3, color='red', interpolate=True)
         
-        ax1.set_title('📈 Equity Curve', fontsize=16, fontweight='bold', pad=20)
+        ax1.set_title('Equity Curve', fontsize=16, fontweight='bold', pad=20)
         ax1.set_ylabel('Equity ($)', fontsize=12, fontweight='bold')
         ax1.legend(loc='best', fontsize=10)
         ax1.grid(True, alpha=0.3, linestyle='--')
@@ -156,7 +157,7 @@ def equity_curve(
         ax2.plot(equity_df['date'], equity_df['drawdown_pct'],
                 linewidth=1.5, color='#8B0000')
         
-        ax2.set_title('📉 Drawdown (%)', fontsize=14, fontweight='bold', pad=15)
+        ax2.set_title('Drawdown (%)', fontsize=14, fontweight='bold', pad=15)
         ax2.set_xlabel('Date', fontsize=12, fontweight='bold')
         ax2.set_ylabel('Drawdown (%)', fontsize=12, fontweight='bold')
         ax2.grid(True, alpha=0.3, linestyle='--')

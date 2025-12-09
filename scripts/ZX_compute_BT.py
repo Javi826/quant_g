@@ -35,7 +35,7 @@ def prepare_data(ohlcv_arrays):
         if ts.dtype.kind != 'M':
             ts = ts.astype('datetime64[ns]')
           
-        ts_int = ts.view('int64')
+        ts_int     = ts.view('int64')
         close_view = data['close']  
         
         
@@ -54,7 +54,7 @@ def prepare_data(ohlcv_arrays):
         
         # Referencias directas (evita lookups posteriores)
         ts_int_arrays[sym] = ts_int
-        close_arrays[sym] = close_view
+        close_arrays[sym]  = close_view
         all_ts_int_lists.append(ts_int)
     
     
@@ -68,8 +68,7 @@ def prepare_data(ohlcv_arrays):
         if sig_idxs.size > 0:
             ts_int_view = sym_data[sym]['ts_int']
             t_ints = ts_int_view[sig_idxs]
-            
-            
+                        
             for t_int, idx in zip(t_ints, sig_idxs):
                 t_int_key = int(t_int)
                 if t_int_key not in signals_by_time:

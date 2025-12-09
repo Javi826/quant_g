@@ -6,7 +6,8 @@ import sys
 import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from itertools import product
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from ZZX_DRAFT4 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from utils.ZX_utils import filter_symbols
 from Z_add_signals_orderblocks import orderblocks_long
 from collections import defaultdict
