@@ -65,7 +65,8 @@ def prepare_data(ohlcv_arrays):
     
     for sym in symbols:
         signal_arr = sym_data[sym]['signal']
-             
+        
+       
         sig_idxs = np.nonzero(signal_arr)[0]
         
         if sig_idxs.size > 0:

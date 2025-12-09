@@ -11,7 +11,8 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_parity import parity_long,detect_orderblocks_long,orderblock_long
+from Z_add_signals_parity import parity_long
+from Z_add_signals_parity import parity_long_s
 from Z_add_signals_parity import parity_short
 
 start_time   = time.time()
@@ -42,10 +43,10 @@ TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50]
-TOLERANCE_LIST       = [20] 
+LOOKBACK_LIST        = [150]
+TOLERANCE_LIST       = [40] 
 
-TP_PCT_LIST          = [6]
+TP_PCT_LIST          = [3]
 SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
@@ -72,7 +73,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = orderblock_long(
+        signals = parity_long_s(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

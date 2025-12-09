@@ -4,7 +4,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 import json
 import copy
-import os
 import traceback
 import logging
 import builtins
@@ -16,11 +15,9 @@ from rich.text import Text
 from rich.console import Group
 from BOT_metrics import bot_metrics
 from collections import defaultdict
-
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
-from ZX_utils_live import fetch_ohlcv_data,normalize_live_ohlcv,df_to_arrays_live
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 BASE_URL     = "https://api.bitget.com"
@@ -202,9 +199,9 @@ def extract_contract_params(c, last_price):
         size_scale = int(c['volumePlace'])
         
         # Estos tres siempre existen como strings
-        min_trade_num = Decimal(c['minTradeNum'])
+        min_trade_num   = Decimal(c['minTradeNum'])
         size_multiplier = Decimal(c['sizeMultiplier'])
-        min_trade_usdt = Decimal(c['minTradeUSDT'])
+        min_trade_usdt  = Decimal(c['minTradeUSDT'])
         
         return price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt
         
@@ -452,8 +449,6 @@ def get_unique_timeframes(strategies):
     """Obtiene lista de timeframes únicos."""
     return list(set(s['timeframe'] for s in strategies))
 
-
-
 def increment_strategy_candles(strat_id, strategy_candles, open_positions, state_file):
     if strat_id not in strategy_candles:
         strategy_candles[strat_id] = 0
@@ -555,12 +550,12 @@ def calculate_pnl(direction, entry_price, current_price, size):
 
 def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
     """Añade una fila de posición a la tabla de Rich"""
-    direction   = pos['direction']
-    tp_price    = pos['tp']
-    sl_price    = pos['sl']
+    direction = pos['direction']
+    tp_price = pos['tp']
+    sl_price = pos['sl']
     entry_price = pos['entry_price']
-    symbol      = pos['symbol']
-    size        = pos['size']
+    symbol = pos['symbol']
+    size = pos['size']
     
     # Calcular distancias al TP y SL
     if direction.lower() == 'short':
@@ -611,7 +606,9 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
     sl_color = "bold red" if sl_pct_away < 1 else "magenta"
     sl_text = f"[white]{format_price(sl_price)}[/white] [{sl_color}](Δ {sl_pct_away:+.2f}%)[/{sl_color}]"
     
-    # En el table.add_row, reemplaza las últimas dos líneas por:
+    # Formatear size
+    size_str = f"{float(size):.6f}".rstrip('0').rstrip('.')
+    
     table.add_row(
         strat_id,
         f"[{direction_style}]{symbol}[/{direction_style}]",
@@ -619,6 +616,7 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
         f"[white]{opened_at_str}[/white]",
         f"[white]{candles_str}[/white]",
         f"{format_price(entry_price)}",
+        f"[white]{size_str}[/white]",  # Nueva columna SIZE
         f"[yellow]{format_price(current_price)}[/yellow]",
         pnl_arrow,
         pnl_text,
@@ -631,16 +629,12 @@ def create_tp_sl_display(now, total_pnl=None):
     """Crea el header y la tabla para el display de TP/SL"""
     # Crear el header con PnL total si se proporciona
     header = Text()
-
     header.append(f"{BLUE_BOLD}{'─'*115}\n")
     header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
-
-    
     if total_pnl is not None:
         pnl_color = "bold green" if total_pnl >= 0 else "bold red"
         header.append(f"💰 Total PnL: ", style="white")
         header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
-    
     header.append(f"{BLUE_BOLD}{'─'*115}\n")
     
     # Crear tabla con columnas adicionales: opened_at y candles
@@ -651,10 +645,11 @@ def create_tp_sl_display(now, total_pnl=None):
     table.add_column("Opened", style="white", width=10)
     table.add_column("Candles", justify="center", width=8)
     table.add_column("Entry", justify="right", width=8)
+    table.add_column("Size", justify="right", width=7)  # Nueva columna
     table.add_column("Current", justify="right", width=8)
     table.add_column("↕", justify="center", width=1)
     table.add_column("PnL (USDT)", justify="right", width=10)
-    table.add_column("TP", justify="right", width=20) 
+    table.add_column("TP", justify="right", width=20)
     table.add_column("SL", justify="right", width=20)
     
     return header, table

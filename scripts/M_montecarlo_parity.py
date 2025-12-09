@@ -14,6 +14,7 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_parity import parity_long
+from Z_add_signals_parity import parity_long_s
 from Z_add_signals_parity import parity_short
 
 DTYPE               = np.float32
@@ -35,8 +36,8 @@ SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [50,100,150,200]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 
-TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10,15]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -78,7 +79,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_long(
+            signals = parity_long_s(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

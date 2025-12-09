@@ -215,17 +215,6 @@
         "usdt_amount": 80.0
       },
       {
-        "symbol": "FARTCOINUSDT",
-        "size": "197.6",
-        "entry_price": "0.4052",
-        "direction": "long",
-        "tp": "0.417356",
-        "sl": "0.36468",
-        "order_id": "1381894721600376833",
-        "opened_at": "2025-12-08T12:01:37.504123+00:00",
-        "usdt_amount": 80.0
-      },
-      {
         "symbol": "LINKUSDT",
         "size": "5",
         "entry_price": "13.911",
@@ -527,17 +516,6 @@
         "usdt_amount": 80.0
       },
       {
-        "symbol": "WLDUSDT",
-        "size": "141",
-        "entry_price": "0.5673",
-        "direction": "short",
-        "tp": "0.538935",
-        "sl": "0.62403",
-        "order_id": "1380928543067361281",
-        "opened_at": "2025-12-05T20:02:22.508223+00:00",
-        "usdt_amount": 80.0
-      },
-      {
         "symbol": "XRPUSDT",
         "size": "39",
         "entry_price": "2.0334",
@@ -551,10 +529,10 @@
     ]
   },
   "strategy_candles": {
-    "double_top_long": 29,
-    "revers_long": 4,
-    "parity_long": 2,
-    "revers_short": 21,
-    "parity_short": 18
+    "double_top_long": 32,
+    "revers_long": 7,
+    "parity_long": 5,
+    "revers_short": 24,
+    "parity_short": 21
   }
 }

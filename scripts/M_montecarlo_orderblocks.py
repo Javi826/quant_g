@@ -24,7 +24,7 @@ STRATEGY            = "orderblocks"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1Dutc'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -34,12 +34,11 @@ MIN_VOL_USDT        = 10_000_000
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50,100,150,200]
 TOLERANCE_LIST       = [5,10,20,30,40] 
-IMPULSE_LIST         = [0.05,0.1,0.2,1.0]
+IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
+SL_PCT_LIST          = [1,2,3,4,5,6,7,8,9,10]
 
-#===========================================================================
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
 # 
@@ -49,7 +48,7 @@ SL_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
 # TP_PCT_LIST          = [3]
 # SL_PCT_LIST          = [10]
 # =============================================================================
-# # =============================================================================
+
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
@@ -83,7 +82,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = orderblocks_short(
+            signals = orderblocks_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

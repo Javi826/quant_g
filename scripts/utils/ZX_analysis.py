@@ -59,6 +59,13 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         'Mutual_Information': mi_series,
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
+# =============================================================================
+#     print("\n" + "="*60)
+#     print("MUTUAL INFORMATION & PEARSON CORRELATION")
+#     print("="*60)
+#     print(analysis_df.to_string())
+#     print("\n")
+# =============================================================================
     
     # Incluir duration_m en las métricas mostradas (duration en minutos)
     metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals', 'duration_m']

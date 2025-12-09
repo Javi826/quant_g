@@ -35,8 +35,8 @@ SELL_AFTER_LIST      = [0]
 LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
-TP_PCT_LIST          = [2.0,2.5,3.0,3.5,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
 
 
 # =============================================================================
@@ -107,12 +107,7 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # GENERATE PATHS FOR MINOR TIMEFRAME AND DERIVE MAJOR
 # -----------------------------------------------------------------------------
 start_paths_time = time.time()
-paths_minor = generate_paths_for_all_symbols_functional(
-    ohlcv_data_minor,
-    n_paths=FINAL_N_PATHS,
-    n_obs=FINAL_N_OBS_PER_PATH,
-    raw_columns=[]
-)
+paths_minor = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
 
 end_paths_time = time.time()
 print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time:.2f} seconds")
