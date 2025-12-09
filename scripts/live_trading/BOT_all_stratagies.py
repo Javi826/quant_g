@@ -25,9 +25,10 @@ setup_print_logger(logdir)
 
 from utils.ZZ_connect import connect_bitget_00
 from ZX_connect_live import get_usdt_balance_00, send_request_00
-BLUE_BOLD    = "\033[1;94m"
-YELLOW_BOLD  = "\033[0;93m"
-RESET        = "\033[0m"
+
+BLUE_BOLD                 = "\033[1;94m"
+YELLOW_BOLD               = "\033[0;93m"
+RESET                     = "\033[0m"
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
 CHECK_INTERVAL            = 10  

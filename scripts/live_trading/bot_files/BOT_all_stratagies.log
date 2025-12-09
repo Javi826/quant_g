@@ -9736,3 +9736,46 @@ The above exception was the direct cause of the following exception:
 2025-12-09 18:15:39,678 - 🔔 No closing position available APTUSDT: {'code': '22002', 'msg': 'No position to close', 'requestTime': 1765300539452, 'data': None}
 2025-12-09 18:15:39,688 -    → Removing from local record (nonexistent position)
 2025-12-09 18:15:40,037 - 📋 Trade logged: APTUSDT | Profit: -8.00 USDT (-10.00%) | Duration: 3.9264 days
+2025-12-09 21:00:49,504 - 
+===================================================================================================================
+2025-12-09 21:00:49,514 - 🔀 New candle(s) detected 2025-12-09 20:00:49 UTC
+2025-12-09 21:00:49,523 - 🔹 Timeframes: 4H
+2025-12-09 21:00:49,532 - 🌐 Syncronizing positions in broker...
+2025-12-09 21:00:55,846 - ✅ Sync completed: All positions exist in broker
+2025-12-09 21:00:55,856 - 📡 Signal search - 2025-12-09 20:00:55
+2025-12-09 21:00:55,865 - -------------------------------------------------------------------------------------------------------------------
+2025-12-09 21:00:55,875 - ➡️  revers_long (4H): 10/50 candles
+2025-12-09 21:00:55,884 - ➡️  parity_long (4H): 8/50 candles
+2025-12-09 21:00:55,893 - ➡️  revers_short (4H): 27/50 candles
+2025-12-09 21:00:55,903 - ➡️  parity_short (4H): 24/50 candles
+2025-12-09 21:00:55,921 - 
+🔄 Processing strategy: double_top_long
+2025-12-09 21:01:06,713 - ✨ Signals detected for double_top_long: 20
+2025-12-09 21:01:08,247 - ✅ ⬆️  LONG   1000BONKUSDT | Size: 7843     | Price: 0.0102    
+2025-12-09 21:01:10,235 - ✅ ⬆️  LONG   AAVEUSDT   | Size: 0.3      | Price: 204.79    
+2025-12-09 21:01:12,255 - ✅ ⬆️  LONG   ADAUSDT    | Size: 168      | Price: 0.4759    
+2025-12-09 21:01:14,389 - ✅ ⬆️  LONG   AVAXUSDT   | Size: 5.4      | Price: 14.628    
+2025-12-09 21:01:16,441 - ✅ ⬆️  LONG   BNBUSDT    | Size: 0.08     | Price: 913.17    
+2025-12-09 21:01:18,514 - ✅ ⬆️  LONG   DOGEUSDT   | Size: 530      | Price: 0.15088   
+2025-12-09 21:01:20,559 - ✅ ⬆️  LONG   DOTUSDT    | Size: 34       | Price: 2.31      
+2025-12-09 21:01:22,517 - ✅ ⬆️  LONG   ENAUSDT    | Size: 280      | Price: 0.2851    
+2025-12-09 21:01:24,416 - ✅ ⬆️  LONG   ETHUSDT    | Size: 0.02     | Price: 3351.24   
+2025-12-09 21:01:26,512 - ✅ ⬆️  LONG   FETUSDT    | Size: 306      | Price: 0.2612    
+2025-12-09 21:01:28,531 - ✅ ⬆️  LONG   FORMUSDT   | Size: 230      | Price: 0.3473    
+2025-12-09 21:01:30,466 - ✅ ⬆️  LONG   LINKUSDT   | Size: 5        | Price: 14.618    
+2025-12-09 21:01:32,730 - ✅ ⬆️  LONG   ONDOUSDT   | Size: 157.6    | Price: 0.5076    
+2025-12-09 21:01:34,787 - ✅ ⬆️  LONG   PENGUUSDT  | Size: 6226     | Price: 0.012848  
+2025-12-09 21:01:36,829 - ✅ ⬆️  LONG   SEIUSDT    | Size: 575      | Price: 0.13895   
+2025-12-09 21:01:38,869 - ✅ ⬆️  LONG   SOLUSDT    | Size: 0.5      | Price: 141.949   
+2025-12-09 21:01:41,078 - ✅ ⬆️  LONG   SUIUSDT    | Size: 47.4     | Price: 1.6846    
+2025-12-09 21:01:43,307 - ✅ ⬆️  LONG   WIFUSDT    | Size: 180.4    | Price: 0.4434    
+2025-12-09 21:01:45,297 - ✅ ⬆️  LONG   WLDUSDT    | Size: 123      | Price: 0.6452    
+2025-12-09 21:01:47,279 - ✅ ⬆️  LONG   XRPUSDT    | Size: 37       | Price: 2.1313    
+2025-12-09 21:01:47,979 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-09 21:01:47,989 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-09 21:01:47,999 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-09 21:01:48,008 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-09 21:01:48,018 - 🔂 Signal cycle completed
+2025-12-09 21:01:48,037 - ===================================================================================================================
+
+2025-12-09 21:01:48,046 - ⏰ Next candle for 4H: 2025-12-10 00:00:45 UTC
