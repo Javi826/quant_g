@@ -30,7 +30,7 @@ def compute_candle_features(df, raw_columns=[]):
     return df, df_raw
 
 
-def generate_multiple_paths(df_hist, n_paths=100, n_obs=1000, raw_columns=[], base_seed=42):
+def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=42):
     df_features, df_raw = compute_candle_features(df_hist, raw_columns)
     n_rows = len(df_features)
     if n_rows == 0 or n_obs == 0:

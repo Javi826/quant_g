@@ -25,9 +25,9 @@ STRATEGY            = "orderblocks"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 400
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -64,7 +64,6 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
 
 # -----------------------------------------------------------------------------
@@ -107,31 +106,10 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
     return all_results
 
 # -----------------------------------------------------------------------------
-# GENERATE PATHS FOR MINOR TIMEFRAME AND DERIVE MAJOR
+# GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME
 # -----------------------------------------------------------------------------
-start_paths_time = time.time()
-paths_minor = generate_paths_for_all_symbols_functional(
-    ohlcv_data_minor,
-    n_paths=FINAL_N_PATHS,
-    n_obs=FINAL_N_OBS_PER_PATH,
-    raw_columns=[]
-)
-
-end_paths_time = time.time()
-print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time:.2f} seconds")
-
-# -----------------------------------------------------------------------------
-# EVALUATE MONTE CARLO PATHS
-# -----------------------------------------------------------------------------
-start_eval_time = time.time()
-results_list = parallel_with_progress(
-    [delayed(process_path_IDX)(path_idx, paths_minor, param_dict_list)
-     for path_idx in range(FINAL_N_PATHS)],
-    desc="\n🔄 Evaluating Paths_IDX"
-)
-end_eval_time = time.time()
-print(f"\n🕒 Paths evaluation: {end_eval_time - start_eval_time:.2f} seconds")
-
+paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
+results_list = parallel_with_progress([delayed(process_path_IDX)(i, paths_minor, param_dict_list) for i in range(FINAL_N_PATHS)], desc="\n🔄 Evaluating Paths_IDX")
 all_results  = [r for sublist in results_list for r in sublist]
 df_portfolio = pd.DataFrame(all_results)
 

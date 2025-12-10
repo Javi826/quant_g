@@ -132,17 +132,11 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         
         fig, ax1 = plt.subplots(figsize=(12,6))
         
-        # Net Gain %
-        ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
-        ax1.set_xlabel("Time")
-        ax1.set_ylabel("Net_Gain_pct", color='blue')
-        ax1.tick_params(axis='y', labelcolor='blue')
-        DATA_FOLDER=data_folder
-        # --- Línea Bitcoin ---
+        # --- Línea Bitcoin (antes de plotear Net Gain para poder comparar) ---
+        DATA_FOLDER = data_folder
         btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
         btc_df = pd.read_parquet(btc_file)
     
-        # Asegurarse de que haya columna timestamp
         if 'timestamp' not in btc_df.columns:
             if isinstance(btc_df.index, pd.DatetimeIndex):
                 btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
@@ -151,18 +145,57 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     
         btc_df = btc_df[['timestamp', 'close']]
         btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
-    
-        # Calcular BTC en porcentaje respecto al primer precio
         btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
     
-        # Graficar BTC
-        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], color='black', linewidth=0.3, label='BTC %')
+        # --- Comparar con BTC para colorear dinámicamente el área ---
+        # Alinear BTC con nuestros timestamps
+        btc_aligned = np.interp(
+            timestamps.astype(np.int64) / 10**9,  # convertir a segundos
+            btc_df['timestamp'].astype(np.int64) / 10**9,
+            btc_df['btc_net_gain_pct']
+        )
+    
+        # Crear máscaras para cuando superamos o no a BTC
+        above_btc = net_gain_pct >= btc_aligned
+        below_btc = net_gain_pct < btc_aligned
+    
+        # Área verde donde superamos BTC
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.1, color='green', interpolate=True)
+    
+        # Área roja donde NO superamos BTC
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.1, color='red', interpolate=True)
+    
+        # Línea azul siempre (encima de las áreas)
+        ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
+    
+        ax1.set_xlabel("Time")
+        ax1.set_ylabel("Net_Gain_pct", color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+    
+        # Graficar BTC con línea naranja punteada
+        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], 
+                 color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
     
         # Drawdown %
         ax2 = ax1.twinx()
         ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
         ax2.set_ylabel("Drawdown", color='red')
         ax2.tick_params(axis='y', labelcolor='red')
+        
+        # Calcular valores para etiquetas
+        final_net_gain = net_gain_pct[-1]  # Último valor en lugar del máximo
+        max_dd = dd_pct.min()
+        final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
+        
+        # Añadir etiquetas en el plot
+        textstr = (
+            f'Net Gain STR: {final_net_gain:.2f}%\n'
+            f'Net Gain BTC: {final_btc:.2f}%\n'
+            f'Max DD        : {max_dd:.2f}%'
+        )
+
+        ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
         
         fig.suptitle(title)
         fig.autofmt_xdate()
@@ -242,32 +275,51 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     # -----------------------------
     path_grouped = df_portfolio.groupby('path_index').agg({
         'Portfolio_Final_Balance': 'mean',
-        'DD': 'mean'  # Asegurarnos de tener el drawdown medio por path_index
+        'DD': 'mean'
     }).reset_index()
     
-    # Calcular Net Gain %
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
     
-    # Subplots: 2 filas, 1 columna
-    fig, axes = plt.subplots(2, 1, figsize=(22,10))  # altura mayor para que no se solapen
+    fig, axes = plt.subplots(2, 1, figsize=(22,10))
     
     # Histograma Net_Gain_pct
     data_gain = path_grouped['Net_Gain_pct'].dropna()
-    axes[0].hist(data_gain, bins=max(10,min(50,len(data_gain))), edgecolor='white', color='#1f77b4')
+    n_bins = max(10, min(50, len(data_gain)))
+    counts, bins, patches = axes[0].hist(data_gain, bins=n_bins, edgecolor='white')
+    
+    for i, patch in enumerate(patches):
+        bin_center = (bins[i] + bins[i+1]) / 2
+        patch.set_facecolor('green' if bin_center >= 0 else 'red')
+    
     axes[0].set_xlabel('Net Gain pct Portafolio (path_IDX)')
     axes[0].set_ylabel('Frequency')
     axes[0].set_title('Distribution: Net Gain pct per Path_IDX')
     axes[0].grid(True, linestyle='--', alpha=0.5)
+    axes[0].axvline(x=0, color='black', linestyle='--', linewidth=1, alpha=0.7)
     
-    # Histograma DD
+    # Histograma DD (granate)
     data_dd = path_grouped['DD'].dropna()
-    axes[1].hist(data_dd, bins=max(10,min(50,len(data_dd))), edgecolor='white', color='#2ca02c')
+    axes[1].hist(data_dd, bins=max(10,min(50,len(data_dd))), edgecolor='white', color='lightcoral')
     axes[1].set_xlabel('DD pct Portafolio (path_IDX)')
     axes[1].set_ylabel('Frequency')
     axes[1].set_title('Distribution: Drawdown per Path_IDX')
     axes[1].grid(True, linestyle='--', alpha=0.5)
     
-    plt.tight_layout()  
+    # -----------------------------
+    # ETIQUETA SIMPLIFICADA
+    # -----------------------------
+    prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
+    textstr = f'Probability of Negative Path: {prob_negative:.2f}%'
+
+    fig.text(
+        0.75, 0.90, textstr,       # posición a la derecha y un poco abajo
+        fontsize=14,
+        fontfamily='monospace',
+        va='top',
+        bbox=dict(boxstyle='round,pad=0.6', facecolor='wheat', alpha=0.9)
+    )
+    
+    plt.tight_layout()
     plt.show()
     plt.close()
         
@@ -277,43 +329,29 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     SHARPE_ADJUSTMENT_FACTOR = 1e6
     df_summary['Sharpe_m']   = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
     
-    # Determinar las mejores combinaciones por métrica
     best_netgain = df_summary.loc[df_summary['Net_Gain_pct_m'].idxmax()]
     best_sharpe  = df_summary.loc[df_summary['Sharpe_m'].idxmax()]
     best_dd      = df_summary.loc[df_summary['DD_m'].idxmin()]
     
-    # Construir tabla resumen
     df_best = pd.DataFrame([
         {'Metric': 'Net_Gain_pct',   **best_netgain},
-        {'Metric': 'Sharpe      ',       **best_sharpe},
+        {'Metric': 'Sharpe      ',   **best_sharpe},
         {'Metric': 'Lowest DD   ',  **best_dd}
     ])
     
-    # Eliminar columnas innecesarias si existen
     df_best = df_best.drop(columns=['Net_Gain_m', 'Rows'], errors='ignore')
-    
-    # Reordenar columnas: Metric primero
     cols = ['Metric'] + [c for c in df_best.columns if c != 'Metric']
     df_best = df_best[cols]
-    
-    # Redondear y formatear
     df_best = df_best.round(2)
 
     print(df_best.to_string(index=False))
 
     median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
     print(f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%")
-
-    # -----------------------------
-    # Desviación estándar
-    # -----------------------------
     std_gain = path_grouped['Net_Gain_pct'].dropna().std()
     print(f"Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
-
-    # -----------------------------
-    # Probabilidad de path negativo
-    # -----------------------------
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
     print(f"Probability of Negative Path : {prob_negative:.2f}%")
 
     return df_summary
+

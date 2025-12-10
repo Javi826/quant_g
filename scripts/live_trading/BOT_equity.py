@@ -20,29 +20,6 @@ def equity_curve(
     output_file='equity_curve.png',
     return_data=False
 ):
-    """
-    Genera la curva de equity del bot de trading desde un archivo Excel.
-    
-    Parameters:
-    -----------
-    excel_file : str
-        Ruta al archivo Excel con los trades
-    initial_capital : float
-        Capital inicial
-    show_plot : bool
-        Si True, muestra el gráfico
-    save_plot : bool
-        Si True, guarda el gráfico como imagen
-    output_file : str
-        Nombre del archivo de salida si save_plot=True
-    return_data : bool
-        Si True, retorna el DataFrame con la curva de equity
-    
-    Returns:
-    --------
-    DataFrame o None
-        DataFrame con columnas ['date', 'equity', 'profit', 'cumulative_profit']
-    """
     
     # Buscar archivo en bot_files si no existe en ruta directa
     if not os.path.exists(excel_file):

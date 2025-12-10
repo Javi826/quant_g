@@ -12,7 +12,8 @@ from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols,final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
-from tools.ZX_optimize_MCf import generate_multiple_paths
+from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
+from Z_optimize_MC import generate_paths_for_symbol
 from Z_add_signals_scalping import scalping_long
 
 start_time = time.time()
@@ -24,7 +25,7 @@ N_JOBS              = -1
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2025_scalping_IS"
-TIMEFRAME           = '5m'
+TIMEFRAME_MINOR     = '15m'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -42,30 +43,26 @@ TOLERANCE_LIST  = [2,5,10,15]
 TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 
+param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
+param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
+
 # -----------------------------
 # MONTECARLO SETTINGS
 # -----------------------------
 FINAL_N_PATHS        = 100
-FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME)    
-
-TS_INDEX    = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
-param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
-
-lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
-param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
-
+FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)    
+TS_INDEX        = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
 # -----------------------------
-# FUNCIONES AUXILIARES
+# SYMBOLS / DATA
 # -----------------------------
-def generate_paths_for_all_symbols_funcional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
-    paths_per_symbol = {}
-    for symbol, df_hist in ohlcv_data.items():
-        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
-        if arr_paths is not None and arr_paths.shape[0] > 0:
-            paths_per_symbol[symbol] = arr_paths
-    return paths_per_symbol
+symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
+ohlcv_data_minor, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
 
+# -----------------------------------------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------------------------------------
 
 def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
     all_results = []
@@ -87,7 +84,6 @@ def process_path_IDX(path_idx, paths_per_symbol, param_dict_list):
         
             arrs['signal'] = np.asarray(signal, dtype=DTYPE)
 
-
         result = run_grid_backtest(
             ohlcv_arrays,
             sell_after=param_dict.get('SELL_AFTER'),
@@ -105,46 +101,18 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
     with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
         return Parallel(n_jobs=n_jobs)(tasks)
 
-# -----------------------------
-# SYMBOLS / DATA
-# -----------------------------
-symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME}.parquet")]
-
-ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
-
-# -----------------------------
-# GENERAR PATHS
-# -----------------------------
-start_paths_time = time.time()
-paths_per_symbol = generate_paths_for_all_symbols_funcional(
-    ohlcv_data,
-    n_paths=FINAL_N_PATHS,
-    n_obs=FINAL_N_OBS_PER_PATH,
-    raw_columns=[]
-)
-valid_symbols = [s for s, arr in paths_per_symbol.items() if arr is not None and len(arr) > 0]
-end_paths_time = time.time()
-print(f"\n🕒 Paths generation: {end_paths_time - start_paths_time:.2f} segundos")
-
-# -----------------------------
-# EVALUAR Paths_IDX
-# -----------------------------
-start_eval_time = time.time()
-results_list    = parallel_with_progress(
-    [delayed(process_path_IDX)(path_idx, paths_per_symbol, param_dict_list)
-     for path_idx in range(FINAL_N_PATHS)],
-    desc="\n🔄 Evaluating Paths_IDX"
-)
-end_eval_time = time.time()
-print(f"\n🕒 Paths evaluation: {end_eval_time - start_eval_time:.2f} segundos")
-
+# -----------------------------------------------------------------------------
+# GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME
+# -----------------------------------------------------------------------------
+paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
+results_list = parallel_with_progress([delayed(process_path_IDX)(i, paths_minor, param_dict_list) for i in range(FINAL_N_PATHS)], desc="\n🔄 Evaluating Paths_IDX")
 all_results  = [r for sublist in results_list for r in sublist]
 df_portfolio = pd.DataFrame(all_results)
 
 # -----------------------------
 # SUMMARY / REPORT
 # -----------------------------
-final_prints(f"🎲 MC_{STRATEGY} 🎲", DATA_FOLDER, TIMEFRAME, MIN_VOL_USDT, ORDER_AMOUNT,param_names, lists_for_grid)
+final_prints(f"🎲 MC_{STRATEGY} 🎲", DATA_FOLDER, TIMEFRAME_MINOR, MIN_VOL_USDT, ORDER_AMOUNT,param_names, lists_for_grid)
 
 df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 

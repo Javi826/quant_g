@@ -24,10 +24,10 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 400
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -40,14 +40,12 @@ TOLERANCE_LIST       = [5,10,15,20,25,30]
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LEFT_LOOKBACK_LIST   = [8] 
-# TOLERANCE_LIST       = [30]
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LEFT_LOOKBACK_LIST   = [5] 
+TOLERANCE_LIST       = [30]
+
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

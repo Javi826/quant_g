@@ -25,10 +25,10 @@ N_JOBS       = -1
 DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
-DATA_FOLDER         = "data/crypto_2023_IS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 400
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 #MIN_VOL_USDT        = 1500_000_000
 
@@ -43,15 +43,13 @@ TREND_TH_LIST        = [10,20,30,40]
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_MINOR_LIST  = [2] 
-# PRICE_TOLERANCE_LIST = [20] 
-# TREND_TH_LIST        = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [50] 
+TREND_TH_LIST        = [5] 
+
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [20]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']

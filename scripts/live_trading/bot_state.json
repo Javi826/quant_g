@@ -397,10 +397,10 @@
     ]
   },
   "strategy_candles": {
-    "double_top_long": 0,
-    "revers_long": 10,
-    "parity_long": 8,
-    "revers_short": 27,
-    "parity_short": 24
+    "double_top_long": 5,
+    "revers_long": 15,
+    "parity_long": 13,
+    "revers_short": 32,
+    "parity_short": 29
   }
 }

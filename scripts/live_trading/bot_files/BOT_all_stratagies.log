@@ -9859,3 +9859,774 @@ The above exception was the direct cause of the following exception:
 2025-12-09 21:58:05,228 - [1;94m===================================================================================================================[0m
 2025-12-09 21:58:05,228 - 
 2025-12-09 21:58:05,228 - ⏰ Next candle for 4H: 2025-12-10 00:00:45 UTC
+2025-12-10 01:00:47,941 - 
+===================================================================================================================
+2025-12-10 01:00:47,960 - 🔀 New candle(s) detected 2025-12-10 00:00:47 UTC
+2025-12-10 01:00:47,979 - 🔹 Timeframes: 4H
+2025-12-10 01:00:47,999 - 🌐 Syncronizing positions in broker...
+2025-12-10 01:01:03,006 - ✅ Sync completed: All positions exist in broker
+2025-12-10 01:01:03,025 - 📡 Signal search - 2025-12-10 00:01:03
+2025-12-10 01:01:03,045 - -------------------------------------------------------------------------------------------------------------------
+2025-12-10 01:01:03,067 - ➡️  double_top_long (4H): 1/50 candles
+2025-12-10 01:01:03,087 - ➡️  revers_long (4H): 11/50 candles
+2025-12-10 01:01:03,107 - ➡️  parity_long (4H): 9/50 candles
+2025-12-10 01:01:03,126 - ➡️  revers_short (4H): 28/50 candles
+2025-12-10 01:01:03,146 - ➡️  parity_short (4H): 25/50 candles
+2025-12-10 01:01:03,165 - 🚫 Skipping double_top_long (4H) - 20 open positions
+2025-12-10 01:01:03,184 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-10 01:01:03,202 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-10 01:01:03,241 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-10 01:01:03,260 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-10 01:01:03,279 - 🔂 Signal cycle completed
+2025-12-10 01:01:03,315 - ===================================================================================================================
+
+2025-12-10 01:01:03,333 - ⏰ Next candle for 4H: 2025-12-10 04:00:45 UTC
+2025-12-10 05:00:48,342 - 
+===================================================================================================================
+2025-12-10 05:00:48,384 - 🔀 New candle(s) detected 2025-12-10 04:00:48 UTC
+2025-12-10 05:00:48,404 - 🔹 Timeframes: 4H
+2025-12-10 05:00:48,423 - 🌐 Syncronizing positions in broker...
+2025-12-10 05:01:02,849 - ✅ Sync completed: All positions exist in broker
+2025-12-10 05:01:02,868 - 📡 Signal search - 2025-12-10 04:01:02
+2025-12-10 05:01:02,886 - -------------------------------------------------------------------------------------------------------------------
+2025-12-10 05:01:02,907 - ➡️  double_top_long (4H): 2/50 candles
+2025-12-10 05:01:02,928 - ➡️  revers_long (4H): 12/50 candles
+2025-12-10 05:01:02,949 - ➡️  parity_long (4H): 10/50 candles
+2025-12-10 05:01:02,969 - ➡️  revers_short (4H): 29/50 candles
+2025-12-10 05:01:03,011 - ➡️  parity_short (4H): 26/50 candles
+2025-12-10 05:01:03,031 - 🚫 Skipping double_top_long (4H) - 20 open positions
+2025-12-10 05:01:03,051 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-10 05:01:03,069 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-10 05:01:03,088 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-10 05:01:03,107 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-10 05:01:03,126 - 🔂 Signal cycle completed
+2025-12-10 05:01:03,166 - ===================================================================================================================
+
+2025-12-10 05:01:03,185 - ⏰ Next candle for 4H: 2025-12-10 08:00:45 UTC
+2025-12-10 09:00:47,062 - 
+===================================================================================================================
+2025-12-10 09:00:47,084 - 🔀 New candle(s) detected 2025-12-10 08:00:47 UTC
+2025-12-10 09:00:47,102 - 🔹 Timeframes: 4H
+2025-12-10 09:00:47,121 - 🌐 Syncronizing positions in broker...
+2025-12-10 09:01:02,244 - ✅ Sync completed: All positions exist in broker
+2025-12-10 09:01:02,263 - 📡 Signal search - 2025-12-10 08:01:02
+2025-12-10 09:01:02,303 - -------------------------------------------------------------------------------------------------------------------
+2025-12-10 09:01:02,323 - ➡️  double_top_long (4H): 3/50 candles
+2025-12-10 09:01:02,343 - ➡️  revers_long (4H): 13/50 candles
+2025-12-10 09:01:02,363 - ➡️  parity_long (4H): 11/50 candles
+2025-12-10 09:01:02,383 - ➡️  revers_short (4H): 30/50 candles
+2025-12-10 09:01:02,403 - ➡️  parity_short (4H): 27/50 candles
+2025-12-10 09:01:02,423 - 🚫 Skipping double_top_long (4H) - 20 open positions
+2025-12-10 09:01:02,443 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-10 09:01:02,462 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-10 09:01:02,481 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-10 09:01:02,500 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-10 09:01:02,519 - 🔂 Signal cycle completed
+2025-12-10 09:01:02,575 - ===================================================================================================================
+
+2025-12-10 09:01:02,594 - ⏰ Next candle for 4H: 2025-12-10 12:00:45 UTC
+2025-12-10 10:03:27,881 - 
+🔚 Interrupted by user.
+2025-12-10 10:03:27,959 - ⛔ BOT Stopped
+2025-12-10 10:03:35,208 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:35,208 - [1;94m🤖 === STARTING MULTI-STRATEGY & MULTI-TIMEFRAME BOT 🤖 ===[0m
+2025-12-10 10:03:35,208 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:35,208 - ✅  State loaded: 35 positions recovered
+2025-12-10 10:03:35,208 -    ➡️  double_top_long: 20 positions | Candles: 3
+2025-12-10 10:03:35,208 -       - 1000BONKUSDT | Size: 7843       | Entry: 0.010197  
+2025-12-10 10:03:35,208 -       - AAVEUSDT     | Size: 0.3        | Entry: 204.84    
+2025-12-10 10:03:35,208 -       - ADAUSDT      | Size: 168        | Entry: 0.4761    
+2025-12-10 10:03:35,208 -       - AVAXUSDT     | Size: 5.4        | Entry: 14.628    
+2025-12-10 10:03:35,208 -       - BNBUSDT      | Size: 0.08       | Entry: 913.21    
+2025-12-10 10:03:35,208 -       - DOGEUSDT     | Size: 530        | Entry: 0.15086   
+2025-12-10 10:03:35,208 -       - DOTUSDT      | Size: 34         | Entry: 2.31      
+2025-12-10 10:03:35,208 -       - ENAUSDT      | Size: 280        | Entry: 0.2851    
+2025-12-10 10:03:35,208 -       - ETHUSDT      | Size: 0.02       | Entry: 3351.62   
+2025-12-10 10:03:35,208 -       - FETUSDT      | Size: 306        | Entry: 0.2612    
+2025-12-10 10:03:35,208 -       - FORMUSDT     | Size: 230        | Entry: 0.3471    
+2025-12-10 10:03:35,208 -       - LINKUSDT     | Size: 5          | Entry: 14.628    
+2025-12-10 10:03:35,208 -       - ONDOUSDT     | Size: 157.6      | Entry: 0.5077    
+2025-12-10 10:03:35,209 -       - PENGUUSDT    | Size: 6226       | Entry: 0.012846  
+2025-12-10 10:03:35,209 -       - SEIUSDT      | Size: 575        | Entry: 0.13898   
+2025-12-10 10:03:35,209 -       - SOLUSDT      | Size: 0.5        | Entry: 141.95    
+2025-12-10 10:03:35,209 -       - SUIUSDT      | Size: 47.4       | Entry: 1.6844    
+2025-12-10 10:03:35,209 -       - WIFUSDT      | Size: 180.4      | Entry: 0.4432    
+2025-12-10 10:03:35,209 -       - WLDUSDT      | Size: 123        | Entry: 0.6451    
+2025-12-10 10:03:35,209 -       - XRPUSDT      | Size: 37         | Entry: 2.1313    
+2025-12-10 10:03:35,209 -    ➡️  revers_long: 2 positions | Candles: 13
+2025-12-10 10:03:35,209 -       - BGBUSDT      | Size: 22         | Entry: 3.571     
+2025-12-10 10:03:35,209 -       - BNBUSDT      | Size: 0.08       | Entry: 902.72    
+2025-12-10 10:03:35,209 -    ➡️  parity_long: 3 positions | Candles: 11
+2025-12-10 10:03:35,209 -       - BGBUSDT      | Size: 22         | Entry: 3.57      
+2025-12-10 10:03:35,209 -       - BNBUSDT      | Size: 0.08       | Entry: 904.46    
+2025-12-10 10:03:35,209 -       - BTCUSDT      | Size: 0.0008     | Entry: 91850.1   
+2025-12-10 10:03:35,209 -    ➡️  revers_short: 1 positions | Candles: 30
+2025-12-10 10:03:35,209 -       - XRPUSDT      | Size: 38         | Entry: 2.0907    
+2025-12-10 10:03:35,209 -    ➡️  parity_short: 9 positions | Candles: 27
+2025-12-10 10:03:35,209 -       - AVAXUSDT     | Size: 5.9        | Entry: 13.405    
+2025-12-10 10:03:35,209 -       - BGBUSDT      | Size: 23         | Entry: 3.457     
+2025-12-10 10:03:35,209 -       - BTCUSDT      | Size: 0.0008     | Entry: 89586.2   
+2025-12-10 10:03:35,209 -       - FORMUSDT     | Size: 240        | Entry: 0.3318    
+2025-12-10 10:03:35,209 -       - HBARUSDT     | Size: 597        | Entry: 0.13396   
+2025-12-10 10:03:35,209 -       - LTCUSDT      | Size: 0.9        | Entry: 80.26     
+2025-12-10 10:03:35,209 -       - SNXUSDT      | Size: 162.3      | Entry: 0.4925    
+2025-12-10 10:03:35,209 -       - SOLUSDT      | Size: 0.6        | Entry: 132.344   
+2025-12-10 10:03:35,209 -       - XRPUSDT      | Size: 39         | Entry: 2.0334    
+2025-12-10 10:03:38,789 - 🔹 Strategy double_top_long (4H): 32 symbols
+2025-12-10 10:03:38,794 - 🔹 Strategy revers_long (4H): 32 symbols
+2025-12-10 10:03:38,798 - 🔹 Strategy parity_long (4H): 32 symbols
+2025-12-10 10:03:38,803 - 🔹 Strategy revers_short (4H): 32 symbols
+2025-12-10 10:03:38,807 - 🔹 Strategy parity_short (4H): 32 symbols
+2025-12-10 10:03:38,807 - 
+➡️  Detected timeframes: 4H
+2025-12-10 10:03:38,807 -    🔹 4H: double_top_long, revers_long, parity_long, revers_short, parity_short
+2025-12-10 10:03:38,807 - 
+✅ BOT Initialization completed
+
+2025-12-10 10:03:38,838 - 
+2025-12-10 10:03:38,838 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:38,838 - [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-10 10:03:38,838 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:38,845 - [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-10 10:03:38,846 - [0;93mparity_short   [0m  2025-11-24           37        48.65  [1;91m      -74.11[0m        -9.39   48.65   18.92    27.03      4.13
+2025-12-10 10:03:38,846 - [0;93mparity_long    [0m  2025-11-24           45        84.44  [1;92m       25.26[0m          3.2   84.44    4.44    11.11      1.54
+2025-12-10 10:03:38,846 - [0;93mrevers_long    [0m  2025-11-24           31        80.65  [1;92m       13.81[0m         1.75   83.87    3.23     12.9      1.58
+2025-12-10 10:03:38,846 - [0;93mrevers_short   [0m  2025-11-24           16        68.75  [1;92m       11.28[0m         1.43   68.75     0.0     12.5      3.49
+2025-12-10 10:03:38,846 - [0;93mdouble_top_long[0m  2025-11-27           25         28.0  [1;91m     -115.17[0m       -14.59    28.0     4.0     64.0      2.64
+2025-12-10 10:03:38,846 - 
+2025-12-10 10:03:38,846 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:38,846 - [1;94m📊 TOTAL SUMMARY[0m
+2025-12-10 10:03:38,846 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:38,846 - [1;94m🧮 Trades_num   :[0m 154
+2025-12-10 10:03:38,846 - [1;94m🕜 Avg_duration :[0m 2.6 days
+2025-12-10 10:03:38,847 - [1;94m🎯 Trades_pct   :[0m 64.29 %
+2025-12-10 10:03:38,847 - [1;94m💱 Profit_pct   :[0m -3.52 %
+2025-12-10 10:03:38,847 - ⭕ [1;94mTOTAL_profit :[0m [1;91m-138.93 $[0m
+2025-12-10 10:03:38,847 - [1;94m===================================================================================================================[0m
+2025-12-10 10:03:38,847 - 
+2025-12-10 10:03:38,847 - ⏰ Next candle for 4H: 2025-12-10 12:00:45 UTC
+2025-12-10 11:47:30,623 - 🔔 No price for BNBUSDT
+2025-12-10 13:00:55,289 - 
+===================================================================================================================
+2025-12-10 13:00:55,324 - 🔀 New candle(s) detected 2025-12-10 12:00:55 UTC
+2025-12-10 13:00:55,359 - 🔹 Timeframes: 4H
+2025-12-10 13:00:55,394 - 🌐 Syncronizing positions in broker...
+2025-12-10 13:01:11,505 - ✅ Sync completed: All positions exist in broker
+2025-12-10 13:01:11,540 - 📡 Signal search - 2025-12-10 12:01:11
+2025-12-10 13:01:11,580 - -------------------------------------------------------------------------------------------------------------------
+2025-12-10 13:01:11,656 - ➡️  double_top_long (4H): 4/50 candles
+2025-12-10 13:01:11,695 - ➡️  revers_long (4H): 14/50 candles
+2025-12-10 13:01:11,731 - ➡️  parity_long (4H): 12/50 candles
+2025-12-10 13:01:11,768 - ➡️  revers_short (4H): 31/50 candles
+2025-12-10 13:01:11,804 - ➡️  parity_short (4H): 28/50 candles
+2025-12-10 13:01:11,840 - 🚫 Skipping double_top_long (4H) - 20 open positions
+2025-12-10 13:01:11,876 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-10 13:01:11,911 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-10 13:01:11,983 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-10 13:01:12,019 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-10 13:01:12,054 - 🔂 Signal cycle completed
+2025-12-10 13:01:12,132 - ===================================================================================================================
+
+2025-12-10 13:01:12,168 - ⏰ Next candle for 4H: 2025-12-10 16:00:45 UTC
+2025-12-10 16:37:14,157 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:14,157 - [1;94m🤖 === STARTING MULTI-STRATEGY & MULTI-TIMEFRAME BOT 🤖 ===[0m
+2025-12-10 16:37:14,157 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:14,157 - ✅  State loaded: 35 positions recovered
+2025-12-10 16:37:14,157 -    ➡️  double_top_long: 20 positions | Candles: 4
+2025-12-10 16:37:14,157 -       - 1000BONKUSDT | Size: 7843       | Entry: 0.010197  
+2025-12-10 16:37:14,157 -       - AAVEUSDT     | Size: 0.3        | Entry: 204.84    
+2025-12-10 16:37:14,157 -       - ADAUSDT      | Size: 168        | Entry: 0.4761    
+2025-12-10 16:37:14,157 -       - AVAXUSDT     | Size: 5.4        | Entry: 14.628    
+2025-12-10 16:37:14,157 -       - BNBUSDT      | Size: 0.08       | Entry: 913.21    
+2025-12-10 16:37:14,157 -       - DOGEUSDT     | Size: 530        | Entry: 0.15086   
+2025-12-10 16:37:14,157 -       - DOTUSDT      | Size: 34         | Entry: 2.31      
+2025-12-10 16:37:14,157 -       - ENAUSDT      | Size: 280        | Entry: 0.2851    
+2025-12-10 16:37:14,157 -       - ETHUSDT      | Size: 0.02       | Entry: 3351.62   
+2025-12-10 16:37:14,157 -       - FETUSDT      | Size: 306        | Entry: 0.2612    
+2025-12-10 16:37:14,157 -       - FORMUSDT     | Size: 230        | Entry: 0.3471    
+2025-12-10 16:37:14,157 -       - LINKUSDT     | Size: 5          | Entry: 14.628    
+2025-12-10 16:37:14,157 -       - ONDOUSDT     | Size: 157.6      | Entry: 0.5077    
+2025-12-10 16:37:14,157 -       - PENGUUSDT    | Size: 6226       | Entry: 0.012846  
+2025-12-10 16:37:14,157 -       - SEIUSDT      | Size: 575        | Entry: 0.13898   
+2025-12-10 16:37:14,157 -       - SOLUSDT      | Size: 0.5        | Entry: 141.95    
+2025-12-10 16:37:14,157 -       - SUIUSDT      | Size: 47.4       | Entry: 1.6844    
+2025-12-10 16:37:14,157 -       - WIFUSDT      | Size: 180.4      | Entry: 0.4432    
+2025-12-10 16:37:14,157 -       - WLDUSDT      | Size: 123        | Entry: 0.6451    
+2025-12-10 16:37:14,157 -       - XRPUSDT      | Size: 37         | Entry: 2.1313    
+2025-12-10 16:37:14,157 -    ➡️  revers_long: 2 positions | Candles: 14
+2025-12-10 16:37:14,157 -       - BGBUSDT      | Size: 22         | Entry: 3.571     
+2025-12-10 16:37:14,157 -       - BNBUSDT      | Size: 0.08       | Entry: 902.72    
+2025-12-10 16:37:14,157 -    ➡️  parity_long: 3 positions | Candles: 12
+2025-12-10 16:37:14,157 -       - BGBUSDT      | Size: 22         | Entry: 3.57      
+2025-12-10 16:37:14,157 -       - BNBUSDT      | Size: 0.08       | Entry: 904.46    
+2025-12-10 16:37:14,157 -       - BTCUSDT      | Size: 0.0008     | Entry: 91850.1   
+2025-12-10 16:37:14,157 -    ➡️  revers_short: 1 positions | Candles: 31
+2025-12-10 16:37:14,157 -       - XRPUSDT      | Size: 38         | Entry: 2.0907    
+2025-12-10 16:37:14,158 -    ➡️  parity_short: 9 positions | Candles: 28
+2025-12-10 16:37:14,158 -       - AVAXUSDT     | Size: 5.9        | Entry: 13.405    
+2025-12-10 16:37:14,158 -       - BGBUSDT      | Size: 23         | Entry: 3.457     
+2025-12-10 16:37:14,158 -       - BTCUSDT      | Size: 0.0008     | Entry: 89586.2   
+2025-12-10 16:37:14,158 -       - FORMUSDT     | Size: 240        | Entry: 0.3318    
+2025-12-10 16:37:14,158 -       - HBARUSDT     | Size: 597        | Entry: 0.13396   
+2025-12-10 16:37:14,158 -       - LTCUSDT      | Size: 0.9        | Entry: 80.26     
+2025-12-10 16:37:14,158 -       - SNXUSDT      | Size: 162.3      | Entry: 0.4925    
+2025-12-10 16:37:14,158 -       - SOLUSDT      | Size: 0.6        | Entry: 132.344   
+2025-12-10 16:37:14,158 -       - XRPUSDT      | Size: 39         | Entry: 2.0334    
+2025-12-10 16:37:17,762 - 🔹 Strategy double_top_long (4H): 32 symbols
+2025-12-10 16:37:17,766 - 🔹 Strategy revers_long (4H): 32 symbols
+2025-12-10 16:37:17,769 - 🔹 Strategy parity_long (4H): 32 symbols
+2025-12-10 16:37:17,772 - 🔹 Strategy revers_short (4H): 32 symbols
+2025-12-10 16:37:17,776 - 🔹 Strategy parity_short (4H): 32 symbols
+2025-12-10 16:37:17,776 - 
+➡️  Detected timeframes: 4H
+2025-12-10 16:37:17,776 -    🔹 4H: double_top_long, revers_long, parity_long, revers_short, parity_short
+2025-12-10 16:37:17,776 - 
+✅ BOT Initialization completed
+
+2025-12-10 16:37:17,798 - 
+2025-12-10 16:37:17,798 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:17,798 - [1;94m📈 STRATEGY ANALYSIS[0m
+2025-12-10 16:37:17,798 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:17,803 - [1;85mStrategy       [0m  [1;85mdate_fo   [0m  [1;85m Trades_num[0m  [1;85m Trades_pct[0m  [1;85mTotal_profit[0m  [1;85m Profit_pct[0m  [1;85mTP_pct[0m  [1;85mSL_pct[0m  [1;85mOOM_pct[0m  [1;85mAvg_days[0m
+2025-12-10 16:37:17,803 - [0;93mparity_short   [0m  2025-11-24           37        48.65  [1;91m      -74.11[0m        -9.39   48.65   18.92    27.03      4.13
+2025-12-10 16:37:17,803 - [0;93mparity_long    [0m  2025-11-24           45        84.44  [1;92m       25.26[0m          3.2   84.44    4.44    11.11      1.54
+2025-12-10 16:37:17,803 - [0;93mrevers_long    [0m  2025-11-24           31        80.65  [1;92m       13.81[0m         1.75   83.87    3.23     12.9      1.58
+2025-12-10 16:37:17,803 - [0;93mrevers_short   [0m  2025-11-24           16        68.75  [1;92m       11.28[0m         1.43   68.75     0.0     12.5      3.49
+2025-12-10 16:37:17,803 - [0;93mdouble_top_long[0m  2025-11-27           25         28.0  [1;91m     -115.17[0m       -14.59    28.0     4.0     64.0      2.64
+2025-12-10 16:37:17,804 - 
+2025-12-10 16:37:17,804 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:17,804 - [1;94m📊 TOTAL SUMMARY[0m
+2025-12-10 16:37:17,804 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:17,804 - [1;94m🧮 Trades_num   :[0m 154
+2025-12-10 16:37:17,804 - [1;94m🕜 Avg_duration :[0m 2.6 days
+2025-12-10 16:37:17,804 - [1;94m🎯 Trades_pct   :[0m 64.29 %
+2025-12-10 16:37:17,804 - [1;94m💱 Profit_pct   :[0m -3.52 %
+2025-12-10 16:37:17,804 - ⭕ [1;94mTOTAL_profit :[0m [1;91m-138.93 $[0m
+2025-12-10 16:37:17,804 - [1;94m===================================================================================================================[0m
+2025-12-10 16:37:17,804 - 
+2025-12-10 16:37:17,804 - ⏰ Next candle for 4H: 2025-12-10 16:00:45 UTC
+2025-12-10 16:37:26,700 - 
+🔚 Interrupted by user.
+2025-12-10 16:37:26,702 - ⛔ BOT Stopped
+2025-12-10 16:37:29,038 - [4;33mReloaded modules[24m: BOT_metrics, parquet_process.Z_parquet_A0_extraction, ZX_utils_live, ZX_utils_bot, Z_add_signals_double_top, Z_add_signals_reversal, utils.ZX_indicators, Z_add_signals_parity, utils.ZZ_connect, ZX_connect_live[0m
+2025-12-10 16:37:29,488 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:37:29,488 - 🔹Symbols removed total  : 370
+2025-12-10 16:37:29,488 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:37:29,826 - 
+🕒 Paths generation + derivation: 0.34 seconds
+2025-12-10 16:37:30,973 - 
+🕒 Paths evaluation: 1.15 seconds
+2025-12-10 16:37:30,974 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:37:30,974 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:37:30,974 - TIMEFRAME          : 4H
+2025-12-10 16:37:30,974 - ORDER_AMOUNT       : 400
+2025-12-10 16:37:30,974 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:37:30,974 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:37:30,974 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:37:30,974 - TOLERANCE_LIST     : [30]
+2025-12-10 16:37:30,974 - TP_PCT_LIST        : [3]
+2025-12-10 16:37:30,974 - SL_PCT_LIST        : [10]
+2025-12-10 16:37:30,974 - 
+2025-12-10 16:37:31,201 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+2025-12-10 16:37:31,201 - 
+P50 Net_Gain_pct per Path    : 43.92%
+2025-12-10 16:37:31,201 - Std Dev Net_Gain_pct per Path: 40.16%
+2025-12-10 16:37:31,201 - Probability of Negative Path : 13.50%
+2025-12-10 16:37:31,201 - 
+🏁 Total execution time: 0 h 0 min 2 s
+2025-12-10 16:39:30,901 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:39:31,330 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:39:31,330 - 🔹Symbols removed total  : 370
+2025-12-10 16:39:31,330 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:39:31,646 - 
+🕒 Paths generation + derivation: 0.32 seconds
+2025-12-10 16:39:32,290 - 
+🕒 Paths evaluation: 0.64 seconds
+2025-12-10 16:39:32,291 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:39:32,291 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:39:32,291 - TIMEFRAME          : 4H
+2025-12-10 16:39:32,291 - ORDER_AMOUNT       : 400
+2025-12-10 16:39:32,291 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:39:32,291 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:39:32,291 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:39:32,291 - TOLERANCE_LIST     : [30]
+2025-12-10 16:39:32,291 - TP_PCT_LIST        : [3]
+2025-12-10 16:39:32,291 - SL_PCT_LIST        : [10]
+2025-12-10 16:39:32,291 - 
+2025-12-10 16:39:32,508 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+2025-12-10 16:39:32,508 - 
+P50 Net_Gain_pct per Path    : 43.92%
+2025-12-10 16:39:32,508 - Std Dev Net_Gain_pct per Path: 40.16%
+2025-12-10 16:39:32,508 - Probability of Negative Path : 13.50%
+2025-12-10 16:39:32,508 - 
+🏁 Total execution time: 0 h 0 min 1 s
+2025-12-10 16:40:15,545 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:40:15,965 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:40:15,965 - 🔹Symbols removed total  : 370
+2025-12-10 16:40:15,965 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:40:16,286 - 
+🕒 Paths generation + derivation: 0.32 seconds
+2025-12-10 16:40:16,913 - 
+🕒 Paths evaluation: 0.63 seconds
+2025-12-10 16:40:16,914 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:40:16,914 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:40:16,914 - TIMEFRAME          : 4H
+2025-12-10 16:40:16,914 - ORDER_AMOUNT       : 400
+2025-12-10 16:40:16,914 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:40:16,914 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:40:16,914 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:40:16,914 - TOLERANCE_LIST     : [30]
+2025-12-10 16:40:16,914 - TP_PCT_LIST        : [3]
+2025-12-10 16:40:16,914 - SL_PCT_LIST        : [10]
+2025-12-10 16:40:16,914 - 
+2025-12-10 16:40:17,131 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           45.83         0.82 21.39      7.23      200.0
+2025-12-10 16:40:17,131 - 
+P50 Net_Gain_pct per Path    : 43.92%
+2025-12-10 16:40:17,131 - Std Dev Net_Gain_pct per Path: 40.16%
+2025-12-10 16:40:17,132 - Probability of Negative Path : 13.50%
+2025-12-10 16:40:17,132 - 
+🏁 Total execution time: 0 h 0 min 1 s
+2025-12-10 16:40:32,723 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:40:33,154 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:40:33,154 - 🔹Symbols removed total  : 370
+2025-12-10 16:40:33,154 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:40:33,453 - 
+🕒 Paths generation + derivation: 0.30 seconds
+2025-12-10 16:40:33,823 - 
+🕒 Paths evaluation: 0.37 seconds
+2025-12-10 16:40:33,823 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:40:33,823 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:40:33,823 - TIMEFRAME          : 4H
+2025-12-10 16:40:33,823 - ORDER_AMOUNT       : 400
+2025-12-10 16:40:33,824 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:40:33,824 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:40:33,824 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:40:33,824 - TOLERANCE_LIST     : [30]
+2025-12-10 16:40:33,824 - TP_PCT_LIST        : [3]
+2025-12-10 16:40:33,824 - SL_PCT_LIST        : [10]
+2025-12-10 16:40:33,824 - 
+2025-12-10 16:40:34,041 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           44.27         0.81 21.94       7.0      100.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           44.27         0.81 21.94       7.0      100.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           44.27         0.81 21.94       7.0      100.0
+2025-12-10 16:40:34,041 - 
+P50 Net_Gain_pct per Path    : 39.12%
+2025-12-10 16:40:34,041 - Std Dev Net_Gain_pct per Path: 41.98%
+2025-12-10 16:40:34,041 - Probability of Negative Path : 13.00%
+2025-12-10 16:40:34,042 - 
+🏁 Total execution time: 0 h 0 min 1 s
+2025-12-10 16:40:42,117 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:40:42,542 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:40:42,542 - 🔹Symbols removed total  : 370
+2025-12-10 16:40:42,542 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:40:42,584 - 
+🕒 Paths generation + derivation: 0.04 seconds
+2025-12-10 16:40:42,648 - 
+🕒 Paths evaluation: 0.06 seconds
+2025-12-10 16:40:42,649 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:40:42,649 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:40:42,649 - TIMEFRAME          : 4H
+2025-12-10 16:40:42,649 - ORDER_AMOUNT       : 400
+2025-12-10 16:40:42,649 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:40:42,650 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:40:42,650 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:40:42,650 - TOLERANCE_LIST     : [30]
+2025-12-10 16:40:42,650 - TP_PCT_LIST        : [3]
+2025-12-10 16:40:42,650 - SL_PCT_LIST        : [10]
+2025-12-10 16:40:42,650 - 
+2025-12-10 16:40:42,850 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           45.53         0.82 22.92      7.23       10.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           45.53         0.82 22.92      7.23       10.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           45.53         0.82 22.92      7.23       10.0
+2025-12-10 16:40:42,851 - 
+P50 Net_Gain_pct per Path    : 36.46%
+2025-12-10 16:40:42,851 - Std Dev Net_Gain_pct per Path: 51.98%
+2025-12-10 16:40:42,851 - Probability of Negative Path : 10.00%
+2025-12-10 16:40:42,851 - 
+🏁 Total execution time: 0 h 0 min 0 s
+2025-12-10 16:40:48,700 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:40:49,130 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:40:49,130 - 🔹Symbols removed total  : 370
+2025-12-10 16:40:49,130 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:40:50,614 - 
+🕒 Paths generation + derivation: 1.48 seconds
+2025-12-10 16:40:53,185 - 
+🕒 Paths evaluation: 2.57 seconds
+2025-12-10 16:40:53,188 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:40:53,188 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:40:53,188 - TIMEFRAME          : 4H
+2025-12-10 16:40:53,188 - ORDER_AMOUNT       : 400
+2025-12-10 16:40:53,188 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:40:53,188 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:40:53,188 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:40:53,188 - TOLERANCE_LIST     : [30]
+2025-12-10 16:40:53,188 - TP_PCT_LIST        : [3]
+2025-12-10 16:40:53,189 - SL_PCT_LIST        : [10]
+2025-12-10 16:40:53,189 - 
+2025-12-10 16:40:53,410 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+Sharpe               0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+2025-12-10 16:40:53,410 - 
+P50 Net_Gain_pct per Path    : 42.12%
+2025-12-10 16:40:53,410 - Std Dev Net_Gain_pct per Path: 40.52%
+2025-12-10 16:40:53,410 - Probability of Negative Path : 11.70%
+2025-12-10 16:40:53,411 - 
+🏁 Total execution time: 0 h 0 min 4 s
+2025-12-10 16:41:15,365 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:41:15,985 - 
+🔹Total symbols BROKER   : 570
+2025-12-10 16:41:15,985 - 🔹Symbols removed total  : 538
+2025-12-10 16:41:15,985 - 🔹Symbols remaining      : 32
+
+2025-12-10 16:41:23,669 - 
+🕒 Paths generation + derivation: 7.68 seconds
+2025-12-10 16:41:35,346 - 
+🕒 Paths evaluation: 11.68 seconds
+2025-12-10 16:41:35,349 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:41:35,349 - DATA_FOLDER        : data/crypto_OOS
+2025-12-10 16:41:35,349 - TIMEFRAME          : 4H
+2025-12-10 16:41:35,349 - ORDER_AMOUNT       : 400
+2025-12-10 16:41:35,349 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:41:35,349 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:41:35,349 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:41:35,349 - TOLERANCE_LIST     : [30]
+2025-12-10 16:41:35,349 - TP_PCT_LIST        : [3]
+2025-12-10 16:41:35,349 - SL_PCT_LIST        : [10]
+2025-12-10 16:41:35,349 - 
+2025-12-10 16:41:35,572 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           40.89          0.8 33.69      4.68     1000.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           40.89          0.8 33.69      4.68     1000.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           40.89          0.8 33.69      4.68     1000.0
+2025-12-10 16:41:35,573 - 
+P50 Net_Gain_pct per Path    : 34.06%
+2025-12-10 16:41:35,573 - Std Dev Net_Gain_pct per Path: 53.65%
+2025-12-10 16:41:35,573 - Probability of Negative Path : 23.60%
+2025-12-10 16:41:35,573 - 
+🏁 Total execution time: 0 h 0 min 20 s
+2025-12-10 16:42:08,539 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:42:08,983 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:42:08,983 - 🔹Symbols removed total  : 370
+2025-12-10 16:42:08,983 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:42:10,462 - 
+🕒 Paths generation + derivation: 1.48 seconds
+2025-12-10 16:42:13,007 - 
+🕒 Paths evaluation: 2.54 seconds
+2025-12-10 16:42:13,010 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:42:13,010 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:42:13,010 - TIMEFRAME          : 4H
+2025-12-10 16:42:13,010 - ORDER_AMOUNT       : 400
+2025-12-10 16:42:13,010 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:42:13,010 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:42:13,010 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:42:13,010 - TOLERANCE_LIST     : [30]
+2025-12-10 16:42:13,010 - TP_PCT_LIST        : [3]
+2025-12-10 16:42:13,010 - SL_PCT_LIST        : [10]
+2025-12-10 16:42:13,010 - 
+2025-12-10 16:42:13,238 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+Sharpe               0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0            45.8         0.82 22.04      7.26     1000.0
+2025-12-10 16:42:13,238 - 
+P50 Net_Gain_pct per Path    : 42.12%
+2025-12-10 16:42:13,239 - Std Dev Net_Gain_pct per Path: 40.52%
+2025-12-10 16:42:13,239 - Probability of Negative Path : 11.70%
+2025-12-10 16:42:13,239 - 
+🏁 Total execution time: 0 h 0 min 4 s
+2025-12-10 16:42:25,356 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:42:25,807 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:42:25,807 - 🔹Symbols removed total  : 373
+2025-12-10 16:42:25,807 - 🔹Symbols remaining      : 3
+
+2025-12-10 16:42:26,574 - 
+🕒 Paths generation + derivation: 0.77 seconds
+2025-12-10 16:42:28,048 - 
+🕒 Paths evaluation: 1.47 seconds
+2025-12-10 16:42:28,051 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:42:28,051 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:42:28,051 - TIMEFRAME          : 4H
+2025-12-10 16:42:28,051 - ORDER_AMOUNT       : 400
+2025-12-10 16:42:28,051 - MIN_VOL_USDT       : 100.000.000
+2025-12-10 16:42:28,051 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:42:28,051 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:42:28,051 - TOLERANCE_LIST     : [30]
+2025-12-10 16:42:28,051 - TP_PCT_LIST        : [3]
+2025-12-10 16:42:28,051 - SL_PCT_LIST        : [10]
+2025-12-10 16:42:28,051 - 
+2025-12-10 16:42:28,271 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           37.96         0.81 18.16      7.38     1000.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           37.96         0.81 18.16      7.38     1000.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           37.96         0.81 18.16      7.38     1000.0
+2025-12-10 16:42:28,271 - 
+P50 Net_Gain_pct per Path    : 34.57%
+2025-12-10 16:42:28,271 - Std Dev Net_Gain_pct per Path: 32.45%
+2025-12-10 16:42:28,272 - Probability of Negative Path : 13.10%
+2025-12-10 16:42:28,272 - 
+🏁 Total execution time: 0 h 0 min 2 s
+2025-12-10 16:42:44,248 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:42:44,650 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:42:44,651 - 🔹Symbols removed total  : 336
+2025-12-10 16:42:44,651 - 🔹Symbols remaining      : 40
+
+2025-12-10 16:42:54,397 - 
+🕒 Paths generation + derivation: 9.75 seconds
+2025-12-10 16:43:08,502 - 
+🕒 Paths evaluation: 14.10 seconds
+2025-12-10 16:43:08,505 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:43:08,505 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:43:08,505 - TIMEFRAME          : 4H
+2025-12-10 16:43:08,505 - ORDER_AMOUNT       : 400
+2025-12-10 16:43:08,505 - MIN_VOL_USDT       : 1.000.000
+2025-12-10 16:43:08,505 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:43:08,505 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:43:08,505 - TOLERANCE_LIST     : [30]
+2025-12-10 16:43:08,505 - TP_PCT_LIST        : [3]
+2025-12-10 16:43:08,505 - SL_PCT_LIST        : [10]
+2025-12-10 16:43:08,505 - 
+2025-12-10 16:43:08,722 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           29.88          0.8 33.77      3.85     1000.0
+Sharpe               0.0            5.0       30.0     3.0    10.0           29.88          0.8 33.77      3.85     1000.0
+Lowest DD            0.0            5.0       30.0     3.0    10.0           29.88          0.8 33.77      3.85     1000.0
+2025-12-10 16:43:08,723 - 
+P50 Net_Gain_pct per Path    : 23.93%
+2025-12-10 16:43:08,723 - Std Dev Net_Gain_pct per Path: 47.82%
+2025-12-10 16:43:08,723 - Probability of Negative Path : 29.80%
+2025-12-10 16:43:08,723 - 
+🏁 Total execution time: 0 h 0 min 24 s
+2025-12-10 16:43:58,459 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:43:58,695 - 
+🔹Total symbols BROKER   : 74
+2025-12-10 16:43:58,696 - 🔹Symbols removed total  : 72
+2025-12-10 16:43:58,696 - 🔹Symbols remaining      : 2
+
+2025-12-10 16:43:58,734 - 
+==  🥇 Grid_reversal_short 🥇 ==
+
+2025-12-10 16:43:58,734 - DATA_FOLDER        : data/crypto_2022_OOS
+2025-12-10 16:43:58,734 - TIMEFRAME          : 4H
+2025-12-10 16:43:58,734 - ORDER_AMOUNT       : 80
+2025-12-10 16:43:58,734 - MIN_VOL_USDT       : 100.000.000
+2025-12-10 16:43:58,734 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:43:58,734 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:43:58,734 - TOLERANCE_LIST     : [30]
+2025-12-10 16:43:58,734 - TP_PCT_LIST        : [3]
+2025-12-10 16:43:58,734 - SL_PCT_LIST        : [10]
+2025-12-10 16:43:58,734 - 
+2025-12-10 16:43:58,737 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct  Win_Ratio  Sharpe  DD_pct Num_Signals  duration_m
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0           8.3       0.79    1.09    9.18         168        2.65
+Sharpe               0.0            5.0       30.0     3.0    10.0           8.3       0.79    1.09    9.18         168        2.65
+Lowest DD            0.0            5.0       30.0     3.0    10.0           8.3       0.79    1.09    9.18         168        2.65
+2025-12-10 16:43:58,861 - 
+🏁 Total execution time: 0 h 0 min 0 s
+2025-12-10 16:44:04,345 - [4;33mReloaded modules[24m: ZX_compute_BT, tools.ZX_st_tools, utils.ZX_analysis, utils.ZX_utils, Z_add_signals_reversal[0m
+2025-12-10 16:44:04,971 - 
+🔹Total symbols BROKER   : 570
+2025-12-10 16:44:04,972 - 🔹Symbols removed total  : 565
+2025-12-10 16:44:04,972 - 🔹Symbols remaining      : 5
+
+2025-12-10 16:44:05,012 - 
+==  🥇 Grid_reversal_short 🥇 ==
+
+2025-12-10 16:44:05,012 - DATA_FOLDER        : data/crypto_OOS
+2025-12-10 16:44:05,012 - TIMEFRAME          : 4H
+2025-12-10 16:44:05,012 - ORDER_AMOUNT       : 80
+2025-12-10 16:44:05,012 - MIN_VOL_USDT       : 100.000.000
+2025-12-10 16:44:05,012 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:44:05,012 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:44:05,012 - TOLERANCE_LIST     : [30]
+2025-12-10 16:44:05,012 - TP_PCT_LIST        : [3]
+2025-12-10 16:44:05,012 - SL_PCT_LIST        : [10]
+2025-12-10 16:44:05,012 - 
+2025-12-10 16:44:05,015 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct  Win_Ratio  Sharpe  DD_pct Num_Signals  duration_m
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0         27.33       0.88    3.47    4.83         171        2.59
+Sharpe               0.0            5.0       30.0     3.0    10.0         27.33       0.88    3.47    4.83         171        2.59
+Lowest DD            0.0            5.0       30.0     3.0    10.0         27.33       0.88    3.47    4.83         171        2.59
+2025-12-10 16:44:05,142 - 
+🏁 Total execution time: 0 h 0 min 0 s
+2025-12-10 16:44:13,528 - [4;33mReloaded modules[24m: ZX_compute_BT, tools.ZX_st_tools, utils.ZX_analysis, utils.ZX_utils, Z_add_signals_reversal[0m
+2025-12-10 16:44:14,134 - 
+🔹Total symbols BROKER   : 570
+2025-12-10 16:44:14,134 - 🔹Symbols removed total  : 538
+2025-12-10 16:44:14,134 - 🔹Symbols remaining      : 32
+
+2025-12-10 16:44:14,322 - 
+==  🥇 Grid_reversal_short 🥇 ==
+
+2025-12-10 16:44:14,322 - DATA_FOLDER        : data/crypto_OOS
+2025-12-10 16:44:14,322 - TIMEFRAME          : 4H
+2025-12-10 16:44:14,322 - ORDER_AMOUNT       : 80
+2025-12-10 16:44:14,322 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:44:14,322 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:44:14,322 - LEFT_LOOKBACK_LIST : [5]
+2025-12-10 16:44:14,322 - TOLERANCE_LIST     : [30]
+2025-12-10 16:44:14,322 - TP_PCT_LIST        : [3]
+2025-12-10 16:44:14,322 - SL_PCT_LIST        : [10]
+2025-12-10 16:44:14,322 - 
+2025-12-10 16:44:14,326 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct  Win_Ratio  Sharpe  DD_pct Num_Signals  duration_m
+Net_Gain_pct         0.0            5.0       30.0     3.0    10.0         44.45       0.87    3.05     7.8         351        2.12
+Sharpe               0.0            5.0       30.0     3.0    10.0         44.45       0.87    3.05     7.8         351        2.12
+Lowest DD            0.0            5.0       30.0     3.0    10.0         44.45       0.87    3.05     7.8         351        2.12
+2025-12-10 16:44:14,605 - 
+🏁 Total execution time: 0 h 0 min 1 s
+2025-12-10 16:44:47,012 - [4;33mReloaded modules[24m: ZX_compute_BT, tools.ZX_st_tools, utils.ZX_analysis, utils.ZX_utils, Z_add_signals_reversal[0m
+2025-12-10 16:44:47,423 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:44:47,424 - 🔹Symbols removed total  : 370
+2025-12-10 16:44:47,424 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:44:47,599 - 
+🕒 Paths generation + derivation: 0.17 seconds
+2025-12-10 16:45:49,389 - 
+🕒 Paths evaluation: 61.79 seconds
+2025-12-10 16:45:49,441 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:45:49,442 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:45:49,442 - TIMEFRAME          : 4H
+2025-12-10 16:45:49,442 - ORDER_AMOUNT       : 400
+2025-12-10 16:45:49,442 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:45:49,442 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:45:49,442 - LEFT_LOOKBACK_LIST : [3, 4, 5, 6, 7, 8, 9]
+2025-12-10 16:45:49,442 - TOLERANCE_LIST     : [20, 25, 30, 40]
+2025-12-10 16:45:49,442 - TP_PCT_LIST        : [2, 3, 4, 5, 6]
+2025-12-10 16:45:49,442 - SL_PCT_LIST        : [5, 10]
+2025-12-10 16:45:49,442 - 
+2025-12-10 16:45:49,822 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            6.0       40.0     3.0    10.0           44.99         0.81 22.52      7.11      100.0
+Sharpe               0.0            8.0       40.0     3.0    10.0           43.93         0.82 20.93      7.42      100.0
+Lowest DD            0.0            9.0       25.0     3.0    10.0           35.39         0.82 20.26      6.59      100.0
+2025-12-10 16:45:49,822 - 
+P50 Net_Gain_pct per Path    : 21.87%
+2025-12-10 16:45:49,823 - Std Dev Net_Gain_pct per Path: 30.18%
+2025-12-10 16:45:49,823 - Probability of Negative Path : 20.00%
+2025-12-10 16:45:49,823 - 
+🏁 Total execution time: 0 h 1 min 2 s
+2025-12-10 16:45:57,931 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:45:58,365 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:45:58,365 - 🔹Symbols removed total  : 370
+2025-12-10 16:45:58,365 - 🔹Symbols remaining      : 6
+
+2025-12-10 16:45:58,541 - 
+🕒 Paths generation + derivation: 0.18 seconds
+2025-12-10 16:47:00,178 - 
+🕒 Paths evaluation: 61.64 seconds
+2025-12-10 16:47:00,225 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 16:47:00,225 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 16:47:00,225 - TIMEFRAME          : 4H
+2025-12-10 16:47:00,225 - ORDER_AMOUNT       : 400
+2025-12-10 16:47:00,225 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 16:47:00,225 - SELL_AFTER_LIST    : [0]
+2025-12-10 16:47:00,225 - LEFT_LOOKBACK_LIST : [3, 4, 5, 6, 7, 8, 9]
+2025-12-10 16:47:00,225 - TOLERANCE_LIST     : [20, 25, 30, 40]
+2025-12-10 16:47:00,225 - TP_PCT_LIST        : [2, 3, 4, 5, 6]
+2025-12-10 16:47:00,225 - SL_PCT_LIST        : [5, 10]
+2025-12-10 16:47:00,225 - 
+2025-12-10 16:47:00,600 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            6.0       40.0     3.0    10.0           44.99         0.81 22.52      7.11      100.0
+Sharpe               0.0            8.0       40.0     3.0    10.0           43.93         0.82 20.93      7.42      100.0
+Lowest DD            0.0            9.0       25.0     3.0    10.0           35.39         0.82 20.26      6.59      100.0
+2025-12-10 16:47:00,600 - 
+P50 Net_Gain_pct per Path    : 21.87%
+2025-12-10 16:47:00,600 - Std Dev Net_Gain_pct per Path: 30.18%
+2025-12-10 16:47:00,601 - Probability of Negative Path : 20.00%
+2025-12-10 16:47:00,601 - 
+🏁 Total execution time: 0 h 1 min 2 s
+2025-12-10 16:51:40,998 - [4;33mReloaded modules[24m: utils.ZX_analysis, utils.ZX_utils, ZX_compute_BT, tools.ZX_st_tools, tools.ZX_optimize_MCf_tf, Z_add_signals_reversal[0m
+2025-12-10 16:51:41,507 - 
+🔹Total symbols BROKER   : 376
+2025-12-10 16:51:41,507 - 🔹Symbols removed total  : 370
+2025-12-10 16:51:41,508 - 🔹Symbols remaining      : 6
+
+2025-12-10 17:00:53,672 - 
+===================================================================================================================
+2025-12-10 17:00:53,711 - 🔀 New candle(s) detected 2025-12-10 16:00:53 UTC
+2025-12-10 17:00:53,749 - 🔹 Timeframes: 4H
+2025-12-10 17:00:53,827 - 🌐 Syncronizing positions in broker...
+2025-12-10 17:01:02,959 - 
+== 🎲 MC_reversal 🎲 ==
+
+2025-12-10 17:01:02,959 - DATA_FOLDER        : data/crypto_2023_IS
+2025-12-10 17:01:02,959 - TIMEFRAME          : 4H
+2025-12-10 17:01:02,959 - ORDER_AMOUNT       : 400
+2025-12-10 17:01:02,959 - MIN_VOL_USDT       : 10.000.000
+2025-12-10 17:01:02,959 - SELL_AFTER_LIST    : [0]
+2025-12-10 17:01:02,959 - LEFT_LOOKBACK_LIST : [3, 4, 5, 6, 7, 8, 9]
+2025-12-10 17:01:02,959 - TOLERANCE_LIST     : [20, 25, 30, 40]
+2025-12-10 17:01:02,959 - TP_PCT_LIST        : [2, 3, 4, 5, 6]
+2025-12-10 17:01:02,959 - SL_PCT_LIST        : [5, 10]
+2025-12-10 17:01:02,959 - 
+2025-12-10 17:01:03,494 -       Metric  SELL_AFTER  LEFT_LOOKBACK  TOLERANCE  TP_PCT  SL_PCT  Net_Gain_pct_m  Win_Ratio_m  DD_m  Sharpe_m  Paths_IDX
+Net_Gain_pct         0.0            5.0       40.0     3.0    10.0           46.50         0.82 22.06      7.30     1000.0
+Sharpe               0.0            4.0       40.0     3.0    10.0           46.32         0.82 21.78      7.33     1000.0
+Lowest DD            0.0            9.0       20.0     3.0    10.0           31.45         0.81 20.92      6.15     1000.0
+2025-12-10 17:01:03,495 - 
+P50 Net_Gain_pct per Path    : 24.40%
+2025-12-10 17:01:03,495 - Std Dev Net_Gain_pct per Path: 30.51%
+2025-12-10 17:01:03,495 - Probability of Negative Path : 18.90%
+2025-12-10 17:01:03,495 - 
+🏁 Total execution time: 0 h 9 min 22 s
+2025-12-10 17:01:09,665 - ✅ Sync completed: All positions exist in broker
+2025-12-10 17:01:09,685 - 📡 Signal search - 2025-12-10 16:01:09
+2025-12-10 17:01:09,704 - -------------------------------------------------------------------------------------------------------------------
+2025-12-10 17:01:09,725 - ➡️  double_top_long (4H): 5/50 candles
+2025-12-10 17:01:09,745 - ➡️  revers_long (4H): 15/50 candles
+2025-12-10 17:01:09,765 - ➡️  parity_long (4H): 13/50 candles
+2025-12-10 17:01:09,784 - ➡️  revers_short (4H): 32/50 candles
+2025-12-10 17:01:09,804 - ➡️  parity_short (4H): 29/50 candles
+2025-12-10 17:01:09,825 - 🚫 Skipping double_top_long (4H) - 20 open positions
+2025-12-10 17:01:09,845 - 🚫 Skipping revers_long (4H) - 2 open positions
+2025-12-10 17:01:09,864 - 🚫 Skipping parity_long (4H) - 3 open positions
+2025-12-10 17:01:09,903 - 🚫 Skipping revers_short (4H) - 1 open positions
+2025-12-10 17:01:09,923 - 🚫 Skipping parity_short (4H) - 9 open positions
+2025-12-10 17:01:09,942 - 🔂 Signal cycle completed
+2025-12-10 17:01:09,980 - ===================================================================================================================
+
+2025-12-10 17:01:10,000 - ⏰ Next candle for 4H: 2025-12-10 20:00:45 UTC

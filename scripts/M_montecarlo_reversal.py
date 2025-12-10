@@ -32,19 +32,18 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
-TOLERANCE_LIST       = [5,10,15,20,25,30]
+LEFT_LOOKBACK_LIST   = [3,4,5,6,7,8,9] 
+TOLERANCE_LIST       = [20,25,30,40]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10,15]
-
+TP_PCT_LIST          = [2,3,4,5,6]
+SL_PCT_LIST          = [2.5,5.0,7.5]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
-# LEFT_LOOKBACK_LIST   = [6] 
+# LEFT_LOOKBACK_LIST   = [5] 
 # TOLERANCE_LIST       = [30]
 # 
-# TP_PCT_LIST          = [5]
+# TP_PCT_LIST          = [3]
 # SL_PCT_LIST          = [10]
 # =============================================================================
 
@@ -54,7 +53,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS = 100
+FINAL_N_PATHS        = 1000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -62,7 +61,6 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
 
 # -----------------------------------------------------------------------------
@@ -104,26 +102,10 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
         return Parallel(n_jobs=n_jobs)(tasks)
 
 # -----------------------------------------------------------------------------
-# GENERATE PATHS FOR MINOR TIMEFRAME AND DERIVE MAJOR
+# GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME
 # -----------------------------------------------------------------------------
-start_paths_time = time.time()
-paths_minor = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
-
-end_paths_time = time.time()
-print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time:.2f} seconds")
-
-# -----------------------------------------------------------------------------
-# EVALUATE MONTE CARLO PATHS
-# -----------------------------------------------------------------------------
-start_eval_time = time.time()
-results_list = parallel_with_progress(
-    [delayed(process_path_IDX)(path_idx, paths_minor, param_dict_list)
-     for path_idx in range(FINAL_N_PATHS)],
-    desc="\n🔄 Evaluating Paths_IDX"
-)
-end_eval_time = time.time()
-print(f"\n🕒 Paths evaluation: {end_eval_time - start_eval_time:.2f} seconds")
-
+paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
+results_list = parallel_with_progress([delayed(process_path_IDX)(i, paths_minor, param_dict_list) for i in range(FINAL_N_PATHS)], desc="\n🔄 Evaluating Paths_IDX")
 all_results  = [r for sublist in results_list for r in sublist]
 df_portfolio = pd.DataFrame(all_results)
 

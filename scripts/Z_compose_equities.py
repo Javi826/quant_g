@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
+
 FOLDER              = "brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '4h'
@@ -114,53 +115,88 @@ def compute_metrics(equity_df, capital, name="Equity"):
 # -------------------------------------------------
 # Plot function (unchanged)
 # -------------------------------------------------
-def plot_netgain_dd(equity_hist, capital, title="Net Gain % & DD"):
+def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
+    initial_capital = capital
     timestamps = pd.to_datetime(equity_hist['timestamp'])
     balances = np.array(equity_hist['balance'])
-
-    net_gain_pct = (balances - capital) / capital * 100
+    
+    # Net Gain %
+    net_gain_pct = (balances - initial_capital) / initial_capital * 100
+    
+    # Drawdown %
     cumulative_max = np.maximum.accumulate(balances)
     dd_pct = (balances - cumulative_max) / cumulative_max * 100
-
+    
     fig, ax1 = plt.subplots(figsize=(12,6))
+    
+    # --- Línea Bitcoin (antes de plotear Net Gain para poder comparar) ---
+    btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
+    btc_df = pd.read_parquet(btc_file)
 
+    if 'timestamp' not in btc_df.columns:
+        if isinstance(btc_df.index, pd.DatetimeIndex):
+            btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
+        else:
+            raise ValueError("El parquet de BTC no tiene columna 'timestamp' ni índice datetime.")
+
+    btc_df = btc_df[['timestamp', 'close']]
+    btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
+    btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
+
+    # --- Comparar con BTC para colorear dinámicamente el área ---
+    # Alinear BTC con nuestros timestamps
+    btc_aligned = np.interp(
+        timestamps.astype(np.int64) / 10**9,  # convertir a segundos
+        btc_df['timestamp'].astype(np.int64) / 10**9,
+        btc_df['btc_net_gain_pct']
+    )
+
+    # Crear máscaras para cuando superamos o no a BTC
+    above_btc = net_gain_pct >= btc_aligned
+    below_btc = net_gain_pct < btc_aligned
+
+    # Área verde donde superamos BTC
+    ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.2, color='green', interpolate=True)
+
+    # Área roja donde NO superamos BTC
+    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red', interpolate=True)
+
+    # Línea azul siempre (encima de las áreas)
     ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
+
     ax1.set_xlabel("Time")
-    ax1.set_ylabel("Net Gain %", color='blue')
+    ax1.set_ylabel("Net_Gain_pct", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
-    try:
-        btc_path = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
-        btc_df = pd.read_parquet(btc_path)
+    # Graficar BTC con línea naranja punteada
+    ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], 
+             color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
 
-        if 'timestamp' not in btc_df.columns:
-            if isinstance(btc_df.index, pd.DatetimeIndex):
-                btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
-            else:
-                raise ValueError("BTC parquet does not have a timestamp column.")
-
-        btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
-        btc_df = btc_df[['timestamp', 'close']]
-        btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
-
-        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'],
-                 color='black', linewidth=0.3, label='BTC %')
-
-    except Exception as e:
-        print(f"⚠️ Error loading BTC: {e}")
-
+    # Drawdown %
     ax2 = ax1.twinx()
-    ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='Drawdown %')
-    ax2.set_ylabel("Drawdown %", color='red')
+    ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
+    ax2.set_ylabel("Drawdown", color='red')
     ax2.tick_params(axis='y', labelcolor='red')
-
+    
+    # Calcular valores para etiquetas
+    final_net_gain = net_gain_pct[-1]  # Último valor en lugar del máximo
+    max_dd = dd_pct.min()
+    final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
+    
+    # Añadir etiquetas en el plot
+    textstr = f'Final Net Gain: {final_net_gain:.2f}%\nMax DD: {max_dd:.2f}%\nBTC Final: {final_btc:.2f}%'
+    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    fig.suptitle(title)
+    fig.autofmt_xdate()
+    ax1.grid(True, linestyle='--', alpha=0.6)
+    
+    # Leyenda combinada
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc='best')
-
-    fig.suptitle(title)
-    ax1.grid(True, linestyle='--', alpha=0.6)
-    fig.autofmt_xdate()
+    
     plt.show()
 
 # -------------------------------------------------
@@ -422,54 +458,56 @@ best_capital = INITIAL_CAPITAL * len(best_dfs_rmse)
 plot_netgain_dd(best_df_rmse, capital=best_capital,
                 title=f"Best Combination by RMSE: {best_name_rmse}")
 
-# -------------------------------------------------
-# Print final personalizado para una combinación específica
-# -------------------------------------------------
-
-custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
-
-# Filtrar métricas del combo seleccionado
-custom_metrics = combo_df.loc[combo_df['Curve'] == custom_combo_name]
-
-if not custom_metrics.empty:
-    # Ajustamos la columna 'Curve' para que el texto empiece a la izquierda
-    custom_metrics_formatted = custom_metrics.copy()
-    custom_metrics_formatted['Curve'] = custom_metrics_formatted['Curve'].str.ljust(70)  # ajustar tamaño según convenga
-    
-    print("\n📊 METRICS TABLE - COMBINACIÓN PERSONALIZADA:\n")
-    print(custom_metrics_formatted.to_string(index=False))
-else:
-    print(f"⚠️ No se encontraron métricas para la combinación: {custom_combo_name}")
-
-# -------------------------------------------------
-# Plot personalizado para la misma combinación
-# -------------------------------------------------
-
-custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
-
-# Filtrar la lista de nombres que componen la combinación
-custom_combo_list = custom_combo_name.split("+")
-
-# Extraer los DataFrames correspondientes
-custom_dfs = [named_dfs[name] for name in custom_combo_list]
-
-# Crear índice común
-start = min(df.index.min() for df in custom_dfs)
-end   = max(df.index.max() for df in custom_dfs)
-common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
-
-# Interpolar y combinar balances
-resampled = []
-for df in custom_dfs:
-    df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
-    resampled.append(df_r['balance'])
-
-combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-custom_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-
-custom_capital = INITIAL_CAPITAL * len(custom_dfs)
-
-# Generar plot
-plot_netgain_dd(custom_df, capital=custom_capital,
-                title=f"Custom Combination: {custom_combo_name}")
+# =============================================================================
+# # -------------------------------------------------
+# # Print final personalizado para una combinación específica
+# # -------------------------------------------------
+# 
+# custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
+# 
+# # Filtrar métricas del combo seleccionado
+# custom_metrics = combo_df.loc[combo_df['Curve'] == custom_combo_name]
+# 
+# if not custom_metrics.empty:
+#     # Ajustamos la columna 'Curve' para que el texto empiece a la izquierda
+#     custom_metrics_formatted = custom_metrics.copy()
+#     custom_metrics_formatted['Curve'] = custom_metrics_formatted['Curve'].str.ljust(70)  # ajustar tamaño según convenga
+#     
+#     print("\n📊 METRICS TABLE - COMBINACIÓN PERSONALIZADA:\n")
+#     print(custom_metrics_formatted.to_string(index=False))
+# else:
+#     print(f"⚠️ No se encontraron métricas para la combinación: {custom_combo_name}")
+# 
+# # -------------------------------------------------
+# # Plot personalizado para la misma combinación
+# # -------------------------------------------------
+# 
+# custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
+# 
+# # Filtrar la lista de nombres que componen la combinación
+# custom_combo_list = custom_combo_name.split("+")
+# 
+# # Extraer los DataFrames correspondientes
+# custom_dfs = [named_dfs[name] for name in custom_combo_list]
+# 
+# # Crear índice común
+# start = min(df.index.min() for df in custom_dfs)
+# end   = max(df.index.max() for df in custom_dfs)
+# common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+# 
+# # Interpolar y combinar balances
+# resampled = []
+# for df in custom_dfs:
+#     df_r = df[['balance']].reindex(common_index)
+#     df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+#     resampled.append(df_r['balance'])
+# 
+# combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+# custom_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+# 
+# custom_capital = INITIAL_CAPITAL * len(custom_dfs)
+# 
+# # Generar plot
+# plot_netgain_dd(custom_df, capital=custom_capital,
+#                 title=f"Custom Combination: {custom_combo_name}")
+# =============================================================================
