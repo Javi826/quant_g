@@ -66,30 +66,7 @@ def load_final_symbols(all_symbols, strategy="_", timeframe="4H"):
     except Exception as e:
         print(f"⚠️ Error loading symbols: {e}")
         return []
-
-def wait_for_next_candle(timeframe='4H'):
-    now = datetime.utcnow()
     
-    if timeframe.endswith('H'):
-        minutes = int(timeframe[:-1]) * 60
-    elif timeframe.endswith('m'):
-        minutes = int(timeframe[:-1])
-    elif timeframe.endswith('Dutc'):
-        minutes = int(timeframe[:-4]) * 24 * 60
-    else:
-        raise ValueError("Invalid timeframe, use 'm', 'H', or 'Dutc'.")
-
-    total_minutes      = now.hour * 60 + now.minute
-    next_total_minutes = ((total_minutes // minutes) + 1) * minutes
-    delta_minutes      = next_total_minutes - total_minutes
-    next_run           = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
-    
-    sleep_seconds = (next_run - now).total_seconds() + 45
-    print(f"🔀 === Waiting for next candle ===: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    time.sleep(sleep_seconds)
-    
-
-
 def fetch_ohlcv_data(symbols, timeframe):
     ohlcv_data = {}
     for sym in symbols:

@@ -3,7 +3,7 @@ import math
 import optuna
 import numpy as np
 from numba import njit, prange
-from ZX_utils import seed_for_symbol
+from utils.ZX_utils import seed_for_symbol
 from scipy.stats import skew, kurtosis
 
 # -----------------------------
@@ -59,7 +59,8 @@ def generate_paths_numba_array(last_price, mu_bar, sigma_bar,
     VOL_FACTOR = 0.4
     MIN_VOL_MULT = 0.1
 
-    paths_array3d = np.empty((n_paths, n_obs, 4), dtype=DTYPE)
+    # Array 6 columnas: open, low, high, close, low_time_offset, high_time_offset
+    paths_array3d = np.empty((n_paths, n_obs, 6), dtype=DTYPE)
 
     for p in prange(n_paths):
         state = np.uint64(seeds[p])
@@ -70,6 +71,7 @@ def generate_paths_numba_array(last_price, mu_bar, sigma_bar,
             path_max = 0.0
             open_price = s
 
+            # Simulación de subpasos
             for k in range(n_substeps):
                 state, z = generate_normal(state)
                 state, u_vm = _lcg_uniform(state)
@@ -91,12 +93,21 @@ def generate_paths_numba_array(last_price, mu_bar, sigma_bar,
             close_price = s
             path_min = max(path_min, min_price)
 
+            # Generar offsets intra-vela coherentes
+            state, u1 = _lcg_uniform(state)
+            state, u2 = _lcg_uniform(state)
+            low_offset  = np.float32(min(u1, u2))   # low antes que high
+            high_offset = np.float32(max(u1, u2))   # high después de low
+
             paths_array3d[p, i, 0] = open_price
             paths_array3d[p, i, 1] = path_min
             paths_array3d[p, i, 2] = path_max
             paths_array3d[p, i, 3] = close_price
+            paths_array3d[p, i, 4] = low_offset
+            paths_array3d[p, i, 5] = high_offset
 
     return paths_array3d
+
 
 # -----------------------------
 # GENERACIÓN DE PATHS PARA UN SÍMBOLO
@@ -265,15 +276,15 @@ def _compute_paths_metrics_numba(hist_rets, syn_array, nlags):
 # -----------------------------
 def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
     if arr_syn_list is None:
-        return None
+        return None, None
 
     syns = [arr_syn_list] if isinstance(arr_syn_list, np.ndarray) else [a for a in arr_syn_list if a is not None and getattr(a, "size", 0) > 0]
     if len(syns) == 0:
-        return None
+        return None, None
 
     closes_hist = df_hist['close'].to_numpy(dtype=DTYPE)
     if closes_hist.size < 2:
-        return None
+        return None, None
     hist_rets_full = np.log(closes_hist[1:] / closes_hist[:-1])
 
     syn_rets_list = []
@@ -296,11 +307,11 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
             continue
 
     if len(syn_rets_list) == 0:
-        return None
+        return None, None
 
     min_len = min(len(hist_rets_full), min(len(r) for r in syn_rets_list))
     if min_len < 2:
-        return None
+        return None, None
 
     hist_rets = hist_rets_full[-min_len:]
     syn_array = np.vstack([r[-min_len:].astype(DTYPE, copy=False) for r in syn_rets_list])
@@ -340,7 +351,10 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
 
     weights = np.array([0.20, 0.20, 0.10, 0.10, 0.10, 0.10, 0.20], dtype=DTYPE)
     metrics = np.array([sim_mean, sim_std, sim_skew, sim_kurt, sim_acf, sim_ks, sim_wass], dtype=DTYPE)
-    return float(np.sum(metrics * weights))
+    score = float(np.sum(metrics * weights))
+
+    return score, metrics
+
 
 # -----------------------------
 # OPTUNA PARA OPTIMIZACIÓN
@@ -357,7 +371,7 @@ def objective(trial, df_hist, n_paths, n_obs, n_substeps, min_price, timeframe, 
         jump_prob_per_substep=jump_prob_per_substep, jump_mu=jump_mu, jump_sigma=jump_sigma,
         timeframe=timeframe, base_seed=base_seed
     )
-    score = evaluate_synthetic_vs_real(df_hist, df_syn_list)
+    score, metrics = evaluate_synthetic_vs_real(df_hist, df_syn_list)  # ✅ DESEMPAQUETAR
     return score if score is not None else -np.inf
 
 def optimize_params_optuna(df_hist, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, seed: int = 42):

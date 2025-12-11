@@ -12,7 +12,7 @@ from ZX_utils_tools import get_usdt_balance_total,date_to_timestamp_ms,summarize
 # CONFIG
 # -----------------------------
 BASE_URL              = "https://api.bitget.com"
-INITIAL_CAPITAL       = 3946 
+INITIAL_CAPITAL       = 3671 
 STRATEGY              = "BOT_strategies"
 TIMEFRAME_MINOR       = '4H'
 SELL_AFTER_N_CANDLES  = 50
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     try:
         # --- HISTORIAL Y WINRATE ---  
-        start_date = "2025-11-24"
+        start_date = "2025-12-11"
         start_time = date_to_timestamp_ms(start_date)
         end_time   = int(datetime.now().timestamp() * 1000)
 

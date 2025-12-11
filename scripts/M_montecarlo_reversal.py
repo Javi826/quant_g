@@ -24,7 +24,7 @@ STRATEGY            = "reversal"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '6Hutc'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -33,10 +33,11 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LEFT_LOOKBACK_LIST   = [3,4,5,6,7,8,9] 
-TOLERANCE_LIST       = [20,25,30,40]
+TOLERANCE_LIST       = [20,30,40]
+MA_PERIOD_LIST       = [25,50,100]
 
-TP_PCT_LIST          = [2,3,4,5,6]
-SL_PCT_LIST          = [2.5,5.0,7.5]
+TP_PCT_LIST          = [2,3,4,5]
+SL_PCT_LIST          = [2.5,5.0,7.5,10]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -47,13 +48,13 @@ SL_PCT_LIST          = [2.5,5.0,7.5]
 # SL_PCT_LIST          = [10]
 # =============================================================================
 
-param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 1000
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -79,6 +80,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
+                ma_period=param_dict.get('MA_PERIOD'),
                 live_trading=False
             )
 

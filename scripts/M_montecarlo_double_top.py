@@ -15,6 +15,10 @@ from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_double_top import double_top_short
 from Z_add_signals_double_top import double_top_long
+# =============================================================================
+# from ZZX_DRAFT4 import double_top_short
+# from ZZX_DRAFT4 import double_top_long
+# =============================================================================
 
 DTYPE             = np.float32
 start_time        = time.time()
@@ -24,7 +28,7 @@ STRATEGY          = "double_top"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '4H'
+TIMEFRAME_MINOR   = '6Hutc'
 ORDER_AMOUNT      = 400
 MIN_VOL_USDT      = 10_000_000
 
@@ -32,12 +36,12 @@ MIN_VOL_USDT      = 10_000_000
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,5] 
+LOOKBACK_MINOR_LIST  = [2,3,5,6] 
 PRICE_TOLERANCE_LIST = [5,10,20,30,40,50] 
 TREND_TH_LIST        = [5,10,20] 
 
 TP_PCT_LIST          = [2,3,4,5,6,7]
-SL_PCT_LIST          = [5,10,15,20]
+SL_PCT_LIST          = [2.5,5,7.5,10]
 
 
 # =============================================================================

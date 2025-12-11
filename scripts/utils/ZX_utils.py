@@ -11,9 +11,6 @@ from email.mime.multipart import MIMEMultipart
 np.random.seed(42)
 random.seed(42)
 
-BASE_URL       = "https://api.bitget.com"
-PRODUCT_TYPE   = 'usdt-futures'  
-
 symbols_to_exclude = {}
 symbols_to_include = ["BTCUSDT"]  # Tu lista de símbolos únicos
 

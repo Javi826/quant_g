@@ -24,31 +24,33 @@ STRATEGY            = "parity"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
-ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+#DATA_FOLDER         = "data/crypto_OOS"
+TIMEFRAME_MINOR     = '1H'
+ORDER_AMOUNT        = 400
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [5,10,20,30,40,50] 
+TOLERANCE_LIST       = [5,10,15,20] 
+MA_PERIOD_LIST       = [25,50,100]
 
-TP_PCT_LIST          = [2,3,4,5]
-SL_PCT_LIST          = [2.5,5.0,7.5]
+TP_PCT_LIST          = [2,3,4,5,6]
+SL_PCT_LIST          = [2.5,5.0,7.5,10]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
 # 
-# LOOKBACK_LIST        = [150]
-# TOLERANCE_LIST       = [40] 
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [20] 
 # 
-# TP_PCT_LIST          = [3]
+# TP_PCT_LIST          = [5]
 # SL_PCT_LIST          = [10]
+# 
 # =============================================================================
-
-param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 
@@ -77,10 +79,11 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_long(
+            signals = parity_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
+                ma_period=param_dict.get('MA_PERIOD'),
                 live_trading=False
             )
 

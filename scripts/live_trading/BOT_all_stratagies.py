@@ -23,8 +23,8 @@ from Z_add_signals_parity import parity_long, parity_short
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
-from utils.ZZ_connect import connect_bitget_00
-from ZX_connect_live import get_usdt_balance_00, send_request_00
+from utils.ZZ_connect import connect_bitget_01
+from ZX_connect_live import get_usdt_balance_01, send_request_01
 
 BLUE_BOLD                 = "\033[1;94m"
 YELLOW_BOLD               = "\033[0;93m"
@@ -45,11 +45,11 @@ STRATEGY_CANDLES = {}
 # Configuración de Estrategias
 # ----------------------
 STRAT_A = {
-    'id': 'double_top_long',
-    'name': 'double_top_long',
+    'id': 'double_top_long_4H',
+    'name': 'double_top_long_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 30,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -59,24 +59,25 @@ STRAT_A = {
 }
 
 STRAT_B = {
-    'id': 'revers_long',
-    'name': 'reversal_long',
+    'id': 'revers_long_4H',
+    'name': 'reversal_long_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 30,
     'left_lookback': 5,
     'tolerance': 30,
+    'ma_period':50,
     'tp_pct': 3,
     'sl_pct': 10,
     'direction': 'long'
 }
 
 STRAT_C = {
-    'id': 'parity_long',
-    'name': 'parity_long',
+    'id': 'parity_long_4H',
+    'name': 'parity_long_4H',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 30,
     'lookback': 150,
     'tolerance': 40,
     'tp_pct': 3,  
@@ -85,24 +86,25 @@ STRAT_C = {
 }
 
 STRAT_D = {
-    'id': 'revers_short',
-    'name': 'reversal_short',
+    'id': 'revers_short_4H',
+    'name': 'reversal_short_4H',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 30,
     'left_lookback': 8,
     'tolerance': 30,
+    'ma_period':50,
     'tp_pct': 5,
     'sl_pct': 10,
     'direction': 'short'
 }
 
 STRAT_E = {
-    'id': 'parity_short',
-    'name': 'parity_short',
+    'id': 'parity_short_4H',
+    'name': 'parity_short_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 30,
     'lookback': 150,
     'tolerance': 20,
     'tp_pct': 5,  
@@ -110,21 +112,74 @@ STRAT_E = {
     'direction': 'short'
 }
 
-STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E]
+STRAT_F = {
+    'id': 'revers_long_1H',
+    'name': 'reversal_long_1H',
+    'timeframe': '1H',
+    'sell_after_ncandles': 50,
+    'order_amount': 30,
+    'left_lookback': 7,
+    'tolerance': 40,
+    'ma_period':50,
+    'tp_pct': 2,
+    'sl_pct': 10,
+    'direction': 'long'
+}
+
+STRAT_G = {
+    'id': 'revers_short_1H',
+    'name': 'reversal_short_1H',
+    'timeframe': '1H',  
+    'sell_after_ncandles': 50,
+    'order_amount': 30,
+    'left_lookback': 5,
+    'tolerance': 30,
+    'ma_period':50,
+    'tp_pct': 1.9,
+    'sl_pct': 5,
+    'direction': 'short'
+}
+
+STRAT_H = {
+    'id': 'revers_long_6Hutc',
+    'name': 'reversal_long_6Hutc',
+    'timeframe': '6Hutc',  
+    'sell_after_ncandles': 50,
+    'order_amount': 30,
+    'left_lookback': 3,
+    'tolerance': 20,
+    'ma_period':50,
+    'tp_pct': 4,
+    'sl_pct': 10,
+    'direction': 'long'
+}
+
+STRAT_I = {
+    'id': 'revers_short_6Hutc',
+    'name': 'reversal_short_6Hutc',
+    'timeframe': '6Hutc',  
+    'sell_after_ncandles': 50,
+    'order_amount': 30,
+    'left_lookback': 6,
+    'tolerance': 30,
+    'ma_period':25,
+    'tp_pct': 4,
+    'sl_pct': 7.5,
+    'direction': 'short'
+}
+
+STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I]
 
 # Funciones comunes
-connect_common      = connect_bitget_00
-send_request_common = send_request_00
-get_balance_common  = get_usdt_balance_00
+connect_common      = connect_bitget_01
+send_request_common = send_request_01
+get_balance_common  = get_usdt_balance_01
 
 # ==========================================================================
 # SIGNALS & STRATEGIES
 # ==========================================================================        
 def detect_signal_for_strategy(strategy, final_symbols):
-    """
-    Detecta señales de trading para una estrategia específica.
-    Devuelve lista de dicts {'symbol', 'timestamp', 'close'}.
-    """
+
     detected = []
     if not final_symbols:
         return detected
@@ -135,11 +190,11 @@ def detect_signal_for_strategy(strategy, final_symbols):
             continue
         
         df_norm = normalize_live_ohlcv(df)
-        arr = df_to_arrays_live(df_norm)
+        arr     = df_to_arrays_live(df_norm)
         
         # Obtener señales según estrategia
         try:
-            if strategy['name'] == 'double_top_long':
+            if strategy['name'] == 'double_top_long_4H':
                 signals = double_top_long(
                     arr,
                     lookback_minor=strategy['lookback'],
@@ -147,32 +202,66 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     trend_th=strategy['trend_th'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'reversal_long':
+            elif strategy['name'] == 'reversal_long_4H':
                 signals = reversal_long(
                     arr,
                     left_lookback=strategy['left_lookback'],
                     tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'parity_long':
+            elif strategy['name'] == 'parity_long_4H':
                 signals = parity_long(
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'reversal_short':
+            elif strategy['name'] == 'reversal_short_4H':
                 signals = reversal_short(
                     arr,
                     left_lookback=strategy['left_lookback'],
                     tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'parity_short':
+            elif strategy['name'] == 'parity_short_4H':
                 signals = parity_short(
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
+                    live_trading=True
+                )
+            elif strategy['name'] == 'reversal_long_1H':
+                signals = reversal_long(
+                    arr,
+                    left_lookback=strategy['left_lookback'],
+                    tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
+                    live_trading=True
+                )
+            elif strategy['name'] == 'reversal_short_1H':
+                signals = reversal_short(
+                    arr,
+                    left_lookback=strategy['left_lookback'],
+                    tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
+                    live_trading=True
+                )
+            elif strategy['name'] == 'reversal_long_6Hutc':
+                signals = reversal_long(
+                    arr,
+                    left_lookback=strategy['left_lookback'],
+                    tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
+                    live_trading=True
+                )
+            elif strategy['name'] == 'reversal_short_6Hutc':
+                signals = reversal_short(
+                    arr,
+                    left_lookback=strategy['left_lookback'],
+                    tolerance=strategy['tolerance'],
+                    ma_period=strategy['ma_period'],
                     live_trading=True
                 )
             else:
@@ -299,7 +388,7 @@ def main_loop():
                     except Exception as e:
                         print(f"❌ Error processing {strat_id}: {e}")
                         import traceback
-                        traceback.print_exc()
+                        #traceback.print_exc()
                         
                         # ⭐ SECOND TRY
                         print(f"⏳ Retrying {strat_id} after 5 seconds...")
@@ -340,7 +429,7 @@ def main_loop():
                     last_tpsl_check = current_time
             
             # Pequeña pausa para no saturar el CPU
-            time.sleep(0.5)
+            time.sleep(0.1)
             
     except KeyboardInterrupt:
         print("\n🔚 Interrupted by user.")

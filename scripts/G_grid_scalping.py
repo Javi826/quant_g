@@ -21,10 +21,10 @@ N_JOBS             =-1
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2025_scalping_IS"
+DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '15m'
-ORDER_AMOUNT        = 80
+ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -41,17 +41,15 @@ TORELANCE_LIST  = [2,5,10,15]
 TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
 SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0,7.5,10]
 
-# =============================================================================
-# SELL_AFTER_LIST = [1,2,3,4,5,6,7,8,9,10]
-# 
-# RSI_LIST        = [15]
-# ADX_LIST        = [35]
-# LOOKBACK_LIST   = [50]
-# TORELANCE_LIST  = [2]
-# 
-# TP_PCT_LIST     = [0]
-# SL_PCT_LIST     = [0]
-# =============================================================================
+SELL_AFTER_LIST = [0]
+
+RSI_LIST        = [30]
+ADX_LIST        = [35]
+LOOKBACK_LIST   = [50]
+TORELANCE_LIST  = [2]
+
+TP_PCT_LIST     = [4.5]
+SL_PCT_LIST     = [2]
 
 
 param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TORELANCE','TP_PCT','SL_PCT']

@@ -161,7 +161,7 @@ def sync_broker(open_positions, strategy_candles, state_file, send_request_func)
                     positions_to_remove.append(i)
                     total_removed += 1
                 
-                time.sleep(0.1)  # Rate limiting
+                time.sleep(0.05)  # Rate limiting
                 
             except Exception as e:
                 print(f"❌ Error checking {pos['symbol']}: {e}")
@@ -192,7 +192,7 @@ def fetch_ticker(send_request_func, product_type, symbol):
         print("🔔 No fecth of ticker:", resp)
         return None, None
     last_price = Decimal(str(resp['data'][0]['lastPr']))
-    time.sleep(0.1)
+    time.sleep(0.05)
     return last_price, resp
 
 
@@ -358,7 +358,7 @@ def place_order(symbol: str,
 # ==========================================================================
 # PRICING
 # ==========================================================================   
-def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_request_func=None, retries=5, delay=0.1):
+def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_request_func=None, retries=5, delay=0.05):
     
     time.sleep(delay)
     
@@ -439,21 +439,35 @@ def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
  # ==========================================================================        
 
 def calculate_next_candle_time(timeframe='4H', hour_zone=None):
+
+    from datetime import datetime, timedelta
+    
     now = datetime.now(hour_zone)
     
-    if timeframe.endswith('H'):
-        minutes = int(timeframe[:-1]) * 60
+    # Detectar tipo de timeframe
+    if timeframe.endswith('Hutc'):
+        # Formato especial UTC: 6Hutc, 12Hutc
+        hours = int(timeframe[:-4])
+        minutes = hours * 60
+    elif timeframe.endswith('H'):
+        # Formato estándar de horas: 1H, 4H, etc.
+        hours = int(timeframe[:-1])
+        minutes = hours * 60
     elif timeframe.endswith('m'):
+        # Formato de minutos: 15m, 30m, etc.
         minutes = int(timeframe[:-1])
     elif timeframe.endswith('Dutc'):
-        minutes = int(timeframe[:-4]) * 24 * 60
+        # Formato de días UTC: 1Dutc
+        days = int(timeframe[:-4])
+        minutes = days * 24 * 60
     else:
-        raise ValueError("Invalid timeframe, use 'm', 'H', or 'Dutc'.")
+        raise ValueError("Invalid timeframe. Use 'm', 'H', 'Hutc', or 'Dutc'. Examples: '15m', '4H', '6Hutc', '1Dutc'")
     
-    total_minutes      = now.hour * 60 + now.minute
+    # Calcular siguiente vela
+    total_minutes = now.hour * 60 + now.minute
     next_total_minutes = ((total_minutes // minutes) + 1) * minutes
-    delta_minutes      = next_total_minutes - total_minutes
-    next_candle        = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
+    delta_minutes = next_total_minutes - total_minutes
+    next_candle = now + timedelta(minutes=delta_minutes, seconds=-now.second, microseconds=-now.microsecond)
     
     # Añadir 45 segundos de margen
     next_candle = next_candle + timedelta(seconds=45)
@@ -856,7 +870,7 @@ def process_strategy(
                     symbol=sig['symbol'],
                     send_request_func=send_request_func
                 )
-            time.sleep(0.1)
+            time.sleep(0.05)
 
             if filled_size is None or filled_size == 0:
                 size = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
@@ -873,7 +887,7 @@ def process_strategy(
         else:
             print(f"🔔 Order executed but no orderId in response")
 
-        time.sleep(0.1)
+        time.sleep(0.05)
         
 def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
     """Genera señales de prueba para testing"""
@@ -921,7 +935,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
 
         print(f"→  Closing {direction} position on {symbol}:")   
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
-        time.sleep(0.1)
+        time.sleep(0.05)
         
         if code == 200 and resp.get("code") == "00000":
             print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
