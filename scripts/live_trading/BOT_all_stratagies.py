@@ -19,7 +19,7 @@ from ZX_utils_bot import group_strategies_by_timeframe,get_unique_timeframes
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
-#SAVE DATE 09-12-2025 EMPIEZA CON POSICIONES.
+#SAVE DATE 011-12-2025 
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
@@ -32,7 +32,7 @@ RESET                     = "\033[0m"
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
 CHECK_INTERVAL            = 10  
-USE_HARDCODED_SIGNALS     = False
+USE_HARDCODED_SIGNALS     = True
 
 # Archivo de estado
 STATE_FILE = 'bot_state.json'
@@ -49,7 +49,7 @@ STRAT_A = {
     'name': 'double_top_long_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -63,7 +63,7 @@ STRAT_B = {
     'name': 'reversal_long_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 5,
     'tolerance': 30,
     'ma_period':50,
@@ -77,7 +77,7 @@ STRAT_C = {
     'name': 'parity_long_4H',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'lookback': 150,
     'tolerance': 40,
     'tp_pct': 3,  
@@ -90,7 +90,7 @@ STRAT_D = {
     'name': 'reversal_short_4H',
     'timeframe': '4H',  
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 8,
     'tolerance': 30,
     'ma_period':50,
@@ -104,7 +104,7 @@ STRAT_E = {
     'name': 'parity_short_4H',
     'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'lookback': 150,
     'tolerance': 20,
     'tp_pct': 5,  
@@ -117,10 +117,10 @@ STRAT_F = {
     'name': 'reversal_long_1H',
     'timeframe': '1H',
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 7,
     'tolerance': 40,
-    'ma_period':50,
+    'ma_period':25,
     'tp_pct': 2,
     'sl_pct': 10,
     'direction': 'long'
@@ -131,7 +131,7 @@ STRAT_G = {
     'name': 'reversal_short_1H',
     'timeframe': '1H',  
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 5,
     'tolerance': 30,
     'ma_period':50,
@@ -145,7 +145,7 @@ STRAT_H = {
     'name': 'reversal_long_6Hutc',
     'timeframe': '6Hutc',  
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 3,
     'tolerance': 20,
     'ma_period':50,
@@ -159,7 +159,7 @@ STRAT_I = {
     'name': 'reversal_short_6Hutc',
     'timeframe': '6Hutc',  
     'sell_after_ncandles': 50,
-    'order_amount': 30,
+    'order_amount': 40,
     'left_lookback': 6,
     'tolerance': 30,
     'ma_period':25,
@@ -318,7 +318,8 @@ def main_loop():
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-        print(f"⏰ Next candle for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        
+        print(f"⏰ Next candle for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
 
     last_tpsl_check = time.time()
     
@@ -359,7 +360,8 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  {strat_id} ({strat['timeframe']}): {candles}/{strat['sell_after_ncandles']} candles")
+                        print(f"➡️  {strat_id:<20} ({strat['timeframe']:<8}): {candles}/{strat['sell_after_ncandles']:<7} candles")
+
                         check_candles_timeout_for_strategy(strat_id, strat['sell_after_ncandles'],OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
                 
                 # Búsqueda de señales (solo si no hay posiciones)
@@ -368,7 +370,8 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Skipping {strat_id} ({strat['timeframe']}) - {num_positions} open positions")
+                        print(f"🚫 Skipping {strat_id:<20} ({strat['timeframe']:<6}) - {num_positions} open positions")
+
                         continue
                     
                     try:

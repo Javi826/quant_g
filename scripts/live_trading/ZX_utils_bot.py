@@ -18,6 +18,8 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from datetime import timedelta
+from ZX_BOT_display import check_all_tp_sl,add_position_to_table,stop_live_display
+
 
 STATE_FILE   = os.path.join(os.path.dirname(__file__), 'tracked_orders_state.json')
 BASE_URL     = "https://api.bitget.com"
@@ -676,7 +678,7 @@ def create_tp_sl_display(now, total_pnl=None):
     
     # Crear tabla con columnas adicionales: opened_at y candles
     table = Table(show_header=True, header_style="bold white", border_style="white")
-    table.add_column("Strategy", style="white", width=15)
+    table.add_column("Strategy", style="white", width=20)
     table.add_column("Symbol", style="bold", width=11)
     table.add_column("Side", justify="center", width=5)
     table.add_column("Opened", style="white", width=10)

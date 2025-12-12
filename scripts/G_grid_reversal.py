@@ -16,7 +16,7 @@ from Z_add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "reversal_long_6Hutc"
+STRATEGY     = "reversal_long_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -44,7 +44,7 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 SELL_AFTER_LIST      = [0]  
 LEFT_LOOKBACK_LIST   = [5] 
 TOLERANCE_LIST       = [30]
-MA_PERIOD_LIST       = [50]
+MA_PERIOD_LIST       = [25]
 
 TP_PCT_LIST          = [1.9]
 SL_PCT_LIST          = [5]
@@ -122,7 +122,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
+save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

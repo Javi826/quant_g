@@ -24,18 +24,19 @@ from Z_add_signals_reversal import reversal_short
 from Z_add_signals_parity import parity_short
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
+from ZX_dashboard import start_dashboard_server
 
-from utils.ZZ_connect import connect_bitget_00
-from ZX_connect_live import get_usdt_balance_00, send_request_00
+from utils.ZZ_connect import connect_bitget_02
+from ZX_connect_live import get_usdt_balance_02, send_request_02
 
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
-MIN_TIMEFRAME             = '4H'
+MIN_TIMEFRAME             = '5m'
 CHECK_INTERVAL            = 15  
 USE_HARDCODED_SIGNALS     = False
 
 # Archivo de estado
-STATE_FILE = 'bot_state.json'
+STATE_FILE = 'bot_state_u.json'
 
 # Registro de posiciones abiertas por estrategia
 OPEN_POSITIONS   = {}
@@ -47,7 +48,7 @@ STRATEGY_CANDLES = {}
 STRAT_A = {
     'id': 'double_top_long',
     'name': 'double_top_long',
-    'timeframe': '4H',
+    'timeframe': '5m',
     'sell_after_ncandles': 50,
     'order_amount': 80,
     'lookback': 2,
@@ -61,7 +62,7 @@ STRAT_A = {
 STRAT_B = {
     'id': 'revers_long',
     'name': 'reversal_long',
-    'timeframe': '4H',
+    'timeframe': '5m',
     'sell_after_ncandles': 50,
     'order_amount': 80,
     'left_lookback': 5,
@@ -74,7 +75,7 @@ STRAT_B = {
 STRAT_C = {
     'id': 'parity_long',
     'name': 'parity_long',
-    'timeframe': '4H',
+    'timeframe': '5m',
     'sell_after_ncandles': 50,
     'order_amount': 80,
     'lookback': 150,
@@ -87,7 +88,7 @@ STRAT_C = {
 STRAT_D = {
     'id': 'revers_short',
     'name': 'reversal_short',
-    'timeframe': '4H',
+    'timeframe': '5m',
     'sell_after_ncandles': 50,
     'order_amount': 80,
     'left_lookback': 8,
@@ -100,7 +101,7 @@ STRAT_D = {
 STRAT_E = {
     'id': 'parity_short',
     'name': 'parity_short',
-    'timeframe': '4H',
+    'timeframe': '5m',
     'sell_after_ncandles': 50,
     'order_amount': 80,
     'lookback': 150,
@@ -114,9 +115,9 @@ STRAT_E = {
 STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E]
 
 # Funciones comunes
-connect_common      = connect_bitget_00
-send_request_common = send_request_00
-get_balance_common  = get_usdt_balance_00
+connect_common      = connect_bitget_02
+send_request_common = send_request_02
+get_balance_common  = get_usdt_balance_02
 
 # ==========================================================================
 # SIGNALS & STRATEGIES

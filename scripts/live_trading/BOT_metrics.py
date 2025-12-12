@@ -12,7 +12,7 @@ RESET        = "\033[0m"
 
 def bot_metrics(
     excel_file='bot_trading_trades.xlsx',
-    initial_capital=3971,
+    initial_capital=3671,
     show_table=True,
     return_data=False
 ):
@@ -112,7 +112,7 @@ def bot_metrics(
     
     # Anchos de columna
     col_widths = {
-        'Strategy': 15,
+        'Strategy': 18,
         'date_fo': 10,
         'Trades_num': 11,
         'Trades_pct': 11,
@@ -206,4 +206,4 @@ def bot_metrics(
 
 if __name__ == '__main__':
     # Ejemplo de uso directo
-    bot_metrics(excel_file='bot_trading_trades.xlsx',initial_capital=3971,show_table=True)
+    bot_metrics(excel_file='bot_trading_trades.xlsx',initial_capital=3671,show_table=True)

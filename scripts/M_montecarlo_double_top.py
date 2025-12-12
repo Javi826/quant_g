@@ -15,10 +15,6 @@ from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_double_top import double_top_short
 from Z_add_signals_double_top import double_top_long
-# =============================================================================
-# from ZZX_DRAFT4 import double_top_short
-# from ZZX_DRAFT4 import double_top_long
-# =============================================================================
 
 DTYPE             = np.float32
 start_time        = time.time()
@@ -82,7 +78,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = double_top_long(
+            signals = double_top_short(
                 arr_minor,
                 lookback_minor=param_dict.get('LOOKBACK_MINOR'),
                 price_tolerance=param_dict.get('PRICE_TOLERANCE'),
