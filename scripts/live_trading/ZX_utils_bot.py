@@ -536,162 +536,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
         bot_metrics()
-# ==========================================================================
-# DISPLAY
-# ==========================================================================
-console       = Console()
-_live_display = None
-def format_price(price):
-    """Formatea precios con decimales apropiados según su magnitud"""
-    price_float = float(price)
-    if price_float < 0.01:
-        return f"{price_float:.6f}"
-    elif price_float < 1:
-        return f"{price_float:.4f}"
-    elif price_float < 100:
-        return f"{price_float:.2f}"
-    else:
-        return f"{price_float:.1f}"
 
-
-def get_pnl_arrow(direction, entry_price, current_price):
-    """Determina la flecha según si la posición está en profit o loss"""
-    entry_float = float(entry_price)
-    current_float = float(current_price)
-    
-    if direction.lower() == 'long':
-        # Para LONG: profit si current > entry
-        if current_float > entry_float:
-            return "[bold green]↑[/bold green]"
-        else:
-            return "[bold red]↓[/bold red]"
-    else:  # short
-        # Para SHORT: profit si current < entry
-        if current_float < entry_float:
-            return "[bold green]↑[/bold green]"
-        else:
-            return "[bold red]↓[/bold red]"
-
-
-def calculate_pnl(direction, entry_price, current_price, size):
-    """Calcula el PnL en USDT de una posición"""
-    entry_float = float(entry_price)
-    current_float = float(current_price)
-    size_float = float(size)
-    
-    if direction.lower() == 'long':
-        pnl = (current_float - entry_float) * size_float
-    else:  # short
-        pnl = (entry_float - current_float) * size_float
-    
-    return pnl
-
-
-def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
-    """Añade una fila de posición a la tabla de Rich"""
-    direction = pos['direction']
-    tp_price = pos['tp']
-    sl_price = pos['sl']
-    entry_price = pos['entry_price']
-    symbol = pos['symbol']
-    size = pos['size']
-    
-    # Calcular distancias al TP y SL
-    if direction.lower() == 'short':
-        dist_to_tp = float(current_price - tp_price)
-        dist_to_sl = float(sl_price - current_price)
-        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
-    else:  # long
-        dist_to_tp = float(tp_price - current_price)
-        dist_to_sl = float(current_price - sl_price)
-        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
-    
-    direction_style = "white"
-    pnl_arrow = get_pnl_arrow(direction, entry_price, current_price)
-    
-    # Calcular PnL numérico
-    pnl = calculate_pnl(direction, entry_price, current_price, size)
-    pnl_accumulator['total'] += pnl
-    
-    # Formatear PnL con color
-    pnl_color = "green" if pnl >= 0 else "red"
-    pnl_text = f"[{pnl_color}]{pnl:+.2f}[/{pnl_color}]"
-    
-    # Extraer opened_at y formatear solo la fecha
-    opened_at = pos.get('opened_at', '')
-    if opened_at:
-        # Si es datetime, convertir a string con solo fecha
-        if hasattr(opened_at, 'strftime'):
-            opened_at_str = opened_at.strftime('%Y-%m-%d')
-        # Si es string, extraer solo YYYY-MM-DD
-        elif isinstance(opened_at, str):
-            opened_at_str = opened_at.split('T')[0] if 'T' in opened_at else opened_at[:10]
-        else:
-            opened_at_str = str(opened_at)[:10]
-    else:
-        opened_at_str = '-'
-    
-    # Obtener candles elapsed y sell_after_ncandles
-    candles_elapsed = strategy_candles.get(strat_id, 0)
-    candles_str = f"{candles_elapsed}/{sell_after_ncandles}" if sell_after_ncandles else f"{candles_elapsed}"
-    
-    # Formatear TP con color condicional
-    tp_color = "bold green" if tp_pct_away < 1 else "cyan"
-    tp_text = f"[white]{format_price(tp_price)}[/white] [{tp_color}](Δ {tp_pct_away:+.2f}%)[/{tp_color}]"
-    
-    # Formatear SL con color condicional
-    sl_color = "bold red" if sl_pct_away < 1 else "magenta"
-    sl_text = f"[white]{format_price(sl_price)}[/white] [{sl_color}](Δ {sl_pct_away:+.2f}%)[/{sl_color}]"
-    
-    # Formatear size
-    size_str = f"{float(size):.6f}".rstrip('0').rstrip('.')
-    
-    table.add_row(
-        strat_id,
-        f"[{direction_style}]{symbol}[/{direction_style}]",
-        f"[{direction_style}]{direction.upper()}[/{direction_style}]",
-        f"[white]{opened_at_str}[/white]",
-        f"[white]{candles_str}[/white]",
-        f"{format_price(entry_price)}",
-        f"[white]{size_str}[/white]",  # Nueva columna SIZE
-        f"[yellow]{format_price(current_price)}[/yellow]",
-        pnl_arrow,
-        pnl_text,
-        tp_text,
-        sl_text
-    )
-
-
-def create_tp_sl_display(now, total_pnl=None):
-    """Crea el header y la tabla para el display de TP/SL"""
-    # Crear el header con PnL total si se proporciona
-    header = Text()
-    header.append(f"{BLUE_BOLD}{'─'*115}\n")
-    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
-    if total_pnl is not None:
-        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
-        header.append(f"💰 Total PnL: ", style="white")
-        header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
-    header.append(f"{BLUE_BOLD}{'─'*115}\n")
-    
-    # Crear tabla con columnas adicionales: opened_at y candles
-    table = Table(show_header=True, header_style="bold white", border_style="white")
-    table.add_column("Strategy", style="white", width=20)
-    table.add_column("Symbol", style="bold", width=11)
-    table.add_column("Side", justify="center", width=5)
-    table.add_column("Opened", style="white", width=10)
-    table.add_column("Candles", justify="center", width=8)
-    table.add_column("Entry", justify="right", width=8)
-    table.add_column("Size", justify="right", width=7)  # Nueva columna
-    table.add_column("Current", justify="right", width=8)
-    table.add_column("↕", justify="center", width=1)
-    table.add_column("PnL (USDT)", justify="right", width=6)
-    table.add_column("TP", justify="right", width=20)
-    table.add_column("SL", justify="right", width=20)
-    
-    return header, table
 
 
 # ==========================================================================
@@ -1191,3 +1036,160 @@ def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
         logger.info(text)
     
     builtins.print = _print_and_log
+    
+# ==========================================================================
+# DISPLAY
+# ==========================================================================
+console       = Console()
+_live_display = None
+def format_price(price):
+    """Formatea precios con decimales apropiados según su magnitud"""
+    price_float = float(price)
+    if price_float < 0.01:
+        return f"{price_float:.6f}"
+    elif price_float < 1:
+        return f"{price_float:.4f}"
+    elif price_float < 100:
+        return f"{price_float:.2f}"
+    else:
+        return f"{price_float:.1f}"
+
+
+def get_pnl_arrow(direction, entry_price, current_price):
+    """Determina la flecha según si la posición está en profit o loss"""
+    entry_float = float(entry_price)
+    current_float = float(current_price)
+    
+    if direction.lower() == 'long':
+        # Para LONG: profit si current > entry
+        if current_float > entry_float:
+            return "[bold green]↑[/bold green]"
+        else:
+            return "[bold red]↓[/bold red]"
+    else:  # short
+        # Para SHORT: profit si current < entry
+        if current_float < entry_float:
+            return "[bold green]↑[/bold green]"
+        else:
+            return "[bold red]↓[/bold red]"
+
+
+def calculate_pnl(direction, entry_price, current_price, size):
+    """Calcula el PnL en USDT de una posición"""
+    entry_float = float(entry_price)
+    current_float = float(current_price)
+    size_float = float(size)
+    
+    if direction.lower() == 'long':
+        pnl = (current_float - entry_float) * size_float
+    else:  # short
+        pnl = (entry_float - current_float) * size_float
+    
+    return pnl
+
+
+def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
+    """Añade una fila de posición a la tabla de Rich"""
+    direction = pos['direction']
+    tp_price = pos['tp']
+    sl_price = pos['sl']
+    entry_price = pos['entry_price']
+    symbol = pos['symbol']
+    size = pos['size']
+    
+    # Calcular distancias al TP y SL
+    if direction.lower() == 'short':
+        dist_to_tp = float(current_price - tp_price)
+        dist_to_sl = float(sl_price - current_price)
+        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+    else:  # long
+        dist_to_tp = float(tp_price - current_price)
+        dist_to_sl = float(current_price - sl_price)
+        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
+        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
+    
+    direction_style = "white"
+    pnl_arrow = get_pnl_arrow(direction, entry_price, current_price)
+    
+    # Calcular PnL numérico
+    pnl = calculate_pnl(direction, entry_price, current_price, size)
+    pnl_accumulator['total'] += pnl
+    
+    # Formatear PnL con color
+    pnl_color = "green" if pnl >= 0 else "red"
+    pnl_text = f"[{pnl_color}]{pnl:+.2f}[/{pnl_color}]"
+    
+    # Extraer opened_at y formatear solo la fecha
+    opened_at = pos.get('opened_at', '')
+    if opened_at:
+        # Si es datetime, convertir a string con solo fecha
+        if hasattr(opened_at, 'strftime'):
+            opened_at_str = opened_at.strftime('%Y-%m-%d')
+        # Si es string, extraer solo YYYY-MM-DD
+        elif isinstance(opened_at, str):
+            opened_at_str = opened_at.split('T')[0] if 'T' in opened_at else opened_at[:10]
+        else:
+            opened_at_str = str(opened_at)[:10]
+    else:
+        opened_at_str = '-'
+    
+    # Obtener candles elapsed y sell_after_ncandles
+    candles_elapsed = strategy_candles.get(strat_id, 0)
+    candles_str = f"{candles_elapsed}/{sell_after_ncandles}" if sell_after_ncandles else f"{candles_elapsed}"
+    
+    # Formatear TP con color condicional
+    tp_color = "bold green" if tp_pct_away < 1 else "cyan"
+    tp_text = f"[white]{format_price(tp_price)}[/white] [{tp_color}](Δ {tp_pct_away:+.2f}%)[/{tp_color}]"
+    
+    # Formatear SL con color condicional
+    sl_color = "bold red" if sl_pct_away < 1 else "magenta"
+    sl_text = f"[white]{format_price(sl_price)}[/white] [{sl_color}](Δ {sl_pct_away:+.2f}%)[/{sl_color}]"
+    
+    # Formatear size
+    size_str = f"{float(size):.6f}".rstrip('0').rstrip('.')
+    
+    table.add_row(
+        strat_id,
+        f"[{direction_style}]{symbol}[/{direction_style}]",
+        f"[{direction_style}]{direction.upper()}[/{direction_style}]",
+        f"[white]{opened_at_str}[/white]",
+        f"[white]{candles_str}[/white]",
+        f"{format_price(entry_price)}",
+        f"[white]{size_str}[/white]",  # Nueva columna SIZE
+        f"[yellow]{format_price(current_price)}[/yellow]",
+        pnl_arrow,
+        pnl_text,
+        tp_text,
+        sl_text
+    )
+
+
+def create_tp_sl_display(now, total_pnl=None):
+    """Crea el header y la tabla para el display de TP/SL"""
+    # Crear el header con PnL total si se proporciona
+    header = Text()
+    header.append(f"{BLUE_BOLD}{'─'*115}\n")
+    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
+    if total_pnl is not None:
+        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
+        header.append(f"💰 Total PnL: ", style="white")
+        header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
+    header.append(f"{BLUE_BOLD}{'─'*115}\n")
+    
+    # Crear tabla con columnas adicionales: opened_at y candles
+    table = Table(show_header=True, header_style="bold white", border_style="white")
+    table.add_column("Strategy", style="white", width=20)
+    table.add_column("Symbol", style="bold", width=11)
+    table.add_column("Side", justify="center", width=5)
+    table.add_column("Opened", style="white", width=10)
+    table.add_column("Candles", justify="center", width=8)
+    table.add_column("Entry", justify="right", width=8)
+    table.add_column("Size", justify="right", width=7)  # Nueva columna
+    table.add_column("Current", justify="right", width=8)
+    table.add_column("↕", justify="center", width=1)
+    table.add_column("PnL (USDT)", justify="right", width=6)
+    table.add_column("TP", justify="right", width=20)
+    table.add_column("SL", justify="right", width=20)
+    
+    return header, table

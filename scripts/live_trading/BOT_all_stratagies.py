@@ -32,7 +32,7 @@ RESET                     = "\033[0m"
 HOUR_ZONE                 = ZoneInfo('UTC')
 PRODUCT_TYPE              = 'USDT-FUTURES'
 CHECK_INTERVAL            = 10  
-USE_HARDCODED_SIGNALS     = True
+USE_HARDCODED_SIGNALS     = False
 
 # Archivo de estado
 STATE_FILE = 'bot_state.json'
@@ -360,7 +360,7 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  {strat_id:<20} ({strat['timeframe']:<8}): {candles}/{strat['sell_after_ncandles']:<7} candles")
+                        print(f"➡️  {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
 
                         check_candles_timeout_for_strategy(strat_id, strat['sell_after_ncandles'],OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
                 
@@ -370,7 +370,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Skipping {strat_id:<20} ({strat['timeframe']:<6}) - {num_positions} open positions")
+                        print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) - {num_positions} open positions")
 
                         continue
                     

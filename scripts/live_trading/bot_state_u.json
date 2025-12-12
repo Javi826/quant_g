@@ -1,0 +1,61 @@
+{
+  "positions": {
+    "double_top_long_4H": [
+      {
+        "symbol": "BTCUSDT",
+        "size": "0.0001",
+        "entry_price": "90010.2",
+        "direction": "long",
+        "tp": "90100.2102",
+        "sl": "89920.1898",
+        "order_id": "1383471404669349889",
+        "opened_at": "2025-12-12T20:26:47.460772+00:00",
+        "usdt_amount": 10.0
+      },
+      {
+        "symbol": "BNBUSDT",
+        "size": "0.01",
+        "entry_price": "875.32",
+        "direction": "long",
+        "tp": "876.19532",
+        "sl": "874.44468",
+        "order_id": "1383471406804250625",
+        "opened_at": "2025-12-12T20:26:48.009011+00:00",
+        "usdt_amount": 10.0
+      }
+    ],
+    "revers_long_4H": [
+      {
+        "symbol": "BTCUSDT",
+        "size": "0.0001",
+        "entry_price": "90183.8",
+        "direction": "long",
+        "tp": "92889.314",
+        "sl": "81165.42",
+        "order_id": "1383462354367950849",
+        "opened_at": "2025-12-12T19:50:49.746732+00:00",
+        "usdt_amount": 10.0
+      },
+      {
+        "symbol": "BNBUSDT",
+        "size": "0.01",
+        "entry_price": "875.74",
+        "direction": "long",
+        "tp": "902.0122",
+        "sl": "788.166",
+        "order_id": "1383462356548988929",
+        "opened_at": "2025-12-12T19:50:50.245349+00:00",
+        "usdt_amount": 10.0
+      }
+    ]
+  },
+  "strategy_candles": {
+    "double_top_long_4H": 4,
+    "revers_long_1H": 0,
+    "revers_short_1H": 0,
+    "revers_long_4H": 20,
+    "parity_long_4H": 0,
+    "revers_short_4H": 0,
+    "parity_short_4H": 0
+  }
+}
