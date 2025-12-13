@@ -37,6 +37,14 @@ RESET        = "\033[0m"
 # ==========================================================================
 USE_WEBSOCKET_FOR_TRADING = False  # ⭐ Solo para place_order: True = WebSocket, False = REST API
 
+# Alias para compatibilidad con código legacy
+USE_WEBSOCKET_FOR_API = True  # Siempre True - todo usa WebSocket excepto órdenes (controlado arriba)
+
+# ==========================================================================
+# API WRAPPER WITH TIMER
+# ==========================================================================
+_original_send_request = None
+
 # ==========================================================================
 # WEBSOCKET-BASED FUNCTIONS (NO API REST)
 # ==========================================================================
@@ -51,7 +59,7 @@ def fetch_ticker_ws(symbol):
     # Suscribir si no está suscrito
     if symbol not in _ws_manager.subscribed_public:
         _ws_manager.subscribe_ticker(symbol)
-        time.sleep(0.1)
+        time.sleep(0.3)
     
     # Obtener del caché
     price_data = _ws_manager.prices.get(symbol)
@@ -120,6 +128,10 @@ class BitgetWSManager:
         self.running = False
         self.authenticated = False  # ⭐ Flag de autenticación
         
+        # Tracking de desconexiones
+        self.last_close_code = None
+        self.last_close_msg = None
+        
         # Threads
         self.public_thread = None
         self.private_thread = None
@@ -150,16 +162,34 @@ class BitgetWSManager:
         self.ping_thread.start()
         
     def _ping_loop(self):
-        """Envía ping cada 20 segundos"""
+        """Envía un ping de aplicación (cadena 'ping') cada 30s y keepalive de bajo impacto.
+        También se encarga de reconexiones suaves si el socket está caído."""
+        ping_interval = 30.0
         while self.running:
             try:
-                if self.public_ws and self.public_ws.sock and self.public_ws.sock.connected:
-                    self.public_ws.send(json.dumps({"op": "ping"}))
-                if self.private_ws and self.private_ws.sock and self.private_ws.sock.connected:
-                    self.private_ws.send(json.dumps({"op": "ping"}))
-                time.sleep(20)
-            except Exception:
-                time.sleep(5)
+                # Enviar PING como cadena simple (Bitget espera "ping" como string, no JSON)
+                if self.public_ws and getattr(self.public_ws, 'sock', None) and getattr(self.public_ws.sock, 'connected', False):
+                    try:
+                        self.public_ws.send("ping")
+                    except Exception as e:
+                        print(f"❌ Error sending public ping: {e}")
+    
+                if self.private_ws and getattr(self.private_ws, 'sock', None) and getattr(self.private_ws.sock, 'connected', False):
+                    try:
+                        self.private_ws.send("ping")
+                    except Exception as e:
+                        print(f"❌ Error sending private ping: {e}")
+    
+                # Esperar intervalo (loop más fino para reaccionar a stop)
+                slept = 0.0
+                while self.running and slept < ping_interval:
+                    time.sleep(0.5)
+                    slept += 0.5
+    
+            except Exception as e:
+                print(f"❌ Ping loop failed: {e}")
+                time.sleep(1)
+
     
     # ==========================================================================
     # PUBLIC WEBSOCKET
@@ -176,30 +206,31 @@ class BitgetWSManager:
                     on_open=self._on_public_open,
                     on_pong=self._on_pong
                 )
-                self.public_ws.run_forever(ping_interval=20, ping_timeout=10)
+                self.public_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
                 print(f"🔔 Public WebSocket error: {e}")
                 time.sleep(2)
     
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
-        # print("✅ Public WebSocket connected")  # Ya se muestra en init_websocket()
+        print("🔌 PUBLIC WebSocket connected")
         if self.subscribed_public:
             self._resubscribe_public()
     
     def _on_public_message(self, ws, message):
-        """Procesa mensajes del canal público"""
         try:
+            # ⛔ Ignorar pongs y mensajes no-JSON
+            if not message or message == "pong":
+                return
+            if message[0] not in ("{", "["):
+                return
+    
             data = json.loads(message)
-            
-            if data.get('event') == 'pong':
+    
+            if data.get('event') in ('pong', 'subscribe'):
                 return
-            
-            if data.get('event') == 'subscribe':
-                return
-            
-            # Procesar datos de precio (ticker)
-            if data.get('action') in ['snapshot', 'update']:
+    
+            if data.get('action') in ('snapshot', 'update'):
                 arg = data.get('arg', {})
                 if arg.get('channel') == 'ticker':
                     symbol = arg.get('instId')
@@ -211,9 +242,10 @@ class BitgetWSManager:
                                 'price': Decimal(last_pr),
                                 'timestamp': time.time()
                             }
-                            # print(f"📊 Received price for {symbol}: {last_pr}")  # Debug
+    
         except Exception as e:
             print(f"🔔 Error processing public message: {e}")
+
     
     def subscribe_ticker(self, symbol):
         """Suscribe a ticker de un símbolo"""
@@ -266,17 +298,31 @@ class BitgetWSManager:
                     on_open=self._on_private_open,
                     on_pong=self._on_pong
                 )
-                self.private_ws.run_forever(ping_interval=20, ping_timeout=10)
+                self.private_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
                 print(f"🔔 Private WebSocket error: {e}")
                 time.sleep(2)
     
     def _on_private_open(self, ws):
         """Callback al conectar WS privado - autenticar"""
-        # print("✅ Private WebSocket connected")  # Ya se muestra en init_websocket()
+        # Detectar si es reconexión (authenticated ya es True)
+        is_reconnect = self.authenticated
+        
+        if is_reconnect:
+            # Mostrar razón de la desconexión anterior si existe
+            if self.last_close_code or self.last_close_msg:
+                print(f"🔄 PRIVATE WebSocket reconnected | Previous: code={self.last_close_code}, msg={self.last_close_msg}")
+                self.last_close_code = None
+                self.last_close_msg = None
+            else:
+                # Sin código de cierre guardado - puede ser timeout sin aviso
+                print("🔄 PRIVATE WebSocket reconnected | Previous: code=unknown (likely timeout)")
+        else:
+            print("🔌 PRIVATE WebSocket connected (first time)")
+        
         self._authenticate()
         time.sleep(1)
-        self._subscribe_private_channels()
+        self._subscribe_private_channels(is_reconnect=is_reconnect)
     
     def _authenticate(self):
         """Autentica el WebSocket privado"""
@@ -304,9 +350,12 @@ class BitgetWSManager:
             self.private_ws.send(json.dumps(auth_msg))
             print("🔐 Authenticating WebSocket...")
     
-    def _subscribe_private_channels(self):
+    def _subscribe_private_channels(self, is_reconnect=False):
         """Suscribe a canales privados esenciales"""
         channels = ['orders', 'fill', 'positions', 'account', 'equity']
+        
+        if not is_reconnect:
+            print(f"📡 Subscribing to {len(channels)} private channels...")
         
         for channel in channels:
             msg = {
@@ -324,113 +373,116 @@ class BitgetWSManager:
             if self.private_ws and self.private_ws.sock and self.private_ws.sock.connected:
                 self.private_ws.send(json.dumps(msg))
                 self.subscribed_private.add(channel)
-                print(f"✅ Subscribed to private channel: {channel}")
+                # Solo mostrar en primera conexión
+                if not is_reconnect:
+                    print(f"  ✅ {channel}")
     
     def _on_private_message(self, ws, message):
-        """Procesa mensajes del canal privado"""
         try:
+            # ⛔ ignorar pong y basura
+            if not message or message == "pong":
+                return
+            if message[0] not in ("{", "["):
+                return
+    
             data = json.loads(message)
-            
-            # Login response
-            if data.get('event') == 'login':
-                code = data.get('code')
-                # Code puede ser string '0' o int 0
-                if code == '0' or code == 0:
+    
+            if data.get("event") in ("pong", "subscribe"):
+                return
+    
+            # Login
+            if data.get("event") == "login":
+                code = data.get("code")
+                if code == "0" or code == 0:
                     print("✅ WebSocket authentication successful")
-                    self.authenticated = True  # ⭐ Marcar como autenticado
+                    self.authenticated = True
                 else:
-                    print(f"❌ WebSocket authentication failed: {data}")
+                    print(f"❌ WebSocket auth failed: {data}")
                     self.authenticated = False
                 return
-            
-            if data.get('event') in ['pong', 'subscribe']:
+    
+            arg = data.get("arg", {})
+            channel = arg.get("channel")
+            action = data.get("action")
+    
+            if not channel or action not in ("snapshot", "update"):
                 return
-            
-            # Procesar datos según canal
-            arg = data.get('arg', {})
-            channel = arg.get('channel')
-            action = data.get('action')
-            
-            if not channel or action not in ['snapshot', 'update']:
-                return
-            
-            data_list = data.get('data', [])
-            
-            # Orders
-            if channel == 'orders':
+    
+            data_list = data.get("data", [])
+    
+            if channel == "orders":
                 for order in data_list:
-                    order_id = order.get('orderId')
-                    if order_id:
-                        self.orders[order_id] = order
+                    oid = order.get("orderId")
+                    if oid:
+                        self.orders[oid] = order
                         if self.on_order_callback:
                             self.on_order_callback(order)
-            
-            # Fills
-            elif channel == 'fill':
+    
+            elif channel == "fill":
                 for fill in data_list:
-                    order_id = fill.get('orderId')
-                    if order_id:
-                        if order_id not in self.fills:
-                            self.fills[order_id] = []
-                        self.fills[order_id].append(fill)
+                    oid = fill.get("orderId")
+                    if oid:
+                        self.fills.setdefault(oid, []).append(fill)
                         if self.on_fill_callback:
                             self.on_fill_callback(fill)
-            
-            # Positions
-            elif channel == 'positions':
-                # Si es snapshot, LIMPIAR caché primero (positions cerradas no se envían)
-                if action == 'snapshot':
-                    # Limpiar todas las posiciones anteriores
+    
+            elif channel == "positions":
+                if action == "snapshot":
                     self.positions.clear()
-                
-                # Agregar/actualizar solo las posiciones que vienen en el mensaje
+    
                 for pos in data_list:
-                    symbol = pos.get('instId')
-                    total = float(pos.get('total', 0))
-                    
+                    symbol = pos.get("instId")
+                    total = float(pos.get("total", 0))
                     if symbol:
-                        # Solo guardar si total > 0 (posición abierta)
                         if total > 0:
                             self.positions[symbol] = pos
-                        elif symbol in self.positions:
-                            # Si total = 0 y está en caché, eliminarla
-                            del self.positions[symbol]
-                        
-                        if self.on_position_callback:
-                            self.on_position_callback(pos)
-            
-            # Account
-            elif channel == 'account':
+                        else:
+                            self.positions.pop(symbol, None)
+    
+            elif channel == "account":
                 for acc in data_list:
-                    margin_coin = acc.get('marginCoin')
-                    if margin_coin:
-                        self.account[margin_coin] = acc
-            
-            # Equity (balance)
-            elif channel == 'equity':
-                for equity_data in data_list:
-                    # Guardar equity data (balance USDT, BTC, etc)
-                    self.equity = equity_data
-                        
+                    coin = acc.get("marginCoin")
+                    if coin:
+                        self.account[coin] = acc
+    
+            elif channel == "equity":
+                for eq in data_list:
+                    self.equity = eq
+    
         except Exception as e:
             print(f"🔔 Error processing private message: {e}")
+
     
     # ==========================================================================
     # COMMON CALLBACKS
     # ==========================================================================
     def _on_pong(self, ws, message):
         """Callback al recibir pong"""
+        # print("✅ Pong received")  # Silenciado - funciona correctamente
         pass
     
     def _on_error(self, ws, error):
         """Callback en caso de error"""
-        if "Connection to remote host was lost" not in str(error):
-            print(f"🔔 WebSocket error: {error}")
+        # Mostrar TODOS los errores para debug
+        print(f"🔔 WebSocket error: {error}")
+        import traceback
+        traceback.print_exc()
     
     def _on_close(self, ws, close_status_code, close_msg):
         """Callback al cerrar conexión"""
-        # print("🔌 WebSocket disconnected - reconnecting...")  # Comentado para evitar spam
-        pass
+        # Identificar cuál WebSocket se cerró
+        ws_type = "PUBLIC" if ws == self.public_ws else "PRIVATE" if ws == self.private_ws else "UNKNOWN"
+        
+        # Guardar razón de cierre para mostrar en reconexión
+        self.last_close_code = close_status_code
+        self.last_close_msg = close_msg
+        
+        # Mostrar desconexión siempre con tipo de WS
+        if close_status_code or close_msg:
+            print(f"⚠️  {ws_type} WebSocket disconnected | code={close_status_code}, msg={close_msg}")
+        else:
+            print(f"⚠️  {ws_type} WebSocket disconnected | code=None, msg=None (unclean close)")
+        # Se reconectará automáticamente por el loop
     
     # ==========================================================================
     # PUBLIC METHODS
@@ -473,7 +525,9 @@ class BitgetWSManager:
         """
         Fuerza actualización REAL de posiciones re-suscribiéndose al canal.
         Esto obliga al servidor a enviar un snapshot fresco.
-        """       
+        """
+        print("   🔄 Re-subscribing to positions channel for fresh snapshot...")
+        
         # Guardar posiciones actuales
         old_positions = {k: v.get('total') for k, v in self.positions.items()}
         
@@ -503,7 +557,7 @@ class BitgetWSManager:
             self.private_ws.send(json.dumps(sub_msg))
             
             # Esperar a recibir el snapshot fresco
-            time.sleep(0.5)
+            time.sleep(1.0)
             
             # Comparar
             new_positions = {k: v.get('total') for k, v in self.positions.items()}
@@ -631,9 +685,7 @@ class BitgetWSManager:
                 except Exception as e:
                     pass
         
-        elapsed = time.time() - start_time
-        color = "\033[0;32m" if elapsed < 5 else "\033[0;93m" if elapsed < 10 else "\033[0;91m"
-        print(f"{color}✅ Pre-loaded {loaded}/{len(symbols)} contracts | {elapsed:.2f}s{RESET}")
+        print(f"\033[0;36m✅ Pre-loaded {loaded}/{len(symbols)} contracts{RESET}")
 
 # Instancia global
 _ws_manager = None
@@ -681,7 +733,7 @@ def get_usdt_balance_ws(exchange=None):
     # Si no hay datos de equity todavía, esperar un poco
     if balance == 0.0 and not _ws_manager.equity:
         print("⏳ Waiting for equity data from WebSocket...")
-        time.sleep(0.5)
+        time.sleep(1.0)
         balance = _ws_manager.get_usdt_balance()
     
     return balance
@@ -769,12 +821,15 @@ def sync_broker(open_positions, strategy_candles, state_file):
     """
     print("🌐 Syncronizing positions in broker...")
     total_removed = 0
+    start_time = time.time()
     
     global _ws_manager
     
     if not _ws_manager:
         raise RuntimeError("WebSocket manager not initialized")
     
+    # ⭐ REFRESCAR datos de posiciones del WebSocket
+    print("🔄 Refreshing position data from WebSocket...")
     _ws_manager.refresh_positions()
     
     # Debug: mostrar todas las posiciones que el WS tiene DESPUÉS del refresh
@@ -866,6 +921,11 @@ def sync_broker(open_positions, strategy_candles, state_file):
     else:
         print(f"✅ Sync completed: All positions exist in broker")
     
+    # Mostrar tiempo total
+    elapsed = time.time() - start_time
+    color = "\033[0;32m" if elapsed < 0.5 else "\033[0;93m" if elapsed < 1.0 else "\033[0;91m"
+    print(f"{color}⚡ WS  Sync completed                             | {elapsed:.3f}s{RESET}")
+
 # ==========================================================================
 # PLACE ORDER
 # ==========================================================================
@@ -980,7 +1040,9 @@ def place_order(symbol: str,
                 margin_mode: str = MARGIN_MODE,
                 send_request_func=None,
                 client_oid: str = None):
-
+    """
+    Coloca una orden via REST API o WebSocket según USE_WEBSOCKET_FOR_API
+    """
     if send_request_func is None:
         raise ValueError("Send request error.")
 
@@ -1721,161 +1783,3 @@ except ImportError:
         return None, None
     console = None
     _live_display = None
-    
-    
-# ==========================================================================
-# DISPLAY
-# ==========================================================================
-console       = Console()
-_live_display = None
-def format_price(price):
-    """Formatea precios con decimales apropiados según su magnitud"""
-    price_float = float(price)
-    if price_float < 0.01:
-        return f"{price_float:.6f}"
-    elif price_float < 1:
-        return f"{price_float:.4f}"
-    elif price_float < 100:
-        return f"{price_float:.2f}"
-    else:
-        return f"{price_float:.1f}"
-
-
-def get_pnl_arrow(direction, entry_price, current_price):
-    """Determina la flecha según si la posición está en profit o loss"""
-    entry_float = float(entry_price)
-    current_float = float(current_price)
-    
-    if direction.lower() == 'long':
-        # Para LONG: profit si current > entry
-        if current_float > entry_float:
-            return "[bold green]↑[/bold green]"
-        else:
-            return "[bold red]↓[/bold red]"
-    else:  # short
-        # Para SHORT: profit si current < entry
-        if current_float < entry_float:
-            return "[bold green]↑[/bold green]"
-        else:
-            return "[bold red]↓[/bold red]"
-
-
-def calculate_pnl(direction, entry_price, current_price, size):
-    """Calcula el PnL en USDT de una posición"""
-    entry_float = float(entry_price)
-    current_float = float(current_price)
-    size_float = float(size)
-    
-    if direction.lower() == 'long':
-        pnl = (current_float - entry_float) * size_float
-    else:  # short
-        pnl = (entry_float - current_float) * size_float
-    
-    return pnl
-
-
-def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, strategy_candles, sell_after_ncandles):
-    """Añade una fila de posición a la tabla de Rich"""
-    direction = pos['direction']
-    tp_price = pos['tp']
-    sl_price = pos['sl']
-    entry_price = pos['entry_price']
-    symbol = pos['symbol']
-    size = pos['size']
-    
-    # Calcular distancias al TP y SL
-    if direction.lower() == 'short':
-        dist_to_tp = float(current_price - tp_price)
-        dist_to_sl = float(sl_price - current_price)
-        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
-    else:  # long
-        dist_to_tp = float(tp_price - current_price)
-        dist_to_sl = float(current_price - sl_price)
-        tp_pct_away = (dist_to_tp / float(entry_price)) * 100
-        sl_pct_away = (dist_to_sl / float(entry_price)) * 100
-    
-    direction_style = "white"
-    pnl_arrow = get_pnl_arrow(direction, entry_price, current_price)
-    
-    # Calcular PnL numérico
-    pnl = calculate_pnl(direction, entry_price, current_price, size)
-    pnl_accumulator['total'] += pnl
-    
-    # Formatear PnL con color
-    pnl_color = "green" if pnl >= 0 else "red"
-    pnl_text = f"[{pnl_color}]{pnl:+.2f}[/{pnl_color}]"
-    
-    # Extraer opened_at y formatear solo la fecha
-    opened_at = pos.get('opened_at', '')
-    if opened_at:
-        # Si es datetime, convertir a string con solo fecha
-        if hasattr(opened_at, 'strftime'):
-            opened_at_str = opened_at.strftime('%Y-%m-%d')
-        # Si es string, extraer solo YYYY-MM-DD
-        elif isinstance(opened_at, str):
-            opened_at_str = opened_at.split('T')[0] if 'T' in opened_at else opened_at[:10]
-        else:
-            opened_at_str = str(opened_at)[:10]
-    else:
-        opened_at_str = '-'
-    
-    # Obtener candles elapsed y sell_after_ncandles
-    candles_elapsed = strategy_candles.get(strat_id, 0)
-    candles_str = f"{candles_elapsed}/{sell_after_ncandles}" if sell_after_ncandles else f"{candles_elapsed}"
-    
-    # Formatear TP con color condicional
-    tp_color = "bold green" if tp_pct_away < 1 else "cyan"
-    tp_text = f"[white]{format_price(tp_price)}[/white] [{tp_color}](Δ {tp_pct_away:+.2f}%)[/{tp_color}]"
-    
-    # Formatear SL con color condicional
-    sl_color = "bold red" if sl_pct_away < 1 else "magenta"
-    sl_text = f"[white]{format_price(sl_price)}[/white] [{sl_color}](Δ {sl_pct_away:+.2f}%)[/{sl_color}]"
-    
-    # Formatear size
-    size_str = f"{float(size):.6f}".rstrip('0').rstrip('.')
-    
-    table.add_row(
-        strat_id,
-        f"[{direction_style}]{symbol}[/{direction_style}]",
-        f"[{direction_style}]{direction.upper()}[/{direction_style}]",
-        f"[white]{opened_at_str}[/white]",
-        f"[white]{candles_str}[/white]",
-        f"{format_price(entry_price)}",
-        f"[white]{size_str}[/white]",  # Nueva columna SIZE
-        f"[yellow]{format_price(current_price)}[/yellow]",
-        pnl_arrow,
-        pnl_text,
-        tp_text,
-        sl_text
-    )
-
-
-def create_tp_sl_display(now, total_pnl=None):
-    """Crea el header y la tabla para el display de TP/SL"""
-    # Crear el header con PnL total si se proporciona
-    header = Text()
-    header.append(f"{BLUE_BOLD}{'─'*115}\n")
-    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
-    if total_pnl is not None:
-        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
-        header.append(f"💰 Total PnL: ", style="white")
-        header.append(f"{total_pnl:+.2f} USDT\n", style=pnl_color)
-    header.append(f"{BLUE_BOLD}{'─'*115}\n")
-    
-    # Crear tabla con columnas adicionales: opened_at y candles
-    table = Table(show_header=True, header_style="bold white", border_style="white")
-    table.add_column("Strategy", style="white", width=20)
-    table.add_column("Symbol", style="bold", width=11)
-    table.add_column("Side", justify="center", width=5)
-    table.add_column("Opened", style="white", width=10)
-    table.add_column("Candles", justify="center", width=8)
-    table.add_column("Entry", justify="right", width=8)
-    table.add_column("Size", justify="right", width=7)  # Nueva columna
-    table.add_column("Current", justify="right", width=8)
-    table.add_column("↕", justify="center", width=1)
-    table.add_column("PnL (USDT)", justify="right", width=6)
-    table.add_column("TP", justify="right", width=20)
-    table.add_column("SL", justify="right", width=20)
-    
-    return header, table

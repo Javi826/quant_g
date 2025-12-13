@@ -632,17 +632,6 @@
         "usdt_amount": 30.0
       },
       {
-        "symbol": "HYPEUSDT",
-        "size": "1.02",
-        "entry_price": "29.193",
-        "direction": "short",
-        "tp": "28.02528",
-        "sl": "31.382475",
-        "order_id": "1383163126366228484",
-        "opened_at": "2025-12-12T00:01:48.556072+00:00",
-        "usdt_amount": 30.0
-      },
-      {
         "symbol": "MLNUSDT",
         "size": "5",
         "entry_price": "5.123",
@@ -724,14 +713,14 @@
     ]
   },
   "strategy_candles": {
-    "revers_short_1H": 30,
-    "revers_long_4H": 7,
-    "parity_long_4H": 7,
-    "revers_short_4H": 7,
-    "parity_short_4H": 7,
-    "double_top_long_4H": 6,
-    "revers_long_1H": 23,
-    "revers_short_6Hutc": 3,
-    "revers_long_6Hutc": 2
+    "revers_short_1H": 42,
+    "revers_long_4H": 10,
+    "parity_long_4H": 10,
+    "revers_short_4H": 10,
+    "parity_short_4H": 10,
+    "double_top_long_4H": 9,
+    "revers_long_1H": 35,
+    "revers_short_6Hutc": 5,
+    "revers_long_6Hutc": 4
   }
 }

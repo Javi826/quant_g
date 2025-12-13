@@ -63,11 +63,11 @@ def bot_metrics(
     
     if show_table:
         print()
-        print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
         print(f"{BLUE_BOLD}📈 STRATEGY ANALYSIS{RESET}")
-        print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
     
-    # Lista para resultados por estrategia
+    # Lista para resultados por estrtegia
     results = []
     
     # Capital por estrategia
@@ -173,9 +173,9 @@ def bot_metrics(
     
     if show_table:
         print()
-        print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
         print(f"{BLUE_BOLD}📊 TOTAL SUMMARY{RESET}")
-        print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
         
         print(f"{BLUE_BOLD}🧮 Trades_num   :{RESET} {num_trades_total}")
         print(f"{BLUE_BOLD}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
@@ -185,7 +185,7 @@ def bot_metrics(
         color = GREEN_BOLD if total_profit_general >= 0 else RED_BOLD
         print(f"{'💵' if total_profit_general >= 0 else '⭕'} {BLUE_BOLD}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")
         
-        print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
         print()
     
     # Preparar datos de retorno
