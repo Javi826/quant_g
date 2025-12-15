@@ -361,7 +361,7 @@ def main_loop():
         print(f"🔹 Strategy {strat['id']} ({strat['timeframe']}): {len(final_by_strat[strat['id']])} symbols")
     
     # Group strategies by timeframe
-    strategies_by_tf = group_strategies_by_timeframe(STRATEGIES)
+    strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
     unique_timeframes = get_unique_timeframes(STRATEGIES)
     
     print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
