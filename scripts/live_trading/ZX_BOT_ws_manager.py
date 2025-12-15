@@ -1,17 +1,13 @@
-"""
-WebSocket Manager para Bitget
-Maneja conexiones WebSocket públicas y privadas para trading
-"""
-
-import os
 import time
 import json
 import hmac
 import base64
 import hashlib
-import threading
 import websocket
+import threading
 from decimal import Decimal
+
+RESET = "\033[0m"
 
 # ==========================================================================
 # WEBSOCKET MANAGER - EXTENDED
@@ -81,21 +77,34 @@ class BitgetWSManager:
         self.ping_thread.start()
         
     def _ping_loop(self):
-        """Envía ping de aplicación ('ping') cada 30s como exige Bitget."""
-        ping_interval = 30.0
+        """Envía un ping de aplicación (cadena 'ping') cada 30s y keepalive de bajo impacto.
+        También se encarga de reconexiones suaves si el socket está caído."""
+        ping_interval = 25.0
         while self.running:
             try:
-                if self.public_ws and self.public_ws.sock and self.public_ws.sock.connected:
-                    self.public_ws.send("ping")
-                if self.private_ws and self.private_ws.sock and self.private_ws.sock.connected:
-                    self.private_ws.send("ping")
+                # Enviar PING como cadena simple (Bitget espera "ping" como string, no JSON)
+                if self.public_ws and getattr(self.public_ws, 'sock', None) and getattr(self.public_ws.sock, 'connected', False):
+                    try:
+                        self.public_ws.send("ping")
+                    except Exception as e:
+                        print(f"❌ Error sending public ping: {e}")
+    
+                if self.private_ws and getattr(self.private_ws, 'sock', None) and getattr(self.private_ws.sock, 'connected', False):
+                    try:
+                        self.private_ws.send("ping")
+                    except Exception as e:
+                        print(f"❌ Error sending private ping: {e}")
+    
+                # Esperar intervalo (loop más fino para reaccionar a stop)
                 slept = 0.0
                 while self.running and slept < ping_interval:
                     time.sleep(0.5)
                     slept += 0.5
+    
             except Exception as e:
-                print(f"❌ Ping loop error: {e}")
+                print(f"❌ Ping loop failed: {e}")
                 time.sleep(1)
+
     
     # ==========================================================================
     # PUBLIC WEBSOCKET
@@ -112,39 +121,30 @@ class BitgetWSManager:
                     on_open=self._on_public_open,
                     on_pong=self._on_pong
                 )
-                
-                # ⭐ Configurar TCP keepalive para mantener NAT/router vivo
-                import socket
-                self.public_ws.run_forever(
-                    ping_interval=10, 
-                    ping_timeout=5,
-                    socket_options=[(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
-                )
+                self.public_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
                 print(f"🔔 Public WebSocket error: {e}")
                 time.sleep(2)
     
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
-        print("🔌 PUBLIC WebSocket connected")
+        print("🔌 PUBLIC  WebSocket connected")
         if self.subscribed_public:
             self._resubscribe_public()
     
     def _on_public_message(self, ws, message):
-        """Procesa mensajes del canal público"""
         try:
-            # ⛔ Ignorar pong string y mensajes no-JSON
+            # ⛔ Ignorar pongs y mensajes no-JSON
             if not message or message == "pong":
                 return
             if message[0] not in ("{", "["):
                 return
-            
+    
             data = json.loads(message)
-            
+    
             if data.get('event') in ('pong', 'subscribe'):
                 return
-            
-            # Procesar datos de precio (ticker)
+    
             if data.get('action') in ('snapshot', 'update'):
                 arg = data.get('arg', {})
                 if arg.get('channel') == 'ticker':
@@ -157,8 +157,10 @@ class BitgetWSManager:
                                 'price': Decimal(last_pr),
                                 'timestamp': time.time()
                             }
+    
         except Exception as e:
             print(f"🔔 Error processing public message: {e}")
+
     
     def subscribe_ticker(self, symbol):
         """Suscribe a ticker de un símbolo"""
@@ -177,6 +179,7 @@ class BitgetWSManager:
         if self.public_ws and self.public_ws.sock and self.public_ws.sock.connected:
             self.public_ws.send(json.dumps(msg))
             self.subscribed_public.add(symbol)
+            # print(f"📡 Subscribed to ticker {symbol} via WebSocket")  # Silenciar para reducir spam
         else:
             self.subscribed_public.add(symbol)
             print(f"⚠️  Cannot subscribe to {symbol} - Public WebSocket not connected")
@@ -210,14 +213,7 @@ class BitgetWSManager:
                     on_open=self._on_private_open,
                     on_pong=self._on_pong
                 )
-                
-                # ⭐ Configurar TCP keepalive para mantener NAT/router vivo
-                import socket
-                self.private_ws.run_forever(
-                    ping_interval=10, 
-                    ping_timeout=5,
-                    socket_options=[(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
-                )
+                self.private_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
                 print(f"🔔 Private WebSocket error: {e}")
                 time.sleep(2)
@@ -234,6 +230,7 @@ class BitgetWSManager:
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
+                # Sin código de cierre guardado - puede ser timeout sin aviso
                 print("🔄 PRIVATE WebSocket reconnected | Previous: code=unknown (likely timeout)")
         else:
             print("🔌 PRIVATE WebSocket connected (first time)")
@@ -266,14 +263,13 @@ class BitgetWSManager:
         
         if self.private_ws and self.private_ws.sock and self.private_ws.sock.connected:
             self.private_ws.send(json.dumps(auth_msg))
-            print("🔐 Authenticating WebSocket...")
     
     def _subscribe_private_channels(self, is_reconnect=False):
         """Suscribe a canales privados esenciales"""
         channels = ['orders', 'fill', 'positions', 'account', 'equity']
         
         if not is_reconnect:
-            print(f"📡 Subscribing to {len(channels)} private channels...")
+            print(f"🛜 Subscribing to {len(channels)} private channels...")
         
         for channel in channels:
             msg = {
@@ -293,100 +289,95 @@ class BitgetWSManager:
                 self.subscribed_private.add(channel)
                 # Solo mostrar en primera conexión
                 if not is_reconnect:
-                    print(f"  ✅ {channel}")
+                    print(f"🆗 {channel}")
     
     def _on_private_message(self, ws, message):
-        """Procesa mensajes del canal privado"""
         try:
-            # ⛔ Ignorar pong string y mensajes no-JSON
+            # ⛔ ignorar pong y basura
             if not message or message == "pong":
                 return
             if message[0] not in ("{", "["):
                 return
-            
+    
             data = json.loads(message)
-            
-            if data.get('event') in ('pong', 'subscribe'):
+    
+            if data.get("event") in ("pong", "subscribe"):
                 return
-            
-            # Login response
-            if data.get('event') == 'login':
-                code = data.get('code')
-                if code == '0' or code == 0:
+    
+            # Login
+            if data.get("event") == "login":
+                code = data.get("code")
+                if code == "0" or code == 0:
                     print("✅ WebSocket authentication successful")
                     self.authenticated = True
                 else:
                     print(f"❌ WebSocket auth failed: {data}")
                     self.authenticated = False
                 return
-            
-            # Procesar datos según canal
-            arg = data.get('arg', {})
-            channel = arg.get('channel')
-            action = data.get('action')
-            
-            if not channel or action not in ('snapshot', 'update'):
+    
+            arg = data.get("arg", {})
+            channel = arg.get("channel")
+            action = data.get("action")
+    
+            if not channel or action not in ("snapshot", "update"):
                 return
-            
-            data_list = data.get('data', [])
-            
-            # Orders
-            if channel == 'orders':
+    
+            data_list = data.get("data", [])
+    
+            if channel == "orders":
                 for order in data_list:
-                    oid = order.get('orderId')
+                    oid = order.get("orderId")
                     if oid:
                         self.orders[oid] = order
                         if self.on_order_callback:
                             self.on_order_callback(order)
-            
-            # Fills
-            elif channel == 'fill':
+    
+            elif channel == "fill":
                 for fill in data_list:
-                    oid = fill.get('orderId')
+                    oid = fill.get("orderId")
                     if oid:
                         self.fills.setdefault(oid, []).append(fill)
                         if self.on_fill_callback:
                             self.on_fill_callback(fill)
-            
-            # Positions
-            elif channel == 'positions':
-                if action == 'snapshot':
+    
+            elif channel == "positions":
+                if action == "snapshot":
                     self.positions.clear()
+    
                 for pos in data_list:
-                    symbol = pos.get('instId')
-                    total = float(pos.get('total', 0))
+                    symbol = pos.get("instId")
+                    total = float(pos.get("total", 0))
                     if symbol:
                         if total > 0:
                             self.positions[symbol] = pos
                         else:
                             self.positions.pop(symbol, None)
-                        if self.on_position_callback:
-                            self.on_position_callback(pos)
-            
-            # Account
-            elif channel == 'account':
+    
+            elif channel == "account":
                 for acc in data_list:
-                    coin = acc.get('marginCoin')
+                    coin = acc.get("marginCoin")
                     if coin:
                         self.account[coin] = acc
-            
-            # Equity (balance)
-            elif channel == 'equity':
+    
+            elif channel == "equity":
                 for eq in data_list:
                     self.equity = eq
-                        
+    
         except Exception as e:
             print(f"🔔 Error processing private message: {e}")
+
     
     # ==========================================================================
     # COMMON CALLBACKS
     # ==========================================================================
     def _on_pong(self, ws, message):
         """Callback al recibir pong"""
+        # print("✅ Pong received")  # Silenciado - funciona correctamente
         pass
     
     def _on_error(self, ws, error):
         """Callback en caso de error"""
+        # Mostrar TODOS los errores para debug
         print(f"🔔 WebSocket error: {error}")
         import traceback
         traceback.print_exc()
@@ -405,6 +396,7 @@ class BitgetWSManager:
             print(f"⚠️  {ws_type} WebSocket disconnected | code={close_status_code}, msg={close_msg}")
         else:
             print(f"⚠️  {ws_type} WebSocket disconnected | code=None, msg=None (unclean close)")
+        # Se reconectará automáticamente por el loop
     
     # ==========================================================================
     # PUBLIC METHODS
@@ -448,6 +440,10 @@ class BitgetWSManager:
         Fuerza actualización REAL de posiciones re-suscribiéndose al canal.
         Esto obliga al servidor a enviar un snapshot fresco.
         """
+        # Guardar posiciones actuales
+        old_positions = {k: v.get('total') for k, v in self.positions.items()}
+        
+        # RE-SUSCRIBIRSE al canal (esto fuerza un snapshot fresco)
         if self.private_ws and self.private_ws.sock and self.private_ws.sock.connected:
             # Primero desuscribirse
             unsub_msg = {
@@ -474,9 +470,9 @@ class BitgetWSManager:
             
             # Esperar a recibir el snapshot fresco
             time.sleep(0.5)
+            
             return True
         else:
-            print("   ❌ Private WebSocket not connected!")
             return False
     
     def get_contract(self, symbol):
@@ -486,7 +482,7 @@ class BitgetWSManager:
     def set_contract(self, symbol, contract_data):
         """Guarda información del contrato en caché"""
         self.contracts[symbol] = contract_data
-    
+        
     def stop(self):
         """Detiene los WebSockets"""
         self.running = False
@@ -524,12 +520,10 @@ class BitgetWSManager:
                 except Exception as e:
                     pass
         
-        print(f"\033[0;36m✅ Pre-loaded {loaded}/{len(symbols)} contracts\033[0m")
+        print(f"\033[0;36m✅ Pre-loaded {loaded}/{len(symbols)} contracts{RESET}")
 
 
-# ==========================================================================
-# GLOBAL INSTANCE AND INITIALIZATION
-# ==========================================================================
+# Instancia global
 _ws_manager = None
 
 def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
@@ -545,7 +539,7 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
         time.sleep(2)  # Dar tiempo a conectar y autenticar
         
         # Verificar conexión
-        print(f"🔍 WebSocket status:")
+        print(f"🟢 WebSocket status:")
         print(f"   - Public WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else '❌ Not connected'}")
         print(f"   - Private WS   : {'✅ Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else '❌ Not connected'}")
         print(f"   - Authenticated: {'✅ Yes' if _ws_manager.authenticated else '❌ No'}")
@@ -557,9 +551,4 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
                 if _ws_manager.authenticated:
                     break
                 time.sleep(0.5)
-    return _ws_manager
-
-
-def get_ws_manager():
-    """Obtiene la instancia global del WebSocket manager"""
     return _ws_manager

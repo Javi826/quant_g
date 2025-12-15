@@ -5,9 +5,9 @@ Bot multi-estrategia con soporte WebSocket completo para todas las operaciones A
 """
 
 # =============================================================================
-# ⭐ CONFIGURACIÓN DE CUENTA - CAMBIAR SOLO ESTE NÚMERO
+# ⭐ ACCOUNT CONFIGURATION
 # =============================================================================
-ACCOUNT_NUMBER = "02"  # Opciones: "00", "01", "02", "03", "04", "05"
+ACCOUNT_NUMBER = "02" # "00", "01", "02", "03", "04", "05"
 # =============================================================================
 
 import os
@@ -18,18 +18,16 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from BOT_metrics import bot_metrics
 
-# --- Imports de módulos ---
+# --- Imports de modules ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 # Import WebSocket-enabled utilities
-from ZX_utils_bot_u_websocket import (
-    increment_strategy_candles, process_strategy, check_all_tp_sl,
-    setup_print_logger, sync_broker, load_state, save_state_local,
-    calculate_next_candle_time, check_candles_timeout_for_strategy,
-    group_strategies_by_timeframe, get_unique_timeframes,
-    init_websocket, get_usdt_balance_ws
-)
+from ZX_utils_bot_u_websocket import increment_strategy_candles, process_strategy, check_all_tp_sl, setup_print_logger
+from ZX_utils_bot_u_websocket import sync_broker, load_state, save_state_local, calculate_next_candle_time
+from ZX_utils_bot_u_websocket import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
+
+from ZX_BOT_ws_manager import  init_websocket
 
 # Set global WebSocket mode
 import ZX_utils_bot_u_websocket
@@ -44,26 +42,18 @@ from utils.ZZ_connect import (
     BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
     BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
     BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02,
-    BITGET_API_KEY_03, BITGET_API_SECRET_03, BITGET_API_PASS_03,
-    BITGET_API_KEY_04, BITGET_API_SECRET_04, BITGET_API_PASS_04,
-    BITGET_API_KEY_05, BITGET_API_SECRET_05, BITGET_API_PASS_05,
-    connect_bitget_00, connect_bitget_01, connect_bitget_02,
-    connect_bitget_03, connect_bitget_04, connect_bitget_05
+    connect_bitget_00, connect_bitget_01, connect_bitget_02
 )
 
 from ZX_connect_live import (
-    send_request_00, send_request_01, send_request_02,
-    send_request_03, send_request_04, send_request_05
+    send_request_00, send_request_01, send_request_02
 )
 
 # ⭐ Seleccionar credenciales y funciones según ACCOUNT_NUMBER
 CREDENTIALS = {
     "00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
     "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
-    "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02),
-    "03": (BITGET_API_KEY_03, BITGET_API_SECRET_03, BITGET_API_PASS_03, connect_bitget_03, send_request_03),
-    "04": (BITGET_API_KEY_04, BITGET_API_SECRET_04, BITGET_API_PASS_04, connect_bitget_04, send_request_04),
-    "05": (BITGET_API_KEY_05, BITGET_API_SECRET_05, BITGET_API_PASS_05, connect_bitget_05, send_request_05),
+    "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
 }
 
 if ACCOUNT_NUMBER not in CREDENTIALS:
@@ -373,7 +363,7 @@ def main_loop():
     bot_metrics()
     
     # ⭐ INITIALIZE WEBSOCKET WITH CREDENTIALS
-    print(f"\n{BLUE_BOLD}🔌 Initializing WebSocket connections...{RESET}")
+    print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     print(f"✅ WebSocket initialized (Trading via {'WS' if ZX_utils_bot_u_websocket.USE_WEBSOCKET_FOR_TRADING else 'REST API'})")
     
@@ -452,7 +442,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) - {num_positions} open positions")
+                        print(f"🚫 {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
                         continue
                     
                     try:

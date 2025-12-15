@@ -370,7 +370,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) - {num_positions} open positions")
+                        print(f"🚫 {strat_id:<18} ({strat['timeframe']:<2}) - {num_positions} open positions")
 
                         continue
                     

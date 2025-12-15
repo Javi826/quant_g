@@ -350,13 +350,13 @@
     ]
   },
   "strategy_candles": {
-    "revers_short_1H": 3,
-    "revers_long_4H": 24,
-    "parity_long_4H": 24,
-    "revers_short_4H": 24,
-    "parity_short_4H": 24,
-    "double_top_long_4H": 23,
-    "revers_long_1H": 43,
+    "revers_short_1H": 4,
+    "revers_long_4H": 25,
+    "parity_long_4H": 25,
+    "revers_short_4H": 25,
+    "parity_short_4H": 25,
+    "double_top_long_4H": 24,
+    "revers_long_1H": 44,
     "revers_short_6Hutc": 0,
     "revers_long_6Hutc": 14
   }
