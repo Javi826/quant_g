@@ -7,7 +7,7 @@ Bot multi-estrategia con soporte WebSocket completo para todas las operaciones A
 # =============================================================================
 # ⭐ ACCOUNT CONFIGURATION
 # =============================================================================
-ACCOUNT_NUMBER = "02" # "00", "01", "02", "03", "04", "05"
+ACCOUNT_NUMBER = "01" # "00", "01", "02", "03", "04", "05"
 # =============================================================================
 
 import os
@@ -41,9 +41,8 @@ from utils.ZZ_connect import (
     connect_bitget_00, connect_bitget_01, connect_bitget_02
 )
 
-from ZX_connect_live import (
-    send_request_00, send_request_01, send_request_02
-)
+from ZX_connect_live import send_request_00, send_request_01, send_request_02
+
 
 # ⭐ Seleccionar credenciales y funciones según ACCOUNT_NUMBER
 CREDENTIALS = {
