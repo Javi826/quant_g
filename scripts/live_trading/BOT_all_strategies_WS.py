@@ -3,20 +3,13 @@
 """
 Bot multi-estrategia con soporte WebSocket completo para todas las operaciones API.
 """
-
-# =============================================================================
-# ⭐ ACCOUNT CONFIGURATION
-# =============================================================================
-ACCOUNT_NUMBER = "01" # "00", "01", "02", "03", "04", "05"
-# =============================================================================
-
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from BOT_metrics import bot_metrics
+from ZX_BOT_metrics import bot_metrics
 
 # --- Imports de modules ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
@@ -26,7 +19,6 @@ from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_o
 from ZX_BOT_operative import increment_strategy_candles, process_strategy, check_all_tp_sl, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
-
 from ZX_BOT_ws_manager import init_websocket
 
 from Z_add_signals_double_top import double_top_long
@@ -51,10 +43,6 @@ CREDENTIALS = {
     "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
 }
 
-if ACCOUNT_NUMBER not in CREDENTIALS:
-    raise ValueError(f"ACCOUNT_NUMBER inválido: {ACCOUNT_NUMBER}. Debe ser '00', '01', '02', '03', '04', o '05'")
-
-BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
 BLUE_BOLD      = "\033[1;94m"
 YELLOW_BOLD    = "\033[0;93m"
@@ -62,20 +50,19 @@ RESET          = "\033[0m"
 HOUR_ZONE      = ZoneInfo('UTC')
 PRODUCT_TYPE   = 'USDT-FUTURES'
 CHECK_INTERVAL = 10
-USE_HARDCODED_SIGNALS = True
+ACCOUNT_NUMBER = "01"
+USE_HARDCODED_SIGNALS = False
 
-print(f"{BLUE_BOLD}{'='*120}")
-print(f"🤖 BOT OPERATING IN ACCOUNT: {ACCOUNT_NUMBER}")
-print(f"{'='*120}{RESET}\n")
-
-# Setup logging
+# SETUPS
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
+if ACCOUNT_NUMBER not in CREDENTIALS:
+    raise ValueError(f"ACCOUNT_NUMBER inválido: {ACCOUNT_NUMBER}. Debe ser '00', '01', '02', '03', '04', o '05'")
 
-# State file
-STATE_FILE = 'bot_state.json'
+BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
-# Global state
+# STATES
+STATE_FILE       = 'bot_state.json'
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
 
@@ -326,7 +313,7 @@ def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
     print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
-    print(f"{BLUE_BOLD}🤖 === STARTING MULTI-STRATEGY BOT WITH WEBSOCKET 🤖 ==={RESET}")
+    print(f"{BLUE_BOLD}🤖 === STARTING MULTI-STRATEGY BOT OPERATING IN ACCOUNT: {ACCOUNT_NUMBER} 🤖 ==={RESET}")
     print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
     
     # Load state
@@ -345,7 +332,7 @@ def main_loop():
     strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
     unique_timeframes = get_unique_timeframes(STRATEGIES)
     
-    print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
+    print(f"\n➡️ Detected timeframes: {', '.join(unique_timeframes)}")
     for tf in unique_timeframes:
         strat_names = [s['id'] for s in strategies_by_tf[tf]]
         print(f"   🔹 {tf}: {', '.join(strat_names)}")

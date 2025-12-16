@@ -27,7 +27,7 @@ DATA_FOLDER         = "data/crypto_2023_IS"
 #DATA_FOLDER         = "data/crypto_OOS"
 TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 400
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID

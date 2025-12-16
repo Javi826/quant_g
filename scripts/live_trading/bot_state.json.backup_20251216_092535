@@ -72,7 +72,30 @@
         "usdt_amount": 40.0
       }
     ],
-    "revers_short_4H": [],
+    "revers_short_4H": [
+      {
+        "symbol": "BTCUSDT",
+        "size": "0.0004",
+        "entry_price": "85892.9",
+        "direction": "short",
+        "tp": "81598.255",
+        "sl": "94482.19",
+        "order_id": "1384733218333937665",
+        "opened_at": "2025-12-16T08:00:47.283215+00:00",
+        "usdt_amount": 40.0
+      },
+      {
+        "symbol": "BNBUSDT",
+        "size": "0.04",
+        "entry_price": "858.91",
+        "direction": "short",
+        "tp": "815.9645",
+        "sl": "944.801",
+        "order_id": "1384733220410118145",
+        "opened_at": "2025-12-16T08:00:47.786334+00:00",
+        "usdt_amount": 40.0
+      }
+    ],
     "parity_short_4H": [
       {
         "symbol": "BNBUSDT",
@@ -132,7 +155,30 @@
         "usdt_amount": 40.0
       }
     ],
-    "revers_long_1H": [],
+    "revers_long_1H": [
+      {
+        "symbol": "BTCUSDT",
+        "size": "0.0004",
+        "entry_price": "85906.7",
+        "direction": "long",
+        "tp": "87624.834",
+        "sl": "77316.03",
+        "order_id": "1384733225648803841",
+        "opened_at": "2025-12-16T08:00:49.027458+00:00",
+        "usdt_amount": 40.0
+      },
+      {
+        "symbol": "BNBUSDT",
+        "size": "0.04",
+        "entry_price": "858.98",
+        "direction": "long",
+        "tp": "876.1596",
+        "sl": "773.082",
+        "order_id": "1384733227750150145",
+        "opened_at": "2025-12-16T08:00:49.526652+00:00",
+        "usdt_amount": 40.0
+      }
+    ],
     "revers_short_6Hutc": [
       {
         "symbol": "ADAUSDT",
