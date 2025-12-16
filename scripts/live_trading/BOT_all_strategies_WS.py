@@ -23,15 +23,11 @@ from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 # Import WebSocket-enabled utilities
-from ZX_utils_bot_u_websocket import increment_strategy_candles, process_strategy, check_all_tp_sl, setup_print_logger
-from ZX_utils_bot_u_websocket import sync_broker, load_state, save_state_local, calculate_next_candle_time
-from ZX_utils_bot_u_websocket import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
+from ZX_BOT_operative import increment_strategy_candles, process_strategy, check_all_tp_sl, setup_print_logger
+from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
+from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
 
-from ZX_BOT_ws_manager import  init_websocket
-
-# Set global WebSocket mode
-import ZX_utils_bot_u_websocket
-ZX_utils_bot_u_websocket.USE_WEBSOCKET_FOR_TRADING = False  # ⭐ True = órdenes via WS (requiere permisos), False = REST API (recomendado)
+from ZX_BOT_ws_manager import init_websocket
 
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
@@ -66,7 +62,7 @@ YELLOW_BOLD    = "\033[0;93m"
 RESET          = "\033[0m"
 HOUR_ZONE      = ZoneInfo('UTC')
 PRODUCT_TYPE   = 'USDT-FUTURES'
-CHECK_INTERVAL = 5
+CHECK_INTERVAL = 10
 USE_HARDCODED_SIGNALS = True
 
 print(f"{BLUE_BOLD}{'='*120}")
@@ -78,7 +74,7 @@ logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_f
 setup_print_logger(logdir)
 
 # State file
-STATE_FILE = 'bot_state_u.json'
+STATE_FILE = 'bot_state.json'
 
 # Global state
 OPEN_POSITIONS   = {}
@@ -90,9 +86,9 @@ STRATEGY_CANDLES = {}
 STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
-    'timeframe': '1m',
-    'sell_after_ncandles': 2,
-    'order_amount': 10,
+    'timeframe': '4H',
+    'sell_after_ncandles': 50,
+    'order_amount': 40,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -104,12 +100,12 @@ STRAT_A = {
 STRAT_B = {
     'id': 'revers_long_4H',
     'name': 'reversal_long_4H',
-    'timeframe': '2m',
+    'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 10,
+    'order_amount': 40,
     'left_lookback': 5,
     'tolerance': 30,
-    'ma_period': 50,
+    'ma_period':50,
     'tp_pct': 3,
     'sl_pct': 10,
     'direction': 'long'
@@ -118,25 +114,25 @@ STRAT_B = {
 STRAT_C = {
     'id': 'parity_long_4H',
     'name': 'parity_long_4H',
-    'timeframe': '4H',
+    'timeframe': '4H',  
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 150,
     'tolerance': 40,
-    'tp_pct': 3,
-    'sl_pct': 10,
+    'tp_pct': 3,  
+    'sl_pct': 10,  
     'direction': 'long'
 }
 
 STRAT_D = {
     'id': 'revers_short_4H',
     'name': 'reversal_short_4H',
-    'timeframe': '4H',
+    'timeframe': '4H',  
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 8,
     'tolerance': 30,
-    'ma_period': 50,
+    'ma_period':50,
     'tp_pct': 5,
     'sl_pct': 10,
     'direction': 'short'
@@ -150,8 +146,8 @@ STRAT_E = {
     'order_amount': 40,
     'lookback': 150,
     'tolerance': 20,
-    'tp_pct': 5,
-    'sl_pct': 10,
+    'tp_pct': 5,  
+    'sl_pct': 10,  
     'direction': 'short'
 }
 
@@ -163,7 +159,7 @@ STRAT_F = {
     'order_amount': 40,
     'left_lookback': 7,
     'tolerance': 40,
-    'ma_period': 25,
+    'ma_period':25,
     'tp_pct': 2,
     'sl_pct': 10,
     'direction': 'long'
@@ -172,12 +168,12 @@ STRAT_F = {
 STRAT_G = {
     'id': 'revers_short_1H',
     'name': 'reversal_short_1H',
-    'timeframe': '1H',
+    'timeframe': '1H',  
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 5,
     'tolerance': 30,
-    'ma_period': 50,
+    'ma_period':50,
     'tp_pct': 1.9,
     'sl_pct': 5,
     'direction': 'short'
@@ -186,12 +182,12 @@ STRAT_G = {
 STRAT_H = {
     'id': 'revers_long_6Hutc',
     'name': 'reversal_long_6Hutc',
-    'timeframe': '6Hutc',
+    'timeframe': '6Hutc',  
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 3,
     'tolerance': 20,
-    'ma_period': 50,
+    'ma_period':50,
     'tp_pct': 4,
     'sl_pct': 10,
     'direction': 'long'
@@ -200,12 +196,12 @@ STRAT_H = {
 STRAT_I = {
     'id': 'revers_short_6Hutc',
     'name': 'reversal_short_6Hutc',
-    'timeframe': '2m',
+    'timeframe': '6Hutc',  
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 6,
     'tolerance': 30,
-    'ma_period': 25,
+    'ma_period':25,
     'tp_pct': 4,
     'sl_pct': 7.5,
     'direction': 'short'
@@ -343,11 +339,7 @@ def main_loop():
     # Load symbols for each strategy
     final_by_strat = {}
     for strat in STRATEGIES:
-        final_by_strat[strat['id']] = load_final_symbols(
-            all_symbols,
-            strategy=strat['name'],
-            timeframe=strat['timeframe']
-        )
+        final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
         print(f"🔹 Strategy {strat['id']} ({strat['timeframe']}): {len(final_by_strat[strat['id']])} symbols")
     
     # Group strategies by timeframe
@@ -360,24 +352,19 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics()
-    
+    bot_metrics()    
     # ⭐ INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
-    print(f"✅ WebSocket initialized (Trading via {'WS' if ZX_utils_bot_u_websocket.USE_WEBSOCKET_FOR_TRADING else 'REST API'})")
     
-    # ⭐ PRE-LOAD CONTRACTS for common symbols (única operación API al inicio)
+    # ⭐ PRE-LOAD CONTRACTS for common symbols
     if ws_manager:
         all_strategy_symbols = set()
         for strat_id, symbols in final_by_strat.items():
             all_strategy_symbols.update(symbols)
         
         if all_strategy_symbols:
-            ws_manager.preload_contracts(
-                list(all_strategy_symbols),
-                product_type=PRODUCT_TYPE
-            )
+            ws_manager.preload_contracts(list(all_strategy_symbols),product_type=PRODUCT_TYPE)
     print()
     
     # Calculate next candle times
@@ -482,7 +469,7 @@ def main_loop():
                             print(f"✅ Retry successful for {strat_id}")
                         except Exception as e2:
                             print(f"❌ Retry failed for {strat_id}: {e2}")
-                
+                                
                 print("🔂 Signal cycle completed")
                 print(f"{'=' * 120}\n")
                 

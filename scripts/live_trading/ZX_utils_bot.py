@@ -33,7 +33,7 @@ RESET        = "\033[0m"
 # ========================================================================== 
 
 def load_state(state_file):
-    OPEN_POSITIONS = {}
+    OPEN_POSITIONS   = {}
     STRATEGY_CANDLES = {}
     if not os.path.exists(state_file):
         print("📂 No previous state file found")

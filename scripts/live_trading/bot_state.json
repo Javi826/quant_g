@@ -72,19 +72,7 @@
         "usdt_amount": 40.0
       }
     ],
-    "revers_short_4H": [
-      {
-        "symbol": "HYPEUSDT",
-        "size": "1.45",
-        "entry_price": "27.499",
-        "direction": "short",
-        "tp": "26.12405",
-        "sl": "30.2489",
-        "order_id": "1383042440981270530",
-        "opened_at": "2025-12-11T16:02:14.948558+00:00",
-        "usdt_amount": 40.0
-      }
-    ],
+    "revers_short_4H": [],
     "parity_short_4H": [
       {
         "symbol": "BNBUSDT",
@@ -106,17 +94,6 @@
         "sl": "98679.9",
         "order_id": "1383042663401017347",
         "opened_at": "2025-12-11T16:03:08.093945+00:00",
-        "usdt_amount": 40.0
-      },
-      {
-        "symbol": "HYPEUSDT",
-        "size": "1.45",
-        "entry_price": "27.534",
-        "direction": "short",
-        "tp": "26.15730",
-        "sl": "30.2874",
-        "order_id": "1383042730325331972",
-        "opened_at": "2025-12-11T16:03:23.966105+00:00",
         "usdt_amount": 40.0
       }
     ],
@@ -155,41 +132,7 @@
         "usdt_amount": 40.0
       }
     ],
-    "revers_long_1H": [
-      {
-        "symbol": "BNBUSDT",
-        "size": "0.04",
-        "entry_price": "896.68",
-        "direction": "long",
-        "tp": "914.6136",
-        "sl": "807.012",
-        "order_id": "1383887775509139566",
-        "opened_at": "2025-12-14T00:01:18.350109+00:00",
-        "usdt_amount": 40.0
-      },
-      {
-        "symbol": "DOGEUSDT",
-        "size": "287",
-        "entry_price": "0.13889",
-        "direction": "long",
-        "tp": "0.1416678",
-        "sl": "0.125001",
-        "order_id": "1383887783725780997",
-        "opened_at": "2025-12-14T00:01:20.399674+00:00",
-        "usdt_amount": 40.0
-      },
-      {
-        "symbol": "SOLUSDT",
-        "size": "0.3",
-        "entry_price": "132.897",
-        "direction": "long",
-        "tp": "135.55494",
-        "sl": "119.6073",
-        "order_id": "1383887791858536449",
-        "opened_at": "2025-12-14T00:01:22.344135+00:00",
-        "usdt_amount": 40.0
-      }
-    ],
+    "revers_long_1H": [],
     "revers_short_6Hutc": [
       {
         "symbol": "ADAUSDT",
@@ -269,17 +212,6 @@
         "usdt_amount": 40.0
       },
       {
-        "symbol": "MLNUSDT",
-        "size": "8",
-        "entry_price": "4.594",
-        "direction": "short",
-        "tp": "4.41024",
-        "sl": "4.938550",
-        "order_id": "1384521993683619846",
-        "opened_at": "2025-12-15T18:01:27.831372+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "SOLUSDT",
         "size": "0.3",
         "entry_price": "124.987",
@@ -350,14 +282,14 @@
     ]
   },
   "strategy_candles": {
-    "revers_short_1H": 4,
-    "revers_long_4H": 25,
-    "parity_long_4H": 25,
-    "revers_short_4H": 25,
-    "parity_short_4H": 25,
-    "double_top_long_4H": 24,
-    "revers_long_1H": 44,
-    "revers_short_6Hutc": 0,
-    "revers_long_6Hutc": 14
+    "revers_short_1H": 15,
+    "revers_long_4H": 27,
+    "parity_long_4H": 27,
+    "revers_short_4H": 0,
+    "parity_short_4H": 27,
+    "double_top_long_4H": 26,
+    "revers_long_1H": 0,
+    "revers_short_6Hutc": 2,
+    "revers_long_6Hutc": 16
   }
 }

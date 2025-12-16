@@ -536,10 +536,10 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
             api_passphrase=api_passphrase
         )
         _ws_manager.start()
-        time.sleep(2)  # Dar tiempo a conectar y autenticar
+        time.sleep(5)  # Dar tiempo a conectar y autenticar
         
         # Verificar conexión
-        print(f"🟢 WebSocket status:")
+        print(f"📱 WebSocket status:")
         print(f"   - Public WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else '❌ Not connected'}")
         print(f"   - Private WS   : {'✅ Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else '❌ Not connected'}")
         print(f"   - Authenticated: {'✅ Yes' if _ws_manager.authenticated else '❌ No'}")

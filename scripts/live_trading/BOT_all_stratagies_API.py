@@ -336,6 +336,7 @@ def main_loop():
             
             # Si al menos un timeframe cerró vela, procesar
             if closed_timeframes:
+                cycle_start_time = time.time()
                 print(f"\n{'=' * 115}")
                 print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
@@ -416,6 +417,9 @@ def main_loop():
                 
                 print("🔂 Signal cycle completed")
                 print(f"{'=' * 115}\n")
+                cycle_elapsed = time.time() - cycle_start_time
+                print(f"⏱️  TOTAL CYCLE TIME: {cycle_elapsed:.3f}s")
+                print(f"{'=' * 120}\n")
                 
                 # ⭐ Recalcular next_candle_time para los timeframes que cerraron
                 for tf in closed_timeframes:

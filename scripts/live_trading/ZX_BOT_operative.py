@@ -10,14 +10,11 @@ import builtins
 import pandas as pd
 from rich.console import Console
 from rich.live import Live
-from rich.table import Table
-from rich.text import Text
 from rich.console import Group
 from BOT_metrics import bot_metrics
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
-from datetime import timedelta
 from ZX_BOT_display import check_all_tp_sl,add_position_to_table,stop_live_display
 
 # Import WebSocket manager
@@ -31,14 +28,17 @@ MARGIN_MODE  = "crossed"
 BLUE_BOLD    = "\033[1;94m"
 RESET        = "\033[0m"
 
-# ==========================================================================
-# GLOBAL CONFIGURATION
-# ==========================================================================
-# Trading siempre via REST API para órdenes
-# WebSocket solo para datos de mercado (precios, posiciones, balance)
+# ⭐ Configuración de archivo Excel para trades
+TRADES_LOG_DIR  = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
+TRADES_LOG_FILE = 'bot_trading_trades.xlsx'
+TRADES_LOG_PATH = os.path.join(TRADES_LOG_DIR, TRADES_LOG_FILE)
+
+# Crear directorio si no existe
+os.makedirs(TRADES_LOG_DIR, exist_ok=True)
+
 
 # ==========================================================================
-# WEBSOCKET-BASED FUNCTIONS (NO API REST)
+# WEBSOCKET-BASED FUNCTIONS 
 # ==========================================================================
 
 def fetch_ticker_ws(symbol):
@@ -49,7 +49,7 @@ def fetch_ticker_ws(symbol):
     # Suscribir si no está suscrito
     if symbol not in ZX_BOT_ws_manager._ws_manager.subscribed_public:
         ZX_BOT_ws_manager._ws_manager.subscribe_ticker(symbol)
-        time.sleep(0.3)
+        time.sleep(0.1)
     
     # Obtener del caché
     price_data = ZX_BOT_ws_manager._ws_manager.prices.get(symbol)
@@ -407,7 +407,7 @@ def place_order(symbol: str,
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
-    exec_price = get_exec_price(resp_order, last_price)
+    exec_price    = get_exec_price(resp_order, last_price)
 
     print(f"✅ {('⬆️ ' if direction=='long' else '⬇️ '):2} {direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
 
@@ -433,10 +433,10 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
         fills = ZX_BOT_ws_manager._ws_manager.get_fills(order_id)
         if fills:
             # Procesar fills
-            total_base = Decimal('0')
-            weighted = Decimal('0')
+            total_base   = Decimal('0')
+            weighted     = Decimal('0')
             total_profit = Decimal('0')
-            total_fee = Decimal('0')
+            total_fee    = Decimal('0')
             
             for f in fills:
                 bv = f.get("baseVolume")
@@ -464,12 +464,13 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
                     pass
             
             entry_price = (weighted / total_base) if total_base > 0 and weighted > 0 else None
+                        
             return total_base, entry_price, total_profit, total_fee
         
         time.sleep(0.05)
     
     # Timeout - retornar None
-    print(f"⚠️  No fills received for order {order_id} via WebSocket")
+    print(f"⚠️  No fills received for order {order_id} via WebSocket (timeout)")
     return None, None, None, None
 
 def get_current_price(symbol, max_cache_age=0.5):
@@ -947,16 +948,13 @@ def log_closed_position(
     reason,
     size,
     profit_from_api=None,
-    fee_from_api=None,
-    excel_file='bot_trading_trades_u.xlsx'
+    fee_from_api=None
 ):
+    """
+    Registra una posición cerrada en el archivo Excel.
+    Usa la ruta definida en TRADES_LOG_PATH (constante global).
+    """
     try:
-        base_dir = os.path.dirname(os.path.abspath(excel_file))
-        files_dir = os.path.join(base_dir, 'bot_files')
-        os.makedirs(files_dir, exist_ok=True)
-
-        excel_file_path = os.path.join(files_dir, os.path.basename(excel_file))
-
         entry_price = float(entry_price)
         close_price = float(close_price)
         usdt_amount = float(usdt_amount)
@@ -1028,13 +1026,14 @@ def log_closed_position(
             'REASON_OUT': reason
         }
 
-        if os.path.exists(excel_file_path):
-            df = pd.read_excel(excel_file_path)
+        # ⭐ Usar la ruta global
+        if os.path.exists(TRADES_LOG_PATH):
+            df = pd.read_excel(TRADES_LOG_PATH)
             df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
         else:
             df = pd.DataFrame([new_record])
 
-        df.to_excel(excel_file_path, index=False, engine='openpyxl')
+        df.to_excel(TRADES_LOG_PATH, index=False, engine='openpyxl')
 
         print(f"📋 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
 
