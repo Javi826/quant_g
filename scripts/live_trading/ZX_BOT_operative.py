@@ -610,6 +610,9 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 # ==========================================================================
 # TP/SL CHECKINGS
 # ==========================================================================
+# ==========================================================================
+# TP/SL CHECKINGS
+# ==========================================================================
 def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_candles,
                               state_file, send_request_func, table=None, pnl_accumulator=None):
     """Comprueba TP/SL para todas las posiciones de una estrategia via WebSocket"""
@@ -641,7 +644,14 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         
         current_price = Decimal(str(current_price))
         
-        if table and pnl_accumulator is not None:
+        # ⭐ CALCULAR PnL SIEMPRE (aunque no haya tabla)
+        if pnl_accumulator is not None:
+            from ZX_BOT_display import calculate_pnl
+            pnl = calculate_pnl(direction, entry_price, current_price, pos['size'])
+            pnl_accumulator['total'] += pnl
+        
+        # LUEGO añadir a tabla si existe
+        if table is not None:
             add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator,
                                  strategy_candles, sell_after_ncandles)
         
@@ -995,7 +1005,7 @@ def log_closed_position(
         print(f"❌ Error logging trade to Excel: {e}")
         traceback.print_exc()
 
-def setup_print_logger(logdir, logfile_name="BOT_all_stratagies_u.log"):
+def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
     """Configura un logger que duplica print() al archivo y a consola."""
     os.makedirs(logdir, exist_ok=True)
     logfile = os.path.join(logdir, logfile_name)

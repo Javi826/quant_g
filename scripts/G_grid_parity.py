@@ -45,7 +45,7 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 SELL_AFTER_LIST      = [0]  
 
 LOOKBACK_LIST        = [100]
-TOLERANCE_LIST       = [20] 
+TOLERANCE_LIST       = [10] 
 MA_PERIOD_LIST       = [25]
 
 TP_PCT_LIST          = [4]

@@ -74,17 +74,6 @@
     ],
     "revers_short_4H": [
       {
-        "symbol": "1000BONKUSDT",
-        "size": "4572",
-        "entry_price": "0.008748",
-        "direction": "short",
-        "tp": "0.00831060",
-        "sl": "0.0096228",
-        "order_id": "1384793670325784578",
-        "opened_at": "2025-12-16T12:01:00.261748+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "AAVEUSDT",
         "size": "0.2",
         "entry_price": "188.07",
@@ -173,17 +162,6 @@
         "usdt_amount": 40.0
       },
       {
-        "symbol": "FETUSDT",
-        "size": "178",
-        "entry_price": "0.2244",
-        "direction": "short",
-        "tp": "0.213180",
-        "sl": "0.24684",
-        "order_id": "1384793707755753479",
-        "opened_at": "2025-12-16T12:01:09.105877+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "HBARUSDT",
         "size": "344",
         "entry_price": "0.11601",
@@ -247,17 +225,6 @@
         "sl": "0.45496",
         "order_id": "1384793729926844417",
         "opened_at": "2025-12-16T12:01:14.370553+00:00",
-        "usdt_amount": 40.0
-      },
-      {
-        "symbol": "PENGUUSDT",
-        "size": "3891",
-        "entry_price": "0.010273",
-        "direction": "short",
-        "tp": "0.00975935",
-        "sl": "0.0113003",
-        "order_id": "1384793734091788297",
-        "opened_at": "2025-12-16T12:01:15.380964+00:00",
         "usdt_amount": 40.0
       },
       {
@@ -629,16 +596,16 @@
     ]
   },
   "strategy_candles": {
-    "revers_short_1H": 40,
-    "revers_long_4H": 34,
-    "parity_long_4H": 34,
-    "revers_short_4H": 5,
-    "parity_short_4H": 34,
-    "double_top_long_4H": 33,
-    "revers_long_1H": 20,
-    "revers_short_6Hutc": 6,
-    "revers_long_6Hutc": 20,
-    "parity_short_1H": 22,
-    "parity_long_1H": 21
+    "revers_short_1H": 46,
+    "revers_long_4H": 35,
+    "parity_long_4H": 35,
+    "revers_short_4H": 6,
+    "parity_short_4H": 35,
+    "double_top_long_4H": 34,
+    "revers_long_1H": 26,
+    "revers_short_6Hutc": 7,
+    "revers_long_6Hutc": 21,
+    "parity_short_1H": 28,
+    "parity_long_1H": 27
   }
 }

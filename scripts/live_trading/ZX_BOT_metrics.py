@@ -6,7 +6,9 @@ RED_BOLD     = "\033[1;91m"
 GREEN_BOLD   = "\033[1;92m"
 MAGENTA_BOLD = "\033[1;85m"
 BLUE_BOLD    = "\033[1;94m"
+BLUE         = "\033[0;94m"
 YELLOW_BOLD  = "\033[0;93m"
+CYAN_BOLD    = "\033[0;96m"
 RESET        = "\033[0m"
 
 
@@ -150,9 +152,9 @@ def bot_metrics(
                 else:
                     cell = f"{formatted:>{width}}"
                 
-                # Pintar en amarillo la columna Strategy
+                # Pintar en cyan la columna Strategy
                 if col == 'Strategy':
-                    cell = f"{YELLOW_BOLD}{cell}{RESET}"
+                    cell = f"{BLUE}{cell}{RESET}"
                 
                 # Pintar Total_profit verde/rojo
                 if col == 'Total_profit':
@@ -164,12 +166,12 @@ def bot_metrics(
             print("  ".join(row_parts))
     
     # Resumen total
-    num_trades_total = len(df)
+    num_trades_total      = len(df)
     positive_trades_total = len(df[df['PROFIT'] > 0])
-    pct_positive_total = (positive_trades_total / num_trades_total * 100) if num_trades_total > 0 else 0
-    total_profit_general = df['PROFIT'].sum()
-    pct_profit = (total_profit_general / initial_capital * 100) if initial_capital > 0 else 0
-    avg_duration_total = df['DURATION'].mean()
+    pct_positive_total    = (positive_trades_total / num_trades_total * 100) if num_trades_total > 0 else 0
+    total_profit_general  = df['PROFIT'].sum()
+    pct_profit            = (total_profit_general / initial_capital * 100) if initial_capital > 0 else 0
+    avg_duration_total    = df['DURATION'].mean()
     
     if show_table:
         print()
@@ -177,10 +179,10 @@ def bot_metrics(
         print(f"{BLUE_BOLD}📊 TOTAL SUMMARY{RESET}")
         print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
         
-        print(f"{BLUE_BOLD}🧮 Trades_num   :{RESET} {num_trades_total}")
-        print(f"{BLUE_BOLD}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
-        print(f"{BLUE_BOLD}🎯 Trades_pct   :{RESET} {pct_positive_total:.2f} %")
-        print(f"{BLUE_BOLD}💱 Profit_pct   :{RESET} {pct_profit:.2f} %")
+        print(f"{BLUE}📊 Trades_num   :{RESET} {num_trades_total}")
+        print(f"{BLUE}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
+        print(f"{BLUE}🎯 Trades_pct   :{RESET} {pct_positive_total:.2f} %")
+        print(f"{BLUE}📈 Profit_pct   :{RESET} {pct_profit:.2f} %")
         
         color = GREEN_BOLD if total_profit_general >= 0 else RED_BOLD
         print(f"{'💵' if total_profit_general >= 0 else '⭕'} {BLUE_BOLD}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")

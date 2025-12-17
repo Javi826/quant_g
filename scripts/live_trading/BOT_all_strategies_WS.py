@@ -25,7 +25,7 @@ from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
 
-# ⭐ Import dinámico basado en ACCOUNT_NUMBER
+#Import dinámico basado en ACCOUNT_NUMBER
 from utils.ZZ_connect import (
     BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
     BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
@@ -37,25 +37,31 @@ from ZX_connect_live import send_request_00, send_request_01, send_request_02
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
-# ⭐ Seleccionar credenciales y funciones según ACCOUNT_NUMBER
+#Seleccionar credenciales y funciones según ACCOUNT_NUMBER
 CREDENTIALS = {
     "00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
     "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
     "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
 }
 
-BLUE_BOLD      = "\033[1;94m"
-YELLOW_BOLD    = "\033[0;93m"
-RESET          = "\033[0m"
-HOUR_ZONE      = ZoneInfo('UTC')
-PRODUCT_TYPE   = 'USDT-FUTURES'
-CHECK_INTERVAL = 10
-ACCOUNT_NUMBER = "01"
+#GENERAL CONFIG
+# ==========================================================================
+HOUR_ZONE             = ZoneInfo('UTC')
+PRODUCT_TYPE          = 'USDT-FUTURES'
+CHECK_INTERVAL        = 10
+ACCOUNT_NUMBER        = "01"
 USE_HARDCODED_SIGNALS = False
-
 BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
+#DISPLAY
+# ==========================================================================
+BLUE_BOLD             = "\033[1;94m"
+YELLOW_BOLD           = "\033[0;93m"
+RESET                 = "\033[0m"
+DISPLAY_MODE          = "summary"
+
 # STATES
+# ==========================================================================
 STATE_FILE       = 'bot_state.json'
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
@@ -368,7 +374,7 @@ def main_loop():
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
-        print(f"🔹 Strategy {strat['id']} ({strat['timeframe']}): {len(final_by_strat[strat['id']])} symbols")
+        print(f"🔹 Strategy {strat['id']:<18} ({strat['timeframe']:<2}): {len(final_by_strat[strat['id']]):>2} symbols")
     
     # Group strategies by timeframe
     strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
@@ -381,11 +387,11 @@ def main_loop():
     
     print("\n✅ BOT Initialization completed\n")
     bot_metrics()    
-    # ⭐ INITIALIZE WEBSOCKET WITH CREDENTIALS
+    #INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
-    # ⭐ PRE-LOAD CONTRACTS for common symbols
+    #PRE-LOAD CONTRACTS for common symbols
     if ws_manager:
         all_strategy_symbols = set()
         for strat_id, symbols in final_by_strat.items():
@@ -519,7 +525,8 @@ def main_loop():
                         send_request_common,
                         HOUR_ZONE,
                         check_tp_sl_for_strategy,  
-                        get_current_price           
+                        get_current_price,
+                        DISPLAY_MODE
                     )
                     last_tpsl_check = current_time
             

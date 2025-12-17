@@ -95,9 +95,8 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
     direction_style = "white"
     pnl_arrow = get_pnl_arrow(direction, entry_price, current_price)
     
-    # Calcular PnL numérico
+    # ⭐ Calcular PnL solo para mostrar, NO acumular (ya se acumuló antes)
     pnl = calculate_pnl(direction, entry_price, current_price, size)
-    pnl_accumulator['total'] += pnl
     
     # Formatear PnL con color
     pnl_color = "green" if pnl >= 0 else "red"
@@ -164,7 +163,7 @@ def create_tp_sl_display(now, total_pnl=None):
     table = Table(show_header=True, header_style="bold white", border_style="white")
     table.add_column("Strategy", style="white", width=20)
     table.add_column("Symbol", style="bold", width=11)
-    table.add_column("Side", justify="center", width=5)
+    table.add_column("Side", justify="left", width=5)
     table.add_column("Opened", style="white", width=10)
     table.add_column("Candles", justify="center", width=8)
     table.add_column("Entry", justify="right", width=8)
@@ -183,8 +182,15 @@ def create_tp_sl_display(now, total_pnl=None):
 # ==========================================================================
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, 
                     send_request_func, hour_zone, check_tp_sl_for_strategy_func, 
-                    get_current_price_func):
-
+                    get_current_price_func, display_mode="summary"):
+    """
+    Chequea TP/SL para todas las estrategias.
+    
+    display_mode opciones:
+        - "none": Print simple en una línea
+        - "summary": Tabla resumida (una fila por estrategia)
+        - "detailed": Tabla detallada (una fila por posición)
+    """
     global _live_display
     
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
@@ -192,44 +198,168 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
     # Acumulador para el PnL total
     pnl_accumulator = {'total': 0.0}
     
-    # Crear header y tabla (sin total aún)
-    header, table = create_tp_sl_display(now)
-    
-    # Crear un diccionario de estrategias por ID para acceso rápido
-    strat_dict = {strat['id']: strat for strat in strategies}
-    
-    # Llenar la tabla con todas las estrategias
-    for idx, strat in enumerate(strategies):
-        strat_id = strat['id']
-        num_positions = len(open_positions.get(strat_id, []))
+    # ═══════════════════════════════════════════════════════════════════════
+    # MODO "none": PRINT SIMPLE (sin Rich)
+    # ═══════════════════════════════════════════════════════════════════════
+    if display_mode == "none":
+        print(f"\n{BLUE_BOLD}{'─'*115}")
+        print(f"🔷 Checking TP/SL - {now}")
         
-        if num_positions > 0:
-            check_tp_sl_for_strategy_func(
-                strat_id, strat, open_positions, strategy_candles, 
-                state_file, send_request_func, table, pnl_accumulator
-            )
+        for strat in strategies:
+            strat_id = strat['id']
+            num_positions = len(open_positions.get(strat_id, []))
             
-            # Añadir fila vacía entre estrategias (excepto la última)
-            if idx < len(strategies) - 1:
-                next_has_positions = any(
-                    len(open_positions.get(strategies[next_idx]['id'], [])) > 0 
-                    for next_idx in range(idx + 1, len(strategies))
+            if num_positions > 0:
+                check_tp_sl_for_strategy_func(
+                    strat_id, strat, open_positions, strategy_candles, 
+                    state_file, send_request_func, None, pnl_accumulator
                 )
-                if next_has_positions:
-                    table.add_row("", "", "", "", "", "", "", "", "", "", "", "")
+        
+        total_pnl = pnl_accumulator['total']
+        pnl_color = "\033[1;92m" if total_pnl >= 0 else "\033[1;91m"
+        print(f"💰 Total PnL: {pnl_color}{total_pnl:+.2f} USDT{RESET}")
+        print(f"{BLUE_BOLD}{'─'*115}{RESET}\n")
+        return
     
-    # Recrear header con el total PnL calculado
-    header, _ = create_tp_sl_display(now, pnl_accumulator['total'])
+    # ═══════════════════════════════════════════════════════════════════════
+    # MODO "summary": TABLA RESUMIDA (una línea por estrategia)
+    # ═══════════════════════════════════════════════════════════════════════
+    if display_mode == "summary":
+        header = Text()
+        header.append(f"{BLUE_BOLD}{'─'*80}\n")
+        header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
+        
+        # Crear tabla resumida
+        summary_table = Table(show_header=True, header_style="bold white", border_style="white")
+        summary_table.add_column("Strategy", style="white", width=20)
+        summary_table.add_column("Side", justify="left", width=6)
+        summary_table.add_column("Opened", style="white", width=10)
+        summary_table.add_column("Candles", justify="center", width=7)
+        summary_table.add_column("#pos", justify="right", width=4)
+        summary_table.add_column("PnL", justify="right", width=6)
+        
+        # Procesar cada estrategia
+        for strat in strategies:
+            strat_id = strat['id']
+            positions = open_positions.get(strat_id, [])
+            num_positions = len(positions)
+            
+            if num_positions > 0:
+                # Acumulador local para esta estrategia
+                strat_pnl_acc = {'total': 0.0}
+                
+                # Chequear TP/SL y acumular PnL
+                check_tp_sl_for_strategy_func(
+                    strat_id, strat, open_positions, strategy_candles, 
+                    state_file, send_request_func, None, strat_pnl_acc
+                )
+                
+                # Acumular al total
+                pnl_accumulator['total'] += strat_pnl_acc['total']
+                
+                # Datos de la primera posición
+                first_pos = positions[0]
+                direction = first_pos['direction'].upper()
+                opened_at = first_pos.get('opened_at', '')
+                if hasattr(opened_at, 'strftime'):
+                    opened_at_str = opened_at.strftime('%Y-%m-%d')
+                elif isinstance(opened_at, str):
+                    opened_at_str = opened_at.split('T')[0] if 'T' in opened_at else opened_at[:10]
+                else:
+                    opened_at_str = str(opened_at)[:10]
+                
+                # Candles
+                candles_elapsed = strategy_candles.get(strat_id, 0)
+                sell_after = strat.get('sell_after_ncandles', 0)
+                candles_str = f"{candles_elapsed}/{sell_after}"
+                
+                # PnL con color
+                strat_pnl = strat_pnl_acc['total']
+                pnl_color = "green" if strat_pnl >= 0 else "red"
+                pnl_text = f"[{pnl_color}]{strat_pnl:+.2f}[/{pnl_color}]"
+                
+                # Side con color
+                side_color = "white"
+                
+                summary_table.add_row(
+                    strat_id,
+                    f"[{side_color}]{direction}[/{side_color}]",
+                    f"[white]{opened_at_str}[/white]",
+                    f"[white]{candles_str}[/white]",
+                    f"[white]{num_positions}[/white]",
+                    pnl_text
+                )
+        
+        # Añadir total PnL al header
+        total_pnl = pnl_accumulator['total']
+        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
+        
+        # Obtener precio de BTCUSDT
+        try:
+            btc_price = get_current_price_func('BTCUSDT')
+        except Exception:
+            btc_price = None
+        
+        header.append(f"💰 Total PnL: ", style="white")
+        header.append(f"{total_pnl:+.2f} USDT", style=pnl_color)
+        if btc_price:
+            header.append(f" | BTC: ", style="white")
+            header.append(f"{btc_price:,.2f}", style="yellow")
+            header.append(f" USDT\n", style="white")
+        else:
+            header.append("\n")
+        header.append(f"{BLUE_BOLD}{'─'*80}\n")
+        
+        display = Group(header, summary_table)
+        
+        if _live_display is None:
+            _live_display = Live(display, console=console, refresh_per_second=4)
+            _live_display.start()
+        else:
+            _live_display.update(display)
+        return
     
-    # Combinar header + tabla
-    display = Group(header, table)
+    # ═══════════════════════════════════════════════════════════════════════
+    # MODO "detailed": TABLA DETALLADA (una fila por posición)
+    # ═══════════════════════════════════════════════════════════════════════
+    if display_mode == "detailed":
+        header, table = create_tp_sl_display(now)
+        
+        for idx, strat in enumerate(strategies):
+            strat_id = strat['id']
+            num_positions = len(open_positions.get(strat_id, []))
+            
+            if num_positions > 0:
+                check_tp_sl_for_strategy_func(
+                    strat_id, strat, open_positions, strategy_candles, 
+                    state_file, send_request_func, table, pnl_accumulator
+                )
+                
+                if idx < len(strategies) - 1:
+                    next_has_positions = any(
+                        len(open_positions.get(strategies[next_idx]['id'], [])) > 0 
+                        for next_idx in range(idx + 1, len(strategies))
+                    )
+                    if next_has_positions:
+                        table.add_row("", "", "", "", "", "", "", "", "", "", "", "")
+        
+        header, _ = create_tp_sl_display(now, pnl_accumulator['total'])
+        display = Group(header, table)
+        
+        if _live_display is None:
+            _live_display = Live(display, console=console, refresh_per_second=4)
+            _live_display.start()
+        else:
+            _live_display.update(display)
+        return
     
-    # Inicializar o actualizar Live display
-    if _live_display is None:
-        _live_display = Live(display, console=console, refresh_per_second=4)
-        _live_display.start()
-    else:
-        _live_display.update(display)
+    # ═══════════════════════════════════════════════════════════════════════
+    # MODO DESCONOCIDO: Usar "summary" por defecto
+    # ═══════════════════════════════════════════════════════════════════════
+    print(f"⚠️  Unknown display_mode '{display_mode}', using 'summary' by default")
+    check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
+                    send_request_func, hour_zone, check_tp_sl_for_strategy_func,
+                    get_current_price_func, display_mode="summary")
 
 
 def stop_live_display():
