@@ -1,67 +1,74 @@
 #!/usr/bin/env python3
-"""
-Script para verificar y reemplazar el archivo bot_state.json correcto
-"""
-
-import json
 import os
-import shutil
+import threading
+import multiprocessing as mp
+import time
+import ctypes
 from datetime import datetime
 
-# Archivo correcto
-CORRECT_FILE = '/home/javi/projects/quant/quant_g/scripts/live_trading/bot_state.json'
+TARGET_CPU = 6
 
-print("=" * 80)
-print("🔍 VERIFICANDO ARCHIVO ACTUAL")
-print("=" * 80)
+# syscall para saber CPU actual
+libc = ctypes.CDLL("libc.so.6")
+SYS_getcpu = 309  # x86_64
 
-if os.path.exists(CORRECT_FILE):
-    print(f"\n📁 Archivo encontrado: {CORRECT_FILE}")
-    
-    # Hacer backup
-    backup_file = CORRECT_FILE + f'.backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
-    shutil.copy2(CORRECT_FILE, backup_file)
-    print(f"✅ Backup creado: {backup_file}")
-    
-    # Leer contenido actual
-    with open(CORRECT_FILE, 'r') as f:
-        data = json.load(f)
-    
-    positions = data.get('positions', {})
-    
-    print(f"\n📊 CONTENIDO ACTUAL:")
-    print(f"   revers_short_4H: {len(positions.get('revers_short_4H', []))} posiciones")
-    print(f"   revers_long_1H: {len(positions.get('revers_long_1H', []))} posiciones")
-    
-    # Mostrar detalles si hay posiciones
-    for strat in ['revers_short_4H', 'revers_long_1H']:
-        pos_list = positions.get(strat, [])
-        if pos_list:
-            print(f"\n   {strat}:")
-            for pos in pos_list:
-                print(f"      - {pos.get('symbol')} | Entry: {pos.get('entry_price')} | Size: {pos.get('size')}")
-    
-    # Limpiar esas estrategias
-    print(f"\n🧹 LIMPIANDO ESTRATEGIAS...")
-    positions['revers_short_4H'] = []
-    positions['revers_long_1H'] = []
-    
-    # Guardar archivo limpio
-    with open(CORRECT_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    print(f"✅ Archivo limpiado y guardado")
-    
-    # Verificar
-    with open(CORRECT_FILE, 'r') as f:
-        data_verify = json.load(f)
-    
-    positions_verify = data_verify.get('positions', {})
-    print(f"\n✅ VERIFICACIÓN:")
-    print(f"   revers_short_4H: {len(positions_verify.get('revers_short_4H', []))} posiciones")
-    print(f"   revers_long_1H: {len(positions_verify.get('revers_long_1H', []))} posiciones")
-    
-else:
-    print(f"❌ Archivo no encontrado: {CORRECT_FILE}")
+def current_cpu():
+    cpu = ctypes.c_uint()
+    node = ctypes.c_uint()
+    libc.syscall(SYS_getcpu, ctypes.byref(cpu), ctypes.byref(node), None)
+    return cpu.value
 
-print("\n" + "=" * 80)
+def log(name):
+    print(
+        f"[{datetime.now().strftime('%H:%M:%S')}] "
+        f"{name:<10} | "
+        f"PID={os.getpid()} | "
+        f"TID={threading.get_native_id()} | "
+        f"allowed={sorted(os.sched_getaffinity(0))} | "
+        f"cpu={current_cpu()}",
+        flush=True
+    )
+
+def worker_thread(i):
+    for _ in range(5):
+        log(f"thread-{i}")
+        time.sleep(0.5)
+
+def worker_process(i):
+    for _ in range(5):
+        log(f"process-{i}")
+        time.sleep(0.5)
+
+def main():
+    print("=== Demo REAL de CPU affinity ===")
+
+    # FIJAR AFINIDAD DEL PROCESO PADRE
+    os.sched_setaffinity(0, {TARGET_CPU})
+
+    log("main-start")
+
+    # Threads
+    threads = []
+    for i in range(3):
+        t = threading.Thread(target=worker_thread, args=(i,))
+        t.start()
+        threads.append(t)
+
+    # Procesos hijos
+    procs = []
+    for i in range(2):
+        p = mp.Process(target=worker_process, args=(i,))
+        p.start()
+        procs.append(p)
+
+    for _ in range(5):
+        log("main-loop")
+        time.sleep(0.5)
+
+    for t in threads:
+        t.join()
+    for p in procs:
+        p.join()
+
+if __name__ == "__main__":
+    main()

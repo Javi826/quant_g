@@ -28,17 +28,29 @@ RESET        = "\033[0m"
 
 # ⭐ Configuración de archivo Excel para trades
 TRADES_LOG_DIR  = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
-TRADES_LOG_FILE = 'bot_trading_trades.xlsx'
+TRADES_LOG_FILE = 'bot_trading_trades_.xlsx'
 TRADES_LOG_PATH = os.path.join(TRADES_LOG_DIR, TRADES_LOG_FILE)
 
 # Crear directorio si no existe
 os.makedirs(TRADES_LOG_DIR, exist_ok=True)
+
+# ⭐⭐⭐ TIMER DECORATOR ⭐⭐⭐
+def timer_decorator(func):
+    """Decorator para medir tiempo de ejecución de funciones"""
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        elapsed_time = time.time() - start_time
+        print(f"⏱️  [{func.__name__}] executed in {elapsed_time:.4f}s")
+        return result
+    return wrapper
 
 
 # ==========================================================================
 # WEBSOCKET-BASED FUNCTIONS 
 # ==========================================================================
 
+@timer_decorator
 def fetch_ticker_ws(symbol):
     """Obtiene ticker SOLO via WebSocket"""
     if not ZX_BOT_ws_manager._ws_manager:
@@ -69,6 +81,7 @@ def fetch_ticker_ws(symbol):
     
     raise TimeoutError(f"No WebSocket data for {symbol}")
 
+@timer_decorator
 def fetch_contracts_ws(symbol):
     """Obtiene contratos SOLO desde caché WebSocket"""
     if not ZX_BOT_ws_manager._ws_manager:
@@ -80,6 +93,7 @@ def fetch_contracts_ws(symbol):
     
     raise ValueError(f"Contract for {symbol} not in cache")
 
+@timer_decorator
 def get_usdt_balance_ws(exchange=None):
     """
     Obtiene el balance USDT desde WebSocket (canal equity).
@@ -102,6 +116,7 @@ def get_usdt_balance_ws(exchange=None):
 # ==========================================================================
 # STATE MANAGEMENT
 # ==========================================================================
+@timer_decorator
 def load_state(state_file):
     OPEN_POSITIONS   = {}
     STRATEGY_CANDLES = {}
@@ -143,6 +158,7 @@ def load_state(state_file):
         traceback.print_exc()
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
+@timer_decorator
 def save_state_local(open_positions, strategy_candles, state_file):
     try:
         positions_copy = copy.deepcopy(open_positions)
@@ -175,6 +191,7 @@ def save_state_local(open_positions, strategy_candles, state_file):
         print(f"❌ Error saving state: {e}")
         traceback.print_exc()
 
+@timer_decorator
 def sync_broker(open_positions, strategy_candles, state_file):
     """
     Sincroniza posiciones locales con el broker via WebSocket (canal positions).
@@ -263,17 +280,21 @@ def sync_broker(open_positions, strategy_candles, state_file):
 # ==========================================================================
 # PLACE ORDER
 # ==========================================================================
+@timer_decorator
 def fetch_ticker(symbol):
     """Obtiene el ticker del símbolo via WebSocket"""
     return fetch_ticker_ws(symbol)
 
+@timer_decorator
 def compute_size_base(usdt_amount, last_price):
     return Decimal(str(usdt_amount)) / last_price
 
+@timer_decorator
 def fetch_contracts(symbol):
     """Obtiene información del contrato desde caché WebSocket"""
     return fetch_contracts_ws(symbol)
 
+@timer_decorator
 def extract_contract_params(c, last_price):
     """Extrae parámetros de configuración del contrato"""
     if c is None:
@@ -292,6 +313,7 @@ def extract_contract_params(c, last_price):
         print(f"Error extrayendo parámetros del contrato: {e}")
         return None, None, None, None, None
 
+@timer_decorator
 def fallback_params(price_tick, size_scale, last_price, min_trade_num=None, min_trade_usdt=None):
     """Aplica valores por defecto si faltan parámetros"""
     if price_tick is None:
@@ -317,16 +339,18 @@ def fallback_params(price_tick, size_scale, last_price, min_trade_num=None, min_
     
     return price_tick, size_scale, min_trade_num, min_trade_usdt
 
+@timer_decorator
 def quantize_size(size_base, size_scale):
     precision_size = Decimal(f"1e-{size_scale}")
     size_q = size_base.quantize(precision_size, rounding=ROUND_DOWN)
     if size_q == 0:
         size_q = size_base.quantize(Decimal("1e-6"), rounding=ROUND_DOWN)
     if size_q == 0:
-        print("⚠️ Size = 0")
+        print("🔔 Size = 0")
         return None, precision_size
     return size_q, precision_size
 
+@timer_decorator
 def build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, side, client_oid):
     body = {
         "symbol": symbol,
@@ -341,6 +365,7 @@ def build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, sid
     }
     return body
 
+@timer_decorator
 def place_market_order(send_request_func, body_order):
     code_order, resp_order = send_request_func("POST", "/api/v2/mix/order/place-order", body=body_order)
     if code_order != 200 or resp_order.get("code") != "00000":
@@ -348,6 +373,7 @@ def place_market_order(send_request_func, body_order):
         return None, None
     return code_order, resp_order
 
+@timer_decorator
 def extract_filled_amount(resp_order, size_q):
     filled_amount = Decimal("0")
     data = resp_order.get("data") or {}
@@ -363,9 +389,11 @@ def extract_filled_amount(resp_order, size_q):
         filled_amount = size_q
     return filled_amount
 
+@timer_decorator
 def get_exec_price(resp_order, last_price):
     return Decimal(str(resp_order['data'].get('price', last_price)))
 
+@timer_decorator
 def place_order(symbol: str,
                 direction: str,
                 usdt_amount: float = 100,
@@ -401,7 +429,7 @@ def place_order(symbol: str,
     body_order = build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, side, client_oid)
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"⚠️ Debug: last_price={last_price}, price_tick={price_tick}, min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
+        print(f"🔔 Debug: last_price={last_price}, price_tick={price_tick}, min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
@@ -414,6 +442,7 @@ def place_order(symbol: str,
 # ==========================================================================
 # PRICING
 # ==========================================================================
+@timer_decorator
 def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_request_func=None, retries=5, delay=0.05):
     """
     Obtiene fills via WebSocket.
@@ -471,6 +500,7 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
     print(f"⚠️  No fills received for order {order_id} via WebSocket (timeout)")
     return None, None, None, None
 
+@timer_decorator
 def get_current_price(symbol, max_cache_age=0.5):
     """Obtiene el precio actual del mercado via WebSocket"""
     if not ZX_BOT_ws_manager._ws_manager:
@@ -502,6 +532,7 @@ def get_current_price(symbol, max_cache_age=0.5):
     # Timeout
     raise TimeoutError(f"No fresh price data for {symbol}")
 
+@timer_decorator
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
     """Calcula los precios de TP y SL basados en el precio de entrada"""
     entry = Decimal(str(entry_price))
@@ -520,6 +551,7 @@ def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
 # ==========================================================================
 # TIMEFRAMES & CANDLES
 # ==========================================================================
+@timer_decorator
 def calculate_next_candle_time(timeframe='4H', hour_zone=None):
     from datetime import datetime, timedelta
     
@@ -548,6 +580,7 @@ def calculate_next_candle_time(timeframe='4H', hour_zone=None):
     
     return next_candle
 
+@timer_decorator
 def group_strategies_by_timeframe(strategies):
     """Agrupa estrategias por timeframe."""
     grouped = defaultdict(list)
@@ -555,20 +588,24 @@ def group_strategies_by_timeframe(strategies):
         grouped[strat['timeframe']].append(strat)
     return grouped
 
+@timer_decorator
 def get_unique_timeframes(strategies):
     """Obtiene lista de timeframes únicos."""
     return list(set(s['timeframe'] for s in strategies))
 
+@timer_decorator
 def increment_strategy_candles(strat_id, strategy_candles, open_positions, state_file):
     if strat_id not in strategy_candles:
         strategy_candles[strat_id] = 0
     strategy_candles[strat_id] += 1
     save_state_local(open_positions, strategy_candles, state_file)
 
+@timer_decorator
 def reset_strategy_candles(strat_id, strategy_candles, open_positions, state_file):
     strategy_candles[strat_id] = 0
     save_state_local(open_positions, strategy_candles, state_file)
 
+@timer_decorator
 def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
                                        open_positions, strategy_candles,
                                        state_file, send_request_func):
@@ -610,6 +647,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 # ==========================================================================
 # TP/SL CHECKINGS
 # ==========================================================================
+@timer_decorator
 def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_candles,
                               state_file, send_request_func, table=None, pnl_accumulator=None):
     """Comprueba TP/SL para todas las posiciones de una estrategia via WebSocket"""
@@ -628,7 +666,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
         except (TimeoutError, RuntimeError) as e:
-            print(f"⚠️ No price for {symbol}: {e}")
+            print(f"🔔 No price for {symbol}: {e}")
             continue
         
         if current_price is None:
@@ -680,6 +718,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
 # ==========================================================================
 # STRATEGY MANAGEMENT
 # ==========================================================================
+@timer_decorator
 def process_strategy(
     strat,
     final_symbols,
@@ -752,16 +791,18 @@ def process_strategy(
                         order_id=order_id, open_positions=open_positions, strategy_candles=strategy_candles,
                         state_file=state_file, hour_zone=hour_zone, usdt_amount=strat['order_amount'])
         else:
-            print(f"⚠️ Order executed but no orderId in response")
+            print(f"🔔 Order executed but no orderId in response")
 
         time.sleep(0.05)
 
+@timer_decorator
 def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
     """Genera señales de prueba para testing"""
     symbols = ['BTCUSDT', 'BNBUSDT']
     signals = []
     for symbol in symbols:
-        code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",params={"productType": PRODUCT_TYPE, "symbol": symbol})
+        code, resp = send_request_func("GET", "/api/v2/mix/market/ticker",
+                                      params={"productType": PRODUCT_TYPE, "symbol": symbol})
         current_price = 50000.0
         if code == 200 and isinstance(resp, dict) and resp.get("code") == "00000":
             try:
@@ -778,6 +819,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 # POSITIONS MANAGEMENT
 # ==========================================================================
+@timer_decorator
 def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None):
     """Cierra una posición con orden market"""
     try:
@@ -840,7 +882,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             bot_metrics()
             return True
         else:
-            print(f"⚠️ No closing position available {symbol}: {resp}")
+            print(f"🔔 No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removing from local record (nonexistent position)")
                 if position_data:
@@ -867,6 +909,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         traceback.print_exc()
         return False
 
+@timer_decorator
 def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct, order_id,
                  open_positions, strategy_candles, state_file, hour_zone, usdt_amount=0):
     """Registra una nueva posición abierta en open_positions y guarda estado"""
@@ -891,6 +934,7 @@ def add_position(strat_id, symbol, size, entry_price, direction, tp_pct, sl_pct,
     open_positions[strat_id].append(position)
     save_state_local(open_positions, strategy_candles, state_file)
 
+@timer_decorator
 def log_closed_position(
     opened_at,
     strategy_id,
@@ -995,6 +1039,7 @@ def log_closed_position(
         print(f"❌ Error logging trade to Excel: {e}")
         traceback.print_exc()
 
+@timer_decorator
 def setup_print_logger(logdir, logfile_name="BOT_all_stratagies_u.log"):
     """Configura un logger que duplica print() al archivo y a consola."""
     os.makedirs(logdir, exist_ok=True)

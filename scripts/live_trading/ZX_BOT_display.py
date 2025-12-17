@@ -9,13 +9,12 @@ from rich.table import Table
 from rich.text import Text
 from rich.console import Group
 from datetime import datetime
-from decimal import Decimal
 
 # ==========================================================================
 # CONSTANTES Y VARIABLES GLOBALES
 # ==========================================================================
 BLUE_BOLD = "\033[1;94m"
-RESET = "\033[0m"
+RESET     = "\033[0m"
 
 console = Console()
 _live_display = None
@@ -185,19 +184,7 @@ def create_tp_sl_display(now, total_pnl=None):
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, 
                     send_request_func, hour_zone, check_tp_sl_for_strategy_func, 
                     get_current_price_func):
-    """
-    Chequea TP/SL para todas las estrategias y muestra el display actualizado.
-    
-    Args:
-        strategies: Lista de configuraciones de estrategias
-        open_positions: Diccionario de posiciones abiertas
-        strategy_candles: Diccionario de contadores de velas
-        state_file: Ruta del archivo de estado
-        send_request_func: Función para hacer requests a la API
-        hour_zone: Zona horaria
-        check_tp_sl_for_strategy_func: Función que verifica TP/SL de una estrategia
-        get_current_price_func: Función para obtener precio actual
-    """
+
     global _live_display
     
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')

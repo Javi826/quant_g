@@ -458,6 +458,31 @@ best_capital = INITIAL_CAPITAL * len(best_dfs_rmse)
 plot_netgain_dd(best_df_rmse, capital=best_capital,
                 title=f"Best Combination by RMSE: {best_name_rmse}")
 
+# -------------------------------------------------
+# Mejor combinación por Profit Factor (mayor)
+# -------------------------------------------------
+best_name_pf = combo_df.loc[combo_df['Profit_Factor'].idxmax(), "Curve"]
+best_combo_pf = best_name_pf.split("+")
+
+best_dfs_pf = [named_dfs[name] for name in best_combo_pf]
+
+start = min(df.index.min() for df in best_dfs_pf)
+end   = max(df.index.max() for df in best_dfs_pf)
+common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
+
+resampled = []
+for df in best_dfs_pf:
+    df_r = df[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    resampled.append(df_r['balance'])
+
+combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
+best_df_pf = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital = INITIAL_CAPITAL * len(best_dfs_pf)
+
+plot_netgain_dd(best_df_pf, capital=best_capital,
+                title=f"Best Combination by Profit Factor: {best_name_pf}")
+
 # =============================================================================
 # # -------------------------------------------------
 # # Print final personalizado para una combinación específica

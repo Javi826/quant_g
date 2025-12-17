@@ -123,8 +123,8 @@ class BitgetWSManager:
                 )
                 self.public_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
-                print(f"🔔 Public WebSocket error: {e}")
-                time.sleep(2)
+                print(f"❌ Public WebSocket error: {e}")
+                time.sleep(0.5)
     
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
@@ -159,7 +159,7 @@ class BitgetWSManager:
                             }
     
         except Exception as e:
-            print(f"🔔 Error processing public message: {e}")
+            print(f"❌ Error processing public message: {e}")
 
     
     def subscribe_ticker(self, symbol):
@@ -215,8 +215,8 @@ class BitgetWSManager:
                 )
                 self.private_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
-                print(f"🔔 Private WebSocket error: {e}")
-                time.sleep(2)
+                print(f"❌ Private WebSocket error: {e}")
+                time.sleep(0.5)
     
     def _on_private_open(self, ws):
         """Callback al conectar WS privado - autenticar"""
@@ -236,7 +236,7 @@ class BitgetWSManager:
             print("🔌 PRIVATE WebSocket connected (first time)")
         
         self._authenticate()
-        time.sleep(1)
+        time.sleep(0.5)
         self._subscribe_private_channels(is_reconnect=is_reconnect)
     
     def _authenticate(self):
@@ -378,9 +378,9 @@ class BitgetWSManager:
     def _on_error(self, ws, error):
         """Callback en caso de error"""
         # Mostrar TODOS los errores para debug
-        print(f"🔔 WebSocket error: {error}")
+        print(f"❌ WebSocket error: {error}")
         import traceback
-        traceback.print_exc()
+        #traceback.print_exc()
     
     def _on_close(self, ws, close_status_code, close_msg):
         """Callback al cerrar conexión"""
@@ -469,7 +469,7 @@ class BitgetWSManager:
             self.private_ws.send(json.dumps(sub_msg))
             
             # Esperar a recibir el snapshot fresco
-            time.sleep(0.5)
+            time.sleep(0.1)
             
             return True
         else:
@@ -536,7 +536,7 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
             api_passphrase=api_passphrase
         )
         _ws_manager.start()
-        time.sleep(5)  # Dar tiempo a conectar y autenticar
+        time.sleep(1)  # Dar tiempo a conectar y autenticar
         
         # Verificar conexión
         print(f"📱 WebSocket status:")

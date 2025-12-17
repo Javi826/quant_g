@@ -14,7 +14,6 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from Z_add_signals_orderblocks import orderblocks_long
-from Z_add_signals_orderblocks import orderblocks_long
 from Z_add_signals_orderblocks import orderblocks_short
 
 DTYPE               = np.float32
@@ -27,18 +26,18 @@ STRATEGY            = "orderblocks"
 DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 400
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150,200]
+LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
-SL_PCT_LIST          = [1,2,3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [2.5,5.0,7.5,10]
+SL_PCT_LIST          = [2.5,5.0,7.5,10]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  

@@ -14,7 +14,7 @@ def monitor_cpu(interval=0.01):
             os.system('clear')
             print("🖥️ CPU usage per core:")
             for i, u in enumerate(usage_per_core):
-                print(f"Hilo {i}: {u:5.1f}%")
+                print(f"Core {i}: {u:5.1f}%")
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\n🔚 Monitor detenido")

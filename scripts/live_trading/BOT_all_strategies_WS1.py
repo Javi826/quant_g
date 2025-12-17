@@ -15,10 +15,10 @@ from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_o
 
 # Import WebSocket-enabled utilities
 from ZX_BOT_display import check_all_tp_sl  # ← AÑADIR ESTA LÍNEA
-from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price  
-from ZX_BOT_operative import increment_strategy_candles, process_strategy, setup_print_logger
-from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
-from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
+from ZX_BOT_operative1 import check_tp_sl_for_strategy, get_current_price  
+from ZX_BOT_operative1 import increment_strategy_candles, process_strategy, setup_print_logger
+from ZX_BOT_operative1 import sync_broker, load_state, save_state_local, calculate_next_candle_time
+from ZX_BOT_operative1 import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
 from ZX_BOT_ws_manager import init_websocket
 
 from Z_add_signals_double_top import double_top_long
@@ -50,13 +50,13 @@ RESET          = "\033[0m"
 HOUR_ZONE      = ZoneInfo('UTC')
 PRODUCT_TYPE   = 'USDT-FUTURES'
 CHECK_INTERVAL = 10
-ACCOUNT_NUMBER = "01"
-USE_HARDCODED_SIGNALS = False
+ACCOUNT_NUMBER = "02"
+USE_HARDCODED_SIGNALS = True
 
 BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
 # STATES
-STATE_FILE       = 'bot_state.json'
+STATE_FILE       = 'bot_state_1.json'
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
 
@@ -66,9 +66,9 @@ STRATEGY_CANDLES = {}
 STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
-    'timeframe': '4H',
-    'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'timeframe': '1m',
+    'sell_after_ncandles': 2,
+    'order_amount': 10,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -80,9 +80,9 @@ STRAT_A = {
 STRAT_B = {
     'id': 'revers_long_4H',
     'name': 'reversal_long_4H',
-    'timeframe': '4H',
+    'timeframe': '2m',
     'sell_after_ncandles': 50,
-    'order_amount': 40,
+    'order_amount': 10,
     'left_lookback': 5,
     'tolerance': 30,
     'ma_period':50,
@@ -475,7 +475,7 @@ def main_loop():
                             detect_signal_func=detect_signal_for_strategy
                         )
                     except Exception as e:
-                        print(f"⚠️ Error processing {strat_id}: {e}")
+                        print(f"❌ Error processing {strat_id}: {e}")
                         
                         # Retry once
                         print(f"⏳ Retrying {strat_id} after 2 seconds...")
