@@ -239,6 +239,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
         summary_table.add_column("PnL", justify="right", width=6)
         
         # Procesar cada estrategia
+
         for strat in strategies:
             strat_id = strat['id']
             positions = open_positions.get(strat_id, [])
@@ -256,6 +257,11 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                 
                 # Acumular al total
                 pnl_accumulator['total'] += strat_pnl_acc['total']
+                
+                # ⭐ RE-CHEQUEAR positions después de check_tp_sl (puede haberse cerrado)
+                positions = open_positions.get(strat_id, [])
+                if not positions:
+                    continue
                 
                 # Datos de la primera posición
                 first_pos = positions[0]
@@ -286,7 +292,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                     f"[{side_color}]{direction}[/{side_color}]",
                     f"[white]{opened_at_str}[/white]",
                     f"[white]{candles_str}[/white]",
-                    f"[white]{num_positions}[/white]",
+                    f"[cyan]{num_positions}[/cyan]",
                     pnl_text
                 )
         
@@ -319,9 +325,9 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
             _live_display.update(display)
         return
     
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     # MODO "detailed": TABLA DETALLADA (una fila por posición)
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     if display_mode == "detailed":
         header, table = create_tp_sl_display(now)
         

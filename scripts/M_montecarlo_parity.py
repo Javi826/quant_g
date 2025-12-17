@@ -32,12 +32,12 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [100,150]
-TOLERANCE_LIST       = [5,10,20,30,40] 
+LOOKBACK_LIST        = [50,100,150]
+TOLERANCE_LIST       = [10,15,20,25,30,35,40] 
 MA_PERIOD_LIST       = [25,50,100]
 
 TP_PCT_LIST          = [3,3.5,4.0,4.5,5]
-SL_PCT_LIST          = [5,6,7,8,9]
+SL_PCT_LIST          = [2.5,5,7.5,10]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -47,7 +47,6 @@ SL_PCT_LIST          = [5,6,7,8,9]
 # 
 # TP_PCT_LIST          = [5]
 # SL_PCT_LIST          = [10]
-# 
 # =============================================================================
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
