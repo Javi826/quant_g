@@ -111,6 +111,7 @@ def bot_metrics(
         })
     
     df_results = pd.DataFrame(results)
+    df_results = df_results.sort_values('Strategy').reset_index(drop=True)
     
     # Anchos de columna
     col_widths = {

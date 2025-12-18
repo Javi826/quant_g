@@ -198,9 +198,9 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
     # Acumulador para el PnL total
     pnl_accumulator = {'total': 0.0}
     
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     # MODO "none": PRINT SIMPLE (sin Rich)
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     if display_mode == "none":
         print(f"\n{BLUE_BOLD}{'─'*115}")
         print(f"🔷 Checking TP/SL - {now}")
@@ -221,12 +221,12 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
         print(f"{BLUE_BOLD}{'─'*115}{RESET}\n")
         return
     
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     # MODO "summary": TABLA RESUMIDA (una línea por estrategia)
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     if display_mode == "summary":
         header = Text()
-        header.append(f"{BLUE_BOLD}{'─'*80}\n")
+        header.append(f"{BLUE_BOLD}{'─'*71}\n")
         header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
         
         # Crear tabla resumida
@@ -240,7 +240,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
         
         # Procesar cada estrategia
 
-        for strat in strategies:
+        for strat in sorted(strategies, key=lambda s: s['id']):
             strat_id = strat['id']
             positions = open_positions.get(strat_id, [])
             num_positions = len(positions)
@@ -314,7 +314,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
             header.append(f" USDT\n", style="white")
         else:
             header.append("\n")
-        header.append(f"{BLUE_BOLD}{'─'*80}\n")
+        header.append(f"{BLUE_BOLD}{'─'*71}\n")
         
         display = Group(header, summary_table)
         
@@ -359,9 +359,9 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
             _live_display.update(display)
         return
     
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     # MODO DESCONOCIDO: Usar "summary" por defecto
-    # ═══════════════════════════════════════════════════════════════════════
+    # =======================================================================
     print(f"⚠️  Unknown display_mode '{display_mode}', using 'summary' by default")
     check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                     send_request_func, hour_zone, check_tp_sl_for_strategy_func,

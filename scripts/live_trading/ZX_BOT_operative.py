@@ -706,7 +706,7 @@ def process_strategy(
     """Procesa una estrategia: busca señales y abre posiciones."""
     strat_id = strat['id']
 
-    print(f"\n🔄 Processing strategy: {strat_id}")
+    print(f"\n⚙️ Processing strategy: {strat_id}")
 
     if use_hardcoded:
         signals = get_hardcoded_signals(strat_id, send_request_func, hour_zone)
@@ -716,6 +716,7 @@ def process_strategy(
         signals = detect_signal_func(strat, final_symbols)
 
     print(f"💫 Signals detected for {strat_id}: {len(signals)}")
+    print('\n')
 
     if not signals:
         return
@@ -809,7 +810,6 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         elif reason == "SL":
             print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
 
-        print(f"→  Closing {direction} position on {symbol}:")
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(0.05)
         
@@ -990,7 +990,7 @@ def log_closed_position(
             'REASON_OUT': reason
         }
 
-        # ⭐ Usar la ruta global
+        #Usar la ruta global
         if os.path.exists(TRADES_LOG_PATH):
             df = pd.read_excel(TRADES_LOG_PATH)
             df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)

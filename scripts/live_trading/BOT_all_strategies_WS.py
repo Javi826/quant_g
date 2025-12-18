@@ -14,7 +14,7 @@ from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 # Import WebSocket-enabled utilities
-from ZX_BOT_display import check_all_tp_sl  # ← AÑADIR ESTA LÍNEA
+from ZX_BOT_display import check_all_tp_sl  
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price  
 from ZX_BOT_operative import increment_strategy_candles, process_strategy, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
@@ -44,8 +44,8 @@ CREDENTIALS = {
     "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
 }
 
-#GENERAL CONFIG
-# ==========================================================================
+# GENERAL CONFIG
+#==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
 PRODUCT_TYPE          = 'USDT-FUTURES'
 CHECK_INTERVAL        = 10
@@ -54,21 +54,21 @@ USE_HARDCODED_SIGNALS = False
 BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
 #DISPLAY
-# ==========================================================================
+#==========================================================================
 BLUE_BOLD             = "\033[1;94m"
 YELLOW_BOLD           = "\033[0;93m"
 RESET                 = "\033[0m"
 DISPLAY_MODE          = "summary"
 
 # STATES
-# ==========================================================================
+#==========================================================================
 STATE_FILE       = 'bot_state.json'
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
 
-# ==========================================================================
+#==========================================================================
 # STRATEGY CONFIGURATION
-# ==========================================================================
+#==========================================================================
 STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
@@ -380,7 +380,7 @@ def main_loop():
     strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
     unique_timeframes = get_unique_timeframes(STRATEGIES)
     
-    print(f"\n➡️ Detected timeframes: {', '.join(unique_timeframes)}")
+    print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
     for tf in unique_timeframes:
         strat_names = [s['id'] for s in strategies_by_tf[tf]]
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
@@ -446,7 +446,7 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
+                        print(f"➡️  STATUS  : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
 
                         check_candles_timeout_for_strategy(
                             strat_id,
@@ -463,7 +463,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
+                        print(f"🚫 SKIPPING: {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
                         continue
                     
                     try:
@@ -481,7 +481,7 @@ def main_loop():
                             detect_signal_func=detect_signal_for_strategy
                         )
                     except Exception as e:
-                        print(f"⚠️ Error processing {strat_id}: {e}")
+                        print(f"❌ Error processing {strat_id}: {e}")
                         
                         # Retry once
                         print(f"⏳ Retrying {strat_id} after 2 seconds...")
