@@ -45,15 +45,32 @@ CREDENTIALS = {
 
 # PATHS & PASSWORDS
 #==========================================================================
-ACCOUNT_NUMBER  = "01"  # Cambiar según cuenta
+ACCOUNT_NUMBER  = "E1"  # Cambiar según cuenta
 BASE_DIR        = os.path.expanduser(f'~/projects/quant/quant_g/scripts/live_trading/bot_files_{ACCOUNT_NUMBER}')
 TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
 LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
 
+#==========================================================================
+# DISPLAY
+#==========================================================================
+BLUE  = "\033[1;94m"   
+CYAN  = "\033[1;96m"  
+RESET = "\033[0m"
+
+if ACCOUNT_NUMBER == "01":
+    BLUE_BOLD = BLUE
+elif ACCOUNT_NUMBER == "E1":
+    BLUE_BOLD = CYAN
+
+RESET        = "\033[0m"
+DISPLAY_MODE = "summary"
+#==========================================================================
+# PATHS FILES & CREDENTIALS
+#==========================================================================
 # Creat directory 
 os.makedirs(BASE_DIR, exist_ok=True)
 # Configuration paths
-configure_paths(TRADES_LOG_PATH)
+configure_paths(TRADES_LOG_PATH, display_color=BLUE_BOLD)
 # Configution logger
 setup_print_logger(BASE_DIR, logfile_name=os.path.basename(LOG_FILE_PATH))
 # Credentials
@@ -66,21 +83,6 @@ HOUR_ZONE             = ZoneInfo('UTC')
 PRODUCT_TYPE          = 'USDT-FUTURES'
 CHECK_INTERVAL        = 10
 USE_HARDCODED_SIGNALS = False
-
-#==========================================================================
-# DISPLAY
-#==========================================================================
-BLUE  = "\033[1;94m"   
-CYAN  = "\033[1;96m"   
-RESET = "\033[0m"
-
-if ACCOUNT_NUMBER == "01":
-    BLUE_BOLD = BLUE
-elif ACCOUNT_NUMBER == "E1":
-    BLUE_BOLD = CYAN
-
-RESET                 = "\033[0m"
-DISPLAY_MODE          = "summary"
 
 #==========================================================================
 # STATES
@@ -247,8 +249,8 @@ STRAT_K = {
 }
 
 STRAT_L = {
-    'id': 'parity_long_6H',
-    'name': 'parity_long_6H',
+    'id': 'parity_long_6Hutc',
+    'name': 'parity_long_6Hutc',
     'timeframe': '6Hutc',
     'sell_after_ncandles': 50,
     'order_amount': 40,
@@ -438,7 +440,7 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics(excel_file=TRADES_LOG_PATH)   
+    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=BLUE_BOLD)  
     #INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
@@ -579,7 +581,8 @@ def main_loop():
                         check_tp_sl_for_strategy,  
                         get_current_price,
                         DISPLAY_MODE,
-                        account_number=ACCOUNT_NUMBER 
+                        account_number=ACCOUNT_NUMBER,
+                        display_color=BLUE_BOLD
                     )
                     last_tpsl_check = current_time
             

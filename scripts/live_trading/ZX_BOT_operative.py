@@ -27,14 +27,16 @@ BLUE_BOLD    = "\033[1;94m"
 RESET        = "\033[0m"
 
 TRADES_LOG_PATH = None 
+DISPLAY_COLOR   = None
 
 # ==========================================================================
 # CONFIGURATION
 # ==========================================================================
-def configure_paths(trades_log_path):
+def configure_paths(trades_log_path, display_color="\033[1;94m"):  # ⭐ AÑADIR parámetro
     """Configura los paths globales desde el script principal"""
-    global TRADES_LOG_PATH
+    global TRADES_LOG_PATH, DISPLAY_COLOR  # ⭐ AÑADIR DISPLAY_COLOR
     TRADES_LOG_PATH = trades_log_path
+    DISPLAY_COLOR = display_color  # ⭐ GUARDAR
     
     # Crear directorio si no existe
     log_dir = os.path.dirname(trades_log_path)
@@ -610,7 +612,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        bot_metrics(excel_file=TRADES_LOG_PATH)
+        bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR)
 
 # ==========================================================================
 # TP/SL CHECKINGS
@@ -849,7 +851,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             fee_from_api=fee_from_api
                         )
                         
-            bot_metrics(excel_file=TRADES_LOG_PATH)
+            bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR)
             return True
         else:
             print(f"⚠️ No closing position available {symbol}: {resp}")

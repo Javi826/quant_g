@@ -16,7 +16,8 @@ def bot_metrics(
     excel_file=None,
     initial_capital=3671,
     show_table=True,
-    return_data=False
+    return_data=False,
+    color_code=None  
 ):
     if excel_file is None:
         print(f"{YELLOW_BOLD}❌ Error: excel_file parameter is required{RESET}")
@@ -42,15 +43,15 @@ def bot_metrics(
         return None
     
     # Calcular duración en días
-    df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
+    df['OPEN_AT']  = pd.to_datetime(df['OPEN_AT'])
     df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
     df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
     
     if show_table:
         print()
-        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
-        print(f"{BLUE_BOLD}📈 STRATEGY ANALYSIS{RESET}")
-        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
+        print(f"{color_code}{'=' * 120}{RESET}")  # ⬅️ Era BLUE_BOLD
+        print(f"{color_code}📈 STRATEGY ANALYSIS{RESET}")
+        print(f"{color_code}{'=' * 120}{RESET}")
     
     # Lista para resultados por estrtegia
     results = []
@@ -159,9 +160,9 @@ def bot_metrics(
     
     if show_table:
         print()
-        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
-        print(f"{BLUE_BOLD}📊 TOTAL SUMMARY{RESET}")
-        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
+        print(f"{color_code}{'=' * 120}{RESET}")  # ⬅️ Era BLUE_BOLD
+        print(f"{color_code}📊 TOTAL SUMMARY{RESET}")  # ⬅️ Era BLUE_BOLD
+        print(f"{color_code}{'=' * 120}{RESET}")  # ⬅️ Era BLUE_BOLD
         
         print(f"{BLUE}📊 Trades_num   :{RESET} {num_trades_total}")
         print(f"{BLUE}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
@@ -169,9 +170,9 @@ def bot_metrics(
         print(f"{BLUE}📈 Profit_pct   :{RESET} {pct_profit:.2f} %")
         
         color = GREEN_BOLD if total_profit_general >= 0 else RED_BOLD
-        print(f"{'💵' if total_profit_general >= 0 else '⭕'} {BLUE_BOLD}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")
+        print(f"{'💵' if total_profit_general >= 0 else '⭕'} {BLUE}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")  # ⬅️ Era BLUE_BOLD
         
-        print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
+        print(f"{color_code}{'=' * 120}{RESET}")  
         print()
     
     # Preparar datos de retorno

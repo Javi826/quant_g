@@ -16,8 +16,8 @@ from Z_add_signals_parity import parity_long
 from Z_add_signals_parity import parity_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
-STRATEGY     = "parity_short_1H"
+SAVE_SYMBOLS = True
+STRATEGY     = "parity_long_6Hutc"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
