@@ -32,7 +32,7 @@ DISPLAY_COLOR   = None
 # ==========================================================================
 # CONFIGURATION
 # ==========================================================================
-def configure_paths(trades_log_path, display_color="\033[1;94m"):  # ⭐ AÑADIR parámetro
+def configure_paths(trades_log_path, display_color=None):  
     """Configura los paths globales desde el script principal"""
     global TRADES_LOG_PATH, DISPLAY_COLOR  # ⭐ AÑADIR DISPLAY_COLOR
     TRADES_LOG_PATH = trades_log_path

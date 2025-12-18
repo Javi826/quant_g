@@ -13,7 +13,7 @@ RESET        = "\033[0m"
 
 
 def equity_curve(
-    excel_file='bot_trading_trades.xlsx',
+    excel_file='bot_trades_01.xlsx',
     initial_capital=3671,
     show_plot=True,
     save_plot=False,

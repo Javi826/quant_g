@@ -1,16 +1,16 @@
 import os
 import pandas as pd
 
-# Colores ANSI
+#  ANSI
 RED_BOLD     = "\033[1;91m"
 GREEN_BOLD   = "\033[1;92m"
 MAGENTA_BOLD = "\033[1;85m"
-BLUE_BOLD    = "\033[1;94m"
 BLUE         = "\033[0;94m"
 YELLOW_BOLD  = "\033[0;93m"
-CYAN_BOLD    = "\033[0;96m"
 RESET        = "\033[0m"
-
+def remove_bold(ansi_color):
+    # Cambia \033[1;XXm → \033[0;XXm
+    return ansi_color.replace("\033[1;", "\033[0;")
 
 def bot_metrics(
     excel_file=None,
@@ -64,13 +64,13 @@ def bot_metrics(
     for strategy in df['STRATEGY'].unique():
         df_strategy = df[df['STRATEGY'] == strategy]
         
-        num_trades = len(df_strategy)
+        num_trades      = len(df_strategy)
         positive_trades = len(df_strategy[df_strategy['PROFIT'] > 0])
-        pct_positive = (positive_trades / num_trades * 100) if num_trades > 0 else 0
-        total_profit = df_strategy['PROFIT'].sum()
-        profit_pct = (total_profit / capital_per_strategy * 100) if capital_per_strategy > 0 else 0
-        avg_duration = round(df_strategy['DURATION'].mean(), 2)
-        date_fo = df_strategy['OPEN_AT'].min()
+        pct_positive    = (positive_trades / num_trades * 100) if num_trades > 0 else 0
+        total_profit    = df_strategy['PROFIT'].sum()
+        profit_pct      = (total_profit / capital_per_strategy * 100) if capital_per_strategy > 0 else 0
+        avg_duration    = round(df_strategy['DURATION'].mean(), 2)
+        date_fo         = df_strategy['OPEN_AT'].min()
         
         total_reasons = len(df_strategy)
         tp_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('TP', na=False)])
@@ -137,9 +137,11 @@ def bot_metrics(
                 else:
                     cell = f"{formatted:>{width}}"
                 
-                # Pintar en cyan la columna Strategy
+                # Pintar en color SIN negrita la columna Strategy
                 if col == 'Strategy':
-                    cell = f"{BLUE}{cell}{RESET}"
+                    normal_color = remove_bold(color_code)
+                    cell = f"{normal_color}{cell}{RESET}"
+
                 
                 # Pintar Total_profit verde/rojo
                 if col == 'Total_profit':
@@ -160,17 +162,19 @@ def bot_metrics(
     
     if show_table:
         print()
-        print(f"{color_code}{'=' * 120}{RESET}")  # ⬅️ Era BLUE_BOLD
-        print(f"{color_code}📊 TOTAL SUMMARY{RESET}")  # ⬅️ Era BLUE_BOLD
-        print(f"{color_code}{'=' * 120}{RESET}")  # ⬅️ Era BLUE_BOLD
+        print(f"{color_code}{'=' * 120}{RESET}")  
+        print(f"{color_code}📊 TOTAL SUMMARY{RESET}")  
+        print(f"{color_code}{'=' * 120}{RESET}") 
         
-        print(f"{BLUE}📊 Trades_num   :{RESET} {num_trades_total}")
-        print(f"{BLUE}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
-        print(f"{BLUE}🎯 Trades_pct   :{RESET} {pct_positive_total:.2f} %")
-        print(f"{BLUE}📈 Profit_pct   :{RESET} {pct_profit:.2f} %")
+        normal_color = remove_bold(color_code)
+        
+        print(f"{normal_color}📊 Trades_num   :{RESET} {num_trades_total}")
+        print(f"{normal_color}🕜 Avg_duration :{RESET} {avg_duration_total:.1f} days")
+        print(f"{normal_color}🎯 Trades_pct   :{RESET} {pct_positive_total:.2f} %")
+        print(f"{normal_color}📈 Profit_pct   :{RESET} {pct_profit:.2f} %")
         
         color = GREEN_BOLD if total_profit_general >= 0 else RED_BOLD
-        print(f"{'💵' if total_profit_general >= 0 else '⭕'} {BLUE}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")  # ⬅️ Era BLUE_BOLD
+        print(f"{'💵' if total_profit_general >= 0 else '⭕'} {color_code}TOTAL_profit :{RESET} {color}{total_profit_general:.2f} ${RESET}")  # ⬅️ Era BLUE_BOLD
         
         print(f"{color_code}{'=' * 120}{RESET}")  
         print()
