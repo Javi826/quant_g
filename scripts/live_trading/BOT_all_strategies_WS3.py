@@ -1,5 +1,5 @@
 """
-Bot multi-estrategy with WebSocket support and complet for API operations.
+Bot multi-estrategia con soporte WebSocket completo para todas las operaciones API.
 """
 import os
 import sys
@@ -9,14 +9,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from ZX_BOT_metrics import bot_metrics
 
-# --- Imports modules ---
+# --- Imports de modules ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 # Import WebSocket-enabled utilities
 from ZX_BOT_display import check_all_tp_sl  
-from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price 
-from ZX_BOT_operative import configure_paths 
+from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price  
 from ZX_BOT_operative import increment_strategy_candles, process_strategy, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
@@ -26,66 +25,44 @@ from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
 
-#Dinamic import account passwords
+#Import dinámico basado en ACCOUNT_NUMBER
 from utils.ZZ_connect import (
     BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
     BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
-    BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1,
-    connect_bitget_00, connect_bitget_01, connect_bitget_E1
+    BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02,
+    connect_bitget_00, connect_bitget_01, connect_bitget_02
 )
 
-from ZX_connect_live import send_request_00, send_request_01, send_request_E1
+from ZX_connect_live import send_request_00, send_request_01, send_request_02
+logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
+setup_print_logger(logdir)
 
-#Credentials according account number
+#Seleccionar credenciales y funciones según ACCOUNT_NUMBER
 CREDENTIALS = {
     "00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
     "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
-    "E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
+    "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
 }
 
-# PATHS & PASSWORDS
-#==========================================================================
-ACCOUNT_NUMBER  = "E1"  # Cambiar según cuenta
-BASE_DIR        = os.path.expanduser(f'~/projects/quant/quant_g/scripts/live_trading/bot_files_{ACCOUNT_NUMBER}')
-TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
-LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
-
-# Creat directory 
-os.makedirs(BASE_DIR, exist_ok=True)
-# Configuration paths
-configure_paths(TRADES_LOG_PATH)
-# Configution logger
-setup_print_logger(BASE_DIR, logfile_name=os.path.basename(LOG_FILE_PATH))
-# Credentials
-BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
-
-#==========================================================================
 # GENERAL CONFIG
 #==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
 PRODUCT_TYPE          = 'USDT-FUTURES'
 CHECK_INTERVAL        = 10
+ACCOUNT_NUMBER        = "01"
 USE_HARDCODED_SIGNALS = False
+BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
+#DISPLAY
 #==========================================================================
-# DISPLAY
-#==========================================================================
-BLUE  = "\033[1;94m"   
-CYAN  = "\033[1;96m"   
-RESET = "\033[0m"
-
-if ACCOUNT_NUMBER == "01":
-    BLUE_BOLD = BLUE
-elif ACCOUNT_NUMBER == "E1":
-    BLUE_BOLD = CYAN
-
+BLUE_BOLD             = "\033[1;94m"
+YELLOW_BOLD           = "\033[0;93m"
 RESET                 = "\033[0m"
 DISPLAY_MODE          = "summary"
 
-#==========================================================================
 # STATES
 #==========================================================================
-STATE_FILE       = os.path.join(BASE_DIR, f'bot_state_{ACCOUNT_NUMBER}.json') 
+STATE_FILE       = 'bot_state.json'
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
 
@@ -246,28 +223,7 @@ STRAT_K = {
     'direction': 'short'
 }
 
-STRAT_L = {
-    'id': 'parity_long_6H',
-    'name': 'parity_long_6H',
-    'timeframe': '6Hutc',
-    'sell_after_ncandles': 50,
-    'order_amount': 40,
-    'lookback': 50,
-    'tolerance': 40,
-    'ma_period':25,
-    'tp_pct': 3.5,  
-    'sl_pct': 10,  
-    'direction': 'long'
-}
-
-
-# ==========================================================================
-# STRATEGY SELECTION
-# ==========================================================================
-if ACCOUNT_NUMBER == "01":
-    STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L]
-elif ACCOUNT_NUMBER == "E1":
-    STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
+STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
 
 send_request_common = send_request_func 
 get_balance_common  = get_usdt_balance_ws
@@ -379,14 +335,6 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     ma_period=strategy['ma_period'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'parity_long_6H':
-                signals = parity_long(
-                    arr,
-                    lookback=strategy['lookback'],
-                    tolerance=strategy['tolerance'],
-                    ma_period=strategy['ma_period'],
-                    live_trading=True
-                )
             else:
                 continue
         except Exception as e:
@@ -438,7 +386,7 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics(excel_file=TRADES_LOG_PATH)   
+    bot_metrics()    
     #INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
@@ -578,8 +526,7 @@ def main_loop():
                         HOUR_ZONE,
                         check_tp_sl_for_strategy,  
                         get_current_price,
-                        DISPLAY_MODE,
-                        account_number=ACCOUNT_NUMBER 
+                        DISPLAY_MODE
                     )
                     last_tpsl_check = current_time
             

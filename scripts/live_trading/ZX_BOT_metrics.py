@@ -13,38 +13,21 @@ RESET        = "\033[0m"
 
 
 def bot_metrics(
-    excel_file='bot_trading_trades.xlsx',
+    excel_file=None,
     initial_capital=3671,
     show_table=True,
     return_data=False
 ):
-    """
-    Analiza las métricas del bot de trading desde un archivo Excel.
-    
-    Parameters:
-    -----------
-    excel_file : str
-        Ruta al archivo Excel con los trades
-    initial_capital : float
-        Capital inicial para calcular porcentajes
-    show_table : bool
-        Si True, muestra la tabla formateada en consola
-    return_data : bool
-        Si True, retorna el DataFrame con los resultados
-    
-    Returns:
-    --------
-    dict o tuple
-        Diccionario con métricas totales, o (dict, DataFrame) si return_data=True
-    """
-    
+    if excel_file is None:
+        print(f"{YELLOW_BOLD}❌ Error: excel_file parameter is required{RESET}")
+        return None  # ✅ Indentado correctamente
     # Buscar archivo en bot_files si no existe en ruta directa
     if not os.path.exists(excel_file):
         bot_files_path = os.path.join("bot_files", os.path.basename(excel_file))
         if os.path.exists(bot_files_path):
             excel_file = bot_files_path
         else:
-            print(f"{RED_BOLD}🔔 File not found: {excel_file}{RESET}")
+            print(f"{YELLOW_BOLD}⚠️  File not found: {excel_file}{RESET}")
             return None
     
     # Leer Excel

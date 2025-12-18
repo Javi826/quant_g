@@ -26,15 +26,20 @@ MARGIN_MODE  = "crossed"
 BLUE_BOLD    = "\033[1;94m"
 RESET        = "\033[0m"
 
-# ⭐ Configuración de archivo Excel para trades
-TRADES_LOG_DIR  = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
-TRADES_LOG_FILE = 'bot_trading_trades.xlsx'
-TRADES_LOG_PATH = os.path.join(TRADES_LOG_DIR, TRADES_LOG_FILE)
+TRADES_LOG_PATH = None 
 
-# Crear directorio si no existe
-os.makedirs(TRADES_LOG_DIR, exist_ok=True)
-
-
+# ==========================================================================
+# CONFIGURATION
+# ==========================================================================
+def configure_paths(trades_log_path):
+    """Configura los paths globales desde el script principal"""
+    global TRADES_LOG_PATH
+    TRADES_LOG_PATH = trades_log_path
+    
+    # Crear directorio si no existe
+    log_dir = os.path.dirname(trades_log_path)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
 # ==========================================================================
 # WEBSOCKET-BASED FUNCTIONS 
 # ==========================================================================
@@ -605,14 +610,12 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        bot_metrics()
+        bot_metrics(excel_file=TRADES_LOG_PATH)
 
 # ==========================================================================
 # TP/SL CHECKINGS
 # ==========================================================================
-# ==========================================================================
-# TP/SL CHECKINGS
-# ==========================================================================
+
 def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_candles,
                               state_file, send_request_func, table=None, pnl_accumulator=None):
     """Comprueba TP/SL para todas las posiciones de una estrategia via WebSocket"""
@@ -631,7 +634,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
         except (TimeoutError, RuntimeError) as e:
-            print(f"⚠️ No price for {symbol}: {e}")
+            print(f"⚠️  No price for {symbol}: {e}")
             continue
         
         if current_price is None:
@@ -706,7 +709,7 @@ def process_strategy(
     """Procesa una estrategia: busca señales y abre posiciones."""
     strat_id = strat['id']
 
-    print(f"\n⚙️ Processing strategy: {strat_id}")
+    print(f"\n⚙️  Processing strategy  : {strat_id}")
 
     if use_hardcoded:
         signals = get_hardcoded_signals(strat_id, send_request_func, hour_zone)
@@ -716,7 +719,6 @@ def process_strategy(
         signals = detect_signal_func(strat, final_symbols)
 
     print(f"💫 Signals detected for {strat_id}: {len(signals)}")
-    print('\n')
 
     if not signals:
         return
@@ -847,7 +849,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             fee_from_api=fee_from_api
                         )
                         
-            bot_metrics()
+            bot_metrics(excel_file=TRADES_LOG_PATH)
             return True
         else:
             print(f"⚠️ No closing position available {symbol}: {resp}")
@@ -1005,7 +1007,7 @@ def log_closed_position(
         print(f"❌ Error logging trade to Excel: {e}")
         traceback.print_exc()
 
-def setup_print_logger(logdir, logfile_name="BOT_all_stratagies.log"):
+def setup_print_logger(logdir, logfile_name=None):
     """Configura un logger que duplica print() al archivo y a consola."""
     os.makedirs(logdir, exist_ok=True)
     logfile = os.path.join(logdir, logfile_name)

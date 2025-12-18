@@ -35,17 +35,6 @@
         "usdt_amount": 40.0
       },
       {
-        "symbol": "SOLUSDT",
-        "size": "0.3",
-        "entry_price": "122.031",
-        "direction": "short",
-        "tp": "119.712411",
-        "sl": "128.13255",
-        "order_id": "1385261723949879298",
-        "opened_at": "2025-12-17T19:00:52.827390+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "XRPUSDT",
         "size": "21",
         "entry_price": "1.8582",

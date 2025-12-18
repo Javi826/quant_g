@@ -44,20 +44,20 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 SELL_AFTER_LIST      = [0]  
 
-LOOKBACK_LIST        = [100]
-TOLERANCE_LIST       = [10] 
+LOOKBACK_LIST        = [50]
+TOLERANCE_LIST       = [40] 
 MA_PERIOD_LIST       = [25]
 
-TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [7.5]
+TP_PCT_LIST          = [3.5]
+SL_PCT_LIST          = [10]
 
 # =============================================================================
-# LOOKBACK_LIST        = [150]
-# TOLERANCE_LIST       = [15] 
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [45] 
 # MA_PERIOD_LIST       = [25]
 # 
-# TP_PCT_LIST          = [2]
-# SL_PCT_LIST          = [10]
+# TP_PCT_LIST          = [3.5]
+# SL_PCT_LIST          = [7.5]
 # =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
@@ -84,7 +84,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = parity_short(
+        signals = parity_long(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

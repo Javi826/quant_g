@@ -147,12 +147,13 @@ def add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator, 
     )
 
 
-def create_tp_sl_display(now, total_pnl=None):
+def create_tp_sl_display(now, total_pnl=None, account_number=None):
     """Crea el header y la tabla para el display de TP/SL"""
     # Crear el header con PnL total si se proporciona
     header = Text()
     header.append(f"{BLUE_BOLD}{'─'*115}\n")
-    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
+    account_str = f" (ACC: {account_number})" if account_number else ""
+    header.append(f"{BLUE_BOLD}🔷 Checking TP/SL{account_str} - {now}\n")
     if total_pnl is not None:
         pnl_color = "bold green" if total_pnl >= 0 else "bold red"
         header.append(f"💰 Total PnL: ", style="white")
@@ -182,7 +183,7 @@ def create_tp_sl_display(now, total_pnl=None):
 # ==========================================================================
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, 
                     send_request_func, hour_zone, check_tp_sl_for_strategy_func, 
-                    get_current_price_func, display_mode="summary"):
+                    get_current_price_func, display_mode="summary", account_number=None): 
     """
     Chequea TP/SL para todas las estrategias.
     
@@ -227,7 +228,8 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
     if display_mode == "summary":
         header = Text()
         header.append(f"{BLUE_BOLD}{'─'*71}\n")
-        header.append(f"{BLUE_BOLD}🔷 Checking TP/SL - {now}\n")
+        account_str = f" (ACC: {account_number})" if account_number else ""
+        header.append(f"{BLUE_BOLD}🔷 Checking TP/SL{account_str} - {now}\n") 
         
         # Crear tabla resumida
         summary_table = Table(show_header=True, header_style="bold white", border_style="white")
@@ -329,7 +331,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
     # MODO "detailed": TABLA DETALLADA (una fila por posición)
     # =======================================================================
     if display_mode == "detailed":
-        header, table = create_tp_sl_display(now)
+        header, table = create_tp_sl_display(now, account_number=account_number)
         
         for idx, strat in enumerate(strategies):
             strat_id = strat['id']
@@ -349,7 +351,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                     if next_has_positions:
                         table.add_row("", "", "", "", "", "", "", "", "", "", "", "")
         
-        header, _ = create_tp_sl_display(now, pnl_accumulator['total'])
+        header, _ = create_tp_sl_display(now, pnl_accumulator['total'], account_number)
         display = Group(header, table)
         
         if _live_display is None:
