@@ -45,7 +45,7 @@ CREDENTIALS = {
 
 # PATHS & PASSWORDS
 #==========================================================================
-ACCOUNT_NUMBER  = "E1"  # Cambiar según cuenta
+ACCOUNT_NUMBER  = "01"  # Cambiar según cuenta
 BASE_DIR        = os.path.expanduser(f'~/projects/quant/quant_g/scripts/live_trading/bot_files_{ACCOUNT_NUMBER}')
 TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
 LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
