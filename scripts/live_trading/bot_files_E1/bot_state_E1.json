@@ -48,17 +48,6 @@
         "usdt_amount": 40.0
       },
       {
-        "symbol": "DOGEUSDT",
-        "size": "309",
-        "entry_price": "0.12941",
-        "direction": "long",
-        "tp": "0.1319982",
-        "sl": "0.116469",
-        "order_id": "1385578825722269697",
-        "opened_at": "2025-12-18T16:00:55.820806+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "ETHUSDT",
         "size": "0.01",
         "entry_price": "2961.82",
@@ -372,14 +361,14 @@
     ]
   },
   "strategy_candles": {
-    "revers_long_1H": 23,
-    "parity_long_1H": 23,
-    "parity_short_1H": 21,
-    "double_top_long_4H": 5,
-    "parity_long_4H": 1,
-    "revers_short_4H": 5,
-    "parity_short_4H": 5,
-    "revers_short_1H": 21,
+    "revers_long_1H": 25,
+    "parity_long_1H": 25,
+    "parity_short_1H": 23,
+    "double_top_long_4H": 6,
+    "parity_long_4H": 2,
+    "revers_short_4H": 6,
+    "parity_short_4H": 6,
+    "revers_short_1H": 23,
     "revers_short_6Hutc": 3
   }
 }

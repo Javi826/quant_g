@@ -850,9 +850,18 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             profit_from_api=profit_from_api,
                             fee_from_api=fee_from_api
                         )
-                        
-            bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR)
-            return True
+            
+            # ⭐ MOVER return True ANTES de bot_metrics para evitar que errores lo interrumpan
+            result = True  
+            
+            # ⭐ bot_metrics en try-catch separado para que no afecte el return
+            try:
+                bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
+            except Exception as e:
+                print(f"⚠️  Error showing metrics (non-critical): {e}")
+            
+            return result
+        
         else:
             print(f"⚠️ No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
@@ -873,7 +882,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             profit_from_api=None,
                             fee_from_api=None
                         )
-                return True
+                return True  # ⭐ Retornar True para eliminar de open_positions
             return False
             
     except Exception as e:

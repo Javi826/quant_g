@@ -8,6 +8,8 @@ MAGENTA_BOLD = "\033[1;85m"
 BLUE         = "\033[0;94m"
 YELLOW_BOLD  = "\033[0;93m"
 RESET        = "\033[0m"
+
+
 def remove_bold(ansi_color):
     # Cambia \033[1;XXm → \033[0;XXm
     return ansi_color.replace("\033[1;", "\033[0;")

@@ -379,11 +379,41 @@ class BitgetWSManager:
     
     def _on_error(self, ws, error):
         """Callback en caso de error"""
-        # Mostrar TODOS los errores para debug
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        print(f"❌ WebSocket error [{now}]: {error}")
-        import traceback
-        traceback.print_exc()
+        error_str = str(error)
+        
+        # Identificar tipo de WebSocket
+        ws_type = "PUBLIC" if ws == self.public_ws else "PRIVATE" if ws == self.private_ws else "UNKNOWN"
+        
+        # Errores de red conocidos (no mostrar traceback)
+        network_errors = [
+            "Temporary failure in name resolution",  # DNS
+            "Name or service not known",              # DNS alternativo
+            "Connection refused",                     # Puerto cerrado
+            "Connection reset by peer",               # Red inestable
+            "timeout",                                # Timeout genérico
+            "timed out",                              # Timeout alternativo
+            "Connection to remote host was lost",     # Desconexión abrupta
+            "No route to host"                        # Red inalcanzable
+        ]
+        
+        # Verificar si es error de red conocido
+        is_network_error = any(err_type.lower() in error_str.lower() for err_type in network_errors)
+        
+        if is_network_error:
+            # Solo warning para errores de red (sin traceback)
+            print("─" * 71)
+            print(f"⚠️  {ws_type} WebSocket network issue [{now}]")
+            print(f"    {error_str}")
+            print(f"    → Retrying connection...")
+            print("─" * 71)
+        else:
+            # Traceback completo para errores inesperados
+            print("─" * 71)
+            print(f"❌ {ws_type} WebSocket unexpected error [{now}]: {error}")
+            print("─" * 71)
+            import traceback
+            traceback.print_exc()
     
     def _on_close(self, ws, close_status_code, close_msg):
         """Callback al cerrar conexión"""
