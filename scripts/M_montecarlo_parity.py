@@ -24,7 +24,7 @@ STRATEGY            = "parity"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -36,7 +36,7 @@ LOOKBACK_LIST        = [25,50,100,150]
 TOLERANCE_LIST       = [10,15,20,25,30,35,40,45,50] 
 MA_PERIOD_LIST       = [25,50,100]
 
-TP_PCT_LIST          = [3,3.5,4.0,4.5,5]
+TP_PCT_LIST          = [3,3.5,4.0,4.5,5,5.5]
 SL_PCT_LIST          = [2.5,5,7.5,10]
 
 # =============================================================================

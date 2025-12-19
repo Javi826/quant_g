@@ -232,7 +232,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
         summary_table.add_column("Strategy", style="white", width=20)
         summary_table.add_column("Side", justify="left", width=6)
         summary_table.add_column("Opened", style="white", width=10)
-        summary_table.add_column("Candles", justify="center", width=7)
+        summary_table.add_column("Candles", justify="right", width=7)
         summary_table.add_column("#pos", justify="right", width=4)
         summary_table.add_column("PnL", justify="right", width=6)
         

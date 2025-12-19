@@ -44,8 +44,10 @@ CREDENTIALS = {
 ACCOUNT_NUMBER  = "01"  
 INITIAL_CAPITAL = 3671
 # -------------------------------------------------------------------------
-ACCOUNT_NUMBER  = "E1"  
-INITIAL_CAPITAL = 1761
+# =============================================================================
+# ACCOUNT_NUMBER  = "E1"  
+# INITIAL_CAPITAL = 1761
+# =============================================================================
 
 #==========================================================================
 # PATHS
@@ -55,7 +57,7 @@ TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
 LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
 
 #==========================================================================
-# DISPLAY
+# DISPLAY: None | summary | detailed
 #==========================================================================
 BLUE  = "\033[1;94m"   
 CYAN  = "\033[1;96m"  
@@ -73,11 +75,10 @@ DISPLAY_MODE = "summary"
 # Creat directory 
 os.makedirs(BASE_DIR, exist_ok=True)
 # Configuration paths
-# Línea ~56
 configure_paths(TRADES_LOG_PATH, display_color=BLUE_BOLD, initial_capital=INITIAL_CAPITAL)
-# Configution logger
+# Configuration logger
 setup_print_logger(BASE_DIR, logfile_name=os.path.basename(LOG_FILE_PATH))
-# Credentials
+# Configuration Credentials
 BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
 
 #==========================================================================
@@ -102,6 +103,7 @@ STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
     'timeframe': '4H',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 2,
@@ -116,6 +118,7 @@ STRAT_B = {
     'id': 'revers_long_4H',
     'name': 'reversal_long_4H',
     'timeframe': '4H',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 5,
@@ -129,7 +132,8 @@ STRAT_B = {
 STRAT_C = {
     'id': 'parity_long_4H',
     'name': 'parity_long_4H',
-    'timeframe': '4H',  
+    'timeframe': '4H', 
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 150,
@@ -144,6 +148,7 @@ STRAT_D = {
     'id': 'revers_short_4H',
     'name': 'reversal_short_4H',
     'timeframe': '4H',  
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 8,
@@ -158,6 +163,7 @@ STRAT_E = {
     'id': 'parity_short_4H',
     'name': 'parity_short_4H',
     'timeframe': '4H',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 150,
@@ -172,6 +178,7 @@ STRAT_F = {
     'id': 'revers_long_1H',
     'name': 'reversal_long_1H',
     'timeframe': '1H',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 7,
@@ -185,7 +192,8 @@ STRAT_F = {
 STRAT_G = {
     'id': 'revers_short_1H',
     'name': 'reversal_short_1H',
-    'timeframe': '1H',  
+    'timeframe': '1H', 
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 5,
@@ -199,7 +207,8 @@ STRAT_G = {
 STRAT_H = {
     'id': 'revers_long_6Hutc',
     'name': 'reversal_long_6Hutc',
-    'timeframe': '6Hutc',  
+    'timeframe': '6Hutc', 
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 3,
@@ -213,7 +222,8 @@ STRAT_H = {
 STRAT_I = {
     'id': 'revers_short_6Hutc',
     'name': 'reversal_short_6Hutc',
-    'timeframe': '6Hutc',  
+    'timeframe': '6Hutc', 
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'left_lookback': 6,
@@ -227,7 +237,8 @@ STRAT_I = {
 STRAT_J = {
     'id': 'parity_long_1H',
     'name': 'parity_long_1H',
-    'timeframe': '1H',  
+    'timeframe': '1H', 
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 150,
@@ -242,6 +253,7 @@ STRAT_K = {
     'id': 'parity_short_1H',
     'name': 'parity_short_1H',
     'timeframe': '1H',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 150,
@@ -256,6 +268,7 @@ STRAT_L = {
     'id': 'parity_long_6Hutc',
     'name': 'parity_long_6Hutc',
     'timeframe': '6Hutc',
+    'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 50,
@@ -297,7 +310,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             continue
         
         df_norm = normalize_live_ohlcv(df)
-        arr = df_to_arrays_live(df_norm)
+        arr     = df_to_arrays_live(df_norm)
         
         try:
             if strategy['name'] == 'double_top_long_4H':
@@ -431,10 +444,15 @@ def main_loop():
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
     # Load symbols for each strategy
-    print(f"\n{BLUE_BOLD} OPERATING SYMBOLS & TIMEFRAMES {RESET}")
+    print(f"\n{BLUE_BOLD} OPERATIVE STRATEGIES: {len(STRATEGIES)} {RESET}")
     print(f"{BLUE_BOLD}{'-' * 120}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
+        #DEPRECATED
+        if not strat.get('active', True):
+            print(f"⏸️  Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING (monitoring only)")
+            continue
+        
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
         print(f"🔹 Strategy {strat['id']:<18} ({strat['timeframe']:<2}): {len(final_by_strat[strat['id']]):>2} symbols")
     
@@ -448,8 +466,8 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    # Línea ~407
     bot_metrics(excel_file=TRADES_LOG_PATH, color_code=BLUE_BOLD, initial_capital=INITIAL_CAPITAL)
+    
     #INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
@@ -509,7 +527,7 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  Status  : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
+                        print(f"➡️  Status   : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
 
                         check_candles_timeout_for_strategy(
                             strat_id,
@@ -523,6 +541,9 @@ def main_loop():
                 # Signal search (only if no positions)
                 for strat in strategies_to_process:
                     strat_id = strat['id']
+                    #DEPRECATED
+                    if not strat.get('active', True):
+                        continue
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
