@@ -14,7 +14,7 @@ def remove_bold(ansi_color):
 
 def bot_metrics(
     excel_file=None,
-    initial_capital=3671,
+    initial_capital=None,
     show_table=True,
     return_data=False,
     color_code=None  
@@ -163,7 +163,7 @@ def bot_metrics(
     if show_table:
         print()
         print(f"{color_code}{'=' * 120}{RESET}")  
-        print(f"{color_code}📊 TOTAL SUMMARY{RESET}")  
+        print(f"{color_code}🧾 TOTAL SUMMARY{RESET}")  
         print(f"{color_code}{'=' * 120}{RESET}") 
         
         normal_color = remove_bold(color_code)

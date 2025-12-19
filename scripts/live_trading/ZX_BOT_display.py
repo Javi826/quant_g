@@ -222,12 +222,13 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
     # =======================================================================
     if display_mode == "summary":
         header = Text()
-        header.append(f"{display_color}{'─'*71}\n")  # ⭐ USAR display_color
+        header.append(f"{display_color}{'─'*72}\n")  # ⭐ USAR display_color
         account_str = f" (ACC: {account_number})" if account_number else ""
         header.append(f"{display_color}🔷 Checking TP/SL{account_str} - {now}\n")
         
         # Crear tabla resumida
-        summary_table = Table(show_header=True, header_style="bold white", border_style="white")
+        border_color = "bright_cyan" if display_color == "\033[1;96m" else "bright_blue"  # ⭐ AÑADIR
+        summary_table = Table(show_header=True, header_style="bold white", border_style=border_color)  # ⭐ CAMBIAR
         summary_table.add_column("Strategy", style="white", width=20)
         summary_table.add_column("Side", justify="left", width=6)
         summary_table.add_column("Opened", style="white", width=10)
@@ -311,7 +312,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
             header.append(f" USDT\n", style="white")
         else:
             header.append("\n")
-        header.append(f"{display_color}{'─'*71}\n")
+        header.append(f"{display_color}{'─'*72}\n")
         
         display = Group(header, summary_table)
         

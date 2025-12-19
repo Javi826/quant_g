@@ -5,6 +5,8 @@ import base64
 import hashlib
 import websocket
 import threading
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 
 RESET = "\033[0m"
@@ -293,7 +295,7 @@ class BitgetWSManager:
     
     def _on_private_message(self, ws, message):
         try:
-            # ⛔ ignorar pong y basura
+            #  ignorar pong y basura
             if not message or message == "pong":
                 return
             if message[0] not in ("{", "["):
@@ -364,7 +366,7 @@ class BitgetWSManager:
                     self.equity = eq
     
         except Exception as e:
-            print(f"🔔 Error processing private message: {e}")
+            print(f"❌ Error processing private message: {e}")
 
     
     # ==========================================================================
@@ -378,25 +380,30 @@ class BitgetWSManager:
     def _on_error(self, ws, error):
         """Callback en caso de error"""
         # Mostrar TODOS los errores para debug
-        print(f"❌ WebSocket error: {error}")
+        now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
+        print(f"❌ WebSocket error [{now}]: {error}")
         import traceback
-        #traceback.print_exc()
+        traceback.print_exc()
     
     def _on_close(self, ws, close_status_code, close_msg):
         """Callback al cerrar conexión"""
         # Identificar cuál WebSocket se cerró
+        now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
         ws_type = "PUBLIC" if ws == self.public_ws else "PRIVATE" if ws == self.private_ws else "UNKNOWN"
         
         # Guardar razón de cierre para mostrar en reconexión
         self.last_close_code = close_status_code
         self.last_close_msg = close_msg
         
+        print("─" * 71)  
+        
         # Mostrar desconexión siempre con tipo de WS
         if close_status_code or close_msg:
-            print(f"⚠️  {ws_type} WebSocket disconnected | code={close_status_code}, msg={close_msg}")
+            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}")  # ⭐ AÑADIR [{now}]
         else:
-            print(f"⚠️  {ws_type} WebSocket disconnected | code=None, msg=None (unclean close)")
-        # Se reconectará automáticamente por el loop
+            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close)")  # ⭐ AÑADIR [{now}]
+        
+        print("─" * 71)  
     
     # ==========================================================================
     # PUBLIC METHODS

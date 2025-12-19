@@ -32,11 +32,11 @@ DISPLAY_COLOR   = None
 # ==========================================================================
 # CONFIGURATION
 # ==========================================================================
-def configure_paths(trades_log_path, display_color=None):  
-    """Configura los paths globales desde el script principal"""
-    global TRADES_LOG_PATH, DISPLAY_COLOR  # ⭐ AÑADIR DISPLAY_COLOR
+def configure_paths(trades_log_path, display_color="\033[1;94m", initial_capital=3671):
+    global TRADES_LOG_PATH, DISPLAY_COLOR, INITIAL_CAPITAL
     TRADES_LOG_PATH = trades_log_path
-    DISPLAY_COLOR = display_color  # ⭐ GUARDAR
+    DISPLAY_COLOR = display_color
+    INITIAL_CAPITAL = initial_capital 
     
     # Crear directorio si no existe
     log_dir = os.path.dirname(trades_log_path)
@@ -101,7 +101,7 @@ def get_usdt_balance_ws(exchange=None):
     # Si no hay datos de equity todavía, esperar un poco
     if balance == 0.0 and not ZX_BOT_ws_manager._ws_manager.equity:
         print("⏳ Waiting for equity data from WebSocket...")
-        time.sleep(0.2)
+        time.sleep(0.05)
         balance = ZX_BOT_ws_manager._ws_manager.get_usdt_balance()
     
     return balance
@@ -135,7 +135,7 @@ def load_state(state_file):
                     'usdt_amount': float(pos.get('usdt_amount', 0))
                 })
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
-        print(f"✅  State loaded: {total_positions} positions recovered")
+        print(f"✅ State loaded: {total_positions} positions recovered")
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
@@ -612,7 +612,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR)
+        bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
 
 # ==========================================================================
 # TP/SL CHECKINGS

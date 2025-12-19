@@ -1,3 +1,4 @@
+#BOT_orchestator.py
 """
 Bot multi-estrategy with WebSocket support and complet for API operations.
 """
@@ -7,45 +8,45 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from ZX_BOT_metrics import bot_metrics
-
-# --- Imports modules ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
+from ZX_connect_live import send_request_00, send_request_01, send_request_E1
 
-# Import WebSocket-enabled utilities
-from ZX_BOT_display import check_all_tp_sl  
-from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price 
-from ZX_BOT_operative import configure_paths 
-from ZX_BOT_operative import increment_strategy_candles, process_strategy, setup_print_logger
-from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time
-from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
+# BOT auxiliars
 from ZX_BOT_ws_manager import init_websocket
+from ZX_BOT_metrics import bot_metrics
+from ZX_BOT_display import check_all_tp_sl  
+from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger
+from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
+from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
 
+# Signals generators
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
 
-#Dinamic import account passwords
-from utils.ZZ_connect import (
-    BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
-    BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
-    BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1,
-    connect_bitget_00, connect_bitget_01, connect_bitget_E1
-)
-
-from ZX_connect_live import send_request_00, send_request_01, send_request_E1
+# Dinamic import account passwords
+from utils.ZZ_connect import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
+from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
+from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
+from utils.ZZ_connect import connect_bitget_00, connect_bitget_01, connect_bitget_E1
 
 #Credentials according account number
 CREDENTIALS = {
-    "00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
-    "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
-    "E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
+"00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
+"01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
+"E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
 }
 
-# PATHS & PASSWORDS
 #==========================================================================
-ACCOUNT_NUMBER  = "E1"  # Cambiar según cuenta
+# PATHS & ACCOUNTS
+#==========================================================================
+ACCOUNT_NUMBER  = "01"  
+INITIAL_CAPITAL = 3671
+# =============================================================================
+# ACCOUNT_NUMBER  = "E1"  
+# INITIAL_CAPITAL = 1711
+# =============================================================================
 BASE_DIR        = os.path.expanduser(f'~/projects/quant/quant_g/scripts/live_trading/bot_files_{ACCOUNT_NUMBER}')
 TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
 LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
@@ -61,8 +62,6 @@ if ACCOUNT_NUMBER == "01":
     BLUE_BOLD = BLUE
 elif ACCOUNT_NUMBER == "E1":
     BLUE_BOLD = CYAN
-
-RESET        = "\033[0m"
 DISPLAY_MODE = "summary"
 
 #==========================================================================
@@ -71,7 +70,8 @@ DISPLAY_MODE = "summary"
 # Creat directory 
 os.makedirs(BASE_DIR, exist_ok=True)
 # Configuration paths
-configure_paths(TRADES_LOG_PATH, display_color=BLUE_BOLD)
+# Línea ~56
+configure_paths(TRADES_LOG_PATH, display_color=BLUE_BOLD, initial_capital=INITIAL_CAPITAL)
 # Configution logger
 setup_print_logger(BASE_DIR, logfile_name=os.path.basename(LOG_FILE_PATH))
 # Credentials
@@ -86,7 +86,7 @@ CHECK_INTERVAL        = 10
 USE_HARDCODED_SIGNALS = False
 
 #==========================================================================
-# STATES
+# POSITIONS & STATES
 #==========================================================================
 STATE_FILE       = os.path.join(BASE_DIR, f'bot_state_{ACCOUNT_NUMBER}.json') 
 OPEN_POSITIONS   = {}
@@ -272,6 +272,9 @@ if ACCOUNT_NUMBER == "01":
 elif ACCOUNT_NUMBER == "E1":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
 
+# ==========================================================================
+# CONNECTIONS
+# ==========================================================================
 send_request_common = send_request_func 
 get_balance_common  = get_usdt_balance_ws
 exchange            = connect_bitget()  
@@ -421,11 +424,12 @@ def main_loop():
     
     # Load state
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
-    
-    # Símbolos disponibles
+    # Symbols
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
     # Load symbols for each strategy
+    print(f"\n{BLUE_BOLD} OPERATING SYMBOLS & TIMEFRAMES {RESET}")
+    print(f"{BLUE_BOLD}{'-' * 120}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
@@ -441,7 +445,8 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=BLUE_BOLD)  
+    # Línea ~407
+    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=BLUE_BOLD, initial_capital=INITIAL_CAPITAL)
     #INITIALIZE WEBSOCKET WITH CREDENTIALS
     print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
@@ -501,7 +506,7 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  STATUS  : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
+                        print(f"➡️  Status  : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
 
                         check_candles_timeout_for_strategy(
                             strat_id,
@@ -518,7 +523,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 SKIPPING: {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
+                        print(f"🚫 Skipping : {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
                         continue
                     
                     try:
@@ -539,8 +544,8 @@ def main_loop():
                         print(f"❌ Error processing {strat_id}: {e}")
                         
                         # Retry once
-                        print(f"⏳ Retrying {strat_id} after 2 seconds...")
-                        time.sleep(2)
+                        print(f"⏳ Retrying {strat_id} after 3 seconds...")
+                        time.sleep(3)
                         try:
                             process_strategy(
                                 strat=strat,
