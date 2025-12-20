@@ -6,6 +6,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
+import argparse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
@@ -41,13 +42,11 @@ CREDENTIALS = {
 #==========================================================================
 # ACCOUNTS
 #==========================================================================
-ACCOUNT_NUMBER  = "01"  
-INITIAL_CAPITAL = 3671
-# -------------------------------------------------------------------------
-# =============================================================================
-# ACCOUNT_NUMBER  = "E1"  
-# INITIAL_CAPITAL = 1761
-# =============================================================================
+parser = argparse.ArgumentParser()
+parser.add_argument('--account', type=str, default='E1', help='Account number (01, E1, etc)')
+args = parser.parse_args()
+ACCOUNT_NUMBER = args.account
+#ACCOUNT_NUMBER  = "01"  
 
 #==========================================================================
 # PATHS
@@ -59,15 +58,19 @@ LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.l
 #==========================================================================
 # DISPLAY: None | summary | detailed
 #==========================================================================
-BLUE  = "\033[1;94m"   
-CYAN  = "\033[1;96m"  
-RESET = "\033[0m"
+BLUE         = "\033[1;94m"   
+CYAN         = "\033[1;96m"  
+RESET        = "\033[0m"
+DISPLAY_MODE = "summary"
 
 if ACCOUNT_NUMBER == "01":
     BLUE_BOLD = BLUE
+    INITIAL_CAPITAL = 3671
 elif ACCOUNT_NUMBER == "E1":
     BLUE_BOLD = CYAN
-DISPLAY_MODE = "summary"
+    INITIAL_CAPITAL = 1761
+    
+
 
 #==========================================================================
 # PATHS FILES & CREDENTIALS

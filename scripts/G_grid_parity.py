@@ -17,7 +17,7 @@ from Z_add_signals_parity import parity_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "parity_long_6Hutc"
+STRATEGY     = "parity_short_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -52,12 +52,12 @@ TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
 
 # =============================================================================
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [45] 
+# LOOKBACK_LIST        = [150]
+# TOLERANCE_LIST       = [15] 
 # MA_PERIOD_LIST       = [25]
 # 
-# TP_PCT_LIST          = [3.5]
-# SL_PCT_LIST          = [7.5]
+# TP_PCT_LIST          = [2]
+# SL_PCT_LIST          = [10]
 # =============================================================================
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

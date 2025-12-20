@@ -73,4 +73,3 @@ def fetch_ohlcv_data(symbols, timeframe):
         ohlcv_data[sym] = df_minor
     return ohlcv_data
 
-

@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore")
 
 MIN_PRICE       = 0.0001
 INITIAL_BALANCE = 800
-COMISION        = 0.08
+COMISION        = 0.1
 
 # ============================
 # prepare_data - 
@@ -211,11 +211,11 @@ def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=Fals
 # ============================
 def close_position(pos, exec_time, exec_price, exit_reason, comi_factor, 
                    trades, trade_times, trade_log_cols, cash_bank, blocked_cash):
-    qty = pos['qty']
+    qty       = pos['qty']
     buy_price = pos['buy_price']
-    is_short = pos.get('is_short', False)
+    is_short  = pos.get('is_short', False)
 
-    commission_buy = pos.get('commission_buy', 0.0)
+    commission_buy = pos.get('commission_buy')
     commission_sell = qty * exec_price * comi_factor
 
     if is_short:
@@ -321,10 +321,10 @@ def update_sim_balance(t_int, open_heap, cash_bank, ts_int_arrays, close_arrays,
     
     # Valor de posiciones LONG
     for sym, qty_sum in symbol_qty_long.items():
-        ts_arr = ts_int_arrays[sym]
-        close_arr = close_arrays[sym]
-        idx = np.searchsorted(ts_arr, t_int, side='right') - 1
-        price = float(close_arr[idx] if idx >= 0 else close_arr[0])
+        ts_arr       = ts_int_arrays[sym]
+        close_arr    = close_arrays[sym]
+        idx          = np.searchsorted(ts_arr, t_int, side='right') - 1
+        price        = float(close_arr[idx] if idx >= 0 else close_arr[0])
         total_value += qty_sum * price
     
     # Valor de posiciones SHORT (el valor es negativo del precio actual)
@@ -513,8 +513,6 @@ def run_backtest_loop(
         )
     
     return cash_bank, blocked_cash, num_signals_executed
-
-
 
 # ============================
 # Métricas (sin cambios)

@@ -24,7 +24,7 @@ STRATEGY            = "parity"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '6Hutc'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -32,11 +32,11 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [25,50,100,150]
-TOLERANCE_LIST       = [10,15,20,25,30,35,40,45,50] 
+LOOKBACK_LIST        = [50,100,150]
+TOLERANCE_LIST       = [10,15,20,25,30,35,40] 
 MA_PERIOD_LIST       = [25,50,100]
 
-TP_PCT_LIST          = [3,3.5,4.0,4.5,5,5.5]
+TP_PCT_LIST          = [3,3.5,4.0,4.5,5]
 SL_PCT_LIST          = [2.5,5,7.5,10]
 
 # =============================================================================
@@ -77,7 +77,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_short(
+            signals = parity_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

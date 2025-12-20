@@ -130,13 +130,14 @@ class BitgetWSManager:
     
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
-        print("🔌 PUBLIC  WebSocket connected")
+        now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
+        print(f"🔌 PUBLIC  WebSocket connected [{now}]")
         if self.subscribed_public:
             self._resubscribe_public()
     
     def _on_public_message(self, ws, message):
         try:
-            # ⛔ Ignorar pongs y mensajes no-JSON
+            # Ignorar pongs y mensajes no-JSON
             if not message or message == "pong":
                 return
             if message[0] not in ("{", "["):
@@ -226,14 +227,17 @@ class BitgetWSManager:
         is_reconnect = self.authenticated
         
         if is_reconnect:
+            now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
             # Mostrar razón de la desconexión anterior si existe
             if self.last_close_code or self.last_close_msg:
-                print(f"🔄 PRIVATE WebSocket reconnected | Previous: code={self.last_close_code}, msg={self.last_close_msg}")
+                print(f"🔄 PRIVATE WebSocket reconnected [{now}]")  # ⭐ Separar en 2 líneas
+                print(f"   Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
                 # Sin código de cierre guardado - puede ser timeout sin aviso
-                print("🔄 PRIVATE WebSocket reconnected | Previous: code=unknown (likely timeout)")
+                print(f"🔄 PRIVATE WebSocket reconnected [{now}]")
+                print(f"   Previous: code=unknown (likely timeout)")
         else:
             print("🔌 PRIVATE WebSocket connected (first time)")
         

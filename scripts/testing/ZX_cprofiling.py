@@ -2,32 +2,30 @@ import time
 import cProfile
 import pstats
 import os
-import sys
 import numpy as np
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from itertools import product
-#from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from ZZX_DRAFT4 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+#from ZZX_DRAFT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE, ORDER_AMOUNT
 from utils.ZX_utils import filter_symbols
-from Z_add_signals_orderblocks import orderblocks_long
+from Z_add_signals_01 import explosive_signal_01
 from collections import defaultdict
 from joblib import Parallel, delayed
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
+from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results
 
 # ==============================
 # Configuración idéntica a main_BACKTESTING.py
 # ==============================
-DATA_FOLDER  = "../data/crypto_OOS"
+DATA_FOLDER  = "data/crypto_2023_IS"
 TIMEFRAME    = '4H'
-MIN_VOL_USDT = 10_000_000
-ORDER_AMOUNT = 80
+MIN_VOL_USDT = 500_000
+ORDER_AMOUNT =100
 
-SELL_AFTER_LIST  = [0]
-LOOKBACK_LIST    = [25, 50, 100, 150]
-TOLERANCE_LIST   = [5, 10, 20, 30, 40]
+SELL_AFTER_LIST    = [20,30,40,50]
+ENTROPY_MAX_LIST   = [0.6,0.8,1.0,2.0]
+ACCEL_SPAN_LIST    = [5,10,15]
 
-TP_PCT_LIST = [3, 4, 5, 6, 7, 8, 9]
-SL_PCT_LIST = [3, 4, 5, 6, 7, 8, 9, 10]
+TP_PCT_LIST        = [0,5,10]
+SL_PCT_LIST        = [0,5,10]
 
 # ==============================
 # Cargar y filtrar símbolos
@@ -45,6 +43,41 @@ ohlcv_data, filtered_symbols = filter_symbols(
 
 ohlcv_base = prepare_ohlcv_arrays(ohlcv_data)
 
+
+# ==============================
+# Wrapper para profiling de una combinación
+# ==============================
+def run_profiled(sell_after, entropy_max, accel_span, tp_pct, sl_pct):
+    ohlcv_arrays = {}
+    for sym, arrs in ohlcv_base.items():
+        signal = explosive_signal_01(arrs['close'], m_accel=accel_span, entropia_max=entropy_max, live=False)
+
+        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
+
+    results = run_grid_backtest(
+        ohlcv_arrays,
+        sell_after=sell_after,
+        order_amount=ORDER_AMOUNT,
+        tp_pct=tp_pct,
+        sl_pct=sl_pct
+    )
+    return results
+
+# ==============================
+# Ejecutar profiling para todas las combinaciones y acumular resultados
+# ==============================
+all_combinations = list(product(
+    SELL_AFTER_LIST,
+    ENTROPY_MAX_LIST,
+    ACCEL_SPAN_LIST,
+    TP_PCT_LIST,
+    SL_PCT_LIST
+))
+
+# Diccionario para acumular stats
+accumulated_stats = defaultdict(lambda: {'calls': 0, 'time_total': 0.0, 'time_cum': 0.0})
+
+
 # ==============================
 # Lista de funciones que queremos trackear
 # ==============================
@@ -61,30 +94,23 @@ local_functions = [
     "execute_signal",
     "process_signals_for_timestamp",
     "initialize_backtest_structures",
-    "run_backtest_loop",
-    "orderblock_long"
+    "run_backtest_loop"
 ]
 
 # ==============================
 # Wrapper de profiling para un worker
 # ==============================
 def profiled_worker(comb):
-    sell_after, lookback, tolerance, tp_pct, sl_pct = comb
+    sell_after, entropy_max, accel_span, tp_pct, sl_pct = comb
 
     profiler = cProfile.Profile()
     profiler.enable()
-    
     # ==============================
     # Ejecutamos la función principal
     # ==============================
     ohlcv_arrays = {}
     for sym, arrs in ohlcv_base.items():
-        signal = orderblocks_long(
-            arr=arrs,
-            lookback=lookback,
-            tolerance=tolerance,
-            live_trading=False
-        )
+        signal = explosive_signal_01(arrs['close'], m_accel=accel_span, entropia_max=entropy_max, live=False)
 
         ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
@@ -117,22 +143,15 @@ def profiled_worker(comb):
 # ==============================
 # Ejecutar paralelizado y consolidar stats
 # ==============================
-all_combinations = list(product(
-    SELL_AFTER_LIST,
-    LOOKBACK_LIST,
-    TOLERANCE_LIST,
-    TP_PCT_LIST,
-    SL_PCT_LIST
-))
+all_combinations  = list(product(SELL_AFTER_LIST, ENTROPY_MAX_LIST, ACCEL_SPAN_LIST, TP_PCT_LIST, SL_PCT_LIST))
+accumulated_stats = defaultdict(lambda: {'calls': 0, 'time_total': 0.0, 'time_cum': 0.0})
 
 # ==============================
 # Medir tiempo total de ejecución
 # ==============================
 start_time = time.time()
 
-grid_results_list = Parallel(n_jobs=-1)(
-    delayed(profiled_worker)(comb) for comb in all_combinations
-)
+grid_results_list = Parallel(n_jobs=-1)(delayed(profiled_worker)(comb) for comb in all_combinations)
 
 elapsed_time = time.time() - start_time
 
@@ -157,3 +176,5 @@ print("-"*95)
 for fn, values in sorted(accumulated_stats.items(), key=lambda x: x[1]['time_cum'], reverse=True):
     pct_total = (values['time_cum'] / total_time_cum * 100) if total_time_cum > 0 else 0
     print(f"{fn:<30} {values['calls']:>15} {values['time_total']:15.6f} {values['time_cum']:15.6f} {pct_total:10.0f} %")
+
+

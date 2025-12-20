@@ -38,7 +38,7 @@ def _apply_shift(signal, entry_delay=1):
 # === LONG 
 # =========================================================
 
-def detect_double_top_long(
+def double_top_long(
     arr,
     lookback_minor,
     price_tolerance,
@@ -141,7 +141,12 @@ def _check_pattern_breakouts_long(active_patterns, close, signal, i):
         if i <= pat["bottom2_idx"]:
             continue
         if close[i] > pat["fib_level_price"]:
-            signal[i] = 1
+            # Confirmación de tendencia con MA50
+            if i >= 50:
+                ma50 = np.mean(close[i-50:i])
+                if close[i] > ma50:
+                    signal[i] = 1
+            # Si no hay suficientes datos, no genera señal
             pat["active"] = False
 
 
@@ -149,7 +154,7 @@ def _check_pattern_breakouts_long(active_patterns, close, signal, i):
 # === SHORT 
 # =========================================================
 
-def detect_double_top_short(
+def double_top_short(
     arr,
     lookback_minor,
     price_tolerance,
@@ -247,5 +252,10 @@ def _check_pattern_breakouts_short(active_patterns, close, signal, i):
         if i <= pat["peak2_idx"]:
             continue
         if close[i] < pat["fib_level_price"]:
-            signal[i] = -1
+            # Confirmación de tendencia con MA50
+            if i >= 50:
+                ma50 = np.mean(close[i-50:i])
+                if close[i] < ma50:
+                    signal[i] = -1
+            # Si no hay suficientes datos, no genera señal
             pat["active"] = False
