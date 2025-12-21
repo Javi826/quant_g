@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
+# === FILE: main_MONTECARLO_.py ===
 # -----------------------------------------------------------
 import os
 import time
@@ -24,7 +24,7 @@ STRATEGY          = "double_top"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_2023_IS"
-TIMEFRAME_MINOR   = '6Hutc'
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 400
 MIN_VOL_USDT      = 10_000_000
 
@@ -32,12 +32,12 @@ MIN_VOL_USDT      = 10_000_000
 # GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,5,6] 
-PRICE_TOLERANCE_LIST = [5,10,20,30,40,50] 
+LOOKBACK_MINOR_LIST  = [2,3,5] 
+PRICE_TOLERANCE_LIST = [5,10,20] 
 TREND_TH_LIST        = [5,10,20] 
 
-TP_PCT_LIST          = [2,3,4,5,6,7]
-SL_PCT_LIST          = [2.5,5,7.5,10]
+TP_PCT_LIST          = [7.5,10]
+SL_PCT_LIST          = [5,10]
 
 
 # =============================================================================
@@ -50,7 +50,7 @@ SL_PCT_LIST          = [2.5,5,7.5,10]
 # SL_PCT_LIST          = [5]
 # =============================================================================
 
-param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------

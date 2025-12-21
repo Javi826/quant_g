@@ -9,7 +9,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 
+YELLOW_BOLD = "\033[1;93m"
 RESET = "\033[0m"
+
 
 # ==========================================================================
 # WEBSOCKET MANAGER - EXTENDED
@@ -406,16 +408,12 @@ class BitgetWSManager:
         
         if is_network_error:
             # Solo warning para errores de red (sin traceback)
-            print("─" * 71)
-            print(f"⚠️  {ws_type} WebSocket network issue [{now}]")
+            print(f"⚠️  {ws_type}  WebSocket network issue [{now}]")
             print(f"    {error_str}")
             print(f"    → Retrying connection...")
-            print("─" * 71)
         else:
             # Traceback completo para errores inesperados
-            print("─" * 71)
-            print(f"❌ {ws_type} WebSocket unexpected error [{now}]: {error}")
-            print("─" * 71)
+            print(f"❌ {ws_type}  WebSocket unexpected error [{now}]: {error}")
             import traceback
             traceback.print_exc()
     
@@ -429,15 +427,12 @@ class BitgetWSManager:
         self.last_close_code = close_status_code
         self.last_close_msg = close_msg
         
-        print("─" * 71)  
-        
         # Mostrar desconexión siempre con tipo de WS
         if close_status_code or close_msg:
-            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}")  # ⭐ AÑADIR [{now}]
+            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}")  
         else:
-            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close)")  # ⭐ AÑADIR [{now}]
-        
-        print("─" * 71)  
+            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close)")  
+ 
     
     # ==========================================================================
     # PUBLIC METHODS

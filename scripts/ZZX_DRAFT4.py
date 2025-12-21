@@ -1,261 +1,176 @@
+# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
+# -----------------------------------------------------------
+import os
+import time
 import numpy as np
-
-# =========================================================
-# === FUNCIONES AUXILIARES COMUNES ===
-# =========================================================
-
-def _compute_trend(close, trend_th, window, direction="up"):
-    n = len(close)
-    trend = np.zeros(n, dtype=bool)
-    for i in range(window, n):
-        price_change = (close[i] - close[i - window]) / close[i - window]
-        if direction == "up":
-            trend[i] = price_change > trend_th
-        else:
-            trend[i] = price_change < -trend_th
-    return trend
+import pandas as pd
+from tqdm import tqdm
+from itertools import product
+from tqdm_joblib import tqdm_joblib
+from joblib import Parallel, delayed
+from utils.ZX_analysis import report_montecarlo
+from utils.ZX_utils import filter_symbols, final_prints
+from ZX_compute_BT1 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results
+from tools.ZX_optimize_MCf_tf1 import generate_multiple_paths
+from Z_add_signals_dt import detect_double_top_short
+from Z_add_signals_dt import detect_double_top_long
 
 
-def _is_local_extreme(series, i, lookback, mode="peak"):
-    window_start = i - lookback
-    segment = series[window_start:i]
-    if len(segment) == 0:
-        return False
-    if mode == "peak":
-        return series[i] > np.max(segment)
-    else:
-        return series[i] < np.min(segment)
+DTYPE             = np.float32
+start_time        = time.time()
+N_JOBS            = -1
+STRATEGY          = "double_top"
+# -----------------------------------------------------------------------------
+# CONFIGURATION
+# -----------------------------------------------------------------------------
+DATA_FOLDER       = "data/crypto_2023_IS"
+TIMEFRAME_MINOR   = '4H'
+ORDER_AMOUNT      = 5_000
+MIN_VOL_USDT      = 10_000_000
 
+# -----------------------------------------------------------------------------
+# GRID 
+# -----------------------------------------------------------------------------
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2,3,5] 
+PRICE_TOLERANCE_LIST = [5,10,20] 
+TREND_TH_LIST        = [5,10,20] 
 
-def _apply_shift(signal, entry_delay=1):
-    
-    shifted               = np.zeros_like(signal)
-    shifted[entry_delay:] = signal[:-entry_delay]
-    
-    return shifted
+TP_PCT_LIST          = [3,5,10]
+SL_PCT_LIST          = [5,10]
 
-# =========================================================
-# === LONG 
-# =========================================================
+# =============================================================================
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_MINOR_LIST  = [2] 
+# PRICE_TOLERANCE_LIST = [20] 
+# TREND_TH_LIST        = [10] 
+# 
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [10]
+# =============================================================================
+# =============================================================================
 
-def double_top_long(
-    arr,
-    lookback_minor,
-    price_tolerance,
-    trend_th,
-    downtrend_window=20,
-    fib_level=0.618,
-    live_trading=True
-):
-    # === Normalización de parámetros ===
-    price_tolerance  = price_tolerance / 100.0
-    trend_th         = trend_th / 100.0
-    fib_level        = 0.618
+param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
+param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
+# -----------------------------------------------------------------------------
+# MONTE CARLO SETTINGS
+# -----------------------------------------------------------------------------
+FINAL_N_PATHS = 50
 
-    high, low, close = arr['high'], arr['low'], arr['close']
-    n = len(close)
+if TIMEFRAME_MINOR == '1H':
+    FINAL_N_OBS_PER_PATH = 4000
+elif TIMEFRAME_MINOR == '4H':
+    FINAL_N_OBS_PER_PATH = 1000
+elif TIMEFRAME_MINOR == '6Hutc':
+    FINAL_N_OBS_PER_PATH = 720
+elif TIMEFRAME_MINOR == '12Hutc':
+    FINAL_N_OBS_PER_PATH = 360
+elif TIMEFRAME_MINOR == '1Dutc':
+    FINAL_N_OBS_PER_PATH = 180
 
-    signal  = np.zeros(n, dtype=int)
+TS_INDEX = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
+# -----------------------------------------------------------------------------
+# LOAD AND FILTER DATA
+# -----------------------------------------------------------------------------
+symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 
-    # === Calcular tendencia bajista ===
-    downtrend = _compute_trend(close, trend_th, downtrend_window, direction="down")
+ohlcv_data_minor, filtered_minor = filter_symbols(
+    symbols_minor,
+    min_vol_usdt=MIN_VOL_USDT,
+    timeframe=TIMEFRAME_MINOR,
+    data_folder=DATA_FOLDER,
+    min_price=MIN_PRICE,
+    vol_window=50
+)
 
-    # === Detectar patrones ===
-    active_patterns = []
-    bottoms_idx     = []
-    min_candles_between_bottoms = 2
+def tf_to_pandas_freq(tf):
+    tf = tf.lower().replace("utc", "")
+    return tf.upper()
 
-    for i in range(n):
-        # Detectar suelos locales
-        if i >= lookback_minor:
-            if _is_local_extreme(low, i, lookback_minor, mode="bottom"):
-                bottoms_idx.append(i)
-                _update_active_patterns_long(
-                    bottoms_idx, active_patterns, low, high, downtrend,
-                    price_tolerance, fib_level, min_candles_between_bottoms
-                )
+# -----------------------------------------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------------------------------------
+def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
+    paths_per_symbol = {}
+    for symbol, df_hist in ohlcv_data.items():
+        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
+        if arr_paths is not None and arr_paths.shape[0] > 0:
+            paths_per_symbol[symbol] = arr_paths
+    return paths_per_symbol
 
-        # Comprobar rupturas de patrones activos
-        _check_pattern_breakouts_long(
-            active_patterns, close, signal, i
+def process_path_IDX(path_idx, paths_minor, param_dict_list):
+    all_results = []
+    for param_dict in param_dict_list:
+        ohlcv_arrays_minor = extract_ohlcv_from_path(paths_minor, path_idx, dtype=DTYPE)
+
+        for sym in ohlcv_arrays_minor.keys():
+
+            arr_minor = ohlcv_arrays_minor[sym]
+ 
+            signals = detect_double_top_long(
+                arr_minor,
+                lookback_minor=param_dict.get('LOOKBACK_MINOR'),
+                price_tolerance=param_dict.get('PRICE_TOLERANCE'),
+                trend_th=param_dict.get('TREND_TH'),
+                backtest=True
+            )
+
+            arr_minor['signal'] = np.asarray(signals, dtype=DTYPE)
+
+        result = run_grid_backtest(
+            ohlcv_arrays_minor,
+            sell_after=param_dict.get('SELL_AFTER'),
+            tp_pct=param_dict.get('TP_PCT'),
+            sl_pct=param_dict.get('SL_PCT'),
+            order_amount=ORDER_AMOUNT
         )
 
-    # === Shift causal para backtest ===
-    if not live_trading:
-        signal = _apply_shift(signal, entry_delay=1)
+        portfolio_record = compile_MC_results(result, param_dict, path_idx, INITIAL_BALANCE, dtype=DTYPE)
+        all_results.append(portfolio_record)
 
-    return signal
+    return all_results
 
+def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
+    with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
+        return Parallel(n_jobs=n_jobs)(tasks)
 
-def _update_active_patterns_long(
-    bottoms_idx, active_patterns, low, high, downtrend,
-    price_tolerance, fib_level, min_candles_between_bottoms
-):
-    bottom2_idx = bottoms_idx[-1]
-    for bottom1_idx in reversed(bottoms_idx[:-1]):
-        if bottom2_idx - bottom1_idx < min_candles_between_bottoms:
-            continue
+# -----------------------------------------------------------------------------
+# GENERATE PATHS FOR MINOR TIMEFRAME AND DERIVE MAJOR
+# -----------------------------------------------------------------------------
+start_paths_time = time.time()
+paths_minor = generate_paths_for_all_symbols_functional(
+    ohlcv_data_minor,
+    n_paths=FINAL_N_PATHS,
+    n_obs=FINAL_N_OBS_PER_PATH,
+    raw_columns=[]
+)
 
-        bottom1_low = low[bottom1_idx]
-        bottom2_low = low[bottom2_idx]
-        if bottom1_low == 0:
-            continue
+end_paths_time = time.time()
+print(f"\n🕒 Paths generation + derivation: {end_paths_time - start_paths_time:.2f} seconds")
 
-        price_diff = abs(bottom1_low - bottom2_low) / bottom1_low
-        if price_diff > price_tolerance:
-            continue
+# -----------------------------------------------------------------------------
+# EVALUATE MONTE CARLO PATHS
+# -----------------------------------------------------------------------------
+start_eval_time = time.time()
+results_list = parallel_with_progress(
+    [delayed(process_path_IDX)(path_idx, paths_minor, param_dict_list)
+     for path_idx in range(FINAL_N_PATHS)],
+    desc="\n🔁 Evaluating Paths_IDX"
+)
+end_eval_time = time.time()
+print(f"\n🕒 Paths evaluation: {end_eval_time - start_eval_time:.2f} seconds")
 
-        if not downtrend[bottom1_idx]:
-            continue
+all_results  = [r for sublist in results_list for r in sublist]
+df_portfolio = pd.DataFrame(all_results)
 
-        peak_segment = high[bottom1_idx:bottom2_idx + 1]
-        if len(peak_segment) == 0:
-            continue
-        peak_idx_rel = np.argmax(peak_segment)
-        peak_idx = bottom1_idx + peak_idx_rel
-        peak_high = peak_segment[peak_idx_rel]
+# -----------------------------------------------------------------------------
+# SUMMARY / REPORT
+# -----------------------------------------------------------------------------
+final_prints(f"🎰 MC_{STRATEGY} 🎰", DATA_FOLDER, f"{TIMEFRAME_MINOR}", min_vol_usdt=MIN_VOL_USDT, order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+df_summary = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
-        pattern_range = peak_high - bottom1_low
-        if pattern_range <= 0:
-            continue
-
-        fib_level_price = bottom1_low + (pattern_range * fib_level)
-        pattern = {
-            "bottom1_idx": bottom1_idx,
-            "bottom2_idx": bottom2_idx,
-            "peak_idx": peak_idx,
-            "peak_high": peak_high,
-            "bottom1_low": bottom1_low,
-            "fib_level_price": fib_level_price,
-            "active": True
-        }
-        active_patterns.append(pattern)
-
-
-def _check_pattern_breakouts_long(active_patterns, close, signal, i):
-    if len(active_patterns) == 0:
-        return
-    for pat in active_patterns:
-        if not pat["active"]:
-            continue
-        if i <= pat["bottom2_idx"]:
-            continue
-        if close[i] > pat["fib_level_price"]:
-            # Confirmación de tendencia con MA50
-            if i >= 50:
-                ma50 = np.mean(close[i-50:i])
-                if close[i] > ma50:
-                    signal[i] = 1
-            # Si no hay suficientes datos, no genera señal
-            pat["active"] = False
-
-
-# =========================================================
-# === SHORT 
-# =========================================================
-
-def double_top_short(
-    arr,
-    lookback_minor,
-    price_tolerance,
-    trend_th,
-    uptrend_window=20,
-    fib_level=0.618,
-    live_trading=True
-):
-    # === Normalización de parámetros ===
-    price_tolerance = price_tolerance / 100.0
-    trend_th        = trend_th / 100.0
-    fib_level       = 0.618
-
-    high, low, close = arr['high'], arr['low'], arr['close']
-    n = len(close)
-
-    signal  = np.zeros(n, dtype=int)
-
-    # === Calcular tendencia alcista ===
-    uptrend = _compute_trend(close, trend_th, uptrend_window, direction="up")
-
-    # === Detectar patrones ===
-    active_patterns = []
-    peaks_idx       = []
-    min_candles_between_peaks = 2
-
-    for i in range(n):
-        # Detectar picos locales
-        if i >= lookback_minor:
-            if _is_local_extreme(high, i, lookback_minor, mode="peak"):
-                peaks_idx.append(i)
-                _update_active_patterns_short(
-                    peaks_idx, active_patterns, high, low, uptrend,
-                    price_tolerance, fib_level, min_candles_between_peaks
-                )
-
-        # Comprobar rupturas de patrones activos
-        _check_pattern_breakouts_short(
-            active_patterns, close, signal, i
-        )
-
-    # === Shift causal para backtest ===
-    if not live_trading:
-        signal = _apply_shift(signal, entry_delay=1)
-
-    return signal
-
-
-def _update_active_patterns_short(
-    peaks_idx, active_patterns, high, low, uptrend,
-    price_tolerance, fib_level, min_candles_between_peaks
-):
-    peak2_idx = peaks_idx[-1]
-    for peak1_idx in reversed(peaks_idx[:-1]):
-        if peak2_idx - peak1_idx < min_candles_between_peaks:
-            continue
-
-        peak1_high = high[peak1_idx]
-        peak2_high = high[peak2_idx]
-        price_diff = abs(peak1_high - peak2_high) / peak1_high
-        if price_diff > price_tolerance:
-            continue
-
-        if not uptrend[peak1_idx]:
-            continue
-
-        valley_segment = low[peak1_idx:peak2_idx + 1]
-        if len(valley_segment) == 0:
-            continue
-        valley_idx_rel = np.argmin(valley_segment)
-        valley_idx = peak1_idx + valley_idx_rel
-        valley_low = valley_segment[valley_idx_rel]
-
-        pattern_range = peak1_high - valley_low
-        fib_level_price = valley_low + (pattern_range * fib_level)
-
-        pattern = {
-            "peak1_idx": peak1_idx,
-            "peak2_idx": peak2_idx,
-            "valley_idx": valley_idx,
-            "valley_low": valley_low,
-            "peak1_high": peak1_high,
-            "fib_level_price": fib_level_price,
-            "active": True
-        }
-        active_patterns.append(pattern)
-
-
-def _check_pattern_breakouts_short(active_patterns, close, signal, i):
-    if len(active_patterns) == 0:
-        return
-    for pat in active_patterns:
-        if not pat["active"]:
-            continue
-        if i <= pat["peak2_idx"]:
-            continue
-        if close[i] < pat["fib_level_price"]:
-            # Confirmación de tendencia con MA50
-            if i >= 50:
-                ma50 = np.mean(close[i-50:i])
-                if close[i] < ma50:
-                    signal[i] = -1
-            # Si no hay suficientes datos, no genera señal
-            pat["active"] = False
+elapsed = int(time.time() - start_time)
+print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

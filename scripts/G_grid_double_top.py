@@ -13,10 +13,6 @@ from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from Z_add_signals_double_top import double_top_short
 from Z_add_signals_double_top import double_top_long
-# =============================================================================
-# from ZZX_DRAFT4 import double_top_short
-# from ZZX_DRAFT4 import double_top_long
-# =============================================================================
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
@@ -30,7 +26,7 @@ DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -50,7 +46,7 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_MINOR_LIST  = [2] 
 PRICE_TOLERANCE_LIST = [10] 
-TREND_TH_LIST        = [20] 
+TREND_TH_LIST        = [10] 
 
 TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
@@ -80,7 +76,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = double_top_short(
+        signals = double_top_long(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 

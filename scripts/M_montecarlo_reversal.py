@@ -24,21 +24,24 @@ STRATEGY            = "reversal"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
-ORDER_AMOUNT        = 400
+TIMEFRAME_MINOR     = '4H'
+ORDER_AMOUNT        = 5000
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [3,4,5,6,7,8,9] 
+LEFT_LOOKBACK_LIST   = [7,8,9] 
 TOLERANCE_LIST       = [20,30,40]
-MA_PERIOD_LIST       = [25,50,100]
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [2,3,4,5]
-SL_PCT_LIST          = [2.5,5.0,7.5,10]
+SELL_AFTER_LIST      = [0]  
+LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
+TOLERANCE_LIST       = [5,10,15,20,25,30]
 
+TP_PCT_LIST          = [3,4,5,6,7]
+SL_PCT_LIST          = [5,10]
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
 # LEFT_LOOKBACK_LIST   = [5] 
@@ -76,7 +79,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_long(
+            signals = reversal_short(
                 arr_minor,
                 left_lookback=param_dict.get('LEFT_LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

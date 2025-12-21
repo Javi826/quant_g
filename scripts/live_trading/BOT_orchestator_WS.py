@@ -11,7 +11,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from ZX_connect_live import send_request_00, send_request_01, send_request_E1
+from ZX_connect_live import send_request_01, send_request_E1
 
 # BOT auxiliars
 from ZX_BOT_ws_manager import init_websocket
@@ -27,14 +27,12 @@ from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
 
 # Dinamic import account passwords
-from utils.ZZ_connect import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
 from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
 from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
-from utils.ZZ_connect import connect_bitget_00, connect_bitget_01, connect_bitget_E1
+from utils.ZZ_connect import connect_bitget_01, connect_bitget_E1
 
 #Credentials according account number
 CREDENTIALS = {
-"00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
 "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
 "E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
 }
@@ -70,8 +68,6 @@ elif ACCOUNT_NUMBER == "E1":
     BLUE_BOLD = CYAN
     INITIAL_CAPITAL = 1761
     
-
-
 #==========================================================================
 # PATHS FILES & CREDENTIALS
 #==========================================================================
@@ -110,7 +106,7 @@ STRAT_A = {
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 2,
-    'tolerance': 20,
+    'tolerance': 10,
     'trend_th': 10,
     'tp_pct': 5,
     'sl_pct': 10,
