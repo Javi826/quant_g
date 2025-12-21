@@ -231,7 +231,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     # RESUMEN POR COMBINACIÓN
     # -----------------------------
     summary_results = []
-    combos_present = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
+    combos_present  = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
 
     for comb in combos_present:
         filt = np.ones(len(df_portfolio), dtype=bool)
@@ -239,23 +239,23 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
             filt &= (df_portfolio[k] == v)
         subset = df_portfolio[filt]
 
-        port_balances = subset['Portfolio_Final_Balance'].dropna()
-        port_dd       = subset['DD'].dropna() if 'DD' in subset.columns else pd.Series(dtype=float)
+        port_balances  = subset['Portfolio_Final_Balance'].dropna()
+        port_dd        = subset['DD'].dropna() if 'DD' in subset.columns else pd.Series(dtype=float)
         port_win_ratio = subset['Win_Ratio'].dropna() if 'Win_Ratio' in subset.columns else pd.Series(dtype=float)
-        port_sharpe   = subset['Sharpe'].dropna() if 'Sharpe' in subset.columns else pd.Series(dtype=float)
+        port_sharpe    = subset['Sharpe'].dropna() if 'Sharpe' in subset.columns else pd.Series(dtype=float)
 
         if len(port_balances) > 0:
-            port_gain_abs = port_balances - initial_balance
-            port_gain_pct = (port_gain_abs / initial_balance) * 100
-            port_net_gain_mean = port_gain_abs.mean()
+            port_gain_abs          = port_balances - initial_balance
+            port_gain_pct          = (port_gain_abs / initial_balance) * 100
+            port_net_gain_mean     = port_gain_abs.mean()
             port_net_gain_pct_mean = port_gain_pct.mean()
         else:
             port_net_gain_mean = np.nan
             port_net_gain_pct_mean = np.nan
 
-        port_dd_mean = port_dd.mean() if len(port_dd) > 0 else np.nan
+        port_dd_mean        = port_dd.mean() if len(port_dd) > 0 else np.nan
         port_win_ratio_mean = port_win_ratio.mean() if len(port_win_ratio) > 0 else np.nan
-        port_sharpe_mean = port_sharpe.mean() if len(port_sharpe) > 0 else np.nan
+        port_sharpe_mean    = port_sharpe.mean() if len(port_sharpe) > 0 else np.nan
 
         summary_results.append({
             **comb,
@@ -312,7 +312,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     textstr = f'Probability of Negative Path: {prob_negative:.2f}%'
 
     fig.text(
-        0.75, 0.90, textstr,       # posición a la derecha y un poco abajo
+        0.75, 0.90, textstr,       
         fontsize=14,
         fontfamily='monospace',
         va='top',
@@ -340,15 +340,15 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     ])
     
     df_best = df_best.drop(columns=['Net_Gain_m', 'Rows'], errors='ignore')
-    cols = ['Metric'] + [c for c in df_best.columns if c != 'Metric']
+    cols    = ['Metric'] + [c for c in df_best.columns if c != 'Metric']
     df_best = df_best[cols]
     df_best = df_best.round(2)
 
     print(df_best.to_string(index=False))
 
-    median_gain = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
+    median_gain   = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
     print(f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%")
-    std_gain = path_grouped['Net_Gain_pct'].dropna().std()
+    std_gain      = path_grouped['Net_Gain_pct'].dropna().std()
     print(f"Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
     print(f"Probability of Negative Path : {prob_negative:.2f}%")

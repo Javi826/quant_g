@@ -131,10 +131,10 @@ def generate_paths_for_symbol(
     if 'close' not in df.columns or len(df) < 2:
         return np.full((n_paths, n_obs, 4), np.nan, dtype=DTYPE)
 
-    closes = df["close"].astype(float)
-    logret = np.log(closes / closes.shift(1)).iloc[1:]
-    mu_bar = float(np.nanmean(logret)) if not logret.empty else 0.0
-    sigma_bar = max(float(np.nanstd(logret, ddof=0)) * vol_scale, 1e-8)
+    closes     = df["close"].astype(float)
+    logret     = np.log(closes / closes.shift(1)).iloc[1:]
+    mu_bar     = float(np.nanmean(logret)) if not logret.empty else 0.0
+    sigma_bar  = max(float(np.nanstd(logret, ddof=0)) * vol_scale, 1e-8)
     last_price = float(df["close"].iloc[-1])
 
     seeds = np.array([seed_for_symbol(sym_name, base_seed=base_seed, path_idx=i) for i in range(n_paths)], dtype=np.uint64)
@@ -257,16 +257,16 @@ def _wasserstein_1d_numba(a, b):
 
 @njit(parallel=True)
 def _compute_paths_metrics_numba(hist_rets, syn_array, nlags):
-    npaths = syn_array.shape[0]
-    dists = np.empty(npaths, dtype=DTYPE)
-    ksD   = np.empty(npaths, dtype=DTYPE)
+    npaths  = syn_array.shape[0]
+    dists   = np.empty(npaths, dtype=DTYPE)
+    ksD     = np.empty(npaths, dtype=DTYPE)
     acf_sum = np.zeros(nlags+1, dtype=DTYPE)
 
     for p in prange(npaths):
         r = syn_array[p]
         dists[p] = _wasserstein_1d_numba(hist_rets, r)
         ksD[p]   = _ks_statistic_numba(hist_rets, r)
-        acf_p = _acf_series_numba(np.abs(r), nlags=nlags)
+        acf_p    = _acf_series_numba(np.abs(r), nlags=nlags)
         for k in range(acf_p.shape[0]):
             acf_sum[k] += acf_p[k]
     return dists, ksD, acf_sum
@@ -344,14 +344,14 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
         hist_norm += hist_acf_abs[k] ** 2
     sim_acf = max(0.0, 100.0 * (1.0 - (diff_norm ** 0.5) / (hist_norm ** 0.5 + 1e-12))) if hist_norm > 0 else 0.0
 
-    sim_ks = np.mean(100.0 * (1.0 - ksD))
-    p95 = float(np.percentile(dists, 95)) + 1e-12
+    sim_ks        = np.mean(100.0 * (1.0 - ksD))
+    p95           = float(np.percentile(dists, 95)) + 1e-12
     wasser_scores = np.ones(npaths, dtype=DTYPE) * 100.0 if p95 <= 0 else 100.0 * (1.0 - np.clip(dists / p95, 0.0, 1.0))
-    sim_wass = float(np.mean(wasser_scores))
+    sim_wass      = float(np.mean(wasser_scores))
 
     weights = np.array([0.20, 0.20, 0.10, 0.10, 0.10, 0.10, 0.20], dtype=DTYPE)
     metrics = np.array([sim_mean, sim_std, sim_skew, sim_kurt, sim_acf, sim_ks, sim_wass], dtype=DTYPE)
-    score = float(np.sum(metrics * weights))
+    score   = float(np.sum(metrics * weights))
 
     return score, metrics
 
@@ -360,10 +360,10 @@ def evaluate_synthetic_vs_real(df_hist, arr_syn_list, nlags_acf=50):
 # OPTUNA PARA OPTIMIZACIÓN
 # -----------------------------
 def objective(trial, df_hist, n_paths, n_obs, n_substeps, min_price, timeframe, base_seed):
-    vol_scale = trial.suggest_float("vol_scale", 0.3, 1.0, step=0.05)
+    vol_scale             = trial.suggest_float("vol_scale", 0.3, 1.0, step=0.05)
     jump_prob_per_substep = trial.suggest_float("jump_prob_per_substep", 0.0, 0.030, step=0.0025)
-    jump_mu = trial.suggest_float("jump_mu", -0.02, 0.02, step=0.0025)
-    jump_sigma = trial.suggest_float("jump_sigma", 0.002, 0.024, step=0.002)
+    jump_mu               = trial.suggest_float("jump_mu", -0.02, 0.02, step=0.0025)
+    jump_sigma            = trial.suggest_float("jump_sigma", 0.002, 0.024, step=0.002)
 
     df_syn_list = generate_paths_for_symbol(
         df_hist, n_paths=n_paths, n_obs=n_obs, n_substeps=n_substeps,
@@ -371,7 +371,7 @@ def objective(trial, df_hist, n_paths, n_obs, n_substeps, min_price, timeframe, 
         jump_prob_per_substep=jump_prob_per_substep, jump_mu=jump_mu, jump_sigma=jump_sigma,
         timeframe=timeframe, base_seed=base_seed
     )
-    score, metrics = evaluate_synthetic_vs_real(df_hist, df_syn_list)  # ✅ DESEMPAQUETAR
+    score, metrics = evaluate_synthetic_vs_real(df_hist, df_syn_list)  
     return score if score is not None else -np.inf
 
 def optimize_params_optuna(df_hist, n_trials, n_paths, n_obs, n_substeps, min_price, timeframe, seed: int = 42):

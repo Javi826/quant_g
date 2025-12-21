@@ -88,9 +88,9 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         else:
             ohlcv_data[sym] = df
             filtered_symbols.append(sym)
-    print(f"\n🔹Total symbols BROKER   : {len(symbols)}")
-    print(f"🔹Symbols removed total  : {len(removed_symbols)}")
-    print(f"🔹Symbols remaining      : {len(filtered_symbols)}\n")
+    print(f"\n🔹Total symbols     : {len(symbols)}")
+    print(f"🔹Symbols removed   : {len(removed_symbols)}")
+    print(f"🔹Symbols remaining : {len(filtered_symbols)}\n")
     return ohlcv_data, filtered_symbols
 
         

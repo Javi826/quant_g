@@ -346,17 +346,6 @@
         "order_id": "1385609087835344997",
         "opened_at": "2025-12-18T18:01:10.891642+00:00",
         "usdt_amount": 40.0
-      },
-      {
-        "symbol": "MLNUSDT",
-        "size": "9",
-        "entry_price": "4.415",
-        "direction": "short",
-        "tp": "4.23840",
-        "sl": "4.746125",
-        "order_id": "1385609091111096321",
-        "opened_at": "2025-12-18T18:01:11.646997+00:00",
-        "usdt_amount": 40.0
       }
     ],
     "revers_long_4H": [
@@ -374,15 +363,15 @@
     ]
   },
   "strategy_candles": {
-    "revers_long_1H": 16,
-    "parity_long_1H": 16,
-    "parity_short_1H": 8,
-    "double_top_long_4H": 15,
-    "parity_long_4H": 1,
-    "revers_short_4H": 15,
-    "parity_short_4H": 14,
-    "revers_short_1H": 8,
-    "revers_short_6Hutc": 10,
-    "revers_long_4H": 8
+    "revers_long_1H": 19,
+    "parity_long_1H": 19,
+    "parity_short_1H": 11,
+    "double_top_long_4H": 16,
+    "parity_long_4H": 2,
+    "revers_short_4H": 16,
+    "parity_short_4H": 15,
+    "revers_short_1H": 11,
+    "revers_short_6Hutc": 11,
+    "revers_long_4H": 9
   }
 }

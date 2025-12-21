@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
+# === FILE: main_MONTECARLO_ ===
 # -----------------------------------------------------------
 import os
 import time
@@ -24,8 +24,8 @@ STRATEGY            = "parity"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
-ORDER_AMOUNT        = 80
+TIMEFRAME_MINOR     = '4H'
+ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
@@ -33,21 +33,12 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [10,15,20,25,30,35,40] 
-MA_PERIOD_LIST       = [25,50,100]
+TOLERANCE_LIST       = [15,20,25,30] 
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [5,7.5,10]
-SL_PCT_LIST          = [2.5,5.0,7.5,10]
+TP_PCT_LIST          = [5.0,7.5,10]
+SL_PCT_LIST          = [5.0,7.5,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# 
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [20] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
@@ -55,7 +46,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 100
+FINAL_N_PATHS        = 50
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
