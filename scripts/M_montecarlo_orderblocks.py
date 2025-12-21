@@ -36,18 +36,8 @@ LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [2.5,5.0,7.5,10]
-SL_PCT_LIST          = [2.5,5.0,7.5,10]
-
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# 
-# LOOKBACK_LIST        = [150]
-# TOLERANCE_LIST       = [40] 
-# 
-# TP_PCT_LIST          = [3]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+TP_PCT_LIST          = [2.5,5.0]
+SL_PCT_LIST          = [5,7.5,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -81,7 +71,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = orderblocks_short(
+            signals = orderblocks_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

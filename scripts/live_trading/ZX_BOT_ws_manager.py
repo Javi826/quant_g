@@ -9,8 +9,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 
-YELLOW_BOLD = "\033[1;93m"
-RESET = "\033[0m"
+GREEN_BOLD  = "\033[0;92m"
+YELLOW_BOLD = "\033[0;93m"
+RED_BOLD    = "\033[0;91m"
+RESET       = "\033[0m"
 
 
 # ==========================================================================
@@ -133,7 +135,7 @@ class BitgetWSManager:
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        print(f"🔌 PUBLIC  WebSocket connected [{now}]")
+        print(f"{GREEN_BOLD}🔌 PUBLIC  WebSocket connected [{now}]{RESET}")
         if self.subscribed_public:
             self._resubscribe_public()
     
@@ -227,21 +229,21 @@ class BitgetWSManager:
         """Callback al conectar WS privado - autenticar"""
         # Detectar si es reconexión (authenticated ya es True)
         is_reconnect = self.authenticated
+        now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
         
         if is_reconnect:
-            now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
             # Mostrar razón de la desconexión anterior si existe
             if self.last_close_code or self.last_close_msg:
-                print(f"🔄 PRIVATE WebSocket reconnected [{now}]")  # ⭐ Separar en 2 líneas
+                print(f"{GREEN_BOLD}🔄 PRIVATE WebSocket reconnected [{now}]{RESET}")
                 print(f"   Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
                 # Sin código de cierre guardado - puede ser timeout sin aviso
-                print(f"🔄 PRIVATE WebSocket reconnected [{now}]")
+                print(f"{GREEN_BOLD}🔄 PRIVATE WebSocket reconnected [{now}]{RESET}")
                 print(f"   Previous: code=unknown (likely timeout)")
         else:
-            print("🔌 PRIVATE WebSocket connected (first time)")
+            print(f"{GREEN_BOLD}🔌 PRIVATE WebSocket connected [{now}]{RESET}")
         
         self._authenticate()
         time.sleep(0.5)
@@ -408,12 +410,12 @@ class BitgetWSManager:
         
         if is_network_error:
             # Solo warning para errores de red (sin traceback)
-            print(f"⚠️  {ws_type}  WebSocket network issue [{now}]")
+            print(f"{YELLOW_BOLD}⚠️  {ws_type}  WebSocket network issue [{now}]{RESET}")
             print(f"    {error_str}")
             print(f"    → Retrying connection...")
         else:
             # Traceback completo para errores inesperados
-            print(f"❌ {ws_type}  WebSocket unexpected error [{now}]: {error}")
+            print(f"{RED_BOLD}❌ {ws_type}  WebSocket unexpected error [{now}]: {error}{RESET}")
             import traceback
             traceback.print_exc()
     
@@ -429,9 +431,9 @@ class BitgetWSManager:
         
         # Mostrar desconexión siempre con tipo de WS
         if close_status_code or close_msg:
-            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}")  
+            print(f"{YELLOW_BOLD}⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}{RESET}") 
         else:
-            print(f"⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close)")  
+            print(f"{YELLOW_BOLD}⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close){RESET}")
  
     
     # ==========================================================================

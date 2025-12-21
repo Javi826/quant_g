@@ -15,8 +15,8 @@ from Z_add_signals_orderblocks import orderblocks_long
 from Z_add_signals_orderblocks import orderblocks_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
-STRATEGY     = "orderblocks_short"
+SAVE_SYMBOLS = True
+STRATEGY     = "orderblocks_long_4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -26,7 +26,7 @@ DATA_FOLDER         = "data/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -35,30 +35,12 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [10,25,50,100,150]
-TOLERANCE_LIST       = [1,5,10,20,30,40]
-IMPULSE_LIST         = [0.1,1.0,10] 
-
-TP_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
-SL_PCT_LIST          = [1,2,3,4,5,6,7,8,9]
-
-SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50]
-TOLERANCE_LIST       = [30] 
-IMPULSE_LIST         = [0.1] 
+TOLERANCE_LIST       = [40] 
+IMPULSE_LIST         = [0.01] 
 
-TP_PCT_LIST          = [2.5]
-SL_PCT_LIST          = [5]
-
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [40] 
-# IMPULSE_LIST         = [0.01] 
-# 
-# TP_PCT_LIST          = [2.5]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
