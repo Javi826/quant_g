@@ -1,4 +1,4 @@
-# === FILE: Z_optimize_MC.py (NUMBA-accelerated, arrays 3D con DTYPE configurable) ===
+# === FILE: Z_optimize_MC.py ===
 import math
 import optuna
 import numpy as np

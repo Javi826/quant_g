@@ -8,7 +8,6 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-#from ZZX_DRAFT4 import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
@@ -36,8 +35,8 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [20] 
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [30] 
 MA_PERIOD_LIST       = [50]
 
 TP_PCT_LIST          = [5]

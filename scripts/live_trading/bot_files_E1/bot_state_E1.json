@@ -363,15 +363,15 @@
     ]
   },
   "strategy_candles": {
-    "revers_long_1H": 21,
-    "parity_long_1H": 21,
-    "parity_short_1H": 13,
-    "double_top_long_4H": 17,
-    "parity_long_4H": 3,
-    "revers_short_4H": 17,
-    "parity_short_4H": 16,
-    "revers_short_1H": 13,
-    "revers_short_6Hutc": 11,
-    "revers_long_4H": 10
+    "revers_long_1H": 25,
+    "parity_long_1H": 25,
+    "parity_short_1H": 17,
+    "double_top_long_4H": 18,
+    "parity_long_4H": 4,
+    "revers_short_4H": 18,
+    "parity_short_4H": 17,
+    "revers_short_1H": 17,
+    "revers_short_6Hutc": 12,
+    "revers_long_4H": 11
   }
 }

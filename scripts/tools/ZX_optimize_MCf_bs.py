@@ -31,12 +31,87 @@ def compute_candle_features(df, raw_columns=[]):
     return df, df_raw
 
 
-def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=42):
+def generate_block_bootstrap_indices(n_rows, n_obs, block_size, rnd):
+    """
+    Genera índices usando Block Bootstrap para preservar autocorrelación.
+    
+    En lugar de muestrear velas individuales aleatoriamente, muestrea
+    bloques consecutivos de velas para mantener la estructura temporal.
+    
+    Parameters:
+    -----------
+    n_rows : int
+        Número total de filas disponibles en el histórico
+    n_obs : int
+        Número de observaciones a generar
+    block_size : int
+        Tamaño del bloque a muestrear (e.g., 5 velas consecutivas)
+    rnd : random.Random
+        Generador de números aleatorios
+    
+    Returns:
+    --------
+    np.array : Array de índices muestreados
+    """
+    indices = []
+    
+    while len(indices) < n_obs:
+        # Muestrear punto de inicio del bloque
+        max_start = n_rows - block_size
+        if max_start < 0:
+            # Si el histórico es muy corto, usar todo
+            max_start = 0
+            block_size_actual = n_rows
+        else:
+            block_size_actual = block_size
+        
+        start_idx = rnd.randint(0, max_start)
+        
+        # Agregar bloque consecutivo
+        block = list(range(start_idx, min(start_idx + block_size_actual, n_rows)))
+        indices.extend(block)
+    
+    # Truncar a n_obs exacto
+    return np.array(indices[:n_obs], dtype=np.int64)
+
+
+def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=42, block_size=5):
+    """
+    Genera múltiples paths sintéticos usando Block Bootstrap.
+    
+    MEJORA IMPLEMENTADA:
+    --------------------
+    Block Bootstrap: Muestrea bloques consecutivos en lugar de velas individuales
+    para preservar autocorrelación y patrones temporales realistas.
+    
+    Parameters:
+    -----------
+    df_hist : pd.DataFrame
+        DataFrame histórico con OHLC
+    n_paths : int
+        Número de paths a generar
+    n_obs : int
+        Número de observaciones por path
+    raw_columns : list
+        Columnas adicionales a incluir
+    base_seed : int
+        Semilla base para reproducibilidad
+    block_size : int (default=5)
+        Tamaño del bloque para block bootstrap
+        - Para 4H: 5 bloques = ~20 horas
+        - Para 1H: 10 bloques = ~10 horas
+        - Para 15m: 20 bloques = ~5 horas
+    
+    Returns:
+    --------
+    np.ndarray : Array 3D (n_paths, n_obs, n_features)
+    """
     df_features, df_raw = compute_candle_features(df_hist, raw_columns)
     n_rows = len(df_features)
     if n_rows == 0 or n_obs == 0:
         return np.empty((0, 0, 0))
 
+    # Preparar data array
     cols = [
         df_features["pct_open_low"].to_numpy(np.float64),
         df_features["pct_open_high"].to_numpy(np.float64),
@@ -59,10 +134,17 @@ def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=4
     paths_array = np.empty((n_paths, n_obs, n_features_out), dtype=np.float64)
 
     for i in range(n_paths):
-        rnd     = random.Random(base_seed + i)
-        indices = np.array([rnd.randrange(n_rows) for _ in range(n_obs)], dtype=np.int64)
+        rnd = random.Random(base_seed + i)
+        
+        # ========================================================================
+        # BLOCK BOOTSTRAP: Muestrear bloques consecutivos
+        # ========================================================================
+        indices = generate_block_bootstrap_indices(n_rows, n_obs, block_size, rnd)
+        
+        # Samplear datos
         sampled = data_array[indices]
 
+        # Construcción del path
         pct_open_low, pct_open_high, pct_open_close = sampled[:, 0], sampled[:, 1], sampled[:, 2]
 
         multipliers  = 1.0 + pct_open_close
@@ -79,16 +161,16 @@ def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=4
         low_times  = times + sampled[:, 4]
         high_times = times + sampled[:, 5]
 
-        # stack completo
+        # Stack completo
         base_cols = [
-                open_prices, 
-                low_prices, 
-                high_prices, 
-                close_prices, 
-                low_times,      # Timestamp cuando ocurrió el low
-                high_times,     # Timestamp cuando ocurrió el high
-                times           # NUEVO: Timestamp de inicio de la vela
-            ]
+            open_prices, 
+            low_prices, 
+            high_prices, 
+            close_prices, 
+            low_times,      # Timestamp cuando ocurrió el low
+            high_times,     # Timestamp cuando ocurrió el high
+            times           # Timestamp de inicio de la vela
+        ]
         if n_raw > 0:
             for idx_col in range(n_raw):
                 base_cols.append(sampled[:, 6 + idx_col])
@@ -134,10 +216,40 @@ def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndar
 
     return paths_major
 
-def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
+
+def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[], block_size=5):
+    """
+    Genera paths para todos los símbolos usando Block Bootstrap.
+    
+    Parameters:
+    -----------
+    ohlcv_data : dict
+        {symbol: DataFrame}
+    n_paths : int
+        Número de paths por símbolo
+    n_obs : int
+        Observaciones por path
+    raw_columns : list
+        Columnas adicionales a incluir
+    block_size : int (default=5)
+        Tamaño de bloques consecutivos
+        - Para 4H: 5 (recomendado)
+        - Para 1H: 10
+        - Para 15m: 20
+    
+    Returns:
+    --------
+    dict : {symbol: np.ndarray paths}
+    """
     paths_per_symbol = {}
     for symbol, df_hist in ohlcv_data.items():
-        arr_paths = generate_multiple_paths(df_hist, n_paths=n_paths, n_obs=n_obs, raw_columns=raw_columns)
+        arr_paths = generate_multiple_paths(
+            df_hist, 
+            n_paths=n_paths, 
+            n_obs=n_obs, 
+            raw_columns=raw_columns,
+            block_size=block_size
+        )
         if arr_paths is not None and arr_paths.shape[0] > 0:
             paths_per_symbol[symbol] = arr_paths
     return paths_per_symbol

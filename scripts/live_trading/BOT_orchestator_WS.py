@@ -444,7 +444,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
-                    impulse=strategy['ma_period'],
+                    impulse=strategy['impulse'],
                     live_trading=True
                 )
             elif strategy['name'] == 'orderblocks_short_4H':
@@ -452,7 +452,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
-                    impulse=strategy['ma_period'],
+                    impulse=strategy['impulse'],
                     live_trading=True
                 )
             else:
@@ -501,18 +501,18 @@ def validate_strategy_configuration(strategies):
     errors   = []
     warnings = []
     
-    # ====================================================================
-    # VALIDACIÓN 1: Nombres implementados
-    # ====================================================================
+    # --------------------------------------------------------------------
+    # VALIDATION 1: Names
+    # --------------------------------------------------------------------
     if missing_implementation:
         errors.append(f"❌ Strategies WITHOUT implementation: {missing_implementation}")
     
     if unused_implementation:
         warnings.append(f"⚠️  Implemented but NOT declared: {unused_implementation}")
     
-    # ====================================================================
-    # VALIDACIÓN 2: Coherencia direction vs nombre
-    # ====================================================================
+    # --------------------------------------------------------------------
+    # VALIDATION 2: Coherence
+    # --------------------------------------------------------------------
     for strat in strategies:
         name      = strat.get('name', '')
         direction = strat.get('direction', '')
@@ -533,7 +533,6 @@ def validate_strategy_configuration(strategies):
                 f"but direction='{direction}'"
             )
         
-        # Validar que direction sea válido
         if direction not in ['long', 'short']:
             errors.append(
                 f"❌ Strategy '{strat_id}' has invalid direction='{direction}' "
@@ -550,7 +549,16 @@ def main_loop():
     print(f"{COLOR}🤖 === STARTING MULTI-STRATEGY BOT OPERATING IN ACCOUNT: {ACCOUNT_NUMBER} 🤖 ==={RESET}")
     print(f"{COLOR}{'=' * 120}{RESET}")
     
-    # ⭐ VALIDAR CONFIGURACIÓN DE ESTRATEGIAS
+    # --------------------------------------------------------------------
+    # LOAD STATE & SYMBOLS 
+    # --------------------------------------------------------------------
+        
+    OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
+    all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
+    
+    # --------------------------------------------------------------------
+    # STRATEGY VALIDATION
+    # --------------------------------------------------------------------
     print(f"\n{COLOR}🪪 Validating strategy configuration...{RESET}")
     errors, warnings = validate_strategy_configuration(STRATEGIES)
     
@@ -571,10 +579,9 @@ def main_loop():
     else:
         print(f"✅ All strategies validated successfully\n")
     
-    OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
-    all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
-    
-    # Load symbols for each strategy
+    # --------------------------------------------------------------------
+    # LOAD SYMBOLS PER STRATEGY & TIMEFRAMES
+    # --------------------------------------------------------------------
     print(f"\n{COLOR} OPERATIVE STRATEGIES: {len(STRATEGIES)} {RESET}")
     print(f"{COLOR}{'-' * 120}{RESET}")
     final_by_strat = {}
@@ -599,11 +606,15 @@ def main_loop():
     print("\n✅ BOT Initialization completed\n")
     bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
     
-    #INITIALIZE WEBSOCKET WITH CREDENTIALS
+    # --------------------------------------------------------------------
+    # INIT WEBSOCKET
+    # --------------------------------------------------------------------
     print(f"\n{COLOR}Initializing WebSocket connections...{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
-    #PRE-LOAD CONTRACTS for common symbols
+    # --------------------------------------------------------------------
+    # PRE-LOAD CONTRACTS INFO
+    # --------------------------------------------------------------------
     if ws_manager:
         all_strategy_symbols = set()
         for strat_id, symbols in final_by_strat.items():
@@ -613,7 +624,9 @@ def main_loop():
             ws_manager.preload_contracts(list(all_strategy_symbols),product_type=PRODUCT_TYPE)
     print()
     
-    # Calculate next candle times
+    # --------------------------------------------------------------------
+    # NEXT CANDLES
+    # --------------------------------------------------------------------
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)

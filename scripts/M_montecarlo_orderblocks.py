@@ -37,7 +37,7 @@ TOLERANCE_LIST       = [5,10,20,30,40]
 IMPULSE_LIST         = [0.01,0.1,1.0]
 
 TP_PCT_LIST          = [2.5,5.0]
-SL_PCT_LIST          = [5,7.5,10]
+SL_PCT_LIST          = [5,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
