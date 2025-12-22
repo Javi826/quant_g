@@ -8,7 +8,9 @@ MAGENTA_BOLD = "\033[1;85m"
 BLUE         = "\033[0;94m"
 YELLOW_BOLD  = "\033[0;93m"
 RESET        = "\033[0m"
-
+class BotState:
+    def __init__(self):
+        self.closed_total_profit = 0.0
 
 def remove_bold(ansi_color):
     # Cambia \033[1;XXm → \033[0;XXm

@@ -15,7 +15,7 @@ from ZX_connect_live import send_request_01, send_request_E1
 
 # BOT auxiliars
 from ZX_BOT_ws_manager import init_websocket
-from ZX_BOT_metrics import bot_metrics
+from ZX_BOT_metrics import bot_metrics,BotState
 from ZX_BOT_display import check_all_tp_sl  
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
@@ -309,6 +309,12 @@ STRAT_N = {
     'direction': 'long'
 }
 
+# ==========================================================================
+# CONNECTIONS
+# ==========================================================================
+send_request_common = send_request_func 
+get_balance_common  = get_usdt_balance_ws
+exchange            = connect_bitget()  
 
 # ==========================================================================
 # STRATEGY SELECTION
@@ -317,14 +323,7 @@ if ACCOUNT_NUMBER == "01":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, STRAT_M, STRAT_N]
 elif ACCOUNT_NUMBER == "E1":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
-
-# ==========================================================================
-# CONNECTIONS
-# ==========================================================================
-send_request_common = send_request_func 
-get_balance_common  = get_usdt_balance_ws
-exchange            = connect_bitget()  
-
+  
 # ==========================================================================
 # SIGNAL DETECTION
 # ==========================================================================
@@ -473,7 +472,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             })
     
     return detected
-
+  
 # ==========================================================================
 # VALIDATION
 # ==========================================================================
@@ -510,9 +509,13 @@ def validate_strategy_configuration(strategies):
     if unused_implementation:
         warnings.append(f"⚠️  Implemented but NOT declared: {unused_implementation}")
     
+    if not missing_implementation:
+        print("   🆗 Validation 1: All strategy names implemented")
+    
     # --------------------------------------------------------------------
-    # VALIDATION 2: Coherence
+    # VALIDATION 2: Coherence direction
     # --------------------------------------------------------------------
+    validation_2_errors = 0
     for strat in strategies:
         name      = strat.get('name', '')
         direction = strat.get('direction', '')
@@ -526,18 +529,61 @@ def validate_strategy_configuration(strategies):
                 f"❌ Strategy '{strat_id}' has name='{name}' (indicates LONG) "
                 f"but direction='{direction}'"
             )
+            validation_2_errors += 1
         
         if name_indicates_short and direction != 'short':
             errors.append(
                 f"❌ Strategy '{strat_id}' has name='{name}' (indicates SHORT) "
                 f"but direction='{direction}'"
             )
+            validation_2_errors += 1
         
         if direction not in ['long', 'short']:
             errors.append(
                 f"❌ Strategy '{strat_id}' has invalid direction='{direction}' "
                 f"(must be 'long' or 'short')"
-            )    
+            )
+            validation_2_errors += 1
+    
+    if validation_2_errors == 0:
+        print("   🆗 Validation 2: All directions coherent with names")
+            
+    # ====================================================================
+    # VALIDATION 3: Timeframe coherence
+    # ====================================================================
+    validation_3_errors = 0
+    for strat in strategies:
+        name      = strat.get('name', '')
+        timeframe = strat.get('timeframe', '')
+        strat_id  = strat.get('id', 'UNKNOWN')
+        
+        if '_4H' in name:
+            if timeframe != '4H':
+                errors.append(
+                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 4H) "
+                    f"but timeframe='{timeframe}'"
+                )
+                validation_3_errors += 1
+        
+        elif '_1H' in name:
+            if timeframe != '1H':
+                errors.append(
+                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 1H) "
+                    f"but timeframe='{timeframe}'"
+                )
+                validation_3_errors += 1
+        
+        elif '_6Hutc' in name:
+            if timeframe != '6Hutc':
+                errors.append(
+                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 6Hutc) "
+                    f"but timeframe='{timeframe}'"
+                )
+                validation_3_errors += 1
+    
+    if validation_3_errors == 0:
+        print("   🆗 Validation 3: All timeframes coherent with names")
+    
     return errors, warnings
 # ==========================================================================
 # MAIN LOOP
@@ -554,6 +600,11 @@ def main_loop():
     # --------------------------------------------------------------------
         
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
+    bot_state = BotState()
+    if os.path.exists(TRADES_LOG_PATH):
+        summary = bot_metrics(excel_file=TRADES_LOG_PATH, show_table=False, return_data=True,initial_capital=INITIAL_CAPITAL)
+        if summary:
+            bot_state.closed_total_profit = summary[0].get('total_profit', 0)
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
     # --------------------------------------------------------------------
@@ -671,8 +722,10 @@ def main_loop():
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        print(f"➡️  Status   : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
-
+                        num_positions = len(OPEN_POSITIONS.get(strat_id, []))
+                        #print(f"➡️  Status   : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
+                        print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) ➡️  Status: {candles}/{strat['sell_after_ncandles']:<2} candles | {num_positions} open positions.")
+                        
                         check_candles_timeout_for_strategy(
                             strat_id,
                             strat['sell_after_ncandles'],
@@ -691,7 +744,7 @@ def main_loop():
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 Skipping : {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
+                        #print(f"🚫 Skipping : {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
                         continue
                     
                     try:
@@ -756,7 +809,8 @@ def main_loop():
                         get_current_price,
                         DISPLAY_MODE,
                         account_number=ACCOUNT_NUMBER,
-                        display_color=COLOR
+                        display_color=COLOR,
+                        bot_state=bot_state
                     )
                     last_tpsl_check = current_time
             

@@ -619,7 +619,7 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
 # ==========================================================================
 
 def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_candles,
-                              state_file, send_request_func, table=None, pnl_accumulator=None):
+                              state_file, send_request_func, table=None, pnl_accumulator=None, bot_state=None): 
     """Comprueba TP/SL para todas las posiciones de una estrategia via WebSocket"""
     if strat_id not in open_positions or not open_positions[strat_id]:
         return
@@ -670,7 +670,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
                 'usdt_amount': pos.get('usdt_amount', 0),
                 'entry_price': pos['entry_price']
             }
-            if close_position(symbol, pos['size'], direction, send_request_func, reason="TP", position_data=position_data):
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="TP", position_data=position_data, bot_state=bot_state):  # ⭐ Pasar
                 positions_to_remove.append(i)
                 
         elif hit_sl:
@@ -680,7 +680,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
                 'usdt_amount': pos.get('usdt_amount', 0),
                 'entry_price': pos['entry_price']
             }
-            if close_position(symbol, pos['size'], direction, send_request_func, reason="SL", position_data=position_data):
+            if close_position(symbol, pos['size'], direction, send_request_func, reason="SL", position_data=position_data, bot_state=bot_state):
                 positions_to_remove.append(i)
     
     if positions_to_remove:
@@ -793,7 +793,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 # POSITIONS MANAGEMENT
 # ==========================================================================
-def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None):
+def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None, bot_state=None):  # ⭐ Añadir
     """Cierra una posición con orden market"""
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
@@ -848,7 +848,8 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             reason=reason,
                             size=size,
                             profit_from_api=profit_from_api,
-                            fee_from_api=fee_from_api
+                            fee_from_api=fee_from_api,
+                            bot_state=bot_state
                         )
             
             # ⭐ MOVER return True ANTES de bot_metrics para evitar que errores lo interrumpan
@@ -925,7 +926,8 @@ def log_closed_position(
     reason,
     size,
     profit_from_api=None,
-    fee_from_api=None
+    fee_from_api=None,
+    bot_state=None
 ):
     """
     Registra una posición cerrada en el archivo Excel.
@@ -1011,6 +1013,8 @@ def log_closed_position(
             df = pd.DataFrame([new_record])
 
         df.to_excel(TRADES_LOG_PATH, index=False, engine='openpyxl')
+        if bot_state is not None:
+            bot_state.closed_total_profit += profit
 
         print(f"📋 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
 

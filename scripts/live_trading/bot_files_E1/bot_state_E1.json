@@ -2,17 +2,6 @@
   "positions": {
     "revers_long_1H": [
       {
-        "symbol": "BTCUSDT",
-        "size": "0.0004",
-        "entry_price": "88184.9",
-        "direction": "long",
-        "tp": "89948.598",
-        "sl": "79366.41",
-        "order_id": "1386348880265383941",
-        "opened_at": "2025-12-20T19:00:51.167055+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "DOGEUSDT",
         "size": "303",
         "entry_price": "0.13189",
@@ -36,17 +25,6 @@
       }
     ],
     "parity_long_1H": [
-      {
-        "symbol": "BTCUSDT",
-        "size": "0.0004",
-        "entry_price": "88201.9",
-        "direction": "long",
-        "tp": "89965.938",
-        "sl": "79381.71",
-        "order_id": "1386348899383021585",
-        "opened_at": "2025-12-20T19:00:55.668537+00:00",
-        "usdt_amount": 40.0
-      },
       {
         "symbol": "DOGEUSDT",
         "size": "303",
@@ -326,17 +304,6 @@
         "usdt_amount": 40.0
       },
       {
-        "symbol": "ETHUSDT",
-        "size": "0.01",
-        "entry_price": "2840.58",
-        "direction": "short",
-        "tp": "2726.9568",
-        "sl": "3053.62350",
-        "order_id": "1385609078549155842",
-        "opened_at": "2025-12-18T18:01:08.643605+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "LINKUSDT",
         "size": "3",
         "entry_price": "12.136",
@@ -360,18 +327,32 @@
         "opened_at": "2025-12-19T20:00:57.917973+00:00",
         "usdt_amount": 40.0
       }
+    ],
+    "revers_long_6Hutc": [
+      {
+        "symbol": "BTCUSDT",
+        "size": "0.0004",
+        "entry_price": "89963",
+        "direction": "long",
+        "tp": "93561.52",
+        "sl": "80966.7",
+        "order_id": "1386967960433364994",
+        "opened_at": "2025-12-22T12:00:51.349074+00:00",
+        "usdt_amount": 40.0
+      }
     ]
   },
   "strategy_candles": {
-    "revers_long_1H": 25,
-    "parity_long_1H": 25,
-    "parity_short_1H": 17,
-    "double_top_long_4H": 18,
-    "parity_long_4H": 4,
-    "revers_short_4H": 18,
-    "parity_short_4H": 17,
-    "revers_short_1H": 17,
-    "revers_short_6Hutc": 12,
-    "revers_long_4H": 11
+    "revers_long_1H": 41,
+    "parity_long_1H": 41,
+    "parity_short_1H": 33,
+    "double_top_long_4H": 22,
+    "parity_long_4H": 8,
+    "revers_short_4H": 22,
+    "parity_short_4H": 21,
+    "revers_short_1H": 33,
+    "revers_short_6Hutc": 15,
+    "revers_long_4H": 15,
+    "revers_long_6Hutc": 0
   }
 }

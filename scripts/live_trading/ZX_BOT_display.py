@@ -185,7 +185,7 @@ def create_tp_sl_display(now, total_pnl=None, account_number=None, display_color
 def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, 
                     send_request_func, hour_zone, check_tp_sl_for_strategy_func, 
                     get_current_price_func, display_mode="summary", account_number=None,
-                    display_color=None):
+                    display_color=None,bot_state=None):
 
     global _live_display
     
@@ -250,7 +250,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                 # Chequear TP/SL y acumular PnL
                 check_tp_sl_for_strategy_func(
                     strat_id, strat, open_positions, strategy_candles, 
-                    state_file, send_request_func, None, strat_pnl_acc
+                    state_file, send_request_func, None, strat_pnl_acc,bot_state
                 )
                 
                 # Acumular al total
@@ -299,13 +299,25 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
         pnl_color = "bold green" if total_pnl >= 0 else "bold red"
         
         # Obtener precio de BTCUSDT
+        # Obtener precio de BTCUSDT
         try:
             btc_price = get_current_price_func('BTCUSDT')
         except Exception:
             btc_price = None
         
-        header.append(f"💰 Total PnL: ", style="white")
+        # ⭐ Closed P/L primero
+        if bot_state is not None:
+            total_profit = bot_state.closed_total_profit
+            profit_color = "bold green" if total_profit >= 0 else "bold red"
+            header.append(f"💰 Closed P/L: ", style="bold white")
+            header.append(f"{total_profit:+.2f} USDT", style=profit_color)
+            header.append(f" | ", style="white")
+        
+        # Open P/L después
+        pnl_color = "bold green" if total_pnl >= 0 else "bold red"
+        header.append(f"Open P/L: ", style="white")
         header.append(f"{total_pnl:+.2f} USDT", style=pnl_color)
+        
         if btc_price:
             header.append(f" | BTC: ", style="white")
             header.append(f"{btc_price:,.2f}", style="yellow")

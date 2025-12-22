@@ -24,7 +24,7 @@ STRATEGY            = "orderblocks"
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '6Hutc'
 ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
@@ -36,8 +36,8 @@ LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [2.5,5.0]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5]
+SL_PCT_LIST          = [5,7.5,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -71,7 +71,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = orderblocks_long(
+            signals = orderblocks_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
