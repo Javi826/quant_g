@@ -4,7 +4,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from ZX_utils_live import fetch_ohlcv_data
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import os
 import json

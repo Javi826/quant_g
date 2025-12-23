@@ -30,7 +30,7 @@ TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
-#MIN_VOL_USDT        = 1500_000_000
+
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -41,15 +41,17 @@ PRICE_TOLERANCE_LIST = [10,20,30,40]
 TREND_TH_LIST        = [10,20,30,40] 
 
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9]
 
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [10] 
-TREND_TH_LIST        = [10] 
-
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [10]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_MINOR_LIST  = [2] 
+# PRICE_TOLERANCE_LIST = [10] 
+# TREND_TH_LIST        = [10] 
+# 
+# TP_PCT_LIST          = [5]
+# SL_PCT_LIST          = [10]
+# =============================================================================
 
 
 param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']

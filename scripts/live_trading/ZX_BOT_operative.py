@@ -139,11 +139,11 @@ def load_state(state_file):
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ➡️  {strat_id}: {len(positions)} positions | Candles: {candles}")
+                print(f"   ➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
                 for pos in positions:
                     size_str = f"{float(pos['size']):.6f}".rstrip('0').rstrip('.')
                     entry_str = f"{float(pos['entry_price']):.6f}".rstrip('0').rstrip('.')
-                    print(f"      - {pos['symbol']:<12} | Size: {size_str:<10} | Entry: {entry_str:<10}")
+                    #print(f"      - {pos['symbol']:<12} | Size: {size_str:<10} | Entry: {entry_str:<10}")
         return OPEN_POSITIONS, STRATEGY_CANDLES
     except Exception as e:
         print(f"❌ Error loading state: {e}")
@@ -797,7 +797,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
     """Cierra una posición con orden market"""
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
-        
+                
         body = {
             "symbol": symbol,
             "productType": PRODUCT_TYPE,

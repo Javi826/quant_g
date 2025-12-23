@@ -11,46 +11,45 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_reversal import reversal_long
-from Z_add_signals_reversal import reversal_short
+from Z_add_signals_doji import doji_long
+from Z_add_signals_doji import doji_short
+
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "reversal_long_1H"
+STRATEGY     = "doji_long_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
-DATA_FOLDER         = "data/crypto_2024_short_IS"
+#DATA_FOLDER         = "data/crypto_2024_short_IS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '30m'
+TIMEFRAME_MINOR     = '4H'
 
-ORDER_AMOUNT        = 400
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
-TOLERANCE_LIST       = [5,10,15,20,25,30]
-MA_PERIOD_LIST       = [5,10,25,50]
+LOOKBACK_LIST        = [3,4,5,6] 
+TOLERANCE_LIST       = [5,10,15]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [2.5,5,7.5,10]
+SL_PCT_LIST          = [2.5,5,7.5,10]
 
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [8] 
-TOLERANCE_LIST       = [25]
-MA_PERIOD_LIST       = [50]
+LOOKBACK_LIST        = [3] 
+TOLERANCE_LIST       = [15]
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [10]
+SL_PCT_LIST          = [7.5]
 
-param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -74,11 +73,10 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_long(
+        signals = doji_long(
             arr_minor,
-            left_lookback=params['LEFT_LOOKBACK'],
+            lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
-            ma_period=params['MA_PERIOD'],
             live_trading=False
         )
 

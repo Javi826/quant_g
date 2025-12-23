@@ -14,6 +14,7 @@ from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_o
 from ZX_connect_live import send_request_01, send_request_E1
 
 # BOT auxiliars
+from ZX_BOT_validations import validate_strategy_configuration
 from ZX_BOT_ws_manager import init_websocket
 from ZX_BOT_metrics import bot_metrics,BotState
 from ZX_BOT_display import check_all_tp_sl  
@@ -45,7 +46,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--account', type=str, default='E1', help='Account number (01, E1, etc)')
 args = parser.parse_args()
 ACCOUNT_NUMBER = args.account
-#ACCOUNT_NUMBER  = "01"  
 
 #==========================================================================
 # PATHS
@@ -473,118 +473,22 @@ def detect_signal_for_strategy(strategy, final_symbols):
     
     return detected
   
-# ==========================================================================
-# VALIDATION
-# ==========================================================================
-def validate_strategy_configuration(strategies):
-
-    implemented_strategies = {
-        'double_top_long_4H',
-        'reversal_long_4H',
-        'parity_long_4H',
-        'reversal_short_4H',
-        'parity_short_4H',
-        'reversal_long_1H',
-        'reversal_short_1H',
-        'reversal_long_6Hutc',
-        'reversal_short_6Hutc',
-        'parity_long_1H',
-        'parity_short_1H',
-        'parity_long_6Hutc',
-        'orderblocks_long_4H',
-        'orderblocks_short_4H'
-    }
-    declared_strategies    = {s['name'] for s in strategies}    
-    missing_implementation = declared_strategies - implemented_strategies
-    unused_implementation  = implemented_strategies - declared_strategies
-    errors   = []
-    warnings = []
-    
-    # --------------------------------------------------------------------
-    # VALIDATION 1: Names
-    # --------------------------------------------------------------------
-    if missing_implementation:
-        errors.append(f"❌ Strategies WITHOUT implementation: {missing_implementation}")
-    
-    if unused_implementation:
-        warnings.append(f"⚠️  Implemented but NOT declared: {unused_implementation}")
-    
-    if not missing_implementation:
-        print("   🆗 Validation 1: All strategy names implemented")
-    
-    # --------------------------------------------------------------------
-    # VALIDATION 2: Coherence direction
-    # --------------------------------------------------------------------
-    validation_2_errors = 0
-    for strat in strategies:
-        name      = strat.get('name', '')
-        direction = strat.get('direction', '')
-        strat_id  = strat.get('id', 'UNKNOWN')
-
-        name_indicates_long  = '_long_' in name.lower()
-        name_indicates_short = '_short_' in name.lower()
-        
-        if name_indicates_long and direction != 'long':
-            errors.append(
-                f"❌ Strategy '{strat_id}' has name='{name}' (indicates LONG) "
-                f"but direction='{direction}'"
-            )
-            validation_2_errors += 1
-        
-        if name_indicates_short and direction != 'short':
-            errors.append(
-                f"❌ Strategy '{strat_id}' has name='{name}' (indicates SHORT) "
-                f"but direction='{direction}'"
-            )
-            validation_2_errors += 1
-        
-        if direction not in ['long', 'short']:
-            errors.append(
-                f"❌ Strategy '{strat_id}' has invalid direction='{direction}' "
-                f"(must be 'long' or 'short')"
-            )
-            validation_2_errors += 1
-    
-    if validation_2_errors == 0:
-        print("   🆗 Validation 2: All directions coherent with names")
-            
-    # ====================================================================
-    # VALIDATION 3: Timeframe coherence
-    # ====================================================================
-    validation_3_errors = 0
-    for strat in strategies:
-        name      = strat.get('name', '')
-        timeframe = strat.get('timeframe', '')
-        strat_id  = strat.get('id', 'UNKNOWN')
-        
-        if '_4H' in name:
-            if timeframe != '4H':
-                errors.append(
-                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 4H) "
-                    f"but timeframe='{timeframe}'"
-                )
-                validation_3_errors += 1
-        
-        elif '_1H' in name:
-            if timeframe != '1H':
-                errors.append(
-                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 1H) "
-                    f"but timeframe='{timeframe}'"
-                )
-                validation_3_errors += 1
-        
-        elif '_6Hutc' in name:
-            if timeframe != '6Hutc':
-                errors.append(
-                    f"❌ Strategy '{strat_id}' has name='{name}' (indicates 6Hutc) "
-                    f"but timeframe='{timeframe}'"
-                )
-                validation_3_errors += 1
-    
-    if validation_3_errors == 0:
-        print("   🆗 Validation 3: All timeframes coherent with names")
-    
-    return errors, warnings
+implemented_strategies = {
+    'double_top_long_4H',
+    'reversal_long_4H',
+    'parity_long_4H',
+    'reversal_short_4H',
+    'parity_short_4H',
+    'reversal_long_1H',
+    'reversal_short_1H',
+    'reversal_long_6Hutc',
+    'reversal_short_6Hutc',
+    'parity_long_1H',
+    'parity_short_1H',
+    'parity_long_6Hutc',
+    'orderblocks_long_4H',
+    'orderblocks_short_4H'
+}
 # ==========================================================================
 # MAIN LOOP
 # ==========================================================================
@@ -611,16 +515,17 @@ def main_loop():
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
     print(f"\n{COLOR}🪪 Validating strategy configuration...{RESET}")
-    errors, warnings = validate_strategy_configuration(STRATEGIES)
+        
+    errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
     
     if errors:
         print(f"\n{COLOR}{'=' * 120}{RESET}")
-        print(f"{COLOR}❗ CONFIGURATION ERRORS FOUND:{RESET}\n")
+        print(f"{COLOR}❌ CONFIGURATION ERRORS FOUND:{RESET}\n")
         for err in errors:
             print(f"  {err}")
         print(f"\n{COLOR}⛔ BOT STOPPED - Fix configuration before running{RESET}")
         print(f"{COLOR}{'=' * 120}{RESET}\n")
-        return  # NO arrancar el bot
+        return  
 
     if warnings:
         print(f"\n{COLOR}⚠️  CONFIGURATION WARNINGS:{RESET}")
@@ -637,7 +542,7 @@ def main_loop():
     print(f"{COLOR}{'-' * 120}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
-        #DEPRECATED
+        #DEPRECATED strategies
         if not strat.get('active', True):
             print(f"⏸️  Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING (monitoring only)")
             continue
@@ -723,7 +628,6 @@ def main_loop():
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
                         num_positions = len(OPEN_POSITIONS.get(strat_id, []))
-                        #print(f"➡️  Status   : {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
                         print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) ➡️  Status: {candles}/{strat['sell_after_ncandles']:<2} candles | {num_positions} open positions.")
                         
                         check_candles_timeout_for_strategy(
@@ -738,13 +642,12 @@ def main_loop():
                 # Signal search (only if no positions)
                 for strat in strategies_to_process:
                     strat_id = strat['id']
-                    #DEPRECATED
+                    #Stratgies deprecated
                     if not strat.get('active', True):
                         continue
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        #print(f"🚫 Skipping : {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
                         continue
                     
                     try:
