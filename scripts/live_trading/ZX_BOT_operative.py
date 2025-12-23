@@ -109,17 +109,33 @@ def get_usdt_balance_ws(exchange=None):
 # ==========================================================================
 # STATE MANAGEMENT
 # ==========================================================================
-def load_state(state_file):
+def load_state(state_file, display_color="\033[1;94m"):
+    """
+    Carga el estado guardado del bot desde un archivo JSON.
+    
+    Args:
+        state_file: Ruta al archivo de estado
+        display_color: Color para los prints informativos
+    """
+    RESET = "\033[0m"
+    
     OPEN_POSITIONS   = {}
     STRATEGY_CANDLES = {}
+    
+    print(f"{display_color}🗃️  Loading BOT state...{RESET}")
+    
     if not os.path.exists(state_file):
-        print("📂 No previous state file found")
+        print(f"{display_color}📂 No previous state file found{RESET}")
+        print(f"{display_color}{'=' * 120}{RESET}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
+    
     try:
         with open(state_file, 'r') as f:
             data = json.load(f)
+        
         STRATEGY_CANDLES = data.get('strategy_candles', {})
         positions_data = data.get('positions', {})
+        
         for strat_id, positions in positions_data.items():
             OPEN_POSITIONS[strat_id] = []
             for pos in positions:
@@ -134,20 +150,25 @@ def load_state(state_file):
                     'opened_at': datetime.fromisoformat(pos.get('opened_at')),
                     'usdt_amount': float(pos.get('usdt_amount', 0))
                 })
+        
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
-        print(f"✅ State loaded: {total_positions} positions recovered")
+        
+        print(f"💼 Total positions recovered: {total_positions}")
+        print(f"{display_color}{'-' * 120}{RESET}")
+        
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
-                for pos in positions:
-                    size_str = f"{float(pos['size']):.6f}".rstrip('0').rstrip('.')
-                    entry_str = f"{float(pos['entry_price']):.6f}".rstrip('0').rstrip('.')
-                    #print(f"      - {pos['symbol']:<12} | Size: {size_str:<10} | Entry: {entry_str:<10}")
+                print(f"➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
+        
+        print(f"✅ State loaded successfully")
+        
         return OPEN_POSITIONS, STRATEGY_CANDLES
+        
     except Exception as e:
         print(f"❌ Error loading state: {e}")
         traceback.print_exc()
+        print(f"{display_color}{'=' * 120}{RESET}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
 def save_state_local(open_positions, strategy_candles, state_file):
@@ -649,7 +670,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         
         current_price = Decimal(str(current_price))
         
-        # ⭐ CALCULAR PnL SIEMPRE (aunque no haya tabla)
+        #CALCULAR PnL SIEMPRE (aunque no haya tabla)
         if pnl_accumulator is not None:
             from ZX_BOT_display import calculate_pnl
             pnl = calculate_pnl(direction, entry_price, current_price, pos['size'])

@@ -3,16 +3,7 @@ Validation functions for bot strategy configuration
 """
 
 def validate_strategy_configuration(strategies, implemented_strategies):
-    """
-    Validates strategy configuration coherence
-    
-    Args:
-        strategies: List of strategy dictionaries to validate
-        implemented_strategies: Set of implemented strategy names
-        
-    Returns:
-        tuple: (errors, warnings) - lists of validation messages
-    """
+
     declared_strategies    = {s['name'] for s in strategies}    
     missing_implementation = declared_strategies - implemented_strategies
     unused_implementation  = implemented_strategies - declared_strategies
@@ -23,10 +14,10 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     # VALIDATION 1: Names
     # --------------------------------------------------------------------
     if missing_implementation:
-        errors.append(f"🔴 Strategies WITHOUT implementation: {missing_implementation}")
+        errors.append(f"❗ Strategies WITHOUT implementation: {missing_implementation}")
     
     if unused_implementation:
-        warnings.append(f"🟡  Implemented but NOT declared: {unused_implementation}")
+        warnings.append(f"❕ Implemented but NOT declared: {unused_implementation}")
     
     if not missing_implementation:
         print("   🆗 Validation 1: All strategy names implemented")
@@ -159,8 +150,11 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     }
     
     # Common required parameters for all strategies
-    COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 
-                              'order_amount', 'tp_pct', 'sl_pct', 'direction']
+    COMMON_REQUIRED_PARAMS = ['id', 'name', 
+                              'timeframe', 'active', 
+                              'sell_after_ncandles', 
+                              'order_amount', 
+                              'tp_pct', 'sl_pct', 'direction']
     
     for strat in strategies:
         strat_id   = strat.get('id', 'UNKNOWN')
@@ -174,10 +168,8 @@ def validate_strategy_configuration(strategies, implemented_strategies):
                 )
                 validation_5_errors += 1
         
-        # Extract base strategy type (remove timeframe suffix like _4H, _1H, _6Hutc)
-        # Examples: reversal_long_4H -> reversal_long, parity_short_6Hutc -> parity_short
         base_type = None
-        for suffix in ['_4H', '_1H', '_6Hutc', '_12H', '_8H']:  # Add more timeframes if needed
+        for suffix in ['_4H', '_1H', '_6Hutc', '_12H', '_8H','30m']:  # Add more timeframes if needed
             if strat_name.endswith(suffix):
                 base_type = strat_name[:-len(suffix)]
                 break

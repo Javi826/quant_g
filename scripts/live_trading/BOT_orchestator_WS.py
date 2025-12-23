@@ -1,6 +1,6 @@
 #BOT_orchestator.py
 """
-Bot multi-estrategy with WebSocket support and complet for API operations.
+Bot multi-estrategy & timeframe with WebSocket support and  API operations.
 """
 import os
 import sys
@@ -17,7 +17,7 @@ from ZX_connect_live import send_request_01, send_request_E1
 from ZX_BOT_validations import validate_strategy_configuration
 from ZX_BOT_ws_manager import init_websocket
 from ZX_BOT_metrics import bot_metrics,BotState
-from ZX_BOT_display import check_all_tp_sl  
+from ZX_BOT_display import check_all_tp_sl,stop_live_display
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
@@ -33,15 +33,13 @@ from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API
 from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
 from utils.ZZ_connect import connect_bitget_01, connect_bitget_E1
 
-#Credentials according account number
+#==========================================================================
+# CREDENTIALS & ACCOUNT LAUNCHING
+#==========================================================================
 CREDENTIALS = {
 "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
 "E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
 }
-
-#==========================================================================
-# ACCOUNTS
-#==========================================================================
 parser = argparse.ArgumentParser()
 parser.add_argument('--account', type=str, default='E1', help='Account number (01, E1, etc)')
 args = parser.parse_args()
@@ -309,6 +307,23 @@ STRAT_N = {
     'direction': 'long'
 }
 
+implemented_strategies = {
+    'double_top_long_4H',
+    'reversal_long_4H',
+    'parity_long_4H',
+    'reversal_short_4H',
+    'parity_short_4H',
+    'reversal_long_1H',
+    'reversal_short_1H',
+    'reversal_long_6Hutc',
+    'reversal_short_6Hutc',
+    'parity_long_1H',
+    'parity_short_1H',
+    'parity_long_6Hutc',
+    'orderblocks_long_4H',
+    'orderblocks_short_4H'
+}
+
 # ==========================================================================
 # CONNECTIONS
 # ==========================================================================
@@ -472,23 +487,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             })
     
     return detected
-  
-implemented_strategies = {
-    'double_top_long_4H',
-    'reversal_long_4H',
-    'parity_long_4H',
-    'reversal_short_4H',
-    'parity_short_4H',
-    'reversal_long_1H',
-    'reversal_short_1H',
-    'reversal_long_6Hutc',
-    'reversal_short_6Hutc',
-    'parity_long_1H',
-    'parity_short_1H',
-    'parity_long_6Hutc',
-    'orderblocks_long_4H',
-    'orderblocks_short_4H'
-}
+
 # ==========================================================================
 # MAIN LOOP
 # ==========================================================================
@@ -503,7 +502,7 @@ def main_loop():
     # LOAD STATE & SYMBOLS 
     # --------------------------------------------------------------------
         
-    OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
+    OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE, display_color=COLOR)
     bot_state = BotState()
     if os.path.exists(TRADES_LOG_PATH):
         summary = bot_metrics(excel_file=TRADES_LOG_PATH, show_table=False, return_data=True,initial_capital=INITIAL_CAPITAL)
@@ -603,6 +602,7 @@ def main_loop():
             
             # Process closed timeframes
             if closed_timeframes:
+                stop_live_display()
                 print(f"\n{'=' * 120}")
                 print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
@@ -665,7 +665,7 @@ def main_loop():
                             detect_signal_func=detect_signal_for_strategy
                         )
                     except Exception as e:
-                        print(f"❌ Error processing {strat_id}: {e}")
+                        print(f"⚠️ Warning first try processing {strat_id}: {e}")
                         
                         # Retry once
                         print(f"⏳ Retrying {strat_id} after 3 seconds...")

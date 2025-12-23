@@ -11,17 +11,17 @@ from datetime import datetime, timezone
 BASE_URL               = "https://api.bitget.com"
 PRODUCT_TYPE           = "usdt-futures"
 
-TIMEFRAME              = "30m"          
+TIMEFRAME              = "1H"          
 LIMIT                  = 200           
-DATA_FOLDER            = "crypto_2025_short"
+DATA_FOLDER            = "crypto_BTC"
 START_DATE             = "2022-01-01"  
 REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06  
 MAX_ITER_PER_SYMBOL    = 2000     
 MAX_RETRIES            = 3      
 
-SELECTED_SYMBOLS = []
-SELECTED_SYMBOLS = None        
+SELECTED_SYMBOLS = ["BTCUSDT"]
+#SELECTED_SYMBOLS = None        
 # ----------------------------------------
 
 MS_90_DAYS = 90 * 24 * 60 * 60 * 1000
