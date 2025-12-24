@@ -100,7 +100,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     # --------------------------------------------------------------------
     validation_4_errors = 0
     MIN_ORDER_AMOUNT = 40
-    MAX_ORDER_AMOUNT = 400
+    MAX_ORDER_AMOUNT = 100
     
     for strat in strategies:
         strat_id      = strat.get('id', 'UNKNOWN')
@@ -131,7 +131,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_4_errors += 1
     
     if validation_4_errors == 0:
-        print("   🆗 Validation 4: All order amounts within valid range (40-400)")
+        print("   🆗 Validation 4: All order amounts within valid range (40-100)")
     
     # --------------------------------------------------------------------
     # VALIDATION 5: Required parameters for each strategy type
@@ -192,5 +192,59 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     
     if validation_5_errors == 0:
         print("   🆗 Validation 5: All strategies have required parameters")
+        
+    # --------------------------------------------------------------------
+    # VALIDATION 6: TP/SL
+    # --------------------------------------------------------------------
+    validation_6_errors = 0
+    MIN_TP_PCT = 1.5
+    MAX_TP_PCT = 10
+    MIN_SL_PCT = 1.5
+    MAX_SL_PCT = 10
+    
+    for strat in strategies:
+        strat_id = strat.get('id', 'UNKNOWN')
+        tp_pct = strat.get('tp_pct', None)
+        sl_pct = strat.get('sl_pct', None)
+        
+        if tp_pct and (tp_pct < MIN_TP_PCT or tp_pct > MAX_TP_PCT):
+            errors.append(f"❌ Strategy '{strat_id}' has tp_pct={tp_pct} (valid range: {MIN_TP_PCT}-{MAX_TP_PCT}%)")
+            validation_6_errors += 1
+        
+        if sl_pct and (sl_pct < MIN_SL_PCT or sl_pct > MAX_SL_PCT):
+            errors.append(f"❌ Strategy '{strat_id}' has sl_pct={sl_pct} (valid range: {MIN_SL_PCT}-{MAX_SL_PCT}%)")
+            validation_6_errors += 1
+    
+    if validation_6_errors == 0:
+        print("   🆗 Validation 6: All TP/SL percentages within valid ranges (1.5 - 10)")
+
+    # --------------------------------------------------------------------
+    # VALIDATION 7: IDs
+    # --------------------------------------------------------------------        
+    validation_7_errors = 0
+    ids = [s.get('id') for s in strategies]
+    duplicates = [id for id in set(ids) if ids.count(id) > 1]
+    
+    if duplicates:
+        errors.append(f"❌ Duplicate strategy IDs found: {duplicates}")
+        validation_7_errors += 1
+    
+    if validation_7_errors == 0:
+        print("   🆗 Validation 7: All strategy IDs are unique")
+    # --------------------------------------------------------------------
+    # VALIDATION 8: Candles
+    # -------------------------------------------------------------------- 
+    validation_8_errors = 0
+    MIN_CANDLES = 45
+    MAX_CANDLES = 55
+    
+    for strat in strategies:
+        strat_id = strat.get('id', 'UNKNOWN')
+        candles = strat.get('sell_after_ncandles', None)
+        
+        if candles and (candles < MIN_CANDLES or candles > MAX_CANDLES):
+            errors.append(f"❌  Strategy '{strat_id}' has sell_after_ncandles={candles} (typical range: {MIN_CANDLES}-{MAX_CANDLES})")
+    if validation_8_errors == 0:
+        print("   🆗 Validation 8: All sell_after_ncandles checked (45-55)")
     
     return errors, warnings

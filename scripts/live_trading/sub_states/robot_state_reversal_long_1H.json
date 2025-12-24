@@ -3,28 +3,28 @@
         "symbol": "BNBUSDT",
         "buy_price": 866.54,
         "amount": 0.0461605927020103,
-        "candles_to_sell": 35,
+        "candles_to_sell": 15,
         "just_bought": false
     },
     {
         "symbol": "BTCUSDT",
         "buy_price": 89111.1,
         "amount": 0.0004488778614560924,
-        "candles_to_sell": 35,
+        "candles_to_sell": 15,
         "just_bought": false
     },
     {
         "symbol": "DOGEUSDT",
         "buy_price": 0.13424,
         "amount": 297.97377830750895,
-        "candles_to_sell": 35,
+        "candles_to_sell": 15,
         "just_bought": false
     },
     {
         "symbol": "XRPUSDT",
         "buy_price": 1.9263,
         "amount": 20.765197528941496,
-        "candles_to_sell": 35,
+        "candles_to_sell": 15,
         "just_bought": false
     }
 ]

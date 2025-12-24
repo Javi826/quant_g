@@ -9,6 +9,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.console import Group
 from datetime import datetime
+import time
 
 # ==========================================================================
 # CONSTANTES Y VARIABLES GLOBALES
@@ -188,7 +189,7 @@ def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file,
                     display_color=None,bot_state=None):
 
     global _live_display
-    
+   
     now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
     
     # Acumulador para el PnL total
@@ -384,3 +385,4 @@ def stop_live_display():
     if _live_display is not None:
         _live_display.stop()
         _live_display = None
+        console.clear()

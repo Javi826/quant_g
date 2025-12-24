@@ -8,14 +8,13 @@ import traceback
 import logging
 import builtins
 import pandas as pd
-from rich.console import Console
-from rich.live import Live
-from rich.console import Group
 from ZX_BOT_metrics import bot_metrics
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
-from ZX_BOT_display import add_position_to_table
+
+from ZX_BOT_D1 import stop_live_display
+from ZX_BOT_D1 import calculate_pnl
 
 # Import WebSocket manager
 import ZX_BOT_ws_manager
@@ -153,13 +152,13 @@ def load_state(state_file, display_color="\033[1;94m"):
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
-        print(f"💼 Total positions recovered: {total_positions}")
+        print(f"🔄 Total positions recovered: {total_positions}")
         print(f"{display_color}{'-' * 120}{RESET}")
         
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
+                print(f"   ➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
         
         print(f"✅ State loaded successfully")
         
@@ -672,15 +671,10 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         
         #CALCULAR PnL SIEMPRE (aunque no haya tabla)
         if pnl_accumulator is not None:
-            from ZX_BOT_display import calculate_pnl
+            
             pnl = calculate_pnl(direction, entry_price, current_price, pos['size'])
             pnl_accumulator['total'] += pnl
-        
-        # LUEGO añadir a tabla si existe
-        if table is not None:
-            add_position_to_table(table, strat_id, pos, current_price, pnl_accumulator,
-                                 strategy_candles, sell_after_ncandles)
-        
+               
         hit_tp = current_price >= tp_price if direction.lower() == 'long' else current_price <= tp_price
         hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
         
@@ -816,6 +810,8 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None, bot_state=None):  # ⭐ Añadir
     """Cierra una posición con orden market"""
+    stop_live_display()
+    
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
                 
@@ -1066,14 +1062,3 @@ def setup_print_logger(logdir, logfile_name=None):
         logger.info(text)
     
     builtins.print = _print_and_log
-
-# Import display functions (assuming they exist)
-try:
-    from ZX_BOT_display import create_tp_sl_display
-    console = Console()
-    _live_display = None
-except ImportError:
-    def create_tp_sl_display(now, total=None):
-        return None, None
-    console = None
-    _live_display = None

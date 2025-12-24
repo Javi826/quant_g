@@ -17,7 +17,7 @@ from ZX_connect_live import send_request_01, send_request_E1
 from ZX_BOT_validations import validate_strategy_configuration
 from ZX_BOT_ws_manager import init_websocket
 from ZX_BOT_metrics import bot_metrics,BotState
-from ZX_BOT_display import check_all_tp_sl,stop_live_display
+from ZX_BOT_D1 import check_all_tp_sl,stop_live_display
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
@@ -514,12 +514,13 @@ def main_loop():
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
     print(f"\n{COLOR}🪪 Validating strategy configuration...{RESET}")
+    print(f"{COLOR}{'-' * 120}{RESET}")
         
     errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
     
     if errors:
         print(f"\n{COLOR}{'=' * 120}{RESET}")
-        print(f"{COLOR}❌ CONFIGURATION ERRORS FOUND:{RESET}\n")
+        print(f"{COLOR}❗ CONFIGURATION ERRORS FOUND:{RESET}\n")
         for err in errors:
             print(f"  {err}")
         print(f"\n{COLOR}⛔ BOT STOPPED - Fix configuration before running{RESET}")
@@ -537,7 +538,7 @@ def main_loop():
     # --------------------------------------------------------------------
     # LOAD SYMBOLS PER STRATEGY & TIMEFRAMES
     # --------------------------------------------------------------------
-    print(f"\n{COLOR} OPERATIVE STRATEGIES: {len(STRATEGIES)} {RESET}")
+    print(f"\n{COLOR}🔢 Operative Strategies: {len(STRATEGIES)} {RESET}")
     print(f"{COLOR}{'-' * 120}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
@@ -559,12 +560,13 @@ def main_loop():
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
+    #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
     
     # --------------------------------------------------------------------
     # INIT WEBSOCKET
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}Initializing WebSocket connections...{RESET}")
+    print(f"\n{COLOR}📱 Initializing WebSocket connections...{RESET}")
+    print(f"{COLOR}{'-' * 120}{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
     # --------------------------------------------------------------------
@@ -582,13 +584,16 @@ def main_loop():
     # --------------------------------------------------------------------
     # NEXT CANDLES
     # --------------------------------------------------------------------
+    print(f"\n{COLOR}🔜 Candles incoming:  {RESET}")
+    print(f"{COLOR}{'-' * 120}{RESET}")
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
         print(f"⏰ Next candle for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
+    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
 
     last_tpsl_check = time.time()
-    
+  
     try:
         while True:
             current_time = time.time()
@@ -602,7 +607,9 @@ def main_loop():
             
             # Process closed timeframes
             if closed_timeframes:
-                stop_live_display()
+                stop_live_display()  
+                time.sleep(0.1)
+                
                 print(f"\n{'=' * 120}")
                 print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
@@ -697,6 +704,9 @@ def main_loop():
                     print(f"⏰ Next candle for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 
                 last_tpsl_check = time.time()
+                if hasattr(check_all_tp_sl, '_last_lines'):
+                    delattr(check_all_tp_sl, '_last_lines')  
+                
             
             # Periodic TP/SL check
             else:

@@ -23,13 +23,14 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_OOS"
-DATA_FOLDER         = "data/crypto_2024_short_IS"
+DATA_FOLDER         = "data/crypto_2024_short_OOS"
+#DATA_FOLDER         = "data/crypto_2024_short_IS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '30m'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -37,10 +38,10 @@ MIN_VOL_USDT        = 10_000_000
 SELL_AFTER_LIST      = [0]  
 
 LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [15] 
-MA_PERIOD_LIST       = [25]
+TOLERANCE_LIST       = [20] 
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [2]
+TP_PCT_LIST          = [2.5]
 SL_PCT_LIST          = [10]
 
 # =============================================================================

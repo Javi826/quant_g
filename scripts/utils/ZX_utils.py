@@ -15,9 +15,9 @@ symbols_to_exclude = {}
 symbols_to_include = ["BTCUSDT"]  
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50, my_symbols=False):
-    ohlcv_data = {}
-    filtered_symbols = []
-    removed_symbols = []
+    ohlcv_data         = {}
+    filtered_symbols   = []
+    removed_symbols    = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
     
     # ---- Filtro de inclusión ----
@@ -48,8 +48,8 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             continue
         # -----------------------------------------------------
         
-        df = None
-        reasons = []
+        df        = None
+        reasons   = []
         file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
         if not os.path.exists(file_path):
             reasons.append("File missing")
@@ -70,7 +70,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if timeframe == "1H":
                     min_bars = 4320
                 elif timeframe == "30m":
-                    min_bars = 8640
+                    min_bars = 7800
                 elif timeframe == "4H":
                     min_bars = 1080
                 elif timeframe == "6Hutc":
@@ -90,9 +90,20 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         else:
             ohlcv_data[sym] = df
             filtered_symbols.append(sym)
+            
     print(f"\n🔹Total symbols     : {len(symbols)}")
     print(f"🔹Symbols removed   : {len(removed_symbols)}")
     print(f"🔹Symbols remaining : {len(filtered_symbols)}\n")
+    
+    
+# =============================================================================
+#     print(f"\n📊 Removal reasons breakdown:")
+#     for reason, count in removed_by_reasons.items():
+#         if count > 0:
+#             print(f"   • {reason:<25}: {count:>4} symbols")
+#     print()
+# =============================================================================
+    
     return ohlcv_data, filtered_symbols
 
         

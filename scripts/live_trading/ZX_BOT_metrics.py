@@ -103,7 +103,7 @@ def bot_metrics(
     
     # Anchos de columna
     col_widths = {
-        'Strategy': 18,
+        'Strategy': 20,
         'date_fo': 10,
         'Trades_num': 11,
         'Trades_pct': 11,
