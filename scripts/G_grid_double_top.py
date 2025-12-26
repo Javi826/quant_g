@@ -22,35 +22,28 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
+DATA_FOLDER         = "data2/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2021_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 80_000_000
 
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,4,5] 
-PRICE_TOLERANCE_LIST = [10,20,30,40] 
-TREND_TH_LIST        = [10,20,30,40] 
-
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9]
 
 # =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_MINOR_LIST  = [2] 
-# PRICE_TOLERANCE_LIST = [10] 
-# TREND_TH_LIST        = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [10]
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [10] 
+TREND_TH_LIST        = [10] 
+ 
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 # =============================================================================
 
 
@@ -62,7 +55,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=True)
 
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 

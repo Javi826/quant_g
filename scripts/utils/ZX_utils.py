@@ -12,7 +12,11 @@ np.random.seed(42)
 random.seed(42)
 
 symbols_to_exclude = {}
-symbols_to_include = ["BTCUSDT"]  
+symbols_to_include = ["ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ETHUSDT","PENGUUSDT","AAVEUSDT",
+                      "ENAUSDT","ONDOUSDT","XRPUSDT","LTCUSDT","ARBUSDT","AVAXUSDT","TAOUSDT","HBARUSDT",
+                      "DOTUSDT","DOGEUSDT","SOLUSDT","FARTCOINUSDT","WIFUSDT","WLDUSDT","NEARUSDT","LINKUSDT",
+                      "BGBUSDT","SNXUSDT","BTCUSDT","SUIUSDT","APTUSDT","FORMUSDT","HYPEUSDT","ADAUSDT"]
+ 
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50, my_symbols=False):
     ohlcv_data         = {}

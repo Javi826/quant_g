@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Bot Dashboard - {{ account }}</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0e1a;
+            color: #e8eaf0;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 16px;
+        }
+        
+        /* Layout principal: 2 columnas */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 0;
+        }
+        
+        /* Header profesional - COLOR DINÁMICO */
+        .header {
+            grid-column: 1 / -1;
+            {% if account == '01' %}
+            background: #1e3a8a;  /* Azul para cuenta 01 */
+            {% elif account == 'E1' %}
+            background: #0891b2;  /* Cyan para cuenta E1 */
+            {% else %}
+            background: #1e3a8a;  /* Default azul */
+            {% endif %}
+            padding: 22px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #1e2940;
+        }
+        
+        .header h1 { 
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .account-badge {
+            font-size: 16px;
+            {% if account == '01' %}
+            background: #2563eb;
+            border: 1px solid #3b82f6;
+            {% elif account == 'E1' %}
+            background: #06b6d4;
+            border: 1px solid #22d3ee;
+            {% else %}
+            background: #2563eb;
+            border: 1px solid #3b82f6;
+            {% endif %}
+            padding: 5px 13px;
+            border-radius: 4px;
+            margin-left: 10px;
+            font-weight: 500;
+        }
+        
+        .status-badge {
+            background: #10b981;
+            padding: 7px 18px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 15px;
+            color: white;
+            border: 1px solid #059669;
+        }
+        
+        .status-badge::before {
+            content: '●';
+            margin-right: 6px;
+        }
+        
+        /* Panel IZQUIERDO: Logs */
+        .logs-panel {
+            background: #141b2d;
+            border-right: 1px solid #1e2940;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .logs-header {
+            background: #1a2332;
+            padding: 16px 20px;
+            border-bottom: 1px solid #1e2940;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logs-header h2 {
+            font-size: 17px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #e8eaf0;
+        }
+        
+        .logs-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-small {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .btn-small:hover { 
+            background: #2563eb;
+        }
+        
+        .btn-small.danger { 
+            background: #dc2626;
+        }
+        
+        .btn-small.danger:hover { 
+            background: #b91c1c;
+        }
+        
+        .logs-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.1;
+            background: #0a0e1a;
+        }
+        
+        .log-line {
+            padding: 5px 8px;
+            margin-bottom: 2px;
+            border-radius: 2px;
+            word-wrap: break-word;
+        }
+        
+        .log-line.info { color: #60a5fa; }
+        .log-line.success { color: #34d399; }
+        .log-line.warning { color: #fbbf24; }
+        .log-line.error { color: #f87171; }
+        .log-line.default { color: #9ca3af; }
+        
+        /* Scrollbar */
+        .logs-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .logs-content::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+        
+        .logs-content::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        
+        .logs-content::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        
+        /* Panel DERECHO */
+        .main-panel {
+            background: #0a0e1a;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        .main-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .main-panel::-webkit-scrollbar-track {
+            background: #0a0e1a;
+        }
+        
+        .main-panel::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        
+        /* Stats cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 26px;
+        }
+        
+        .stat-card {
+            background: #141b2d;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #1e2940;
+        }
+        
+        .stat-label {
+            color: #9ca3af;
+            font-size: 13px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+        
+        .stat-value.positive { color: #10b981; }
+        .stat-value.negative { color: #ef4444; }
+        .stat-value.neutral { color: #60a5fa; }
+        .stat-value.warning { color: #f59e0b; }
+        
+        /* Contenedor de tablas */
+        .content-section {
+            background: #141b2d;
+            border-radius: 6px;
+            padding: 22px;
+            border: 1px solid #1e2940;
+            margin-bottom: 22px;
+        }
+        
+        .content-section h2 {
+            margin-bottom: 20px;
+            color: #e8eaf0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        /* Tabs */
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #1e2940;
+            padding-bottom: 8px;
+        }
+        
+        .tab-btn {
+            background: transparent;
+            color: #9ca3af;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .tab-btn:hover {
+            background: #1a2332;
+            color: #e8eaf0;
+        }
+        
+        .tab-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Selector de vistas */
+        .view-selector {
+            display: flex;
+            gap: 6px;
+            background: #1a2332;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .view-btn {
+            background: transparent;
+            color: #9ca3af;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .view-btn:hover {
+            background: #1e2940;
+            color: #e8eaf0;
+        }
+        
+        .view-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        /* Tablas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            text-align: left;
+            padding: 14px 16px;
+            background: #1a2332;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #1e2940;
+        }
+        
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #1e2940;
+            font-size: 18px;
+            color: #e8eaf0;
+        }
+        
+        tbody tr:hover { 
+            background: #1a2332;
+        }
+        
+        .direction-long { 
+            color: #10b981;
+            font-weight: 600;
+        }
+        
+        .direction-short { 
+            color: #ef4444;
+            font-weight: 600;
+        }
+        
+        /* Badges */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        
+        .badge-active { 
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge-deprecating { 
+            background: #64748b;
+            color: white;
+        }
+        
+        .badge-not-implemented { 
+            background: #dc2626;
+            color: white;
+        }
+        
+        .badge-tp { 
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge-sl { 
+            background: #ef4444;
+            color: white;
+        }
+        
+        .badge-timeout { 
+            background: #64748b;
+            color: white;
+        }
+        
+        /* WebSocket status indicator */
+        .ws-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        
+        .ws-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .ws-dot.connected {
+            background: #10b981;
+        }
+        
+        .ws-dot.disconnected {
+            background: #ef4444;
+        }
+        
+        /* Config cards */
+        .config-card {
+            background: #1a2332;
+            padding: 18px;
+            border-radius: 6px;
+            border: 1px solid #1e2940;
+            margin-bottom: 16px;
+        }
+        
+        .config-card h3 {
+            color: #e8eaf0;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #1e2940;
+        }
+        
+        .config-row:last-child {
+            border-bottom: none;
+        }
+        
+        .config-label {
+            color: #9ca3af;
+            font-size: 18px;
+        }
+        
+        .config-value {
+            color: #e8eaf0;
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        /* Timeframes list */
+        .timeframe-item {
+            background: #1a2332;
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border: 1px solid #1e2940;
+        }
+        
+        .timeframe-header {
+            color: #60a5fa;
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 15px;
+        }
+        
+        .timeframe-strategies {
+            color: #9ca3af;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        /* Auto-scroll indicator */
+        .auto-scroll-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: #10b981;
+            color: white;
+            padding: 9px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .auto-scroll-indicator.active {
+            display: block;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .dashboard-container {
+                grid-template-columns: 350px 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr;
+            }
+            
+            .logs-panel {
+                border-right: none;
+                border-bottom: 1px solid #1e2940;
+                max-height: 300px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                Trading Bot Dashboard
+                <span class="account-badge" id="account-badge">ACC: {{ account }}</span>
+            </h1>
+            <div class="status-badge" id="status">Running</div>
+        </div>
+        
+        <!-- Panel IZQUIERDO: Logs -->
+        <div class="logs-panel">
+            <div class="logs-header">
+                <h2>Execution Logs</h2>
+                <div class="logs-controls">
+                    <button class="btn-small" onclick="toggleAutoScroll()" id="auto-scroll-btn">
+                        Auto
+                    </button>
+                    <button class="btn-small danger" onclick="clearLogs()">
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div class="logs-content" id="logs-content">
+                <div class="log-line default">Waiting for bot output...</div>
+            </div>
+        </div>
+        
+        <!-- Panel DERECHO -->
+        <div class="main-panel">
+            <!-- Stats cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">📊 Positions</div>
+                    <div class="stat-value neutral" id="total-positions">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📈 Open P/L</div>
+                    <div class="stat-value positive" id="open-pnl">$-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">💵 Closed P/L</div>
+                    <div class="stat-value positive" id="total-profit">$-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📊 Profit %</div>
+                    <div class="stat-value positive" id="profit-pct">-%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📋 Trades</div>
+                    <div class="stat-value neutral" id="trades-num">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">🎯 Win Rate</div>
+                    <div class="stat-value neutral" id="trades-pct">-%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">₿ BTC Price</div>
+                    <div class="stat-value warning" id="btc-price">$-</div>
+                </div>
+            </div>
+            
+            <!-- Tabs principales -->
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="switchTab('positions')">Positions</button>
+                <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
+                <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
+                <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
+            </div>
+            
+            <!-- Tab: Positions -->
+            <div id="tab-positions" class="tab-content active">
+                <div class="content-section">
+                    <h2>
+                        <span>Active Positions</span>
+                        <div class="view-selector">
+                            <button class="view-btn active" onclick="setPositionsView('compact')">Compact</button>
+                            <button class="view-btn" onclick="setPositionsView('detailed')">Detailed</button>
+                        </div>
+                    </h2>
+                    <div id="positions-container"></div>
+                </div>
+            </div>
+            
+            <!-- Tab: Strategy Analysis -->
+            <div id="tab-analysis" class="tab-content">
+                <div class="content-section">
+                    <h2>Strategy Performance Analysis</h2>
+                    <div id="analysis-container">
+                        <div style="text-align: center; color: #9ca3af; padding: 40px;">
+                            Loading analysis...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab: Recent Trades -->
+            <div id="tab-trades" class="tab-content">
+                <div class="content-section">
+                    <h2>Recent Closed Trades</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Closed At</th>
+                                <th>Strategy</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Profit</th>
+                                <th>Profit %</th>
+                                <th>Exit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                            <tr><td colspan="7" style="text-align: center; color: #9ca3af;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Tab: Config & Connections -->
+            <div id="tab-config" class="tab-content">
+                <div class="content-section">
+                    <h2>Bot Configuration & Status</h2>
+                    
+                    <!-- WebSocket Status - PRIMERO -->
+                    <div class="config-card">
+                        <h3>🌐 WebSocket Connections</h3>
+                        <div class="config-row">
+                            <span class="config-label">Public Channel:</span>
+                            <span class="ws-indicator" id="ws-public">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Connecting...</span>
+                            </span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Private Channel:</span>
+                            <span class="ws-indicator" id="ws-private">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Connecting...</span>
+                            </span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Authentication:</span>
+                            <span class="ws-indicator" id="ws-auth">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Pending...</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuration Overview - SEGUNDO -->
+                    <div class="config-card">
+                        <h3>⚙️ Configuration Overview</h3>
+                        <div class="config-row">
+                            <span class="config-label">Account:</span>
+                            <span class="config-value" id="config-account">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Initial Capital:</span>
+                            <span class="config-value" id="config-capital">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Total Strategies:</span>
+                            <span class="config-value" id="config-total-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Active:</span>
+                            <span class="config-value" id="config-active-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Deprecating:</span>
+                            <span class="config-value" id="config-deprecating-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Not Implemented:</span>
+                            <span class="config-value" id="config-not-implemented-strat">-</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Strategies List - TABLA COMPLETA CON PARÁMETROS CORRECTOS -->
+                    <div class="config-card">
+                        <h3>📋 Strategies List</h3>
+                        <div style="overflow-x: auto;">
+                            <table id="strategies-table" style="min-width: 1200px;">
+                                <thead>
+                                    <tr>
+                                        <th>Strategy ID</th>
+                                        <th>TF</th>
+                                        <th>Side</th>
+                                        <th>Symbols</th>
+                                        <th>TP%</th>
+                                        <th>SL%</th>
+                                        <th>Amount</th>
+                                        <th>Candles</th>
+                                        <th>Lookback</th>
+                                        <th>Tolerance</th>
+                                        <th>MA Per.</th>
+                                        <th>Impulse</th>
+                                        <th>Trend</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="strategies-body">
+                                    <tr><td colspan="14" style="text-align: center; color: #9ca3af;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Timeframes -->
+                    <div class="config-card">
+                        <h3>⏰ Timeframes Summary</h3>
+                        <div id="timeframes-container">
+                            <div style="text-align: center; color: #9ca3af; padding: 20px;">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Indicador de auto-scroll -->
+    <div class="auto-scroll-indicator active" id="auto-scroll-indicator">
+        Auto-scroll enabled
+    </div>
+    
+    <script>
+        // =================================================================
+        // VARIABLES GLOBALES
+        // =================================================================
+        let autoScroll = true;
+        let lastLogTimestamp = null;
+        let isLoadingData = false;
+        let isLoadingLogs = false;
+        let currentPositionsView = 'compact';
+        let cachedPositions = [];
+        let currentTab = 'positions';
+        
+        // =================================================================
+        // TABS
+        // =================================================================
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            
+            if (tabName === 'analysis') {
+                loadStrategyAnalysis();
+            } else if (tabName === 'config') {
+                loadBotConfig();
+            }
+        }
+        
+        // =================================================================
+        // FUNCIONES DE LOG
+        // =================================================================
+        function getLogClass(line) {
+            if (line.includes('Position opened') || line.includes('TP REACHED')) {
+                return 'success';
+            } else if (line.includes('Error') || line.includes('SL REACHED')) {
+                return 'error';
+            } else if (line.includes('Warning')) {
+                return 'warning';
+            } else if (line.includes('Checking')) {
+                return 'info';
+            }
+            return 'default';
+        }
+        
+        async function loadLogs() {
+            if (isLoadingLogs) return;
+            isLoadingLogs = true;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const res = await fetch('/api/logs/stream', {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                
+                const data = await res.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    const logsContent = document.getElementById('logs-content');
+                    
+                    if (logsContent.children.length === 1 && 
+                        logsContent.children[0].textContent.includes('Waiting')) {
+                        logsContent.innerHTML = '';
+                    }
+                    
+                    const fragment = document.createDocumentFragment();
+                    
+                    data.logs.forEach(log => {
+                        const logLine = document.createElement('div');
+                        logLine.className = `log-line ${getLogClass(log)}`;
+                        logLine.textContent = log;
+                        fragment.appendChild(logLine);
+                    });
+                    
+                    logsContent.appendChild(fragment);
+                    
+                    while (logsContent.children.length > 500) {
+                        logsContent.removeChild(logsContent.firstChild);
+                    }
+                    
+                    if (autoScroll) {
+                        requestAnimationFrame(() => {
+                            logsContent.scrollTop = logsContent.scrollHeight;
+                        });
+                    }
+                    
+                    lastLogTimestamp = data.timestamp;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.warn('Logs request timeout');
+                } else {
+                    console.error('Error loading logs:', error);
+                }
+            } finally {
+                isLoadingLogs = false;
+            }
+        }
+        
+        // =================================================================
+        // RENDERIZADO DE POSICIONES
+        // =================================================================
+        function setPositionsView(view) {
+            currentPositionsView = view;
+            
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            renderPositions(cachedPositions);
+            localStorage.setItem('positionsView', view);
+        }
+        
+        function renderPositions(positions) {
+            cachedPositions = positions;
+            const container = document.getElementById('positions-container');
+            
+            if (!positions || positions.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 40px;">No active positions</div>';
+                return;
+            }
+            
+            if (currentPositionsView === 'compact') {
+                renderCompactView(container, positions);
+            } else if (currentPositionsView === 'detailed') {
+                renderDetailedView(container, positions);
+            }
+        }
+        
+        function renderCompactView(container, positions) {
+            const groupedByStrategy = {};
+            
+            positions.forEach(pos => {
+                if (!groupedByStrategy[pos.strategy]) {
+                    groupedByStrategy[pos.strategy] = {
+                        positions: [],
+                        totalPnl: 0,
+                        direction: pos.direction,
+                        opened_at: pos.opened_at,
+                        candles: pos.candles,
+                        max_candles: pos.max_candles
+                    };
+                }
+                groupedByStrategy[pos.strategy].positions.push(pos);
+                groupedByStrategy[pos.strategy].totalPnl += (pos.current_pnl || 0);
+            });
+            
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Strategy</th>
+                            <th>Side</th>
+                            <th>Opened</th>
+                            <th>Candles</th>
+                            <th>#pos</th>
+                            <th>PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${Object.entries(groupedByStrategy).map(([strategyId, data]) => {
+                            const pnl = data.totalPnl;
+                            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+                            
+                            let openedDateStr = '';
+                            if (data.opened_at) {
+                                try {
+                                    const date = new Date(data.opened_at);
+                                    openedDateStr = date.toISOString().split('T')[0];
+                                } catch {
+                                    openedDateStr = String(data.opened_at).substring(0, 10);
+                                }
+                            }
+                            
+                            return `
+                                <tr>
+                                    <td>${strategyId}</td>
+                                    <td class="direction-${data.direction.toLowerCase()}">${data.direction.toUpperCase()}</td>
+                                    <td>${openedDateStr}</td>
+                                    <td>${data.candles || 0}/${data.max_candles || 50}</td>
+                                    <td style="text-align: center; color: #60a5fa; font-weight: 600;">${data.positions.length}</td>
+                                    <td class="${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = html;
+        }
+        
+        function renderDetailedView(container, positions) {
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Strategy</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Entry</th>
+                            <th>Current</th>
+                            <th>Size</th>
+                            <th>TP</th>
+                            <th>SL</th>
+                            <th>P/L</th>
+                            <th>Candles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${positions.map(pos => {
+                            const pnl = pos.current_pnl || 0;
+                            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+                            return `
+                                <tr>
+                                    <td>${pos.strategy}</td>
+                                    <td>${pos.symbol}</td>
+                                    <td class="direction-${pos.direction.toLowerCase()}">${pos.direction.toUpperCase()}</td>
+                                    <td>$${parseFloat(pos.entry_price).toFixed(2)}</td>
+                                    <td>$${parseFloat(pos.current_price || pos.entry_price).toFixed(2)}</td>
+                                    <td>${parseFloat(pos.size).toFixed(4)}</td>
+                                    <td>$${parseFloat(pos.tp).toFixed(2)}</td>
+                                    <td>$${parseFloat(pos.sl).toFixed(2)}</td>
+                                    <td class="${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
+                                    <td>${pos.candles || 0}/${pos.max_candles || 50}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            container.innerHTML = html;
+        }
+        
+        // =================================================================
+        // STRATEGY ANALYSIS
+        // =================================================================
+        async function loadStrategyAnalysis() {
+            try {
+                const res = await fetch('/api/strategy-analysis');
+                const data = await res.json();
+                
+                const container = document.getElementById('analysis-container');
+                
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 40px;">No trades data available</div>';
+                    return;
+                }
+                
+                const html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>First Trade</th>
+                                <th>Trades</th>
+                                <th>Win %</th>
+                                <th>Total Profit</th>
+                                <th>Profit %</th>
+                                <th>TP %</th>
+                                <th>SL %</th>
+                                <th>OOM %</th>
+                                <th>Avg Days</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(strat => {
+                                const profitClass = strat.Total_profit >= 0 ? 'direction-long' : 'direction-short';
+                                return `
+                                    <tr>
+                                        <td>${strat.Strategy}</td>
+                                        <td>${strat.date_fo}</td>
+                                        <td>${strat.Trades_num}</td>
+                                        <td>${strat.Trades_pct.toFixed(1)}%</td>
+                                        <td class="${profitClass}">${strat.Total_profit >= 0 ? '+' : ''}$${strat.Total_profit.toFixed(2)}</td>
+                                        <td class="${profitClass}">${strat.Profit_pct >= 0 ? '+' : ''}${strat.Profit_pct.toFixed(1)}%</td>
+                                        <td>${strat.TP_pct.toFixed(1)}%</td>
+                                        <td>${strat.SL_pct.toFixed(1)}%</td>
+                                        <td>${strat.OOM_pct.toFixed(1)}%</td>
+                                        <td>${strat.Avg_days.toFixed(2)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading strategy analysis:', error);
+                document.getElementById('analysis-container').innerHTML = 
+                    '<div style="text-align: center; color: #ef4444; padding: 40px;">Error loading analysis</div>';
+            }
+        }
+        
+        // =================================================================
+        // BOT CONFIG - PARÁMETROS CORRECTOS
+        // =================================================================
+        async function loadBotConfig() {
+            try {
+                const res = await fetch('/api/bot-config');
+                const data = await res.json();
+                
+                // Configuration Overview
+                document.getElementById('config-account').textContent = data.account || '-';
+                document.getElementById('config-capital').textContent = `$${(data.initial_capital || 0).toLocaleString()}`;
+                document.getElementById('config-total-strat').textContent = data.stats.total || 0;
+                document.getElementById('config-active-strat').textContent = data.stats.active || 0;
+                document.getElementById('config-deprecating-strat').textContent = data.stats.deprecating || 0;
+                document.getElementById('config-not-implemented-strat').textContent = data.stats.not_implemented || 0;
+                
+                // WebSocket Status
+                const wsPublic = document.getElementById('ws-public');
+                const wsPrivate = document.getElementById('ws-private');
+                const wsAuth = document.getElementById('ws-auth');
+                
+                if (data.websocket_status.public_connected) {
+                    wsPublic.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+                } else {
+                    wsPublic.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+                }
+                
+                if (data.websocket_status.private_connected) {
+                    wsPrivate.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+                } else {
+                    wsPrivate.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+                }
+                
+                if (data.websocket_status.authenticated) {
+                    wsAuth.innerHTML = '<span class="ws-dot connected"></span><span>Authenticated</span>';
+                } else {
+                    wsAuth.innerHTML = '<span class="ws-dot disconnected"></span><span>Not Authenticated</span>';
+                }
+                
+                // ⭐ Strategies Table - PARÁMETROS CORRECTOS (sin left_lookback)
+                const strategiesBody = document.getElementById('strategies-body');
+                if (!data.strategies || data.strategies.length === 0) {
+                    strategiesBody.innerHTML = '<tr><td colspan="14" style="text-align: center; color: #9ca3af;">No strategies configured</td></tr>';
+                } else {
+                    strategiesBody.innerHTML = data.strategies.map(strat => {
+                        let statusBadge = '';
+                        if (strat.status === 'ACTIVE') {
+                            statusBadge = '<span class="badge badge-active">Active</span>';
+                        } else if (strat.status === 'DEPRECATING') {
+                            statusBadge = '<span class="badge badge-deprecating">Deprecating</span>';
+                        } else {
+                            statusBadge = '<span class="badge badge-not-implemented">Not Impl.</span>';
+                        }
+                        
+                        return `
+                            <tr>
+                                <td>${strat.id}</td>
+                                <td>${strat.timeframe}</td>
+                                <td class="direction-${strat.direction.toLowerCase()}">${strat.direction.toUpperCase()}</td>
+                                <td style="text-align: center; color: #60a5fa;">${strat.symbols_count}</td>
+                                <td>${strat.tp_pct}</td>
+                                <td>${strat.sl_pct}</td>
+                                <td>$${strat.order_amount}</td>
+                                <td>${strat.sell_after_ncandles}</td>
+                                <td>${strat.lookback}</td>
+                                <td>${strat.tolerance}</td>
+                                <td>${strat.ma_period}</td>
+                                <td>${strat.impulse}</td>
+                                <td>${strat.trend_th}</td>
+                                <td>${statusBadge}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+                
+                // Timeframes Summary
+                const timeframesContainer = document.getElementById('timeframes-container');
+                if (!data.timeframes || Object.keys(data.timeframes).length === 0) {
+                    timeframesContainer.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 20px;">No timeframes configured</div>';
+                } else {
+                    timeframesContainer.innerHTML = Object.entries(data.timeframes)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([tf, strategies]) => `
+                            <div class="timeframe-item">
+                                <div class="timeframe-header">${tf} (${strategies.length} strategies)</div>
+                                <div class="timeframe-strategies">${strategies.join(', ')}</div>
+                            </div>
+                        `).join('');
+                }
+                
+            } catch (error) {
+                console.error('Error loading bot config:', error);
+            }
+        }
+        
+        // =================================================================
+        // CARGAR DATOS
+        // =================================================================
+        async function loadData() {
+            if (isLoadingData) return;
+            isLoadingData = true;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+                
+                const statusRes = await fetch('/api/status', {
+                    signal: controller.signal
+                });
+                
+                if (!statusRes.ok) {
+                    throw new Error(`Status HTTP ${statusRes.status}`);
+                }
+                
+                const status = await statusRes.json();
+                
+                requestAnimationFrame(() => {
+                    document.getElementById('total-positions').textContent = 
+                        status.total_positions || 0;
+                    
+                    const totalProfit = status.total_profit || 0;
+                    const profitEl = document.getElementById('total-profit');
+                    profitEl.textContent = `$${totalProfit.toFixed(2)}`;
+                    profitEl.className = `stat-value ${totalProfit >= 0 ? 'positive' : 'negative'}`;
+                    
+                    const openPnl = status.open_pnl || 0;
+                    const openPnlEl = document.getElementById('open-pnl');
+                    openPnlEl.textContent = `$${openPnl.toFixed(2)}`;
+                    openPnlEl.className = `stat-value ${openPnl >= 0 ? 'positive' : 'negative'}`;
+                    
+                    const profitPct = status.profit_pct || 0;
+                    const profitPctEl = document.getElementById('profit-pct');
+                    profitPctEl.textContent = `${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%`;
+                    profitPctEl.className = `stat-value ${profitPct >= 0 ? 'positive' : 'negative'}`;
+                    
+                    document.getElementById('trades-num').textContent = 
+                        status.num_trades || 0;
+                    
+                    const tradesPct = status.trades_pct || 0;
+                    document.getElementById('trades-pct').textContent = 
+                        `${tradesPct.toFixed(1)}%`;
+                    
+                    const btcPrice = status.btc_price || 0;
+                    document.getElementById('btc-price').textContent = 
+                        `$${btcPrice.toLocaleString()}`;
+                });
+                
+                const posRes = await fetch('/api/positions', {
+                    signal: controller.signal
+                });
+                
+                if (!posRes.ok) {
+                    throw new Error(`Positions HTTP ${posRes.status}`);
+                }
+                
+                const positions = await posRes.json();
+                
+                requestAnimationFrame(() => {
+                    if (currentTab === 'positions') {
+                        renderPositions(positions);
+                    }
+                });
+                
+                const tradesRes = await fetch('/api/trades/recent', {
+                    signal: controller.signal
+                });
+                
+                if (!tradesRes.ok) {
+                    throw new Error(`Trades HTTP ${tradesRes.status}`);
+                }
+                
+                const trades = await tradesRes.json();
+                
+                requestAnimationFrame(() => {
+                    const tradesBody = document.getElementById('trades-body');
+                    if (!trades || trades.length === 0) {
+                        tradesBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #9ca3af;">No recent trades</td></tr>';
+                    } else {
+                        tradesBody.innerHTML = trades.reverse().map(trade => {
+                            const profitClass = trade.PROFIT >= 0 ? 'direction-long' : 'direction-short';
+                            
+                            let reasonBadge = '';
+                            if (trade.REASON_OUT === 'TP') {
+                                reasonBadge = '<span class="badge badge-tp">TP</span>';
+                            } else if (trade.REASON_OUT === 'SL') {
+                                reasonBadge = '<span class="badge badge-sl">SL</span>';
+                            } else {
+                                reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
+                            }
+                            
+                            return `
+                                <tr>
+                                    <td>${new Date(trade.CLOSE_AT).toLocaleString()}</td>
+                                    <td>${trade.STRATEGY}</td>
+                                    <td>${trade.SYMBOL}</td>
+                                    <td class="direction-${trade.DIRECTION.toLowerCase()}">${trade.DIRECTION}</td>
+                                    <td class="${profitClass}">${trade.PROFIT >= 0 ? '+' : ''}$${trade.PROFIT.toFixed(2)}</td>
+                                    <td class="${profitClass}">${trade.PROFIT_PCT >= 0 ? '+' : ''}${trade.PROFIT_PCT.toFixed(2)}%</td>
+                                    <td>${reasonBadge}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.warn('Data request timeout');
+                } else {
+                    console.error('Error loading data:', error);
+                }
+            } finally {
+                isLoadingData = false;
+            }
+        }
+        
+        // =================================================================
+        // CONTROLES UI
+        // =================================================================
+        function toggleAutoScroll() {
+            autoScroll = !autoScroll;
+            const btn = document.getElementById('auto-scroll-btn');
+            const indicator = document.getElementById('auto-scroll-indicator');
+            
+            if (autoScroll) {
+                btn.textContent = 'Auto';
+                indicator.classList.add('active');
+            } else {
+                btn.textContent = 'Manual';
+                indicator.classList.remove('active');
+            }
+        }
+        
+        function clearLogs() {
+            if (confirm('Clear all logs from display?')) {
+                document.getElementById('logs-content').innerHTML = 
+                    '<div class="log-line default">Logs cleared</div>';
+            }
+        }
+        
+        document.getElementById('logs-content').addEventListener('scroll', function() {
+            const logsContent = this;
+            const isAtBottom = logsContent.scrollHeight - logsContent.scrollTop 
+                              <= logsContent.clientHeight + 50;
+            
+            if (!isAtBottom && autoScroll) {
+                toggleAutoScroll();
+            }
+        });
+        
+        // =================================================================
+        // POLLING
+        // =================================================================
+        let dataInterval = null;
+        let logsInterval = null;
+        let configInterval = null;
+        
+        function startPolling() {
+            loadData();
+            loadLogs();
+            
+            dataInterval = setInterval(() => {
+                loadData().catch(err => {
+                    console.error('Data polling error:', err);
+                });
+            }, 3000);
+            
+            logsInterval = setInterval(() => {
+                loadLogs().catch(err => {
+                    console.error('Logs polling error:', err);
+                });
+            }, 1500);
+            
+            // Config polling (menos frecuente)
+            configInterval = setInterval(() => {
+                if (currentTab === 'config') {
+                    loadBotConfig().catch(err => {
+                        console.error('Config polling error:', err);
+                    });
+                }
+            }, 30000); // 30 segundos
+        }
+        
+        function stopPolling() {
+            if (dataInterval) {
+                clearInterval(dataInterval);
+                dataInterval = null;
+            }
+            if (logsInterval) {
+                clearInterval(logsInterval);
+                logsInterval = null;
+            }
+            if (configInterval) {
+                clearInterval(configInterval);
+                configInterval = null;
+            }
+        }
+        
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Dashboard hidden - pausing polling');
+                stopPolling();
+            } else {
+                console.log('Dashboard visible - resuming polling');
+                startPolling();
+            }
+        });
+        
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+        });
+        
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+        
+        // =================================================================
+        // INICIALIZACIÓN
+        // =================================================================
+        const savedView = localStorage.getItem('positionsView') || 'compact';
+        currentPositionsView = savedView;
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    if (btn.textContent.toLowerCase().includes(savedView)) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                startPolling();
+            });
+        } else {
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                if (btn.textContent.toLowerCase().includes(savedView)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            startPolling();
+        }
+        
+        console.log('Dashboard initialized');
+    </script>
+</body>
+</html>
+
+

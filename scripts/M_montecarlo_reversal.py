@@ -23,35 +23,31 @@ STRATEGY            = "reversal"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_IS"
-DATA_FOLDER         = "data/crypto_2024_short_IS"
-TIMEFRAME_MINOR     = '30m'
-ORDER_AMOUNT        = 400
+DATA_FOLDER         = "data/crypto_2022_IS"
+#DATA_FOLDER         = "data/crypto_2024_short_IS"
+TIMEFRAME_MINOR     = '4H'
+ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [7,8,9] 
+LOOKBACK_LIST        = [7,8,9] 
 TOLERANCE_LIST       = [20,30,40]
 MA_PERIOD_LIST       = [50]
 
+# -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
+LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [3,4,5,6,7]
-SL_PCT_LIST          = [5,10]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
-SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [5] 
-TOLERANCE_LIST       = [30]
 
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [10]
-
-param_names     = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------
@@ -79,9 +75,9 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_short(
+            signals = reversal_long(
                 arr_minor,
-                left_lookback=param_dict.get('LEFT_LOOKBACK'),
+                lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
                 ma_period=param_dict.get('MA_PERIOD'),
                 live_trading=False

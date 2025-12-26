@@ -13,8 +13,9 @@ pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 
 
+
 def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=False, save_excel=False):
-  
+ 
     df = df.copy()
     # -----------------------------
     # Métricas derivadas
@@ -24,12 +25,11 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     df.loc[df["Num_Signals"] == 0, "Gain_signal"] = np.nan
 
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
-    
+   
     # -----------------------------
     # Mutual Information + Pearson correlation
     # -----------------------------
     if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        #print("\n⚠️ df_portfolio empty or <5 filas. Mutual Information y Pearson skipped.\n")
         mi_series = pd.Series([None]*len(parameters), index=parameters)
         pearson_series = pd.Series([None]*len(parameters), index=parameters)
     else:
@@ -59,27 +59,20 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         'Mutual_Information': mi_series,
         'Pearson_Correlation': pearson_series
     }).sort_values(by='Mutual_Information', ascending=False)
-# =============================================================================
-#     print("\n" + "="*60)
-#     print("MUTUAL INFORMATION & PEARSON CORRELATION")
-#     print("="*60)
-#     print(analysis_df.to_string())
-#     print("\n")
-# =============================================================================
-    
+   
     # Incluir duration_m en las métricas mostradas (duration en minutos)
     metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals', 'duration_m']
 
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
-    
+   
     # -----------------------------
     # BEST COMBOS PER METRIC
     # -----------------------------
     best_netgain = df_portfolio.loc[df_portfolio['Net_Gain_pct'].idxmax()]
     best_sharpe  = df_portfolio.loc[df_portfolio['Sharpe'].idxmax()]
     best_dd      = df_portfolio.loc[df_portfolio['DD_pct'].idxmin()]
-    
+   
     df_summary = pd.DataFrame([
         {'Metric':'Net_Gain_pct', **best_netgain},
         {'Metric':'Sharpe      ', **best_sharpe},
@@ -88,7 +81,79 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     df_summary['Num_Signals'] = df_summary['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     df_summary = df_summary.round(2)
     print(df_summary.to_string(index=False))
-  
+   
+    # -----------------------------
+    # MONTHLY METRICS TABLE
+    # -----------------------------
+    def calculate_monthly_metrics(equity_hist, initial_capital):
+        """Calcula métricas mensuales a partir del historial de equity"""
+        if not equity_hist or len(equity_hist['timestamp']) == 0:
+            return pd.DataFrame()
+       
+        df_eq = pd.DataFrame({
+            'timestamp': pd.to_datetime(equity_hist['timestamp']),
+            'balance': equity_hist['balance']
+        })
+       
+        # Agrupar por mes
+        df_eq['month'] = df_eq['timestamp'].dt.to_period('M')
+       
+        monthly_stats = []
+        for month, group in df_eq.groupby('month'):
+            start_balance = group['balance'].iloc[0]
+            end_balance = group['balance'].iloc[-1]
+           
+            # Net Gain del mes
+            monthly_gain = end_balance - start_balance
+            monthly_gain_pct = (monthly_gain / start_balance) * 100
+           
+            # Drawdown máximo del mes
+            cummax = group['balance'].expanding().max()
+            dd = (group['balance'] - cummax) / cummax * 100
+            max_dd = dd.min()
+           
+            monthly_stats.append({
+                'Month': str(month),
+                'Net_Gain_%': monthly_gain_pct,
+                'Max_DD_%': max_dd,
+                'Start_Bal': start_balance,
+                'End_Bal': end_balance
+            })
+       
+        return pd.DataFrame(monthly_stats)
+   
+    # Calcular métricas mensuales para la mejor combinación por Net_Gain
+    best_row = df.loc[df["Net_Gain_pct"].idxmax()]
+    equity_hist = best_row.get("sim_balance_history", None)
+   
+    if equity_hist:
+        monthly_df = calculate_monthly_metrics(equity_hist, initial_capital)
+       
+        if not monthly_df.empty:
+            print("\n" + "="*60)
+            print("MONTHLY PERFORMANCE - Best Net_Gain Strategy")
+            print("="*60)
+           
+            # Formatear la tabla
+            monthly_display = monthly_df.copy()
+            monthly_display['Net_Gain_%'] = monthly_display['Net_Gain_%'].apply(lambda x: f"{x:.2f}")
+            monthly_display['Max_DD_%'] = monthly_display['Max_DD_%'].apply(lambda x: f"{x:.2f}")
+            monthly_display['Start_Bal'] = monthly_display['Start_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+            monthly_display['End_Bal'] = monthly_display['End_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+           
+            print(monthly_display.to_string(index=False))
+           
+            # Estadísticas agregadas
+            print("\n" + "-"*60)
+            print("MONTHLY STATISTICS")
+            print("-"*60)
+            print(f"Average Monthly Gain: {monthly_df['Net_Gain_%'].mean():.2f}%")
+            print(f"Best Month:           {monthly_df['Net_Gain_%'].max():.2f}%")
+            print(f"Worst Month:          {monthly_df['Net_Gain_%'].min():.2f}%")
+            print(f"Winning Months:       {(monthly_df['Net_Gain_%'] > 0).sum()} / {len(monthly_df)}")
+            print(f"Average Monthly DD:   {monthly_df['Max_DD_%'].mean():.2f}%")
+            print()
+ 
     # -----------------------------
     # PLOTS
     # -----------------------------
@@ -98,13 +163,13 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
             metrics_to_plot.append('Net_Gain_pct')
         if 'Win_Ratio' in df_portfolio.columns:
             metrics_to_plot.append('Win_Ratio')
-        
+       
         for param in parameters:
             agg_dict = {metric: 'sum' if metric=='Net_Gain_pct' else 'mean' for metric in metrics_to_plot}
             grouped = df_portfolio.groupby(param).agg(agg_dict).reset_index()
             if 'Win_Ratio' in grouped.columns:
                 grouped['Win_Ratio_scaled'] = grouped['Win_Ratio'] * 100
-            
+           
             plt.figure(figsize=(8,5))
             plt.plot(grouped[param], grouped['Net_Gain_pct'], marker='o', color='blue', label='Net_Gain_pct')
             if 'Win_Ratio_scaled' in grouped.columns:
@@ -115,79 +180,69 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
             plt.legend()
             plt.grid(True, linestyle='--', alpha=0.5)
             plt.show()
-            
+           
     # -----------------------------
     # PLOT: Net Gain % y DD vs Tiempo (con BTC siempre)
     # -----------------------------
     def plot_netgain_dd(equity_hist, initial_capital, title="Net Gain % y DD"):
         timestamps = pd.to_datetime(equity_hist['timestamp'])
         balances = np.array(equity_hist['balance'])
-        
+       
         # Net Gain %
         net_gain_pct = (balances - initial_capital) / initial_capital * 100
-        
+       
         # Drawdown %
         cumulative_max = np.maximum.accumulate(balances)
         dd_pct = (balances - cumulative_max) / cumulative_max * 100
-        
+       
         fig, ax1 = plt.subplots(figsize=(12,6))
-        
+       
         # --- Línea Bitcoin (antes de plotear Net Gain para poder comparar) ---
         DATA_FOLDER = data_folder
         btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
         btc_df = pd.read_parquet(btc_file)
-    
+   
         if 'timestamp' not in btc_df.columns:
             if isinstance(btc_df.index, pd.DatetimeIndex):
                 btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
             else:
                 raise ValueError("El parquet de BTC no tiene columna 'timestamp' ni índice datetime.")
-    
+   
         btc_df = btc_df[['timestamp', 'close']]
         btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
         btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
-    
+   
         # --- Comparar con BTC para colorear dinámicamente el área ---
-        # Alinear BTC con nuestros timestamps
         btc_aligned = np.interp(
-            timestamps.astype(np.int64) / 10**9,  # convertir a segundos
+            timestamps.astype(np.int64) / 10**9,
             btc_df['timestamp'].astype(np.int64) / 10**9,
             btc_df['btc_net_gain_pct']
         )
-    
-        # Crear máscaras para cuando superamos o no a BTC
+   
         above_btc = net_gain_pct >= btc_aligned
         below_btc = net_gain_pct < btc_aligned
-    
-        # Área verde donde superamos BTC
+   
         ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.1, color='green', interpolate=True)
-    
-        # Área roja donde NO superamos BTC
         ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.1, color='red', interpolate=True)
-    
-        # Línea azul siempre (encima de las áreas)
         ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
-    
+   
         ax1.set_xlabel("Time")
         ax1.set_ylabel("Net_Gain_pct", color='blue')
         ax1.tick_params(axis='y', labelcolor='blue')
-    
-        # Graficar BTC con línea naranja punteada
-        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], 
+   
+        ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'],
                  color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
-    
+   
         # Drawdown %
         ax2 = ax1.twinx()
         ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
         ax2.set_ylabel("Drawdown", color='red')
         ax2.tick_params(axis='y', labelcolor='red')
-        
-        # Calcular valores para etiquetas
-        final_net_gain = net_gain_pct[-1]  # Último valor en lugar del máximo
+       
+        final_net_gain = net_gain_pct[-1]
         max_dd = dd_pct.min()
         final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
-        
-        # Añadir etiquetas en el plot
+       
         textstr = (
             f'Net Gain STR: {final_net_gain:.2f}%\n'
             f'Net Gain BTC: {final_btc:.2f}%\n'
@@ -196,31 +251,23 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
 
         ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
                  verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-        
+       
         fig.suptitle(title)
         fig.autofmt_xdate()
         ax1.grid(True, linestyle='--', alpha=0.6)
-        
-        # Leyenda combinada
+       
         lines, labels = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax1.legend(lines + lines2, labels + labels2, loc='best')
-        
+       
         plt.show()
 
-    
     # -----------------------------
     # Uso de la función
     # -----------------------------
     best_row = df.loc[df["Net_Gain_pct"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Net Gain")
- 
-# =============================================================================
-#     best_row = df.loc[df["Sharpe"].idxmax()]
-#     equity_hist = best_row.get("sim_balance_history", None)
-#     plot_netgain_dd(equity_hist, initial_capital, title="Net_Gain_pct & DD - Best Sharpe")
-# =============================================================================
          
     return df_portfolio, mi_series
 
@@ -277,26 +324,26 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
         'Portfolio_Final_Balance': 'mean',
         'DD': 'mean'
     }).reset_index()
-    
+   
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
-    
+   
     fig, axes = plt.subplots(2, 1, figsize=(22,10))
-    
+   
     # Histograma Net_Gain_pct
     data_gain = path_grouped['Net_Gain_pct'].dropna()
     n_bins = max(10, min(50, len(data_gain)))
     counts, bins, patches = axes[0].hist(data_gain, bins=n_bins, edgecolor='white')
-    
+   
     for i, patch in enumerate(patches):
         bin_center = (bins[i] + bins[i+1]) / 2
         patch.set_facecolor('green' if bin_center >= 0 else 'red')
-    
+   
     axes[0].set_xlabel('Net Gain pct Portafolio (path_IDX)')
     axes[0].set_ylabel('Frequency')
     axes[0].set_title('Distribution: Net Gain pct per Path_IDX')
     axes[0].grid(True, linestyle='--', alpha=0.5)
     axes[0].axvline(x=0, color='black', linestyle='--', linewidth=1, alpha=0.7)
-    
+   
     # Histograma DD (granate)
     data_dd = path_grouped['DD'].dropna()
     axes[1].hist(data_dd, bins=max(10,min(50,len(data_dd))), edgecolor='white', color='lightcoral')
@@ -304,7 +351,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     axes[1].set_ylabel('Frequency')
     axes[1].set_title('Distribution: Drawdown per Path_IDX')
     axes[1].grid(True, linestyle='--', alpha=0.5)
-    
+   
     # -----------------------------
     # ETIQUETA SIMPLIFICADA
     # -----------------------------
@@ -312,33 +359,33 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     textstr = f'Probability of Negative Path: {prob_negative:.2f}%'
 
     fig.text(
-        0.75, 0.90, textstr,       
+        0.75, 0.90, textstr,      
         fontsize=14,
         fontfamily='monospace',
         va='top',
         bbox=dict(boxstyle='round,pad=0.6', facecolor='wheat', alpha=0.9)
     )
-    
+   
     plt.tight_layout()
     plt.show()
     plt.close()
-        
+       
     # -----------------------------
     # MEJORES COMBOS POR MÉTRICA
     # -----------------------------
     SHARPE_ADJUSTMENT_FACTOR = 1e6
     df_summary['Sharpe_m']   = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
-    
+   
     best_netgain = df_summary.loc[df_summary['Net_Gain_pct_m'].idxmax()]
     best_sharpe  = df_summary.loc[df_summary['Sharpe_m'].idxmax()]
     best_dd      = df_summary.loc[df_summary['DD_m'].idxmin()]
-    
+   
     df_best = pd.DataFrame([
         {'Metric': 'Net_Gain_pct',   **best_netgain},
         {'Metric': 'Sharpe      ',   **best_sharpe},
         {'Metric': 'Lowest DD   ',  **best_dd}
     ])
-    
+   
     df_best = df_best.drop(columns=['Net_Gain_m', 'Rows'], errors='ignore')
     cols    = ['Metric'] + [c for c in df_best.columns if c != 'Metric']
     df_best = df_best[cols]
@@ -354,4 +401,5 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     print(f"Probability of Negative Path : {prob_negative:.2f}%")
 
     return df_summary
+
 

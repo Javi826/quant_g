@@ -17,8 +17,10 @@ from ZX_connect_live import send_request_01, send_request_E1
 from ZX_BOT_validations import validate_strategy_configuration
 from ZX_BOT_ws_manager import init_websocket
 from ZX_BOT_metrics import bot_metrics,BotState
-from ZX_BOT_D1 import check_all_tp_sl,stop_live_display
-from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger
+
+#from ZX_BOT_D1 import check_all_tp_sl
+from ZX_BOT_dashboard import DashboardServer, create_dashboard_template
+from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger,check_all_tp_sl
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
 
@@ -63,9 +65,12 @@ DISPLAY_MODE = "summary"
 if ACCOUNT_NUMBER == "01":
     COLOR = BLUE
     INITIAL_CAPITAL = 3671
+    dashboard_port = 5000 
+    
 elif ACCOUNT_NUMBER == "E1":
     COLOR = CYAN
     INITIAL_CAPITAL = 1761
+    dashboard_port=5001
     
 #==========================================================================
 # PATHS FILES & CREDENTIALS
@@ -101,7 +106,7 @@ STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
     'timeframe': '4H',
-    'active': True,
+    'active': False,
     'sell_after_ncandles': 50,
     'order_amount': 40,
     'lookback': 2,
@@ -119,8 +124,8 @@ STRAT_B = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 5,
-    'tolerance': 30,
+    'lookback': 4,
+    'tolerance': 20,
     'ma_period':50,
     'tp_pct': 3,
     'sl_pct': 10,
@@ -149,11 +154,11 @@ STRAT_D = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 8,
-    'tolerance': 30,
+    'lookback': 4,
+    'tolerance': 25,
     'ma_period':50,
-    'tp_pct': 5,
-    'sl_pct': 10,
+    'tp_pct': 3,
+    'sl_pct': 9,
     'direction': 'short'
 }
 
@@ -161,14 +166,14 @@ STRAT_E = {
     'id': 'parity_short_4H',
     'name': 'parity_short_4H',
     'timeframe': '4H',
-    'active': True,
+    'active': False,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'lookback': 150,
-    'tolerance': 20,
+    'lookback': 100,
+    'tolerance': 30,
     'ma_period':50,
-    'tp_pct': 5,  
-    'sl_pct': 10,  
+    'tp_pct': 3,  
+    'sl_pct': 9,  
     'direction': 'short'
 }
 
@@ -179,7 +184,7 @@ STRAT_F = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 7,
+    'lookback': 7,
     'tolerance': 40,
     'ma_period':25,
     'tp_pct': 2,
@@ -194,7 +199,7 @@ STRAT_G = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 5,
+    'lookback': 5,
     'tolerance': 30,
     'ma_period':50,
     'tp_pct': 1.9,
@@ -209,7 +214,7 @@ STRAT_H = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 3,
+    'lookback': 3,
     'tolerance': 20,
     'ma_period':50,
     'tp_pct': 4,
@@ -224,7 +229,7 @@ STRAT_I = {
     'active': True,
     'sell_after_ncandles': 50,
     'order_amount': 40,
-    'left_lookback': 6,
+    'lookback': 6,
     'tolerance': 30,
     'ma_period':25,
     'tp_pct': 4,
@@ -337,7 +342,7 @@ exchange            = connect_bitget()
 if ACCOUNT_NUMBER == "01":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, STRAT_M, STRAT_N]
 elif ACCOUNT_NUMBER == "E1":
-    STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
+    STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K,STRAT_M]
   
 # ==========================================================================
 # SIGNAL DETECTION
@@ -368,7 +373,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_long_4H':
                 signals = reversal_long(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -384,7 +389,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_short_4H':
                 signals = reversal_short(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -400,7 +405,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_long_1H':
                 signals = reversal_long(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -408,7 +413,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_short_1H':
                 signals = reversal_short(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -416,7 +421,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_long_6Hutc':
                 signals = reversal_long(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -424,7 +429,7 @@ def detect_signal_for_strategy(strategy, final_symbols):
             elif strategy['name'] == 'reversal_short_6Hutc':
                 signals = reversal_short(
                     arr,
-                    left_lookback=strategy['left_lookback'],
+                    lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
                     ma_period=strategy['ma_period'],
                     live_trading=True
@@ -494,9 +499,9 @@ def detect_signal_for_strategy(strategy, final_symbols):
 def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print(f"{COLOR}{'=' * 120}{RESET}")
-    print(f"{COLOR}🤖 === STARTING MULTI-STRATEGY BOT OPERATING IN ACCOUNT: {ACCOUNT_NUMBER} 🤖 ==={RESET}")
-    print(f"{COLOR}{'=' * 120}{RESET}")
+    print(f"{COLOR}{'=' * 44}{RESET}")
+    print(f"{COLOR}🤖 STARTING BOT IN ACCOUNT: {ACCOUNT_NUMBER} 🤖{RESET}")
+    print(f"{COLOR}{'=' * 44}{RESET}")
     
     # --------------------------------------------------------------------
     # LOAD STATE & SYMBOLS 
@@ -514,17 +519,17 @@ def main_loop():
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
     print(f"\n{COLOR}🪪 Validating strategy configuration...{RESET}")
-    print(f"{COLOR}{'-' * 120}{RESET}")
+    print(f"{COLOR}{'-' * 44}{RESET}")
         
     errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
     
     if errors:
-        print(f"\n{COLOR}{'=' * 120}{RESET}")
+        print(f"\n{COLOR}{'=' * 44}{RESET}")
         print(f"{COLOR}❗ CONFIGURATION ERRORS FOUND:{RESET}\n")
         for err in errors:
             print(f"  {err}")
         print(f"\n{COLOR}⛔ BOT STOPPED - Fix configuration before running{RESET}")
-        print(f"{COLOR}{'=' * 120}{RESET}\n")
+        print(f"{COLOR}{'=' * 44}{RESET}\n")
         return  
 
     if warnings:
@@ -539,7 +544,7 @@ def main_loop():
     # LOAD SYMBOLS PER STRATEGY & TIMEFRAMES
     # --------------------------------------------------------------------
     print(f"\n{COLOR}🔢 Operative Strategies: {len(STRATEGIES)} {RESET}")
-    print(f"{COLOR}{'-' * 120}{RESET}")
+    print(f"{COLOR}{'-' * 44}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
         #DEPRECATED strategies
@@ -562,11 +567,36 @@ def main_loop():
     print("\n✅ BOT Initialization completed\n")
     #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
     
+    # ⭐ Después de cargar símbolos y antes del WebSocket
+    print(f"\n{COLOR}🌐 Starting Web...{RESET}")
+    print(f"{COLOR}{'-' * 44}{RESET}")
+    
+    # Crear template si no existe
+    create_dashboard_template(BASE_DIR)
+    
+    # Iniciar dashboard
+    dashboard = DashboardServer(
+        account_number=ACCOUNT_NUMBER,
+        base_dir=BASE_DIR,
+        get_current_price_func=get_current_price,
+        get_balance_func=get_usdt_balance_ws,
+        strategies_config=STRATEGIES,
+        color_code=COLOR,
+        initial_capital=INITIAL_CAPITAL,
+        implemented_strategies=implemented_strategies,  # ⭐ NUEVO
+        symbols_by_strategy=final_by_strat  # ⭐ NUEVO
+    )
+    
+    dashboard.start(port=dashboard_port)
+    
+    print(f"✅ Bot monitoring active - Check dashboard at http://localhost:{dashboard_port}")
+
+
     # --------------------------------------------------------------------
     # INIT WEBSOCKET
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}📱 Initializing WebSocket connections...{RESET}")
-    print(f"{COLOR}{'-' * 120}{RESET}")
+    print(f"\n{COLOR}📱 Init  WebSocket...{RESET}")
+    print(f"{COLOR}{'-' * 44}{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
     # --------------------------------------------------------------------
@@ -585,12 +615,12 @@ def main_loop():
     # NEXT CANDLES
     # --------------------------------------------------------------------
     print(f"\n{COLOR}🔜 Candles incoming:  {RESET}")
-    print(f"{COLOR}{'-' * 120}{RESET}")
+    print(f"{COLOR}{'-' * 44}{RESET}")
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-        print(f"⏰ Next candle for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
-    bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
+        print(f"⏰ Next for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
+    #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
 
     last_tpsl_check = time.time()
   
@@ -607,19 +637,18 @@ def main_loop():
             
             # Process closed timeframes
             if closed_timeframes:
-                stop_live_display()  
-                time.sleep(0.1)
+
                 
-                print(f"\n{'=' * 120}")
-                print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(f"\n{'=' * 44}")
+                print(f"🔀 New candle(s) {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
 
                 # Sync with broker
                 sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"📡 Signal search - {now}")
-                print(f"{'-' * 120}")
+                print(f"📡 Searching Signals... - {now}")
+                print(f"{'-' * 44}")
                 
                 # Process strategies for closed timeframes
                 strategies_to_process = []
@@ -635,7 +664,7 @@ def main_loop():
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
                         num_positions = len(OPEN_POSITIONS.get(strat_id, []))
-                        print(f"🚫 Skipping {strat_id:<18} ({strat['timeframe']:<2}) ➡️  Status: {candles}/{strat['sell_after_ncandles']:<2} candles | {num_positions} open positions.")
+                        print(f"🚫 Skip {strat_id:<20} ({strat['timeframe']:<2}) ➡️  {candles}/{strat['sell_after_ncandles']:<2} | {num_positions} pos.")
                         
                         check_candles_timeout_for_strategy(
                             strat_id,
@@ -643,7 +672,8 @@ def main_loop():
                             OPEN_POSITIONS,
                             STRATEGY_CANDLES,
                             STATE_FILE,
-                            send_request_common
+                            send_request_common,
+                            bot_state=bot_state
                         )
                 
                 # Signal search (only if no positions)
@@ -696,12 +726,12 @@ def main_loop():
                             print(f"❌ Retry failed for {strat_id}: {e2}")
                                 
                 print("🔂 Signal cycle completed")
-                print(f"{'=' * 120}\n")
+                print(f"{'=' * 44}\n")
                 
                 # Recalculate next candle times
                 for tf in closed_timeframes:
                     next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-                    print(f"⏰ Next candle for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                    print(f"⏰ Next for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 
                 last_tpsl_check = time.time()
                 if hasattr(check_all_tp_sl, '_last_lines'):

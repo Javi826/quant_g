@@ -1,6 +1,5 @@
 # Z_WFO_backtest_multi_tf.py (MAIN - Multi-Timeframe Strategy)
 import os
-import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
@@ -29,12 +28,12 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150,200]
-TOLERANCE_LIST       = [5,10,20,30,40] 
+LOOKBACK_LIST        = [50,100,150]
+TOLERANCE_LIST       = [15,20,25,30] 
 MA_PERIOD_LIST       = [25,50,100]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [3,4,5,6,7]
+SL_PCT_LIST          = [5,7.5,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

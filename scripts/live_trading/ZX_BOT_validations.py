@@ -1,3 +1,4 @@
+#ZX_BOT_validations.py
 """
 Validation functions for bot strategy configuration
 """
@@ -141,8 +142,8 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     # Define required parameters by strategy base name (without timeframe)
     STRATEGY_TYPE_REQUIRED_PARAMS = {
         'double_top_long': ['lookback', 'tolerance', 'trend_th'],
-        'reversal_long': ['left_lookback', 'tolerance', 'ma_period'],
-        'reversal_short': ['left_lookback', 'tolerance', 'ma_period'],
+        'reversal_long': ['lookback', 'tolerance', 'ma_period'],
+        'reversal_short': ['lookback', 'tolerance', 'ma_period'],
         'parity_long': ['lookback', 'tolerance', 'ma_period'],
         'parity_short': ['lookback', 'tolerance', 'ma_period'],
         'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
@@ -247,4 +248,62 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     if validation_8_errors == 0:
         print("   🆗 Validation 8: All sell_after_ncandles checked (45-55)")
     
+    # --------------------------------------------------------------------
+    # VALIDATION 9: No duplicate strategies (name + timeframe)
+    # -------------------------------------------------------------------- 
+    validation_9_errors = 0
+    seen_combinations = set()
+    
+    for strat in strategies:
+        strat_id = strat.get('id', 'UNKNOWN')
+        name = strat.get('name', '')
+        timeframe = strat.get('timeframe', '')
+        
+        combination = (name, timeframe)
+        
+        if combination in seen_combinations:
+            errors.append(
+                f"❌ Duplicate strategy found: name='{name}', timeframe='{timeframe}' "
+                f"(strategy '{strat_id}' conflicts with another)"
+            )
+            validation_9_errors += 1
+        else:
+            seen_combinations.add(combination)
+    
+    if validation_9_errors == 0:
+        print("   🆗 Validation 9: All strategies names + Timeframe are unique.")
+        
+    # --------------------------------------------------------------------
+    # VALIDATION 10: Unique strategy names
+    # -------------------------------------------------------------------- 
+    validation_10_errors = 0
+    names = [s.get('name') for s in strategies]
+    duplicates = [name for name in set(names) if names.count(name) > 1]
+    
+    if duplicates:
+        errors.append(f"❌ Duplicate strategy names found: {duplicates}")
+        validation_10_errors += 1
+    
+    if validation_10_errors == 0:
+        print("   🆗 Validation 10: All strategy names are unique")
+        
+    # --------------------------------------------------------------------
+    # VALIDATION 12: Valid timeframes
+    # -------------------------------------------------------------------- 
+    validation_12_errors = 0
+    VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
+    
+    for strat in strategies:
+        strat_id = strat.get('id', 'UNKNOWN')
+        timeframe = strat.get('timeframe', '')
+        
+        if timeframe not in VALID_TIMEFRAMES:
+            errors.append(
+                f"❌ Strategy '{strat_id}' has invalid timeframe='{timeframe}' "
+                f"(valid: {', '.join(VALID_TIMEFRAMES)})"
+            )
+            validation_12_errors += 1
+    
+    if validation_12_errors == 0:
+        print("   🆗 Validation 12: All timeframes are valid")
     return errors, warnings

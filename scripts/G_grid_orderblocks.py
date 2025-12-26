@@ -22,11 +22,11 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
+DATA_FOLDER         = "data2/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -35,13 +35,20 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [100]
+LOOKBACK_LIST        = [150]
 TOLERANCE_LIST       = [30] 
 IMPULSE_LIST         = [1.0] 
 
 TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
 
+#SELL_AFTER_LIST      = [0]  
+#LOOKBACK_LIST        = [50]
+#TOLERANCE_LIST       = [40] 
+#IMPULSE_LIST         = [0.01] 
+
+#TP_PCT_LIST          = [5]
+#SL_PCT_LIST          = [10]
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
@@ -50,7 +57,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=False)
 
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 

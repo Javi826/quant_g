@@ -1,3 +1,4 @@
+#ZX_BOT_operative.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -13,7 +14,6 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 
-from ZX_BOT_D1 import stop_live_display
 from ZX_BOT_D1 import calculate_pnl
 
 # Import WebSocket manager
@@ -125,7 +125,7 @@ def load_state(state_file, display_color="\033[1;94m"):
     
     if not os.path.exists(state_file):
         print(f"{display_color}📂 No previous state file found{RESET}")
-        print(f"{display_color}{'=' * 120}{RESET}\n")
+        print(f"{display_color}{'=' * 20}{RESET}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
     
     try:
@@ -153,7 +153,7 @@ def load_state(state_file, display_color="\033[1;94m"):
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
         print(f"🔄 Total positions recovered: {total_positions}")
-        print(f"{display_color}{'-' * 120}{RESET}")
+        print(f"{display_color}{'-' * 20}{RESET}")
         
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
@@ -207,7 +207,7 @@ def sync_broker(open_positions, strategy_candles, state_file):
     Sincroniza posiciones locales con el broker via WebSocket (canal positions).
     Refresca datos para asegurar que estén actualizados.
     """
-    print("🌐 Syncronizing positions in broker...")
+    print("🌐 Syncronizing broker...")
     total_removed = 0
     
     if not ZX_BOT_ws_manager._ws_manager:
@@ -285,7 +285,7 @@ def sync_broker(open_positions, strategy_candles, state_file):
         save_state_local(open_positions, strategy_candles, state_file)
         print(f"✅ Sync completed: {total_removed} position(s) removed")
     else:
-        print(f"✅ Sync completed: All positions exist in broker")
+        print(f"✅ Sync completed.")
     
 # ==========================================================================
 # PLACE ORDER
@@ -527,7 +527,7 @@ def get_current_price(symbol, max_cache_age=0.5):
         time.sleep(0.01)
     
     # Timeout
-    raise TimeoutError(f"No fresh price data for {symbol}")
+    raise TimeoutError(f"No fresh price for {symbol}")
 
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
     """Calcula los precios de TP y SL basados en el precio de entrada"""
@@ -598,7 +598,7 @@ def reset_strategy_candles(strat_id, strategy_candles, open_positions, state_fil
 
 def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
                                        open_positions, strategy_candles,
-                                       state_file, send_request_func):
+                                       state_file, send_request_func,bot_state=None):
     """Cierra todas las posiciones de una estrategia si superan el límite de velas"""
     candles_elapsed = strategy_candles.get(strat_id, 0)
     if candles_elapsed < sell_after_ncandles:
@@ -612,8 +612,8 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
     if not positions:
         return
 
-    print(f"\n🕓 TIMEOUT REACHED for strategy {strat_id}")
-    print(f"➡ Candles ongoing         : {candles_elapsed}/{sell_after_ncandles}")
+    print(f"\n🕓 TIMEOUT REACHED for {strat_id}")
+    print(f"➡ Candles: {candles_elapsed}/{sell_after_ncandles}")
     print(f"→ Closing {len(positions)} positions...")
 
     all_closed = True
@@ -625,14 +625,14 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
             'entry_price': pos['entry_price']
         }
         if not close_position(pos['symbol'], pos['size'], pos['direction'],
-                              send_request_func, reason="TIMEOUT", position_data=position_data):
+                              send_request_func, reason="TIMEOUT", position_data=position_data,bot_state=bot_state):
             all_closed = False
 
     if all_closed:
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
+        #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
 
 # ==========================================================================
 # TP/SL CHECKINGS
@@ -705,8 +705,55 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         
         save_state_local(open_positions, strategy_candles, state_file)
 
+# ==========================================================================
+# FUNCIÓN PRINCIPAL - VERSIÓN SIMPLIFICADA
+# ==========================================================================
+def check_all_tp_sl(strategies, open_positions, strategy_candles, state_file, 
+                    send_request_func, hour_zone, check_tp_sl_for_strategy_func, 
+                    get_current_price_func=None, display_mode="simple", account_number=None,
+                    display_color=None, bot_state=None):
+    """
+    Versión simplificada para uso con dashboard.
+    Mantiene toda la lógica de negocio pero solo imprime mensaje básico.
+    
+    Parámetros opcionales (ignorados en modo simple):
+    - get_current_price_func: No se usa (mantenido por compatibilidad)
+    - display_mode: No se usa (mantenido por compatibilidad)
+    - display_color: No se usa (mantenido por compatibilidad)
+    """
+    now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
+    
+    
+    # Acumulador para el PnL total
+    pnl_accumulator = {'total': 0.0}
+    
+    # Lógica de negocio: procesar todas las estrategias
+    for strat in strategies:
+        strat_id = strat['id']
+        positions = open_positions.get(strat_id, [])
+        
+        if positions:
+            strat_pnl_acc = {'total': 0.0}
+            check_tp_sl_for_strategy_func(
+                strat_id, strat, open_positions, strategy_candles, 
+                state_file, send_request_func, None, strat_pnl_acc, bot_state
+            )
+            pnl_accumulator['total'] += strat_pnl_acc['total']
+    
+    return pnl_accumulator
 
-
+def calculate_pnl(direction, entry_price, current_price, size):
+    """Calcula el PnL en USDT de una posición"""
+    entry_float = float(entry_price)
+    current_float = float(current_price)
+    size_float = float(size)
+    
+    if direction.lower() == 'long':
+        pnl = (current_float - entry_float) * size_float
+    else:  # short
+        pnl = (entry_float - current_float) * size_float
+    
+    return pnl
 # ==========================================================================
 # STRATEGY MANAGEMENT
 # ==========================================================================
@@ -810,8 +857,7 @@ def get_hardcoded_signals(strat_id, send_request_func, hour_zone):
 # ==========================================================================
 def close_position(symbol, size, direction, send_request_func, reason="NO_INFO", position_data=None, bot_state=None):  # ⭐ Añadir
     """Cierra una posición con orden market"""
-    stop_live_display()
-    
+
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
                 
@@ -827,15 +873,17 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         }
         
         if reason == "TP":
-            print(f"\n💲 TP REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
+            print(f"\n💲 TP for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
         elif reason == "SL":
-            print(f"\n🔻 SL REACHED for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
+            print(f"\n🔻 SL for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")           
+        elif reason == "TIMEOUT":
+            print(f"\n🕓 TIMEOUT for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
 
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(0.05)
         
         if code == 200 and resp.get("code") == "00000":
-            print(f"✅ Position closed due to {reason}: {symbol} | Size: {size}")
+            print(f"✅ Position closed - {reason}: {symbol} | Size: {size}")
             
             if position_data:
                 data = resp.get('data', {})
@@ -871,12 +919,6 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             
             # ⭐ MOVER return True ANTES de bot_metrics para evitar que errores lo interrumpan
             result = True  
-            
-            # ⭐ bot_metrics en try-catch separado para que no afecte el return
-            try:
-                bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
-            except Exception as e:
-                print(f"⚠️  Error showing metrics (non-critical): {e}")
             
             return result
         
@@ -1033,7 +1075,7 @@ def log_closed_position(
         if bot_state is not None:
             bot_state.closed_total_profit += profit
 
-        print(f"📋 Trade logged: {symbol} | Profit: {profit:.2f} USDT ({profit_pct:+.2f}%) | Duration: {delta_days:.4f} days")
+        print(f"📋 Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
 
     except Exception as e:
         print(f"❌ Error logging trade to Excel: {e}")
@@ -1049,7 +1091,7 @@ def setup_print_logger(logdir, logfile_name=None):
     logger.propagate = False
     
     fh = logging.FileHandler(logfile, encoding='utf-8')
-    fh.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+    fh.setFormatter(logging.Formatter('%(message)s'))
     
     if not logger.handlers:
         logger.addHandler(fh)

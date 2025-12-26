@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/live_trading/BOT_orchestator_WS.py', 'scripts/live_trading/sub_strategies/A02_reversal_long_1H.py', 'scripts/live_trading/ZX_utils_live.py']
+recent_files = ['scripts/live_trading/A01_reversal_long_1H.py', 'scripts/live_trading/ZX_BOT_operative.py', 'scripts/live_trading/BOT_orchestator_WS.py', 'scripts/live_trading/ZX_BOT_validations.py', 'scripts/live_trading/ZX_BOT_metrics.py']
 
 [main]
 version = 0.2.0
