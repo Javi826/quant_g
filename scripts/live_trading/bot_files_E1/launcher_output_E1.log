@@ -1,0 +1,65 @@
+
+Setting active strategies from command line: ['revers_long_4H', 'parity_long_4H', 'revers_short_4H', 'revers_long_1H', 'revers_short_1H', 'revers_long_6Hutc', 'revers_short_6Hutc', 'parity_long_1H', 'parity_short_1H', 'orderblocks_short_4H']
+[1;96m============================================[0m
+[1;96mSTARTING BOT IN ACCOUNT: E1[0m
+[1;96m============================================[0m
+[1;96m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 44
+[1;96m--------------------[0m
+   ➡️  revers_long_1H       :  1 positions | Candles:  8
+   ➡️  parity_long_1H       :  4 positions | Candles:  8
+   ➡️  parity_short_1H      :  4 positions | Candles:  2
+   ➡️  double_top_long_4H   :  5 positions | Candles:  1
+   ➡️  revers_short_4H      :  7 positions | Candles:  2
+   ➡️  parity_short_4H      : 14 positions | Candles:  1
+   ➡️  revers_short_1H      :  1 positions | Candles:  2
+   ➡️  revers_short_6Hutc   :  3 positions | Candles: 34
+   ➡️  revers_long_4H       :  1 positions | Candles: 45
+   ➡️  revers_long_6Hutc    :  1 positions | Candles: 19
+   ➡️  orderblocks_short_4H :  3 positions | Candles:  9
+✅ State loaded successfully
+
+[1;96m🪪 Validating strategy configuration...[0m
+[1;96m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+
+[1;96m⚠️  CONFIGURATION WARNINGS:[0m
+  ❕ Implemented but NOT declared: {'orderblocks_long_4H', 'parity_long_6Hutc'}
+
+
+[1;96m🔢 Operative Strategies: 12 [0m
+[1;96m--------------------------------------------[0m
+⏸️  Strategy double_top_long_4H (4H): DEPRECATING (monitoring only)
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+⏸️  Strategy parity_short_4H    (4H): DEPRECATING (monitoring only)
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 4H, 6Hutc, 1H
+
+✅ BOT Initialization completed
+
+
+[1;96m🌐 Starting Web...[0m
+[1;96m--------------------------------------------[0m
+ * Serving Flask app 'ZX_BOT_dashboard'
+ * Debug mode: off
+INFO:websocket:Websocket connected
+INFO:websocket:Websocket connected

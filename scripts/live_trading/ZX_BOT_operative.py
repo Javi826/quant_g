@@ -92,14 +92,14 @@ def get_usdt_balance_ws(exchange=None):
     Parámetro exchange ignorado (compatibilidad).
     """
     if not ZX_BOT_ws_manager._ws_manager:
-        print("❌ WebSocket manager not initialized for balance check")
+        print("❌ Error WS manager not init for balance check")
         return 0.0
     
     balance = ZX_BOT_ws_manager._ws_manager.get_usdt_balance()
     
     # Si no hay datos de equity todavía, esperar un poco
     if balance == 0.0 and not ZX_BOT_ws_manager._ws_manager.equity:
-        print("⏳ Waiting for equity data from WebSocket...")
+        print("Waiting for equity data from WebSocket...")
         time.sleep(0.05)
         balance = ZX_BOT_ws_manager._ws_manager.get_usdt_balance()
     
@@ -350,7 +350,7 @@ def quantize_size(size_base, size_scale):
     if size_q == 0:
         size_q = size_base.quantize(Decimal("1e-6"), rounding=ROUND_DOWN)
     if size_q == 0:
-        print("⚠️ Size = 0")
+        print("⚠️ WAR- Size = 0")
         return None, precision_size
     return size_q, precision_size
 
@@ -428,7 +428,7 @@ def place_order(symbol: str,
     body_order = build_order_body(symbol, product_type, margin_mode, margin_coin, size_q, side, client_oid)
     code_order, resp_order = place_market_order(send_request_func, body_order)
     if code_order is None:
-        print(f"⚠️ Debug: last_price={last_price}, price_tick={price_tick}, min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
+        print(f"⚠️ WAR-: last_price={last_price}, price_tick={price_tick}, min_num: {min_trade_num}, min_usdt: {min_trade_usdt}")
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
@@ -495,13 +495,13 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
         time.sleep(0.05)
     
     # Timeout - retornar None
-    print(f"⚠️  No fills received for order {order_id} via WebSocket (timeout)")
+    print(f"⚠️  WAR- No fills received for order {order_id} via WebSocket (timeout)")
     return None, None, None, None
 
 def get_current_price(symbol, max_cache_age=0.5):
     """Obtiene el precio actual del mercado via WebSocket"""
     if not ZX_BOT_ws_manager._ws_manager:
-        raise RuntimeError("WebSocket manager not initialized")
+        raise RuntimeError("WS manager not init.")
     
     # Suscribir si no está suscrito
     if symbol not in ZX_BOT_ws_manager._ws_manager.subscribed_public:
@@ -527,7 +527,7 @@ def get_current_price(symbol, max_cache_age=0.5):
         time.sleep(0.01)
     
     # Timeout
-    raise TimeoutError(f"No fresh price for {symbol}")
+    raise TimeoutError(f"No price - {symbol}")
 
 def calculate_tp_sl_prices(entry_price, direction, tp_pct, sl_pct):
     """Calcula los precios de TP y SL basados en el precio de entrada"""
@@ -782,7 +782,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"💫 Signals detected for {strat_id}: {len(signals)}")
+    print(f"💫 =-Signals detected for {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -792,7 +792,7 @@ def process_strategy(
     for sig in signals:
         usdt_balance = get_balance_func(exchange)
         if usdt_balance < strat['order_amount']:
-            print(f"🔔 Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
+            print(f"🔔 WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}")
             continue
 
         resp_order = place_order(
@@ -829,7 +829,7 @@ def process_strategy(
                         order_id=order_id, open_positions=open_positions, strategy_candles=strategy_candles,
                         state_file=state_file, hour_zone=hour_zone, usdt_amount=strat['order_amount'])
         else:
-            print(f"⚠️ Order executed but no orderId in response")
+            print(f"⚠️ WAR-Order executed but no orderId in response")
 
         time.sleep(0.05)
 
@@ -923,7 +923,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             return result
         
         else:
-            print(f"⚠️ No closing position available {symbol}: {resp}")
+            print(f"⚠️ WAR-No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
                 print(f"   → Removing from local record (nonexistent position)")
                 if position_data:

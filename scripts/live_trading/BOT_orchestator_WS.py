@@ -11,7 +11,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from ZX_connect_live import send_request_01, send_request_E1
+from ZX_connect_live import send_request_01, send_request_E1,send_request_00
 
 # BOT auxiliars
 from ZX_BOT_validations import validate_strategy_configuration
@@ -31,22 +31,24 @@ from Z_add_signals_parity import parity_long, parity_short
 from Z_add_signals_orderblocks import orderblocks_long, orderblocks_short
 
 # Dinamic import account passwords
+from utils.ZZ_connect import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
 from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
 from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
-from utils.ZZ_connect import connect_bitget_01, connect_bitget_E1
+from utils.ZZ_connect import connect_bitget_01, connect_bitget_E1, connect_bitget_00
 
 #==========================================================================
 # CREDENTIALS & ACCOUNT LAUNCHING
 #==========================================================================
 CREDENTIALS = {
+"00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
 "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
 "E1": (BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1, connect_bitget_E1, send_request_E1)
 }
 parser = argparse.ArgumentParser()
 parser.add_argument('--account', type=str, default='E1', help='Account number (01, E1, etc)')
+parser.add_argument('--set-active', type=str, default=None, help='Comma-separated list of strategy IDs to set as active')
 args = parser.parse_args()
 ACCOUNT_NUMBER = args.account
-
 #==========================================================================
 # PATHS
 #==========================================================================
@@ -58,11 +60,12 @@ LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.l
 # DISPLAY: None | summary | detailed
 #==========================================================================
 BLUE         = "\033[1;94m"   
-CYAN         = "\033[1;96m"  
+CYAN         = "\033[1;96m" 
+WHITE        = "\033[1;97m" 
 RESET        = "\033[0m"
 DISPLAY_MODE = "summary"
 
-if ACCOUNT_NUMBER == "01":
+if ACCOUNT_NUMBER == "00":
     COLOR = BLUE
     INITIAL_CAPITAL = 3671
     dashboard_port = 5000 
@@ -71,7 +74,11 @@ elif ACCOUNT_NUMBER == "E1":
     COLOR = CYAN
     INITIAL_CAPITAL = 1761
     dashboard_port=5001
-    
+
+elif ACCOUNT_NUMBER == "01":
+    COLOR = WHITE
+    INITIAL_CAPITAL =9999
+    dashboard_port=5099
 #==========================================================================
 # PATHS FILES & CREDENTIALS
 #==========================================================================
@@ -337,12 +344,33 @@ get_balance_common  = get_usdt_balance_ws
 exchange            = connect_bitget()  
 
 # ==========================================================================
+# APPLY --set-active ARGUMENT
+# ==========================================================================
+if args.set_active:
+    active_ids = [s.strip() for s in args.set_active.split(',')]
+    print(f"\nSetting active strategies from command line: {active_ids}")
+    
+    for strat in [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, 
+                  STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, 
+                  STRAT_M, STRAT_N]:
+        if strat['id'] in active_ids:
+            strat['active'] = True
+        else:
+            strat['active'] = False
+
+# ==========================================================================
 # STRATEGY SELECTION
 # ==========================================================================
-if ACCOUNT_NUMBER == "01":
+
+# ==========================================================================
+# STRATEGY SELECTION
+# ==========================================================================
+if ACCOUNT_NUMBER == "00":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, STRAT_M, STRAT_N]
 elif ACCOUNT_NUMBER == "E1":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K,STRAT_M]
+elif ACCOUNT_NUMBER == "01":
+    STRATEGIES = []
   
 # ==========================================================================
 # SIGNAL DETECTION
@@ -500,7 +528,7 @@ def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
     print(f"{COLOR}{'=' * 44}{RESET}")
-    print(f"{COLOR}🤖 STARTING BOT IN ACCOUNT: {ACCOUNT_NUMBER} 🤖{RESET}")
+    print(f"{COLOR}STARTING BOT IN ACCOUNT: {ACCOUNT_NUMBER}{RESET}")
     print(f"{COLOR}{'=' * 44}{RESET}")
     
     # --------------------------------------------------------------------
@@ -562,12 +590,11 @@ def main_loop():
     print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
     for tf in unique_timeframes:
         strat_names = [s['id'] for s in strategies_by_tf[tf]]
-        print(f"   🔹 {tf}: {', '.join(strat_names)}")
+
     
     print("\n✅ BOT Initialization completed\n")
-    #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
-    
-    # ⭐ Después de cargar símbolos y antes del WebSocket
+ 
+    # Después de cargar símbolos y antes del WebSocket
     print(f"\n{COLOR}🌐 Starting Web...{RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
     
@@ -583,8 +610,8 @@ def main_loop():
         strategies_config=STRATEGIES,
         color_code=COLOR,
         initial_capital=INITIAL_CAPITAL,
-        implemented_strategies=implemented_strategies,  # ⭐ NUEVO
-        symbols_by_strategy=final_by_strat  # ⭐ NUEVO
+        implemented_strategies=implemented_strategies,
+        symbols_by_strategy=final_by_strat  
     )
     
     dashboard.start(port=dashboard_port)
@@ -619,7 +646,7 @@ def main_loop():
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-        print(f"⏰ Next for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
+        print(f"Next for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
     #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=COLOR, initial_capital=INITIAL_CAPITAL)
 
     last_tpsl_check = time.time()
@@ -702,7 +729,7 @@ def main_loop():
                             detect_signal_func=detect_signal_for_strategy
                         )
                     except Exception as e:
-                        print(f"⚠️ Warning first try processing {strat_id}: {e}")
+                        print(f"⚠️ WAR- first try processing {strat_id}: {e}")
                         
                         # Retry once
                         print(f"⏳ Retrying {strat_id} after 3 seconds...")
@@ -723,7 +750,7 @@ def main_loop():
                             )
                             print(f"✅ Retry successful for {strat_id}")
                         except Exception as e2:
-                            print(f"❌ Retry failed for {strat_id}: {e2}")
+                            print(f"❌ Error Retry failed for {strat_id}: {e2}")
                                 
                 print("🔂 Signal cycle completed")
                 print(f"{'=' * 44}\n")
@@ -731,12 +758,9 @@ def main_loop():
                 # Recalculate next candle times
                 for tf in closed_timeframes:
                     next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-                    print(f"⏰ Next for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                    print(f"Next for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 
                 last_tpsl_check = time.time()
-                if hasattr(check_all_tp_sl, '_last_lines'):
-                    delattr(check_all_tp_sl, '_last_lines')  
-                
             
             # Periodic TP/SL check
             else:

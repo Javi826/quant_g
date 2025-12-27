@@ -9,7 +9,8 @@ import re
 import threading
 import pandas as pd
 from datetime import datetime
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, send_from_directory, request
+
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -68,6 +69,27 @@ class DashboardServer:
         def index():
             """Página principal del dashboard - Pasar account_number al template"""
             return render_template('dashboard.html', account=self.account_number)
+        
+        @self.app.route('/favicon.jpg')
+        def favicon():
+            """Servir favicon desde la carpeta de cada cuenta"""
+            return send_from_directory(
+                self.base_dir,  # ✅ CORRECTO - cada cuenta tiene el suyo
+                'favicon.jpg',
+                mimetype='image/jpeg'
+            )
+        
+        @self.app.route('/api/health')
+        def health_check():
+            """
+            ✅ NEW: Health check rápido - no depende de archivos
+            Responde inmediatamente para verificar que Flask está listo
+            """
+            return jsonify({
+                'status': 'ready',
+                'account': self.account_number,
+                'timestamp': datetime.now().isoformat()
+            })
         
         @self.app.route('/api/logs/stream')
         def stream_logs():
@@ -134,7 +156,7 @@ class DashboardServer:
                 try:
                     balance = self.get_balance(None)
                 except Exception as e:
-                    print(f"⚠️  Error getting balance: {e}")
+                    print(f"⚠️  WAR- getting balance: {e}")
                     balance = 0.0
                 
                 # Calcular profit cerrado desde Excel
@@ -177,7 +199,7 @@ class DashboardServer:
                             
                             open_pnl += pnl
                         except Exception as e:
-                            print(f"⚠️No PnL for {pos.get('symbol')}: {e}")
+                            print(f"⚠️No PnL - {pos.get('symbol')}: {e}")
                 
                 # Obtener precio de BTC
                 btc_price = 0
@@ -203,6 +225,7 @@ class DashboardServer:
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+        
         
         @self.app.route('/api/positions')
         def get_positions():
@@ -257,7 +280,70 @@ class DashboardServer:
                 return jsonify(positions_data)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+            
+        @self.app.route('/api/bot/stop', methods=['POST'])
+        def stop_bot():
+            """Stop the bot by killing its process directly"""
+            try:
+                import subprocess
+                import os
+                import signal
+                
+                # Find the bot process PID
+                result = subprocess.run(
+                    ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    pid = int(result.stdout.strip())
+                    
+                    # Kill the process with SIGTERM (clean shutdown)
+                    os.kill(pid, signal.SIGTERM)
+                    
+                    return jsonify({
+                        'status': 'stopped',
+                        'pid': pid,
+                        'message': f'Bot process {pid} terminated'
+                    })
+                else:
+                    return jsonify({
+                        'status': 'not_found',
+                        'message': 'Bot process not found'
+                    }), 404
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
         
+        @self.app.route('/api/bot/verify-stopped')
+        def verify_stopped():
+            """Verify if the bot process is still running"""
+            try:
+                import subprocess
+                
+                # Check if bot process exists
+                result = subprocess.run(
+                    ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
+                    capture_output=True,
+                    text=True
+                )
+                
+                running = result.returncode == 0
+                pid = int(result.stdout.strip()) if running else None
+                
+                return jsonify({
+                    'pid': pid,
+                    'running': running
+                })
+                
+            except Exception as e:
+                # If there's an error, assume the process stopped
+                return jsonify({
+                    'running': False,
+                    'error': str(e)
+                }), 200
+                
         @self.app.route('/api/trades/recent')
         def get_recent_trades():
             """Últimos 15 trades cerrados"""
@@ -466,6 +552,130 @@ class DashboardServer:
                     'account': self.account_number,
                     'strategies': strategies_info
                 })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        # ✅ NEW: Symbols Analysis endpoint
+        @self.app.route('/api/symbols-analysis')
+        def get_symbols_analysis():
+            """
+            Análisis de performance por símbolo.
+            Devuelve: Symbol, Total Trades, Win %, Total Profit, Avg Profit
+            """
+            try:
+                if not os.path.exists(self.trades_file):
+                    return jsonify([])
+                
+                df = pd.read_excel(self.trades_file)
+                
+                if df.empty:
+                    return jsonify([])
+                
+                results = []
+                
+                for symbol in sorted(df['SYMBOL'].unique()):
+                    df_symbol = df[df['SYMBOL'] == symbol]
+                    
+                    total_trades = len(df_symbol)
+                    positive_trades = len(df_symbol[df_symbol['PROFIT'] > 0])
+                    win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
+                    total_profit = df_symbol['PROFIT'].sum()
+                    avg_profit = total_profit / total_trades if total_trades > 0 else 0
+                    
+                    results.append({
+                        'Symbol': symbol,
+                        'Total_Trades': total_trades,
+                        'Win_Pct': round(win_pct, 2),
+                        'Total_Profit': round(total_profit, 2),
+                        'Avg_Profit': round(avg_profit, 2)
+                    })
+                
+                return jsonify(results)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        # ✅ NEW: Equity & Drawdown endpoint - AGGREGATED
+        @self.app.route('/api/equity-data')
+        def get_equity_data():
+            """
+            Calcula curvas AGREGADAS de equity y drawdown en PORCENTAJE.
+            Query params: ?strategies=strat1,strat2,strat3
+            Devuelve UNA SOLA curva sumando todas las estrategias seleccionadas.
+            """
+            try:
+                if not os.path.exists(self.trades_file):
+                    return jsonify({'error': 'No trades file found'}), 404
+                
+                # Obtener estrategias seleccionadas
+                strategies_param = request.args.get('strategies', '')
+                selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
+                
+                if not selected_strategies:
+                    return jsonify({'error': 'No strategies selected'}), 400
+                
+                # Leer trades
+                df = pd.read_excel(self.trades_file)
+                
+                if df.empty:
+                    return jsonify({'dates': [], 'equity_pct': [], 'drawdown_pct': []})
+                
+                # Filtrar por estrategias seleccionadas
+                df = df[df['STRATEGY'].isin(selected_strategies)]
+                
+                if df.empty:
+                    return jsonify({'dates': [], 'equity_pct': [], 'drawdown_pct': []})
+                
+                # Convertir fechas
+                df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
+                df = df.sort_values('CLOSE_AT')
+                df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
+                
+                # ✅ CALCULAR CAPITAL INICIAL ASIGNADO
+                # Total de estrategias implementadas
+                total_strategies = len(self.implemented_strategies)
+                if total_strategies == 0:
+                    total_strategies = len(self.strategies)  # Fallback
+                
+                num_selected = len(selected_strategies)
+                
+                # Capital asignado = (capital_total / total_strategies) * num_selected
+                if total_strategies > 0:
+                    capital_assigned = (self.initial_capital / total_strategies) * num_selected
+                else:
+                    capital_assigned = self.initial_capital
+                
+                # ✅ AGRUPAR PROFITS POR FECHA (suma de todas las estrategias seleccionadas)
+                daily_profit = df.groupby('date_str')['PROFIT'].sum().reset_index()
+                daily_profit = daily_profit.sort_values('date_str')
+                
+                # ✅ CALCULAR EQUITY ACUMULADO EN USD
+                daily_profit['cumulative_profit'] = daily_profit['PROFIT'].cumsum()
+                daily_profit['equity_usd'] = capital_assigned + daily_profit['cumulative_profit']
+                
+                # ✅ CONVERTIR A PORCENTAJE
+                if capital_assigned > 0:
+                    daily_profit['equity_pct'] = ((daily_profit['equity_usd'] / capital_assigned) - 1) * 100
+                else:
+                    daily_profit['equity_pct'] = 0
+                
+                # ✅ CALCULAR DRAWDOWN EN PORCENTAJE
+                daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
+                daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
+                
+                # ✅ EXTRAER DATOS PARA FRONTEND
+                dates = daily_profit['date_str'].tolist()
+                equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
+                drawdown_pct = [round(val, 2) for val in daily_profit['drawdown_pct'].tolist()]
+                
+                return jsonify({
+                    'dates': dates,
+                    'equity_pct': equity_pct,
+                    'drawdown_pct': drawdown_pct,
+                    'capital_assigned': round(capital_assigned, 2),
+                    'num_selected': num_selected,
+                    'total_strategies': total_strategies
+                })
+                
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
     

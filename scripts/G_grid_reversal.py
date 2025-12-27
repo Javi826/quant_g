@@ -16,14 +16,14 @@ from Z_add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
+MY_SYMBOLS   = True
 STRATEGY     = "reversal_long_4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
+DATA_FOLDER         = "data2/crypto_OOS"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
@@ -75,7 +75,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_short(
+        signals = reversal_long(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

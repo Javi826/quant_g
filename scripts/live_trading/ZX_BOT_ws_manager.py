@@ -109,7 +109,7 @@ class BitgetWSManager:
                     slept += 0.5
     
             except Exception as e:
-                print(f"❌ Ping loop failed: {e}")
+                print(f"❌ Error-Ping loop failed: {e}")
                 time.sleep(1)
 
     
@@ -130,13 +130,13 @@ class BitgetWSManager:
                 )
                 self.public_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
-                print(f"❌ Public WebSocket error: {e}")
+                print(f"❌ Public WS error: {e}")
                 time.sleep(0.5)
     
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        print(f"{GREEN_BOLD}🔌 PUBLIC  WebSocket connected [{now}]{RESET}")
+        print(f"{GREEN_BOLD}🔌 PUBLIC   WS connected [{now}]{RESET}")
         if self.subscribed_public:
             self._resubscribe_public()
     
@@ -190,7 +190,7 @@ class BitgetWSManager:
             # print(f"📡 Subscribed to ticker {symbol} via WebSocket")  # Silenciar para reducir spam
         else:
             self.subscribed_public.add(symbol)
-            print(f"⚠️  Cannot subscribe to {symbol} - Public WebSocket not connected")
+            print(f"⚠️ Cant subs to {symbol} - Public WS not conne.")
     
     def _resubscribe_public(self):
         """Resuscribe a canales públicos"""
@@ -223,7 +223,7 @@ class BitgetWSManager:
                 )
                 self.private_ws.run_forever(ping_interval=10, ping_timeout=5)
             except Exception as e:
-                print(f"❌ Private WebSocket error: {e}")
+                print(f"❌ Error-Private WS error: {e}")
                 time.sleep(0.5)
     
     def _on_private_open(self, ws):
@@ -235,16 +235,16 @@ class BitgetWSManager:
         if is_reconnect:
             # Mostrar razón de la desconexión anterior si existe
             if self.last_close_code or self.last_close_msg:
-                print(f"{GREEN_BOLD}🔄 PRIVATE WebSocket reconnected [{now}]{RESET}")
+                print(f"{GREEN_BOLD}🔄 PRIVATE WS connected [{now}]{RESET}")
                 print(f"   Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
                 # Sin código de cierre guardado - puede ser timeout sin aviso
-                print(f"{GREEN_BOLD}🔄 PRIVATE WebSocket reconnected [{now}]{RESET}")
+                print(f"{GREEN_BOLD}🔄 PRIVATE WS connected [{now}]{RESET}")
                 print(f"   Previous: code=unknown (likely timeout)")
         else:
-            print(f"{GREEN_BOLD}🔌 PRIVATE WebSocket connected [{now}]{RESET}")
+            print(f"{GREEN_BOLD}🔌 PRIVATE WS connected [{now}]{RESET}")
         
         self._authenticate()
         time.sleep(0.5)
@@ -319,10 +319,10 @@ class BitgetWSManager:
             if data.get("event") == "login":
                 code = data.get("code")
                 if code == "0" or code == 0:
-                    print("✅ WebSocket authentication successful")
+                    print("✅ WS authentication successful")
                     self.authenticated = True
                 else:
-                    print(f"❌ WebSocket auth failed: {data}")
+                    print(f"❌ Error-WebSocket auth failed: {data}")
                     self.authenticated = False
                 return
     
@@ -411,12 +411,12 @@ class BitgetWSManager:
         
         if is_network_error:
             # Solo warning para errores de red (sin traceback)
-            print(f"{YELLOW_BOLD}⚠️  {ws_type}  WebSocket network issue [{now}]{RESET}")
+            print(f"{YELLOW_BOLD}⚠️  WAR-{ws_type}  WS network issue [{now}]{RESET}")
             print(f"    {error_str}")
             print(f"    → Retrying connection...")
         else:
             # Traceback completo para errores inesperados
-            print(f"{RED_BOLD}❌ {ws_type}  WebSocket unexpected error [{now}]: {error}{RESET}")
+            print(f"{RED_BOLD}❌ {ws_type}  WS unexpected error [{now}]: {error}{RESET}")
             import traceback
             traceback.print_exc()
     
@@ -432,9 +432,9 @@ class BitgetWSManager:
         
         # Mostrar desconexión siempre con tipo de WS
         if close_status_code or close_msg:
-            print(f"{YELLOW_BOLD}⚠️  {ws_type} WebSocket disconnected [{now}] | code={close_status_code}, msg={close_msg}{RESET}") 
+            print(f"{YELLOW_BOLD}⚠️  WAR-{ws_type} WS disconnected [{now}] | code={close_status_code}, msg={close_msg}{RESET}") 
         else:
-            print(f"{YELLOW_BOLD}⚠️  {ws_type} WebSocket disconnected [{now}] | code=None, msg=None (unclean close){RESET}")
+            print(f"{YELLOW_BOLD}⚠️  WAR-{ws_type} WS disconnected [{now}] | code=None, msg=None (unclean close){RESET}")
  
     
     # ==========================================================================
