@@ -11,6 +11,9 @@ import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
 
+# ✅ Import metrics calculator
+from ZX_BOT_metrics import MetricsCalculator
+
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -61,6 +64,93 @@ class DashboardServer:
         # Thread del servidor
         self.server_thread = None
         self.running = False
+    
+    # ============================================
+    # 🔧 MÉTODOS AUXILIARES PRIVADOS
+    # ============================================
+    
+    def _load_trades_dataframe(self):
+        """
+        Carga y valida el DataFrame de trades desde el archivo Excel.
+        
+        Este método centraliza la lógica de carga y validación que se repite
+        en múltiples endpoints.
+        
+        Returns:
+            pd.DataFrame: DataFrame de trades si existe y tiene datos
+            None: Si el archivo no existe o está vacío
+        """
+        if not os.path.exists(self.trades_file):
+            return None
+        
+        try:
+            df = pd.read_excel(self.trades_file)
+            if df.empty:
+                return None
+            return df
+        except Exception as e:
+            print(f"❌ Error loading trades file: {e}")
+            return None
+    
+    def _prepare_trades_dataframe(self, df):
+        """
+        Prepara el DataFrame de trades con columnas de fechas procesadas.
+        
+        Convierte las columnas de fechas a datetime y calcula la duración
+        de cada trade. Este procesamiento es común en varios endpoints.
+        
+        Args:
+            df: DataFrame crudo de trades
+        
+        Returns:
+            pd.DataFrame: DataFrame con columnas adicionales:
+                - OPEN_AT: datetime
+                - CLOSE_AT: datetime
+                - CLOSE_DATE: datetime (copia de CLOSE_AT)
+                - DURATION: duración en días (float)
+        """
+        df = df.copy()
+        df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
+        df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
+        df['CLOSE_DATE'] = pd.to_datetime(df['CLOSE_AT'])
+        df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
+        return df
+    
+    def _calculate_capital_allocation(self, num_strategies=None):
+        """
+        Calcula el capital asignado por estrategia.
+        
+        El capital total se divide equitativamente entre todas las estrategias
+        implementadas (o el número especificado).
+        
+        Args:
+            num_strategies: Número de estrategias para dividir el capital.
+                          Si None, usa len(self.implemented_strategies)
+        
+        Returns:
+            float: Capital asignado por estrategia
+                   Retorna 0.0 si num_strategies es 0
+        
+        Examples:
+            >>> # Con 10 estrategias y 10000 de capital
+            >>> capital_per_strat = self._calculate_capital_allocation()
+            >>> # Retorna: 1000.0
+            
+            >>> # Con número específico
+            >>> capital_for_combo = self._calculate_capital_allocation(3)
+            >>> # Para una combo de 3 estrategias
+        """
+        if num_strategies is None:
+            num_strategies = len(self.implemented_strategies)
+        
+        if num_strategies == 0:
+            return 0.0
+        
+        return self.initial_capital / num_strategies
+    
+    # ============================================
+    # 📡 RUTAS DE LA API
+    # ============================================
     
     def _register_routes(self):
         """Registra todas las rutas de la API del dashboard"""
@@ -156,7 +246,7 @@ class DashboardServer:
                 try:
                     balance = self.get_balance(None)
                 except Exception as e:
-                    print(f"⚠️  WAR- getting balance: {e}")
+                    print(f"⚠️  Error getting balance: {e}")
                     balance = 0.0
                 
                 # Calcular profit cerrado desde Excel
@@ -166,20 +256,17 @@ class DashboardServer:
                 profit_pct = 0
                 trades_pct = 0
                 
-                if os.path.exists(self.trades_file):
-                    try:
-                        df = pd.read_excel(self.trades_file)
-                        total_profit = df['PROFIT'].sum()
-                        num_trades = len(df)
-                        positive_trades = len(df[df['PROFIT'] > 0])
-                        
-                        if num_trades > 0:
-                            trades_pct = (positive_trades / num_trades) * 100
-                        
-                        if self.initial_capital > 0:
-                            profit_pct = (total_profit / self.initial_capital) * 100
-                    except Exception as e:
-                        print(f"⚠️  Error reading trades file: {e}")
+                df = self._load_trades_dataframe()
+                if df is not None:
+                    total_profit = df['PROFIT'].sum()
+                    num_trades = len(df)
+                    positive_trades = len(df[df['PROFIT'] > 0])
+                    
+                    if num_trades > 0:
+                        trades_pct = (positive_trades / num_trades) * 100
+                    
+                    if self.initial_capital > 0:
+                        profit_pct = (total_profit / self.initial_capital) * 100
                 
                 # Calcular PnL abierto
                 open_pnl = 0
@@ -348,10 +435,10 @@ class DashboardServer:
         def get_recent_trades():
             """Últimos 15 trades cerrados"""
             try:
-                if not os.path.exists(self.trades_file):
+                df = self._load_trades_dataframe()
+                if df is None:
                     return jsonify([])
                 
-                df = pd.read_excel(self.trades_file)
                 recent = df.tail(15).to_dict('records')
                 return jsonify(recent)
             except Exception as e:
@@ -361,22 +448,16 @@ class DashboardServer:
         def get_strategy_analysis():
             """Análisis detallado por estrategia"""
             try:
-                if not os.path.exists(self.trades_file):
+                df = self._load_trades_dataframe()
+                if df is None:
                     return jsonify([])
                 
-                df = pd.read_excel(self.trades_file)
-                
-                if df.empty:
-                    return jsonify([])
-                
-                df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
-                df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
-                df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
+                df = self._prepare_trades_dataframe(df)
                 
                 results = []
                 
                 num_strategies = df['STRATEGY'].nunique()
-                capital_per_strategy = self.initial_capital / num_strategies if num_strategies > 0 else 0
+                capital_per_strategy = self._calculate_capital_allocation(num_strategies)
                 
                 for strategy in sorted(df['STRATEGY'].unique()):
                     df_strategy = df[df['STRATEGY'] == strategy]
@@ -555,6 +636,97 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
+        # ✅ NEW: Compose Analysis endpoint - TOP 10 combinations
+        @self.app.route('/api/compose-analysis')
+        def get_compose_analysis():
+            """
+            Calcula todas las combinaciones de estrategias y devuelve TOP 10 por métrica seleccionada.
+            Query param: metric (profit_factor, weekly_win_pct, max_dd, expectancy, recovery_factor, sharpe_ratio)
+            """
+            try:
+                metric = request.args.get('metric', 'profit_factor')
+                
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify([])
+                
+                # Get all unique strategies with trades
+                strategies = df['STRATEGY'].unique().tolist()
+                
+                if len(strategies) == 0:
+                    return jsonify([])
+                
+                # Map strategy names to numbers using self.strategies (has correct 'id' field)
+                # Extract IDs and sort alphabetically
+                all_strategy_ids = [s['id'] for s in self.strategies]
+                sorted_strategy_ids = sorted(all_strategy_ids)
+                
+                strategy_numbers = {}
+                for i, strat_id in enumerate(sorted_strategy_ids, 1):
+                    strategy_numbers[strat_id] = str(i).zfill(2)
+                
+                from itertools import combinations
+                
+                results = []
+                
+                # Calculate capital per strategy (for allocation calculation)
+                capital_per_strat = self._calculate_capital_allocation()
+                
+                # Generate all combinations (1 to N strategies)
+                for r in range(1, len(strategies) + 1):
+                    for combo in combinations(strategies, r):
+                        # ⭐ Skip combinations with non-implemented strategies
+                        if any(s not in strategy_numbers for s in combo):
+                            continue
+                        
+                        # Filter trades for this combination
+                        df_combo = df[df['STRATEGY'].isin(combo)]
+                        
+                        if len(df_combo) == 0:
+                            continue
+                        
+                        # ✅ CALCULAR CAPITAL ASIGNADO para esta combinación
+                        combo_capital = capital_per_strat * len(combo)
+                        
+                        # ✅ CALCULAR MÉTRICAS usando método unificado
+                        metrics = MetricsCalculator.calculate_all_metrics(
+                            df=df_combo,
+                            capital_assigned=combo_capital,
+                            include_profit_pct=True  # ← Compose necesita total_profit_pct
+                        )
+                        
+                        # Create combination string using numbers
+                        combo_numbers = [strategy_numbers.get(s, '??') for s in combo]
+                        combo_str = '+'.join(combo_numbers)
+                        
+                        results.append({
+                            'combination': combo_str,
+                            'total_profit_pct': metrics['total_profit_pct'],
+                            'total_profit_usd': metrics['total_profit_usd'],
+                            'profit_factor': metrics['profit_factor'],
+                            'weekly_win_pct': metrics['weekly_win_pct'],
+                            'max_dd': metrics['max_dd'],
+                            'recovery_factor': metrics['recovery_factor'],
+                            'sharpe_ratio': metrics['sharpe_ratio']
+                        })
+                
+                # Sort by selected metric
+                if metric == 'max_dd':
+                    # For Max DD, lower (less negative) is better
+                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
+                else:
+                    # For all other metrics, higher is better
+                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
+                
+                # Return TOP 10
+                return jsonify(results_sorted[:10])
+                
+            except Exception as e:
+                print(f"Error in compose analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
+        
         # ✅ NEW: Symbols Analysis endpoint
         @self.app.route('/api/symbols-analysis')
         def get_symbols_analysis():
@@ -563,12 +735,8 @@ class DashboardServer:
             Devuelve: Symbol, Total Trades, Win %, Total Profit, Avg Profit
             """
             try:
-                if not os.path.exists(self.trades_file):
-                    return jsonify([])
-                
-                df = pd.read_excel(self.trades_file)
-                
-                if df.empty:
+                df = self._load_trades_dataframe()
+                if df is None:
                     return jsonify([])
                 
                 results = []
@@ -603,7 +771,8 @@ class DashboardServer:
             Devuelve UNA SOLA curva sumando todas las estrategias seleccionadas.
             """
             try:
-                if not os.path.exists(self.trades_file):
+                df = self._load_trades_dataframe()
+                if df is None:
                     return jsonify({'error': 'No trades file found'}), 404
                 
                 # Obtener estrategias seleccionadas
@@ -613,59 +782,56 @@ class DashboardServer:
                 if not selected_strategies:
                     return jsonify({'error': 'No strategies selected'}), 400
                 
-                # Leer trades
-                df = pd.read_excel(self.trades_file)
-                
-                if df.empty:
-                    return jsonify({'dates': [], 'equity_pct': [], 'drawdown_pct': []})
-                
                 # Filtrar por estrategias seleccionadas
                 df = df[df['STRATEGY'].isin(selected_strategies)]
                 
                 if df.empty:
                     return jsonify({'dates': [], 'equity_pct': [], 'drawdown_pct': []})
                 
-                # Convertir fechas
-                df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
+                # Preparar fechas
+                df = self._prepare_trades_dataframe(df)
                 df = df.sort_values('CLOSE_AT')
                 df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
                 
                 # ✅ CALCULAR CAPITAL INICIAL ASIGNADO
-                # Total de estrategias implementadas
-                total_strategies = len(self.implemented_strategies)
-                if total_strategies == 0:
-                    total_strategies = len(self.strategies)  # Fallback
-                
                 num_selected = len(selected_strategies)
+                total_strategies = len(self.implemented_strategies) if len(self.implemented_strategies) > 0 else len(self.strategies)
                 
                 # Capital asignado = (capital_total / total_strategies) * num_selected
-                if total_strategies > 0:
-                    capital_assigned = (self.initial_capital / total_strategies) * num_selected
+                capital_per_strategy = self._calculate_capital_allocation(total_strategies)
+                capital_assigned = capital_per_strategy * num_selected
+                
+                # ✅ CALCULAR MÉTRICAS usando método unificado
+                metrics_data = MetricsCalculator.calculate_all_metrics(
+                    df=df,
+                    capital_assigned=capital_assigned,
+                    include_profit_pct=False
+                )
+                
+                # ✅ EXTRAER EQUITY DIARIA para gráficas
+                daily_profit = metrics_data['daily_profit']
+                
+                if not daily_profit.empty:
+                    # Convertir fechas a string para JSON
+                    daily_profit['date_str'] = daily_profit['date'].astype(str)
+                    
+                    # Calcular equity en porcentaje
+                    if capital_assigned > 0:
+                        daily_profit['equity_pct'] = ((daily_profit['equity_usd'] / capital_assigned) - 1) * 100
+                    else:
+                        daily_profit['equity_pct'] = 0
+                    
+                    # Calcular drawdown en porcentaje
+                    daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
+                    daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
+                    
+                    dates = daily_profit['date_str'].tolist()
+                    equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
+                    drawdown_pct = [round(val, 2) for val in daily_profit['drawdown_pct'].tolist()]
                 else:
-                    capital_assigned = self.initial_capital
-                
-                # ✅ AGRUPAR PROFITS POR FECHA (suma de todas las estrategias seleccionadas)
-                daily_profit = df.groupby('date_str')['PROFIT'].sum().reset_index()
-                daily_profit = daily_profit.sort_values('date_str')
-                
-                # ✅ CALCULAR EQUITY ACUMULADO EN USD
-                daily_profit['cumulative_profit'] = daily_profit['PROFIT'].cumsum()
-                daily_profit['equity_usd'] = capital_assigned + daily_profit['cumulative_profit']
-                
-                # ✅ CONVERTIR A PORCENTAJE
-                if capital_assigned > 0:
-                    daily_profit['equity_pct'] = ((daily_profit['equity_usd'] / capital_assigned) - 1) * 100
-                else:
-                    daily_profit['equity_pct'] = 0
-                
-                # ✅ CALCULAR DRAWDOWN EN PORCENTAJE
-                daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
-                daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
-                
-                # ✅ EXTRAER DATOS PARA FRONTEND
-                dates = daily_profit['date_str'].tolist()
-                equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
-                drawdown_pct = [round(val, 2) for val in daily_profit['drawdown_pct'].tolist()]
+                    dates = []
+                    equity_pct = []
+                    drawdown_pct = []
                 
                 return jsonify({
                     'dates': dates,
@@ -673,7 +839,13 @@ class DashboardServer:
                     'drawdown_pct': drawdown_pct,
                     'capital_assigned': round(capital_assigned, 2),
                     'num_selected': num_selected,
-                    'total_strategies': total_strategies
+                    'total_strategies': total_strategies,
+                    'total_profit_usd': metrics_data['total_profit_usd'],
+                    'profit_factor': metrics_data['profit_factor'],
+                    'weekly_win_pct': metrics_data['weekly_win_pct'],
+                    'max_dd': metrics_data['max_dd'],
+                    'recovery_factor': metrics_data['recovery_factor'],
+                    'sharpe_ratio': metrics_data['sharpe_ratio']
                 })
                 
             except Exception as e:

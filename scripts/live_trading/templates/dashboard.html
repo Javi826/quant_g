@@ -371,7 +371,7 @@
             padding: 12px;
             font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 12px;
-            line-height: 0.9;
+            line-height: 0.5;
             background: #0d1117;
         }
         
@@ -555,7 +555,7 @@
             background: #1c2128;
             color: #ffffff;
             font-weight: 600;
-            font-size: 20px;
+            font-size: 19px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 1px solid #30363d;
@@ -879,6 +879,7 @@
                 <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
                 <button class="tab-btn" onclick="switchTab('equity')">Equity & DD</button>
                 <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
+                <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
             </div>
             
             <div id="tab-positions" class="tab-content active">
@@ -928,9 +929,10 @@
                 <div class="content-section">
                     <h2>Equity Curve & Drawdown</h2>
                     
-                    <!-- ✅ Sub-tabs for Curves and Symbols -->
+                    <!-- ✅ Sub-tabs for Curves, Compose, and Symbols -->
                     <div class="tabs-container" style="margin-top: 20px;">
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                     </div>
                     
@@ -945,12 +947,67 @@
                             </div>
                         </div>
                         
+                        <!-- ✅ Metrics display -->
+                        <div id="equity-metrics" style="display: none; background: #1c2128; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #21262d;">
+                            <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap;">
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">💵 Profit $:</span>
+                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📊 Profit Factor:</span>
+                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📈 Weekly Win %:</span>
+                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📉 Max DD:</span>
+                                    <span id="metric-max-dd" style="color: #f85149; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">🔄 Recovery Factor:</span>
+                                    <span id="metric-recovery" style="color: #a371f7; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">⚡ Sharpe Ratio:</span>
+                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="chart-container">
                             <canvas id="equityChart"></canvas>
                         </div>
                         
                         <div class="chart-container">
                             <canvas id="drawdownChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Compose Sub-tab -->
+                    <div id="equity-subtab-compose" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Combinations - TOP 10</h3>
+                        
+                        <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
+                            <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
+                            <select id="compose-metric" style="padding: 10px 15px; font-size: 16px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
+                                <option value="total_profit_pct">Total Profit %</option>
+                                <option value="profit_factor">Profit Factor</option>
+                                <option value="weekly_win_pct">Weekly Win %</option>
+                                <option value="max_dd">Max DD (lowest)</option>
+                                <option value="recovery_factor">Recovery Factor</option>
+                                <option value="sharpe_ratio">Sharpe Ratio</option>
+                                <option value="total_profit_usd">Profit $</option>
+                            </select>
+                            <button class="update-chart-btn" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
+                        </div>
+                        
+                        <div id="compose-container">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Select a metric and click "Show TOP 10"
+                            </div>
                         </div>
                     </div>
                     
@@ -1069,6 +1126,212 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
+// ═══════════════════════════════════════════════════════════════════
+// 🎨 CONSTANTES DE DISEÑO Y CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════════════════
+
+const COLORS = {
+    // Metric colors
+    gold: '#FFBF00',
+    green: '#3fb950',
+    yellow: '#d29922',
+    red: '#f85149',
+    
+    // UI colors
+    textPrimary: '#c9d1d9',
+    textSecondary: '#8b949e',
+    gridDark: '#21262d',
+    borderYellow: '#facc15',
+    white: '#ffffff',
+    blue: '#58a6ff',
+    
+    // Chart specific
+    equityPositive: '#3fb950',
+    equityNegative: '#f85149',
+    drawdownRed: '#f85149',
+    drawdownRedAlpha: 'rgba(248, 81, 73, 0.1)'
+};
+
+const METRIC_THRESHOLDS = {
+    profitFactor: {
+        excellent: 2.0,   // Gold
+        good: 1.5,        // Green
+        acceptable: 1.0,  // Yellow
+    },
+    sharpeRatio: {
+        excellent: 2.0,
+        good: 1.5,
+        acceptable: 1.0,
+    },
+    recoveryFactor: {
+        excellent: 10,    // Green
+        acceptable: 5,    // Yellow
+    }
+};
+
+const CHART_DEFAULTS = {
+    fontSize: {
+        title: 20,
+        axis: 16
+    },
+    gridColor: COLORS.gridDark,
+    borderColor: COLORS.borderYellow,
+    borderWidth: 1,
+    textColor: COLORS.white,
+    titleColor: COLORS.textPrimary
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// 🔧 FUNCIONES HELPER PARA MÉTRICAS Y COLORES
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Obtiene el color y sombra para Profit Factor o Sharpe Ratio
+ * @param {number} value - Valor de la métrica
+ * @param {boolean} withGlow - Si debe incluir efecto de brillo
+ * @returns {Object} { color, shadow }
+ */
+function getMetricColor(value, withGlow = false) {
+    const thresholds = METRIC_THRESHOLDS.profitFactor;
+    
+    if (value >= thresholds.excellent) {
+        return {
+            color: COLORS.gold,
+            shadow: withGlow ? '0 0 13px rgba(255, 215, 0, 0.8)' : 'none'
+        };
+    } else if (value >= thresholds.good) {
+        return { color: COLORS.green, shadow: 'none' };
+    } else if (value >= thresholds.acceptable) {
+        return { color: COLORS.yellow, shadow: 'none' };
+    } else {
+        return { color: COLORS.red, shadow: 'none' };
+    }
+}
+
+/**
+ * Obtiene el color para Recovery Factor
+ * @param {number} value - Valor del recovery factor
+ * @returns {string} Color hex
+ */
+function getRecoveryColor(value) {
+    const thresholds = METRIC_THRESHOLDS.recoveryFactor;
+    
+    if (value >= thresholds.excellent) {
+        return COLORS.green;
+    } else if (value >= thresholds.acceptable) {
+        return COLORS.yellow;
+    } else {
+        return COLORS.red;
+    }
+}
+
+/**
+ * Obtiene color simple positivo/negativo
+ * @param {number} value - Valor a evaluar
+ * @returns {string} Color hex
+ */
+function getPositiveNegativeColor(value) {
+    return value >= 0 ? COLORS.green : COLORS.red;
+}
+
+/**
+ * Aplica color a un elemento DOM según el tipo de métrica
+ * @param {HTMLElement} element - Elemento DOM
+ * @param {number} value - Valor de la métrica
+ * @param {string} type - Tipo: 'profitFactor', 'sharpe', 'recovery', 'positiveNegative'
+ */
+function applyMetricColor(element, value, type = 'profitFactor') {
+    if (type === 'profitFactor' || type === 'sharpe') {
+        const { color, shadow } = getMetricColor(value, true);
+        element.style.color = color;
+        element.style.textShadow = shadow;
+    } else if (type === 'recovery') {
+        element.style.color = getRecoveryColor(value);
+    } else if (type === 'positiveNegative') {
+        element.style.color = getPositiveNegativeColor(value);
+    }
+}
+
+/**
+ * Obtiene clase de estilo inline para usar en tablas
+ * @param {number} value - Valor de la métrica
+ * @param {string} type - Tipo de métrica
+ * @returns {string} String con style inline
+ */
+function getMetricStyleClass(value, type = 'profitFactor') {
+    if (type === 'profitFactor' || type === 'sharpe') {
+        const { color, shadow } = getMetricColor(value,true);
+        return shadow !== 'none' 
+            ? `style="color: ${color}; text-shadow: ${shadow};"` 
+            : `style="color: ${color};"`;
+    } else if (type === 'recovery') {
+        return `style="color: ${getRecoveryColor(value)};"`;
+    } else if (type === 'positiveNegative') {
+        return `style="color: ${getPositiveNegativeColor(value)};"`;
+    }
+}
+
+/**
+ * Genera configuración base para Chart.js
+ * @param {string} title - Título del gráfico
+ * @param {boolean} reverseY - Si el eje Y debe invertirse
+ * @returns {Object} Configuración de Chart.js
+ */
+function getBaseChartConfig(title, reverseY = false) {
+    const config = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top' },
+            title: { 
+                display: true, 
+                text: title,
+                color: CHART_DEFAULTS.titleColor,
+                font: {
+                    size: CHART_DEFAULTS.fontSize.title,
+                    weight: 'bold'
+                }
+            }
+        },
+        scales: {
+            x: { 
+                ticks: { 
+                    color: CHART_DEFAULTS.textColor,
+                    font: { size: CHART_DEFAULTS.fontSize.axis }
+                }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                } 
+            },
+            y: { 
+                ticks: { 
+                    color: CHART_DEFAULTS.textColor,
+                    font: { size: CHART_DEFAULTS.fontSize.axis },
+                    callback: function(value) {
+                        return value.toFixed(1) + '%';
+                    }
+                }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                }
+            }
+        }
+    };
+    
+    // Si necesita eje Y invertido (para drawdown)
+    if (reverseY) {
+        config.scales.y.reverse = true;
+    }
+    
+    return config;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ✅ NEW: Wait for Backend Function
 // ═══════════════════════════════════════════════════════════════════
@@ -1267,13 +1530,17 @@ function switchEquitySubTab(subTabName) {
     document.getElementById('equity-subtab-' + subTabName).classList.add('active');
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
+    if (subTabName === 'compose') {
+        // Show initial message
+        document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
+    }
 }
 
 function getLogClass(line) {
     // 🟢 VERDE: TP for, PRIVATE WS connected, PUBLIC WS connected
     if (line.includes('TP for') || 
         line.includes('PRIVATE WS connected') || 
-        line.includes('PUBLIC WS connected')) {
+        line.includes('PUBLIC- WS connected')) {
         return 'success';
     }
     
@@ -1288,7 +1555,7 @@ function getLogClass(line) {
     }
     
     // 🔵 AZUL: Checking (opcional, puedes quitarlo si no lo usas)
-    if (line.includes('Checking')) {
+    if (line.includes('Signals detected')) {
         return 'info';
     }
     
@@ -1586,10 +1853,10 @@ async function loadEquityTab() {
         checkboxContainer.innerHTML = '';
         checkboxContainer.appendChild(allCheckbox);
         
-        // ✅ Sort alphabetically
+        // ✅ Sort strategies by ID (to match backend numbering)
         const sortedStrategies = allStrategiesList.sort((a, b) => a.id.localeCompare(b.id));
         
-        sortedStrategies.forEach(strat => {
+        sortedStrategies.forEach((strat, index) => {
             const div = document.createElement('div');
             div.className = 'checkbox-item';
             
@@ -1601,7 +1868,9 @@ async function loadEquityTab() {
             
             const label = document.createElement('label');
             label.htmlFor = 'strat-' + strat.id;
-            label.textContent = strat.id + ' (' + strat.status + ')';
+            // ✅ Add strategy number matching backend (based on sorted self.strategies)
+            const stratNumber = String(index + 1).padStart(2, '0');
+            label.textContent = '[' + stratNumber + '] ' + strat.id + ' (' + strat.status + ')';
             
             div.appendChild(checkbox);
             div.appendChild(label);
@@ -1621,6 +1890,78 @@ async function loadEquityTab() {
         
     } catch (error) {
         console.error('Error loading equity tab:', error);
+    }
+}
+
+// ✅ NEW: Load compose analysis - TOP 10 combinations
+async function loadComposeAnalysis() {
+    try {
+        const metric = document.getElementById('compose-metric').value;
+        const res = await fetch('/api/compose-analysis?metric=' + metric);
+        const data = await res.json();
+        const container = document.getElementById('compose-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        // Determine which column to highlight
+        const metricNames = {
+            'total_profit_pct': 'Total Profit %',
+            'profit_factor': 'Profit Factor',
+            'weekly_win_pct': 'Weekly Win %',
+            'max_dd': 'Max DD',
+            'recovery_factor': 'Recovery',
+            'sharpe_ratio': 'Sharpe',
+            'total_profit_usd': 'Profit $'
+        };
+        
+        const highlightCol = metricNames[metric];
+        
+        const html = '<table><thead><tr>' +
+            '<th>#</th>' +
+            '<th>Combination</th>' +
+            '<th' + (highlightCol === 'Total Profit %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Total Profit %</th>' +
+            '<th' + (highlightCol === 'Profit Factor' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit Factor</th>' +
+            '<th' + (highlightCol === 'Weekly Win %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly Win %</th>' +
+            '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
+            '<th' + (highlightCol === 'Recovery' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Recovery</th>' +
+            '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
+            '<th' + (highlightCol === 'Profit $' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit $</th>' +
+            '</tr></thead><tbody>' +
+            data.map((row, idx) => {
+                const pfClass = getMetricStyleClass(row.profit_factor, 'profitFactor');
+                const recClass = getMetricStyleClass(row.recovery_factor, 'recovery');
+                const sharpeClass = getMetricStyleClass(row.sharpe_ratio, 'sharpe');
+                const profitPctClass = getMetricStyleClass(row.total_profit_pct, 'positiveNegative');
+                const profitUsdClass = getMetricStyleClass(row.total_profit_usd, 'positiveNegative');
+                
+                const tpStyle = highlightCol === 'Total Profit %' ? 'font-weight: 900;' : '';
+                const pfStyle = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
+                const wwStyle = highlightCol === 'Weekly Win %' ? 'font-weight: 900;' : '';
+                const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
+                const recStyle = highlightCol === 'Recovery' ? 'font-weight: 900;' : '';
+                const sharpeStyle = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
+                const puStyle = highlightCol === 'Profit $' ? 'font-weight: 900;' : '';
+                
+                return '<tr>' +
+                    '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
+                    '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
+                    '<td ' + profitPctClass.replace('style="', 'style="' + tpStyle) + '>' + (row.total_profit_pct >= 0 ? '+' : '') + row.total_profit_pct + '%</td>' +
+                    '<td ' + pfClass.replace('style="', 'style="' + pfStyle) + '>' + row.profit_factor + '</td>' +
+                    '<td style="' + wwStyle + '">' + row.weekly_win_pct + '%</td>' +
+                    '<td style="color: #f85149; ' + ddStyle + '">' + row.max_dd + '%</td>' +
+                    '<td ' + recClass.replace('style="', 'style="' + recStyle) + '>' + row.recovery_factor + '</td>' +
+                    '<td ' + sharpeClass.replace('style="', 'style="' + sharpeStyle) + '>' + row.sharpe_ratio + '</td>' +
+                    '<td ' + profitUsdClass.replace('style="', 'style="' + puStyle) + '>' + (row.total_profit_usd >= 0 ? '+' : '') + '$' + row.total_profit_usd + '</td>' +
+                    '</tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading compose analysis:', error);
+        document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
 
@@ -1677,13 +2018,38 @@ async function updateEquityChart() {
             return;
         }
         
+        // ✅ Display metrics
+        document.getElementById('equity-metrics').style.display = 'block';
+        document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
+        document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
+        document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
+        document.getElementById('metric-max-dd').textContent = '-' + (data.max_dd || 0) + '%';
+        document.getElementById('metric-recovery').textContent = (data.recovery_factor || 0);
+        document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
+        
+        // Color Profit USD
+        const puElement = document.getElementById('metric-profit-usd');
+        applyMetricColor(puElement, data.total_profit_usd, 'positiveNegative');
+        
+        // Color profit factor
+        const pfElement = document.getElementById('metric-profit-factor');
+        applyMetricColor(pfElement, data.profit_factor, 'profitFactor');
+        
+        // Color recovery factor
+        const recElement = document.getElementById('metric-recovery');
+        applyMetricColor(recElement, data.recovery_factor, 'recovery');
+        
+        // Color Sharpe ratio
+        const sharpeElement = document.getElementById('metric-sharpe');
+        applyMetricColor(sharpeElement, data.sharpe_ratio, 'sharpe');
+        
         // Destroy existing charts
         if (equityChart) equityChart.destroy();
         if (drawdownChart) drawdownChart.destroy();
         
         // ✅ Determine equity line color (green if positive, red if negative)
         const finalEquity = data.equity_pct[data.equity_pct.length - 1] || 0;
-        const equityColor = finalEquity >= 0 ? '#3fb950' : '#f85149';
+        const equityColor = finalEquity >= 0 ? COLORS.equityPositive : COLORS.equityNegative;
         
         // ✅ Create Equity Chart - ONE LINE
         const ctxEquity = document.getElementById('equityChart').getContext('2d');
@@ -1701,51 +2067,7 @@ async function updateEquityChart() {
                     tension: 0.1
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    title: { 
-                        display: true, 
-                        text: 'Equity Curve (%) - ' + selectedStrategies.length + ' strategies selected',
-                        color: '#c9d1d9',
-                        font: {
-                            size: 20,
-                            weight: 'bold'
-                        }
-                    }
-                },
-                scales: {
-                    x: { 
-                        ticks: { 
-                            color: '#ffffff',
-                            font: { size: 13 }
-                        }, 
-                        grid: { 
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        } 
-                    },
-                    y: { 
-                        ticks: { 
-                            color: '#ffffff',
-                            font: { size: 13 },
-                            callback: function(value) {
-                                return value.toFixed(1) + '%';
-                            }
-                        }, 
-                        grid: { 
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        }
-                    }
-                }
-            }
+            options: getBaseChartConfig('Equity Curve (%) - ' + selectedStrategies.length + ' strategies selected', false)
         });
         
         // ✅ Create Drawdown Chart - ONE RED LINE
@@ -1757,60 +2079,15 @@ async function updateEquityChart() {
                 datasets: [{
                     label: 'Drawdown (%)',
                     data: data.drawdown_pct,
-                    borderColor: '#f85149',
-                    backgroundColor: 'rgba(248, 81, 73, 0.1)',
+                    borderColor: COLORS.drawdownRed,
+                    backgroundColor: COLORS.drawdownRedAlpha,
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.1,
                     fill: true
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true, position: 'top' },
-                    title: { 
-                        display: true, 
-                        text: 'Drawdown (%) - ' + selectedStrategies.length + ' strategies selected',
-                        color: '#c9d1d9',
-                        font: {
-                            size: 20,
-                            weight: 'bold'
-                        }
-                    }
-                },
-                scales: {
-                    x: { 
-                        ticks: { 
-                            color: '#ffffff',
-                            font: { size: 13 }
-                        }, 
-                        grid: { 
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        } 
-                    },
-                    y: { 
-                        ticks: { 
-                            color: '#ffffff',
-                            font: { size: 13 },
-                            callback: function(value) {
-                                return value.toFixed(1) + '%';
-                            }
-                        }, 
-                        grid: { 
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        },
-                        reverse: true
-                    }
-                }
-            }
+            options: getBaseChartConfig('Drawdown (%) - ' + selectedStrategies.length + ' strategies selected', true)
         });
         
     } catch (error) {
@@ -1903,11 +2180,22 @@ function clearLogs() {
 
 let dataInterval, logsInterval;
 
+// ✅ Live clock update
+function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('live-clock').textContent = `${hours}:${minutes}:${seconds}`;
+}
+
 function startPolling() {
     loadData();
     loadLogs();
-    dataInterval = setInterval(() => loadData().catch(console.error), 3000);
-    logsInterval = setInterval(() => loadLogs().catch(console.error), 1500);
+    updateClock(); // Initial clock update
+    dataInterval = setInterval(() => loadData().catch(console.error), 10000);
+    logsInterval = setInterval(() => loadLogs().catch(console.error), 5000);
+    setInterval(updateClock, 1000); // Update clock every second
 }
 
 function stopPolling() {

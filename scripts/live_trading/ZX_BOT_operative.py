@@ -9,15 +9,12 @@ import traceback
 import logging
 import builtins
 import pandas as pd
-from ZX_BOT_metrics import bot_metrics
 from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 
-from ZX_BOT_D1 import calculate_pnl
-
 # Import WebSocket manager
-import ZX_BOT_ws_manager
+import ZX_BOT_websocket
 
 BASE_URL     = "https://api.bitget.com"
 PRODUCT_TYPE = "USDT-FUTURES"
@@ -47,16 +44,16 @@ def configure_paths(trades_log_path, display_color="\033[1;94m", initial_capital
 
 def fetch_ticker_ws(symbol):
     """Obtiene ticker SOLO via WebSocket"""
-    if not ZX_BOT_ws_manager._ws_manager:
+    if not ZX_BOT_websocket._ws_manager:
         raise RuntimeError("WebSocket not initialized")
     
     # Suscribir si no está suscrito
-    if symbol not in ZX_BOT_ws_manager._ws_manager.subscribed_public:
-        ZX_BOT_ws_manager._ws_manager.subscribe_ticker(symbol)
+    if symbol not in ZX_BOT_websocket._ws_manager.subscribed_public:
+        ZX_BOT_websocket._ws_manager.subscribe_ticker(symbol)
         time.sleep(0.05)
     
     # Obtener del caché
-    price_data = ZX_BOT_ws_manager._ws_manager.prices.get(symbol)
+    price_data = ZX_BOT_websocket._ws_manager.prices.get(symbol)
     
     if price_data:
         age = time.time() - price_data['timestamp']
@@ -68,7 +65,7 @@ def fetch_ticker_ws(symbol):
     timeout_start = time.time()
     
     while (time.time() - timeout_start) < 2.0:
-        price_data = ZX_BOT_ws_manager._ws_manager.prices.get(symbol)
+        price_data = ZX_BOT_websocket._ws_manager.prices.get(symbol)
         if price_data and price_data['timestamp'] > initial_ts:
             return price_data['price'], None
         time.sleep(0.02)
@@ -77,10 +74,10 @@ def fetch_ticker_ws(symbol):
 
 def fetch_contracts_ws(symbol):
     """Obtiene contratos SOLO desde caché WebSocket"""
-    if not ZX_BOT_ws_manager._ws_manager:
+    if not ZX_BOT_websocket._ws_manager:
         raise RuntimeError("WebSocket not initialized")
     
-    contract = ZX_BOT_ws_manager._ws_manager.get_contract(symbol)
+    contract = ZX_BOT_websocket._ws_manager.get_contract(symbol)
     if contract:
         return contract
     
@@ -91,17 +88,17 @@ def get_usdt_balance_ws(exchange=None):
     Obtiene el balance USDT desde WebSocket (canal equity).
     Parámetro exchange ignorado (compatibilidad).
     """
-    if not ZX_BOT_ws_manager._ws_manager:
-        print("❌ Error WS manager not init for balance check")
+    if not ZX_BOT_websocket._ws_manager:
+        print("❌ Error WS manager not init for balance.")
         return 0.0
     
-    balance = ZX_BOT_ws_manager._ws_manager.get_usdt_balance()
+    balance = ZX_BOT_websocket._ws_manager.get_usdt_balance()
     
     # Si no hay datos de equity todavía, esperar un poco
-    if balance == 0.0 and not ZX_BOT_ws_manager._ws_manager.equity:
+    if balance == 0.0 and not ZX_BOT_websocket._ws_manager.equity:
         print("Waiting for equity data from WebSocket...")
         time.sleep(0.05)
-        balance = ZX_BOT_ws_manager._ws_manager.get_usdt_balance()
+        balance = ZX_BOT_websocket._ws_manager.get_usdt_balance()
     
     return balance
 
@@ -210,11 +207,11 @@ def sync_broker(open_positions, strategy_candles, state_file):
     print("🌐 Syncronizing broker...")
     total_removed = 0
     
-    if not ZX_BOT_ws_manager._ws_manager:
-        raise RuntimeError("WebSocket manager not initialized")
+    if not ZX_BOT_websocket._ws_manager:
+        raise RuntimeError("WebSocket manager not init.")
     
     # ⭐ REFRESCAR datos de posiciones del WebSocket
-    ZX_BOT_ws_manager._ws_manager.refresh_positions()
+    ZX_BOT_websocket._ws_manager.refresh_positions()
     
     for strat_id, positions in list(open_positions.items()):
         positions_to_remove = []
@@ -224,7 +221,7 @@ def sync_broker(open_positions, strategy_candles, state_file):
                 symbol = pos['symbol']
                 
                 # Obtener posición desde WebSocket (ya refrescado)
-                ws_position = ZX_BOT_ws_manager._ws_manager.get_position(symbol)
+                ws_position = ZX_BOT_websocket._ws_manager.get_position(symbol)
                 
                 # Verificar si la posición existe
                 position_exists = False
@@ -447,7 +444,7 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
     """
     time.sleep(delay)
     
-    if not ZX_BOT_ws_manager._ws_manager:
+    if not ZX_BOT_websocket._ws_manager:
         raise RuntimeError("WebSocket manager not initialized")
     
     # Esperar a recibir fills via WebSocket
@@ -455,7 +452,7 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
     timeout = 1.0
     
     while time.time() - start_time < timeout:
-        fills = ZX_BOT_ws_manager._ws_manager.get_fills(order_id)
+        fills = ZX_BOT_websocket._ws_manager.get_fills(order_id)
         if fills:
             # Procesar fills
             total_base   = Decimal('0')
@@ -500,14 +497,14 @@ def get_fills_for_order(order_id, symbol, product_type=PRODUCT_TYPE, send_reques
 
 def get_current_price(symbol, max_cache_age=0.5):
     """Obtiene el precio actual del mercado via WebSocket"""
-    if not ZX_BOT_ws_manager._ws_manager:
+    if not ZX_BOT_websocket._ws_manager:
         raise RuntimeError("WS manager not init.")
     
     # Suscribir si no está suscrito
-    if symbol not in ZX_BOT_ws_manager._ws_manager.subscribed_public:
-        ZX_BOT_ws_manager._ws_manager.subscribe_ticker(symbol)
+    if symbol not in ZX_BOT_websocket._ws_manager.subscribed_public:
+        ZX_BOT_websocket._ws_manager.subscribe_ticker(symbol)
     
-    price_data = ZX_BOT_ws_manager._ws_manager.prices.get(symbol)
+    price_data = ZX_BOT_websocket._ws_manager.prices.get(symbol)
     
     # Usar caché si es suficientemente fresco
     if price_data:
@@ -521,7 +518,7 @@ def get_current_price(symbol, max_cache_age=0.5):
     start_time = time.time()
     
     while (time.time() - start_time) < timeout:
-        price_data = ZX_BOT_ws_manager._ws_manager.prices.get(symbol)
+        price_data = ZX_BOT_websocket._ws_manager.prices.get(symbol)
         if price_data and price_data['timestamp'] > initial_timestamp:
             return price_data['price']
         time.sleep(0.01)
@@ -632,7 +629,6 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
         save_state_local(open_positions, strategy_candles, state_file)
-        #bot_metrics(excel_file=TRADES_LOG_PATH, color_code=DISPLAY_COLOR, initial_capital=INITIAL_CAPITAL)
 
 # ==========================================================================
 # TP/SL CHECKINGS
@@ -782,7 +778,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"💫 =-Signals detected for {strat_id}: {len(signals)}")
+    print(f"💫 Signals detected  {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -917,7 +913,6 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
                             bot_state=bot_state
                         )
             
-            # ⭐ MOVER return True ANTES de bot_metrics para evitar que errores lo interrumpan
             result = True  
             
             return result
@@ -946,7 +941,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
             return False
             
     except Exception as e:
-        print(f"❌ Error closing position {symbol}: {e}")
+        print(f"❌ Error closing {symbol}: {e}")
         traceback.print_exc()
         return False
 
@@ -1078,7 +1073,7 @@ def log_closed_position(
         print(f"📋 Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
 
     except Exception as e:
-        print(f"❌ Error logging trade to Excel: {e}")
+        print(f"❌ Error logging to Excel: {e}")
         traceback.print_exc()
 
 def setup_print_logger(logdir, logfile_name=None):

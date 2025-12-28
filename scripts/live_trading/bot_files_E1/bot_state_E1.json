@@ -15,17 +15,6 @@
     ],
     "parity_long_1H": [
       {
-        "symbol": "BNBUSDT",
-        "size": "0.04",
-        "entry_price": "840.9",
-        "direction": "long",
-        "tp": "857.718",
-        "sl": "756.81",
-        "order_id": "1388779982393348097",
-        "opened_at": "2025-12-27T12:01:11.095208+00:00",
-        "usdt_amount": 40.0
-      },
-      {
         "symbol": "DOGEUSDT",
         "size": "325",
         "entry_price": "0.1231",
@@ -162,7 +151,19 @@
         "usdt_amount": 40.0
       }
     ],
-    "parity_long_4H": [],
+    "parity_long_4H": [
+      {
+        "symbol": "SOLUSDT",
+        "size": "0.3",
+        "entry_price": "124.737",
+        "direction": "long",
+        "tp": "128.47911",
+        "sl": "112.2633",
+        "order_id": "1388961076732399617",
+        "opened_at": "2025-12-28T00:00:47.250088+00:00",
+        "usdt_amount": 40.0
+      }
+    ],
     "revers_short_4H": [
       {
         "symbol": "BGBUSDT",
@@ -509,17 +510,17 @@
     ]
   },
   "strategy_candles": {
-    "revers_long_1H": 8,
-    "parity_long_1H": 8,
-    "parity_short_1H": 2,
-    "double_top_long_4H": 1,
-    "parity_long_4H": 0,
-    "revers_short_4H": 2,
-    "parity_short_4H": 1,
-    "revers_short_1H": 2,
-    "revers_short_6Hutc": 34,
-    "revers_long_4H": 45,
-    "revers_long_6Hutc": 19,
-    "orderblocks_short_4H": 9
+    "revers_long_1H": 28,
+    "parity_long_1H": 28,
+    "parity_short_1H": 22,
+    "double_top_long_4H": 5,
+    "parity_long_4H": 3,
+    "revers_short_4H": 6,
+    "parity_short_4H": 5,
+    "revers_short_1H": 22,
+    "revers_short_6Hutc": 38,
+    "revers_long_4H": 49,
+    "revers_long_6Hutc": 23,
+    "orderblocks_short_4H": 13
   }
 }

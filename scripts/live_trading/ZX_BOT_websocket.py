@@ -136,7 +136,7 @@ class BitgetWSManager:
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        print(f"{GREEN_BOLD}🔌 PUBLIC   WS connected [{now}]{RESET}")
+        print(f"{GREEN_BOLD}🔌 PUBLIC-     WS connected [{now}]{RESET}")
         if self.subscribed_public:
             self._resubscribe_public()
     
@@ -424,7 +424,7 @@ class BitgetWSManager:
         """Callback al cerrar conexión"""
         # Identificar cuál WebSocket se cerró
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        ws_type = "PUBLIC" if ws == self.public_ws else "PRIVATE" if ws == self.private_ws else "UNKNOWN"
+        ws_type = "PUBLIC " if ws == self.public_ws else "PRIVATE" if ws == self.private_ws else "UNKNOWN"
         
         # Guardar razón de cierre para mostrar en reconexión
         self.last_close_code = close_status_code
@@ -579,7 +579,7 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
         
         # Verificar conexión
         print(f"➡️  WebSocket status:")
-        print(f"  - Public WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else '⚠️  Not connected'}")
+        print(f"  - Public- WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else '⚠️  Not connected'}")
         print(f"  - Private WS   : {'✅ Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else '⚠️  Not connected'}")
         print(f"  - Authenticated: {'✅ Yes' if _ws_manager.authenticated else '⚠️  No'}")
         

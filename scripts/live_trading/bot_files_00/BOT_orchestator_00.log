@@ -1,0 +1,1011 @@
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94m🪪 Validating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 1H, 4H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+❌ Error WS manager not init for balance.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - FORMUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - SNXUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - 1000BONKUSDT: WS manager not init.
+⚠️No PnL - AAVEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - DOTUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - HBARUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - MLNUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring active - Check dashboard at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+[0;92m🔌 PRIVATE WS connected [2025-12-28 15:20:25 UTC][0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 15:20:25 UTC][0m
+➡️  WebSocket status:
+  - Public WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+Next for 1H    : 2025-12-28 16:00:45 UTC
+Next for 4H    : 2025-12-28 16:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94m🪪 Validating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 1H, 4H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+❌ Error WS manager not init for balance.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - FORMUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - SNXUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - 1000BONKUSDT: WS manager not init.
+⚠️No PnL - AAVEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - DOTUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - HBARUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - MLNUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring active - Check dashboard at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 15:29:40 UTC][0m
+[0;92m🔌 PRIVATE WS connected [2025-12-28 15:29:40 UTC][0m
+➡️  WebSocket status:
+  - Public WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+Next for 1H    : 2025-12-28 16:00:45 UTC
+Next for 4H    : 2025-12-28 16:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 4H, 1H, 6Hutc
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 15:41:04 UTC][0m
+[0;92m🔌 PRIVATE WS connected [2025-12-28 15:41:04 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 4H    : 2025-12-28 16:00:45 UTC
+Next for 1H    : 2025-12-28 16:00:45 UTC
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 4H, 1H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+❌ Error WS manager not init for balance.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - FORMUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - SNXUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - 1000BONKUSDT: WS manager not init.
+⚠️No PnL - AAVEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BGBUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - DOTUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - PENGUUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - ONDOUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - WIFUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - APTUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - ADAUSDT: WS manager not init.
+⚠️No PnL - BNBUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - LINKUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - SUIUSDT: WS manager not init.
+⚠️No PnL - TAOUSDT: WS manager not init.
+⚠️No PnL - WLDUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - ENAUSDT: WS manager not init.
+⚠️No PnL - HBARUSDT: WS manager not init.
+⚠️No PnL - HYPEUSDT: WS manager not init.
+⚠️No PnL - MLNUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - BTCUSDT: WS manager not init.
+⚠️No PnL - DOGEUSDT: WS manager not init.
+⚠️No PnL - ETHUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - XRPUSDT: WS manager not init.
+⚠️No PnL - SOLUSDT: WS manager not init.
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PRIVATE WS connected [2025-12-28 15:43:20 UTC][0m
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 15:43:20 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 4H, 1H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PRIVATE WS connected [2025-12-28 15:44:21 UTC][0m
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 15:44:21 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+⚠️No PnL - HYPEUSDT: No price - HYPEUSDT
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+Next for 4H    : 2025-12-28 16:00:45 UTC
+Next for 1H    : 2025-12-28 16:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 1H, 4H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PRIVATE WS connected [2025-12-28 16:00:17 UTC][0m
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 16:00:17 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+⚠️No PnL - HYPEUSDT: No price - HYPEUSDT
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+Next for 1H    : 2025-12-28 17:00:45 UTC
+Next for 4H    : 2025-12-28 20:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 6Hutc, 1H, 4H
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+Waiting for equity data from WebSocket...
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PRIVATE WS connected [2025-12-28 16:16:13 UTC][0m
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 16:16:14 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+⚠️No PnL - HYPEUSDT: No price - HYPEUSDT
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+Next for 1H    : 2025-12-28 17:00:45 UTC
+Next for 4H    : 2025-12-28 20:00:45 UTC
+[1;94m============================================[0m
+[1;94mSTARTING BOT IN ACCOUNT: 00[0m
+[1;94m============================================[0m
+[1;94m🗃️  Loading BOT state...[0m
+🔄 Total positions recovered: 64
+[1;94m--------------------[0m
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
+✅ State loaded successfully
+
+[1;94mValidating strategy configuration...[0m
+[1;94m--------------------------------------------[0m
+   🆗 Val 1: All strategy names implemented
+   🆗 Val 2: All directions coherent with names
+   🆗 Val 3: All timeframes coherent with names
+   🆗 Val 4: All order amounts in range (40-100)
+   🆗 Val 5: All strategies required parameters
+   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)
+   🆗 Val 7: All strategy IDs unique
+   🆗 Val 8: All sell_after_ncandles ok (45-55)
+   🆗 Val 9: All strategies names + TF are unique.
+   🆗 Val 10: All strategy names unique
+   🆗 Val 12: All TF are valid
+✅ All strategies validated successfully
+
+
+[1;94m🔢 Operative Strategies: 14 [0m
+[1;94m--------------------------------------------[0m
+🔹 Strategy double_top_long_4H (4H): 32 symbols
+🔹 Strategy revers_long_4H     (4H): 32 symbols
+🔹 Strategy parity_long_4H     (4H):  5 symbols
+🔹 Strategy revers_short_4H    (4H): 32 symbols
+🔹 Strategy parity_short_4H    (4H): 32 symbols
+🔹 Strategy revers_long_1H     (1H):  6 symbols
+🔹 Strategy revers_short_1H    (1H):  6 symbols
+🔹 Strategy revers_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy revers_short_6Hutc (6Hutc): 15 symbols
+🔹 Strategy parity_long_1H     (1H):  6 symbols
+🔹 Strategy parity_short_1H    (1H):  6 symbols
+🔹 Strategy parity_long_6Hutc  (6Hutc): 15 symbols
+🔹 Strategy orderblocks_short_4H (4H): 32 symbols
+🔹 Strategy orderblocks_long_4H (4H): 32 symbols
+
+➡️  Detected timeframes: 1H, 4H, 6Hutc
+
+✅ BOT Initialization completed
+
+
+[1;94m🌐 Starting Web...[0m
+[1;94m--------------------------------------------[0m
+❌ Error WS manager not init for balance.
+
+[1;94m🌐 Dashboard Web Started[0m
+─────────────────────────────────────────────
+📊 Local:   http://localhost:5000
+🔗 Network: http://127.0.0.1:5000
+🌍 LAN:     http://<your-ip>:5000
+─────────────────────────────────────────────
+
+✅ Bot monitoring at http://localhost:5000
+
+[1;94m📱 Init  WebSocket...[0m
+[1;94m--------------------------------------------[0m
+⚠️ Cant subs to HYPEUSDT - Public WS not conne.
+[0;92m🔌 PRIVATE WS connected [2025-12-28 16:18:39 UTC][0m
+[0;92m🔌 PUBLIC-     WS connected [2025-12-28 16:18:39 UTC][0m
+➡️  WebSocket status:
+  - Public- WS    : ✅ Connected
+  - Private WS   : ✅ Connected
+  - Authenticated: ⚠️  No
+⚠️No PnL - HYPEUSDT: No price - HYPEUSDT
+🛜 Subscribing to 5 private channels...
+🆗 orders
+🆗 fill
+🆗 positions
+🆗 account
+🆗 equity
+✅ WS authentication successful
+📦 Pre-loading contract for 33 symbols
+[0;36m✅ Pre-loaded 33/33 contracts[0m
+
+
+[1;94m🔜 Candles incoming:  [0m
+[1;94m--------------------------------------------[0m
+Next for 1H    : 2025-12-28 17:00:45 UTC
+Next for 4H    : 2025-12-28 20:00:45 UTC
+Next for 6Hutc : 2025-12-28 18:00:45 UTC
+
+============================================
+🔀 New candle(s) 2025-12-28 17:00:45 UTC
+🔹 Timeframes: 1H
+🌐 Syncronizing broker...
+✅ Sync completed.
+📡 Searching Signals... - 2025-12-28 17:00:45
+--------------------------------------------
+🚫 Skip revers_long_1H       (1H) ➡️  27/50 | 1 pos.
+🚫 Skip revers_short_1H      (1H) ➡️  25/50 | 1 pos.
+🚫 Skip parity_long_1H       (1H) ➡️  27/50 | 3 pos.
+🚫 Skip parity_short_1H      (1H) ➡️  27/50 | 4 pos.
+🔂 Signal cycle completed
+============================================
+
+Next for 1H: 2025-12-28 18:00:45 UTC
+
+============================================
+🔀 New candle(s) 2025-12-28 18:00:45 UTC
+🔹 Timeframes: 1H, 6Hutc
+🌐 Syncronizing broker...
+✅ Sync completed.
+📡 Searching Signals... - 2025-12-28 18:00:45
+--------------------------------------------
+🚫 Skip revers_long_1H       (1H) ➡️  28/50 | 1 pos.
+🚫 Skip revers_short_1H      (1H) ➡️  26/50 | 1 pos.
+🚫 Skip parity_long_1H       (1H) ➡️  28/50 | 3 pos.
+🚫 Skip parity_short_1H      (1H) ➡️  28/50 | 4 pos.
+🚫 Skip revers_long_6Hutc    (6Hutc) ➡️  5/50 | 1 pos.
+🚫 Skip revers_short_6Hutc   (6Hutc) ➡️  5/50 | 11 pos.
+🚫 Skip parity_long_6Hutc    (6Hutc) ➡️  5/50 | 4 pos.
+🔂 Signal cycle completed
+============================================
+
+Next for 1H: 2025-12-28 19:00:45 UTC
+Next for 6Hutc: 2025-12-29 00:00:45 UTC

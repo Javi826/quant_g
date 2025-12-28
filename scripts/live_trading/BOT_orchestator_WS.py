@@ -15,10 +15,9 @@ from ZX_connect_live import send_request_01, send_request_E1,send_request_00
 
 # BOT auxiliars
 from ZX_BOT_validations import validate_strategy_configuration
-from ZX_BOT_ws_manager import init_websocket
-from ZX_BOT_metrics import bot_metrics,BotState
+from ZX_BOT_websocket import init_websocket
+from ZX_BOT_metrics import BotState
 
-#from ZX_BOT_D1 import check_all_tp_sl
 from ZX_BOT_dashboard import DashboardServer, create_dashboard_template
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger,check_all_tp_sl
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
@@ -54,7 +53,7 @@ ACCOUNT_NUMBER = args.account
 #==========================================================================
 BASE_DIR        = os.path.expanduser(f'~/projects/quant/quant_g/scripts/live_trading/bot_files_{ACCOUNT_NUMBER}')
 TRADES_LOG_PATH = os.path.join(BASE_DIR, f'bot_trades_{ACCOUNT_NUMBER}.xlsx')
-LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_all_strategies_{ACCOUNT_NUMBER}.log')
+LOG_FILE_PATH   = os.path.join(BASE_DIR, f'BOT_orchestator_{ACCOUNT_NUMBER}.log')
 
 #==========================================================================
 # DISPLAY: None | summary | detailed
@@ -348,19 +347,15 @@ exchange            = connect_bitget()
 # ==========================================================================
 if args.set_active:
     active_ids = [s.strip() for s in args.set_active.split(',')]
-    print(f"\nSetting active strategies from command line: {active_ids}")
-    
+    #print(f"\nSetting active strategies from command line: {active_ids}")
     for strat in [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, 
+    
                   STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, 
                   STRAT_M, STRAT_N]:
         if strat['id'] in active_ids:
             strat['active'] = True
         else:
             strat['active'] = False
-
-# ==========================================================================
-# STRATEGY SELECTION
-# ==========================================================================
 
 # ==========================================================================
 # STRATEGY SELECTION
@@ -538,15 +533,16 @@ def main_loop():
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE, display_color=COLOR)
     bot_state = BotState()
     if os.path.exists(TRADES_LOG_PATH):
-        summary = bot_metrics(excel_file=TRADES_LOG_PATH, show_table=False, return_data=True,initial_capital=INITIAL_CAPITAL)
-        if summary:
-            bot_state.closed_total_profit = summary[0].get('total_profit', 0)
+        import pandas as pd
+        df = pd.read_excel(TRADES_LOG_PATH)
+        if not df.empty:
+            bot_state.closed_total_profit = df['PROFIT'].sum()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
     # --------------------------------------------------------------------
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}🪪 Validating strategy configuration...{RESET}")
+    print(f"\n{COLOR}Validating strategy configuration...{RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
         
     errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
@@ -577,7 +573,7 @@ def main_loop():
     for strat in STRATEGIES:
         #DEPRECATED strategies
         if not strat.get('active', True):
-            print(f"⏸️  Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING (monitoring only)")
+            print(f"⏸️ Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING")
             continue
         
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
@@ -616,7 +612,7 @@ def main_loop():
     
     dashboard.start(port=dashboard_port)
     
-    print(f"✅ Bot monitoring active - Check dashboard at http://localhost:{dashboard_port}")
+    print(f"✅ Bot monitoring at http://localhost:{dashboard_port}")
 
 
     # --------------------------------------------------------------------
@@ -732,7 +728,7 @@ def main_loop():
                         print(f"⚠️ WAR- first try processing {strat_id}: {e}")
                         
                         # Retry once
-                        print(f"⏳ Retrying {strat_id} after 3 seconds...")
+                        print(f"Retrying {strat_id} after 3 seconds...")
                         time.sleep(3)
                         try:
                             process_strategy(

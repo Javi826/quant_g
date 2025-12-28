@@ -1,27 +1,26 @@
-
-Setting active strategies from command line: ['double_top_long_4H', 'revers_long_4H', 'parity_long_4H', 'revers_short_4H', 'parity_short_4H', 'revers_long_1H', 'revers_short_1H', 'revers_long_6Hutc', 'revers_short_6Hutc', 'parity_long_1H', 'parity_short_1H', 'parity_long_6Hutc', 'orderblocks_short_4H', 'orderblocks_long_4H']
 [1;94m============================================[0m
 [1;94mSTARTING BOT IN ACCOUNT: 00[0m
 [1;94m============================================[0m
 [1;94m🗃️  Loading BOT state...[0m
-🔄 Total positions recovered: 71
+🔄 Total positions recovered: 64
 [1;94m--------------------[0m
-   ➡️  double_top_long_4H   :  2 positions | Candles:  2
-   ➡️  revers_long_4H       : 11 positions | Candles:  2
-   ➡️  revers_short_4H      :  7 positions | Candles:  2
-   ➡️  parity_short_4H      : 18 positions | Candles:  2
-   ➡️  orderblocks_short_4H :  6 positions | Candles:  2
-   ➡️  orderblocks_long_4H  :  1 positions | Candles:  2
-   ➡️  revers_long_6Hutc    :  1 positions | Candles:  1
-   ➡️  revers_short_6Hutc   : 11 positions | Candles:  1
-   ➡️  parity_long_6Hutc    :  4 positions | Candles:  1
-   ➡️  revers_long_1H       :  1 positions | Candles:  8
-   ➡️  parity_long_1H       :  4 positions | Candles:  8
-   ➡️  parity_short_1H      :  4 positions | Candles:  8
-   ➡️  revers_short_1H      :  1 positions | Candles:  6
+   ➡️  double_top_long_4H   :  1 positions | Candles:  6
+   ➡️  revers_long_4H       :  5 positions | Candles:  6
+   ➡️  revers_short_4H      :  7 positions | Candles:  6
+   ➡️  parity_short_4H      : 18 positions | Candles:  6
+   ➡️  orderblocks_short_4H :  6 positions | Candles:  6
+   ➡️  orderblocks_long_4H  :  1 positions | Candles:  6
+   ➡️  revers_long_6Hutc    :  1 positions | Candles:  4
+   ➡️  revers_short_6Hutc   : 11 positions | Candles:  4
+   ➡️  parity_long_6Hutc    :  4 positions | Candles:  4
+   ➡️  revers_long_1H       :  1 positions | Candles: 26
+   ➡️  parity_long_1H       :  3 positions | Candles: 26
+   ➡️  parity_short_1H      :  4 positions | Candles: 26
+   ➡️  revers_short_1H      :  1 positions | Candles: 24
+   ➡️  parity_long_4H       :  1 positions | Candles:  3
 ✅ State loaded successfully
 
-[1;94m🪪 Validating strategy configuration...[0m
+[1;94mValidating strategy configuration...[0m
 [1;94m--------------------------------------------[0m
    🆗 Val 1: All strategy names implemented
    🆗 Val 2: All directions coherent with names
@@ -54,7 +53,7 @@ Setting active strategies from command line: ['double_top_long_4H', 'revers_long
 🔹 Strategy orderblocks_short_4H (4H): 32 symbols
 🔹 Strategy orderblocks_long_4H (4H): 32 symbols
 
-➡️  Detected timeframes: 4H, 6Hutc, 1H
+➡️  Detected timeframes: 1H, 4H, 6Hutc
 
 ✅ BOT Initialization completed
 
