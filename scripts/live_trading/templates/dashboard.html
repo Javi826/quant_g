@@ -158,7 +158,7 @@
         }
         
         .header h1 { 
-            font-size: 22px;
+            font-size: 25px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -168,7 +168,7 @@
         }
         
         .account-badge {
-            font-size: 13px;
+            font-size: 14px;
             {% if account == '00' %}
             background: rgba(37, 99, 235, 0.25);
             border: 1px solid rgba(59, 130, 246, 0.4);
@@ -652,7 +652,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 13px;
+            font-size: 20px;
         }
         
         .ws-dot {
@@ -812,7 +812,7 @@
     <div class="dashboard-container">
         <div class="header">
             <h1>
-                BOT Dashboard
+                BOT_trading
                 <span class="account-badge">ACC: {{ account }}</span>
             </h1>
             <div class="header-right">
@@ -870,7 +870,7 @@
                 <button class="tab-btn active" onclick="switchTab('positions')">Positions</button>
                 <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
                 <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
-                <button class="tab-btn" onclick="switchTab('equity')">Equity & DD</button>
+                <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
                 <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
                 <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
             </div>
@@ -919,12 +919,13 @@
             
             <div id="tab-equity" class="tab-content">
                 <div class="content-section">
-                    <h2>Equity Curve & Drawdown</h2>
+                    <h2>Analytics</h2>
                     
                     <div class="tabs-container" style="margin-top: 20px;">
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                     </div>
                     
                     <div id="equity-subtab-curves" class="tab-content active">
@@ -938,42 +939,42 @@
                         </div>
                         
                         <div id="equity-metrics" style="display: none; background: #1c2128; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #21262d;">
-                            <div style="display: flex; gap: 25px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 27px; align-items: center; flex-wrap: wrap;">
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">#trades:</span>
-                                    <span id="metric-num-trades" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">#trades:</span>
+                                    <span id="metric-num-trades" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_%:</span>
-                                    <span id="metric-profit-pct" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit_%:</span>
+                                    <span id="metric-profit-pct" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_$:</span>
-                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit_$:</span>
+                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit Factor:</span>
-                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit Factor:</span>
+                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Weekly_%:</span>
-                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Weekly_%:</span>
+                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Win Rate:</span>
-                                    <span id="metric-win-rate" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Win Rate:</span>
+                                    <span id="metric-win-rate" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Max DD:</span>
-                                    <span id="metric-max-dd" style="color: #f85149; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Max DD:</span>
+                                    <span id="metric-max-dd" style="color: #f85149; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Ulcer:</span>
-                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Ulcer:</span>
+                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Sharpe:</span>
-                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Sharpe:</span>
+                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                             </div>
                         </div>
@@ -992,7 +993,7 @@
                         
                         <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
                             <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
-                            <select id="compose-metric" style="padding: 10px 15px; font-size: 18px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
+                            <select id="compose-metric" style="padding: 10px 15px; font-size: 16px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
                                 <option value="num_trades">#trades</option>
                                 <option value="total_profit_pct">Profit_%</option>
                                 <option value="total_profit_usd">Profit_$</option>
@@ -1011,11 +1012,27 @@
                                 Select a metric and click "Show TOP 10"
                             </div>
                         </div>
+                        
+                        <button class="update-chart-btn" onclick="loadComposeCharts()" style="display: none; margin-top: 20px;" id="compose-plot-btn">📊 Plot Selected Combinations</button>
+                        
+                        <div id="compose-charts-container" style="margin-top: 30px;">
+                            <div style="height: 400px; margin-bottom: 20px;">
+                                <canvas id="compose-equity-chart"></canvas>
+                            </div>
+                            <div style="height: 400px;">
+                                <canvas id="compose-drawdown-chart"></canvas>
+                            </div>
+                        </div>
                     </div>
                     
                     <div id="equity-subtab-symbols" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
                         <div id="symbols-container">Loading...</div>
+                    </div>
+                    
+                    <div id="equity-subtab-weekday" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
+                        <div id="weekday-container">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -1201,7 +1218,7 @@ function getBaseChartConfig(title, reverseY = false) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { display: true, position: 'top' },
+            legend: { display: false },
             title: { 
                 display: true, 
                 text: title,
@@ -1407,16 +1424,18 @@ function switchEquitySubTab(subTabName) {
     document.getElementById('equity-subtab-' + subTabName).classList.add('active');
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
+    if (subTabName === 'weekday') loadWeekDayAnalysis();
     if (subTabName === 'compose') {
         document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
+        document.getElementById('compose-plot-btn').style.display = 'none';
     }
 }
 
 function getLogClass(line) {
-    if (line.includes('TP for') || line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'success';
+    if (line.includes('TP for') || line.includes('PRIVATE WS connected') || line.includes('PUBLIC WS connected')) return 'success';
     if (line.includes('Error') || line.includes('SL for')) return 'error';
     if (line.includes('WAR')) return 'warning';
-    if (line.includes('DOBLE')) return 'info';
+    if (line.includes('Checking')) return 'info';
     return 'default';
 }
 
@@ -1600,10 +1619,10 @@ async function loadStrategyAnalysis() {
         
         const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
-        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
             sortedData.map(s => {
                 const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
             }).join('') +
             '</tbody></table>';
         container.innerHTML = html;
@@ -1743,6 +1762,8 @@ async function loadEquityTab() {
 
 async function loadComposeAnalysis() {
     try {
+        document.querySelectorAll('.compose-checkbox').forEach(cb => cb.checked = false);
+        
         const metric = document.getElementById('compose-metric').value;
         const res = await fetch('/api/compose-analysis?metric=' + metric);
         
@@ -1753,6 +1774,7 @@ async function loadComposeAnalysis() {
         
         if (!data || data.length === 0) {
             container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            document.getElementById('compose-plot-btn').style.display = 'none';
             return;
         }
         
@@ -1791,6 +1813,7 @@ async function loadComposeAnalysis() {
         const highlightCol = metricNames[metric];
         
         const html = '<table><thead><tr>' +
+            '<th style="width: 40px;"></th>' +
             '<th>#</th>' +
             '<th>Combination</th>' +
             '<th' + (highlightCol === '#trades' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>#trades</th>' +
@@ -1834,6 +1857,7 @@ async function loadComposeAnalysis() {
                 const prefixProfitUSD = (isFinite(row.total_profit_usd) && row.total_profit_usd >= 0) ? '+$' : '$';
                 
                 return '<tr>' +
+                    '<td><input type="checkbox" class="compose-checkbox" value="' + row.combination + '" onchange="checkComposeLimit()"></td>' +
                     '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
                     '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
                     '<td style="' + ntStyle + '">' + numTrades + '</td>' +
@@ -1850,15 +1874,264 @@ async function loadComposeAnalysis() {
             '</tbody></table>';
         
         container.innerHTML = html;
+        document.getElementById('compose-plot-btn').style.display = 'block';
         
     } catch (error) {
         console.error('Error in compose:', error);
+        document.getElementById('compose-plot-btn').style.display = 'none';
         document.getElementById('compose-container').innerHTML = 
             '<div style="text-align: center; color: #f85149; padding: 40px;">' +
             '<div style="font-size: 18px; margin-bottom: 10px;">❌ Error loading data</div>' +
             '<div style="font-size: 14px; color: #8b949e;">Check browser console (F12) for details</div>' +
             '<div style="font-size: 12px; color: #8b949e; margin-top: 10px;">Error: ' + error.message + '</div>' +
             '</div>';
+    }
+}
+
+function checkComposeLimit() {
+    const checkboxes = document.querySelectorAll('.compose-checkbox:checked');
+    if (checkboxes.length > 3) {
+        alert('Maximum 3 combinations can be selected for plotting');
+        event.target.checked = false;
+    }
+}
+
+let composeEquityChart = null;
+let composeDrawdownChart = null;
+let strategyNumbersMap = {}; // Mapeo número → ID
+
+async function loadStrategyNumbersMap() {
+    try {
+        const res = await fetch('/api/strategy-numbers-map');
+        if (res.ok) {
+            strategyNumbersMap = await res.json();
+            console.log('Strategy numbers map loaded:', strategyNumbersMap);
+        }
+    } catch (error) {
+        console.error('Error loading strategy numbers map:', error);
+    }
+}
+
+// Cargar el mapeo al inicio
+loadStrategyNumbersMap();
+
+async function loadComposeCharts() {
+    try {
+        const checkboxes = document.querySelectorAll('.compose-checkbox:checked');
+        const selectedCombinations = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (selectedCombinations.length === 0) {
+            alert('Please select at least one combination to plot');
+            return;
+        }
+        
+        if (selectedCombinations.length > 3) {
+            alert('Maximum 3 combinations can be selected');
+            return;
+        }
+        
+        console.log('Selected combinations:', selectedCombinations);
+        
+        const colors = {
+            equity: ['#58a6ff', '#3fb950', '#22d3ee'],
+            equityAlpha: ['rgba(88, 166, 255, 0.1)', 'rgba(63, 185, 80, 0.1)', 'rgba(34, 211, 238, 0.1)'],
+            drawdown: ['#f85149', '#ff6b6b', '#ff8787'],
+            drawdownAlpha: ['rgba(248, 81, 73, 0.1)', 'rgba(255, 107, 107, 0.1)', 'rgba(255, 135, 135, 0.1)']
+        };
+        
+        const equityDatasets = [];
+        const drawdownDatasets = [];
+        let allDates = [];
+        let colorIndex = 0;
+        
+        for (let i = 0; i < selectedCombinations.length; i++) {
+            const combination = selectedCombinations[i];
+            const numbers = combination.split('+');
+            
+            console.log('Combination:', combination);
+            console.log('Numbers:', numbers);
+            
+            // Convertir números a IDs de estrategias
+            const strategies = numbers.map(num => strategyNumbersMap[num]).filter(id => id);
+            
+            console.log('Converted to strategy IDs:', strategies);
+            
+            if (strategies.length === 0) {
+                console.warn('No valid strategy IDs found for ' + combination);
+                continue;
+            }
+            
+            console.log('Fetching data for:', combination);
+            console.log('Strategies:', strategies);
+            console.log('URL:', '/api/equity-data?strategies=' + strategies.join(','));
+            
+            const res = await fetch('/api/equity-data?strategies=' + strategies.join(','));
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            
+            console.log('Data received for ' + combination + ':', data);
+            
+            if (!data.dates || !data.equity_pct || !data.drawdown_pct) {
+                console.warn('Invalid data structure for ' + combination, data);
+                continue; // Skip this combination
+            }
+            
+            if (data.dates.length === 0) {
+                console.warn('No data points for ' + combination + ' - skipping');
+                continue; // Skip this combination
+            }
+            
+            if (colorIndex === 0) {
+                allDates = data.dates;
+            }
+            
+            equityDatasets.push({
+                label: combination,
+                data: data.equity_pct,
+                borderColor: colors.equity[colorIndex],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.1,
+                fill: false
+            });
+            
+            drawdownDatasets.push({
+                label: combination,
+                data: data.drawdown_pct,
+                borderColor: colors.drawdown[colorIndex],
+                backgroundColor: colors.drawdownAlpha[colorIndex],
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.1,
+                fill: true
+            });
+            
+            colorIndex++;
+        }
+        
+        console.log('Equity datasets:', equityDatasets);
+        console.log('Drawdown datasets:', drawdownDatasets);
+        console.log('All dates:', allDates);
+        
+        // Validate that we have at least one valid combination
+        if (equityDatasets.length === 0) {
+            alert('⚠️ No valid data found for selected combinations.\n\nThis can happen if:\n- Strategies have no closed trades\n- Strategy names don\'t match Excel data\n\nCheck browser console (F12) for details.');
+            return;
+        }
+        
+        if (allDates.length === 0) {
+            alert('⚠️ No dates available in the data.');
+            return;
+        }
+        
+        // Destroy old charts if they exist
+        if (composeEquityChart) {
+            composeEquityChart.destroy();
+            composeEquityChart = null;
+        }
+        if (composeDrawdownChart) {
+            composeDrawdownChart.destroy();
+            composeDrawdownChart = null;
+        }
+        
+        // Create equity chart
+        const equityCanvas = document.getElementById('compose-equity-chart');
+        if (!equityCanvas) {
+            throw new Error('Equity canvas not found');
+        }
+        const equityCtx = equityCanvas.getContext('2d');
+        if (!equityCtx) {
+            throw new Error('Cannot get equity canvas context');
+        }
+        composeEquityChart = new Chart(equityCtx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: equityDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        display: true, 
+                        position: 'top',
+                        labels: { color: COLORS.white, font: { size: 14 } }
+                    },
+                    title: { 
+                        display: true, 
+                        text: 'Equity (%) - Comparison',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    },
+                    y: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    }
+                }
+            }
+        });
+        
+        console.log('Equity chart created:', composeEquityChart);
+        
+        // Create drawdown chart
+        const drawdownCanvas = document.getElementById('compose-drawdown-chart');
+        if (!drawdownCanvas) {
+            throw new Error('Drawdown canvas not found');
+        }
+        const drawdownCtx = drawdownCanvas.getContext('2d');
+        if (!drawdownCtx) {
+            throw new Error('Cannot get drawdown canvas context');
+        }
+        composeDrawdownChart = new Chart(drawdownCtx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: drawdownDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        display: true, 
+                        position: 'top',
+                        labels: { color: COLORS.white, font: { size: 14 } }
+                    },
+                    title: { 
+                        display: true, 
+                        text: 'Drawdown (%) - Comparison',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    },
+                    y: { 
+                        reverse: true,
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    }
+                }
+            }
+        });
+        
+        console.log('Drawdown chart created:', composeDrawdownChart);
+        
+    } catch (error) {
+        console.error('Error loading compose charts:', error);
+        console.error('Error stack:', error.stack);
+        alert('❌ Error loading charts:\n\n' + error.message + '\n\nCheck browser console (F12) for details');
     }
 }
 
@@ -1886,6 +2159,31 @@ async function loadSymbolsAnalysis() {
     } catch (error) {
         console.error('Error loading symbols analysis:', error);
         document.getElementById('symbols-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+async function loadWeekDayAnalysis() {
+    try {
+        const res = await fetch('/api/weekday-analysis');
+        const data = await res.json();
+        const container = document.getElementById('weekday-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        const html = '<table><thead><tr><th>Day</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+            data.map(d => {
+                const profitClass = d.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
+                const avgProfitClass = d.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + d.Day + '</td><td>' + d.Total_Trades + '</td><td>' + d.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (d.Total_Profit >= 0 ? '+' : '') + '$' + d.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (d.Avg_Profit >= 0 ? '+' : '') + '$' + d.Avg_Profit.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading weekday analysis:', error);
+        document.getElementById('weekday-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
 

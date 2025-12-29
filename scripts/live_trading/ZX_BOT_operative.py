@@ -204,7 +204,7 @@ def sync_broker(open_positions, strategy_candles, state_file):
     Sincroniza posiciones locales con el broker via WebSocket (canal positions).
     Refresca datos para asegurar que estén actualizados.
     """
-    print("🌐 Syncronizing broker...")
+    #print("🌐 Syncronizing broker...")
     total_removed = 0
     
     if not ZX_BOT_websocket._ws_manager:
@@ -280,9 +280,9 @@ def sync_broker(open_positions, strategy_candles, state_file):
     # Guardar estado si hubo cambios
     if total_removed > 0:
         save_state_local(open_positions, strategy_candles, state_file)
-        print(f"✅ Sync completed: {total_removed} position(s) removed")
+        print(f"✅ Sync with broker completed: {total_removed} position(s) removed")
     else:
-        print(f"✅ Sync completed.")
+        print(f"✅ Sync with broker completed.")
     
 # ==========================================================================
 # PLACE ORDER

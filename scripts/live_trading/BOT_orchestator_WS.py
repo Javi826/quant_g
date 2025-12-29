@@ -663,8 +663,8 @@ def main_loop():
 
                 
                 print(f"\n{'=' * 44}")
-                print(f"🔀 New candle(s) {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-                print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
+                print(f"🔀 New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                #print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
 
                 # Sync with broker
                 sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
@@ -754,7 +754,7 @@ def main_loop():
                 # Recalculate next candle times
                 for tf in closed_timeframes:
                     next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
-                    print(f"Next for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                    #print(f"Next for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 
                 last_tpsl_check = time.time()
             

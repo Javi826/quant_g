@@ -1,818 +1,2131 @@
-"""
-Módulo de dashboard web para el bot de trading.
-Se ejecuta en un thread separado y proporciona visualización en tiempo real.
-"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>BOT_trading - {{ account }}</title>
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg">
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 15px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           LOADING SPLASH SCREEN
+           ═══════════════════════════════════════════════════════════════ */
+        
+        #loading-splash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            {% if account == '00' %}
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            {% elif account == 'E1' %}
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+            {% elif account == '01' %}
+            background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
+            {% else %}
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            {% endif %}
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        #loading-splash.hidden {
+            display: none;
+        }
+        
+        .loading-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+        }
+        
+        .loading-title {
+            font-size: 32px;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+        }
+        
+        .loading-subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            margin: 0 0 40px 0;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        
+        .loading-status {
+            font-size: 14px;
+            opacity: 0.7;
+            margin: 0;
+        }
+        
+        .loading-error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid #ef4444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .loading-error.visible {
+            display: block;
+        }
+        
+        .loading-error-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fca5a5;
+            margin-bottom: 10px;
+        }
+        
+        .loading-error-text {
+            font-size: 14px;
+            color: #fecaca;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.95); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           DASHBOARD STYLES (ORIGINAL)
+           ═══════════════════════════════════════════════════════════════ */
+        
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 0;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            {% if account == '00' %}
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            {% elif account == 'E1' %}
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0f0f0f 100%);
+            {% elif account == '01' %}
+            background: linear-gradient(135deg, #4b5563 0%, #6b7280 100%);
+            {% else %}
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            {% endif %}
+            padding: 20px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header h1 { 
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
+        
+        .account-badge {
+            font-size: 13px;
+            {% if account == '00' %}
+            background: rgba(37, 99, 235, 0.25);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+            {% elif account == 'E1' %}
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #e0e0e0;
+            {% elif account == '01' %}
+            background: rgba(156, 163, 175, 0.25);
+            border: 1px solid rgba(209, 213, 219, 0.4);
+            color: #d1d5db;
+            {% else %}
+            background: rgba(37, 99, 235, 0.25);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+            {% endif %}
+            padding: 5px 12px;
+            border-radius: 6px;
+            margin-left: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .status-badge {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 13px;
+            color: #34d399;
+            letter-spacing: 0.3px;
+        }
+        
+        .status-badge::before {
+            content: '●';
+            margin-right: 6px;
+        }
+        
+        .btn-stop {
+            background: rgba(248, 81, 73, 0.15);
+            color: #ff7b72;
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            padding: 7px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            letter-spacing: 0.3px;
+        }
+        
+        .btn-stop:hover {
+            background: rgba(248, 81, 73, 0.25);
+            border-color: rgba(248, 81, 73, 0.5);
+            transform: translateY(-1px);
+        }
+        
+        .stop-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        
+        .stop-overlay.active {
+            display: flex;
+        }
+        
+        .stop-box {
+            background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
+            border: 2px solid #ff7b72;
+            border-radius: 12px;
+            padding: 40px;
+            min-width: 600px;
+            max-width: 700px;
+            text-align: center;
+        }
+        
+        .stop-box h2 {
+            color: #ff7b72;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .stop-status {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #c9d1d9;
+            text-align: left;
+            background: #0d1117;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .stop-status-line {
+            margin-bottom: 4px;
+        }
+        
+        .stop-status-line.success { color: #3fb950; }
+        .stop-status-line.error { color: #f85149; }
+        .stop-status-line.warning { color: #d29922; }
+        
+        .stop-status::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .stop-status::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+        
+        .stop-status::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+        
+        .logs-panel {
+            background: #161b22;
+            border-right: 1px solid #21262d;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .logs-header {
+            background: #1c2128;
+            padding: 14px 20px;
+            border-bottom: 1px solid #21262d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logs-header h2 {
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .logs-controls {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .btn-small {
+            background: rgba(31, 111, 235, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(31, 111, 235, 0.3);
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-small:hover { 
+            background: rgba(31, 111, 235, 0.25);
+            border-color: rgba(31, 111, 235, 0.5);
+        }
+        
+        .btn-small.danger { 
+            background: rgba(248, 81, 73, 0.15);
+            color: #ff7b72;
+            border-color: rgba(248, 81, 73, 0.3);
+        }
+        
+        .btn-small.danger:hover { 
+            background: rgba(248, 81, 73, 0.25);
+            border-color: rgba(248, 81, 73, 0.5);
+        }
+        
+        .logs-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 0.9;
+            background: #0d1117;
+        }
+        
+        .log-line {
+            padding: 4px 6px;
+            margin-bottom: 1px;
+            border-radius: 3px;
+            word-wrap: break-word;
+        }
+        
+        .log-line.info { color: #58a6ff; }
+        .log-line.success { color: #3fb950; }
+        .log-line.warning { color: #d29922; }
+        .log-line.error { color: #f85149; }
+        .log-line.default { color: #8b949e; }
+        
+        .logs-content::-webkit-scrollbar,
+        .main-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .logs-content::-webkit-scrollbar-track,
+        .main-panel::-webkit-scrollbar-track {
+            background: #0d1117;
+        }
+        
+        .logs-content::-webkit-scrollbar-thumb,
+        .main-panel::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+        
+        .logs-content::-webkit-scrollbar-thumb:hover,
+        .main-panel::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
+        }
+        
+        .main-panel {
+            background: #0d1117;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
+            padding: 18px;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+            transition: all 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            border-color: #30363d;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-label {
+            color: #8b949e;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -0.8px;
+        }
+        
+        .stat-value.positive { color: #3fb950; }
+        .stat-value.negative { color: #f85149; }
+        .stat-value.neutral { color: #58a6ff; }
+        .stat-value.warning { color: #d29922; }
+        
+        .content-section {
+            background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
+            border-radius: 8px;
+            padding: 24px;
+            border: 1px solid #21262d;
+            margin-bottom: 20px;
+        }
+        
+        .content-section h2 {
+            margin-bottom: 20px;
+            color: #c9d1d9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        
+        .tabs-container {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #21262d;
+            padding-bottom: 0;
+        }
+        
+        .tab-btn {
+            background: transparent;
+            color: #8b949e;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .tab-btn:hover {
+            color: #c9d1d9;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .tab-btn.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+            background: transparent;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .view-selector {
+            display: flex;
+            gap: 0;
+            background: #1c2128;
+            padding: 3px;
+            border-radius: 6px;
+            border: 1px solid #21262d;
+        }
+        
+        .view-btn {
+            background: transparent;
+            color: #8b949e;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .view-btn:hover {
+            color: #c9d1d9;
+        }
+        
+        .view-btn.active {
+            background: #388bfd;
+            color: white;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        th {
+            text-align: left;
+            padding: 12px 14px;
+            background: #1c2128;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #30363d;
+        }
+        
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #21262d;
+            font-size: 19px;
+            color: #c9d1d9;
+        }
+        
+        tbody tr {
+            transition: background 0.15s ease;
+        }
+        
+        tbody tr:hover { 
+            background: rgba(56, 139, 253, 0.05);
+        }
+        
+        .direction-long { 
+            color: #3fb950;
+            font-weight: 600;
+        }
+        
+        .direction-short { 
+            color: #f85149;
+            font-weight: 600;
+        }
+        
+        .delta-tp {
+            color: #22d3ee;
+            font-weight: 500;
+        }
+        
+        .delta-sl {
+            color: #e879f9;
+            font-weight: 500;
+        }
+        
+        .delta-tp-close {
+            color: #10ff10;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(16, 255, 16, 0.6);
+        }
+        
+        .delta-sl-close {
+            color: #ff1010;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(255, 16, 16, 0.6);
+        }
+        
+        .badge {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: inline-block;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-active { 
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge-deprecating { 
+            background: #64748b;
+            color: white;
+        }
+        
+        .badge-not-implemented { 
+            background: #dc2626;
+            color: white;
+        }
+        
+        .badge-tp { 
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge-sl { 
+            background: #ef4444;
+            color: white;
+        }
+        
+        .badge-timeout { 
+            background: #64748b;
+            color: white;
+        }
+        
+        .ws-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        
+        .ws-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .ws-dot.connected {
+            background: #3fb950;
+            box-shadow: 0 0 8px rgba(63, 185, 80, 0.5);
+        }
+        
+        .ws-dot.disconnected {
+            background: #f85149;
+        }
+        
+        .config-card {
+            background: #1c2128;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+            margin-bottom: 16px;
+        }
+        
+        .config-card h3 {
+            color: #c9d1d9;
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid #21262d;
+        }
+        
+        .config-row:last-child {
+            border-bottom: none;
+        }
+        
+        .config-label {
+            color: #8b949e;
+            font-size: 20px;
+        }
+        
+        .config-value {
+            color: #c9d1d9;
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .timeframe-item {
+            background: #1c2128;
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            border: 1px solid #21262d;
+        }
+        
+        .timeframe-header {
+            color: #58a6ff;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 22px;
+        }
+        
+        .timeframe-strategies {
+            color: #8b949e;
+            font-size: 18px;
+        }
+        
+        .strategy-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #1c2128;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .checkbox-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #c9d1d9;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        
+        .update-chart-btn {
+            background: #388bfd;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+        
+        .update-chart-btn:hover {
+            background: #4a9eff;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-splash">
+        <div class="loading-content">
+            <h1 class="loading-title">Trading Bot Dashboard</h1>
+            <p class="loading-subtitle">Connecting to backend...</p>
+            <div class="loading-spinner"></div>
+            <p class="loading-status" id="loading-status">Attempt <span id="attempt-count">1</span> of 30</p>
+            <div class="loading-error" id="loading-error">
+                <div class="loading-error-title">⚠️ Connection Timeout</div>
+                <div class="loading-error-text">
+                    Backend is taking longer than expected to respond.<br>
+                    The bot might still be starting up. Please wait...
+                </div>
+            </div>
+        </div>
+    </div>
 
-import os
-import json
-import re
-import threading
-import pandas as pd
-from datetime import datetime
-from flask import Flask, render_template, jsonify, send_from_directory, request
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>
+                BOT Dashboard
+                <span class="account-badge">ACC: {{ account }}</span>
+            </h1>
+            <div class="header-right">
+                <div class="status-badge">Running</div>
+                <button class="btn-stop" onclick="stopBot()">⛔ Stop Bot</button>
+            </div>
+        </div>
+        
+        <div class="logs-panel">
+            <div class="logs-header">
+                <h2>Execution Logs</h2>
+                <div class="logs-controls">
+                    <button class="btn-small" onclick="toggleAutoScroll()" id="auto-scroll-btn">Auto</button>
+                    <button class="btn-small danger" onclick="clearLogs()">Clear</button>
+                </div>
+            </div>
+            <div class="logs-content" id="logs-content">
+                <div class="log-line default">Waiting for bot output...</div>
+            </div>
+        </div>
+        
+        <div class="main-panel">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">💵 Closed P/L</div>
+                    <div class="stat-value positive" id="total-profit">$-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📊 Profit %</div>
+                    <div class="stat-value positive" id="profit-pct">-%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📋 Trades</div>
+                    <div class="stat-value neutral" id="trades-num">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">🎯 Win Rate</div>
+                    <div class="stat-value neutral" id="trades-pct">-%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📊 Positions</div>
+                    <div class="stat-value neutral" id="total-positions">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">📈 Open P/L</div>
+                    <div class="stat-value positive" id="open-pnl">$-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">₿ BTC Price</div>
+                    <div class="stat-value warning" id="btc-price">$-</div>
+                </div>
+            </div>
+            
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="switchTab('positions')">Positions</button>
+                <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
+                <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
+                <button class="tab-btn" onclick="switchTab('equity')">Equity & DD</button>
+                <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
+                <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
+            </div>
+            
+            <div id="tab-positions" class="tab-content active">
+                <div class="content-section">
+                    <h2>
+                        <span>Active Positions</span>
+                        <div class="view-selector">
+                            <button class="view-btn active" onclick="setPositionsView('compact')">Compact</button>
+                            <button class="view-btn" onclick="setPositionsView('detailed')">Detailed</button>
+                        </div>
+                    </h2>
+                    <div id="positions-container"></div>
+                </div>
+            </div>
+            
+            <div id="tab-analysis" class="tab-content">
+                <div class="content-section">
+                    <h2>Strategy Performance Analysis</h2>
+                    <div id="analysis-container">Loading...</div>
+                </div>
+            </div>
+            
+            <div id="tab-trades" class="tab-content">
+                <div class="content-section">
+                    <h2>Recent Closed Trades</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Closed At</th>
+                                <th>Strategy</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Profit</th>
+                                <th>Profit %</th>
+                                <th>Exit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-body">
+                            <tr><td colspan="7" style="text-align: center;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="tab-equity" class="tab-content">
+                <div class="content-section">
+                    <h2>Equity Curve & Drawdown</h2>
+                    
+                    <div class="tabs-container" style="margin-top: 20px;">
+                        <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
+                    </div>
+                    
+                    <div id="equity-subtab-curves" class="tab-content active">
+                        <button class="update-chart-btn" onclick="updateEquityChart()">🔄 Update Chart</button>
+                        
+                        <div class="strategy-checkboxes" id="strategy-checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="strat-all" value="ALL" checked>
+                                <label for="strat-all">ALL STRATEGIES</label>
+                            </div>
+                        </div>
+                        
+                        <div id="equity-metrics" style="display: none; background: #1c2128; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #21262d;">
+                            <div style="display: flex; gap: 25px; align-items: center; flex-wrap: wrap;">
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">#trades:</span>
+                                    <span id="metric-num-trades" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_%:</span>
+                                    <span id="metric-profit-pct" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_$:</span>
+                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit Factor:</span>
+                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Weekly_%:</span>
+                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Win Rate:</span>
+                                    <span id="metric-win-rate" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Max DD:</span>
+                                    <span id="metric-max-dd" style="color: #f85149; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Ulcer:</span>
+                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Sharpe:</span>
+                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <canvas id="equityChart"></canvas>
+                        </div>
+                        
+                        <div class="chart-container">
+                            <canvas id="drawdownChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div id="equity-subtab-compose" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Combinations - TOP 10</h3>
+                        
+                        <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
+                            <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
+                            <select id="compose-metric" style="padding: 10px 15px; font-size: 18px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
+                                <option value="num_trades">#trades</option>
+                                <option value="total_profit_pct">Profit_%</option>
+                                <option value="total_profit_usd">Profit_$</option>
+                                <option value="profit_factor">Profit Factor</option>
+                                <option value="weekly_win_pct">Weekly_%</option>
+                                <option value="win_rate">Win Rate</option>
+                                <option value="max_dd">Max DD (lowest)</option>
+                                <option value="ulcer_index">Ulcer (lowest)</option>
+                                <option value="sharpe_ratio">Sharpe</option>
+                            </select>
+                            <button class="update-chart-btn" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
+                        </div>
+                        
+                        <div id="compose-container">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Select a metric and click "Show TOP 10"
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="equity-subtab-symbols" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
+                        <div id="symbols-container">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-config" class="tab-content">
+                <div class="content-section">
+                    <h2>Bot Configuration & Status</h2>
+                    
+                    <div class="config-card">
+                        <h3>🌐 WebSocket Connections</h3>
+                        <div class="config-row">
+                            <span class="config-label">Public Channel:</span>
+                            <span class="ws-indicator" id="ws-public">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Connecting...</span>
+                            </span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Private Channel:</span>
+                            <span class="ws-indicator" id="ws-private">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Connecting...</span>
+                            </span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Authentication:</span>
+                            <span class="ws-indicator" id="ws-auth">
+                                <span class="ws-dot disconnected"></span>
+                                <span>Pending...</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>⚙️ Configuration</h3>
+                        <div class="config-row">
+                            <span class="config-label">Account:</span>
+                            <span class="config-value" id="config-account">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Initial Capital:</span>
+                            <span class="config-value" id="config-capital">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Total Strategies:</span>
+                            <span class="config-value" id="config-total-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Active:</span>
+                            <span class="config-value" id="config-active-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Deprecating:</span>
+                            <span class="config-value" id="config-deprecating-strat">-</span>
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Not Implemented:</span>
+                            <span class="config-value" id="config-not-implemented-strat">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>📋 Strategies List</h3>
+                        <div style="overflow-x: auto;">
+                            <table id="strategies-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>ID</th>
+                                        <th>TF</th>
+                                        <th>Side</th>
+                                        <th>Symbols</th>
+                                        <th>TP%</th>
+                                        <th>SL%</th>
+                                        <th>Amount</th>
+                                        <th>Candles</th>
+                                        <th>Lookback</th>
+                                        <th>Tolerance</th>
+                                        <th>MA</th>
+                                        <th>Impulse</th>
+                                        <th>Trend</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="strategies-body">
+                                    <tr><td colspan="15" style="text-align: center;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="config-card">
+                        <h3>⏰ Timeframes</h3>
+                        <div id="timeframes-container">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="stop-overlay" id="stop-overlay">
+        <div class="stop-box">
+            <h2 id="stop-title">⛔ STOPPING BOT</h2>
+            <div class="stop-status" id="stop-status">
+                <div class="stop-status-line">Initializing stop sequence...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+const COLORS = {
+    purple: '#6d28d9',
+    green: '#3fb950',
+    yellow: '#d29922',
+    red: '#f85149',
+    textPrimary: '#c9d1d9',
+    textSecondary: '#8b949e',
+    gridDark: '#21262d',
+    borderYellow: '#facc15',
+    white: '#ffffff',
+    blue: '#58a6ff',
+    equityPositive: '#3fb950',
+    equityNegative: '#f85149',
+    drawdownRed: '#f85149',
+    drawdownRedAlpha: 'rgba(248, 81, 73, 0.1)'
+};
 
-from ZX_BOT_metrics import MetricsCalculator
+const METRIC_THRESHOLDS = {
+    profitFactor: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
+    sharpeRatio: { excellent: 2.0, good: 1.5, acceptable: 1.0 }
+};
+
+const CHART_DEFAULTS = {
+    fontSize: { title: 20, axis: 16 },
+    gridColor: COLORS.gridDark,
+    borderColor: COLORS.borderYellow,
+    borderWidth: 1,
+    textColor: COLORS.white,
+    titleColor: COLORS.textPrimary
+};
+
+function getMetricColor(value, withGlow = false) {
+    const thresholds = METRIC_THRESHOLDS.profitFactor;
+    if (value >= thresholds.excellent) {
+        return { color: COLORS.purple, shadow: withGlow ? '0 0 10px rgba(109, 40, 217, 0.8)' : 'none' };
+    } else if (value >= thresholds.good) {
+        return { color: COLORS.green, shadow: 'none' };
+    } else if (value >= thresholds.acceptable) {
+        return { color: COLORS.yellow, shadow: 'none' };
+    } else {
+        return { color: COLORS.red, shadow: 'none' };
+    }
+}
+
+function getPositiveNegativeColor(value) {
+    return value >= 0 ? COLORS.green : COLORS.red;
+}
+
+function applyMetricColor(element, value, type = 'profitFactor') {
+    if (type === 'profitFactor' || type === 'sharpe') {
+        const { color, shadow } = getMetricColor(value, true);
+        element.style.color = color;
+        element.style.textShadow = shadow;
+    } else if (type === 'positiveNegative') {
+        element.style.color = getPositiveNegativeColor(value);
+    }
+}
+
+function getMetricStyleClass(value, type = 'profitFactor') {
+    if (type === 'profitFactor' || type === 'sharpe') {
+        const { color, shadow } = getMetricColor(value, true);
+        return shadow !== 'none' 
+            ? `style="color: ${color}; text-shadow: ${shadow};"` 
+            : `style="color: ${color};"`;
+    } else if (type === 'positiveNegative') {
+        return `style="color: ${getPositiveNegativeColor(value)};"`;
+    }
+}
+
+function getBaseChartConfig(title, reverseY = false) {
+    const config = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true, position: 'top' },
+            title: { 
+                display: true, 
+                text: title,
+                color: CHART_DEFAULTS.titleColor,
+                font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+            }
+        },
+        scales: {
+            x: { 
+                ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                } 
+            },
+            y: { 
+                ticks: { 
+                    color: CHART_DEFAULTS.textColor,
+                    font: { size: CHART_DEFAULTS.fontSize.axis },
+                    callback: function(value) { return value.toFixed(1) + '%'; }
+                }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                }
+            }
+        }
+    };
+    if (reverseY) config.scales.y.reverse = true;
+    return config;
+}
+
+async function waitForBackend() {
+    const maxAttempts = 30;
+    let attempts = 0;
+    const splash = document.getElementById('loading-splash');
+    const statusText = document.getElementById('loading-status');
+    const attemptCount = document.getElementById('attempt-count');
+    const errorBox = document.getElementById('loading-error');
+    
+    splash.classList.remove('hidden');
+    splash.style.opacity = '1';
+    splash.style.display = 'flex';
+    errorBox.classList.remove('visible');
+    
+    while (attempts < maxAttempts) {
+        attempts++;
+        attemptCount.textContent = attempts;
+        
+        try {
+            const response = await fetch('/api/status', { 
+                method: 'GET',
+                cache: 'no-cache',
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'running' || data.account) {
+                    statusText.innerHTML = '✅ Connected successfully!';
+                    statusText.style.color = '#4ade80';
+                    await new Promise(r => setTimeout(r, 500));
+                    splash.style.transition = 'opacity 0.3s ease';
+                    splash.style.opacity = '0';
+                    await new Promise(r => setTimeout(r, 300));
+                    splash.classList.add('hidden');
+                    splash.style.display = 'none';
+                    return true;
+                }
+            }
+        } catch (error) {}
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    
+    errorBox.classList.add('visible');
+    setTimeout(() => {
+        splash.style.transition = 'opacity 0.5s ease';
+        splash.style.opacity = '0';
+        setTimeout(() => {
+            splash.classList.add('hidden');
+            splash.style.display = 'none';
+        }, 500);
+    }, 5000);
+    return false;
+}
+
+let autoScroll = true;
+let isLoadingData = false;
+let isLoadingLogs = false;
+let currentPositionsView = 'compact';
+let cachedPositions = [];
+let currentTab = 'positions';
+let equityChart = null;
+let drawdownChart = null;
+let allStrategiesList = [];
+let isStoppingBot = false;
+
+async function stopBot() {
+    if (isStoppingBot) return;
+    if (!confirm('WARNING: STOP TRADING BOT?\n\nThis will terminate the bot process.\n\nAre you sure?')) return;
+    isStoppingBot = true;
+    
+    const overlay = document.getElementById('stop-overlay');
+    const statusDiv = document.getElementById('stop-status');
+    statusDiv.innerHTML = '';
+    overlay.classList.add('active');
+    
+    addStopLog('Initializing stop sequence...');
+    addStopLog('Stop signal requested');
+    
+    try {
+        const stopResponse = await fetch('/api/bot/stop', { method: 'POST' });
+        if (!stopResponse.ok) throw new Error('Failed to send stop signal');
+        
+        const stopData = await stopResponse.json();
+        addStopLog('Stop signal sent (SIGTERM) to PID ' + stopData.pid, 'success');
+        
+        let attempts = 0;
+        const maxAttempts = 30;
+        let botStoppedConfirmed = false;
+        
+        const verifyInterval = setInterval(async () => {
+            attempts++;
+            addStopLog('Verifying shutdown... (' + attempts + '/' + maxAttempts + ')');
+            
+            try {
+                const verifyResponse = await fetch('/api/bot/verify-stopped', {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (verifyResponse.ok) {
+                    const status = await verifyResponse.json();
+                    if (!status.running) {
+                        clearInterval(verifyInterval);
+                        botStoppedConfirmed = true;
+                        addStopLog('Process verified as terminated', 'success');
+                        addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
+                        document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
+                        document.getElementById('stop-title').style.color = COLORS.green;
+                        return;
+                    }
+                }
+            } catch (error) {
+                clearInterval(verifyInterval);
+                botStoppedConfirmed = true;
+                addStopLog('Backend stopped responding', 'success');
+                addStopLog('Flask server terminated (expected)', 'success');
+                addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
+                document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
+                document.getElementById('stop-title').style.color = COLORS.green;
+                return;
+            }
+            
+            if (attempts >= maxAttempts && !botStoppedConfirmed) {
+                clearInterval(verifyInterval);
+                addStopLog('⚠️ VERIFICATION TIMEOUT', 'warning');
+                addStopLog('Bot may still be running. Check manually.', 'warning');
+                document.getElementById('stop-title').textContent = '⚠️ TIMEOUT';
+                document.getElementById('stop-title').style.color = COLORS.yellow;
+            }
+        }, 1000);
+        
+    } catch (error) {
+        if (error.message.includes('fetch') || error.name === 'TypeError') {
+            addStopLog('⚠️ Backend not responding', 'warning');
+            addStopLog('Bot may have already stopped', 'warning');
+        } else {
+            addStopLog('❌ ERROR: ' + error.message, 'error');
+        }
+    }
+}
+
+function addStopLog(message, className = '') {
+    const statusDiv = document.getElementById('stop-status');
+    const line = document.createElement('div');
+    line.className = 'stop-status-line' + (className ? ' ' + className : '');
+    line.textContent = message;
+    statusDiv.appendChild(line);
+    statusDiv.scrollTop = statusDiv.scrollHeight;
+}
+
+function switchTab(tabName) {
+    currentTab = tabName;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    if (tabName === 'analysis') loadStrategyAnalysis();
+    if (tabName === 'config') loadBotConfig();
+    if (tabName === 'equity') loadEquityTab();
+}
+
+function switchEquitySubTab(subTabName) {
+    document.querySelectorAll('#tab-equity .tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('#tab-equity .tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById('equity-subtab-' + subTabName).classList.add('active');
+    
+    if (subTabName === 'symbols') loadSymbolsAnalysis();
+    if (subTabName === 'compose') {
+        document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
+    }
+}
+
+function getLogClass(line) {
+    if (line.includes('TP for')) return 'success';
+    if (line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'info';
+    if (line.includes('Error')) return 'error';
+    if (line.includes('SL for')) return 'warning';
+    if (line.includes('WAR')) return 'warning';
+    return 'default';
+}
 
 
-class DashboardServer:
-    """Servidor web del dashboard para monitoreo en tiempo real del bot"""
-    
-    def __init__(self, account_number, base_dir, get_current_price_func, 
-                 get_balance_func, strategies_config, color_code=None,
-                 initial_capital=0, implemented_strategies=None, symbols_by_strategy=None):
-        """
-        Inicializa el servidor del dashboard.
+
+async function loadLogs() {
+    if (isLoadingLogs) return;
+    isLoadingLogs = true;
+    try {
+        const res = await fetch('/api/logs/stream');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
         
-        Args:
-            account_number: Número de cuenta (ej: "01", "E1")
-            base_dir: Directorio base de los archivos del bot
-            get_current_price_func: Función para obtener precio actual de un símbolo
-            get_balance_func: Función para obtener balance USDT
-            strategies_config: Lista de configuraciones de estrategias (STRATEGIES)
-            color_code: Código ANSI de color para logs (opcional)
-            initial_capital: Capital inicial de la cuenta
-            implemented_strategies: Set de estrategias implementadas
-            symbols_by_strategy: Dict con símbolos por estrategia
-        """
-        self.account_number = account_number
-        self.base_dir = base_dir
-        self.get_current_price = get_current_price_func
-        self.get_balance = get_balance_func
-        self.strategies = strategies_config
-        self.color_code = color_code or ""
-        self.initial_capital = initial_capital
-        self.implemented_strategies = implemented_strategies or set()
-        self.symbols_by_strategy = symbols_by_strategy or {}
-        
-        self.state_file = os.path.join(base_dir, f'bot_state_{account_number}.json')
-        self.trades_file = os.path.join(base_dir, f'bot_trades_{account_number}.xlsx')
-        self.log_file = os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
-        
-        self.templates_dir = os.path.join(os.path.dirname(base_dir), 'templates')
-        os.makedirs(self.templates_dir, exist_ok=True)
-        
-        self.app = Flask(__name__, template_folder=self.templates_dir)
-        self.app.last_log_position = 0
-        
-        self._register_routes()
-        
-        self.server_thread = None
-        self.running = False
-    
-    def _load_trades_dataframe(self):
-        """
-        Carga y valida el DataFrame de trades desde el archivo Excel.
-        
-        Returns:
-            pd.DataFrame: DataFrame de trades si existe y tiene datos
-            None: Si el archivo no existe o está vacío
-        """
-        if not os.path.exists(self.trades_file):
-            return None
-        
-        try:
-            df = pd.read_excel(self.trades_file)
-            if df.empty:
-                return None
-            return df
-        except Exception as e:
-            print(f"❌ Error loading trades file: {e}")
-            return None
-    
-    def _prepare_trades_dataframe(self, df):
-        """
-        Prepara el DataFrame de trades con columnas de fechas procesadas.
-        
-        Args:
-            df: DataFrame crudo de trades
-        
-        Returns:
-            pd.DataFrame: DataFrame con columnas adicionales
-        """
-        df = df.copy()
-        df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
-        df['CLOSE_AT'] = pd.to_datetime(df['CLOSE_AT'])
-        df['CLOSE_DATE'] = pd.to_datetime(df['CLOSE_AT'])
-        df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
-        return df
-    
-    def _calculate_capital_allocation(self, num_strategies=None):
-        """
-        Calcula el capital asignado por estrategia.
-        
-        Args:
-            num_strategies: Número de estrategias para dividir el capital
-        
-        Returns:
-            float: Capital asignado por estrategia
-        """
-        if num_strategies is None:
-            num_strategies = len(self.implemented_strategies)
-        
-        if num_strategies == 0:
-            return 0.0
-        
-        return self.initial_capital / num_strategies
-    
-    def _get_full_strategies_list_with_numbers(self):
-        """
-        Genera la lista completa de estrategias con numeración consistente.
-        
-        Returns:
-            tuple: (strategies_list, strategy_numbers_dict)
-        """
-        declared_names = {s['name'] for s in self.strategies}
-        
-        strategies_list = []
-        
-        for strat in self.strategies:
-            is_active = strat.get('active', True)
+        if (data.logs && data.logs.length > 0) {
+            const logsContent = document.getElementById('logs-content');
+            if (logsContent.children.length === 1 && logsContent.children[0].textContent.includes('Waiting')) {
+                logsContent.innerHTML = '';
+            }
             
-            if is_active:
-                status = 'ACTIVE'
-            else:
-                status = 'DEPRECATING'
+            const fragment = document.createDocumentFragment();
+            data.logs.forEach(log => {
+                const logLine = document.createElement('div');
+                logLine.className = 'log-line ' + getLogClass(log);
+                logLine.textContent = log;
+                fragment.appendChild(logLine);
+            });
+            logsContent.appendChild(fragment);
             
-            symbols_count = len(self.symbols_by_strategy.get(strat['id'], []))
+            while (logsContent.children.length > 500) {
+                logsContent.removeChild(logsContent.firstChild);
+            }
             
-            strategies_list.append({
-                'id': strat['id'],
-                'name': strat.get('name', strat['id']),
-                'timeframe': strat.get('timeframe', 'N/A'),
-                'direction': strat.get('direction', 'N/A'),
-                'status': status,
-                'symbols_count': symbols_count,
-                'tp_pct': strat.get('tp_pct', 'N/A'),
-                'sl_pct': strat.get('sl_pct', 'N/A'),
-                'order_amount': strat.get('order_amount', 'N/A'),
-                'sell_after_ncandles': strat.get('sell_after_ncandles', 'N/A'),
-                'lookback': strat.get('lookback', 'N/A'),
-                'tolerance': strat.get('tolerance', 'N/A'),
-                'ma_period': strat.get('ma_period', 'N/A'),
-                'impulse': strat.get('impulse', 'N/A'),
-                'trend_th': strat.get('trend_th', 'N/A')
-            })
-        
-        not_declared = self.implemented_strategies - declared_names
-        for name in sorted(not_declared):
-            strategies_list.append({
-                'id': name,
-                'name': name,
-                'timeframe': 'N/A',
-                'direction': 'N/A',
-                'status': 'NOT IMPLEMENTED',
-                'symbols_count': 0,
-                'tp_pct': 'N/A',
-                'sl_pct': 'N/A',
-                'order_amount': 'N/A',
-                'sell_after_ncandles': 'N/A',
-                'lookback': 'N/A',
-                'tolerance': 'N/A',
-                'ma_period': 'N/A',
-                'impulse': 'N/A',
-                'trend_th': 'N/A'
-            })
-        
-        strategies_list.sort(key=lambda x: x['id'])
-        
-        strategy_numbers = {}
-        for i, strat in enumerate(strategies_list, 1):
-            number = str(i).zfill(2)
-            strat['number'] = number
-            strategy_numbers[strat['id']] = number
-        
-        return strategies_list, strategy_numbers
+            if (autoScroll) {
+                requestAnimationFrame(() => {
+                    logsContent.scrollTop = logsContent.scrollHeight;
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading logs:', error);
+    } finally {
+        isLoadingLogs = false;
+    }
+}
+
+function setPositionsView(view) {
+    currentPositionsView = view;
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    renderPositions(cachedPositions);
+    localStorage.setItem('positionsView', view);
+}
+
+function renderPositions(positions) {
+    cachedPositions = positions;
+    const container = document.getElementById('positions-container');
     
-    def _register_routes(self):
-        """Registra todas las rutas de la API del dashboard"""
+    if (!positions || positions.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No active positions</div>';
+        return;
+    }
+    
+    if (currentPositionsView === 'compact') {
+        renderCompactView(container, positions);
+    } else {
+        renderDetailedView(container, positions);
+    }
+}
+
+function renderCompactView(container, positions) {
+    const groupedByStrategy = {};
+    positions.forEach(pos => {
+        if (!groupedByStrategy[pos.strategy]) {
+            groupedByStrategy[pos.strategy] = {
+                positions: [],
+                totalPnl: 0,
+                direction: pos.direction,
+                opened_at: pos.opened_at,
+                candles: pos.candles,
+                max_candles: pos.max_candles
+            };
+        }
+        groupedByStrategy[pos.strategy].positions.push(pos);
+        groupedByStrategy[pos.strategy].totalPnl += (pos.current_pnl || 0);
+    });
+    
+    let allEntries = [];
+    
+    if (allStrategiesList && allStrategiesList.length > 0) {
+        const allActiveDeprecating = allStrategiesList.filter(s => 
+            s.status === 'ACTIVE' || s.status === 'DEPRECATING'
+        );
         
-        @self.app.route('/')
-        def index():
-            return render_template('dashboard.html', account=self.account_number)
-        
-        @self.app.route('/favicon.jpg')
-        def favicon():
-            return send_from_directory(self.base_dir, 'favicon.jpg', mimetype='image/jpeg')
-        
-        @self.app.route('/api/health')
-        def health_check():
-            return jsonify({
-                'status': 'ready',
-                'account': self.account_number,
-                'timestamp': datetime.now().isoformat()
-            })
-        
-        @self.app.route('/api/logs/stream')
-        def stream_logs():
-            try:
-                if not os.path.exists(self.log_file):
-                    return jsonify({'logs': [], 'timestamp': None})
-                
-                with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    f.seek(self.app.last_log_position)
-                    new_lines = f.readlines()
-                    self.app.last_log_position = f.tell()
-                
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                emoji_pattern = re.compile(
-                    "["
-                    u"\U0001F600-\U0001F64F"
-                    u"\U0001F300-\U0001F5FF"
-                    u"\U0001F680-\U0001F6FF"
-                    u"\U0001F1E0-\U0001F1FF"
-                    u"\U00002702-\U000027B0"
-                    u"\U000024C2-\U0001F251"
-                    "]+", flags=re.UNICODE)
-                
-                clean_lines = []
-                for line in new_lines:
-                    if line.strip():
-                        clean = ansi_escape.sub('', line.strip())
-                        clean = emoji_pattern.sub('', clean)
-                        clean = ' '.join(clean.split())
-                        if clean:
-                            clean_lines.append(clean)
-                
-                return jsonify({
-                    'logs': clean_lines,
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception as e:
-                return jsonify({'error': str(e), 'logs': []}), 500
-        
-        @self.app.route('/api/status')
-        def get_status():
-            try:
-                if not os.path.exists(self.state_file):
-                    return jsonify({'error': 'State file not found'}), 404
-                
-                with open(self.state_file, 'r') as f:
-                    state = json.load(f)
-                
-                total_positions = sum(len(positions) 
-                                    for positions in state.get('positions', {}).values())
-                
-                try:
-                    balance = self.get_balance(None)
-                except Exception as e:
-                    print(f"⚠️  Error getting balance: {e}")
-                    balance = 0.0
-                
-                total_profit = 0
-                num_trades = 0
-                positive_trades = 0
-                profit_pct = 0
-                trades_pct = 0
-                
-                df = self._load_trades_dataframe()
-                if df is not None:
-                    total_profit = df['PROFIT'].sum()
-                    num_trades = len(df)
-                    positive_trades = len(df[df['PROFIT'] > 0])
-                    
-                    if num_trades > 0:
-                        trades_pct = (positive_trades / num_trades) * 100
-                    
-                    if self.initial_capital > 0:
-                        profit_pct = (total_profit / self.initial_capital) * 100
-                
-                open_pnl = 0
-                for strat_id, positions in state.get('positions', {}).items():
-                    for pos in positions:
-                        try:
-                            symbol = pos['symbol']
-                            current_price = self.get_current_price(symbol)
-                            entry_price = float(pos['entry_price'])
-                            size = float(pos['size'])
-                            direction = pos['direction'].lower()
-                            
-                            if direction == 'long':
-                                pnl = (float(current_price) - entry_price) * size
-                            else:
-                                pnl = (entry_price - float(current_price)) * size
-                            
-                            open_pnl += pnl
-                        except Exception as e:
-                            print(f"⚠️No PnL - {pos.get('symbol')}: {e}")
-                
-                btc_price = 0
-                try:
-                    btc_price = float(self.get_current_price('BTCUSDT'))
-                except:
-                    pass
-                
-                return jsonify({
-                    'status': 'running',
-                    'account': self.account_number,
-                    'total_positions': total_positions,
-                    'strategies': state.get('positions', {}),
-                    'candles': state.get('strategy_candles', {}),
-                    'total_profit': float(total_profit),
-                    'open_pnl': float(open_pnl),
-                    'balance': float(balance),
-                    'profit_pct': float(profit_pct),
-                    'num_trades': num_trades,
-                    'trades_pct': float(trades_pct),
-                    'btc_price': float(btc_price),
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/positions')
-        def get_positions():
-            try:
-                if not os.path.exists(self.state_file):
-                    return jsonify([])
-                
-                with open(self.state_file, 'r') as f:
-                    state = json.load(f)
-                
-                positions_data = []
-                for strategy_id, positions in state.get('positions', {}).items():
-                    max_candles = 50
-                    for strat in self.strategies:
-                        if strat['id'] == strategy_id:
-                            max_candles = strat.get('sell_after_ncandles', 50)
-                            break
-                    
-                    for pos in positions:
-                        try:
-                            symbol = pos['symbol']
-                            current_price = self.get_current_price(symbol)
-                            entry_price = float(pos['entry_price'])
-                            size = float(pos['size'])
-                            direction = pos['direction'].lower()
-                            
-                            if direction == 'long':
-                                pnl = (float(current_price) - entry_price) * size
-                            else:
-                                pnl = (entry_price - float(current_price)) * size
-                            
-                            candles = state.get('strategy_candles', {}).get(strategy_id, 0)
-                            
-                            positions_data.append({
-                                'strategy': strategy_id,
-                                'symbol': symbol,
-                                'direction': pos['direction'],
-                                'entry_price': entry_price,
-                                'current_price': float(current_price),
-                                'size': size,
-                                'tp': float(pos['tp']),
-                                'sl': float(pos['sl']),
-                                'current_pnl': float(pnl),
-                                'candles': candles,
-                                'max_candles': max_candles,
-                                'opened_at': pos['opened_at']
-                            })
-                        except Exception as e:
-                            print(f"⚠️  Error processing position {pos.get('symbol')}: {e}")
-                
-                return jsonify(positions_data)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+        allActiveDeprecating.forEach(strat => {
+            if (groupedByStrategy[strat.id]) {
+                allEntries.push([strat.id, groupedByStrategy[strat.id]]);
+            } else {
+                allEntries.push([strat.id, {
+                    positions: [],
+                    totalPnl: 0,
+                    direction: strat.direction,
+                    opened_at: null,
+                    candles: 0,
+                    max_candles: 50,
+                    isEmpty: true
+                }]);
+            }
+        });
+    } else {
+        allEntries = Object.entries(groupedByStrategy);
+    }
+    
+    const sortedEntries = allEntries.sort((a, b) => a[0].localeCompare(b[0]));
+    
+    if (sortedEntries.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No active positions</div>';
+        return;
+    }
+    
+    const html = '<table><thead><tr><th>#</th><th>Strategy</th><th>Side</th><th>Opened</th><th style="text-align: right;">Candles</th><th style="text-align: center;">#pos</th><th>PnL</th></tr></thead><tbody>' +
+        sortedEntries.map(([strategyId, data], index) => {
+            const pnl = data.totalPnl;
+            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+            const num = String(index + 1).padStart(2, '0');
             
-        @self.app.route('/api/bot/stop', methods=['POST'])
-        def stop_bot():
-            try:
-                import subprocess
-                import os
-                import signal
-                
-                result = subprocess.run(
-                    ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
-                    capture_output=True,
-                    text=True
-                )
-                
-                if result.returncode == 0:
-                    pid = int(result.stdout.strip())
-                    os.kill(pid, signal.SIGTERM)
-                    
-                    return jsonify({
-                        'status': 'stopped',
-                        'pid': pid,
-                        'message': f'Bot process {pid} terminated'
-                    })
-                else:
-                    return jsonify({
-                        'status': 'not_found',
-                        'message': 'Bot process not found'
-                    }), 404
-                    
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+            let openedDateStr = '-';
+            if (data.opened_at) {
+                try {
+                    const date = new Date(data.opened_at);
+                    openedDateStr = date.toISOString().split('T')[0];
+                } catch {
+                    openedDateStr = String(data.opened_at).substring(0, 10);
+                }
+            }
+            
+            if (data.isEmpty) {
+                return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strategyId + '</td><td class="direction-' + data.direction.toLowerCase() + '">' + data.direction.toUpperCase() + '</td><td>-</td><td style="text-align: right;">-</td><td style="text-align: center; color: #f85149; font-weight: 600;">0</td><td>-</td></tr>';
+            }
+            
+            return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strategyId + '</td><td class="direction-' + data.direction.toLowerCase() + '">' + data.direction.toUpperCase() + '</td><td>' + openedDateStr + '</td><td style="text-align: right;">' + (data.candles || 0) + '/' + (data.max_candles || 50) + '</td><td style="text-align: center; color: #58a6ff; font-weight: 600;">' + data.positions.length + '</td><td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function renderDetailedView(container, positions) {
+    const html = '<table><thead><tr><th>Strategy</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Size</th><th>TP</th><th>SL</th><th>P/L</th><th>Delta TP</th><th>Delta SL</th><th style="text-align: right;">Candles</th></tr></thead><tbody>' +
+        positions.map(pos => {
+            const pnl = pos.current_pnl || 0;
+            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+            const currentPrice = parseFloat(pos.current_price || pos.entry_price);
+            const tp = parseFloat(pos.tp);
+            const sl = parseFloat(pos.sl);
+            
+            let deltaTp, deltaSl;
+            if (pos.direction.toLowerCase() === 'long') {
+                deltaTp = ((tp - currentPrice) / currentPrice * 100);
+                deltaSl = ((currentPrice - sl) / currentPrice * 100);
+            } else {
+                deltaTp = ((currentPrice - tp) / currentPrice * 100);
+                deltaSl = ((sl - currentPrice) / currentPrice * 100);
+            }
+            
+            const deltaTpClass = Math.abs(deltaTp) < 1 ? 'delta-tp-close' : 'delta-tp';
+            const deltaSlClass = Math.abs(deltaSl) < 1 ? 'delta-sl-close' : 'delta-sl';
+            
+            return '<tr><td>' + pos.strategy + '</td><td>' + pos.symbol + '</td><td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td><td>$' + parseFloat(pos.entry_price).toFixed(2) + '</td><td>$' + currentPrice.toFixed(2) + '</td><td>' + parseFloat(pos.size).toFixed(4) + '</td><td>$' + tp.toFixed(2) + '</td><td>$' + sl.toFixed(2) + '</td><td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td><td class="' + deltaTpClass + '">' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%</td><td class="' + deltaSlClass + '">' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%</td><td style="text-align: right;">' + (pos.candles || 0) + '/' + (pos.max_candles || 50) + '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    container.innerHTML = html;
+}
+
+async function loadStrategyAnalysis() {
+    try {
+        const res = await fetch('/api/strategy-analysis');
+        const data = await res.json();
+        const container = document.getElementById('analysis-container');
         
-        @self.app.route('/api/bot/verify-stopped')
-        def verify_stopped():
-            try:
-                import subprocess
-                
-                result = subprocess.run(
-                    ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
-                    capture_output=True,
-                    text=True
-                )
-                
-                running = result.returncode == 0
-                pid = int(result.stdout.strip()) if running else None
-                
-                return jsonify({'pid': pid, 'running': running})
-                
-            except Exception as e:
-                return jsonify({'running': False, 'error': str(e)}), 200
-                
-        @self.app.route('/api/trades/recent')
-        def get_recent_trades():
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify([])
-                
-                recent = df.tail(15).to_dict('records')
-                return jsonify(recent)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data</div>';
+            return;
+        }
         
-        @self.app.route('/api/strategy-analysis')
-        def get_strategy_analysis():
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify([])
-                
-                df = self._prepare_trades_dataframe(df)
-                
-                results = []
-                
-                num_strategies = df['STRATEGY'].nunique()
-                capital_per_strategy = self._calculate_capital_allocation(num_strategies)
-                
-                for strategy in sorted(df['STRATEGY'].unique()):
-                    df_strategy = df[df['STRATEGY'] == strategy]
-                    
-                    num_trades = len(df_strategy)
-                    positive_trades = len(df_strategy[df_strategy['PROFIT'] > 0])
-                    pct_positive = (positive_trades / num_trades * 100) if num_trades > 0 else 0
-                    total_profit = df_strategy['PROFIT'].sum()
-                    profit_pct = (total_profit / capital_per_strategy * 100) if capital_per_strategy > 0 else 0
-                    avg_duration = round(df_strategy['DURATION'].mean(), 2)
-                    date_fo = df_strategy['OPEN_AT'].min()
-                    
-                    total_reasons = len(df_strategy)
-                    tp_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('TP', na=False)])
-                    sl_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('SL', na=False)])
-                    oom_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('OUT_OF_MARGIN', na=False)])
-                    
-                    pct_tp = (tp_count / total_reasons * 100) if total_reasons > 0 else 0
-                    pct_sl = (sl_count / total_reasons * 100) if total_reasons > 0 else 0
-                    pct_oom = (oom_count / total_reasons * 100) if total_reasons > 0 else 0
-                    
-                    results.append({
-                        'Strategy': strategy,
-                        'date_fo': date_fo.strftime('%Y-%m-%d'),
-                        'Trades_num': num_trades,
-                        'Trades_pct': round(pct_positive, 2),
-                        'Total_profit': round(total_profit, 2),
-                        'Profit_pct': round(profit_pct, 2),
-                        'TP_pct': round(pct_tp, 2),
-                        'SL_pct': round(pct_sl, 2),
-                        'OOM_pct': round(pct_oom, 2),
-                        'Avg_days': avg_duration
-                    })
-                
-                return jsonify(results)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+        const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
-        @self.app.route('/api/bot-config')
-        def get_bot_config():
-            try:
-                ws_status = {
-                    'public_connected': False,
-                    'private_connected': False,
-                    'authenticated': False
+        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+            sortedData.map(s => {
+                const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadBotConfig() {
+    try {
+        const res = await fetch('/api/bot-config');
+        const data = await res.json();
+        
+        allStrategiesList = data.strategies || [];
+        
+        document.getElementById('config-account').textContent = data.account || '-';
+        document.getElementById('config-capital').textContent = '$' + (data.initial_capital || 0).toLocaleString();
+        document.getElementById('config-total-strat').textContent = data.stats.total || 0;
+        document.getElementById('config-active-strat').textContent = data.stats.active || 0;
+        document.getElementById('config-deprecating-strat').textContent = data.stats.deprecating || 0;
+        document.getElementById('config-not-implemented-strat').textContent = data.stats.not_implemented || 0;
+        
+        const wsPublic = document.getElementById('ws-public');
+        const wsPrivate = document.getElementById('ws-private');
+        const wsAuth = document.getElementById('ws-auth');
+        
+        if (data.websocket_status.public_connected) {
+            wsPublic.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+        } else {
+            wsPublic.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+        }
+        
+        if (data.websocket_status.private_connected) {
+            wsPrivate.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+        } else {
+            wsPrivate.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+        }
+        
+        if (data.websocket_status.authenticated) {
+            wsAuth.innerHTML = '<span class="ws-dot connected"></span><span>Authenticated</span>';
+        } else {
+            wsAuth.innerHTML = '<span class="ws-dot disconnected"></span><span>Not Authenticated</span>';
+        }
+        
+        const strategiesBody = document.getElementById('strategies-body');
+        if (!data.strategies || data.strategies.length === 0) {
+            strategiesBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">No strategies</td></tr>';
+        } else {
+            const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
+            strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
+                let statusBadge = '';
+                if (strat.status === 'ACTIVE') {
+                    statusBadge = '<span class="badge badge-active">Active</span>';
+                } else if (strat.status === 'DEPRECATING') {
+                    statusBadge = '<span class="badge badge-deprecating">Deprecating</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-not-implemented">Not Impl.</span>';
                 }
                 
-                try:
-                    import ZX_BOT_websocket
-                    if ZX_BOT_websocket._ws_manager:
-                        ws = ZX_BOT_websocket._ws_manager
-                        ws_status['public_connected'] = (
-                            ws.public_ws and 
-                            ws.public_ws.sock and 
-                            ws.public_ws.sock.connected
-                        )
-                        ws_status['private_connected'] = (
-                            ws.private_ws and 
-                            ws.private_ws.sock and 
-                            ws.private_ws.sock.connected
-                        )
-                        ws_status['authenticated'] = ws.authenticated
-                except:
-                    pass
+                const num = String(index + 1).padStart(2, '0');
                 
-                timeframes_grouped = {}
-                for strat in self.strategies:
-                    tf = strat.get('timeframe', 'Unknown')
-                    if tf not in timeframes_grouped:
-                        timeframes_grouped[tf] = []
-                    timeframes_grouped[tf].append(strat['id'])
-                
-                strategies_list, _ = self._get_full_strategies_list_with_numbers()
-                
-                active_count = sum(1 for s in strategies_list if s['status'] == 'ACTIVE')
-                deprecating_count = sum(1 for s in strategies_list if s['status'] == 'DEPRECATING')
-                not_implemented_count = sum(1 for s in strategies_list if s['status'] == 'NOT IMPLEMENTED')
-                
-                return jsonify({
-                    'account': self.account_number,
-                    'initial_capital': self.initial_capital,
-                    'websocket_status': ws_status,
-                    'strategies': strategies_list,
-                    'timeframes': timeframes_grouped,
-                    'stats': {
-                        'total': len(self.implemented_strategies),
-                        'active': active_count,
-                        'deprecating': deprecating_count,
-                        'not_implemented': not_implemented_count
-                    }
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strat.id + '</td><td>' + strat.timeframe + '</td><td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td><td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td><td>' + strat.tp_pct + '</td><td>' + strat.sl_pct + '</td><td>$' + strat.order_amount + '</td><td>' + strat.sell_after_ncandles + '</td><td>' + strat.lookback + '</td><td>' + strat.tolerance + '</td><td>' + strat.ma_period + '</td><td>' + strat.impulse + '</td><td>' + strat.trend_th + '</td><td>' + statusBadge + '</td></tr>';
+            }).join('');
+        }
         
-        @self.app.route('/api/config')
-        def get_config():
-            try:
-                strategies_info = []
-                for strat in self.strategies:
-                    strategies_info.append({
-                        'id': strat['id'],
-                        'name': strat['name'],
-                        'timeframe': strat['timeframe'],
-                        'active': strat.get('active', True),
-                        'direction': strat['direction'],
-                        'tp_pct': strat['tp_pct'],
-                        'sl_pct': strat['sl_pct'],
-                        'order_amount': strat.get('order_amount', 0)
-                    })
-                
-                return jsonify({
-                    'account': self.account_number,
-                    'strategies': strategies_info
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+        const timeframesContainer = document.getElementById('timeframes-container');
+        if (!data.timeframes || Object.keys(data.timeframes).length === 0) {
+            timeframesContainer.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 20px;">No timeframes</div>';
+        } else {
+            timeframesContainer.innerHTML = Object.entries(data.timeframes)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([tf, strategies]) => '<div class="timeframe-item"><div class="timeframe-header">' + tf + ' (' + strategies.length + ' strategies)</div><div class="timeframe-strategies">' + strategies.join(', ') + '</div></div>')
+                .join('');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadEquityTab() {
+    try {
+        const res = await fetch('/api/bot-config');
+        const data = await res.json();
         
-        @self.app.route('/api/compose-analysis')
-        def get_compose_analysis():
-            try:
-                from itertools import combinations
-                
-                metric = request.args.get('metric', 'profit_factor')
-                
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify([])
-                
-                strategies_list, strategy_numbers = self._get_full_strategies_list_with_numbers()
-                
-                active_deprecating = [s for s in strategies_list 
-                                     if s['status'] in ('ACTIVE', 'DEPRECATING')]
-                
-                strategies_in_excel = df['STRATEGY'].unique().tolist()
-                
-                strategies_with_trades = []
-                for strat in active_deprecating:
-                    if strat['id'] in strategies_in_excel:
-                        strategies_with_trades.append(strat['id'])
-                
-                if len(strategies_with_trades) == 0:
-                    return jsonify([])
-                
-                results = []
-                
-                capital_per_strat = self._calculate_capital_allocation()
-                
-                for r in range(1, len(strategies_with_trades) + 1):
-                    for combo in combinations(strategies_with_trades, r):
-                        df_combo = df[df['STRATEGY'].isin(combo)]
-                        
-                        if len(df_combo) == 0:
-                            continue
-                        
-                        combo_capital = capital_per_strat * len(combo)
-                        
-                        metrics = MetricsCalculator.calculate_all_metrics(
-                            df=df_combo,
-                            capital_assigned=combo_capital,
-                            include_profit_pct=True
-                        )
-                        
-                        combo_numbers = [strategy_numbers.get(s, '??') for s in combo]
-                        combo_str = '+'.join(combo_numbers)
-                        
-                        results.append({
-                            'combination': combo_str,
-                            'total_profit_pct': metrics['total_profit_pct'],
-                            'total_profit_usd': metrics['total_profit_usd'],
-                            'profit_factor': metrics['profit_factor'],
-                            'weekly_win_pct': metrics['weekly_win_pct'],
-                            'max_dd': metrics['max_dd'],
-                            'sharpe_ratio': metrics['sharpe_ratio']
-                        })
-                
-                if metric == 'max_dd':
-                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
-                else:
-                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
-                
-                return jsonify(results_sorted[:10])
-                
-            except Exception as e:
-                print(f"❌ Error in compose: {e}")
-                import traceback
-                traceback.print_exc()
-                return jsonify({'error': str(e)}), 500
+        allStrategiesList = data.strategies || [];
         
-        @self.app.route('/api/symbols-analysis')
-        def get_symbols_analysis():
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify([])
-                
-                results = []
-                
-                for symbol in sorted(df['SYMBOL'].unique()):
-                    df_symbol = df[df['SYMBOL'] == symbol]
-                    
-                    total_trades = len(df_symbol)
-                    positive_trades = len(df_symbol[df_symbol['PROFIT'] > 0])
-                    win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
-                    total_profit = df_symbol['PROFIT'].sum()
-                    avg_profit = total_profit / total_trades if total_trades > 0 else 0
-                    
-                    results.append({
-                        'Symbol': symbol,
-                        'Total_Trades': total_trades,
-                        'Win_Pct': round(win_pct, 2),
-                        'Total_Profit': round(total_profit, 2),
-                        'Avg_Profit': round(avg_profit, 2)
-                    })
-                
-                return jsonify(results)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+        const allStrategies = allStrategiesList;
         
-        @self.app.route('/api/equity-data')
-        def get_equity_data():
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify({'error': 'No trades file found'}), 404
-                
-                strategies_param = request.args.get('strategies', '')
-                selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
-                
-                if not selected_strategies:
-                    return jsonify({'error': 'No strategies selected'}), 400
-                
-                df = df[df['STRATEGY'].isin(selected_strategies)]
-                
-                if df.empty:
-                    num_selected = len(selected_strategies)
-                    return jsonify({
-                        'dates': [],
-                        'equity_pct': [],
-                        'drawdown_pct': [],
-                        'capital_assigned': 0,
-                        'num_selected': num_selected,
-                        'total_strategies': 0,
-                        'total_profit_usd': 0,
-                        'profit_factor': 0,
-                        'weekly_win_pct': 0,
-                        'max_dd': 0,
-                        'sharpe_ratio': 0,
-                        'message': 'No trades found for selected strategies'
-                    })
-                
-                df = self._prepare_trades_dataframe(df)
-                df = df.sort_values('CLOSE_AT')
-                df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
-                
-                num_selected = len(selected_strategies)
-                total_strategies = len(self.implemented_strategies) if len(self.implemented_strategies) > 0 else len(self.strategies)
-                
-                capital_per_strategy = self._calculate_capital_allocation(total_strategies)
-                capital_assigned = capital_per_strategy * num_selected
-                
-                metrics_data = MetricsCalculator.calculate_all_metrics(
-                    df=df,
-                    capital_assigned=capital_assigned,
-                    include_profit_pct=False
-                )
-                
-                daily_profit = metrics_data['daily_profit']
-                
-                if not daily_profit.empty:
-                    daily_profit['date_str'] = daily_profit['date'].astype(str)
-                    
-                    if capital_assigned > 0:
-                        daily_profit['equity_pct'] = ((daily_profit['equity_usd'] / capital_assigned) - 1) * 100
-                    else:
-                        daily_profit['equity_pct'] = 0
-                    
-                    daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
-                    daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
-                    
-                    dates = daily_profit['date_str'].tolist()
-                    equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
-                    drawdown_pct = [round(val, 2) for val in daily_profit['drawdown_pct'].tolist()]
-                else:
-                    dates = []
-                    equity_pct = []
-                    drawdown_pct = []
-                
-                return jsonify({
-                    'dates': dates,
-                    'equity_pct': equity_pct,
-                    'drawdown_pct': drawdown_pct,
-                    'capital_assigned': round(capital_assigned, 2),
-                    'num_selected': num_selected,
-                    'total_strategies': total_strategies,
-                    'total_profit_usd': metrics_data['total_profit_usd'],
-                    'profit_factor': metrics_data['profit_factor'],
-                    'weekly_win_pct': metrics_data['weekly_win_pct'],
-                    'max_dd': metrics_data['max_dd'],
-                    'sharpe_ratio': metrics_data['sharpe_ratio']
-                })
-                
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-    
-    def start(self, host='0.0.0.0', port=5000):
-        """Inicia el servidor del dashboard"""
-        if self.running:
-            print("⚠️  Dashboard already running")
-            return
+        const checkboxContainer = document.getElementById('strategy-checkboxes');
+        const allCheckbox = checkboxContainer.querySelector('#strat-all').parentElement;
         
-        def run_server():
-            import logging
-            log = logging.getLogger('werkzeug')
-            log.setLevel(logging.ERROR)
+        checkboxContainer.innerHTML = '';
+        checkboxContainer.appendChild(allCheckbox);
+        
+        allStrategies.forEach((strat) => {
+            const div = document.createElement('div');
+            div.className = 'checkbox-item';
             
-            try:
-                self.app.run(
-                    host=host, 
-                    port=port, 
-                    debug=False, 
-                    use_reloader=False, 
-                    threaded=True
-                )
-            except Exception as e:
-                print(f"❌ Dashboard server error: {e}")
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'strat-' + strat.id;
+            checkbox.value = strat.id;
+            checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
+            
+            const label = document.createElement('label');
+            label.htmlFor = 'strat-' + strat.id;
+            label.textContent = '[' + strat.number + '] ' + strat.id + ' (' + strat.status + ')';
+            
+            if (strat.status === 'ACTIVE') {
+                label.style.color = '#ffffff';
+                label.style.fontWeight = '600';
+            } else if (strat.status === 'DEPRECATING') {
+                label.style.color = '#d29922';
+            } else if (strat.status === 'NOT IMPLEMENTED') {
+                label.style.color = '#8b949e';
+                label.style.fontStyle = 'italic';
+            }
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            checkboxContainer.appendChild(div);
+        });
         
-        self.server_thread = threading.Thread(target=run_server, daemon=True)
-        self.server_thread.start()
-        self.running = True
+        document.getElementById('strat-all').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]').forEach(cb => {
+                if (cb.id !== 'strat-all') cb.checked = isChecked;
+            });
+        });
         
-        import time
-        time.sleep(0.5)
+        await updateEquityChart();
         
-        color = self.color_code
-        reset = "\033[0m" if color else ""
+    } catch (error) {
+        console.error('Error loading equity tab:', error);
+    }
+}
+
+async function loadComposeAnalysis() {
+    try {
+        const metric = document.getElementById('compose-metric').value;
+        const res = await fetch('/api/compose-analysis?metric=' + metric);
         
-        print(f"\n{color}🌐 Dashboard Web Started{reset}")
-        print(f"{'─' * 45}")
-        print(f"📊 Local:   http://localhost:{port}")
-        print(f"🔗 Network: http://127.0.0.1:{port}")
-        print(f"🌍 LAN:     http://<your-ip>:{port}")
-        print(f"{'─' * 45}\n")
-    
-    def stop(self):
-        """Detiene el servidor"""
-        self.running = False
-        print("🛑 Dashboard server stopped")
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
+        const data = await res.json();
+        const container = document.getElementById('compose-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        function formatNumber(value, decimals = 2, suffix = '') {
+            if (value === null || value === undefined) return '-';
+            if (!isFinite(value)) return '-';
+            return value.toFixed(decimals) + suffix;
+        }
+        
+        function getMetricClass(value, metric_type) {
+            if (!isFinite(value)) return '';
+            
+            if (metric_type === 'profit_pct' || metric_type === 'profit_usd') {
+                return value >= 0 ? 'direction-long' : 'direction-short';
+            } else if (metric_type === 'profit_factor' || metric_type === 'sharpe') {
+                if (value >= 2.0) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
+                if (value >= 1.5) return 'style="color: #3fb950;"';
+                if (value >= 1.0) return 'style="color: #d29922;"';
+                return 'style="color: #f85149;"';
+            }
+            return '';
+        }
+        
+        const metricNames = {
+            'num_trades': '#trades',
+            'total_profit_pct': 'Profit_%',
+            'total_profit_usd': 'Profit_$',
+            'profit_factor': 'Profit Factor',
+            'weekly_win_pct': 'Weekly_%',
+            'win_rate': 'Win Rate',
+            'max_dd': 'Max DD',
+            'ulcer_index': 'Ulcer',
+            'sharpe_ratio': 'Sharpe'
+        };
+        
+        const highlightCol = metricNames[metric];
+        
+        const html = '<table><thead><tr>' +
+            '<th>#</th>' +
+            '<th>Combination</th>' +
+            '<th' + (highlightCol === '#trades' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>#trades</th>' +
+            '<th' + (highlightCol === 'Profit_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_%</th>' +
+            '<th' + (highlightCol === 'Profit_$' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_$</th>' +
+            '<th' + (highlightCol === 'Profit Factor' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit Factor</th>' +
+            '<th' + (highlightCol === 'Weekly_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly_%</th>' +
+            '<th' + (highlightCol === 'Win Rate' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Win Rate</th>' +
+            '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
+            '<th' + (highlightCol === 'Ulcer' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Ulcer</th>' +
+            '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
+            '</tr></thead><tbody>' +
+            data.map((row, idx) => {
+                const numTrades = row.num_trades || 0;
+                const totalProfitPct = formatNumber(row.total_profit_pct, 1, '%');
+                const profitUSD = formatNumber(row.total_profit_usd, 2);
+                const profitFactor = formatNumber(row.profit_factor, 2);
+                const weeklyWin = formatNumber(row.weekly_win_pct, 1, '%');
+                const winRate = formatNumber(row.win_rate, 1, '%');
+                const maxDD = formatNumber(row.max_dd, 2, '%');
+                const ulcerIndex = formatNumber(row.ulcer_index, 2);
+                const sharpe = formatNumber(row.sharpe_ratio, 2);
+                
+                const profitPctClass = isFinite(row.total_profit_pct) ? (row.total_profit_pct >= 0 ? 'direction-long' : 'direction-short') : '';
+                const profitUSDClass = isFinite(row.total_profit_usd) ? (row.total_profit_usd >= 0 ? 'direction-long' : 'direction-short') : '';
+                
+                const pfStyle = getMetricClass(row.profit_factor, 'profit_factor');
+                const sharpeStyle = getMetricClass(row.sharpe_ratio, 'sharpe');
+                
+                const ntStyle = highlightCol === '#trades' ? 'font-weight: 900;' : '';
+                const tpStyle = highlightCol === 'Profit_%' ? 'font-weight: 900;' : '';
+                const puStyle = highlightCol === 'Profit_$' ? 'font-weight: 900;' : '';
+                const pfHighlight = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
+                const wwStyle = highlightCol === 'Weekly_%' ? 'font-weight: 900;' : '';
+                const wrStyle = highlightCol === 'Win Rate' ? 'font-weight: 900;' : '';
+                const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
+                const uiStyle = highlightCol === 'Ulcer' ? 'font-weight: 900;' : '';
+                const sharpeHighlight = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
+                
+                const prefixProfitPct = (isFinite(row.total_profit_pct) && row.total_profit_pct >= 0) ? '+' : '';
+                const prefixProfitUSD = (isFinite(row.total_profit_usd) && row.total_profit_usd >= 0) ? '+$' : '$';
+                
+                return '<tr>' +
+                    '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
+                    '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
+                    '<td style="' + ntStyle + '">' + numTrades + '</td>' +
+                    '<td class="' + profitPctClass + '" style="' + tpStyle + '">' + prefixProfitPct + totalProfitPct + '</td>' +
+                    '<td class="' + profitUSDClass + '" style="' + puStyle + '">' + prefixProfitUSD + profitUSD + '</td>' +
+                    '<td ' + pfStyle + ' style="' + pfHighlight + '">' + profitFactor + '</td>' +
+                    '<td style="' + wwStyle + '">' + weeklyWin + '</td>' +
+                    '<td style="' + wrStyle + '">' + winRate + '</td>' +
+                    '<td style="color: #f85149; ' + ddStyle + '">' + maxDD + '</td>' +
+                    '<td style="' + uiStyle + '">' + ulcerIndex + '</td>' +
+                    '<td ' + sharpeStyle + ' style="' + sharpeHighlight + '">' + sharpe + '</td>' +
+                    '</tr>';
+            }).join('') +
+            '</tbody></table>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error in compose:', error);
+        document.getElementById('compose-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">' +
+            '<div style="font-size: 18px; margin-bottom: 10px;">❌ Error loading data</div>' +
+            '<div style="font-size: 14px; color: #8b949e;">Check browser console (F12) for details</div>' +
+            '<div style="font-size: 12px; color: #8b949e; margin-top: 10px;">Error: ' + error.message + '</div>' +
+            '</div>';
+    }
+}
 
+async function loadSymbolsAnalysis() {
+    try {
+        const res = await fetch('/api/symbols-analysis');
+        const data = await res.json();
+        const container = document.getElementById('symbols-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        const sortedData = data.sort((a, b) => b.Win_Pct - a.Win_Pct);
+        
+        const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+            sortedData.map(s => {
+                const profitClass = s.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
+                const avgProfitClass = s.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + s.Symbol + '</td><td>' + s.Total_Trades + '</td><td>' + s.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_Profit >= 0 ? '+' : '') + '$' + s.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (s.Avg_Profit >= 0 ? '+' : '') + '$' + s.Avg_Profit.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading symbols analysis:', error);
+        document.getElementById('symbols-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
 
-def create_dashboard_template(base_dir):
-    """Crea el archivo HTML del dashboard si no existe en ruta común"""
-    templates_dir = os.path.join(os.path.dirname(base_dir), 'templates')
-    os.makedirs(templates_dir, exist_ok=True)
-    
-    template_path = os.path.join(templates_dir, 'dashboard.html')
-    
-    if os.path.exists(template_path):
-        return
-    
-    print(f"⚠️  Creating template at {template_path}")
-    print(f"   Please ensure the complete dashboard.html is in place")
+async function updateEquityChart() {
+    try {
+        const selectedStrategies = [];
+        document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
+            if (cb.value !== 'ALL') {
+                selectedStrategies.push(cb.value);
+            }
+        });
+        
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+        
+        const res = await fetch('/api/equity-data?strategies=' + selectedStrategies.join(','));
+        const data = await res.json();
+        
+        if (!data.dates || data.dates.length === 0) {
+            const strategiesStr = selectedStrategies.join(', ');
+            alert(`No trades found for:\n${strategiesStr}\n\n${data.message || 'These strategies have no closed trades yet.'}`);
+            return;
+        }
+        
+        document.getElementById('equity-metrics').style.display = 'block';
+        document.getElementById('metric-num-trades').textContent = data.num_trades || 0;
+        
+        const profitPct = ((data.total_profit_usd / data.capital_assigned) * 100) || 0;
+        document.getElementById('metric-profit-pct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+        
+        document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
+        document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
+        document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
+        document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
+        document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
+        document.getElementById('metric-ulcer-index').textContent = data.ulcer_index || 0;
+        document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
+        
+        const pctElement = document.getElementById('metric-profit-pct');
+        applyMetricColor(pctElement, profitPct, 'positiveNegative');
+        
+        const puElement = document.getElementById('metric-profit-usd');
+        applyMetricColor(puElement, data.total_profit_usd, 'positiveNegative');
+        
+        const pfElement = document.getElementById('metric-profit-factor');
+        applyMetricColor(pfElement, data.profit_factor, 'profitFactor');
+        
+        const sharpeElement = document.getElementById('metric-sharpe');
+        applyMetricColor(sharpeElement, data.sharpe_ratio, 'sharpe');
+        
+        if (equityChart) equityChart.destroy();
+        if (drawdownChart) drawdownChart.destroy();
+        
+        const finalEquity = data.equity_pct[data.equity_pct.length - 1] || 0;
+        const equityColor = finalEquity >= 0 ? COLORS.equityPositive : COLORS.equityNegative;
+        
+        const ctxEquity = document.getElementById('equityChart').getContext('2d');
+        equityChart = new Chart(ctxEquity, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Equity (%)',
+                    data: data.equity_pct,
+                    borderColor: equityColor,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: getBaseChartConfig('Equity Curve (%) - ' + selectedStrategies.length + ' strategies selected', false)
+        });
+        
+        const ctxDD = document.getElementById('drawdownChart').getContext('2d');
+        drawdownChart = new Chart(ctxDD, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Drawdown (%)',
+                    data: data.drawdown_pct,
+                    borderColor: COLORS.drawdownRed,
+                    backgroundColor: COLORS.drawdownRedAlpha,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: getBaseChartConfig('Drawdown (%) - ' + selectedStrategies.length + ' strategies selected', true)
+        });
+        
+    } catch (error) {
+        console.error('Error updating equity chart:', error);
+        alert('Error loading equity data: ' + error.message);
+    }
+}
 
+async function loadData() {
+    if (isLoadingData) return;
+    isLoadingData = true;
+    try {
+        const statusRes = await fetch('/api/status');
+        if (!statusRes.ok) throw new Error('HTTP ' + statusRes.status);
+        const status = await statusRes.json();
+        
+        requestAnimationFrame(() => {
+            document.getElementById('total-positions').textContent = status.total_positions || 0;
+            
+            const totalProfit = status.total_profit || 0;
+            const profitEl = document.getElementById('total-profit');
+            profitEl.textContent = '$' + totalProfit.toFixed(2);
+            profitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'positive' : 'negative');
+            
+            const openPnl = status.open_pnl || 0;
+            const openPnlEl = document.getElementById('open-pnl');
+            openPnlEl.textContent = '$' + openPnl.toFixed(2);
+            openPnlEl.className = 'stat-value ' + (openPnl >= 0 ? 'positive' : 'negative');
+            
+            const profitPct = status.profit_pct || 0;
+            const profitPctEl = document.getElementById('profit-pct');
+            profitPctEl.textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+            profitPctEl.className = 'stat-value ' + (profitPct >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('trades-num').textContent = status.num_trades || 0;
+            const tradesPct = status.trades_pct || 0;
+            document.getElementById('trades-pct').textContent = tradesPct.toFixed(1) + '%';
+            const btcPrice = status.btc_price || 0;
+            document.getElementById('btc-price').textContent = '$' + btcPrice.toLocaleString();
+        });
+        
+        const posRes = await fetch('/api/positions');
+        if (!posRes.ok) throw new Error('HTTP ' + posRes.status);
+        const positions = await posRes.json();
+        
+        requestAnimationFrame(() => {
+            if (currentTab === 'positions') renderPositions(positions);
+        });
+        
+        const tradesRes = await fetch('/api/trades/recent');
+        if (!tradesRes.ok) throw new Error('HTTP ' + tradesRes.status);
+        const trades = await tradesRes.json();
+        
+        requestAnimationFrame(() => {
+            const tradesBody = document.getElementById('trades-body');
+            if (!trades || trades.length === 0) {
+                tradesBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No trades</td></tr>';
+            } else {
+                tradesBody.innerHTML = trades.reverse().map(trade => {
+                    const profitClass = trade.PROFIT >= 0 ? 'direction-long' : 'direction-short';
+                    let reasonBadge = '';
+                    if (trade.REASON_OUT === 'TP') {
+                        reasonBadge = '<span class="badge badge-tp">TP</span>';
+                    } else if (trade.REASON_OUT === 'SL') {
+                        reasonBadge = '<span class="badge badge-sl">SL</span>';
+                    } else {
+                        reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
+                    }
+                    return '<tr><td>' + new Date(trade.CLOSE_AT).toLocaleString() + '</td><td>' + trade.STRATEGY + '</td><td>' + trade.SYMBOL + '</td><td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td><td class="' + profitClass + '">' + (trade.PROFIT >= 0 ? '+' : '') + '$' + trade.PROFIT.toFixed(2) + '</td><td class="' + profitClass + '">' + (trade.PROFIT_PCT >= 0 ? '+' : '') + trade.PROFIT_PCT.toFixed(2) + '%</td><td>' + reasonBadge + '</td></tr>';
+                }).join('');
+            }
+        });
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        isLoadingData = false;
+    }
+}
 
-if __name__ == '__main__':
-    print("⚠️  This module should be imported, not run directly")
-    print("Usage:")
-    print("  from ZX_BOT_dashboard import DashboardServer")
-    print("  dashboard = DashboardServer(...)")
-    print("  dashboard.start()")
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('auto-scroll-btn').textContent = autoScroll ? 'Auto' : 'Manual';
+}
+
+function clearLogs() {
+    if (confirm('Clear all logs?')) {
+        document.getElementById('logs-content').innerHTML = '<div class="log-line default">Logs cleared</div>';
+    }
+}
+
+let dataInterval, logsInterval;
+
+function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('live-clock').textContent = `${hours}:${minutes}:${seconds}`;
+}
+
+function startPolling() {
+    loadData();
+    loadLogs();
+    updateClock();
+    dataInterval = setInterval(() => loadData().catch(console.error), 3000);
+    logsInterval = setInterval(() => loadLogs().catch(console.error), 1500);
+    setInterval(updateClock, 1000);
+}
+
+function stopPolling() {
+    if (dataInterval) clearInterval(dataInterval);
+    if (logsInterval) clearInterval(logsInterval);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopPolling();
+    else startPolling();
+});
+
+const savedView = localStorage.getItem('positionsView') || 'compact';
+currentPositionsView = savedView;
+
+async function initializeDashboard() {
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        if (btn.textContent.toLowerCase().includes(savedView)) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+    
+    const backendReady = await waitForBackend();
+    await loadBotConfig();
+    startPolling();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeDashboard);
+} else {
+    initializeDashboard();
+}
+
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        initializeDashboard();
+    }
+});
+    </script>
+</body>
+</html>

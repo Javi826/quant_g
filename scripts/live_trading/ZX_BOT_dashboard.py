@@ -463,10 +463,12 @@ class DashboardServer:
                     tp_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('TP', na=False)])
                     sl_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('SL', na=False)])
                     oom_count = len(df_strategy[df_strategy['REASON_OUT'].str.contains('OUT_OF_MARGIN', na=False)])
+                    timeout_count = len(df_strategy[df_strategy['REASON_OUT'] == 'TIMEOUT'])
                     
                     pct_tp = (tp_count / total_reasons * 100) if total_reasons > 0 else 0
                     pct_sl = (sl_count / total_reasons * 100) if total_reasons > 0 else 0
                     pct_oom = (oom_count / total_reasons * 100) if total_reasons > 0 else 0
+                    pct_timeout = (timeout_count / total_reasons * 100) if total_reasons > 0 else 0
                     
                     results.append({
                         'Strategy': strategy,
@@ -478,6 +480,7 @@ class DashboardServer:
                         'TP_pct': round(pct_tp, 2),
                         'SL_pct': round(pct_sl, 2),
                         'OOM_pct': round(pct_oom, 2),
+                        'TIMEOUT_pct': round(pct_timeout, 2),
                         'Avg_days': avg_duration
                     })
                 
@@ -564,6 +567,18 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
+        @self.app.route('/api/strategy-numbers-map')
+        def get_strategy_numbers_map():
+            try:
+                strategies_list, strategy_numbers = self._get_full_strategies_list_with_numbers()
+                
+                # Crear mapeo inverso: número → ID
+                numbers_to_ids = {v: k for k, v in strategy_numbers.items()}
+                
+                return jsonify(numbers_to_ids)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
         @self.app.route('/api/compose-analysis')
         def get_compose_analysis():
             try:
@@ -592,7 +607,8 @@ class DashboardServer:
                 
                 results = []
                 
-                capital_per_strat = self._calculate_capital_allocation()
+                num_strategies_with_trades = len(df['STRATEGY'].unique())
+                capital_per_strat = self._calculate_capital_allocation(num_strategies_with_trades)
                 
                 for r in range(1, len(strategies_with_trades) + 1):
                     for combo in combinations(strategies_with_trades, r):
@@ -670,12 +686,53 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
+        @self.app.route('/api/weekday-analysis')
+        def get_weekday_analysis():
+            try:
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify([])
+                
+                df = self._prepare_trades_dataframe(df)
+                
+                df['weekday'] = df['OPEN_AT'].dt.day_name()
+                
+                weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                
+                results = []
+                
+                for day in weekday_order:
+                    df_day = df[df['weekday'] == day]
+                    
+                    if len(df_day) == 0:
+                        continue
+                    
+                    total_trades = len(df_day)
+                    positive_trades = len(df_day[df_day['PROFIT'] > 0])
+                    win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
+                    total_profit = df_day['PROFIT'].sum()
+                    avg_profit = total_profit / total_trades if total_trades > 0 else 0
+                    
+                    results.append({
+                        'Day': day,
+                        'Total_Trades': total_trades,
+                        'Win_Pct': round(win_pct, 2),
+                        'Total_Profit': round(total_profit, 2),
+                        'Avg_Profit': round(avg_profit, 2)
+                    })
+                
+                return jsonify(results)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
         @self.app.route('/api/equity-data')
         def get_equity_data():
             try:
                 df = self._load_trades_dataframe()
                 if df is None:
                     return jsonify({'error': 'No trades file found'}), 404
+                
+                num_strategies_with_trades = len(df['STRATEGY'].unique())
                 
                 strategies_param = request.args.get('strategies', '')
                 selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
@@ -693,7 +750,7 @@ class DashboardServer:
                         'drawdown_pct': [],
                         'capital_assigned': 0,
                         'num_selected': num_selected,
-                        'total_strategies': 0,
+                        'total_strategies': num_strategies_with_trades,
                         'num_trades': 0,
                         'total_profit_usd': 0,
                         'profit_factor': 0,
@@ -710,9 +767,8 @@ class DashboardServer:
                 df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
                 
                 num_selected = len(selected_strategies)
-                total_strategies = len(self.implemented_strategies) if len(self.implemented_strategies) > 0 else len(self.strategies)
                 
-                capital_per_strategy = self._calculate_capital_allocation(total_strategies)
+                capital_per_strategy = self._calculate_capital_allocation(num_strategies_with_trades)
                 capital_assigned = capital_per_strategy * num_selected
                 
                 metrics_data = MetricsCalculator.calculate_all_metrics(
@@ -748,7 +804,7 @@ class DashboardServer:
                     'drawdown_pct': drawdown_pct,
                     'capital_assigned': round(capital_assigned, 2),
                     'num_selected': num_selected,
-                    'total_strategies': total_strategies,
+                    'total_strategies': num_strategies_with_trades,
                     'num_trades': metrics_data['num_trades'],
                     'total_profit_usd': metrics_data['total_profit_usd'],
                     'profit_factor': metrics_data['profit_factor'],

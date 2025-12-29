@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>BOT_trading - {{ account }}</title>
+    <title>BOT Trading - {{ account }}</title>
     <link rel="icon" type="image/jpeg" href="/favicon.jpg">
     <style>
         * { 
@@ -158,7 +158,7 @@
         }
         
         .header h1 { 
-            font-size: 22px;
+            font-size: 25px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -168,7 +168,7 @@
         }
         
         .account-badge {
-            font-size: 13px;
+            font-size: 14px;
             {% if account == '00' %}
             background: rgba(37, 99, 235, 0.25);
             border: 1px solid rgba(59, 130, 246, 0.4);
@@ -555,7 +555,7 @@
             background: #1c2128;
             color: #ffffff;
             font-weight: 600;
-            font-size: 24px;
+            font-size: 18px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 1px solid #30363d;
@@ -564,7 +564,7 @@
         td {
             padding: 12px 14px;
             border-bottom: 1px solid #21262d;
-            font-size: 21px;
+            font-size: 19px;
             color: #c9d1d9;
         }
         
@@ -652,7 +652,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 13px;
+            font-size: 20px;
         }
         
         .ws-dot {
@@ -812,7 +812,7 @@
     <div class="dashboard-container">
         <div class="header">
             <h1>
-                BOT Dashboard
+                BOT Trading
                 <span class="account-badge">ACC: {{ account }}</span>
             </h1>
             <div class="header-right">
@@ -870,7 +870,7 @@
                 <button class="tab-btn active" onclick="switchTab('positions')">Positions</button>
                 <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
                 <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
-                <button class="tab-btn" onclick="switchTab('equity')">Equity & DD</button>
+                <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
                 <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
                 <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
             </div>
@@ -919,12 +919,13 @@
             
             <div id="tab-equity" class="tab-content">
                 <div class="content-section">
-                    <h2>Equity Curve & Drawdown</h2>
+                    <h2>Analytics</h2>
                     
                     <div class="tabs-container" style="margin-top: 20px;">
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                     </div>
                     
                     <div id="equity-subtab-curves" class="tab-content active">
@@ -938,26 +939,42 @@
                         </div>
                         
                         <div id="equity-metrics" style="display: none; background: #1c2128; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #21262d;">
-                            <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 27px; align-items: center; flex-wrap: wrap;">
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">💵 Profit $:</span>
-                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">#trades:</span>
+                                    <span id="metric-num-trades" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📊 Profit Factor:</span>
-                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit_%:</span>
+                                    <span id="metric-profit-pct" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📈 Weekly Win %:</span>
-                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit_$:</span>
+                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📉 Max DD:</span>
-                                    <span id="metric-max-dd" style="color: #f85149; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Profit Factor:</span>
+                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">⚡ Sharpe Ratio:</span>
-                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Weekly_%:</span>
+                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Win Rate:</span>
+                                    <span id="metric-win-rate" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Max DD:</span>
+                                    <span id="metric-max-dd" style="color: #f85149; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Ulcer:</span>
+                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Sharpe:</span>
+                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                             </div>
                         </div>
@@ -977,12 +994,15 @@
                         <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
                             <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
                             <select id="compose-metric" style="padding: 10px 15px; font-size: 16px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
-                                <option value="total_profit_pct">Total Profit %</option>
+                                <option value="num_trades">#trades</option>
+                                <option value="total_profit_pct">Profit_%</option>
+                                <option value="total_profit_usd">Profit_$</option>
                                 <option value="profit_factor">Profit Factor</option>
-                                <option value="weekly_win_pct">Weekly Win %</option>
+                                <option value="weekly_win_pct">Weekly_%</option>
+                                <option value="win_rate">Win Rate</option>
                                 <option value="max_dd">Max DD (lowest)</option>
-                                <option value="sharpe_ratio">Sharpe Ratio</option>
-                                <option value="total_profit_usd">Profit $</option>
+                                <option value="ulcer_index">Ulcer (lowest)</option>
+                                <option value="sharpe_ratio">Sharpe</option>
                             </select>
                             <button class="update-chart-btn" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
                         </div>
@@ -997,6 +1017,11 @@
                     <div id="equity-subtab-symbols" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
                         <div id="symbols-container">Loading...</div>
+                    </div>
+                    
+                    <div id="equity-subtab-weekday" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
+                        <div id="weekday-container">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -1182,7 +1207,7 @@ function getBaseChartConfig(title, reverseY = false) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { display: true, position: 'top' },
+            legend: { display: false },
             title: { 
                 display: true, 
                 text: title,
@@ -1388,16 +1413,18 @@ function switchEquitySubTab(subTabName) {
     document.getElementById('equity-subtab-' + subTabName).classList.add('active');
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
+    if (subTabName === 'weekday') loadWeekDayAnalysis();
     if (subTabName === 'compose') {
         document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
     }
 }
 
 function getLogClass(line) {
-    if (line.includes('TP for') || line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'success';
-    if (line.includes('Error') || line.includes('SL for')) return 'error';
+    if (line.includes('TP for')) return 'success';
+    if (line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'info';
+    if (line.includes('Error')) return 'error';
+    if (line.includes('SL for')) return 'warning';
     if (line.includes('WAR')) return 'warning';
-    if (line.includes('Signals detected')) return 'info';
     return 'default';
 }
 
@@ -1581,10 +1608,10 @@ async function loadStrategyAnalysis() {
         
         const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
-        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
             sortedData.map(s => {
                 const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
             }).join('') +
             '</tbody></table>';
         container.innerHTML = html;
@@ -1758,12 +1785,15 @@ async function loadComposeAnalysis() {
         }
         
         const metricNames = {
-            'total_profit_pct': 'Total Profit %',
+            'num_trades': '#trades',
+            'total_profit_pct': 'Profit_%',
+            'total_profit_usd': 'Profit_$',
             'profit_factor': 'Profit Factor',
-            'weekly_win_pct': 'Weekly Win %',
+            'weekly_win_pct': 'Weekly_%',
+            'win_rate': 'Win Rate',
             'max_dd': 'Max DD',
-            'sharpe_ratio': 'Sharpe',
-            'total_profit_usd': 'Profit $'
+            'ulcer_index': 'Ulcer',
+            'sharpe_ratio': 'Sharpe'
         };
         
         const highlightCol = metricNames[metric];
@@ -1771,20 +1801,26 @@ async function loadComposeAnalysis() {
         const html = '<table><thead><tr>' +
             '<th>#</th>' +
             '<th>Combination</th>' +
-            '<th' + (highlightCol === 'Total Profit %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Total Profit %</th>' +
+            '<th' + (highlightCol === '#trades' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>#trades</th>' +
+            '<th' + (highlightCol === 'Profit_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_%</th>' +
+            '<th' + (highlightCol === 'Profit_$' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_$</th>' +
             '<th' + (highlightCol === 'Profit Factor' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit Factor</th>' +
-            '<th' + (highlightCol === 'Weekly Win %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly Win %</th>' +
+            '<th' + (highlightCol === 'Weekly_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly_%</th>' +
+            '<th' + (highlightCol === 'Win Rate' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Win Rate</th>' +
             '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
+            '<th' + (highlightCol === 'Ulcer' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Ulcer</th>' +
             '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
-            '<th' + (highlightCol === 'Profit $' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit $</th>' +
             '</tr></thead><tbody>' +
             data.map((row, idx) => {
+                const numTrades = row.num_trades || 0;
                 const totalProfitPct = formatNumber(row.total_profit_pct, 1, '%');
+                const profitUSD = formatNumber(row.total_profit_usd, 2);
                 const profitFactor = formatNumber(row.profit_factor, 2);
                 const weeklyWin = formatNumber(row.weekly_win_pct, 1, '%');
+                const winRate = formatNumber(row.win_rate, 1, '%');
                 const maxDD = formatNumber(row.max_dd, 2, '%');
+                const ulcerIndex = formatNumber(row.ulcer_index, 2);
                 const sharpe = formatNumber(row.sharpe_ratio, 2);
-                const profitUSD = formatNumber(row.total_profit_usd, 2);
                 
                 const profitPctClass = isFinite(row.total_profit_pct) ? (row.total_profit_pct >= 0 ? 'direction-long' : 'direction-short') : '';
                 const profitUSDClass = isFinite(row.total_profit_usd) ? (row.total_profit_usd >= 0 ? 'direction-long' : 'direction-short') : '';
@@ -1792,12 +1828,15 @@ async function loadComposeAnalysis() {
                 const pfStyle = getMetricClass(row.profit_factor, 'profit_factor');
                 const sharpeStyle = getMetricClass(row.sharpe_ratio, 'sharpe');
                 
-                const tpStyle = highlightCol === 'Total Profit %' ? 'font-weight: 900;' : '';
+                const ntStyle = highlightCol === '#trades' ? 'font-weight: 900;' : '';
+                const tpStyle = highlightCol === 'Profit_%' ? 'font-weight: 900;' : '';
+                const puStyle = highlightCol === 'Profit_$' ? 'font-weight: 900;' : '';
                 const pfHighlight = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
-                const wwStyle = highlightCol === 'Weekly Win %' ? 'font-weight: 900;' : '';
+                const wwStyle = highlightCol === 'Weekly_%' ? 'font-weight: 900;' : '';
+                const wrStyle = highlightCol === 'Win Rate' ? 'font-weight: 900;' : '';
                 const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
+                const uiStyle = highlightCol === 'Ulcer' ? 'font-weight: 900;' : '';
                 const sharpeHighlight = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
-                const puStyle = highlightCol === 'Profit $' ? 'font-weight: 900;' : '';
                 
                 const prefixProfitPct = (isFinite(row.total_profit_pct) && row.total_profit_pct >= 0) ? '+' : '';
                 const prefixProfitUSD = (isFinite(row.total_profit_usd) && row.total_profit_usd >= 0) ? '+$' : '$';
@@ -1805,12 +1844,15 @@ async function loadComposeAnalysis() {
                 return '<tr>' +
                     '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
                     '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
+                    '<td style="' + ntStyle + '">' + numTrades + '</td>' +
                     '<td class="' + profitPctClass + '" style="' + tpStyle + '">' + prefixProfitPct + totalProfitPct + '</td>' +
+                    '<td class="' + profitUSDClass + '" style="' + puStyle + '">' + prefixProfitUSD + profitUSD + '</td>' +
                     '<td ' + pfStyle + ' style="' + pfHighlight + '">' + profitFactor + '</td>' +
                     '<td style="' + wwStyle + '">' + weeklyWin + '</td>' +
+                    '<td style="' + wrStyle + '">' + winRate + '</td>' +
                     '<td style="color: #f85149; ' + ddStyle + '">' + maxDD + '</td>' +
+                    '<td style="' + uiStyle + '">' + ulcerIndex + '</td>' +
                     '<td ' + sharpeStyle + ' style="' + sharpeHighlight + '">' + sharpe + '</td>' +
-                    '<td class="' + profitUSDClass + '" style="' + puStyle + '">' + prefixProfitUSD + profitUSD + '</td>' +
                     '</tr>';
             }).join('') +
             '</tbody></table>';
@@ -1855,6 +1897,31 @@ async function loadSymbolsAnalysis() {
     }
 }
 
+async function loadWeekDayAnalysis() {
+    try {
+        const res = await fetch('/api/weekday-analysis');
+        const data = await res.json();
+        const container = document.getElementById('weekday-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        const html = '<table><thead><tr><th>Day</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+            data.map(d => {
+                const profitClass = d.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
+                const avgProfitClass = d.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + d.Day + '</td><td>' + d.Total_Trades + '</td><td>' + d.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (d.Total_Profit >= 0 ? '+' : '') + '$' + d.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (d.Avg_Profit >= 0 ? '+' : '') + '$' + d.Avg_Profit.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading weekday analysis:', error);
+        document.getElementById('weekday-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
 async function updateEquityChart() {
     try {
         const selectedStrategies = [];
@@ -1879,11 +1946,21 @@ async function updateEquityChart() {
         }
         
         document.getElementById('equity-metrics').style.display = 'block';
+        document.getElementById('metric-num-trades').textContent = data.num_trades || 0;
+        
+        const profitPct = ((data.total_profit_usd / data.capital_assigned) * 100) || 0;
+        document.getElementById('metric-profit-pct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+        
         document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
         document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
         document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
-        document.getElementById('metric-max-dd').textContent = '-' + (data.max_dd || 0) + '%';
+        document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
+        document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
+        document.getElementById('metric-ulcer-index').textContent = data.ulcer_index || 0;
         document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
+        
+        const pctElement = document.getElementById('metric-profit-pct');
+        applyMetricColor(pctElement, profitPct, 'positiveNegative');
         
         const puElement = document.getElementById('metric-profit-usd');
         applyMetricColor(puElement, data.total_profit_usd, 'positiveNegative');

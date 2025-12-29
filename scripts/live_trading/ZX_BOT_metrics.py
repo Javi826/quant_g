@@ -109,25 +109,6 @@ class MetricsCalculator:
         return round(drawdown.min(), 2)
     
     @staticmethod
-    def recovery_factor(total_profit: float, max_dd: float) -> float:
-        """
-        Calcula el Recovery Factor.
-        
-        Recovery Factor = Total Profit / |Max Drawdown|
-        
-        Args:
-            total_profit: Profit total en USD
-            max_dd: Max Drawdown en % (valor negativo)
-        
-        Returns:
-            Recovery Factor redondeado a 2 decimales
-            Retorna 0 si max_dd es 0
-        """
-        if max_dd != 0:
-            return round(abs(total_profit / max_dd), 2)
-        return 0.0
-    
-    @staticmethod
     def sharpe_ratio(daily_returns: pd.Series) -> float:
         """
         Calcula el Sharpe Ratio anualizado.
