@@ -371,7 +371,7 @@
             padding: 12px;
             font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 12px;
-            line-height: 0.5;
+            line-height: 0.9;
             background: #0d1117;
         }
         
@@ -555,7 +555,7 @@
             background: #1c2128;
             color: #ffffff;
             font-weight: 600;
-            font-size: 19px;
+            font-size: 18px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 1px solid #30363d;
@@ -564,7 +564,7 @@
         td {
             padding: 12px 14px;
             border-bottom: 1px solid #21262d;
-            font-size: 18px;
+            font-size: 19px;
             color: #c9d1d9;
         }
         
@@ -731,7 +731,6 @@
             font-size: 18px;
         }
         
-        /* ✅ NEW: Equity & DD styles */
         .strategy-checkboxes {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -794,9 +793,6 @@
     </style>
 </head>
 <body>
-    <!-- ═══════════════════════════════════════════════════════════════
-         LOADING SPLASH SCREEN
-         ═══════════════════════════════════════════════════════════════ -->
     <div id="loading-splash">
         <div class="loading-content">
             <h1 class="loading-title">Trading Bot Dashboard</h1>
@@ -813,9 +809,6 @@
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         DASHBOARD (ORIGINAL)
-         ═══════════════════════════════════════════════════════════════ -->
     <div class="dashboard-container">
         <div class="header">
             <h1>
@@ -924,19 +917,16 @@
                 </div>
             </div>
             
-            <!-- ✅ NEW: Equity & DD Tab -->
             <div id="tab-equity" class="tab-content">
                 <div class="content-section">
                     <h2>Equity Curve & Drawdown</h2>
                     
-                    <!-- ✅ Sub-tabs for Curves, Compose, and Symbols -->
                     <div class="tabs-container" style="margin-top: 20px;">
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                     </div>
                     
-                    <!-- Curves Sub-tab -->
                     <div id="equity-subtab-curves" class="tab-content active">
                         <button class="update-chart-btn" onclick="updateEquityChart()">🔄 Update Chart</button>
                         
@@ -947,32 +937,43 @@
                             </div>
                         </div>
                         
-                        <!-- ✅ Metrics display -->
                         <div id="equity-metrics" style="display: none; background: #1c2128; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #21262d;">
-                            <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 25px; align-items: center; flex-wrap: wrap;">
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">💵 Profit $:</span>
-                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">#trades:</span>
+                                    <span id="metric-num-trades" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📊 Profit Factor:</span>
-                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_%:</span>
+                                    <span id="metric-profit-pct" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📈 Weekly Win %:</span>
-                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit_$:</span>
+                                    <span id="metric-profit-usd" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">📉 Max DD:</span>
-                                    <span id="metric-max-dd" style="color: #f85149; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Profit Factor:</span>
+                                    <span id="metric-profit-factor" style="color: #3fb950; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">🔄 Recovery Factor:</span>
-                                    <span id="metric-recovery" style="color: #a371f7; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Weekly_%:</span>
+                                    <span id="metric-weekly-win" style="color: #58a6ff; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 20px; font-weight: 600;">⚡ Sharpe Ratio:</span>
-                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 28px; font-weight: 700; margin-left: 12px;">-</span>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Win Rate:</span>
+                                    <span id="metric-win-rate" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Max DD:</span>
+                                    <span id="metric-max-dd" style="color: #f85149; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Ulcer:</span>
+                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
+                                </div>
+                                <div>
+                                    <span style="color: #8b949e; font-size: 16px; font-weight: 600;">Sharpe:</span>
+                                    <span id="metric-sharpe" style="color: #22d3ee; font-size: 22px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                             </div>
                         </div>
@@ -986,20 +987,21 @@
                         </div>
                     </div>
                     
-                    <!-- Compose Sub-tab -->
                     <div id="equity-subtab-compose" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Combinations - TOP 10</h3>
                         
                         <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
                             <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
-                            <select id="compose-metric" style="padding: 10px 15px; font-size: 16px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
-                                <option value="total_profit_pct">Total Profit %</option>
+                            <select id="compose-metric" style="padding: 10px 15px; font-size: 18px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
+                                <option value="num_trades">#trades</option>
+                                <option value="total_profit_pct">Profit_%</option>
+                                <option value="total_profit_usd">Profit_$</option>
                                 <option value="profit_factor">Profit Factor</option>
-                                <option value="weekly_win_pct">Weekly Win %</option>
+                                <option value="weekly_win_pct">Weekly_%</option>
+                                <option value="win_rate">Win Rate</option>
                                 <option value="max_dd">Max DD (lowest)</option>
-                                <option value="recovery_factor">Recovery Factor</option>
-                                <option value="sharpe_ratio">Sharpe Ratio</option>
-                                <option value="total_profit_usd">Profit $</option>
+                                <option value="ulcer_index">Ulcer (lowest)</option>
+                                <option value="sharpe_ratio">Sharpe</option>
                             </select>
                             <button class="update-chart-btn" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
                         </div>
@@ -1011,7 +1013,6 @@
                         </div>
                     </div>
                     
-                    <!-- Symbols Sub-tab -->
                     <div id="equity-subtab-symbols" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
                         <div id="symbols-container">Loading...</div>
@@ -1126,26 +1127,17 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
-// ═══════════════════════════════════════════════════════════════════
-// 🎨 CONSTANTES DE DISEÑO Y CONFIGURACIÓN
-// ═══════════════════════════════════════════════════════════════════
-
 const COLORS = {
-    // Metric colors
-    gold: '#FFBF00',
+    purple: '#6d28d9',
     green: '#3fb950',
     yellow: '#d29922',
     red: '#f85149',
-    
-    // UI colors
     textPrimary: '#c9d1d9',
     textSecondary: '#8b949e',
     gridDark: '#21262d',
     borderYellow: '#facc15',
     white: '#ffffff',
     blue: '#58a6ff',
-    
-    // Chart specific
     equityPositive: '#3fb950',
     equityNegative: '#f85149',
     drawdownRed: '#f85149',
@@ -1153,27 +1145,12 @@ const COLORS = {
 };
 
 const METRIC_THRESHOLDS = {
-    profitFactor: {
-        excellent: 2.0,   // Gold
-        good: 1.5,        // Green
-        acceptable: 1.0,  // Yellow
-    },
-    sharpeRatio: {
-        excellent: 2.0,
-        good: 1.5,
-        acceptable: 1.0,
-    },
-    recoveryFactor: {
-        excellent: 10,    // Green
-        acceptable: 5,    // Yellow
-    }
+    profitFactor: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
+    sharpeRatio: { excellent: 2.0, good: 1.5, acceptable: 1.0 }
 };
 
 const CHART_DEFAULTS = {
-    fontSize: {
-        title: 20,
-        axis: 16
-    },
+    fontSize: { title: 20, axis: 16 },
     gridColor: COLORS.gridDark,
     borderColor: COLORS.borderYellow,
     borderWidth: 1,
@@ -1181,24 +1158,10 @@ const CHART_DEFAULTS = {
     titleColor: COLORS.textPrimary
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// 🔧 FUNCIONES HELPER PARA MÉTRICAS Y COLORES
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * Obtiene el color y sombra para Profit Factor o Sharpe Ratio
- * @param {number} value - Valor de la métrica
- * @param {boolean} withGlow - Si debe incluir efecto de brillo
- * @returns {Object} { color, shadow }
- */
 function getMetricColor(value, withGlow = false) {
     const thresholds = METRIC_THRESHOLDS.profitFactor;
-    
     if (value >= thresholds.excellent) {
-        return {
-            color: COLORS.gold,
-            shadow: withGlow ? '0 0 13px rgba(255, 215, 0, 0.8)' : 'none'
-        };
+        return { color: COLORS.purple, shadow: withGlow ? '0 0 10px rgba(109, 40, 217, 0.8)' : 'none' };
     } else if (value >= thresholds.good) {
         return { color: COLORS.green, shadow: 'none' };
     } else if (value >= thresholds.acceptable) {
@@ -1208,75 +1171,31 @@ function getMetricColor(value, withGlow = false) {
     }
 }
 
-/**
- * Obtiene el color para Recovery Factor
- * @param {number} value - Valor del recovery factor
- * @returns {string} Color hex
- */
-function getRecoveryColor(value) {
-    const thresholds = METRIC_THRESHOLDS.recoveryFactor;
-    
-    if (value >= thresholds.excellent) {
-        return COLORS.green;
-    } else if (value >= thresholds.acceptable) {
-        return COLORS.yellow;
-    } else {
-        return COLORS.red;
-    }
-}
-
-/**
- * Obtiene color simple positivo/negativo
- * @param {number} value - Valor a evaluar
- * @returns {string} Color hex
- */
 function getPositiveNegativeColor(value) {
     return value >= 0 ? COLORS.green : COLORS.red;
 }
 
-/**
- * Aplica color a un elemento DOM según el tipo de métrica
- * @param {HTMLElement} element - Elemento DOM
- * @param {number} value - Valor de la métrica
- * @param {string} type - Tipo: 'profitFactor', 'sharpe', 'recovery', 'positiveNegative'
- */
 function applyMetricColor(element, value, type = 'profitFactor') {
     if (type === 'profitFactor' || type === 'sharpe') {
         const { color, shadow } = getMetricColor(value, true);
         element.style.color = color;
         element.style.textShadow = shadow;
-    } else if (type === 'recovery') {
-        element.style.color = getRecoveryColor(value);
     } else if (type === 'positiveNegative') {
         element.style.color = getPositiveNegativeColor(value);
     }
 }
 
-/**
- * Obtiene clase de estilo inline para usar en tablas
- * @param {number} value - Valor de la métrica
- * @param {string} type - Tipo de métrica
- * @returns {string} String con style inline
- */
 function getMetricStyleClass(value, type = 'profitFactor') {
     if (type === 'profitFactor' || type === 'sharpe') {
-        const { color, shadow } = getMetricColor(value,true);
+        const { color, shadow } = getMetricColor(value, true);
         return shadow !== 'none' 
             ? `style="color: ${color}; text-shadow: ${shadow};"` 
             : `style="color: ${color};"`;
-    } else if (type === 'recovery') {
-        return `style="color: ${getRecoveryColor(value)};"`;
     } else if (type === 'positiveNegative') {
         return `style="color: ${getPositiveNegativeColor(value)};"`;
     }
 }
 
-/**
- * Genera configuración base para Chart.js
- * @param {string} title - Título del gráfico
- * @param {boolean} reverseY - Si el eje Y debe invertirse
- * @returns {Object} Configuración de Chart.js
- */
 function getBaseChartConfig(title, reverseY = false) {
     const config = {
         responsive: true,
@@ -1287,18 +1206,12 @@ function getBaseChartConfig(title, reverseY = false) {
                 display: true, 
                 text: title,
                 color: CHART_DEFAULTS.titleColor,
-                font: {
-                    size: CHART_DEFAULTS.fontSize.title,
-                    weight: 'bold'
-                }
+                font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
             }
         },
         scales: {
             x: { 
-                ticks: { 
-                    color: CHART_DEFAULTS.textColor,
-                    font: { size: CHART_DEFAULTS.fontSize.axis }
-                }, 
+                ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
                 grid: { 
                     color: CHART_DEFAULTS.gridColor,
                     drawBorder: true,
@@ -1310,9 +1223,7 @@ function getBaseChartConfig(title, reverseY = false) {
                 ticks: { 
                     color: CHART_DEFAULTS.textColor,
                     font: { size: CHART_DEFAULTS.fontSize.axis },
-                    callback: function(value) {
-                        return value.toFixed(1) + '%';
-                    }
+                    callback: function(value) { return value.toFixed(1) + '%'; }
                 }, 
                 grid: { 
                     color: CHART_DEFAULTS.gridColor,
@@ -1323,23 +1234,13 @@ function getBaseChartConfig(title, reverseY = false) {
             }
         }
     };
-    
-    // Si necesita eje Y invertido (para drawdown)
-    if (reverseY) {
-        config.scales.y.reverse = true;
-    }
-    
+    if (reverseY) config.scales.y.reverse = true;
     return config;
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// ✅ NEW: Wait for Backend Function
-// ═══════════════════════════════════════════════════════════════════
 
 async function waitForBackend() {
     const maxAttempts = 30;
     let attempts = 0;
-    
     const splash = document.getElementById('loading-splash');
     const statusText = document.getElementById('loading-status');
     const attemptCount = document.getElementById('attempt-count');
@@ -1350,56 +1251,36 @@ async function waitForBackend() {
     splash.style.display = 'flex';
     errorBox.classList.remove('visible');
     
-    console.log('🔍 Waiting for backend to be ready...');
-    
     while (attempts < maxAttempts) {
         attempts++;
         attemptCount.textContent = attempts;
-        
-        console.log(`Attempt ${attempts}/${maxAttempts}: Checking backend...`);
         
         try {
             const response = await fetch('/api/status', { 
                 method: 'GET',
                 cache: 'no-cache',
-                headers: {
-                    'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
-                }
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
             });
             
             if (response.ok) {
                 const data = await response.json();
-                
                 if (data.status === 'running' || data.account) {
-                    console.log('✅ Backend ready!', data);
-                    
                     statusText.innerHTML = '✅ Connected successfully!';
                     statusText.style.color = '#4ade80';
-                    
                     await new Promise(r => setTimeout(r, 500));
-                    
                     splash.style.transition = 'opacity 0.3s ease';
                     splash.style.opacity = '0';
-                    
                     await new Promise(r => setTimeout(r, 300));
                     splash.classList.add('hidden');
                     splash.style.display = 'none';
-                    
-                    console.log('✅ Splash hidden, dashboard ready');
                     return true;
                 }
             }
-        } catch (error) {
-            console.log(`Attempt ${attempts}/${maxAttempts}: Backend not ready yet... (${error.message})`);
-        }
-        
+        } catch (error) {}
         await new Promise(r => setTimeout(r, 1000));
     }
     
-    console.warn('⚠️ Backend connection timeout after 30 seconds');
     errorBox.classList.add('visible');
-    
     setTimeout(() => {
         splash.style.transition = 'opacity 0.5s ease';
         splash.style.opacity = '0';
@@ -1408,13 +1289,8 @@ async function waitForBackend() {
             splash.style.display = 'none';
         }, 500);
     }, 5000);
-    
     return false;
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// ORIGINAL DASHBOARD CODE
-// ═══════════════════════════════════════════════════════════════════
 
 let autoScroll = true;
 let isLoadingData = false;
@@ -1425,14 +1301,16 @@ let currentTab = 'positions';
 let equityChart = null;
 let drawdownChart = null;
 let allStrategiesList = [];
+let isStoppingBot = false;
 
 async function stopBot() {
-    if (!confirm('WARNING: STOP TRADING BOT?\n\nThis will terminate the bot process.\n\nAre you sure?')) {
-        return;
-    }
+    if (isStoppingBot) return;
+    if (!confirm('WARNING: STOP TRADING BOT?\n\nThis will terminate the bot process.\n\nAre you sure?')) return;
+    isStoppingBot = true;
     
     const overlay = document.getElementById('stop-overlay');
     const statusDiv = document.getElementById('stop-status');
+    statusDiv.innerHTML = '';
     overlay.classList.add('active');
     
     addStopLog('Initializing stop sequence...');
@@ -1467,19 +1345,18 @@ async function stopBot() {
                         addStopLog('Process verified as terminated', 'success');
                         addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
                         document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
-                        document.getElementById('stop-title').style.color = '#3fb950';
+                        document.getElementById('stop-title').style.color = COLORS.green;
                         return;
                     }
                 }
             } catch (error) {
                 clearInterval(verifyInterval);
                 botStoppedConfirmed = true;
-                
                 addStopLog('Backend stopped responding', 'success');
                 addStopLog('Flask server terminated (expected)', 'success');
                 addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
                 document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
-                document.getElementById('stop-title').style.color = '#3fb950';
+                document.getElementById('stop-title').style.color = COLORS.green;
                 return;
             }
             
@@ -1488,7 +1365,7 @@ async function stopBot() {
                 addStopLog('⚠️ VERIFICATION TIMEOUT', 'warning');
                 addStopLog('Bot may still be running. Check manually.', 'warning');
                 document.getElementById('stop-title').textContent = '⚠️ TIMEOUT';
-                document.getElementById('stop-title').style.color = '#d29922';
+                document.getElementById('stop-title').style.color = COLORS.yellow;
             }
         }, 1000);
         
@@ -1531,35 +1408,15 @@ function switchEquitySubTab(subTabName) {
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
     if (subTabName === 'compose') {
-        // Show initial message
         document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
     }
 }
 
 function getLogClass(line) {
-    // 🟢 VERDE: TP for, PRIVATE WS connected, PUBLIC WS connected
-    if (line.includes('TP for') || 
-        line.includes('PRIVATE WS connected') || 
-        line.includes('PUBLIC- WS connected')) {
-        return 'success';
-    }
-    
-    // 🔴 ROJO: Error, SL for
-    if (line.includes('Error') || line.includes('SL for')) {
-        return 'error';
-    }
-    
-    // 🟡 AMARILLO: WAR (WARNING)
-    if (line.includes('WAR')) {
-        return 'warning';
-    }
-    
-    // 🔵 AZUL: Checking (opcional, puedes quitarlo si no lo usas)
-    if (line.includes('Signals detected')) {
-        return 'info';
-    }
-    
-    // ⚪ GRIS: Todo lo demás
+    if (line.includes('TP for') || line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'success';
+    if (line.includes('Error') || line.includes('SL for')) return 'error';
+    if (line.includes('WAR')) return 'warning';
+    if (line.includes('DOBLE')) return 'info';
     return 'default';
 }
 
@@ -1646,19 +1503,15 @@ function renderCompactView(container, positions) {
     
     let allEntries = [];
     
-    // ✅ Check if allStrategiesList is loaded
     if (allStrategiesList && allStrategiesList.length > 0) {
-        // ✅ FULL MODE: Show ALL active + deprecating strategies
         const allActiveDeprecating = allStrategiesList.filter(s => 
             s.status === 'ACTIVE' || s.status === 'DEPRECATING'
         );
         
         allActiveDeprecating.forEach(strat => {
             if (groupedByStrategy[strat.id]) {
-                // Strategy has positions
                 allEntries.push([strat.id, groupedByStrategy[strat.id]]);
             } else {
-                // Strategy has NO positions - show 0
                 allEntries.push([strat.id, {
                     positions: [],
                     totalPnl: 0,
@@ -1671,11 +1524,9 @@ function renderCompactView(container, positions) {
             }
         });
     } else {
-        // ✅ FALLBACK MODE: Show only strategies with positions
         allEntries = Object.entries(groupedByStrategy);
     }
     
-    // ✅ Sort alphabetically
     const sortedEntries = allEntries.sort((a, b) => a[0].localeCompare(b[0]));
     
     if (sortedEntries.length === 0) {
@@ -1699,7 +1550,6 @@ function renderCompactView(container, positions) {
                 }
             }
             
-            // ✅ If no positions, show 0 in red
             if (data.isEmpty) {
                 return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strategyId + '</td><td class="direction-' + data.direction.toLowerCase() + '">' + data.direction.toUpperCase() + '</td><td>-</td><td style="text-align: right;">-</td><td style="text-align: center; color: #f85149; font-weight: 600;">0</td><td>-</td></tr>';
             }
@@ -1748,7 +1598,6 @@ async function loadStrategyAnalysis() {
             return;
         }
         
-        // ✅ Sort alphabetically by Strategy
         const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
         const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
@@ -1768,7 +1617,6 @@ async function loadBotConfig() {
         const res = await fetch('/api/bot-config');
         const data = await res.json();
         
-        // ✅ Store ALL strategies globally (for positions table)
         allStrategiesList = data.strategies || [];
         
         document.getElementById('config-account').textContent = data.account || '-';
@@ -1804,7 +1652,6 @@ async function loadBotConfig() {
         if (!data.strategies || data.strategies.length === 0) {
             strategiesBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">No strategies</td></tr>';
         } else {
-            // ✅ Sort strategies alphabetically by ID and add numbering
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
             strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
                 let statusBadge = '';
@@ -1836,27 +1683,22 @@ async function loadBotConfig() {
     }
 }
 
-// ✅ NEW: Equity & DD Tab Functions
 async function loadEquityTab() {
     try {
         const res = await fetch('/api/bot-config');
         const data = await res.json();
         
-        // ✅ Store ALL strategies (active + deprecating + not implemented)
         allStrategiesList = data.strategies || [];
         
-        // Populate checkboxes with ALL strategies
+        const allStrategies = allStrategiesList;
+        
         const checkboxContainer = document.getElementById('strategy-checkboxes');
         const allCheckbox = checkboxContainer.querySelector('#strat-all').parentElement;
         
-        // Clear all except "ALL" checkbox
         checkboxContainer.innerHTML = '';
         checkboxContainer.appendChild(allCheckbox);
         
-        // ✅ Sort strategies by ID (to match backend numbering)
-        const sortedStrategies = allStrategiesList.sort((a, b) => a.id.localeCompare(b.id));
-        
-        sortedStrategies.forEach((strat, index) => {
+        allStrategies.forEach((strat) => {
             const div = document.createElement('div');
             div.className = 'checkbox-item';
             
@@ -1864,20 +1706,27 @@ async function loadEquityTab() {
             checkbox.type = 'checkbox';
             checkbox.id = 'strat-' + strat.id;
             checkbox.value = strat.id;
-            checkbox.checked = true;
+            checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
             
             const label = document.createElement('label');
             label.htmlFor = 'strat-' + strat.id;
-            // ✅ Add strategy number matching backend (based on sorted self.strategies)
-            const stratNumber = String(index + 1).padStart(2, '0');
-            label.textContent = '[' + stratNumber + '] ' + strat.id + ' (' + strat.status + ')';
+            label.textContent = '[' + strat.number + '] ' + strat.id + ' (' + strat.status + ')';
+            
+            if (strat.status === 'ACTIVE') {
+                label.style.color = '#ffffff';
+                label.style.fontWeight = '600';
+            } else if (strat.status === 'DEPRECATING') {
+                label.style.color = '#d29922';
+            } else if (strat.status === 'NOT IMPLEMENTED') {
+                label.style.color = '#8b949e';
+                label.style.fontStyle = 'italic';
+            }
             
             div.appendChild(checkbox);
             div.appendChild(label);
             checkboxContainer.appendChild(div);
         });
         
-        // Handle "ALL" checkbox
         document.getElementById('strat-all').addEventListener('change', function() {
             const isChecked = this.checked;
             document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]').forEach(cb => {
@@ -1885,7 +1734,6 @@ async function loadEquityTab() {
             });
         });
         
-        // Initial chart load
         await updateEquityChart();
         
     } catch (error) {
@@ -1893,11 +1741,13 @@ async function loadEquityTab() {
     }
 }
 
-// ✅ NEW: Load compose analysis - TOP 10 combinations
 async function loadComposeAnalysis() {
     try {
         const metric = document.getElementById('compose-metric').value;
         const res = await fetch('/api/compose-analysis?metric=' + metric);
+        
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
         const data = await res.json();
         const container = document.getElementById('compose-container');
         
@@ -1906,15 +1756,36 @@ async function loadComposeAnalysis() {
             return;
         }
         
-        // Determine which column to highlight
+        function formatNumber(value, decimals = 2, suffix = '') {
+            if (value === null || value === undefined) return '-';
+            if (!isFinite(value)) return '-';
+            return value.toFixed(decimals) + suffix;
+        }
+        
+        function getMetricClass(value, metric_type) {
+            if (!isFinite(value)) return '';
+            
+            if (metric_type === 'profit_pct' || metric_type === 'profit_usd') {
+                return value >= 0 ? 'direction-long' : 'direction-short';
+            } else if (metric_type === 'profit_factor' || metric_type === 'sharpe') {
+                if (value >= 2.0) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
+                if (value >= 1.5) return 'style="color: #3fb950;"';
+                if (value >= 1.0) return 'style="color: #d29922;"';
+                return 'style="color: #f85149;"';
+            }
+            return '';
+        }
+        
         const metricNames = {
-            'total_profit_pct': 'Total Profit %',
+            'num_trades': '#trades',
+            'total_profit_pct': 'Profit_%',
+            'total_profit_usd': 'Profit_$',
             'profit_factor': 'Profit Factor',
-            'weekly_win_pct': 'Weekly Win %',
+            'weekly_win_pct': 'Weekly_%',
+            'win_rate': 'Win Rate',
             'max_dd': 'Max DD',
-            'recovery_factor': 'Recovery',
-            'sharpe_ratio': 'Sharpe',
-            'total_profit_usd': 'Profit $'
+            'ulcer_index': 'Ulcer',
+            'sharpe_ratio': 'Sharpe'
         };
         
         const highlightCol = metricNames[metric];
@@ -1922,50 +1793,75 @@ async function loadComposeAnalysis() {
         const html = '<table><thead><tr>' +
             '<th>#</th>' +
             '<th>Combination</th>' +
-            '<th' + (highlightCol === 'Total Profit %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Total Profit %</th>' +
+            '<th' + (highlightCol === '#trades' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>#trades</th>' +
+            '<th' + (highlightCol === 'Profit_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_%</th>' +
+            '<th' + (highlightCol === 'Profit_$' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_$</th>' +
             '<th' + (highlightCol === 'Profit Factor' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit Factor</th>' +
-            '<th' + (highlightCol === 'Weekly Win %' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly Win %</th>' +
+            '<th' + (highlightCol === 'Weekly_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly_%</th>' +
+            '<th' + (highlightCol === 'Win Rate' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Win Rate</th>' +
             '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
-            '<th' + (highlightCol === 'Recovery' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Recovery</th>' +
+            '<th' + (highlightCol === 'Ulcer' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Ulcer</th>' +
             '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
-            '<th' + (highlightCol === 'Profit $' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit $</th>' +
             '</tr></thead><tbody>' +
             data.map((row, idx) => {
-                const pfClass = getMetricStyleClass(row.profit_factor, 'profitFactor');
-                const recClass = getMetricStyleClass(row.recovery_factor, 'recovery');
-                const sharpeClass = getMetricStyleClass(row.sharpe_ratio, 'sharpe');
-                const profitPctClass = getMetricStyleClass(row.total_profit_pct, 'positiveNegative');
-                const profitUsdClass = getMetricStyleClass(row.total_profit_usd, 'positiveNegative');
+                const numTrades = row.num_trades || 0;
+                const totalProfitPct = formatNumber(row.total_profit_pct, 1, '%');
+                const profitUSD = formatNumber(row.total_profit_usd, 2);
+                const profitFactor = formatNumber(row.profit_factor, 2);
+                const weeklyWin = formatNumber(row.weekly_win_pct, 1, '%');
+                const winRate = formatNumber(row.win_rate, 1, '%');
+                const maxDD = formatNumber(row.max_dd, 2, '%');
+                const ulcerIndex = formatNumber(row.ulcer_index, 2);
+                const sharpe = formatNumber(row.sharpe_ratio, 2);
                 
-                const tpStyle = highlightCol === 'Total Profit %' ? 'font-weight: 900;' : '';
-                const pfStyle = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
-                const wwStyle = highlightCol === 'Weekly Win %' ? 'font-weight: 900;' : '';
+                const profitPctClass = isFinite(row.total_profit_pct) ? (row.total_profit_pct >= 0 ? 'direction-long' : 'direction-short') : '';
+                const profitUSDClass = isFinite(row.total_profit_usd) ? (row.total_profit_usd >= 0 ? 'direction-long' : 'direction-short') : '';
+                
+                const pfStyle = getMetricClass(row.profit_factor, 'profit_factor');
+                const sharpeStyle = getMetricClass(row.sharpe_ratio, 'sharpe');
+                
+                const ntStyle = highlightCol === '#trades' ? 'font-weight: 900;' : '';
+                const tpStyle = highlightCol === 'Profit_%' ? 'font-weight: 900;' : '';
+                const puStyle = highlightCol === 'Profit_$' ? 'font-weight: 900;' : '';
+                const pfHighlight = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
+                const wwStyle = highlightCol === 'Weekly_%' ? 'font-weight: 900;' : '';
+                const wrStyle = highlightCol === 'Win Rate' ? 'font-weight: 900;' : '';
                 const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
-                const recStyle = highlightCol === 'Recovery' ? 'font-weight: 900;' : '';
-                const sharpeStyle = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
-                const puStyle = highlightCol === 'Profit $' ? 'font-weight: 900;' : '';
+                const uiStyle = highlightCol === 'Ulcer' ? 'font-weight: 900;' : '';
+                const sharpeHighlight = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
+                
+                const prefixProfitPct = (isFinite(row.total_profit_pct) && row.total_profit_pct >= 0) ? '+' : '';
+                const prefixProfitUSD = (isFinite(row.total_profit_usd) && row.total_profit_usd >= 0) ? '+$' : '$';
                 
                 return '<tr>' +
                     '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
                     '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
-                    '<td ' + profitPctClass.replace('style="', 'style="' + tpStyle) + '>' + (row.total_profit_pct >= 0 ? '+' : '') + row.total_profit_pct + '%</td>' +
-                    '<td ' + pfClass.replace('style="', 'style="' + pfStyle) + '>' + row.profit_factor + '</td>' +
-                    '<td style="' + wwStyle + '">' + row.weekly_win_pct + '%</td>' +
-                    '<td style="color: #f85149; ' + ddStyle + '">' + row.max_dd + '%</td>' +
-                    '<td ' + recClass.replace('style="', 'style="' + recStyle) + '>' + row.recovery_factor + '</td>' +
-                    '<td ' + sharpeClass.replace('style="', 'style="' + sharpeStyle) + '>' + row.sharpe_ratio + '</td>' +
-                    '<td ' + profitUsdClass.replace('style="', 'style="' + puStyle) + '>' + (row.total_profit_usd >= 0 ? '+' : '') + '$' + row.total_profit_usd + '</td>' +
+                    '<td style="' + ntStyle + '">' + numTrades + '</td>' +
+                    '<td class="' + profitPctClass + '" style="' + tpStyle + '">' + prefixProfitPct + totalProfitPct + '</td>' +
+                    '<td class="' + profitUSDClass + '" style="' + puStyle + '">' + prefixProfitUSD + profitUSD + '</td>' +
+                    '<td ' + pfStyle + ' style="' + pfHighlight + '">' + profitFactor + '</td>' +
+                    '<td style="' + wwStyle + '">' + weeklyWin + '</td>' +
+                    '<td style="' + wrStyle + '">' + winRate + '</td>' +
+                    '<td style="color: #f85149; ' + ddStyle + '">' + maxDD + '</td>' +
+                    '<td style="' + uiStyle + '">' + ulcerIndex + '</td>' +
+                    '<td ' + sharpeStyle + ' style="' + sharpeHighlight + '">' + sharpe + '</td>' +
                     '</tr>';
             }).join('') +
             '</tbody></table>';
+        
         container.innerHTML = html;
+        
     } catch (error) {
-        console.error('Error loading compose analysis:', error);
-        document.getElementById('compose-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+        console.error('Error in compose:', error);
+        document.getElementById('compose-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">' +
+            '<div style="font-size: 18px; margin-bottom: 10px;">❌ Error loading data</div>' +
+            '<div style="font-size: 14px; color: #8b949e;">Check browser console (F12) for details</div>' +
+            '<div style="font-size: 12px; color: #8b949e; margin-top: 10px;">Error: ' + error.message + '</div>' +
+            '</div>';
     }
 }
 
-// ✅ NEW: Load symbols analysis
 async function loadSymbolsAnalysis() {
     try {
         const res = await fetch('/api/symbols-analysis');
@@ -1977,7 +1873,6 @@ async function loadSymbolsAnalysis() {
             return;
         }
         
-        // ✅ Sort by Win% descending (highest first)
         const sortedData = data.sort((a, b) => b.Win_Pct - a.Win_Pct);
         
         const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
@@ -1996,7 +1891,6 @@ async function loadSymbolsAnalysis() {
 
 async function updateEquityChart() {
     try {
-        // Get selected strategies
         const selectedStrategies = [];
         document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
             if (cb.value !== 'ALL') {
@@ -2009,49 +1903,47 @@ async function updateEquityChart() {
             return;
         }
         
-        // Fetch equity data
         const res = await fetch('/api/equity-data?strategies=' + selectedStrategies.join(','));
         const data = await res.json();
         
         if (!data.dates || data.dates.length === 0) {
-            alert('No data available for selected strategies');
+            const strategiesStr = selectedStrategies.join(', ');
+            alert(`No trades found for:\n${strategiesStr}\n\n${data.message || 'These strategies have no closed trades yet.'}`);
             return;
         }
         
-        // ✅ Display metrics
         document.getElementById('equity-metrics').style.display = 'block';
+        document.getElementById('metric-num-trades').textContent = data.num_trades || 0;
+        
+        const profitPct = ((data.total_profit_usd / data.capital_assigned) * 100) || 0;
+        document.getElementById('metric-profit-pct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+        
         document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
         document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
         document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
-        document.getElementById('metric-max-dd').textContent = '-' + (data.max_dd || 0) + '%';
-        document.getElementById('metric-recovery').textContent = (data.recovery_factor || 0);
+        document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
+        document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
+        document.getElementById('metric-ulcer-index').textContent = data.ulcer_index || 0;
         document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
         
-        // Color Profit USD
+        const pctElement = document.getElementById('metric-profit-pct');
+        applyMetricColor(pctElement, profitPct, 'positiveNegative');
+        
         const puElement = document.getElementById('metric-profit-usd');
         applyMetricColor(puElement, data.total_profit_usd, 'positiveNegative');
         
-        // Color profit factor
         const pfElement = document.getElementById('metric-profit-factor');
         applyMetricColor(pfElement, data.profit_factor, 'profitFactor');
         
-        // Color recovery factor
-        const recElement = document.getElementById('metric-recovery');
-        applyMetricColor(recElement, data.recovery_factor, 'recovery');
-        
-        // Color Sharpe ratio
         const sharpeElement = document.getElementById('metric-sharpe');
         applyMetricColor(sharpeElement, data.sharpe_ratio, 'sharpe');
         
-        // Destroy existing charts
         if (equityChart) equityChart.destroy();
         if (drawdownChart) drawdownChart.destroy();
         
-        // ✅ Determine equity line color (green if positive, red if negative)
         const finalEquity = data.equity_pct[data.equity_pct.length - 1] || 0;
         const equityColor = finalEquity >= 0 ? COLORS.equityPositive : COLORS.equityNegative;
         
-        // ✅ Create Equity Chart - ONE LINE
         const ctxEquity = document.getElementById('equityChart').getContext('2d');
         equityChart = new Chart(ctxEquity, {
             type: 'line',
@@ -2070,7 +1962,6 @@ async function updateEquityChart() {
             options: getBaseChartConfig('Equity Curve (%) - ' + selectedStrategies.length + ' strategies selected', false)
         });
         
-        // ✅ Create Drawdown Chart - ONE RED LINE
         const ctxDD = document.getElementById('drawdownChart').getContext('2d');
         drawdownChart = new Chart(ctxDD, {
             type: 'line',
@@ -2180,7 +2071,6 @@ function clearLogs() {
 
 let dataInterval, logsInterval;
 
-// ✅ Live clock update
 function updateClock() {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -2192,10 +2082,10 @@ function updateClock() {
 function startPolling() {
     loadData();
     loadLogs();
-    updateClock(); // Initial clock update
-    dataInterval = setInterval(() => loadData().catch(console.error), 10000);
-    logsInterval = setInterval(() => loadLogs().catch(console.error), 5000);
-    setInterval(updateClock, 1000); // Update clock every second
+    updateClock();
+    dataInterval = setInterval(() => loadData().catch(console.error), 3000);
+    logsInterval = setInterval(() => loadLogs().catch(console.error), 1500);
+    setInterval(updateClock, 1000);
 }
 
 function stopPolling() {
@@ -2212,42 +2102,24 @@ const savedView = localStorage.getItem('positionsView') || 'compact';
 currentPositionsView = savedView;
 
 async function initializeDashboard() {
-    console.log('🚀 Dashboard initialization started');
-    
     document.querySelectorAll('.view-btn').forEach(btn => {
         if (btn.textContent.toLowerCase().includes(savedView)) btn.classList.add('active');
         else btn.classList.remove('active');
     });
     
-    console.log('⏳ Calling waitForBackend()...');
     const backendReady = await waitForBackend();
-    
-    if (backendReady) {
-        console.log('✅ Backend confirmed ready, starting polling');
-    } else {
-        console.warn('⚠️ Backend timeout, starting polling anyway');
-    }
-    
-    // ✅ Load bot config FIRST to populate allStrategiesList
     await loadBotConfig();
-    
     startPolling();
-    console.log('✅ Dashboard fully initialized');
 }
 
-console.log('📄 Script loaded, scheduling initialization...');
-
 if (document.readyState === 'loading') {
-    console.log('📌 Document still loading, waiting for DOMContentLoaded');
     document.addEventListener('DOMContentLoaded', initializeDashboard);
 } else {
-    console.log('📌 Document already loaded, initializing immediately');
     initializeDashboard();
 }
 
 window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
-        console.log('🔄 Page restored from bfcache, re-initializing...');
         initializeDashboard();
     }
 });

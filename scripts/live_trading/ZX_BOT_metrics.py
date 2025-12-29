@@ -4,6 +4,7 @@ Todas las métricas financieras del bot están aquí para evitar duplicación.
 """
 
 import pandas as pd
+import numpy as np
 from typing import Optional, Dict
 
 class BotState:
@@ -151,6 +152,29 @@ class MetricsCalculator:
         return 0.0
     
     @staticmethod
+    def ulcer_index(equity_series: pd.Series) -> float:
+        """
+        Calcula el Ulcer Index.
+        
+        Ulcer Index = sqrt(mean(drawdown_pct^2))
+        
+        Args:
+            equity_series: Serie de pandas con valores de equity
+        
+        Returns:
+            Ulcer Index redondeado a 2 decimales
+            Retorna 0 si no hay datos
+        """
+        if len(equity_series) == 0:
+            return 0.0
+        
+        peaks = equity_series.cummax()
+        drawdown_pct = ((equity_series - peaks) / peaks) * 100
+        ulcer = np.sqrt((drawdown_pct ** 2).mean())
+        
+        return round(ulcer, 2)
+    
+    @staticmethod
     def total_profit_usd(df: pd.DataFrame) -> float:
         """
         Calcula el profit total en USD.
@@ -197,11 +221,13 @@ class MetricsCalculator:
         """
         if len(df) == 0:
             result = {
+                'num_trades': 0,
                 'total_profit_usd': 0.0,
                 'profit_factor': 0.0,
                 'weekly_win_pct': 0.0,
+                'win_rate': 0.0,
                 'max_dd': 0.0,
-                'recovery_factor': 0.0,
+                'ulcer_index': 0.0,
                 'sharpe_ratio': 0.0,
                 'daily_profit': pd.DataFrame()
             }
@@ -212,7 +238,7 @@ class MetricsCalculator:
         # 1. Ordenar por fecha de cierre
         df_sorted = df.sort_values('CLOSE_AT').copy()
         
-        # 2. Equity trade-by-trade (para Max DD preciso)
+        # 2. Equity trade-by-trade (para Max DD preciso y Ulcer Index)
         cumulative_profit = df_sorted['PROFIT'].cumsum()
         equity_trades = capital_assigned + cumulative_profit
         
@@ -231,13 +257,25 @@ class MetricsCalculator:
         # 6. Max DD (desde equity trade-by-trade para máxima precisión)
         max_dd = cls.max_drawdown_from_equity(equity_trades)
         
-        # 7. Construir resultado
+        # 7. Ulcer Index (desde equity trade-by-trade)
+        ulcer = cls.ulcer_index(equity_trades)
+        
+        # 8. Número de trades
+        num_trades = len(df)
+        
+        # 9. Win Rate (% de trades ganadores)
+        win_rate = (len(df[df['PROFIT'] > 0]) / num_trades * 100) if num_trades > 0 else 0.0
+        win_rate = round(win_rate, 1)
+        
+        # 10. Construir resultado
         result = {
+            'num_trades': num_trades,
             'total_profit_usd': total_profit,
             'profit_factor': cls.profit_factor(df),
             'weekly_win_pct': cls.weekly_win_percentage(df),
+            'win_rate': win_rate,
             'max_dd': max_dd,
-            'recovery_factor': cls.recovery_factor(total_profit, max_dd),
+            'ulcer_index': ulcer,
             'sharpe_ratio': cls.sharpe_ratio(daily_returns),
             'daily_profit': daily_profit  # ← Para Curves (gráficas)
         }

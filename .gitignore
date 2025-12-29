@@ -3,9 +3,8 @@ env_quant/
 *.xlsx
 *.h5
 *.pt
+*.log
 __pycache__/
 
 scripts/utils/ZZ_connect.py
 scripts/Z_add_signals*
-
-

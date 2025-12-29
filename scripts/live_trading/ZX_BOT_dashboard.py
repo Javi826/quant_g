@@ -11,7 +11,6 @@ import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
 
-# ✅ Import metrics calculator
 from ZX_BOT_metrics import MetricsCalculator
 
 
@@ -45,36 +44,24 @@ class DashboardServer:
         self.implemented_strategies = implemented_strategies or set()
         self.symbols_by_strategy = symbols_by_strategy or {}
         
-        # Rutas de archivos
         self.state_file = os.path.join(base_dir, f'bot_state_{account_number}.json')
         self.trades_file = os.path.join(base_dir, f'bot_trades_{account_number}.xlsx')
-        self.log_file = os.path.join(base_dir, f'BOT_all_strategies_{account_number}.log')
+        self.log_file = os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
         
-        # ⭐ Templates directory COMÚN (no dentro de bot_files_XX)
         self.templates_dir = os.path.join(os.path.dirname(base_dir), 'templates')
         os.makedirs(self.templates_dir, exist_ok=True)
         
-        # Flask app
         self.app = Flask(__name__, template_folder=self.templates_dir)
         self.app.last_log_position = 0
         
-        # Registrar rutas
         self._register_routes()
         
-        # Thread del servidor
         self.server_thread = None
         self.running = False
-    
-    # ============================================
-    # 🔧 MÉTODOS AUXILIARES PRIVADOS
-    # ============================================
     
     def _load_trades_dataframe(self):
         """
         Carga y valida el DataFrame de trades desde el archivo Excel.
-        
-        Este método centraliza la lógica de carga y validación que se repite
-        en múltiples endpoints.
         
         Returns:
             pd.DataFrame: DataFrame de trades si existe y tiene datos
@@ -96,18 +83,11 @@ class DashboardServer:
         """
         Prepara el DataFrame de trades con columnas de fechas procesadas.
         
-        Convierte las columnas de fechas a datetime y calcula la duración
-        de cada trade. Este procesamiento es común en varios endpoints.
-        
         Args:
             df: DataFrame crudo de trades
         
         Returns:
-            pd.DataFrame: DataFrame con columnas adicionales:
-                - OPEN_AT: datetime
-                - CLOSE_AT: datetime
-                - CLOSE_DATE: datetime (copia de CLOSE_AT)
-                - DURATION: duración en días (float)
+            pd.DataFrame: DataFrame con columnas adicionales
         """
         df = df.copy()
         df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
@@ -120,25 +100,11 @@ class DashboardServer:
         """
         Calcula el capital asignado por estrategia.
         
-        El capital total se divide equitativamente entre todas las estrategias
-        implementadas (o el número especificado).
-        
         Args:
-            num_strategies: Número de estrategias para dividir el capital.
-                          Si None, usa len(self.implemented_strategies)
+            num_strategies: Número de estrategias para dividir el capital
         
         Returns:
             float: Capital asignado por estrategia
-                   Retorna 0.0 si num_strategies es 0
-        
-        Examples:
-            >>> # Con 10 estrategias y 10000 de capital
-            >>> capital_per_strat = self._calculate_capital_allocation()
-            >>> # Retorna: 1000.0
-            
-            >>> # Con número específico
-            >>> capital_for_combo = self._calculate_capital_allocation(3)
-            >>> # Para una combo de 3 estrategias
         """
         if num_strategies is None:
             num_strategies = len(self.implemented_strategies)
@@ -148,33 +114,88 @@ class DashboardServer:
         
         return self.initial_capital / num_strategies
     
-    # ============================================
-    # 📡 RUTAS DE LA API
-    # ============================================
+    def _get_full_strategies_list_with_numbers(self):
+        """
+        Genera la lista completa de estrategias con numeración consistente.
+        
+        Returns:
+            tuple: (strategies_list, strategy_numbers_dict)
+        """
+        declared_names = {s['name'] for s in self.strategies}
+        
+        strategies_list = []
+        
+        for strat in self.strategies:
+            is_active = strat.get('active', True)
+            
+            if is_active:
+                status = 'ACTIVE'
+            else:
+                status = 'DEPRECATING'
+            
+            symbols_count = len(self.symbols_by_strategy.get(strat['id'], []))
+            
+            strategies_list.append({
+                'id': strat['id'],
+                'name': strat.get('name', strat['id']),
+                'timeframe': strat.get('timeframe', 'N/A'),
+                'direction': strat.get('direction', 'N/A'),
+                'status': status,
+                'symbols_count': symbols_count,
+                'tp_pct': strat.get('tp_pct', 'N/A'),
+                'sl_pct': strat.get('sl_pct', 'N/A'),
+                'order_amount': strat.get('order_amount', 'N/A'),
+                'sell_after_ncandles': strat.get('sell_after_ncandles', 'N/A'),
+                'lookback': strat.get('lookback', 'N/A'),
+                'tolerance': strat.get('tolerance', 'N/A'),
+                'ma_period': strat.get('ma_period', 'N/A'),
+                'impulse': strat.get('impulse', 'N/A'),
+                'trend_th': strat.get('trend_th', 'N/A')
+            })
+        
+        not_declared = self.implemented_strategies - declared_names
+        for name in sorted(not_declared):
+            strategies_list.append({
+                'id': name,
+                'name': name,
+                'timeframe': 'N/A',
+                'direction': 'N/A',
+                'status': 'NOT IMPLEMENTED',
+                'symbols_count': 0,
+                'tp_pct': 'N/A',
+                'sl_pct': 'N/A',
+                'order_amount': 'N/A',
+                'sell_after_ncandles': 'N/A',
+                'lookback': 'N/A',
+                'tolerance': 'N/A',
+                'ma_period': 'N/A',
+                'impulse': 'N/A',
+                'trend_th': 'N/A'
+            })
+        
+        strategies_list.sort(key=lambda x: x['id'])
+        
+        strategy_numbers = {}
+        for i, strat in enumerate(strategies_list, 1):
+            number = str(i).zfill(2)
+            strat['number'] = number
+            strategy_numbers[strat['id']] = number
+        
+        return strategies_list, strategy_numbers
     
     def _register_routes(self):
         """Registra todas las rutas de la API del dashboard"""
         
         @self.app.route('/')
         def index():
-            """Página principal del dashboard - Pasar account_number al template"""
             return render_template('dashboard.html', account=self.account_number)
         
         @self.app.route('/favicon.jpg')
         def favicon():
-            """Servir favicon desde la carpeta de cada cuenta"""
-            return send_from_directory(
-                self.base_dir,  # ✅ CORRECTO - cada cuenta tiene el suyo
-                'favicon.jpg',
-                mimetype='image/jpeg'
-            )
+            return send_from_directory(self.base_dir, 'favicon.jpg', mimetype='image/jpeg')
         
         @self.app.route('/api/health')
         def health_check():
-            """
-            ✅ NEW: Health check rápido - no depende de archivos
-            Responde inmediatamente para verificar que Flask está listo
-            """
             return jsonify({
                 'status': 'ready',
                 'account': self.account_number,
@@ -183,25 +204,16 @@ class DashboardServer:
         
         @self.app.route('/api/logs/stream')
         def stream_logs():
-            """
-            Devuelve las líneas nuevas del log desde la última lectura.
-            Limpia códigos ANSI para mejor visualización en web.
-            """
             try:
                 if not os.path.exists(self.log_file):
                     return jsonify({'logs': [], 'timestamp': None})
                 
                 with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    # Ir a la última posición leída
                     f.seek(self.app.last_log_position)
                     new_lines = f.readlines()
-                    # Actualizar posición para próxima lectura
                     self.app.last_log_position = f.tell()
                 
-                # Limpiar códigos ANSI (colores de terminal)
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                
-                # Limpiar emojis
                 emoji_pattern = re.compile(
                     "["
                     u"\U0001F600-\U0001F64F"
@@ -230,7 +242,6 @@ class DashboardServer:
         
         @self.app.route('/api/status')
         def get_status():
-            """Estado general del bot"""
             try:
                 if not os.path.exists(self.state_file):
                     return jsonify({'error': 'State file not found'}), 404
@@ -238,18 +249,15 @@ class DashboardServer:
                 with open(self.state_file, 'r') as f:
                     state = json.load(f)
                 
-                # Contar posiciones abiertas
                 total_positions = sum(len(positions) 
                                     for positions in state.get('positions', {}).values())
                 
-                # Obtener balance actual del WebSocket
                 try:
                     balance = self.get_balance(None)
                 except Exception as e:
                     print(f"⚠️  Error getting balance: {e}")
                     balance = 0.0
                 
-                # Calcular profit cerrado desde Excel
                 total_profit = 0
                 num_trades = 0
                 positive_trades = 0
@@ -268,7 +276,6 @@ class DashboardServer:
                     if self.initial_capital > 0:
                         profit_pct = (total_profit / self.initial_capital) * 100
                 
-                # Calcular PnL abierto
                 open_pnl = 0
                 for strat_id, positions in state.get('positions', {}).items():
                     for pos in positions:
@@ -288,7 +295,6 @@ class DashboardServer:
                         except Exception as e:
                             print(f"⚠️No PnL - {pos.get('symbol')}: {e}")
                 
-                # Obtener precio de BTC
                 btc_price = 0
                 try:
                     btc_price = float(self.get_current_price('BTCUSDT'))
@@ -313,10 +319,8 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
-        
         @self.app.route('/api/positions')
         def get_positions():
-            """Posiciones con precios actuales"""
             try:
                 if not os.path.exists(self.state_file):
                     return jsonify([])
@@ -370,13 +374,11 @@ class DashboardServer:
             
         @self.app.route('/api/bot/stop', methods=['POST'])
         def stop_bot():
-            """Stop the bot by killing its process directly"""
             try:
                 import subprocess
                 import os
                 import signal
                 
-                # Find the bot process PID
                 result = subprocess.run(
                     ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
                     capture_output=True,
@@ -385,8 +387,6 @@ class DashboardServer:
                 
                 if result.returncode == 0:
                     pid = int(result.stdout.strip())
-                    
-                    # Kill the process with SIGTERM (clean shutdown)
                     os.kill(pid, signal.SIGTERM)
                     
                     return jsonify({
@@ -405,11 +405,9 @@ class DashboardServer:
         
         @self.app.route('/api/bot/verify-stopped')
         def verify_stopped():
-            """Verify if the bot process is still running"""
             try:
                 import subprocess
                 
-                # Check if bot process exists
                 result = subprocess.run(
                     ['pgrep', '-f', f'BOT_orchestator_WS.py --account {self.account_number}'],
                     capture_output=True,
@@ -419,21 +417,13 @@ class DashboardServer:
                 running = result.returncode == 0
                 pid = int(result.stdout.strip()) if running else None
                 
-                return jsonify({
-                    'pid': pid,
-                    'running': running
-                })
+                return jsonify({'pid': pid, 'running': running})
                 
             except Exception as e:
-                # If there's an error, assume the process stopped
-                return jsonify({
-                    'running': False,
-                    'error': str(e)
-                }), 200
+                return jsonify({'running': False, 'error': str(e)}), 200
                 
         @self.app.route('/api/trades/recent')
         def get_recent_trades():
-            """Últimos 15 trades cerrados"""
             try:
                 df = self._load_trades_dataframe()
                 if df is None:
@@ -446,7 +436,6 @@ class DashboardServer:
         
         @self.app.route('/api/strategy-analysis')
         def get_strategy_analysis():
-            """Análisis detallado por estrategia"""
             try:
                 df = self._load_trades_dataframe()
                 if df is None:
@@ -498,9 +487,7 @@ class DashboardServer:
         
         @self.app.route('/api/bot-config')
         def get_bot_config():
-            """Configuración y estado del bot con detección de 3 estados"""
             try:
-                # WebSocket status
                 ws_status = {
                     'public_connected': False,
                     'private_connected': False,
@@ -508,9 +495,9 @@ class DashboardServer:
                 }
                 
                 try:
-                    import ZX_BOT_ws_manager
-                    if ZX_BOT_ws_manager._ws_manager:
-                        ws = ZX_BOT_ws_manager._ws_manager
+                    import ZX_BOT_websocket
+                    if ZX_BOT_websocket._ws_manager:
+                        ws = ZX_BOT_websocket._ws_manager
                         ws_status['public_connected'] = (
                             ws.public_ws and 
                             ws.public_ws.sock and 
@@ -525,7 +512,6 @@ class DashboardServer:
                 except:
                     pass
                 
-                # Agrupar estrategias por timeframe
                 timeframes_grouped = {}
                 for strat in self.strategies:
                     tf = strat.get('timeframe', 'Unknown')
@@ -533,68 +519,11 @@ class DashboardServer:
                         timeframes_grouped[tf] = []
                     timeframes_grouped[tf].append(strat['id'])
                 
-                # Detectar 3 estados: ACTIVE, DEPRECATING, NOT IMPLEMENTED
-                declared_names = {s['name'] for s in self.strategies}
+                strategies_list, _ = self._get_full_strategies_list_with_numbers()
                 
-                active_count = 0
-                deprecating_count = 0
-                not_implemented_count = len(self.implemented_strategies - declared_names)
-                
-                # Preparar lista completa de estrategias
-                strategies_list = []
-                
-                # 1. Estrategias declaradas en STRATEGIES
-                for strat in self.strategies:
-                    is_active = strat.get('active', True)
-                    
-                    if is_active:
-                        status = 'ACTIVE'
-                        active_count += 1
-                    else:
-                        status = 'DEPRECATING'
-                        deprecating_count += 1
-                    
-                    # Obtener número de símbolos
-                    symbols_count = len(self.symbols_by_strategy.get(strat['id'], []))
-                    
-                    strategies_list.append({
-                        'id': strat['id'],
-                        'name': strat.get('name', strat['id']),
-                        'timeframe': strat.get('timeframe', 'N/A'),
-                        'direction': strat.get('direction', 'N/A'),
-                        'status': status,
-                        'symbols_count': symbols_count,
-                        'tp_pct': strat.get('tp_pct', 'N/A'),
-                        'sl_pct': strat.get('sl_pct', 'N/A'),
-                        'order_amount': strat.get('order_amount', 'N/A'),
-                        'sell_after_ncandles': strat.get('sell_after_ncandles', 'N/A'),
-                        'lookback': strat.get('lookback', 'N/A'),
-                        'tolerance': strat.get('tolerance', 'N/A'),
-                        'ma_period': strat.get('ma_period', 'N/A'),
-                        'impulse': strat.get('impulse', 'N/A'),
-                        'trend_th': strat.get('trend_th', 'N/A')
-                    })
-                
-                # 2. Estrategias implementadas pero NO declaradas
-                not_declared = self.implemented_strategies - declared_names
-                for name in sorted(not_declared):
-                    strategies_list.append({
-                        'id': name,
-                        'name': name,
-                        'timeframe': 'N/A',
-                        'direction': 'N/A',
-                        'status': 'NOT IMPLEMENTED',
-                        'symbols_count': 0,
-                        'tp_pct': 'N/A',
-                        'sl_pct': 'N/A',
-                        'order_amount': 'N/A',
-                        'sell_after_ncandles': 'N/A',
-                        'lookback': 'N/A',
-                        'tolerance': 'N/A',
-                        'ma_period': 'N/A',
-                        'impulse': 'N/A',
-                        'trend_th': 'N/A'
-                    })
+                active_count = sum(1 for s in strategies_list if s['status'] == 'ACTIVE')
+                deprecating_count = sum(1 for s in strategies_list if s['status'] == 'DEPRECATING')
+                not_implemented_count = sum(1 for s in strategies_list if s['status'] == 'NOT IMPLEMENTED')
                 
                 return jsonify({
                     'account': self.account_number,
@@ -614,7 +543,6 @@ class DashboardServer:
         
         @self.app.route('/api/config')
         def get_config():
-            """Configuración legacy (mantener por compatibilidad)"""
             try:
                 strategies_info = []
                 for strat in self.strategies:
@@ -636,104 +564,84 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
-        # ✅ NEW: Compose Analysis endpoint - TOP 10 combinations
         @self.app.route('/api/compose-analysis')
         def get_compose_analysis():
-            """
-            Calcula todas las combinaciones de estrategias y devuelve TOP 10 por métrica seleccionada.
-            Query param: metric (profit_factor, weekly_win_pct, max_dd, expectancy, recovery_factor, sharpe_ratio)
-            """
             try:
+                from itertools import combinations
+                
                 metric = request.args.get('metric', 'profit_factor')
                 
                 df = self._load_trades_dataframe()
                 if df is None:
                     return jsonify([])
                 
-                # Get all unique strategies with trades
-                strategies = df['STRATEGY'].unique().tolist()
+                strategies_list, strategy_numbers = self._get_full_strategies_list_with_numbers()
                 
-                if len(strategies) == 0:
+                active_deprecating = [s for s in strategies_list 
+                                     if s['status'] in ('ACTIVE', 'DEPRECATING')]
+                
+                strategies_in_excel = df['STRATEGY'].unique().tolist()
+                
+                strategies_with_trades = []
+                for strat in active_deprecating:
+                    if strat['id'] in strategies_in_excel:
+                        strategies_with_trades.append(strat['id'])
+                
+                if len(strategies_with_trades) == 0:
                     return jsonify([])
-                
-                # Map strategy names to numbers using self.strategies (has correct 'id' field)
-                # Extract IDs and sort alphabetically
-                all_strategy_ids = [s['id'] for s in self.strategies]
-                sorted_strategy_ids = sorted(all_strategy_ids)
-                
-                strategy_numbers = {}
-                for i, strat_id in enumerate(sorted_strategy_ids, 1):
-                    strategy_numbers[strat_id] = str(i).zfill(2)
-                
-                from itertools import combinations
                 
                 results = []
                 
-                # Calculate capital per strategy (for allocation calculation)
                 capital_per_strat = self._calculate_capital_allocation()
                 
-                # Generate all combinations (1 to N strategies)
-                for r in range(1, len(strategies) + 1):
-                    for combo in combinations(strategies, r):
-                        # ⭐ Skip combinations with non-implemented strategies
-                        if any(s not in strategy_numbers for s in combo):
-                            continue
-                        
-                        # Filter trades for this combination
+                for r in range(1, len(strategies_with_trades) + 1):
+                    for combo in combinations(strategies_with_trades, r):
                         df_combo = df[df['STRATEGY'].isin(combo)]
                         
                         if len(df_combo) == 0:
                             continue
                         
-                        # ✅ CALCULAR CAPITAL ASIGNADO para esta combinación
                         combo_capital = capital_per_strat * len(combo)
                         
-                        # ✅ CALCULAR MÉTRICAS usando método unificado
                         metrics = MetricsCalculator.calculate_all_metrics(
                             df=df_combo,
                             capital_assigned=combo_capital,
-                            include_profit_pct=True  # ← Compose necesita total_profit_pct
+                            include_profit_pct=True
                         )
                         
-                        # Create combination string using numbers
                         combo_numbers = [strategy_numbers.get(s, '??') for s in combo]
                         combo_str = '+'.join(combo_numbers)
                         
                         results.append({
                             'combination': combo_str,
+                            'num_trades': metrics['num_trades'],
                             'total_profit_pct': metrics['total_profit_pct'],
                             'total_profit_usd': metrics['total_profit_usd'],
                             'profit_factor': metrics['profit_factor'],
                             'weekly_win_pct': metrics['weekly_win_pct'],
+                            'win_rate': metrics['win_rate'],
                             'max_dd': metrics['max_dd'],
-                            'recovery_factor': metrics['recovery_factor'],
+                            'ulcer_index': metrics['ulcer_index'],
                             'sharpe_ratio': metrics['sharpe_ratio']
                         })
                 
-                # Sort by selected metric
                 if metric == 'max_dd':
-                    # For Max DD, lower (less negative) is better
                     results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
+                elif metric == 'ulcer_index':
+                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=False)
                 else:
-                    # For all other metrics, higher is better
                     results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
                 
-                # Return TOP 10
                 return jsonify(results_sorted[:10])
                 
             except Exception as e:
-                print(f"Error in compose analysis: {e}")
+                print(f"❌ Error in compose: {e}")
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
         
-        # ✅ NEW: Symbols Analysis endpoint
         @self.app.route('/api/symbols-analysis')
         def get_symbols_analysis():
-            """
-            Análisis de performance por símbolo.
-            Devuelve: Symbol, Total Trades, Win %, Total Profit, Avg Profit
-            """
             try:
                 df = self._load_trades_dataframe()
                 if df is None:
@@ -762,66 +670,67 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
-        # ✅ NEW: Equity & Drawdown endpoint - AGGREGATED
         @self.app.route('/api/equity-data')
         def get_equity_data():
-            """
-            Calcula curvas AGREGADAS de equity y drawdown en PORCENTAJE.
-            Query params: ?strategies=strat1,strat2,strat3
-            Devuelve UNA SOLA curva sumando todas las estrategias seleccionadas.
-            """
             try:
                 df = self._load_trades_dataframe()
                 if df is None:
                     return jsonify({'error': 'No trades file found'}), 404
                 
-                # Obtener estrategias seleccionadas
                 strategies_param = request.args.get('strategies', '')
                 selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
                 
                 if not selected_strategies:
                     return jsonify({'error': 'No strategies selected'}), 400
                 
-                # Filtrar por estrategias seleccionadas
                 df = df[df['STRATEGY'].isin(selected_strategies)]
                 
                 if df.empty:
-                    return jsonify({'dates': [], 'equity_pct': [], 'drawdown_pct': []})
+                    num_selected = len(selected_strategies)
+                    return jsonify({
+                        'dates': [],
+                        'equity_pct': [],
+                        'drawdown_pct': [],
+                        'capital_assigned': 0,
+                        'num_selected': num_selected,
+                        'total_strategies': 0,
+                        'num_trades': 0,
+                        'total_profit_usd': 0,
+                        'profit_factor': 0,
+                        'weekly_win_pct': 0,
+                        'win_rate': 0,
+                        'max_dd': 0,
+                        'ulcer_index': 0,
+                        'sharpe_ratio': 0,
+                        'message': 'No trades found for selected strategies'
+                    })
                 
-                # Preparar fechas
                 df = self._prepare_trades_dataframe(df)
                 df = df.sort_values('CLOSE_AT')
                 df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
                 
-                # ✅ CALCULAR CAPITAL INICIAL ASIGNADO
                 num_selected = len(selected_strategies)
                 total_strategies = len(self.implemented_strategies) if len(self.implemented_strategies) > 0 else len(self.strategies)
                 
-                # Capital asignado = (capital_total / total_strategies) * num_selected
                 capital_per_strategy = self._calculate_capital_allocation(total_strategies)
                 capital_assigned = capital_per_strategy * num_selected
                 
-                # ✅ CALCULAR MÉTRICAS usando método unificado
                 metrics_data = MetricsCalculator.calculate_all_metrics(
                     df=df,
                     capital_assigned=capital_assigned,
                     include_profit_pct=False
                 )
                 
-                # ✅ EXTRAER EQUITY DIARIA para gráficas
                 daily_profit = metrics_data['daily_profit']
                 
                 if not daily_profit.empty:
-                    # Convertir fechas a string para JSON
                     daily_profit['date_str'] = daily_profit['date'].astype(str)
                     
-                    # Calcular equity en porcentaje
                     if capital_assigned > 0:
                         daily_profit['equity_pct'] = ((daily_profit['equity_usd'] / capital_assigned) - 1) * 100
                     else:
                         daily_profit['equity_pct'] = 0
                     
-                    # Calcular drawdown en porcentaje
                     daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
                     daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
                     
@@ -840,11 +749,13 @@ class DashboardServer:
                     'capital_assigned': round(capital_assigned, 2),
                     'num_selected': num_selected,
                     'total_strategies': total_strategies,
+                    'num_trades': metrics_data['num_trades'],
                     'total_profit_usd': metrics_data['total_profit_usd'],
                     'profit_factor': metrics_data['profit_factor'],
                     'weekly_win_pct': metrics_data['weekly_win_pct'],
+                    'win_rate': metrics_data['win_rate'],
                     'max_dd': metrics_data['max_dd'],
-                    'recovery_factor': metrics_data['recovery_factor'],
+                    'ulcer_index': metrics_data['ulcer_index'],
                     'sharpe_ratio': metrics_data['sharpe_ratio']
                 })
                 
@@ -898,7 +809,6 @@ class DashboardServer:
 
 def create_dashboard_template(base_dir):
     """Crea el archivo HTML del dashboard si no existe en ruta común"""
-    # ⭐ Ruta común (no dentro de bot_files_XX)
     templates_dir = os.path.join(os.path.dirname(base_dir), 'templates')
     os.makedirs(templates_dir, exist_ok=True)
     
