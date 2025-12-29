@@ -4,6 +4,7 @@ env_quant/
 *.h5
 *.pt
 *.log
+*.json
 __pycache__/
 
 scripts/utils/ZZ_connect.py
