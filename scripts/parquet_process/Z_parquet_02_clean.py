@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-# 📁 Folders with the files
+# 📁 Folders with the filess
 BASE_DIR = Path(__file__).resolve().parent.parent
 input_folder = BASE_DIR / "data" / "crypto_2022_2"
 output_folder = BASE_DIR / "data" / "crypto_2022_2_clean"
