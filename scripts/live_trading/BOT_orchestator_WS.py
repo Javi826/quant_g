@@ -109,7 +109,7 @@ STRATEGY_CANDLES = {}
 # STRATEGY CONFIGURATION
 #==========================================================================
 STRAT_A = {
-    'id': 'double_top_long_4H',
+    'id': '01_double_top_long_4H',
     'name': 'double_top_long_4H',
     'timeframe': '4H',
     'active': False,
@@ -124,7 +124,7 @@ STRAT_A = {
 }
 
 STRAT_B = {
-    'id': 'revers_long_4H',
+    'id': '02_reversal_long_4H',
     'name': 'reversal_long_4H',
     'timeframe': '4H',
     'active': True,
@@ -139,7 +139,7 @@ STRAT_B = {
 }
 
 STRAT_C = {
-    'id': 'parity_long_4H',
+    'id': '03_parity_long_4H',
     'name': 'parity_long_4H',
     'timeframe': '4H', 
     'active': True,
@@ -154,7 +154,7 @@ STRAT_C = {
 }
 
 STRAT_D = {
-    'id': 'revers_short_4H',
+    'id': '04_reversal_short_4H',
     'name': 'reversal_short_4H',
     'timeframe': '4H',  
     'active': True,
@@ -169,7 +169,7 @@ STRAT_D = {
 }
 
 STRAT_E = {
-    'id': 'parity_short_4H',
+    'id': '05_parity_short_4H',
     'name': 'parity_short_4H',
     'timeframe': '4H',
     'active': False,
@@ -184,7 +184,7 @@ STRAT_E = {
 }
 
 STRAT_F = {
-    'id': 'revers_long_1H',
+    'id': '06_reversal_long_1H',
     'name': 'reversal_long_1H',
     'timeframe': '1H',
     'active': True,
@@ -199,7 +199,7 @@ STRAT_F = {
 }
 
 STRAT_G = {
-    'id': 'revers_short_1H',
+    'id': '07_reversal_short_1H',
     'name': 'reversal_short_1H',
     'timeframe': '1H', 
     'active': True,
@@ -214,7 +214,7 @@ STRAT_G = {
 }
 
 STRAT_H = {
-    'id': 'revers_long_6Hutc',
+    'id': '08_reversal_long_6Hutc',
     'name': 'reversal_long_6Hutc',
     'timeframe': '6Hutc', 
     'active': True,
@@ -229,7 +229,7 @@ STRAT_H = {
 }
 
 STRAT_I = {
-    'id': 'revers_short_6Hutc',
+    'id': '09_reversal_short_6Hutc',
     'name': 'reversal_short_6Hutc',
     'timeframe': '6Hutc', 
     'active': True,
@@ -244,7 +244,7 @@ STRAT_I = {
 }
 
 STRAT_J = {
-    'id': 'parity_long_1H',
+    'id': '10_parity_long_1H',
     'name': 'parity_long_1H',
     'timeframe': '1H', 
     'active': True,
@@ -259,7 +259,7 @@ STRAT_J = {
 }
 
 STRAT_K = {
-    'id': 'parity_short_1H',
+    'id': '11_parity_short_1H',
     'name': 'parity_short_1H',
     'timeframe': '1H',
     'active': True,
@@ -274,7 +274,7 @@ STRAT_K = {
 }
 
 STRAT_L = {
-    'id': 'parity_long_6Hutc',
+    'id': '12_parity_long_6Hutc',
     'name': 'parity_long_6Hutc',
     'timeframe': '6Hutc',
     'active': True,
@@ -289,7 +289,7 @@ STRAT_L = {
 }
 
 STRAT_M = {
-    'id': 'orderblocks_short_4H',
+    'id': '13_orderblocks_short_4H',
     'name': 'orderblocks_short_4H',
     'timeframe': '4H',
     'active': True,
@@ -304,7 +304,7 @@ STRAT_M = {
 }
 
 STRAT_N = {
-    'id': 'orderblocks_long_4H',
+    'id': '14_orderblocks_long_4H',
     'name': 'orderblocks_long_4H',
     'timeframe': '4H',
     'active': True,

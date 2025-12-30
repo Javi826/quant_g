@@ -2,6 +2,7 @@
 """
 Validation functions for bot strategy configuration
 """
+import re
 
 def validate_strategy_configuration(strategies, implemented_strategies):
 
@@ -232,6 +233,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     
     if validation_7_errors == 0:
         print("   🆗 Val 7: All strategy IDs unique")
+        
     # --------------------------------------------------------------------
     # VALIDATION 8: Candles
     # -------------------------------------------------------------------- 
@@ -306,4 +308,53 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     
     if validation_12_errors == 0:
         print("   🆗 Val 12: All TF are valid")
+    
+    # --------------------------------------------------------------------
+    # VALIDATION 13: ID format with numeric prefix
+    # -------------------------------------------------------------------- 
+    validation_13_errors = 0
+    
+    for strat in strategies:
+        strat_id = strat.get('id', '')
+        
+        # Validar formato: NN_nombre_estrategia (mínimo 2 dígitos + guión bajo + algo)
+        if not re.match(r'^\d{2}_\w+', strat_id):
+            errors.append(
+                f"❌ Strategy '{strat_id}' has invalid ID format. "
+                f"Expected: 'NN_strategy_name' (e.g., '02_reversal_long_4H')"
+            )
+            validation_13_errors += 1
+            continue  # Skip demás validaciones para este ID
+        
+        # Extraer número del ID
+        id_parts = strat_id.split('_', 1)  # Split solo en el primer '_'
+        id_number = id_parts[0]
+        
+        # Validar que el número tenga exactamente 2 dígitos
+        if len(id_number) != 2:
+            errors.append(
+                f"❌ Strategy '{strat_id}' numeric prefix must be exactly 2 digits "
+                f"(e.g., '02_name', not '2_name' or '002_name')"
+            )
+            validation_13_errors += 1
+        
+        # Validar que el número sea válido (01-99)
+        try:
+            num_value = int(id_number)
+            if num_value < 1 or num_value > 99:
+                errors.append(
+                    f"❌ Strategy '{strat_id}' numeric prefix must be 01-99 "
+                    f"(found: {id_number})"
+                )
+                validation_13_errors += 1
+        except ValueError:
+            # Ya se capturó con la regex, pero por si acaso
+            errors.append(
+                f"❌ Strategy '{strat_id}' numeric prefix is not a valid number"
+            )
+            validation_13_errors += 1
+    
+    if validation_13_errors == 0:
+        print("   🆗 Val 13: All strategy IDs have correct numeric prefix format (NN_name)")
+    
     return errors, warnings

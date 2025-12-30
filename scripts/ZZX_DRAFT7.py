@@ -2523,18 +2523,6 @@ function clearLogs() {
     }
 }
 
-// Configuración de intervalos de polling adaptativo
-const POLLING_CONFIG = {
-    data: {
-        active: 5000,      // 5 segundos cuando pestaña visible
-        inactive: 15000    // 15 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
-    },
-    logs: {
-        active: 2000,      // 2 segundos cuando pestaña visible
-        inactive: 5000     // 5 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
-    }
-};
-
 let dataInterval, logsInterval;
 
 function updateClock() {
@@ -2546,22 +2534,11 @@ function updateClock() {
 }
 
 function startPolling() {
-    // Detener polling previo si existe (para evitar duplicados al cambiar de pestaña)
-    stopPolling();
-    
-    // Carga inmediata de datos
     loadData();
     loadLogs();
     updateClock();
-    
-    // Determinar intervalos según visibilidad de la pestaña
-    const isActive = !document.hidden;
-    const dataDelay = isActive ? POLLING_CONFIG.data.active : POLLING_CONFIG.data.inactive;
-    const logsDelay = isActive ? POLLING_CONFIG.logs.active : POLLING_CONFIG.logs.inactive;
-    
-    // Iniciar polling con intervalos apropiados
-    dataInterval = setInterval(() => loadData().catch(console.error), dataDelay);
-    logsInterval = setInterval(() => loadLogs().catch(console.error), logsDelay);
+    dataInterval = setInterval(() => loadData().catch(console.error), 3000);
+    logsInterval = setInterval(() => loadLogs().catch(console.error), 1500);
     setInterval(updateClock, 1000);
 }
 

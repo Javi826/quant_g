@@ -96,6 +96,35 @@ class DashboardServer:
         df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
         return df
     
+    @staticmethod
+    def _extract_number_from_id(strategy_id):
+        """
+        Extrae el número prefijo del ID de estrategia.
+        
+        Formato esperado: 'NN_nombre_estrategia' donde NN es un número de 2 dígitos.
+        Ejemplo: '02_reversal_long_4H' → '02'
+        
+        Args:
+            strategy_id: ID de la estrategia
+        
+        Returns:
+            str: Número extraído o '??' si no se puede extraer
+        """
+        if not strategy_id or not isinstance(strategy_id, str):
+            return '??'
+        
+        # Buscar patrón NN_ al inicio (2 dígitos seguidos de guión bajo)
+        match = re.match(r'^(\d{2})_', strategy_id)
+        if match:
+            return match.group(1)
+        
+        # Fallback: buscar cualquier número al inicio
+        match = re.match(r'^(\d+)', strategy_id)
+        if match:
+            return match.group(1).zfill(2)
+        
+        return '??'
+    
     def _calculate_capital_allocation(self, num_strategies=None):
         """
         Calcula el capital asignado por estrategia.
@@ -116,15 +145,18 @@ class DashboardServer:
     
     def _get_full_strategies_list_with_numbers(self):
         """
-        Genera la lista completa de estrategias con numeración consistente.
+        Genera la lista completa de estrategias con numeración extraída de los IDs.
+        
+        Los números se extraen directamente de los IDs con prefijo numérico (ej: '02_reversal_long_4H').
         
         Returns:
-            tuple: (strategies_list, strategy_numbers_dict)
+            list: Lista de estrategias con información completa y campo 'number'
         """
         declared_names = {s['name'] for s in self.strategies}
         
         strategies_list = []
         
+        # Procesar estrategias declaradas
         for strat in self.strategies:
             is_active = strat.get('active', True)
             
@@ -153,6 +185,7 @@ class DashboardServer:
                 'trend_th': strat.get('trend_th', 'N/A')
             })
         
+        # Procesar estrategias no declaradas (implementadas pero no en config)
         not_declared = self.implemented_strategies - declared_names
         for name in sorted(not_declared):
             strategies_list.append({
@@ -173,15 +206,14 @@ class DashboardServer:
                 'trend_th': 'N/A'
             })
         
+        # Ordenar por ID (orden alfabético, que respeta el prefijo numérico)
         strategies_list.sort(key=lambda x: x['id'])
         
-        strategy_numbers = {}
-        for i, strat in enumerate(strategies_list, 1):
-            number = str(i).zfill(2)
-            strat['number'] = number
-            strategy_numbers[strat['id']] = number
+        # Extraer número del ID para cada estrategia
+        for strat in strategies_list:
+            strat['number'] = self._extract_number_from_id(strat['id'])
         
-        return strategies_list, strategy_numbers
+        return strategies_list
     
     def _register_routes(self):
         """Registra todas las rutas de la API del dashboard"""
@@ -522,7 +554,7 @@ class DashboardServer:
                         timeframes_grouped[tf] = []
                     timeframes_grouped[tf].append(strat['id'])
                 
-                strategies_list, _ = self._get_full_strategies_list_with_numbers()
+                strategies_list = self._get_full_strategies_list_with_numbers()
                 
                 active_count = sum(1 for s in strategies_list if s['status'] == 'ACTIVE')
                 deprecating_count = sum(1 for s in strategies_list if s['status'] == 'DEPRECATING')
@@ -567,18 +599,6 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
-        @self.app.route('/api/strategy-numbers-map')
-        def get_strategy_numbers_map():
-            try:
-                strategies_list, strategy_numbers = self._get_full_strategies_list_with_numbers()
-                
-                # Crear mapeo inverso: número → ID
-                numbers_to_ids = {v: k for k, v in strategy_numbers.items()}
-                
-                return jsonify(numbers_to_ids)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-        
         @self.app.route('/api/compose-analysis')
         def get_compose_analysis():
             try:
@@ -590,7 +610,7 @@ class DashboardServer:
                 if df is None:
                     return jsonify([])
                 
-                strategies_list, strategy_numbers = self._get_full_strategies_list_with_numbers()
+                strategies_list = self._get_full_strategies_list_with_numbers()
                 
                 active_deprecating = [s for s in strategies_list 
                                      if s['status'] in ('ACTIVE', 'DEPRECATING')]
@@ -625,7 +645,8 @@ class DashboardServer:
                             include_profit_pct=True
                         )
                         
-                        combo_numbers = [strategy_numbers.get(s, '??') for s in combo]
+                        # Extraer números directamente de los IDs
+                        combo_numbers = [self._extract_number_from_id(s) for s in combo]
                         combo_str = '+'.join(combo_numbers)
                         
                         results.append({
