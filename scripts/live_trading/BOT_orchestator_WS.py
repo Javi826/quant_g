@@ -573,7 +573,7 @@ def main_loop():
     for strat in STRATEGIES:
         #DEPRECATED strategies
         if not strat.get('active', True):
-            print(f"⏸️ Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING")
+            print(f"Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING")
             continue
         
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])

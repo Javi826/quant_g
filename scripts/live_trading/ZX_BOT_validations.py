@@ -355,6 +355,6 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_13_errors += 1
     
     if validation_13_errors == 0:
-        print("   🆗 Val 13: All strategy IDs have correct numeric prefix format (NN_name)")
+        print("   🆗 Val 13: All IDs correct prefix (NN_name)")
     
     return errors, warnings
