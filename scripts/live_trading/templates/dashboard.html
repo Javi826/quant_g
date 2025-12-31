@@ -132,7 +132,7 @@
         
         .dashboard-container {
             display: grid;
-            grid-template-columns: 420px 1fr;
+            grid-template-columns: 419px 1fr;
             grid-template-rows: auto 1fr;
             height: 100vh;
             gap: 0;
@@ -380,6 +380,7 @@
             margin-bottom: 1px;
             border-radius: 3px;
             word-wrap: break-word;
+            white-space: pre; 
         }
         
         .log-line.info { color: #58a6ff; }
@@ -387,7 +388,19 @@
         .log-line.warning { color: #d29922; }
         .log-line.error { color: #f85149; }
         .log-line.default { color: #8b949e; }
-        .log-line.sl-stopped { color: #d946ef; }
+        
+        /* ⭐ NUEVAS CLASES BRILLANTES */
+        .log-line.tp-hit {
+            color: #10ff10;                              /* Verde brillante */
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(16, 255, 16, 0.6); /* Glow verde */
+        }
+        
+        .log-line.sl-hit {
+            color: #ff10ff;                              /* Magenta brillante */
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(255, 16, 255, 0.6); /* Glow magenta */
+        }
         
         .logs-content::-webkit-scrollbar,
         .main-panel::-webkit-scrollbar {
@@ -604,9 +617,9 @@
         }
         
         .delta-sl-close {
-            color: #ff1010;
+            color: #ff10ff;                              /* ⭐ Magenta brillante */
             font-weight: 700;
-            text-shadow: 0 0 8px rgba(255, 16, 16, 0.6);
+            text-shadow: 0 0 8px rgba(255, 16, 255, 0.6); /* ⭐ Glow magenta */
         }
         
         .badge {
@@ -1442,13 +1455,19 @@ function switchEquitySubTab(subTabName) {
 }
 
 function getLogClass(line) {
-    if (line.includes('TP for')) return 'success';
-    if (line.includes('SL for')) return 'sl-stopped';
-    if (line.includes('PRIVATE WS connected') || line.includes('PUBLIC- WS connected')) return 'info';
+    if (line.includes('TP for')) return 'tp-hit';      // ⭐ Verde brillante
+    if (line.includes('SL for')) return 'sl-hit';      // ⭐ Magenta brillante
+    if (
+        line.includes('PRIVATE WS connected') || 
+        line.includes('PUBLIC- WS connected') || 
+        line.includes('SHORT') || 
+        line.includes('LONG')
+    ) return 'info';
     if (line.includes('Error')) return 'error';
     if (line.includes('WAR')) return 'warning';
     return 'default';
 }
+
 
 async function loadLogs() {
     if (isLoadingLogs) return;
@@ -1620,28 +1639,50 @@ function renderDetailedView(container, positions) {
     // Ordenar por deltaTp ascendente (menor = más cerca de TP)
     const sortedPositions = positionsWithDelta.sort((a, b) => a._deltaTp - b._deltaTp);
     
-    // Renderizar tabla (código original sin cambios)
-    const html = '<table><thead><tr><th>Strategy</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Size</th><th>TP</th><th>SL</th><th>P/L</th><th>Delta TP</th><th>Delta SL</th><th style="text-align: right;">Candles</th></tr></thead><tbody>' +
+    // ⭐ HEADERS MODIFICADOS - Eliminadas columnas Delta TP y Delta SL
+    const html = '<table><thead><tr>' +
+        '<th>Strategy</th>' +
+        '<th>Symbol</th>' +
+        '<th>Side</th>' +
+        '<th>Entry</th>' +
+        '<th>Current</th>' +
+        '<th>Size</th>' +
+        '<th>TP (Δ%)</th>' +          // ⭐ MODIFICADO
+        '<th>SL (Δ%)</th>' +          // ⭐ MODIFICADO
+        '<th>PnL</th>' +
+        '<th style="text-align: right;">Candles</th>' +
+        '</tr></thead><tbody>' +
         sortedPositions.map(pos => {
             const pnl = pos.current_pnl || 0;
             const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
-            const currentPrice = parseFloat(pos.current_price || pos.entry_price);
-            const tp = parseFloat(pos.tp);
-            const sl = parseFloat(pos.sl);
             
-            let deltaTp, deltaSl;
-            if (pos.direction.toLowerCase() === 'long') {
-                deltaTp = ((tp - currentPrice) / currentPrice * 100);
-                deltaSl = ((currentPrice - sl) / currentPrice * 100);
-            } else {
-                deltaTp = ((currentPrice - tp) / currentPrice * 100);
-                deltaSl = ((sl - currentPrice) / currentPrice * 100);
-            }
+            // ⭐ Usar valores del backend (con precisión dinámica)
+            const currentPrice = pos.current_price;
+            const tp = pos.tp;
+            const sl = pos.sl;
+            const entryPrice = pos.entry_price;
+            const precision = pos.precision || 2;
+            
+            // ⭐ Usar deltas del backend
+            const deltaTp = pos.distance_to_tp_pct || 0;
+            const deltaSl = pos.distance_to_sl_pct || 0;
             
             const deltaTpClass = Math.abs(deltaTp) < 1 ? 'delta-tp-close' : 'delta-tp';
             const deltaSlClass = Math.abs(deltaSl) < 1 ? 'delta-sl-close' : 'delta-sl';
             
-            return '<tr><td>' + pos.strategy + '</td><td>' + pos.symbol + '</td><td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td><td>$' + parseFloat(pos.entry_price).toFixed(2) + '</td><td>$' + currentPrice.toFixed(2) + '</td><td>' + parseFloat(pos.size).toFixed(4) + '</td><td>$' + tp.toFixed(2) + '</td><td>$' + sl.toFixed(2) + '</td><td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td><td class="' + deltaTpClass + '">' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%</td><td class="' + deltaSlClass + '">' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%</td><td style="text-align: right;">' + (pos.candles || 0) + '/' + (pos.max_candles || 50) + '</td></tr>';
+            // ⭐ CELDAS MODIFICADAS - TP y SL fusionados con Delta
+            return '<tr>' +
+                '<td>' + pos.strategy + '</td>' +
+                '<td>' + pos.symbol + '</td>' +
+                '<td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td>' +
+                '<td>$' + entryPrice.toFixed(precision) + '</td>' +
+                '<td>$' + currentPrice.toFixed(precision) + '</td>' +
+                '<td>' + parseFloat(pos.size).toFixed(4) + '</td>' +
+                '<td>$' + tp.toFixed(precision) + ' <span class="' + deltaTpClass + '">(Δ' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%)</span></td>' +
+                '<td>$' + sl.toFixed(precision) + ' <span class="' + deltaSlClass + '">(Δ' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%)</span></td>' +
+                '<td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td>' +
+                '<td style="text-align: right;">' + (pos.candles || 0) + '/' + (pos.max_candles || 50) + '</td>' +
+                '</tr>';
         }).join('') +
         '</tbody></table>';
     container.innerHTML = html;
@@ -2547,11 +2588,11 @@ function clearLogs() {
 const POLLING_CONFIG = {
     data: {
         active: 5000,      // 5 segundos cuando pestaña visible
-        inactive: 15000    // 15 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
+        inactive: 90000    // 15 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
     },
     logs: {
         active: 2000,      // 2 segundos cuando pestaña visible
-        inactive: 5000     // 5 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
+        inactive: 90000     // 5 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
     }
 };
 

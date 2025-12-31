@@ -136,7 +136,7 @@ class BitgetWSManager:
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        print(f"{GREEN_BOLD}🔌 PUBLIC-     WS connected [{now}]{RESET}")
+        print(f"{GREEN_BOLD}PUBLIC- WS connected [{now}]{RESET}")
         if self.subscribed_public:
             self._resubscribe_public()
     
@@ -190,7 +190,7 @@ class BitgetWSManager:
             # print(f"📡 Subscribed to ticker {symbol} via WebSocket")  # Silenciar para reducir spam
         else:
             self.subscribed_public.add(symbol)
-            print(f"⚠️ Cant subs to {symbol} - Public WS not conne.")
+            print(f"Cant subs to {symbol} - Public WS not connected.")
     
     def _resubscribe_public(self):
         """Resuscribe a canales públicos"""
@@ -235,16 +235,16 @@ class BitgetWSManager:
         if is_reconnect:
             # Mostrar razón de la desconexión anterior si existe
             if self.last_close_code or self.last_close_msg:
-                print(f"{GREEN_BOLD}🔄 PRIVATE WS connected [{now}]{RESET}")
-                print(f"   Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
+                print(f"{GREEN_BOLD}PRIVATE WS connected [{now}]{RESET}")
+                print(f"Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
                 # Sin código de cierre guardado - puede ser timeout sin aviso
-                print(f"{GREEN_BOLD}🔄 PRIVATE WS connected [{now}]{RESET}")
-                print(f"   Previous: code=unknown (likely timeout)")
+                print(f"{GREEN_BOLD}PRIVATE WS connected [{now}]{RESET}")
+                print(f"Previous: code=unknown (likely timeout)")
         else:
-            print(f"{GREEN_BOLD}🔌 PRIVATE WS connected [{now}]{RESET}")
+            print(f"{GREEN_BOLD}PRIVATE WS connected [{now}]{RESET}")
         
         self._authenticate()
         time.sleep(0.5)
@@ -280,7 +280,7 @@ class BitgetWSManager:
         channels = ['orders', 'fill', 'positions', 'account', 'equity']
         
         if not is_reconnect:
-            print(f"🛜 Subscribing to {len(channels)} private channels...")
+            print(f"Subscribing to {len(channels)} private channels...")
         
         for channel in channels:
             msg = {
@@ -300,7 +300,7 @@ class BitgetWSManager:
                 self.subscribed_private.add(channel)
                 # Solo mostrar en primera conexión
                 if not is_reconnect:
-                    print(f"🆗 {channel}")
+                    print(f"OK-{channel}")
     
     def _on_private_message(self, ws, message):
         try:
@@ -319,7 +319,7 @@ class BitgetWSManager:
             if data.get("event") == "login":
                 code = data.get("code")
                 if code == "0" or code == 0:
-                    print("✅ WS authentication successful")
+                    print("WS authentication successful")
                     self.authenticated = True
                 else:
                     print(f"❌ Error-WebSocket auth failed: {data}")
@@ -412,8 +412,8 @@ class BitgetWSManager:
         if is_network_error:
             # Solo warning para errores de red (sin traceback)
             print(f"{YELLOW_BOLD}⚠️  WAR-{ws_type}  WS network issue [{now}]{RESET}")
-            print(f"    {error_str}")
-            print(f"    → Retrying connection...")
+            print(f"{error_str}")
+            print(f"Retrying connection...")
         else:
             # Traceback completo para errores inesperados
             print(f"{RED_BOLD}❌ {ws_type}  WS unexpected error [{now}]: {error}{RESET}")
@@ -535,7 +535,7 @@ class BitgetWSManager:
         Pre-carga contratos via API REST (única excepción necesaria al inicio).
         send_request_func puede ser None - usa requests directo.
         """
-        print(f"📦 Pre-loading contract for {len(symbols)} symbols")
+        print(f"Pre-loading contract for {len(symbols)} symbols")
         
         loaded = 0
         
@@ -559,7 +559,7 @@ class BitgetWSManager:
                 except Exception as e:
                     pass
         
-        print(f"\033[0;36m✅ Pre-loaded {loaded}/{len(symbols)} contracts{RESET}")
+        print(f"\033[0;36mPre-loaded {loaded}/{len(symbols)} contracts{RESET}")
 
 
 # Instancia global
@@ -578,10 +578,10 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
         time.sleep(1)  # Dar tiempo a conectar y autenticar
         
         # Verificar conexión
-        print(f"➡️  WebSocket status:")
-        print(f"  - Public- WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else '⚠️  Not connected'}")
-        print(f"  - Private WS   : {'✅ Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else '⚠️  Not connected'}")
-        print(f"  - Authenticated: {'✅ Yes' if _ws_manager.authenticated else '⚠️  No'}")
+        print(f"WebSocket status:")
+        print(f"Public- WS    : {'✅ Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else 'Not connected'}")
+        print(f"Private WS    : {'✅ Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else 'Not connected'}")
+        print(f"Authenticated : {'✅ Yes' if _ws_manager.authenticated else 'No'}")
         
         # Verificar si la autenticación fue exitosa
         if api_key and api_secret:

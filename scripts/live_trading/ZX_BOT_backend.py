@@ -58,6 +58,33 @@ class DashboardServer:
         
         self.server_thread = None
         self.running = False
+        
+    def get_precision_for_price(self, price):
+        """
+        Determina el número de decimales a mostrar según la magnitud del precio.
+        
+        Args:
+            price: Precio del activo
+        
+        Returns:
+            int: Número de decimales recomendados
+        """
+        price = abs(float(price))
+        
+        if price >= 10000:      # BTC, BNB (50000.0)
+            return 1
+        elif price >= 1000:     # ETH alto (3000.0)
+            return 2
+        elif price >= 100:      # ETH, SOL (300.0)
+            return 2
+        elif price >= 10:       # ADA, DOT (15.0)
+            return 3
+        elif price >= 1:        # DOGE, XRP (1.5)
+            return 4
+        elif price >= 0.01:     # Coins medianos (0.05)
+            return 5
+        else:                   # SHIB, PEPE (0.00001)
+            return 5
     
     def _load_trades_dataframe(self):
         """
@@ -256,12 +283,16 @@ class DashboardServer:
                     u"\U000024C2-\U0001F251"
                     "]+", flags=re.UNICODE)
                 
+                # ⭐ Regex para quitar timestamp: "YYYY-MM-DD HH:MM:SS - "
+                timestamp_pattern = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - ')
+                
                 clean_lines = []
                 for line in new_lines:
                     if line.strip():
                         clean = ansi_escape.sub('', line.strip())
                         clean = emoji_pattern.sub('', clean)
-                        clean = ' '.join(clean.split())
+                        clean = timestamp_pattern.sub('', clean)  # ⭐ QUITAR TIMESTAMP
+                        #clean = ' '.join(clean.split())
                         if clean:
                             clean_lines.append(clean)
                 
@@ -271,7 +302,7 @@ class DashboardServer:
                 })
             except Exception as e:
                 return jsonify({'error': str(e), 'logs': []}), 500
-        
+            
         @self.app.route('/api/status')
         def get_status():
             try:
@@ -287,7 +318,7 @@ class DashboardServer:
                 try:
                     balance = self.get_balance(None)
                 except Exception as e:
-                    print(f"⚠️  Error getting balance: {e}")
+                    print(f"Error getting balance: {e}")
                     balance = 0.0
                 
                 total_profit = 0
@@ -325,7 +356,7 @@ class DashboardServer:
                             
                             open_pnl += pnl
                         except Exception as e:
-                            print(f"⚠️No PnL - {pos.get('symbol')}: {e}")
+                            print(f"No PnL - {pos.get('symbol')}: {e}")
                 
                 btc_price = 0
                 try:
@@ -375,7 +406,10 @@ class DashboardServer:
                             entry_price = float(pos['entry_price'])
                             size = float(pos['size'])
                             direction = pos['direction'].lower()
+                            tp_price = float(pos['tp'])
+                            sl_price = float(pos['sl'])
                             
+                            # Calcular PnL
                             if direction == 'long':
                                 pnl = (float(current_price) - entry_price) * size
                             else:
@@ -383,19 +417,41 @@ class DashboardServer:
                             
                             candles = state.get('strategy_candles', {}).get(strategy_id, 0)
                             
+                            # ⭐ PRECISIÓN DINÁMICA
+                            precision = self.get_precision_for_price(current_price)
+                            
+                            current_price_rounded = round(float(current_price), precision)
+                            tp_rounded = round(tp_price, precision)
+                            sl_rounded = round(sl_price, precision)
+                            entry_rounded = round(entry_price, precision)
+                            
+                            # ⭐ CALCULAR DISTANCIAS (Δ%)
+                            if direction == 'long':
+                                # LONG: TP arriba, SL abajo
+                                distance_to_tp = ((tp_price - float(current_price)) / float(current_price)) * 100
+                                distance_to_sl = ((float(current_price) - sl_price) / float(current_price)) * 100
+                            else:
+                                # SHORT: TP abajo, SL arriba
+                                distance_to_tp = ((float(current_price) - tp_price) / float(current_price)) * 100
+                                distance_to_sl = ((sl_price - float(current_price)) / float(current_price)) * 100
+                            
                             positions_data.append({
                                 'strategy': strategy_id,
                                 'symbol': symbol,
                                 'direction': pos['direction'],
-                                'entry_price': entry_price,
-                                'current_price': float(current_price),
+                                'entry_price': entry_rounded,
+                                'current_price': current_price_rounded,
                                 'size': size,
-                                'tp': float(pos['tp']),
-                                'sl': float(pos['sl']),
+                                'tp': tp_rounded,
+                                'sl': sl_rounded,
                                 'current_pnl': float(pnl),
                                 'candles': candles,
                                 'max_candles': max_candles,
-                                'opened_at': pos['opened_at']
+                                'opened_at': pos['opened_at'],
+                                # ⭐ NUEVOS CAMPOS
+                                'distance_to_tp_pct': round(distance_to_tp, 2),
+                                'distance_to_sl_pct': round(distance_to_sl, 2),
+                                'precision': precision
                             })
                         except Exception as e:
                             print(f"⚠️  Error processing position {pos.get('symbol')}: {e}")
@@ -871,11 +927,11 @@ class DashboardServer:
         color = self.color_code
         reset = "\033[0m" if color else ""
         
-        print(f"\n{color}🌐 Dashboard Web Started{reset}")
+        print(f"\n{color}Dashboard Web Started{reset}")
         print(f"{'─' * 45}")
-        print(f"📊 Local:   http://localhost:{port}")
-        print(f"🔗 Network: http://127.0.0.1:{port}")
-        print(f"🌍 LAN:     http://<your-ip>:{port}")
+        print(f"Local:   http://localhost:{port}")
+        print(f"Network: http://127.0.0.1:{port}")
+        print(f"LAN:     http://<your-ip>:{port}")
         print(f"{'─' * 45}\n")
     
     def stop(self):
@@ -901,6 +957,6 @@ def create_dashboard_template(base_dir):
 if __name__ == '__main__':
     print("⚠️  This module should be imported, not run directly")
     print("Usage:")
-    print("  from ZX_BOT_dashboard import DashboardServer")
+    print("  from ZX_BOT_backend import DashboardServer")
     print("  dashboard = DashboardServer(...)")
     print("  dashboard.start()")

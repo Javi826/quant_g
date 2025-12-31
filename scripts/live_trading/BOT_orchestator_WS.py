@@ -18,7 +18,7 @@ from ZX_BOT_validations import validate_strategy_configuration
 from ZX_BOT_websocket import init_websocket
 from ZX_BOT_metrics import BotState
 
-from ZX_BOT_dashboard import DashboardServer, create_dashboard_template
+from ZX_BOT_backend import DashboardServer, create_dashboard_template
 from ZX_BOT_operative import check_tp_sl_for_strategy, get_current_price,configure_paths,process_strategy, setup_print_logger,check_all_tp_sl
 from ZX_BOT_operative import sync_broker, load_state, save_state_local, calculate_next_candle_time,increment_strategy_candles
 from ZX_BOT_operative import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
@@ -347,7 +347,7 @@ exchange            = connect_bitget()
 # ==========================================================================
 if args.set_active:
     active_ids = [s.strip() for s in args.set_active.split(',')]
-    #print(f"\nSetting active strategies from command line: {active_ids}")
+    print(f"Setting active strategies from command line: {active_ids}")
     for strat in [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, 
     
                   STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K, STRAT_L, 
@@ -542,14 +542,14 @@ def main_loop():
     # --------------------------------------------------------------------
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}Validating strategy configuration...{RESET}")
+    print(f"{COLOR}Validating strategy configuration...{RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
         
     errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
     
     if errors:
-        print(f"\n{COLOR}{'=' * 44}{RESET}")
-        print(f"{COLOR}❗ CONFIGURATION ERRORS FOUND:{RESET}\n")
+        print(f"{COLOR}{'=' * 44}{RESET}")
+        print(f"{COLOR}CONFIGURATION ERRORS FOUND:{RESET}\n")
         for err in errors:
             print(f"  {err}")
         print(f"\n{COLOR}⛔ BOT STOPPED - Fix configuration before running{RESET}")
@@ -557,41 +557,42 @@ def main_loop():
         return  
 
     if warnings:
-        print(f"\n{COLOR}⚠️  CONFIGURATION WARNINGS:{RESET}")
+        print(f"{COLOR}CONFIGURATION WARNINGS:{RESET}")
         for warn in warnings:
-            print(f"  {warn}")
+            print(f"{warn}")
         print()
     else:
-        print(f"✅ All strategies validated successfully\n")
+        print(f"All strategies validated successfully\n")
     
     # --------------------------------------------------------------------
     # LOAD SYMBOLS PER STRATEGY & TIMEFRAMES
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}🔢 Operative Strategies: {len(STRATEGIES)} {RESET}")
+    print(f"{COLOR}Operative Strategies: {len(STRATEGIES)} {RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
         #DEPRECATED strategies
         if not strat.get('active', True):
-            print(f"Strategy {strat['id']:<18} ({strat['timeframe']:<2}): DEPRECATING")
+            print(f"{strat['id']:<24}: DEPRECATING")
             continue
         
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
-        print(f"🔹 Strategy {strat['id']:<18} ({strat['timeframe']:<2}): {len(final_by_strat[strat['id']]):>2} symbols")
+        print(f"{strat['id']:<24} : {len(final_by_strat[strat['id']]):>2} symbols")
+
     
     # Group strategies by timeframe
     strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
     unique_timeframes = get_unique_timeframes(STRATEGIES)
     
-    print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
+    print(f"Detected timeframes: {', '.join(unique_timeframes)}")
     for tf in unique_timeframes:
         strat_names = [s['id'] for s in strategies_by_tf[tf]]
 
     
-    print("\n✅ BOT Initialization completed\n")
+    print("BOT Initialization completed\n")
  
     # Después de cargar símbolos y antes del WebSocket
-    print(f"\n{COLOR}🌐 Starting Web...{RESET}")
+    print(f"{COLOR}Starting Web...{RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
     
     # Crear template si no existe
@@ -612,13 +613,13 @@ def main_loop():
     
     dashboard.start(port=dashboard_port)
     
-    print(f"✅ Bot monitoring at http://localhost:{dashboard_port}")
+    print(f"Bot monitoring at http://localhost:{dashboard_port}")
 
 
     # --------------------------------------------------------------------
     # INIT WEBSOCKET
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}📱 Init  WebSocket...{RESET}")
+    print(f"{COLOR}Init  WebSocket...{RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
@@ -637,7 +638,7 @@ def main_loop():
     # --------------------------------------------------------------------
     # NEXT CANDLES
     # --------------------------------------------------------------------
-    print(f"\n{COLOR}🔜 Candles incoming:  {RESET}")
+    print(f"{COLOR}Candles incoming:  {RESET}")
     print(f"{COLOR}{'-' * 44}{RESET}")
     next_candle_times = {}
     for tf in unique_timeframes:
@@ -662,15 +663,15 @@ def main_loop():
             if closed_timeframes:
 
                 
-                print(f"\n{'=' * 44}")
-                print(f"🔀 New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
-                #print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
+                print(f"{'=' * 44}")
+                print(f"New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                #print(f"Timeframes: {', '.join(closed_timeframes)}")
 
                 # Sync with broker
                 sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
-                print(f"📡 Searching Signals... - {now}")
+                print(f"Searching Signals... - {now}")
                 print(f"{'-' * 44}")
                 
                 # Process strategies for closed timeframes
@@ -685,9 +686,11 @@ def main_loop():
                     
                     if has_positions:
                         increment_strategy_candles(strat_id, STRATEGY_CANDLES, OPEN_POSITIONS, STATE_FILE)
-                        candles = STRATEGY_CANDLES.get(strat_id, 0)
+                        candles       = STRATEGY_CANDLES.get(strat_id, 0)
                         num_positions = len(OPEN_POSITIONS.get(strat_id, []))
-                        print(f"🚫 Skip {strat_id:<20} ({strat['timeframe']:<2}) ➡️  {candles}/{strat['sell_after_ncandles']:<2} | {num_positions} pos.")
+                        
+                        print(f"Skip {strat_id:<26} {candles:>2}/{strat['sell_after_ncandles']:<2} | {num_positions:>2} pos.")
+
                         
                         check_candles_timeout_for_strategy(
                             strat_id,
@@ -744,11 +747,11 @@ def main_loop():
                                 use_hardcoded=USE_HARDCODED_SIGNALS,
                                 detect_signal_func=detect_signal_for_strategy
                             )
-                            print(f"✅ Retry successful for {strat_id}")
+                            print(f"Retry successful for {strat_id}")
                         except Exception as e2:
                             print(f"❌ Error Retry failed for {strat_id}: {e2}")
                                 
-                print("🔂 Signal cycle completed")
+                print("Signal cycle completed")
                 print(f"{'=' * 44}\n")
                 
                 # Recalculate next candle times
@@ -780,7 +783,7 @@ def main_loop():
             time.sleep(0.05)
             
     except KeyboardInterrupt:
-        print("\n🔚 Interrupted by user.")
+        print("🔚 Interrupted by user.")
         save_state_local(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
         print("⛔ BOT Stopped")
 

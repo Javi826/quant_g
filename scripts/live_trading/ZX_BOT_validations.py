@@ -16,13 +16,13 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     # VALIDATION 1: Names
     # --------------------------------------------------------------------
     if missing_implementation:
-        errors.append(f"❗ Strategies WITHOUT implementation: {missing_implementation}")
+        errors.append(f"Strategies WITHOUT implementation: {missing_implementation}")
     
     if unused_implementation:
-        warnings.append(f"❕ Implemented but NOT declared: {unused_implementation}")
+        warnings.append(f"-Implemented but NOT declared: {unused_implementation}")
     
     if not missing_implementation:
-        print("   🆗 Val 1: All strategy names implemented")
+        print("Val 01: All strategy names implemented")
     
     # --------------------------------------------------------------------
     # VALIDATION 2: Coherence direction
@@ -58,7 +58,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_2_errors += 1
     
     if validation_2_errors == 0:
-        print("   🆗 Val 2: All directions coherent with names")
+        print("Val 02: All directions coherent with names")
             
     # --------------------------------------------------------------------
     # VALIDATION 3: Timeframe coherence
@@ -94,7 +94,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
                 validation_3_errors += 1
     
     if validation_3_errors == 0:
-        print("   🆗 Val 3: All timeframes coherent with names")
+        print("Val 03: All timeframes coherent with names")
         
         
     # --------------------------------------------------------------------
@@ -133,7 +133,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_4_errors += 1
     
     if validation_4_errors == 0:
-        print("   🆗 Val 4: All order amounts in range (40-100)")
+        print("Val 04: All order amounts in range (40-100)")
     
     # --------------------------------------------------------------------
     # VALIDATION 5: Required parameters for each strategy type
@@ -193,7 +193,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             )
     
     if validation_5_errors == 0:
-        print("   🆗 Val 5: All strategies required parameters")
+        print("Val 05: All strategies required parameters")
         
     # --------------------------------------------------------------------
     # VALIDATION 6: TP/SL
@@ -218,7 +218,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_6_errors += 1
     
     if validation_6_errors == 0:
-        print("   🆗 Val 6: All TP/SL % within valid ranges (1.5 - 10)")
+        print("Val 06: All TP/SL % within valid ranges (1.5 - 10)")
 
     # --------------------------------------------------------------------
     # VALIDATION 7: IDs
@@ -232,7 +232,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         validation_7_errors += 1
     
     if validation_7_errors == 0:
-        print("   🆗 Val 7: All strategy IDs unique")
+        print("Val 07: All strategy IDs unique")
         
     # --------------------------------------------------------------------
     # VALIDATION 8: Candles
@@ -248,7 +248,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         if candles and (candles < MIN_CANDLES or candles > MAX_CANDLES):
             errors.append(f"❌  Strategy '{strat_id}' has sell_after_ncandles={candles} (typical range: {MIN_CANDLES}-{MAX_CANDLES})")
     if validation_8_errors == 0:
-        print("   🆗 Val 8: All sell_after_ncandles ok (45-55)")
+        print("Val 08: All sell_after_ncandles ok (45-55)")
     
     # --------------------------------------------------------------------
     # VALIDATION 9: No duplicate strategies (name + timeframe)
@@ -273,7 +273,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             seen_combinations.add(combination)
     
     if validation_9_errors == 0:
-        print("   🆗 Val 9: All strategies names + TF are unique.")
+        print("Val 09: All strategies names + TF are unique.")
         
     # --------------------------------------------------------------------
     # VALIDATION 10: Unique strategy names
@@ -287,7 +287,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         validation_10_errors += 1
     
     if validation_10_errors == 0:
-        print("   🆗 Val 10: All strategy names unique")
+        print("Val 10: All strategy names unique")
         
     # --------------------------------------------------------------------
     # VALIDATION 12: Valid timeframes
@@ -307,7 +307,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_12_errors += 1
     
     if validation_12_errors == 0:
-        print("   🆗 Val 12: All TF are valid")
+        print("Val 12: All TF are valid")
     
     # --------------------------------------------------------------------
     # VALIDATION 13: ID format with numeric prefix
@@ -355,6 +355,6 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_13_errors += 1
     
     if validation_13_errors == 0:
-        print("   🆗 Val 13: All IDs correct prefix (NN_name)")
+        print("Val 13: All IDs correct prefix (NN_name)")
     
     return errors, warnings

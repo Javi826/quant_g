@@ -118,10 +118,10 @@ def load_state(state_file, display_color="\033[1;94m"):
     OPEN_POSITIONS   = {}
     STRATEGY_CANDLES = {}
     
-    print(f"{display_color}🗃️  Loading BOT state...{RESET}")
+    print(f"{display_color}Loading BOT state...{RESET}")
     
     if not os.path.exists(state_file):
-        print(f"{display_color}📂 No previous state file found{RESET}")
+        print(f"{display_color}No previous state file found{RESET}")
         print(f"{display_color}{'=' * 20}{RESET}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
     
@@ -149,15 +149,15 @@ def load_state(state_file, display_color="\033[1;94m"):
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
-        print(f"🔄 Total positions recovered: {total_positions}")
-        print(f"{display_color}{'-' * 20}{RESET}")
+        print(f"Total positions recovered: {total_positions}")
+        print(f"{display_color}{'-' * 44}{RESET}")
         
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                print(f"   ➡️  {strat_id:<21}: {len(positions):>2} positions | Candles: {candles:>2}")
+                print(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
         
-        print(f"✅ State loaded successfully")
+        print(f"State loaded successfully")
         
         return OPEN_POSITIONS, STRATEGY_CANDLES
         
@@ -204,7 +204,7 @@ def sync_broker(open_positions, strategy_candles, state_file):
     Sincroniza posiciones locales con el broker via WebSocket (canal positions).
     Refresca datos para asegurar que estén actualizados.
     """
-    #print("🌐 Syncronizing broker...")
+    #print("Syncronizing broker...")
     total_removed = 0
     
     if not ZX_BOT_websocket._ws_manager:
@@ -231,11 +231,11 @@ def sync_broker(open_positions, strategy_candles, state_file):
                     
                     # Debug: mostrar info de la posición
                     if not position_exists:
-                        print(f"   📊 {symbol}: total={total_size} (position closed)")
+                        print(f"{symbol}: total={total_size} (position closed)")
                 
                 # Si no existe en WS data, tampoco existe
                 if not position_exists:
-                    print(f"→ Position {symbol} doesn't exist in broker - treating as SL")
+                    print(f"Position {symbol} doesn't exist in broker - treating as SL")
                     
                     sl_price = pos['sl']
                     
@@ -280,9 +280,9 @@ def sync_broker(open_positions, strategy_candles, state_file):
     # Guardar estado si hubo cambios
     if total_removed > 0:
         save_state_local(open_positions, strategy_candles, state_file)
-        print(f"✅ Sync with broker completed: {total_removed} position(s) removed")
+        print(f"Sync with broker completed: {total_removed} position(s) removed")
     else:
-        print(f"✅ Sync with broker completed.")
+        print(f"Sync with broker completed.")
     
 # ==========================================================================
 # PLACE ORDER
@@ -431,7 +431,7 @@ def place_order(symbol: str,
     filled_amount = extract_filled_amount(resp_order, size_q)
     exec_price    = get_exec_price(resp_order, last_price)
 
-    print(f"✅ {('⬆️ ' if direction=='long' else '⬇️ '):2} {direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
+    print(f"{direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | Price: {exec_price:<10}")
 
     return resp_order
 
@@ -609,9 +609,9 @@ def check_candles_timeout_for_strategy(strat_id, sell_after_ncandles,
     if not positions:
         return
 
-    print(f"\n🕓 TIMEOUT REACHED for {strat_id}")
-    print(f"➡ Candles: {candles_elapsed}/{sell_after_ncandles}")
-    print(f"→ Closing {len(positions)} positions...")
+    print(f"TIMEOUT REACHED for {strat_id}")
+    print(f"Candles: {candles_elapsed}/{sell_after_ncandles}")
+    print(f"Closing {len(positions)} positions...")
 
     all_closed = True
     for pos in positions:
@@ -652,7 +652,7 @@ def check_tp_sl_for_strategy(strat_id, strat_config, open_positions, strategy_ca
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
         except (TimeoutError, RuntimeError) as e:
-            print(f"⚠️  No price for {symbol}: {e}")
+            print(f"No price for {symbol}: {e}")
             continue
         
         if current_price is None:
@@ -769,7 +769,7 @@ def process_strategy(
     """Procesa una estrategia: busca señales y abre posiciones."""
     strat_id = strat['id']
 
-    print(f"\n⚙️  Processing strategy  : {strat_id}")
+    print(f"Processing strategy  : {strat_id}")
 
     if use_hardcoded:
         signals = get_hardcoded_signals(strat_id, send_request_func, hour_zone)
@@ -778,7 +778,7 @@ def process_strategy(
             raise ValueError("No se proporcionó detect_signal_func")
         signals = detect_signal_func(strat, final_symbols)
 
-    print(f"💫 Signals detected  {strat_id}: {len(signals)}")
+    print(f"Signals detected  {strat_id}: {len(signals)}")
 
     if not signals:
         return
@@ -869,17 +869,17 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         }
         
         if reason == "TP":
-            print(f"\n💲 TP for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
+            print(f"TP for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
         elif reason == "SL":
-            print(f"\n🔻 SL for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")           
+            print(f"SL for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")           
         elif reason == "TIMEOUT":
-            print(f"\n🕓 TIMEOUT for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
+            print(f"TIMEOUT for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) at {datetime.now().strftime('%H:%M')}")
 
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
         time.sleep(0.05)
         
         if code == 200 and resp.get("code") == "00000":
-            print(f"✅ Position closed - {reason}: {symbol} | Size: {size}")
+            print(f"Position closed - {reason}: {symbol} | Size: {size}")
             
             if position_data:
                 data = resp.get('data', {})
@@ -1070,14 +1070,14 @@ def log_closed_position(
         if bot_state is not None:
             bot_state.closed_total_profit += profit
 
-        print(f"📋 Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
+        print(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
 
     except Exception as e:
         print(f"❌ Error logging to Excel: {e}")
         traceback.print_exc()
 
 def setup_print_logger(logdir, logfile_name=None):
-    """Configura un logger que duplica print() al archivo y a consola."""
+    """Configura un logger que duplica print() al archivo (con fecha) y a consola (sin fecha)."""
     os.makedirs(logdir, exist_ok=True)
     logfile = os.path.join(logdir, logfile_name)
     
@@ -1085,13 +1085,16 @@ def setup_print_logger(logdir, logfile_name=None):
     logger.setLevel(logging.INFO)
     logger.propagate = False
     
+    # ⭐ Handler para ARCHIVO - CON fecha y hora
     fh = logging.FileHandler(logfile, encoding='utf-8')
-    fh.setFormatter(logging.Formatter('%(message)s'))
+    fh.setFormatter(logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
     
     if not logger.handlers:
         logger.addHandler(fh)
     
     old_print = builtins.print
+    
+
     
     def _print_and_log(*args, **kwargs):
         old_print(*args, **kwargs)

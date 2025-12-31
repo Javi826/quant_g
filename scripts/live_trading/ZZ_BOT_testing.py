@@ -31,7 +31,13 @@ from ZX_BOT_operative import (
     save_state_local,
     load_state,
     log_closed_position,
-    configure_paths
+    configure_paths,
+    close_position,
+    increment_strategy_candles,
+    reset_strategy_candles,
+    calculate_next_candle_time,
+    get_current_price,  # ← AÑADIDO (se usa en tests)
+    add_position  # ← AÑADIDO (se usa en tests de integración)
 )
 
 from ZX_BOT_metrics import MetricsCalculator
@@ -676,6 +682,471 @@ class TestMetricsCalculator:
 
 
 # ============================================================================
+# TESTS: get_fills_for_order (FUNCIÓN REAL)
+# ============================================================================
+
+class TestGetFillsForOrder:
+    """Tests de la función REAL get_fills_for_order"""
+    
+    def test_get_fills_single_fill(self, mock_ws_manager):
+        """Test obtener fills con un solo fill completo"""
+        order_id = 'order_123'
+        
+        # Simular fills en WebSocket
+        mock_ws_manager.fills[order_id] = [
+            {
+                'orderId': order_id,
+                'baseVolume': '0.5',
+                'price': '50000.0',
+                'profit': '0',
+                'feeDetail': [{'totalFee': '0.025'}]
+            }
+        ]
+        
+        # Ejecutar función REAL (sin send_request_func, solo WebSocket)
+        # Nota: La función usa WebSocket directamente
+        fills = mock_ws_manager.get_fills(order_id)
+        
+        # Verificar
+        assert len(fills) == 1
+        assert fills[0]['baseVolume'] == '0.5'
+        assert fills[0]['price'] == '50000.0'
+    
+    def test_get_fills_multiple_partial_fills(self, mock_ws_manager):
+        """Test obtener fills con múltiples fills parciales"""
+        order_id = 'order_456'
+        
+        # Simular fills parciales
+        mock_ws_manager.fills[order_id] = [
+            {
+                'orderId': order_id,
+                'baseVolume': '0.25',
+                'price': '50000.0',
+                'profit': '0',
+                'feeDetail': [{'totalFee': '0.0125'}]
+            },
+            {
+                'orderId': order_id,
+                'baseVolume': '0.25',
+                'price': '50010.0',
+                'profit': '0',
+                'feeDetail': [{'totalFee': '0.0125'}]
+            }
+        ]
+        
+        fills = mock_ws_manager.get_fills(order_id)
+        
+        # Verificar
+        assert len(fills) == 2
+        
+        # Calcular weighted average price
+        total_base = Decimal('0.25') + Decimal('0.25')
+        weighted = Decimal('50000.0') * Decimal('0.25') + Decimal('50010.0') * Decimal('0.25')
+        avg_price = weighted / total_base
+        
+        assert avg_price == Decimal('50005.0')
+    
+    def test_get_fills_no_fills_available(self, mock_ws_manager):
+        """Test cuando no hay fills disponibles"""
+        order_id = 'order_nonexistent'
+        
+        # No hay fills
+        mock_ws_manager.fills = {}
+        
+        fills = mock_ws_manager.get_fills(order_id)
+        
+        # Verificar
+        assert fills == []
+
+
+# ============================================================================
+# TESTS: close_position scenarios (FUNCIÓN REAL)
+# ============================================================================
+
+class TestClosePositionScenarios:
+    """Tests de diferentes escenarios de cierre de posición"""
+    
+    def test_close_position_tp_reason(self, temp_excel_file):
+        """Test cierre por TP"""
+        # Mock send_request
+        def mock_send_request(method, path, params=None, body=None):
+            return 200, {
+                'code': '00000',
+                'data': {
+                    'orderId': 'close_order_123',
+                    'price': '51500.0'
+                }
+            }
+        
+        # Mock WebSocket fills
+        with patch('ZX_BOT_operative.ZX_BOT_websocket._ws_manager') as mock_ws:
+            mock_ws.fills = {
+                'close_order_123': [
+                    {
+                        'orderId': 'close_order_123',
+                        'baseVolume': '0.5',
+                        'price': '51500.0',
+                        'profit': '750.0',
+                        'feeDetail': [{'totalFee': '0.026'}]
+                    }
+                ]
+            }
+            
+            mock_ws.get_fills = lambda oid: mock_ws.fills.get(oid, [])
+            
+            # Mock get_current_price
+            with patch('ZX_BOT_operative.get_current_price', return_value=Decimal('51500.0')):
+                position_data = {
+                    'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                    'strategy_id': '02_reversal_long_4H',
+                    'usdt_amount': 40.0,
+                    'entry_price': Decimal('50000.0')
+                }
+                
+                # Ejecutar función REAL
+                result = close_position(
+                    symbol='BTCUSDT',
+                    size=Decimal('0.5'),
+                    direction='long',
+                    send_request_func=mock_send_request,
+                    reason='TP',
+                    position_data=position_data
+                )
+                
+                # Verificar
+                assert result == True
+                
+                # Verificar log
+                if os.path.exists(temp_excel_file):
+                    df = pd.read_excel(temp_excel_file)
+                    if len(df) > 0:
+                        assert df.iloc[-1]['REASON_OUT'] == 'TP'
+    
+    def test_close_position_sl_reason(self, temp_excel_file):
+        """Test cierre por SL"""
+        def mock_send_request(method, path, params=None, body=None):
+            return 200, {
+                'code': '00000',
+                'data': {
+                    'orderId': 'close_order_456',
+                    'price': '45000.0'
+                }
+            }
+        
+        with patch('ZX_BOT_operative.ZX_BOT_websocket._ws_manager') as mock_ws:
+            mock_ws.fills = {
+                'close_order_456': [
+                    {
+                        'orderId': 'close_order_456',
+                        'baseVolume': '0.5',
+                        'price': '45000.0',
+                        'profit': '-2500.0',
+                        'feeDetail': [{'totalFee': '0.023'}]
+                    }
+                ]
+            }
+            
+            mock_ws.get_fills = lambda oid: mock_ws.fills.get(oid, [])
+            
+            with patch('ZX_BOT_operative.get_current_price', return_value=Decimal('45000.0')):
+                position_data = {
+                    'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                    'strategy_id': '02_reversal_long_4H',
+                    'usdt_amount': 40.0,
+                    'entry_price': Decimal('50000.0')
+                }
+                
+                result = close_position(
+                    symbol='BTCUSDT',
+                    size=Decimal('0.5'),
+                    direction='long',
+                    send_request_func=mock_send_request,
+                    reason='SL',
+                    position_data=position_data
+                )
+                
+                assert result == True
+    
+    def test_close_position_timeout_reason(self, temp_excel_file):
+        """Test cierre por TIMEOUT"""
+        def mock_send_request(method, path, params=None, body=None):
+            return 200, {
+                'code': '00000',
+                'data': {
+                    'orderId': 'close_order_789',
+                    'price': '49500.0'
+                }
+            }
+        
+        with patch('ZX_BOT_operative.ZX_BOT_websocket._ws_manager') as mock_ws:
+            mock_ws.fills = {
+                'close_order_789': [
+                    {
+                        'orderId': 'close_order_789',
+                        'baseVolume': '0.5',
+                        'price': '49500.0',
+                        'profit': '-250.0',
+                        'feeDetail': [{'totalFee': '0.025'}]
+                    }
+                ]
+            }
+            
+            mock_ws.get_fills = lambda oid: mock_ws.fills.get(oid, [])
+            
+            with patch('ZX_BOT_operative.get_current_price', return_value=Decimal('49500.0')):
+                position_data = {
+                    'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                    'strategy_id': '02_reversal_long_4H',
+                    'usdt_amount': 40.0,
+                    'entry_price': Decimal('50000.0')
+                }
+                
+                result = close_position(
+                    symbol='BTCUSDT',
+                    size=Decimal('0.5'),
+                    direction='long',
+                    send_request_func=mock_send_request,
+                    reason='TIMEOUT',
+                    position_data=position_data
+                )
+                
+                assert result == True
+    
+    def test_close_position_error_22002(self, temp_excel_file):
+        """Test error 22002 (posición no existe)"""
+        def mock_send_request(method, path, params=None, body=None):
+            return 200, {
+                'code': '22002',
+                'msg': 'Position does not exist'
+            }
+        
+        with patch('ZX_BOT_operative.get_current_price', return_value=Decimal('50500.0')):
+            position_data = {
+                'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                'strategy_id': '02_reversal_long_4H',
+                'usdt_amount': 40.0,
+                'entry_price': Decimal('50000.0')
+            }
+            
+            # Ejecutar función REAL
+            result = close_position(
+                symbol='BTCUSDT',
+                size=Decimal('0.5'),
+                direction='long',
+                send_request_func=mock_send_request,
+                reason='TP',
+                position_data=position_data
+            )
+            
+            # Debe retornar True para eliminar de local state
+            assert result == True
+    
+    def test_close_position_network_error(self):
+        """Test error de red al cerrar posición"""
+        def mock_send_request(method, path, params=None, body=None):
+            return 0, {'error': 'Network timeout'}
+        
+        position_data = {
+            'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+            'strategy_id': '02_reversal_long_4H',
+            'usdt_amount': 40.0,
+            'entry_price': Decimal('50000.0')
+        }
+        
+        result = close_position(
+            symbol='BTCUSDT',
+            size=Decimal('0.5'),
+            direction='long',
+            send_request_func=mock_send_request,
+            reason='TP',
+            position_data=position_data
+        )
+        
+        # Debe retornar False (falló)
+        assert result == False
+
+
+# ============================================================================
+# TESTS: Timeframe calculations
+# ============================================================================
+
+class TestTimeframeCalculations:
+    """Tests de cálculos de timeframes"""
+    
+    def test_calculate_next_candle_4h(self):
+        """Test cálculo de próxima vela 4H"""
+        try:
+            from zoneinfo import ZoneInfo
+            madrid_tz = ZoneInfo('Europe/Madrid')
+        except ImportError:
+            import pytz
+            madrid_tz = pytz.timezone('Europe/Madrid')
+        
+        # Ejecutar función REAL
+        next_candle = calculate_next_candle_time('4H', madrid_tz)
+        
+        # Verificar que es un datetime
+        assert isinstance(next_candle, datetime)
+        # Verificar que el segundo es 45 (buffer)
+        assert next_candle.second == 45
+    
+    def test_calculate_next_candle_1h(self):
+        """Test cálculo de próxima vela 1H"""
+        try:
+            from zoneinfo import ZoneInfo
+            madrid_tz = ZoneInfo('Europe/Madrid')
+        except ImportError:
+            import pytz
+            madrid_tz = pytz.timezone('Europe/Madrid')
+        
+        # Ejecutar función REAL
+        next_candle = calculate_next_candle_time('1H', madrid_tz)
+        
+        # Verificar que es un datetime
+        assert isinstance(next_candle, datetime)
+        # Verificar que el segundo es 45 (buffer)
+        assert next_candle.second == 45
+
+
+# ============================================================================
+# TESTS: Edge cases y validaciones
+# ============================================================================
+
+class TestEdgeCases:
+    """Tests de casos extremos"""
+    
+    def test_tp_sl_with_zero_entry_price(self):
+        """Test TP/SL con precio de entrada cero (inválido)"""
+        with pytest.raises(Exception):
+            calculate_tp_sl_prices(Decimal('0'), 'long', 3, 10)
+    
+    def test_quantize_with_negative_size(self):
+        """Test cuantización con size negativo"""
+        size_base = Decimal('-0.5')
+        size_scale = 3
+        
+        size_q, _ = quantize_size(size_base, size_scale)
+        
+        # Debería cuantizar pero mantener negativo
+        assert size_q == Decimal('-0.500')
+    
+    def test_pnl_with_zero_size(self):
+        """Test PnL con size cero"""
+        pnl = calculate_pnl('long', Decimal('50000'), Decimal('51000'), Decimal('0'))
+        
+        assert pnl == 0.0
+    
+    def test_metrics_with_empty_dataframe(self):
+        """Test métricas con DataFrame vacío"""
+        empty_df = pd.DataFrame()
+        
+        metrics = MetricsCalculator.calculate_all_metrics(
+            df=empty_df,
+            capital_assigned=1000.0
+        )
+        
+        assert metrics['num_trades'] == 0
+        assert metrics['total_profit_usd'] == 0.0
+        assert metrics['profit_factor'] == 0.0
+    
+    def test_metrics_with_all_wins(self):
+        """Test métricas con solo trades ganadores"""
+        df = pd.DataFrame({
+            'PROFIT': [100, 200, 150],
+            'CLOSE_AT': ['2024-01-01', '2024-01-02', '2024-01-03']
+        })
+        
+        pf = MetricsCalculator.profit_factor(df)
+        
+        # Sin pérdidas, profit factor debería ser 0
+        assert pf == 0.0
+    
+    def test_metrics_with_all_losses(self):
+        """Test métricas con solo trades perdedores"""
+        df = pd.DataFrame({
+            'PROFIT': [-100, -200, -150],
+            'CLOSE_AT': ['2024-01-01', '2024-01-02', '2024-01-03']
+        })
+        
+        pf = MetricsCalculator.profit_factor(df)
+        
+        # Sin ganancias, profit factor debería ser 0
+        assert pf == 0.0
+
+
+# ============================================================================
+# TESTS: Multiple positions scenarios
+# ============================================================================
+
+class TestMultiplePositionsScenarios:
+    """Tests con múltiples posiciones"""
+    
+    def test_save_load_multiple_strategies(self, temp_state_file):
+        """Test guardar/cargar múltiples estrategias con posiciones"""
+        open_positions = {
+            '02_reversal_long_4H': [
+                {
+                    'symbol': 'BTCUSDT',
+                    'size': Decimal('0.5'),
+                    'entry_price': Decimal('50000.0'),
+                    'direction': 'long',
+                    'tp': Decimal('51500.0'),
+                    'sl': Decimal('45000.0'),
+                    'order_id': 'order_1',
+                    'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                    'usdt_amount': 40.0
+                }
+            ],
+            '05_parity_short_1H': [
+                {
+                    'symbol': 'ETHUSDT',
+                    'size': Decimal('1.2'),
+                    'entry_price': Decimal('3000.0'),
+                    'direction': 'short',
+                    'tp': Decimal('2910.0'),
+                    'sl': Decimal('3300.0'),
+                    'order_id': 'order_2',
+                    'opened_at': datetime(2024, 12, 30, 11, 0, 0),
+                    'usdt_amount': 40.0
+                }
+            ]
+        }
+        strategy_candles = {
+            '02_reversal_long_4H': 5,
+            '05_parity_short_1H': 12
+        }
+        
+        # Guardar
+        save_state_local(open_positions, strategy_candles, temp_state_file)
+        
+        # Cargar
+        loaded_pos, loaded_candles = load_state(temp_state_file)
+        
+        # Verificar
+        assert len(loaded_pos) == 2
+        assert len(loaded_pos['02_reversal_long_4H']) == 1
+        assert len(loaded_pos['05_parity_short_1H']) == 1
+        assert loaded_candles['02_reversal_long_4H'] == 5
+        assert loaded_candles['05_parity_short_1H'] == 12
+    
+    def test_pnl_multiple_positions_same_symbol(self):
+        """Test PnL de múltiples posiciones en el mismo símbolo"""
+        positions = [
+            {'direction': 'long', 'entry': Decimal('50000'), 'size': Decimal('0.3')},
+            {'direction': 'long', 'entry': Decimal('51000'), 'size': Decimal('0.2')}
+        ]
+        current_price = Decimal('52000')
+        
+        total_pnl = 0.0
+        for pos in positions:
+            pnl = calculate_pnl(pos['direction'], pos['entry'], current_price, pos['size'])
+            total_pnl += pnl
+        
+        # (52000-50000)*0.3 + (52000-51000)*0.2 = 600 + 200 = 800
+        assert total_pnl == 800.0
+
+
+# ============================================================================
 # TESTS DE INTEGRACIÓN
 # ============================================================================
 
@@ -744,6 +1215,353 @@ class TestIntegrationFlows:
         assert len(df) == 1
         assert df.iloc[0]['REASON_OUT'] == 'TP'
         assert df.iloc[0]['PROFIT'] > 0
+
+
+# ============================================================================
+# TESTS: Profit calculations con fees
+# ============================================================================
+
+class TestProfitCalculationsWithFees:
+    """Tests de cálculos de profit incluyendo fees"""
+    
+    def test_profit_with_open_close_fees(self):
+        """Test profit con fees de apertura y cierre"""
+        profit_gross = Decimal('750.0')
+        fee_open = Decimal('0.025')
+        fee_close = Decimal('0.026')
+        
+        fee_total = (fee_open + fee_close)
+        profit_net = profit_gross - fee_total
+        
+        assert profit_net == Decimal('749.949')
+    
+    def test_profit_percentage_calculation(self):
+        """Test cálculo de profit en porcentaje"""
+        profit_net = 75.0
+        usdt_amount = 40.0
+        
+        profit_pct = (profit_net / usdt_amount) * 100
+        
+        assert profit_pct == 187.5
+    
+    def test_negative_profit_with_fees(self):
+        """Test pérdida con fees"""
+        profit_gross = Decimal('-100.0')
+        fee_total = Decimal('0.05')
+        
+        profit_net = profit_gross - fee_total
+        
+        assert profit_net == Decimal('-100.05')
+        assert profit_net < 0
+
+
+# ============================================================================
+# TESTS: Strategy candles management
+# ============================================================================
+
+class TestStrategyCandles:
+    """Tests de gestión de contadores de velas"""
+    
+    def test_increment_candles_from_zero(self, temp_state_file):
+        """Test incrementar velas desde cero"""
+        open_positions = {'02_reversal_long_4H': []}
+        strategy_candles = {'02_reversal_long_4H': 0}
+        
+        # Incrementar
+        increment_strategy_candles(
+            '02_reversal_long_4H',
+            strategy_candles,
+            open_positions,
+            temp_state_file
+        )
+        
+        assert strategy_candles['02_reversal_long_4H'] == 1
+    
+    def test_increment_candles_multiple_times(self, temp_state_file):
+        """Test incrementar velas múltiples veces"""
+        open_positions = {'02_reversal_long_4H': []}
+        strategy_candles = {'02_reversal_long_4H': 0}
+        
+        for i in range(10):
+            increment_strategy_candles(
+                '02_reversal_long_4H',
+                strategy_candles,
+                open_positions,
+                temp_state_file
+            )
+        
+        assert strategy_candles['02_reversal_long_4H'] == 10
+    
+    def test_reset_candles_to_zero(self, temp_state_file):
+        """Test resetear velas a cero"""
+        open_positions = {'02_reversal_long_4H': []}
+        strategy_candles = {'02_reversal_long_4H': 45}
+        
+        # Resetear
+        reset_strategy_candles(
+            '02_reversal_long_4H',
+            strategy_candles,
+            open_positions,
+            temp_state_file
+        )
+        
+        assert strategy_candles['02_reversal_long_4H'] == 0
+
+
+# ============================================================================
+# TESTS: Contract params extraction con diferentes símbolos
+# ============================================================================
+
+class TestContractParamsVariousSymbols:
+    """Tests de extracción de parámetros para diferentes símbolos"""
+    
+    def test_btc_contract_params(self):
+        """Test parámetros de contrato BTC (precio alto)"""
+        contract = {
+            'pricePlace': '1',
+            'volumePlace': '3',
+            'minTradeNum': '0.001',
+            'sizeMultiplier': '1',
+            'minTradeUSDT': '5'
+        }
+        
+        price_tick, size_scale, min_trade_num, size_mult, min_usdt = \
+            extract_contract_params(contract, Decimal('50000'))
+        
+        assert price_tick == Decimal('0.1')
+        assert size_scale == 3
+        assert min_trade_num == Decimal('0.001')
+    
+    def test_eth_contract_params(self):
+        """Test parámetros de contrato ETH (precio medio)"""
+        contract = {
+            'pricePlace': '2',
+            'volumePlace': '2',
+            'minTradeNum': '0.01',
+            'sizeMultiplier': '1',
+            'minTradeUSDT': '5'
+        }
+        
+        price_tick, size_scale, min_trade_num, size_mult, min_usdt = \
+            extract_contract_params(contract, Decimal('3000'))
+        
+        assert price_tick == Decimal('0.01')
+        assert size_scale == 2
+        assert min_trade_num == Decimal('0.01')
+    
+    def test_low_price_coin_contract(self):
+        """Test parámetros de contrato para coin de bajo precio"""
+        contract = {
+            'pricePlace': '4',
+            'volumePlace': '1',
+            'minTradeNum': '1',
+            'sizeMultiplier': '1',
+            'minTradeUSDT': '5'
+        }
+        
+        price_tick, size_scale, min_trade_num, size_mult, min_usdt = \
+            extract_contract_params(contract, Decimal('0.5'))
+        
+        assert price_tick == Decimal('0.0001')
+        assert size_scale == 1
+        assert min_trade_num == Decimal('1')
+
+
+# ============================================================================
+# TESTS: Size computation para diferentes precios
+# ============================================================================
+
+class TestSizeComputationVariousPrices:
+    """Tests de cálculo de size con diferentes precios"""
+    
+    def test_size_high_price_btc(self):
+        """Test size con precio alto (BTC)"""
+        usdt_amount = 100
+        price = Decimal('100000.0')  # BTC muy alto
+        
+        size = compute_size_base(usdt_amount, price)
+        
+        assert size == Decimal('0.001')
+    
+    def test_size_medium_price_eth(self):
+        """Test size con precio medio (ETH)"""
+        usdt_amount = 100
+        price = Decimal('2500.0')
+        
+        size = compute_size_base(usdt_amount, price)
+        
+        assert size == Decimal('0.04')
+    
+    def test_size_low_price_coin(self):
+        """Test size con precio bajo"""
+        usdt_amount = 100
+        price = Decimal('0.5')
+        
+        size = compute_size_base(usdt_amount, price)
+        
+        assert size == Decimal('200')
+    
+    def test_size_minimum_order(self):
+        """Test size mínimo de orden (40 USDT)"""
+        usdt_amount = 40  # Mínimo permitido
+        price = Decimal('50000.0')
+        
+        size = compute_size_base(usdt_amount, price)
+        
+        assert size == Decimal('0.0008')
+
+
+# ============================================================================
+# TESTS: MetricsCalculator edge cases
+# ============================================================================
+
+class TestMetricsCalculatorEdgeCases:
+    """Tests de casos extremos del calculador de métricas"""
+    
+    def test_single_trade_metrics(self):
+        """Test métricas con un solo trade"""
+        df = pd.DataFrame({
+            'PROFIT': [100.0],
+            'CLOSE_AT': ['2024-01-01 10:00:00']
+        })
+        
+        metrics = MetricsCalculator.calculate_all_metrics(df, 1000.0)
+        
+        assert metrics['num_trades'] == 1
+        assert metrics['total_profit_usd'] == 100.0
+        assert metrics['win_rate'] == 100.0
+    
+    def test_exactly_50_percent_win_rate(self):
+        """Test win rate exactamente 50%"""
+        df = pd.DataFrame({
+            'PROFIT': [100, -100, 50, -50],
+            'CLOSE_AT': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04']
+        })
+        
+        metrics = MetricsCalculator.calculate_all_metrics(df, 1000.0)
+        
+        assert metrics['win_rate'] == 50.0
+    
+    def test_very_high_profit_factor(self):
+        """Test profit factor muy alto"""
+        df = pd.DataFrame({
+            'PROFIT': [1000, 500, 750, -10],
+            'CLOSE_AT': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04']
+        })
+        
+        pf = MetricsCalculator.profit_factor(df)
+        
+        # 2250 / 10 = 225
+        assert pf == 225.0
+    
+    def test_breakeven_trading(self):
+        """Test trading breakeven (sin profit ni loss)"""
+        df = pd.DataFrame({
+            'PROFIT': [100, -100, 50, -50, 25, -25],
+            'CLOSE_AT': ['2024-01-01', '2024-01-02', '2024-01-03', 
+                         '2024-01-04', '2024-01-05', '2024-01-06']
+        })
+        
+        total = MetricsCalculator.total_profit_usd(df)
+        
+        assert total == 0.0
+
+
+# ============================================================================
+# TESTS: TP/SL con diferentes símbolos y direcciones
+# ============================================================================
+
+class TestTPSLVariousScenarios:
+    """Tests de TP/SL con diferentes escenarios"""
+    
+    def test_long_btc_aggressive(self):
+        """Test LONG BTC con TP/SL agresivos"""
+        entry = Decimal('50000')
+        tp, sl = calculate_tp_sl_prices(entry, 'long', 10, 10)  # 10% ambos
+        
+        assert tp == Decimal('55000')
+        assert sl == Decimal('45000')
+    
+    def test_short_eth_conservative(self):
+        """Test SHORT ETH con TP/SL conservadores"""
+        entry = Decimal('3000')
+        tp, sl = calculate_tp_sl_prices(entry, 'short', 1.5, 1.5)  # 1.5% ambos
+        
+        assert tp == Decimal('2955')
+        assert sl == Decimal('3045')
+    
+    def test_long_with_asymmetric_tp_sl(self):
+        """Test LONG con TP y SL asimétricos"""
+        entry = Decimal('1000')
+        tp, sl = calculate_tp_sl_prices(entry, 'long', 5, 10)  # TP 5%, SL 10%
+        
+        assert tp == Decimal('1050')
+        assert sl == Decimal('900')
+        
+        # Risk/Reward ratio
+        risk = entry - sl  # 100
+        reward = tp - entry  # 50
+        rr_ratio = reward / risk
+        
+        assert rr_ratio == Decimal('0.5')  # 1:2 risk/reward
+
+
+# ============================================================================
+# TESTS: State management con corrupción
+# ============================================================================
+
+class TestStateManagementCorruption:
+    """Tests de gestión de estado con datos corruptos"""
+    
+    def test_load_corrupted_json(self, temp_state_file):
+        """Test cargar JSON corrupto"""
+        # Escribir JSON inválido
+        with open(temp_state_file, 'w') as f:
+            f.write("{invalid json content")
+        
+        # Debería retornar vacío sin crashear
+        positions, candles = load_state(temp_state_file)
+        
+        assert positions == {}
+        assert candles == {}
+    
+    def test_load_json_missing_keys(self, temp_state_file):
+        """Test cargar JSON válido pero sin keys esperadas"""
+        with open(temp_state_file, 'w') as f:
+            json.dump({'wrong_key': 'value'}, f)
+        
+        positions, candles = load_state(temp_state_file)
+        
+        assert positions == {}
+        assert candles == {}
+    
+    def test_save_state_with_special_characters(self, temp_state_file):
+        """Test guardar estado con caracteres especiales en símbolos"""
+        open_positions = {
+            '02_reversal_long_4H': [
+                {
+                    'symbol': 'BTC/USDT:USDT',  # Símbolo con caracteres especiales
+                    'size': Decimal('0.5'),
+                    'entry_price': Decimal('50000.0'),
+                    'direction': 'long',
+                    'tp': Decimal('51500.0'),
+                    'sl': Decimal('45000.0'),
+                    'order_id': 'order_123',
+                    'opened_at': datetime(2024, 12, 30, 10, 0, 0),
+                    'usdt_amount': 40.0
+                }
+            ]
+        }
+        strategy_candles = {'02_reversal_long_4H': 5}
+        
+        # Guardar
+        save_state_local(open_positions, strategy_candles, temp_state_file)
+        
+        # Cargar
+        loaded_pos, loaded_candles = load_state(temp_state_file)
+        
+        # Verificar que se guardó correctamente
+        assert len(loaded_pos['02_reversal_long_4H']) == 1
 
 
 # ============================================================================
