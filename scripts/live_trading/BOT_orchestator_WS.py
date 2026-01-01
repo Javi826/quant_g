@@ -522,9 +522,9 @@ def detect_signal_for_strategy(strategy, final_symbols):
 def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print(f"{COLOR}{'=' * 44}{RESET}")
+    print(f"{COLOR}{'=' * 48}{RESET}")
     print(f"{COLOR}STARTING BOT IN ACCOUNT: {ACCOUNT_NUMBER}{RESET}")
-    print(f"{COLOR}{'=' * 44}{RESET}")
+    print(f"{COLOR}{'=' * 48}{RESET}")
     
     # --------------------------------------------------------------------
     # LOAD STATE & SYMBOLS 
@@ -543,17 +543,17 @@ def main_loop():
     # STRATEGY VALIDATION
     # --------------------------------------------------------------------
     print(f"{COLOR}Validating strategy configuration...{RESET}")
-    print(f"{COLOR}{'-' * 44}{RESET}")
+    print(f"{COLOR}{'-' * 48}{RESET}")
         
     errors, warnings = validate_strategy_configuration(STRATEGIES, implemented_strategies)
     
     if errors:
-        print(f"{COLOR}{'=' * 44}{RESET}")
+        print(f"{COLOR}{'=' * 48}{RESET}")
         print(f"{COLOR}CONFIGURATION ERRORS FOUND:{RESET}\n")
         for err in errors:
             print(f"  {err}")
         print(f"\n{COLOR}⛔ BOT STOPPED - Fix configuration before running{RESET}")
-        print(f"{COLOR}{'=' * 44}{RESET}\n")
+        print(f"{COLOR}{'=' * 48}{RESET}\n")
         return  
 
     if warnings:
@@ -568,7 +568,7 @@ def main_loop():
     # LOAD SYMBOLS PER STRATEGY & TIMEFRAMES
     # --------------------------------------------------------------------
     print(f"{COLOR}Operative Strategies: {len(STRATEGIES)} {RESET}")
-    print(f"{COLOR}{'-' * 44}{RESET}")
+    print(f"{COLOR}{'-' * 48}{RESET}")
     final_by_strat = {}
     for strat in STRATEGIES:
         #DEPRECATED strategies
@@ -593,7 +593,7 @@ def main_loop():
  
     # Después de cargar símbolos y antes del WebSocket
     print(f"{COLOR}Starting Web...{RESET}")
-    print(f"{COLOR}{'-' * 44}{RESET}")
+    print(f"{COLOR}{'-' * 48}{RESET}")
     
     # Crear template si no existe
     create_dashboard_template(BASE_DIR)
@@ -620,7 +620,7 @@ def main_loop():
     # INIT WEBSOCKET
     # --------------------------------------------------------------------
     print(f"{COLOR}Init  WebSocket...{RESET}")
-    print(f"{COLOR}{'-' * 44}{RESET}")
+    print(f"{COLOR}{'-' * 48}{RESET}")
     ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
     
     # --------------------------------------------------------------------
@@ -639,7 +639,7 @@ def main_loop():
     # NEXT CANDLES
     # --------------------------------------------------------------------
     print(f"{COLOR}Candles incoming:  {RESET}")
-    print(f"{COLOR}{'-' * 44}{RESET}")
+    print(f"{COLOR}{'-' * 48}{RESET}")
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
@@ -663,7 +663,7 @@ def main_loop():
             if closed_timeframes:
 
                 
-                print(f"{'=' * 44}")
+                print(f"{'=' * 48}")
                 print(f"New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 #print(f"Timeframes: {', '.join(closed_timeframes)}")
 
@@ -672,7 +672,7 @@ def main_loop():
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
                 print(f"Searching Signals... - {now}")
-                print(f"{'-' * 44}")
+                print(f"{'-' * 48}")
                 
                 # Process strategies for closed timeframes
                 strategies_to_process = []
@@ -689,9 +689,8 @@ def main_loop():
                         candles       = STRATEGY_CANDLES.get(strat_id, 0)
                         num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                         
-                        print(f"Skip {strat_id:<26} {candles:>2}/{strat['sell_after_ncandles']:<2} | {num_positions:>2} pos.")
-
-                        
+                        print(f"Skip {strat_id:<23} {candles:>2}/{strat['sell_after_ncandles']:<2} | {num_positions:>2} pos.")
+                      
                         check_candles_timeout_for_strategy(
                             strat_id,
                             strat['sell_after_ncandles'],
@@ -752,7 +751,7 @@ def main_loop():
                             print(f"❌ Error Retry failed for {strat_id}: {e2}")
                                 
                 print("Signal cycle completed")
-                print(f"{'=' * 44}\n")
+                print(f"{'=' * 48}\n")
                 
                 # Recalculate next candle times
                 for tf in closed_timeframes:

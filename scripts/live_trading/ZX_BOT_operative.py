@@ -150,7 +150,7 @@ def load_state(state_file, display_color="\033[1;94m"):
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
         print(f"Total positions recovered: {total_positions}")
-        print(f"{display_color}{'-' * 44}{RESET}")
+        print(f"{display_color}{'-' * 48}{RESET}")
         
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
@@ -769,7 +769,8 @@ def process_strategy(
     """Procesa una estrategia: busca señales y abre posiciones."""
     strat_id = strat['id']
 
-    print(f"Processing strategy  : {strat_id}")
+    print(f"Processing strategy: {strat_id}")
+    print(f"{'-' * 48}")
 
     if use_hardcoded:
         signals = get_hardcoded_signals(strat_id, send_request_func, hour_zone)
@@ -879,7 +880,7 @@ def close_position(symbol, size, direction, send_request_func, reason="NO_INFO",
         time.sleep(0.05)
         
         if code == 200 and resp.get("code") == "00000":
-            print(f"Position closed - {reason}: {symbol} | Size: {size}")
+            #print(f"Position closed - {reason}: {symbol} | Size: {size}")
             
             if position_data:
                 data = resp.get('data', {})

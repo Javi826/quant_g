@@ -920,13 +920,16 @@
                                 <th>Strategy</th>
                                 <th>Symbol</th>
                                 <th>Side</th>
+                                <th>Size</th>
+                                <th>Entry</th>
+                                <th>Close</th>
                                 <th>Profit</th>
                                 <th>Profit %</th>
                                 <th>Exit</th>
                             </tr>
                         </thead>
                         <tbody id="trades-body">
-                            <tr><td colspan="7" style="text-align: center;">Loading...</td></tr>
+                            <tr><td colspan="10" style="text-align: center;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2562,7 +2565,18 @@ async function loadData() {
                     } else {
                         reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
                     }
-                    return '<tr><td>' + new Date(trade.CLOSE_AT).toLocaleString() + '</td><td>' + trade.STRATEGY + '</td><td>' + trade.SYMBOL + '</td><td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td><td class="' + profitClass + '">' + (trade.PROFIT >= 0 ? '+' : '') + '$' + trade.PROFIT.toFixed(2) + '</td><td class="' + profitClass + '">' + (trade.PROFIT_PCT >= 0 ? '+' : '') + trade.PROFIT_PCT.toFixed(2) + '%</td><td>' + reasonBadge + '</td></tr>';
+                    return '<tr>' +
+                        '<td>' + new Date(trade.CLOSE_AT).toLocaleString() + '</td>' +
+                        '<td>' + trade.STRATEGY + '</td>' +
+                        '<td>' + trade.SYMBOL + '</td>' +
+                        '<td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td>' +
+                        '<td>' + parseFloat(trade.SIZE || 0).toFixed(4) + '</td>' +
+                        '<td>$' + parseFloat(trade.PRICE_ENTRY || 0).toFixed(2) + '</td>' +
+                        '<td>$' + parseFloat(trade.PRICE_CLOSE || 0).toFixed(2) + '</td>' +
+                        '<td class="' + profitClass + '">' + (trade.PROFIT >= 0 ? '+' : '') + '$' + trade.PROFIT.toFixed(2) + '</td>' +
+                        '<td class="' + profitClass + '">' + (trade.PROFIT_PCT >= 0 ? '+' : '') + trade.PROFIT_PCT.toFixed(2) + '%</td>' +
+                        '<td>' + reasonBadge + '</td>' +
+                        '</tr>';
                 }).join('');
             }
         });
