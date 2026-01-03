@@ -1,4 +1,4 @@
-#MAIN EXTRACTION
+#Z_parquet_A0_extraction.py
 # -----------------------------
 import os
 import time

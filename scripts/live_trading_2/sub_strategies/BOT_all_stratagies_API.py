@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Bot multi-estrategia con soporte WebSocket completo para todas las operaciones API.
+Bot multi-estrategia con soporte para múltiples timeframes simultáneos.
 """
 import os
 import sys
@@ -7,68 +9,47 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from ZX_BOT_metrics import bot_metrics
+from BOT_metrics import bot_metrics
 
-# --- Imports de modules ---
+# --- Imports de tus módulos ---
 from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from ZX_utils_live import load_final_symbols, fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-
-# Import WebSocket-enabled utilities
-from ZX_BOT_display import check_all_tp_sl  # ← AÑADIR ESTA LÍNEA
-from ZX_BOT_operative1 import check_tp_sl_for_strategy, get_current_price  
-from ZX_BOT_operative1 import increment_strategy_candles, process_strategy, setup_print_logger
-from ZX_BOT_operative1 import sync_broker, load_state, save_state_local, calculate_next_candle_time
-from ZX_BOT_operative1 import check_candles_timeout_for_strategy, group_strategies_by_timeframe, get_unique_timeframes, get_usdt_balance_ws
-from ZX_BOT_ws_manager import init_websocket
-
+from ZX_utils_bot import increment_strategy_candles, process_strategy, check_all_tp_sl,setup_print_logger, sync_broker, load_state, save_state_local,calculate_next_candle_time, check_candles_timeout_for_strategy
+from ZX_utils_bot import group_strategies_by_timeframe,get_unique_timeframes
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
 from Z_add_signals_parity import parity_long, parity_short
-
-# ⭐ Import dinámico basado en ACCOUNT_NUMBER
-from utils.ZZ_connect import (
-    BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
-    BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
-    BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02,
-    connect_bitget_00, connect_bitget_01, connect_bitget_02
-)
-
-from ZX_connect_live import send_request_00, send_request_01, send_request_02
+#SAVE DATE 011-12-2025 
 logdir = os.path.expanduser('~/projects/quant/quant_g/scripts/live_trading/bot_files')
 setup_print_logger(logdir)
 
-# ⭐ Seleccionar credenciales y funciones según ACCOUNT_NUMBER
-CREDENTIALS = {
-    "00": (BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00, connect_bitget_00, send_request_00),
-    "01": (BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01, connect_bitget_01, send_request_01),
-    "02": (BITGET_API_KEY_02, BITGET_API_SECRET_02, BITGET_API_PASS_02, connect_bitget_02, send_request_02)
-}
+from utils.ZZ_connect import connect_bitget_01
+from ZX_connect_live import get_usdt_balance_01, send_request_01
 
-BLUE_BOLD      = "\033[1;94m"
-YELLOW_BOLD    = "\033[0;93m"
-RESET          = "\033[0m"
-HOUR_ZONE      = ZoneInfo('UTC')
-PRODUCT_TYPE   = 'USDT-FUTURES'
-CHECK_INTERVAL = 10
-ACCOUNT_NUMBER = "02"
-USE_HARDCODED_SIGNALS = True
+BLUE_BOLD                 = "\033[1;94m"
+YELLOW_BOLD               = "\033[0;93m"
+RESET                     = "\033[0m"
+HOUR_ZONE                 = ZoneInfo('UTC')
+PRODUCT_TYPE              = 'USDT-FUTURES'
+CHECK_INTERVAL            = 10  
+USE_HARDCODED_SIGNALS     = False
 
-BITGET_API_KEY, BITGET_API_SECRET, BITGET_API_PASS, connect_bitget, send_request_func = CREDENTIALS[ACCOUNT_NUMBER]
+# Archivo de estado
+STATE_FILE = 'bot_state.json'
 
-# STATES
-STATE_FILE       = 'bot_state_1.json'
+# Registro de posiciones abiertas por estrategia
 OPEN_POSITIONS   = {}
 STRATEGY_CANDLES = {}
 
-# ==========================================================================
-# STRATEGY CONFIGURATION
-# ==========================================================================
+# ----------------------
+# Configuración de Estrategias
+# ----------------------
 STRAT_A = {
     'id': 'double_top_long_4H',
     'name': 'double_top_long_4H',
-    'timeframe': '1m',
-    'sell_after_ncandles': 2,
-    'order_amount': 10,
+    'timeframe': '4H',
+    'sell_after_ncandles': 50,
+    'order_amount': 40,
     'lookback': 2,
     'tolerance': 20,
     'trend_th': 10,
@@ -80,9 +61,9 @@ STRAT_A = {
 STRAT_B = {
     'id': 'revers_long_4H',
     'name': 'reversal_long_4H',
-    'timeframe': '2m',
+    'timeframe': '4H',
     'sell_after_ncandles': 50,
-    'order_amount': 10,
+    'order_amount': 40,
     'left_lookback': 5,
     'tolerance': 30,
     'ma_period':50,
@@ -99,7 +80,6 @@ STRAT_C = {
     'order_amount': 40,
     'lookback': 150,
     'tolerance': 40,
-    'ma_period':50,
     'tp_pct': 3,  
     'sl_pct': 10,  
     'direction': 'long'
@@ -127,7 +107,6 @@ STRAT_E = {
     'order_amount': 40,
     'lookback': 150,
     'tolerance': 20,
-    'ma_period':50,
     'tp_pct': 5,  
     'sl_pct': 10,  
     'direction': 'short'
@@ -189,45 +168,18 @@ STRAT_I = {
     'direction': 'short'
 }
 
-STRAT_J = {
-    'id': 'parity_long_1H',
-    'name': 'parity_long_1H',
-    'timeframe': '1H',  
-    'sell_after_ncandles': 50,
-    'order_amount': 40,
-    'lookback': 150,
-    'tolerance': 15,
-    'ma_period':25,
-    'tp_pct': 2,  
-    'sl_pct': 10,  
-    'direction': 'long'
-}
+STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I]
 
-STRAT_K = {
-    'id': 'parity_short_1H',
-    'name': 'parity_short_1H',
-    'timeframe': '1H',
-    'sell_after_ncandles': 50,
-    'order_amount': 40,
-    'lookback': 150,
-    'tolerance': 20,
-    'ma_period':50,
-    'tp_pct': 2,  
-    'sl_pct': 7.5,  
-    'direction': 'short'
-}
-
-STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K]
-
-send_request_common = send_request_func 
-get_balance_common  = get_usdt_balance_ws
-exchange            = connect_bitget()  
+# Funciones comunes
+connect_common      = connect_bitget_01
+send_request_common = send_request_01
+get_balance_common  = get_usdt_balance_01
 
 # ==========================================================================
-# SIGNAL DETECTION
-# ==========================================================================
+# SIGNALS & STRATEGIES
+# ==========================================================================        
 def detect_signal_for_strategy(strategy, final_symbols):
-    """Detecta señales para una estrategia"""
+
     detected = []
     if not final_symbols:
         return detected
@@ -238,8 +190,9 @@ def detect_signal_for_strategy(strategy, final_symbols):
             continue
         
         df_norm = normalize_live_ohlcv(df)
-        arr = df_to_arrays_live(df_norm)
+        arr     = df_to_arrays_live(df_norm)
         
+        # Obtener señales según estrategia
         try:
             if strategy['name'] == 'double_top_long_4H':
                 signals = double_top_long(
@@ -262,7 +215,6 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
-                    ma_period=strategy['ma_period'],
                     live_trading=True
                 )
             elif strategy['name'] == 'reversal_short_4H':
@@ -278,7 +230,6 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     arr,
                     lookback=strategy['lookback'],
                     tolerance=strategy['tolerance'],
-                    ma_period=strategy['ma_period'],
                     live_trading=True
                 )
             elif strategy['name'] == 'reversal_long_1H':
@@ -313,28 +264,13 @@ def detect_signal_for_strategy(strategy, final_symbols):
                     ma_period=strategy['ma_period'],
                     live_trading=True
                 )
-            elif strategy['name'] == 'parity_long_1H':
-                signals = parity_long(
-                    arr,
-                    lookback=strategy['lookback'],
-                    tolerance=strategy['tolerance'],
-                    ma_period=strategy['ma_period'],
-                    live_trading=True
-                )
-            elif strategy['name'] == 'parity_short_1H':
-                signals = parity_short(
-                    arr,
-                    lookback=strategy['lookback'],
-                    tolerance=strategy['tolerance'],
-                    ma_period=strategy['ma_period'],
-                    live_trading=True
-                )
             else:
                 continue
         except Exception as e:
             print(f"❌ Error looking for signals {sym} ({strategy['name']}): {e}")
             continue
         
+        # Verificar si hay señal en la última vela
         if signals is None or len(signals) == 0:
             continue
         
@@ -349,56 +285,40 @@ def detect_signal_for_strategy(strategy, final_symbols):
     return detected
 
 # ==========================================================================
-# MAIN LOOP
-# ==========================================================================
+# LOOP PRINCIPAL
+# ==========================================================================  
+
 def main_loop():
     global OPEN_POSITIONS, STRATEGY_CANDLES
     
-    print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
-    print(f"{BLUE_BOLD}🤖 === STARTING MULTI-STRATEGY BOT OPERATING IN ACCOUNT: {ACCOUNT_NUMBER} 🤖 ==={RESET}")
-    print(f"{BLUE_BOLD}{'=' * 120}{RESET}")
-    
-    # Load state
+    print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
+    print(f"{BLUE_BOLD}🤖 === STARTING MULTI-STRATEGY & MULTI-TIMEFRAME BOT 🤖 ==={RESET}")
+    print(f"{BLUE_BOLD}{'=' * 115}{RESET}")
     OPEN_POSITIONS, STRATEGY_CANDLES = load_state(STATE_FILE)
-    
-    # Símbolos disponibles
+    exchange    = connect_common()
     all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
     
-    # Load symbols for each strategy
     final_by_strat = {}
     for strat in STRATEGIES:
         final_by_strat[strat['id']] = load_final_symbols(all_symbols,strategy=strat['name'],timeframe=strat['timeframe'])
         print(f"🔹 Strategy {strat['id']} ({strat['timeframe']}): {len(final_by_strat[strat['id']])} symbols")
     
-    # Group strategies by timeframe
     strategies_by_tf  = group_strategies_by_timeframe(STRATEGIES)
     unique_timeframes = get_unique_timeframes(STRATEGIES)
     
-    print(f"\n➡️ Detected timeframes: {', '.join(unique_timeframes)}")
+    print(f"\n➡️  Detected timeframes: {', '.join(unique_timeframes)}")
     for tf in unique_timeframes:
         strat_names = [s['id'] for s in strategies_by_tf[tf]]
         print(f"   🔹 {tf}: {', '.join(strat_names)}")
     
     print("\n✅ BOT Initialization completed\n")
-    bot_metrics()    
-    # ⭐ INITIALIZE WEBSOCKET WITH CREDENTIALS
-    print(f"\n{BLUE_BOLD}Initializing WebSocket connections...{RESET}")
-    ws_manager = init_websocket(api_key=BITGET_API_KEY,api_secret=BITGET_API_SECRET,api_passphrase=BITGET_API_PASS)
+    bot_metrics()
     
-    # ⭐ PRE-LOAD CONTRACTS for common symbols
-    if ws_manager:
-        all_strategy_symbols = set()
-        for strat_id, symbols in final_by_strat.items():
-            all_strategy_symbols.update(symbols)
-        
-        if all_strategy_symbols:
-            ws_manager.preload_contracts(list(all_strategy_symbols),product_type=PRODUCT_TYPE)
-    print()
-    
-    # Calculate next candle times
+    # ⭐ Calcular next_candle_time para cada timeframe
     next_candle_times = {}
     for tf in unique_timeframes:
         next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
+        
         print(f"⏰ Next candle for {tf:<{5}} : {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S'):<{18}} UTC")
 
     last_tpsl_check = time.time()
@@ -408,31 +328,32 @@ def main_loop():
             current_time = time.time()
             now_datetime = datetime.now(HOUR_ZONE)
             
-            # Check which timeframes closed
+            # ⭐ Verificar qué timeframes cerraron vela
             closed_timeframes = []
             for tf in unique_timeframes:
                 if now_datetime >= next_candle_times[tf]:
                     closed_timeframes.append(tf)
             
-            # Process closed timeframes
+            # Si al menos un timeframe cerró vela, procesar
             if closed_timeframes:
-                print(f"\n{'=' * 120}")
+                cycle_start_time = time.time()
+                print(f"\n{'=' * 115}")
                 print(f"🔀 New candle(s) detected {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 print(f"🔹 Timeframes: {', '.join(closed_timeframes)}")
 
-                # Sync with broker
-                sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE)
+                # Sincronizar con broker una sola vez
+                sync_broker(OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
                 
                 now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
                 print(f"📡 Signal search - {now}")
-                print(f"{'-' * 120}")
+                print(f"{'-' * 115}")
                 
-                # Process strategies for closed timeframes
+                # ⭐ Procesar solo las estrategias de los timeframes que cerraron
                 strategies_to_process = []
                 for tf in closed_timeframes:
                     strategies_to_process.extend(strategies_by_tf[tf])
                 
-                # Increment candle counters and check timeouts
+                # Incrementar contador de velas y chequear timeouts
                 for strat in strategies_to_process:
                     strat_id = strat['id']
                     has_positions = strat_id in OPEN_POSITIONS and len(OPEN_POSITIONS[strat_id]) > 0
@@ -442,22 +363,16 @@ def main_loop():
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
                         print(f"➡️  {strat_id:<18} ({strat['timeframe']:<2}): {candles}/{strat['sell_after_ncandles']:<2} candles")
 
-                        check_candles_timeout_for_strategy(
-                            strat_id,
-                            strat['sell_after_ncandles'],
-                            OPEN_POSITIONS,
-                            STRATEGY_CANDLES,
-                            STATE_FILE,
-                            send_request_common
-                        )
+                        check_candles_timeout_for_strategy(strat_id, strat['sell_after_ncandles'],OPEN_POSITIONS, STRATEGY_CANDLES, STATE_FILE, send_request_common)
                 
-                # Signal search (only if no positions)
+                # Búsqueda de señales (solo si no hay posiciones)
                 for strat in strategies_to_process:
                     strat_id = strat['id']
                     num_positions = len(OPEN_POSITIONS.get(strat_id, []))
                     
                     if num_positions > 0:
-                        print(f"🚫 {strat_id:<18} ({strat['timeframe']:<2}): {num_positions} open positions")
+                        print(f"🚫 {strat_id:<18} ({strat['timeframe']:<2}) - {num_positions} open positions")
+
                         continue
                     
                     try:
@@ -476,10 +391,12 @@ def main_loop():
                         )
                     except Exception as e:
                         print(f"❌ Error processing {strat_id}: {e}")
+                        import traceback
+                        #traceback.print_exc()
                         
-                        # Retry once
-                        print(f"⏳ Retrying {strat_id} after 2 seconds...")
-                        time.sleep(2)
+                        # ⭐ SECOND TRY
+                        print(f"⏳ Retrying {strat_id} after 5 seconds...")
+                        time.sleep(5)
                         try:
                             process_strategy(
                                 strat=strat,
@@ -497,33 +414,29 @@ def main_loop():
                             print(f"✅ Retry successful for {strat_id}")
                         except Exception as e2:
                             print(f"❌ Retry failed for {strat_id}: {e2}")
-                                
+                
                 print("🔂 Signal cycle completed")
+                print(f"{'=' * 115}\n")
+                cycle_elapsed = time.time() - cycle_start_time
+                print(f"⏱️  TOTAL CYCLE TIME: {cycle_elapsed:.3f}s")
                 print(f"{'=' * 120}\n")
                 
-                # Recalculate next candle times
+                # ⭐ Recalcular next_candle_time para los timeframes que cerraron
                 for tf in closed_timeframes:
                     next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
                     print(f"⏰ Next candle for {tf}: {next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC")
                 
+                # Resetear el tiempo del último chequeo TP/SL
                 last_tpsl_check = time.time()
             
-            # Periodic TP/SL check
+            # Chequeo periódico de TP/SL cada CHECK_INTERVAL segundos
             else:
                 if current_time - last_tpsl_check >= CHECK_INTERVAL:
-                    check_all_tp_sl(
-                        STRATEGIES,
-                        OPEN_POSITIONS,
-                        STRATEGY_CANDLES,
-                        STATE_FILE,
-                        send_request_common,
-                        HOUR_ZONE,
-                        check_tp_sl_for_strategy,  
-                        get_current_price           
-                    )
+                    check_all_tp_sl(STRATEGIES, OPEN_POSITIONS, STRATEGY_CANDLES,STATE_FILE, send_request_common, HOUR_ZONE)
                     last_tpsl_check = current_time
             
-            time.sleep(0.05)
+            # Pequeña pausa para no saturar el CPU
+            time.sleep(0.1)
             
     except KeyboardInterrupt:
         print("\n🔚 Interrupted by user.")

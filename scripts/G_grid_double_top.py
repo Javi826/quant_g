@@ -16,27 +16,26 @@ from Z_add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-STRATEGY     = "double_top_long_4H"
+MY_SYMBOLS   = True
+STRATEGY     = "double_top__4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data2/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_2021_OOS"
+DATA_FOLDER         = "data/crypto_OOS"
+#DATA_FOLDER         = "data/crypto_OOS_2"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 80_000_000
+MIN_VOL_USDT        = 10_000_000
 
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-
-# =============================================================================
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_MINOR_LIST  = [2] 
 PRICE_TOLERANCE_LIST = [10] 
@@ -44,6 +43,14 @@ TREND_TH_LIST        = [10]
  
 TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
+# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [5] 
+TREND_TH_LIST        = [5] 
+ 
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [7]
 # =============================================================================
 
 
@@ -55,7 +62,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=True)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=MY_SYMBOLS)
 
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
@@ -71,7 +78,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = double_top_long(
+        signals = double_top_short(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 
@@ -112,7 +119,7 @@ save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtes
 save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
-final_prints(f" 🥇Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
+final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 

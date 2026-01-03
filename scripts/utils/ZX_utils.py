@@ -55,6 +55,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         df        = None
         reasons   = []
         file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
+        
         if not os.path.exists(file_path):
             reasons.append("File missing")
         else:
@@ -65,10 +66,12 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 last_close = df['close'].iloc[-1]
                 if last_close <= min_price:
                     reasons.append("Last close too low")
+                    
             if df is not None:
                 avg_vol = df['volume_quote'].tail(vol_window).mean()
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
+                    
             if df is not None:
                 n_rows = len(df)
                 if timeframe == "1H":
@@ -85,6 +88,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                     min_bars = 180
                 else:
                     min_bars = 999999999
+                    
                 if n_rows < min_bars:
                     reasons.append("Not enough bars")
         if reasons:
@@ -100,13 +104,12 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     print(f"🔹Symbols remaining : {len(filtered_symbols)}\n")
     
     
-# =============================================================================
-#     print(f"\n📊 Removal reasons breakdown:")
-#     for reason, count in removed_by_reasons.items():
-#         if count > 0:
-#             print(f"   • {reason:<25}: {count:>4} symbols")
-#     print()
-# =============================================================================
+
+    #print(f"\n📊 Removal reasons breakdown:")
+    #for reason, count in removed_by_reasons.items():
+    #     if count > 0:
+    #         print(f"   • {reason:<25}: {count:>4} symbols")
+    #print()
     
     return ohlcv_data, filtered_symbols
 

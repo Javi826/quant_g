@@ -365,7 +365,7 @@ if ACCOUNT_NUMBER == "00":
 elif ACCOUNT_NUMBER == "E1":
     STRATEGIES = [STRAT_A, STRAT_B, STRAT_C, STRAT_D, STRAT_E, STRAT_F, STRAT_G, STRAT_H, STRAT_I, STRAT_J, STRAT_K,STRAT_M]
 elif ACCOUNT_NUMBER == "01":
-    STRATEGIES = [STRAT_A, STRAT_B, STRAT_C]
+    STRATEGIES = []
   
 # ==========================================================================
 # SIGNAL DETECTION

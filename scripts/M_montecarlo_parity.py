@@ -26,7 +26,7 @@ STRATEGY            = "parity"
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data/crypto_2022_IS"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
@@ -36,10 +36,10 @@ MIN_VOL_USDT        = 10_000_000
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [15,20,25,30] 
-MA_PERIOD_LIST       = [50]
+MA_PERIOD_LIST       = [25,50]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
