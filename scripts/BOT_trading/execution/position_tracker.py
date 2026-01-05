@@ -264,7 +264,6 @@ def check_all_tp_sl(strategies: List[Dict],
                    get_current_price_func: Optional[Any] = None,
                    display_mode: str = "simple",
                    account_number: Optional[str] = None,
-                   display_color: Optional[str] = None,
                    bot_state=None) -> Dict:
     """
     Check TP/SL for all strategies (simplified for dashboard).
@@ -284,7 +283,7 @@ def check_all_tp_sl(strategies: List[Dict],
         get_current_price_func: Unused (kept for compatibility)
         display_mode: Unused (kept for compatibility)
         account_number: Unused (kept for compatibility)
-        display_color: Unused (kept for compatibility)
+
         bot_state: Bot state for profit tracking
     
     Returns:

@@ -31,27 +31,24 @@ from config.settings import BASE_URL, PRODUCT_TYPE, MARGIN_MODE, MARGIN_COIN
 
 # Global configuration
 TRADES_LOG_PATH = None
-DISPLAY_COLOR = None
 INITIAL_CAPITAL = None
 
 
 # ==========================================================================
 # CONFIGURATION
 # ==========================================================================
-def configure_paths(trades_log_path: str, display_color: str = "\033[1;94m", 
+def configure_paths(trades_log_path: str, 
                    initial_capital: float = 3671) -> None:
     """
     Configure global paths and settings for order manager.
     
     Args:
         trades_log_path: Path to Excel file for trade logger
-        display_color: ANSI color code for console output
         initial_capital: Initial capital for the account
     """
-    global TRADES_LOG_PATH, DISPLAY_COLOR, INITIAL_CAPITAL
+    global TRADES_LOG_PATH,INITIAL_CAPITAL
     
     TRADES_LOG_PATH = trades_log_path
-    DISPLAY_COLOR = display_color
     INITIAL_CAPITAL = initial_capital
     
     # Configure trade logger
@@ -130,7 +127,7 @@ def fetch_contracts_ws(symbol: str) -> Dict[str, Any]:
     if contract:
         return contract
     
-    raise ValueError(f"Contract for {symbol} not in cache")
+    raise ValueError(f"Error-Contract for {symbol} not in cache")
 
 
 def get_usdt_balance_ws(exchange=None) -> float:
@@ -144,7 +141,7 @@ def get_usdt_balance_ws(exchange=None) -> float:
         USDT balance as float
     """
     if not get_ws_manager():
-        logger.error("Error WS manager not init for balance.")
+        logger.error("Error-WS manager not init for balance.")
         return 0.0
     
     balance = get_ws_manager().get_usdt_balance()
@@ -569,7 +566,7 @@ def close_position(symbol: str,
         else:
             logger.warning(f"WAR-No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
-                logger.warning(f"Removing from local record (nonexistent position)")
+                logger.warning(f"WAR-Removing from local record (nonexistent position)")
                 if position_data:
                     current_price = get_current_price(symbol)
                     if current_price:

@@ -150,12 +150,12 @@ class StrategyProcessor:
             
             if usdt_balance < strat['order_amount']:
                 logger.warning(
-                    f"Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}"
+                    f"WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}"
                 )
                 continue
             
             # Place order - CLONED LOGIC
-            logger.info(f"Placing order for {sig['symbol']}")
+            logger.debug(f"Placing order for {sig['symbol']}")
             resp_order = place_order(
                 symbol=sig['symbol'],
                 direction=strat['direction'],
@@ -164,7 +164,7 @@ class StrategyProcessor:
             )
             
             if resp_order is None:
-                logger.error(f"Failed to place order for {sig['symbol']}")
+                logger.error(f"Error-Failed to place order for {sig['symbol']}")
                 continue
             
             # Extract order data - CLONED LOGIC
@@ -208,7 +208,7 @@ class StrategyProcessor:
                     hour_zone=self.hour_zone,
                     usdt_amount=strat['order_amount']
                 )
-                logger.info(f"Position added to tracking: {sig['symbol']}")
+                logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:
                 logger.warning("Order executed but no orderId in response")
             

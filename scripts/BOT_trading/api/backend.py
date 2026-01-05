@@ -21,7 +21,7 @@ class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
     
     def __init__(self, account_number, base_dir, get_current_price_func, 
-                 get_balance_func, strategies_config, color_code=None,
+                 get_balance_func, strategies_config,
                  initial_capital=0, implemented_strategies=None, symbols_by_strategy=None):
         """
         Inicializa el servidor del dashboard.
@@ -31,8 +31,6 @@ class DashboardServer:
             base_dir: Directorio base de los archivos del bot
             get_current_price_func: Función para obtener precio actual de un símbolo
             get_balance_func: Función para obtener balance USDT
-            strategies_config: Lista de configuraciones de estrategias (STRATEGIES)
-            color_code: Código ANSI de color para logs (opcional)
             initial_capital: Capital inicial de la cuenta
             implemented_strategies: Set de estrategias implementadas
             symbols_by_strategy: Dict con símbolos por estrategia
@@ -42,7 +40,6 @@ class DashboardServer:
         self.get_current_price = get_current_price_func
         self.get_balance = get_balance_func
         self.strategies = strategies_config
-        self.color_code = color_code or ""
         self.initial_capital = initial_capital
         self.implemented_strategies = implemented_strategies or set()
         self.symbols_by_strategy = symbols_by_strategy or {}
@@ -935,10 +932,7 @@ class DashboardServer:
         import time
         time.sleep(0.5)
         
-        color = self.color_code
-        reset = "\033[0m" if color else ""
-        
-        logger.info(f"\n{color}Dashboard Web Started{reset}")
+        logger.info(f"\nDashboard Web Started")
         logger.info(f"{'─' * 45}")
         logger.info(f"Local:   http://localhost:{port}")
         logger.info(f"Network: http://127.0.0.1:{port}")

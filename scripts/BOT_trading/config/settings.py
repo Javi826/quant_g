@@ -37,12 +37,6 @@ USE_HARDCODED_SIGNALS = False
 
 DISPLAY_MODE ="summary"
 
-# ANSI color codes
-COLOR_RESET = "\033[0m"
-COLOR_BLUE  = "\033[1;94m"
-COLOR_CYAN  = "\033[1;96m"
-COLOR_WHITE = "\033[1;97m"
-
 # ==========================================================================
 # ACCOUNT-SPECIFIC SETTINGS
 # ==========================================================================
@@ -51,19 +45,16 @@ ACCOUNTS = {
     "00": {
         "initial_capital": 3671,
         "dashboard_port": 5000,
-        "color": COLOR_BLUE,
         "description": "Main Account"
     },
     "E1": {
         "initial_capital": 1761,
         "dashboard_port": 5001,
-        "color": COLOR_CYAN,
         "description": "Elite Account"
     },
     "01": {
         "initial_capital": 117,
         "dashboard_port": 5099,
-        "color": COLOR_WHITE,
         "description": "Testing Account"
     }
 }
@@ -163,7 +154,7 @@ MIN_CANDLES = 49
 MAX_CANDLES = 51
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['1H', '4H', '6Hutc', '15m', '30m']
+VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
 
 # ==========================================================================
 # STRATEGY CONFIGURATION & VALIDATION

@@ -61,8 +61,7 @@ from config.settings import (
     PRODUCT_TYPE,
     CHECK_INTERVAL,
     USE_HARDCODED_SIGNALS,
-    DISPLAY_MODE,
-    COLOR_RESET
+    DISPLAY_MODE
 )
 
 
@@ -107,7 +106,6 @@ class BotOrchestrator:
         
         # Account configuration
         self.config = get_account_config(account_number)
-        self.color = self.config['color']
         self.initial_capital = self.config['initial_capital']
         self.dashboard_port = self.config['dashboard_port']
         self.base_dir = self.config['paths']['base_dir']
@@ -181,7 +179,7 @@ class BotOrchestrator:
         - WebSocket connections
         """
         if self._initialized:
-            self.logger.warning("Bot already initialized, skipping...")
+            self.logger.warning("WAR-Bot already initialized, skipping...")
             return
         
         self._setup_directories()
@@ -259,7 +257,6 @@ class BotOrchestrator:
         os.makedirs(self.base_dir, exist_ok=True)
         configure_paths(
             self.trades_log_path,
-            display_color=self.color,
             initial_capital=self.initial_capital
         )
     
@@ -267,7 +264,6 @@ class BotOrchestrator:
         """Load bot state from disk and initialize BotState."""
         self.open_positions, self.strategy_candles = load_state(
             self.state_file,
-            display_color=self.color
         )
         
         self.bot_state = BotState()
@@ -289,8 +285,8 @@ class BotOrchestrator:
             apply_set_active_argument(self.strategies, self.active_strategy_ids)
         
         # Validate
-        self.logger.info(f"{self.color}Validating strategy configuration...{COLOR_RESET}")
-        self.logger.info(f"{self.color}{'-' * 48}{COLOR_RESET}")
+        self.logger.info(f"Validating strategy configuration...")
+        self.logger.info(f"{'-' * 48}")
         
         errors, warnings = validate_strategy_configuration(
             self.strategies,
@@ -298,16 +294,16 @@ class BotOrchestrator:
         )
         
         if errors:
-            self.logger.error(f"{self.color}{'=' * 48}{COLOR_RESET}")
-            self.logger.error(f"{self.color}CONFIGURATION ERRORS FOUND:{COLOR_RESET}\n")
+            self.logger.error(f"{'=' * 48}")
+            self.logger.error(f"CONFIGURATION ERRORS FOUND:\n")
             for err in errors:
                 self.logger.error(f"  {err}")
-            self.logger.error(f"\n{self.color}⛔ BOT STOPPED - Fix configuration{COLOR_RESET}")
-            self.logger.error(f"{self.color}{'=' * 48}{COLOR_RESET}\n")
+            self.logger.error(f"\n⛔ BOT STOPPED - Fix configuration")
+            self.logger.error(f"{'=' * 48}\n")
             raise ValueError("Invalid strategy configuration")
         
         if warnings:
-            self.logger.warning(f"{self.color}CONFIGURATION WARNINGS:{COLOR_RESET}")
+            self.logger.warning(f"CONFIGURATION WARNINGS:")
             for warn in warnings:
                 self.logger.warning(f"{warn}")
         else:
@@ -317,8 +313,8 @@ class BotOrchestrator:
         """Load market symbols for each strategy."""
         self.all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
         
-        self.logger.info(f"{self.color}Operative Strategies: {len(self.strategies)}{COLOR_RESET}")
-        self.logger.info(f"{self.color}{'-' * 48}{COLOR_RESET}")
+        self.logger.info(f"Operative Strategies: {len(self.strategies)}")
+        self.logger.info(f"{'-' * 48}")
         
         for strat in self.strategies:
             if not strat.get('active', True):
@@ -354,8 +350,8 @@ class BotOrchestrator:
     
     def _start_dashboard(self) -> None:
         """Start the web dashboard."""
-        self.logger.info(f"{self.color}Starting Web...{COLOR_RESET}")
-        self.logger.info(f"{self.color}{'-' * 48}{COLOR_RESET}")
+        self.logger.info(f"Starting Web...")
+        self.logger.info(f"{'-' * 48}")
         
         create_dashboard_template(self.base_dir)
         
@@ -365,7 +361,6 @@ class BotOrchestrator:
             get_current_price_func=get_current_price,
             get_balance_func=get_usdt_balance_ws,
             strategies_config=self.strategies,
-            color_code=self.color,
             initial_capital=self.initial_capital,
             implemented_strategies=IMPLEMENTED_STRATEGIES,
             symbols_by_strategy=self.final_by_strat
@@ -376,8 +371,8 @@ class BotOrchestrator:
     
     def _initialize_websocket(self) -> None:
         """Initialize WebSocket connections."""
-        self.logger.info(f"{self.color}Init WebSocket...{COLOR_RESET}")
-        self.logger.info(f"{self.color}{'-' * 48}{COLOR_RESET}")
+        self.logger.info(f"Init WebSocket...")
+        self.logger.info(f"{'-' * 48}")
         
         self.ws_manager = init_websocket(
             api_key=self.bitget_client.api_key,
@@ -399,8 +394,8 @@ class BotOrchestrator:
     
     def _calculate_next_candles(self) -> None:
         """Calculate next candle close times."""
-        self.logger.info(f"{self.color}Candles incoming:{COLOR_RESET}")
-        self.logger.info(f"{self.color}{'-' * 48}{COLOR_RESET}")
+        self.logger.info(f"Candles incoming:")
+        self.logger.info(f"{'-' * 48}")
         
         for tf in self.unique_timeframes:
             self.next_candle_times[tf] = calculate_next_candle_time(tf, hour_zone=HOUR_ZONE)
@@ -555,7 +550,7 @@ class BotOrchestrator:
                     strategy_candles=self.strategy_candles
                 )
             except Exception as e:
-                self.logger.warning(f"WARNING - first try processing {strat_id}: {e}")
+                self.logger.warning(f"WARfirst try processing {strat_id}: {e}")
                 
                 # Retry once
                 self.logger.info(f"Retrying {strat_id} after 3 seconds...")
@@ -570,7 +565,7 @@ class BotOrchestrator:
                     )
                     self.logger.info(f"Retry successful for {strat_id}")
                 except Exception as e2:
-                    self.logger.error(f"Error - Retry failed for {strat_id}: {e2}")
+                    self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
     
     def _periodic_tpsl_check(self, current_time: float) -> None:
         """
@@ -591,7 +586,6 @@ class BotOrchestrator:
                 get_current_price,
                 DISPLAY_MODE,
                 account_number=self.account_number,
-                display_color=self.color,
                 bot_state=self.bot_state
             )
             self.last_tpsl_check = current_time
@@ -637,7 +631,6 @@ class BotOrchestrator:
     
     def _log_startup(self) -> None:
         """Log bot startup information."""
-        reset = COLOR_RESET
-        self.logger.info(f"{self.color}{'=' * 48}{reset}")
-        self.logger.info(f"{self.color}STARTING BOT IN ACCOUNT: {self.account_number}{reset}")
-        self.logger.info(f"{self.color}{'=' * 48}{reset}")
+        self.logger.info(f"{'=' * 48}")
+        self.logger.info(f"STARTING BOT IN ACCOUNT: {self.account_number}")
+        self.logger.info(f"{'=' * 48}")

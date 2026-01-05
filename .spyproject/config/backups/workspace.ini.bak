@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['scripts/ZZX_DRAFT5.py', 'scripts/ZZX_DRAFT6.py', 'scripts/live_trading/templates/dashboard.html', 'scripts/parquet_process/Z_parquet_03_highlow_tf.py', 'scripts/parquet_process/Z_parquet_04_WFO.py', 'scripts/utils/ZX_CPU.py']
+recent_files = ['scripts/ZZX_DRAFT5.py', 'scripts/ZZX_DRAFT6.py', 'scripts/live_trading/templates/dashboard.html', 'scripts/parquet_process/Z_parquet_03_highlow_tf.py', 'scripts/parquet_process/Z_parquet_04_WFO.py', 'scripts/utils/ZX_CPU.py', 'scripts/BOT_trading/core/orchestrator.py', 'scripts/utils/ZX_CPU1.py', 'scripts/BOT_trading/market_data/websocket_manager.py', 'scripts/BOT_trading/config/settings.py']
 
 [main]
 version = 0.2.0

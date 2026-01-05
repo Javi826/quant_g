@@ -62,8 +62,8 @@ def main():
     
     # Get account config for logger setup
     account_config = get_account_config(account_number)
-    base_dir     = account_config['paths']['base_dir']
-    log_file = account_config['paths']['log_file']
+    base_dir       = account_config['paths']['base_dir']
+    log_file       = account_config['paths']['log_file']
     
     # Create directory
     os.makedirs(base_dir, exist_ok=True)

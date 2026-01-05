@@ -72,7 +72,7 @@ def log_closed_position(opened_at,
         bot_state: Bot state object for profit tracking
     """
     if TRADES_LOG_PATH is None:
-        logger.warning("WAR: TRADES_LOG_PATH not configured. Trade not logged.")
+        logger.warning("WAR-TRADES_LOG_PATH not configured. Trade not logged.")
         return
     
     try:
@@ -173,5 +173,5 @@ def log_closed_position(opened_at,
         logger.info(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
 
     except Exception as e:
-        logger.error(f"Error logging to Excel: {e}")
+        logger.error(f"Error-logging to Excel: {e}")
         traceback.print_exc()

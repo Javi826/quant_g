@@ -29,7 +29,7 @@ logger = logging.getLogger('BOT_trading.execution.state_manager')
 # ==========================================================================
 # STATE PERSISTENCE
 # ==========================================================================
-def load_state(state_file: str, display_color: str = "\033[1;94m") -> Tuple[Dict, Dict]:
+def load_state(state_file: str) -> Tuple[Dict, Dict]:
     """
     Load bot state from JSON file.
     
@@ -39,7 +39,6 @@ def load_state(state_file: str, display_color: str = "\033[1;94m") -> Tuple[Dict
     
     Args:
         state_file: Path to state JSON file
-        display_color: ANSI color code for console output
     
     Returns:
         Tuple of (open_positions, strategy_candles) dictionaries
@@ -48,16 +47,15 @@ def load_state(state_file: str, display_color: str = "\033[1;94m") -> Tuple[Dict
         >>> positions, candles = load_state('bot_state_E1.json')
         >>> print(f"Loaded {sum(len(p) for p in positions.values())} positions")
     """
-    RESET = "\033[0m"
     
     OPEN_POSITIONS = {}
     STRATEGY_CANDLES = {}
     
-    logger.info(f"{display_color}Loading BOT state...{RESET}")
+    logger.info(f"Loading BOT state...")
     
     if not os.path.exists(state_file):
-        logger.info(f"{display_color}No previous state file found{RESET}")
-        logger.info(f"{display_color}{'=' * 20}{RESET}\n")
+        logger.info(f"No previous state file found")
+        logger.info(f"{'=' * 20}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
     
     try:
@@ -86,7 +84,7 @@ def load_state(state_file: str, display_color: str = "\033[1;94m") -> Tuple[Dict
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
         logger.info(f"Total positions recovered: {total_positions}")
-        logger.info(f"{display_color}{'-' * 48}{RESET}")
+        logger.info(f"{'-' * 48}")
         
         # Display summary
         for strat_id, positions in OPEN_POSITIONS.items():
@@ -99,9 +97,9 @@ def load_state(state_file: str, display_color: str = "\033[1;94m") -> Tuple[Dict
         return OPEN_POSITIONS, STRATEGY_CANDLES
         
     except Exception as e:
-        logger.error(f"Error loading state: {e}")
+        logger.error(f"Error-loading state: {e}")
         traceback.print_exc()
-        logger.info(f"{display_color}{'=' * 120}{RESET}\n")
+        logger.info(f"{'=' * 120}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
 
@@ -155,7 +153,7 @@ def save_state_local(open_positions: Dict,
             json.dump(state_data, f, indent=2)
             
     except Exception as e:
-        logger.error(f"Error saving state: {e}")
+        logger.error(f"Error-saving state: {e}")
         traceback.print_exc()
 
 
