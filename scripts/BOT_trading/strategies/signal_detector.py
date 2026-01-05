@@ -55,7 +55,7 @@ def detect_signals_for_strategy(
         
         # Normalize data
         df_norm = normalize_live_ohlcv(df)
-        arr = df_to_arrays_live(df_norm)
+        arr     = df_to_arrays_live(df_norm)
         
         # Extract parameters for this strategy
         params = extract_strategy_params(strat)
