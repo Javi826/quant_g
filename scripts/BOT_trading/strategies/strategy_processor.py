@@ -29,7 +29,7 @@ from state import (
 )
 
 # Import signal detection functions
-from .signal_detector import detect_signals_for_strategy
+from .strategy_registry import detect_signals_for_strategy
 from .hardcoded_signals import get_hardcoded_signals
 
 
@@ -192,7 +192,7 @@ class StrategyProcessor:
                     entry_price = entry_price_from_fills if entry_price_from_fills is not None else Decimal(str(sig.get('close', 0)))
                     logger.debug(f"Using fills data: size={size}, price={entry_price}")
                 
-                # Add position to tracking - CLONED LOGIC
+                # Add position to tracking
                 add_position(
                     strat_id=strat_id,
                     symbol=sig['symbol'],

@@ -13,9 +13,9 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 # Ensure parent directories are in path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)  # live_trading2/
-grandparent_dir = os.path.dirname(parent_dir)  # scripts/
+current_dir     = os.path.dirname(os.path.abspath(__file__))
+parent_dir      = os.path.dirname(current_dir)
+grandparent_dir = os.path.dirname(parent_dir)  
 
 # Add to path if not already there
 for path in [parent_dir, grandparent_dir]:
@@ -29,40 +29,19 @@ from validation import validate_strategy_configuration
 from analytics import BotState
 from api.backend import DashboardServer, create_dashboard_template
 
-from execution import (
-    configure_paths,
-    get_current_price,
-    check_tp_sl_for_strategy,
-    check_all_tp_sl,
-    get_usdt_balance_ws,
-    BitgetClient
-)
+from execution import configure_paths, get_current_price, check_tp_sl_for_strategy
+from execution import check_all_tp_sl, get_usdt_balance_ws, BitgetClient
 
-from state import (
-    load_state,
-    save_state_local,
-    sync_broker,
-    increment_strategy_candles,
-    check_candles_timeout_for_strategy
-)
+from state import load_state, save_state_local, sync_broker
+from state import increment_strategy_candles, check_candles_timeout_for_strategy
 
-from bot_utils import (
-    calculate_next_candle_time,
-    group_strategies_by_timeframe,
-    get_unique_timeframes
-)
+from bot_utils import calculate_next_candle_time, group_strategies_by_timeframe
+from bot_utils import get_unique_timeframes
 
-from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES, load_strategies
+from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
-from config.settings import (
-    get_account_config,
-    get_account_strategies,
-    HOUR_ZONE,
-    PRODUCT_TYPE,
-    CHECK_INTERVAL,
-    USE_HARDCODED_SIGNALS,
-    DISPLAY_MODE
-)
+from config.settings import get_account_config, get_account_strategies, HOUR_ZONE
+from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,DISPLAY_MODE
 
 
 class BotOrchestrator:

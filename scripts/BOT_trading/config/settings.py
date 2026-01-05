@@ -67,7 +67,7 @@ ACCOUNTS = {
 # Strategy IDs reference strategies defined in config/strategies.yaml
 ACCOUNT_STRATEGIES = {
     "00": [
-        # All 14 strategies
+        
         '01_double_top_long_4H',
         '02_reversal_long_4H',
         '03_parity_long_4H',
@@ -84,7 +84,7 @@ ACCOUNT_STRATEGIES = {
         '14_orderblocks_long_4H'
     ],
     "E1": [
-        # All except STRAT_L (12_parity_long_6Hutc) and STRAT_N (14_orderblocks_long_4H)
+        
         '01_double_top_long_4H',
         '02_reversal_long_4H',
         '03_parity_long_4H',
@@ -100,8 +100,8 @@ ACCOUNT_STRATEGIES = {
     ],
     "01": [
         # Only testing strategies
-        '01_double_top_long_2m',
-        '02_reversal_long_5m'
+        '06_reversal_long_1H',
+        '07_reversal_short_1H'
     ]
 }
 

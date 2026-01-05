@@ -8,8 +8,8 @@ from parquet_process.Z_parquet_A0_extraction import get_futures_symbols_from_api
 from Z_add_signals_reversal import reversal_long
 from ZX_utils_live import load_final_symbols, normalize_live_ohlcv, df_to_arrays_live, PRODUCT_TYPE
 from ZX_utils_sub import load_state,save_state,sync_positions_with_exchange,process_signals_and_buy,manage_open_positions,wait_for_next_candle
-from utils.ZZ_connect import connect_bitget_02
-from ZX_connect_live import get_usdt_balance_02, send_request_02, get_open_positions_02
+from utils.ZZ_connect import connect_bitget_01
+from ZX_connect_live import get_usdt_balance_01, send_request_01, get_open_positions_01
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 ROBOTS_JSON_DIR = os.path.join(os.path.dirname(__file__), "sub_states")
@@ -54,7 +54,7 @@ def check_latest_signal(df_minor, symbol):
 # ----------------------
 # MAIN LOOP
 # ----------------------
-exchange       = connect_bitget_02()
+exchange       = connect_bitget_01()
 all_symbols    = get_futures_symbols_from_api(PRODUCT_TYPE)
 final_symbols  = load_final_symbols(all_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR)
 
@@ -70,7 +70,7 @@ try:
         print(f'\n🔷 === 01_{STRATEGY}_{TIMEFRAME_MINOR} strategy === 🔷')
         wait_for_next_candle(TIMEFRAME_MINOR)
         # 🔍 SINCRONIZAR con el exchange (detecta cierres por TP/SL)
-        sync_positions_with_exchange(open_positions, get_open_positions_02, PRODUCT_TYPE)
+        sync_positions_with_exchange(open_positions, get_open_positions_01, PRODUCT_TYPE)
         
         # 💾 Guardar estado después de sincronizar
         save_state(open_positions, STATE_FILE)
@@ -88,8 +88,8 @@ try:
                 tp_pct=TP_PCT,
                 sl_pct=SL_PCT,
                 direction="long",
-                send_request_fn=send_request_02,
-                get_balance_fn=get_usdt_balance_02,
+                send_request_fn=send_request_01,
+                get_balance_fn=get_usdt_balance_01,
                 check_signal_fn=check_latest_signal
             )
             
@@ -102,7 +102,7 @@ try:
         # -------------------------------
         # ORDERS MANAGEMENT
         # -------------------------------
-        manage_open_positions(open_positions, send_request_fn=send_request_02, product_type=PRODUCT_TYPE)
+        manage_open_positions(open_positions, send_request_fn=send_request_01, product_type=PRODUCT_TYPE)
         save_state(open_positions, STATE_FILE)
         print("🔂 === Signal cycle completed ===")
 
