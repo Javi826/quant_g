@@ -98,7 +98,7 @@ class DashboardServer:
             return None
         
         try:
-            df = pd.read_excel(self.trades_file)
+            df = pd.read_excel(self.trades_file, engine='openpyxl')
             if df.empty:
                 return None
             return df

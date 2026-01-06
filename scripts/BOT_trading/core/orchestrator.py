@@ -267,10 +267,7 @@ class BotOrchestrator:
         self.logger.info(f"Validating strategy configuration...")
         self.logger.info(f"{'-' * 48}")
         
-        errors, warnings = validate_strategy_configuration(
-            self.strategies,
-            IMPLEMENTED_STRATEGIES
-        )
+        errors, warnings = validate_strategy_configuration(self.strategies,IMPLEMENTED_STRATEGIES)
         
         if errors:
             self.logger.error(f"{'=' * 48}")

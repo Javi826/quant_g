@@ -38,7 +38,7 @@ def check_latest_signal(df_minor, symbol):
     
     signals = reversal_long(
         arr_minor,
-        left_lookback=LEFT_LOOKBACK,
+        lookback=LEFT_LOOKBACK,
         tolerance=TOLERANCE,
         ma_period=MA_PERIOD,
         live_trading=True

@@ -191,7 +191,7 @@ WS_PRIVATE_URL = "wss://ws.bitget.com/v2/ws/private"
 
 # Log levels
 CONSOLE_LOG_LEVEL = "INFO"
-FILE_LOG_LEVEL    = "DEBUG"
+FILE_LOG_LEVEL    = "INFO"
 
 # Log rotation
 LOG_MAX_BYTES    = 10 * 1024 * 1024  

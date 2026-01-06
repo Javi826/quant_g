@@ -21,9 +21,9 @@ import logging
 # Setup logger
 logger = logging.getLogger('BOT_trading.strategies.registry')
 
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 # PATH SETUP (same as old registry.py)
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 
 current_dir = os.path.dirname(os.path.abspath(__file__))  
 bot_dir     = os.path.dirname(current_dir)                    
@@ -32,9 +32,9 @@ scripts_dir = os.path.dirname(bot_dir)
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 # IMPORTS - Signal generation functions from Z_add_signals_*.py
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 
 from Z_add_signals_double_top import double_top_long
 from Z_add_signals_reversal import reversal_long, reversal_short
@@ -45,9 +45,9 @@ from Z_add_signals_orderblocks import orderblocks_long, orderblocks_short
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 # MAIN SIGNAL DETECTION FUNCTION
-# ══════════════════════════════════════════════════════════════════════════
+#===========================================================================
 
 def detect_signals_for_strategy(
     strat: dict,
