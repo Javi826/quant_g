@@ -18,12 +18,11 @@ from core import BotOrchestrator
 from config.settings import get_account_config
 
 # Credentials
-from utils.ZZ_connect import (
-    BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00,
-    BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01,
-    BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1,
-    connect_bitget_00, connect_bitget_01, connect_bitget_E1
-)
+from utils.ZZ_connect import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
+from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
+from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
+from utils.ZZ_connect import connect_bitget_00, connect_bitget_01, connect_bitget_E1
+
 
 
 def main():

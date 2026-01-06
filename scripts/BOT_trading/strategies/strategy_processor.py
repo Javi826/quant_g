@@ -113,7 +113,7 @@ class StrategyProcessor:
         logger.info("-" * 48)
         
         # ====================================================================
-        # SIGNAL DETECTION (HARDCODED OR REAL) - CLONED LOGIC
+        # SIGNAL DETECTION 
         # ====================================================================
         if self.use_hardcoded:
             logger.debug(f"Using hardcoded signals for {strat_id}")
@@ -141,10 +141,10 @@ class StrategyProcessor:
         )
         
         # ====================================================================
-        # PROCESS ALL SIGNALS - CLONED LOGIC
+        # PROCESS ALL SIGNALS 
         # ====================================================================
         for sig in signals:
-            # Check balance before each order - CLONED LOGIC
+            # Check balance before each order - 
             usdt_balance = self.get_balance(exchange)
             logger.debug(f"Current balance: {usdt_balance:.2f} USDT")
             
@@ -182,7 +182,7 @@ class StrategyProcessor:
                 )
                 time.sleep(0.05)
                 
-                # Determine size and entry price - CLONED LOGIC
+                # Determine size and entry price 
                 if filled_size is None or filled_size == 0:
                     size = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
                     entry_price = Decimal(str(data.get('price', sig.get('close', 0))))

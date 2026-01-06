@@ -1,44 +1,40 @@
 """
 Professional logging system for trading bot.
-
-This module provides a production-ready logging configuration with:
-- Multiple log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- Console and file handlers
-- Automatic log rotation
-- Rich formatting with timestamps and module information
 """
 
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from config.settings import CONSOLE_LOG_LEVEL, FILE_LOG_LEVEL, LOG_MAX_BYTES, LOG_BACKUP_COUNT  # ⭐ Añadir
 
 
 def setup_logger(
     log_dir: str,
     logfile_name: str = 'bot.log',
-    console_level: int = logging.INFO,
-    file_level: int = logging.DEBUG,
-    max_bytes: int = 10 * 1024 * 1024,  # 10 MB
-    backup_count: int = 5
+    console_level: str = None,  # ⭐ Cambiar a str (acepta 'INFO', 'DEBUG', etc.)
+    file_level: str = None,     # ⭐ Cambiar a str
+    max_bytes: int = None,
+    backup_count: int = None
 ) -> logging.Logger:
     """
     Setup professional logging system with console and file handlers.
     
-    Args:
-        log_dir: Directory where log files will be stored
-        logfile_name: Name of the log file
-        console_level: Minimum level for console output (default: INFO)
-        file_level: Minimum level for file output (default: DEBUG)
-        max_bytes: Maximum size of log file before rotation (default: 10MB)
-        backup_count: Number of backup files to keep (default: 5)
-    
-    Returns:
-        Configured root logger
-    
-    Example:
-        >>> logger = setup_professional_logger('/path/to/logs', 'trading.log')
-        >>> logger.info("Bot started")
+    If levels not provided, uses values from config.settings.
     """
+    # ⭐ Usar valores de settings.py si no se proporcionan
+    if console_level is None:
+        console_level = CONSOLE_LOG_LEVEL
+    if file_level is None:
+        file_level = FILE_LOG_LEVEL
+    if max_bytes is None:
+        max_bytes = LOG_MAX_BYTES
+    if backup_count is None:
+        backup_count = LOG_BACKUP_COUNT
+    
+    # ⭐ Convertir strings a niveles de logging
+    console_level_int = getattr(logging, console_level.upper())
+    file_level_int = getattr(logging, file_level.upper())
+    
     # Create log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, logfile_name)
@@ -52,17 +48,16 @@ def setup_logger(
     root_logger.propagate = False
     
     # ========================================================================
-    # CONSOLE HANDLER (Simple format for readability)
+    # CONSOLE HANDLER
     # ========================================================================
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(console_level)
+    console_handler.setLevel(console_level_int) 
     
-    # Simple format for console (no timestamps, just message)
     console_format = logging.Formatter('%(message)s')
     console_handler.setFormatter(console_format)
     
     # ========================================================================
-    # FILE HANDLER (Detailed format with rotation)
+    # FILE HANDLER
     # ========================================================================
     file_handler = RotatingFileHandler(
         log_path,
@@ -70,10 +65,9 @@ def setup_logger(
         backupCount=backup_count,
         encoding='utf-8'
     )
-    file_handler.setLevel(file_level)
+    file_handler.setLevel(file_level_int)  # ⭐ Usar nivel convertido
     
     # Detailed format for file
-    #file_format = logging.Formatter('%(message)s')
     file_format = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -90,45 +84,27 @@ def setup_logger(
     root_logger.info("=" * 60)
     root_logger.info("Logging system initialized")
     root_logger.info(f"Log file: {log_path}")
-    root_logger.info(f"Console level: {logging.getLevelName(console_level)}")
-    root_logger.info(f"File level: {logging.getLevelName(file_level)}")
+    root_logger.info(f"Console level: {console_level}")  
+    root_logger.info(f"File level: {file_level}")        
     root_logger.info("=" * 60)
     
     return root_logger
 
 
 def get_module_logger(module_name: str) -> logging.Logger:
-    """
-    Get a logger for a specific module.
-    
-    Args:
-        module_name: Name of the module (e.g., 'execution.order_manager')
-    
-    Returns:
-        Logger instance for the module
-    
-    Example:
-        >>> logger = get_module_logger('execution.order_manager')
-        >>> logger.info("Order placed")
-    """
+    """Get a logger for a specific module."""
     return logging.getLogger(f'BOT_trading.{module_name}')
 
 
 # ============================================================================
-# BACKWARD COMPATIBILITY (for gradual migration)
+# BACKWARD COMPATIBILITY
 # ============================================================================
 def setup_print_logger(logdir: str, logfile_name: str = None):
-    """
-    Backward compatibility wrapper.
-    Calls new professional logger setup.
-    
-    Args:
-        logdir: Log directory
-        logfile_name: Log file name
-    """
+    """Backward compatibility wrapper."""
     if logfile_name is None:
         logfile_name = 'bot.log'
     
+    # ⭐ Ahora usa settings.py automáticamente
     return setup_logger(
         log_dir=logdir,
         logfile_name=logfile_name

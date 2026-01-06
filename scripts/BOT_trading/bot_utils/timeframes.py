@@ -66,9 +66,9 @@ def calculate_next_candle_time(timeframe: str = '4H', hour_zone=None) -> datetim
         )
     
     # Calculate next candle time
-    total_minutes = now.hour * 60 + now.minute
+    total_minutes      = now.hour * 60 + now.minute
     next_total_minutes = ((total_minutes // minutes) + 1) * minutes
-    delta_minutes = next_total_minutes - total_minutes
+    delta_minutes      = next_total_minutes - total_minutes
     
     next_candle = now + timedelta(
         minutes=delta_minutes,

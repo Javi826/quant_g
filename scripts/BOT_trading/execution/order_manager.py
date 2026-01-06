@@ -27,7 +27,7 @@ logger = logging.getLogger('BOT_trading.execution.order_manager')
 # ==========================================================================
 # CONSTANTS
 # ==========================================================================
-from config.settings import BASE_URL, PRODUCT_TYPE, MARGIN_MODE, MARGIN_COIN
+from config.settings import  PRODUCT_TYPE, MARGIN_MODE
 
 # Global configuration
 TRADES_LOG_PATH = None
@@ -213,11 +213,11 @@ def extract_contract_params(c: Dict, last_price: Decimal) -> Tuple:
         return None, None, None, None, None
     
     try:
-        price_tick = Decimal(f"1e-{int(c['pricePlace'])}")
-        size_scale = int(c['volumePlace'])
-        min_trade_num = Decimal(c['minTradeNum'])
+        price_tick      = Decimal(f"1e-{int(c['pricePlace'])}")
+        size_scale      = int(c['volumePlace'])
+        min_trade_num   = Decimal(c['minTradeNum'])
         size_multiplier = Decimal(c['sizeMultiplier'])
-        min_trade_usdt = Decimal(c['minTradeUSDT'])
+        min_trade_usdt  = Decimal(c['minTradeUSDT'])
         
         return price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt
         
@@ -390,7 +390,7 @@ def place_order(symbol: str,
         return None
 
     filled_amount = extract_filled_amount(resp_order, size_q)
-    exec_price = get_exec_price(resp_order, last_price)
+    exec_price    = get_exec_price(resp_order, last_price)
 
     logger.info(f"{direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | "
           f"Price: {exec_price:<10}")
