@@ -220,7 +220,7 @@ class DashboardServer:
                 'name': name,
                 'timeframe': 'N/A',
                 'direction': 'N/A',
-                'status': 'NOT IMPLEMENTED',
+                'status': 'NOT IMPLE.',
                 'symbols_count': 0,
                 'tp_pct': 'N/A',
                 'sl_pct': 'N/A',
@@ -397,13 +397,13 @@ class DashboardServer:
                     
                     for pos in positions:
                         try:
-                            symbol = pos['symbol']
+                            symbol        = pos['symbol']
                             current_price = self.get_current_price(symbol)
-                            entry_price = float(pos['entry_price'])
-                            size = float(pos['size'])
-                            direction = pos['direction'].lower()
-                            tp_price = float(pos['tp'])
-                            sl_price = float(pos['sl'])
+                            entry_price   = float(pos['entry_price'])
+                            size          = float(pos['size'])
+                            direction     = pos['direction'].lower()
+                            tp_price      = float(pos['tp'])
+                            sl_price      = float(pos['sl'])
                             
                             # Calcular PnL
                             if direction == 'long':
@@ -413,7 +413,7 @@ class DashboardServer:
                             
                             candles = state.get('strategy_candles', {}).get(strategy_id, 0)
                             
-                            # ⭐ PRECISIÓN DINÁMICA
+                            # PRECISIÓN DINÁMICA
                             precision = self.get_precision_for_price(current_price)
                             
                             current_price_rounded = round(float(current_price), precision)
@@ -421,7 +421,7 @@ class DashboardServer:
                             sl_rounded = round(sl_price, precision)
                             entry_rounded = round(entry_price, precision)
                             
-                            # ⭐ CALCULAR DISTANCIAS (Δ%)
+                            # CALCULAR DISTANCIAS (Δ%)
                             if direction == 'long':
                                 # LONG: TP arriba, SL abajo
                                 distance_to_tp = ((tp_price - float(current_price)) / float(current_price)) * 100

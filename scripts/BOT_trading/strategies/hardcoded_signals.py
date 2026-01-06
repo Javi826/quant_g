@@ -18,32 +18,7 @@ def get_hardcoded_signals(
     hour_zone,
     product_type: str = 'USDT-FUTURES'
 ) -> List[Dict]:
-    """
-    Generate hardcoded test signals for testing.
-    
-    This function fetches real prices from the API but returns them as
-    hardcoded signals for all specified test symbols.
-    
-    Args:
-        strat_id: Strategy identifier (unused but kept for compatibility)
-        send_request_func: Function to send REST API requests
-        hour_zone: Timezone object for timestamps
-        product_type: Product type for the API request
-    
-    Returns:
-        List of signal dictionaries, each containing:
-            - symbol: Trading symbol
-            - close: Current price from API
-            - timestamp: ISO format timestamp
-    
-    Example:
-        >>> signals = get_hardcoded_signals('01_double_top_long_2m', send_func, utc_zone)
-        >>> print(signals)
-        [
-            {'symbol': 'BTCUSDT', 'close': 96543.2, 'timestamp': '2026-01-03T17:30:45'},
-            {'symbol': 'BNBUSDT', 'close': 645.8, 'timestamp': '2026-01-03T17:30:45'}
-        ]
-    """
+
     # Symbols to generate signals for
     symbols = ['BTCUSDT', 'BNBUSDT']
     signals = []

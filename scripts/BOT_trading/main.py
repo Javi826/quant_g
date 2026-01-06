@@ -23,8 +23,6 @@ from utils.ZZ_connect import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API
 from utils.ZZ_connect import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
 from utils.ZZ_connect import connect_bitget_00, connect_bitget_01, connect_bitget_E1
 
-
-
 def main():
     """Main entry point."""
     # Parse arguments

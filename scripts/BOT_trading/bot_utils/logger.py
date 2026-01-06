@@ -11,8 +11,8 @@ from config.settings import CONSOLE_LOG_LEVEL, FILE_LOG_LEVEL, LOG_MAX_BYTES, LO
 def setup_logger(
     log_dir: str,
     logfile_name: str = 'bot.log',
-    console_level: str = None,  # ⭐ Cambiar a str (acepta 'INFO', 'DEBUG', etc.)
-    file_level: str = None,     # ⭐ Cambiar a str
+    console_level: str = None,  
+    file_level: str = None,     
     max_bytes: int = None,
     backup_count: int = None
 ) -> logging.Logger:
@@ -21,7 +21,7 @@ def setup_logger(
     
     If levels not provided, uses values from config.settings.
     """
-    # ⭐ Usar valores de settings.py si no se proporcionan
+    #  Usar valores de settings.py si no se proporcionan
     if console_level is None:
         console_level = CONSOLE_LOG_LEVEL
     if file_level is None:
@@ -31,7 +31,7 @@ def setup_logger(
     if backup_count is None:
         backup_count = LOG_BACKUP_COUNT
     
-    # ⭐ Convertir strings a niveles de logging
+    # Convertir strings a niveles de logging
     console_level_int = getattr(logging, console_level.upper())
     file_level_int = getattr(logging, file_level.upper())
     

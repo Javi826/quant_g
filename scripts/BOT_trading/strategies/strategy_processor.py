@@ -17,16 +17,10 @@ from typing import Dict, List, Callable, Any
 logger = logging.getLogger('BOT_trading.strategies.processor')
 
 # Import from execution module
-from execution import (
-    place_order,
-    add_position,
-    get_fills_for_order
-)
+from execution import place_order,add_position,get_fills_for_order
 
 # Import from state module
-from state import (
-    reset_strategy_candles
-)
+from state import reset_strategy_candles
 
 # Import signal detection functions
 from .strategy_registry import detect_signals_for_strategy
@@ -154,7 +148,7 @@ class StrategyProcessor:
                 )
                 continue
             
-            # Place order - CLONED LOGIC
+            # Place order
             logger.debug(f"Placing order for {sig['symbol']}")
             resp_order = place_order(
                 symbol=sig['symbol'],
@@ -168,13 +162,13 @@ class StrategyProcessor:
                 continue
             
             # Extract order data - CLONED LOGIC
-            data = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
+            data     = resp_order.get('data', {}) if isinstance(resp_order, dict) else {}
             order_id = data.get('orderId')
             
             if order_id:
                 logger.debug(f"Order placed successfully: {order_id}")
                 
-                # Get fills for accurate entry price - CLONED LOGIC
+                # Get fills for accurate entry price 
                 filled_size, entry_price_from_fills, _, _ = get_fills_for_order(
                     order_id=order_id,
                     symbol=sig['symbol'],
@@ -184,7 +178,7 @@ class StrategyProcessor:
                 
                 # Determine size and entry price 
                 if filled_size is None or filled_size == 0:
-                    size = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
+                    size        = Decimal(str(data.get('size', data.get('filledQty', data.get('baseVolume', 0)))))
                     entry_price = Decimal(str(data.get('price', sig.get('close', 0))))
                     logger.debug(f"Using order data: size={size}, price={entry_price}")
                 else:

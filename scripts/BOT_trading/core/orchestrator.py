@@ -307,7 +307,7 @@ class BotOrchestrator:
             )
         
         # Group strategies by timeframe
-        self.strategies_by_tf = group_strategies_by_timeframe(self.strategies)
+        self.strategies_by_tf  = group_strategies_by_timeframe(self.strategies)
         self.unique_timeframes = get_unique_timeframes(self.strategies)
         
         self.logger.info(f"Detected timeframes: {', '.join(self.unique_timeframes)}")
@@ -395,10 +395,8 @@ class BotOrchestrator:
         - TP/SL hits → close positions
         """
         while self._running:
-            current_time = time.time()
-            now_datetime = datetime.now(HOUR_ZONE)
-            
-            # Check which timeframes closed
+            current_time      = time.time()
+            now_datetime      = datetime.now(HOUR_ZONE)
             closed_timeframes = self._get_closed_timeframes(now_datetime)
             
             if closed_timeframes:
@@ -479,7 +477,7 @@ class BotOrchestrator:
                     self.open_positions,
                     self.state_file
                 )
-                candles = self.strategy_candles.get(strat_id, 0)
+                candles       = self.strategy_candles.get(strat_id, 0)
                 num_positions = len(self.open_positions.get(strat_id, []))
                 
                 self.logger.info(
@@ -526,7 +524,7 @@ class BotOrchestrator:
                     strategy_candles=self.strategy_candles
                 )
             except Exception as e:
-                self.logger.warning(f"WARfirst try processing {strat_id}: {e}")
+                self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
                 
                 # Retry once
                 self.logger.info(f"Retrying {strat_id} after 3 seconds...")

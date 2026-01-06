@@ -104,8 +104,7 @@ def detect_signals_for_strategy(
         return []
     
     # Fetch OHLCV data for all symbols
-    ohlcv_data = fetch_ohlcv_data(final_symbols, timeframe)
-    
+    ohlcv_data  = fetch_ohlcv_data(final_symbols, timeframe)    
     all_signals = []
     
     # Process each symbol
@@ -113,9 +112,9 @@ def detect_signals_for_strategy(
         if df is None or df.empty:
             continue
         
-        # Normalize data (EXACT SAME as signal_detector.py)
+        # Normalize data
         df_norm = normalize_live_ohlcv(df)
-        arr = df_to_arrays_live(df_norm)
+        arr     = df_to_arrays_live(df_norm)
         
         try:
             signals = None
@@ -261,7 +260,7 @@ def detect_signals_for_strategy(
                 continue
             
             # ==============================================================
-            # VERIFY SIGNAL (EXACT SAME LOGIC as signal_detector.py)
+            # VERIFY SIGNAL
             # ==============================================================
             if signals is None or len(signals) == 0:
                 continue

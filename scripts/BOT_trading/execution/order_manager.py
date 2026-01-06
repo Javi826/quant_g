@@ -507,7 +507,7 @@ def close_position(symbol: str,
         body = {
             "symbol": symbol,
             "productType": PRODUCT_TYPE,
-            "marginMode": "isolated",
+            "marginMode": MARGIN_MODE,
             "marginCoin": "USDT",
             "size": format(size, "f"),
             "side": close_side,
