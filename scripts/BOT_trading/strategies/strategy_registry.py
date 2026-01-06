@@ -22,7 +22,7 @@ import logging
 logger = logging.getLogger('BOT_trading.strategies.registry')
 
 #===========================================================================
-# PATH SETUP (same as old registry.py)
+# PATH SETUP 
 #===========================================================================
 
 current_dir = os.path.dirname(os.path.abspath(__file__))  
@@ -33,7 +33,7 @@ if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
 #===========================================================================
-# IMPORTS - Signal generation functions from Z_add_signals_*.py
+# IMPORTS - Signal generation functions 
 #===========================================================================
 
 from Z_add_signals_double_top import double_top_long
@@ -93,14 +93,14 @@ def detect_signals_for_strategy(
         >>> signals = detect_signals_for_strategy(strat, ['BTCUSDT', 'ETHUSDT'], None)
     """
     strategy_name = strat['name']
-    timeframe = strat['timeframe']
+    timeframe     = strat['timeframe']
     
     logger.info(f"Processing strategy: {strat['id']}")
     logger.info("-" * 48)
     
     # Validate symbols
     if not final_symbols:
-        logger.warning(f"No symbols to process for {strat['id']}")
+        logger.error(f"No symbols to process for {strat['id']}")
         return []
     
     # Fetch OHLCV data for all symbols

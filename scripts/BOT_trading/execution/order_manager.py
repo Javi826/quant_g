@@ -196,7 +196,7 @@ def get_current_price(symbol: str, max_cache_age: float = 0.5) -> Decimal:
             return price_data['price']
         time.sleep(0.01)
     
-    raise TimeoutError(f"WAR-No price-{symbol}")
+    raise TimeoutError(f"No price-{symbol}")
 
 
 # ==========================================================================
@@ -291,9 +291,23 @@ def build_order_body(symbol: str, product_type: str, margin_mode: str,
     }
     return body
 
-
 def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[int], Optional[Dict]]:
-    """Place market order via REST API."""
+    """Place market order via REST API with 1 retry."""
+    
+    # Primer intento
+    code_order, resp_order = send_request_func(
+        "POST", 
+        "/api/v2/mix/order/place-order", 
+        body=body_order
+    )
+    
+    if code_order == 200 and resp_order.get("code") == "00000":
+        return code_order, resp_order
+    
+    # Fall - retry
+    logger.warning(f"WAR-Order failed, retrying in 0.5s... {resp_order}")
+    time.sleep(0.5) 
+    
     code_order, resp_order = send_request_func(
         "POST", 
         "/api/v2/mix/order/place-order", 
@@ -301,10 +315,27 @@ def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[in
     )
     
     if code_order != 200 or resp_order.get("code") != "00000":
-        logger.error("Error-order:", resp_order)
+        logger.error(f"ERR-Order failed after retry: {resp_order}")
         return None, None
     
+    logger.info("INF-Order placed successfully on retry")
     return code_order, resp_order
+
+# =============================================================================
+# def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[int], Optional[Dict]]:
+#     """Place market order via REST API."""
+#     code_order, resp_order = send_request_func(
+#         "POST", 
+#         "/api/v2/mix/order/place-order", 
+#         body=body_order
+#     )
+#     
+#     if code_order != 200 or resp_order.get("code") != "00000":
+#         logger.error("Error-order:", resp_order)
+#         return None, None
+#     
+#     return code_order, resp_order
+# =============================================================================
 
 
 def extract_filled_amount(resp_order: Dict, size_q: Decimal) -> Decimal:
@@ -366,7 +397,7 @@ def place_order(symbol: str,
 
     # Calculate size
     size_base = compute_size_base(usdt_amount, last_price)
-    c = fetch_contracts_ws(symbol)
+    c         = fetch_contracts_ws(symbol)
     price_tick, size_scale, min_trade_num, size_multiplier, min_trade_usdt = \
         extract_contract_params(c, last_price)
     
@@ -391,9 +422,17 @@ def place_order(symbol: str,
 
     filled_amount = extract_filled_amount(resp_order, size_q)
     exec_price    = get_exec_price(resp_order, last_price)
-
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NUEVO: Log de partial fills
+    # ═══════════════════════════════════════════════════════════════
+    if filled_amount < size_q * Decimal('0.95'):  # Tolerancia 5%
+        logger.warning(f"WAR-Partial fill for {symbol}: requested={size_q}, filled={filled_amount}")
+    # ═══════════════════════════════════════════════════════════════
+    
     logger.info(f"{direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | "
-          f"Price: {exec_price:<10}")
+      f"Price: {exec_price:<10}")
+       
 
     return resp_order
 
@@ -435,15 +474,15 @@ def get_fills_for_order(order_id: str,
         fills = get_ws_manager().get_fills(order_id)
         if fills:
             # Process fills
-            total_base = Decimal('0')
-            weighted = Decimal('0')
+            total_base   = Decimal('0')
+            weighted     = Decimal('0')
             total_profit = Decimal('0')
-            total_fee = Decimal('0')
+            total_fee    = Decimal('0')
             
             for f in fills:
-                bv = f.get("baseVolume")
-                price = f.get("price")
-                profit = f.get("profit")
+                bv         = f.get("baseVolume")
+                price      = f.get("price")
+                profit     = f.get("profit")
                 fee_detail = f.get("feeDetail", [])
                 
                 if bv is None or price is None:
