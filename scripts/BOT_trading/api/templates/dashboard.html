@@ -1127,11 +1127,7 @@
                                         <th>SL%</th>
                                         <th>Amount</th>
                                         <th>Candles</th>
-                                        <th>Lookback</th>
-                                        <th>Tolerance</th>
-                                        <th>MA</th>
-                                        <th>Impulse</th>
-                                        <th>Trend</th>
+                                        <th>Params</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
@@ -1851,6 +1847,54 @@ async function loadBotConfig() {
             strategiesBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">No strategies</td></tr>';
         } else {
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
+            
+            // ═══════════════════════════════════════════════════════════
+            // NUEVO: Recopilar TODOS los parámetros únicos
+            // ═══════════════════════════════════════════════════════════
+            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count'];
+            const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
+            const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
+            
+            const extraParamKeys = new Set();
+            sortedStrategies.forEach(strat => {
+                Object.keys(strat).forEach(key => {
+                    if (!excludeKeys.has(key)) {
+                        extraParamKeys.add(key);
+                    }
+                });
+            });
+            
+            const extraParamKeysArray = Array.from(extraParamKeys).sort();
+            
+            // ═══════════════════════════════════════════════════════════
+            // NUEVO: Generar THEAD dinámicamente
+            // ═══════════════════════════════════════════════════════════
+            let dynamicHeaders = '';
+            extraParamKeysArray.forEach(key => {
+                // ═══════════════════════════════════════════════════════════
+                // NUEVO: Solo primera palabra (antes del primer _)
+                // ═══════════════════════════════════════════════════════════
+                const firstWord = key.split('_')[0];
+                const displayName = firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+                dynamicHeaders += '<th>' + displayName + '</th>';
+            });
+            
+            document.querySelector('#strategies-table thead tr').innerHTML = 
+                '<th>#</th>' +
+                '<th>ID</th>' +
+                '<th>TF</th>' +
+                '<th>Side</th>' +
+                '<th>Symbols</th>' +
+                '<th>TP%</th>' +
+                '<th>SL%</th>' +
+                '<th>Amount</th>' +
+                '<th>Candles</th>' +
+                dynamicHeaders +
+                '<th>Status</th>';
+            
+            // ═══════════════════════════════════════════════════════════
+            // NUEVO: Generar TBODY dinámicamente
+            // ═══════════════════════════════════════════════════════════
             strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
                 let statusBadge = '';
                 if (strat.status === 'ACTIVE') {
@@ -1863,7 +1907,31 @@ async function loadBotConfig() {
                 
                 const num = String(index + 1).padStart(2, '0');
                 
-                return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strat.id + '</td><td>' + strat.timeframe + '</td><td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td><td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td><td>' + strat.tp_pct + '</td><td>' + strat.sl_pct + '</td><td>$' + strat.order_amount + '</td><td>' + strat.sell_after_ncandles + '</td><td>' + strat.lookback + '</td><td>' + strat.tolerance + '</td><td>' + strat.ma_period + '</td><td>' + strat.impulse + '</td><td>' + strat.trend_th + '</td><td>' + statusBadge + '</td></tr>';
+                // Columnas fijas
+                const fixedCols = 
+                    '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+                    '<td>' + strat.id + '</td>' +
+                    '<td>' + strat.timeframe + '</td>' +
+                    '<td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td>' +
+                    '<td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td>';
+                
+                // Columnas comunes
+                let commonCols = '';
+                commonKeys.forEach(key => {
+                    const value = strat[key] !== undefined ? strat[key] : 'N/A';
+                    const display = key === 'order_amount' ? '$' + value : value;
+                    commonCols += '<td>' + display + '</td>';
+                });
+                
+                // Columnas dinámicas (mismo orden que headers)
+                let extraCols = '';
+                extraParamKeysArray.forEach(key => {
+                    const value = strat[key];
+                    const display = (value !== undefined && value !== 'N/A') ? value : '-';
+                    extraCols += '<td>' + display + '</td>';
+                });
+                
+                return '<tr>' + fixedCols + commonCols + extraCols + '<td>' + statusBadge + '</td></tr>';
             }).join('');
         }
         

@@ -11,7 +11,7 @@ import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
 import logging
-
+from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 
 from analytics.metrics import MetricsCalculator
@@ -173,46 +173,52 @@ class DashboardServer:
     def _get_full_strategies_list_with_numbers(self):
         """
         Genera la lista completa de estrategias con numeración extraída de los IDs.
-        
-        Los números se extraen directamente de los IDs con prefijo numérico (ej: '02_reversal_long_4H').
-        
-        Returns:
-            list: Lista de estrategias con información completa y campo 'number'
+        DINÁMICO: Extrae TODOS los parámetros del YAML automáticamente.
         """
-        declared_names = {s['name'] for s in self.strategies}
+        # Parámetros comunes que SIEMPRE deben aparecer
+        COMMON_PARAMS = {
+            'id', 'name', 'timeframe', 'direction', 'active',
+            'tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'
+        }
         
+        # Parámetros internos que NO queremos mostrar
+        EXCLUDE_PARAMS = {'active'}
+        
+        declared_names = {s['name'] for s in self.strategies}
         strategies_list = []
         
         # Procesar estrategias declaradas
         for strat in self.strategies:
             is_active = strat.get('active', True)
-            
-            if is_active:
-                status = 'ACTIVE'
-            else:
-                status = 'DEPRECATING'
-            
+            status = 'ACTIVE' if is_active else 'DEPRECATING'
             symbols_count = len(self.symbols_by_strategy.get(strat['id'], []))
             
-            strategies_list.append({
+            # ═══════════════════════════════════════════════════════════
+            # NUEVO: Extraer TODOS los parámetros dinámicamente
+            # ═══════════════════════════════════════════════════════════
+            strategy_dict = {
                 'id': strat['id'],
                 'name': strat.get('name', strat['id']),
                 'timeframe': strat.get('timeframe', 'N/A'),
                 'direction': strat.get('direction', 'N/A'),
                 'status': status,
-                'symbols_count': symbols_count,
-                'tp_pct': strat.get('tp_pct', 'N/A'),
-                'sl_pct': strat.get('sl_pct', 'N/A'),
-                'order_amount': strat.get('order_amount', 'N/A'),
-                'sell_after_ncandles': strat.get('sell_after_ncandles', 'N/A'),
-                'lookback': strat.get('lookback', 'N/A'),
-                'tolerance': strat.get('tolerance', 'N/A'),
-                'ma_period': strat.get('ma_period', 'N/A'),
-                'impulse': strat.get('impulse', 'N/A'),
-                'trend_th': strat.get('trend_th', 'N/A')
-            })
+                'symbols_count': symbols_count
+            }
+            
+            # Añadir todos los demás parámetros del YAML (excepto los excluidos)
+            for key, value in strat.items():
+                if key not in strategy_dict and key not in EXCLUDE_PARAMS:
+                    strategy_dict[key] = value if value is not None else 'N/A'
+            
+            # Asegurar que parámetros comunes existen (aunque no estén en YAML)
+            for param in COMMON_PARAMS - EXCLUDE_PARAMS - {'id', 'name'}:
+                if param not in strategy_dict:
+                    strategy_dict[param] = 'N/A'
+            # ═══════════════════════════════════════════════════════════
+            
+            strategies_list.append(strategy_dict)
         
-        # Procesar estrategias no declaradas (implementadas pero no en config)
+        # Procesar estrategias no declaradas (igual que antes)
         not_declared = self.implemented_strategies - declared_names
         for name in sorted(not_declared):
             strategies_list.append({
@@ -225,18 +231,11 @@ class DashboardServer:
                 'tp_pct': 'N/A',
                 'sl_pct': 'N/A',
                 'order_amount': 'N/A',
-                'sell_after_ncandles': 'N/A',
-                'lookback': 'N/A',
-                'tolerance': 'N/A',
-                'ma_period': 'N/A',
-                'impulse': 'N/A',
-                'trend_th': 'N/A'
+                'sell_after_ncandles': 'N/A'
             })
         
-        # Ordenar por ID (orden alfabético, que respeta el prefijo numérico)
+        # Ordenar y añadir números
         strategies_list.sort(key=lambda x: x['id'])
-        
-        # Extraer número del ID para cada estrategia
         for strat in strategies_list:
             strat['number'] = self._extract_number_from_id(strat['id'])
         
@@ -594,9 +593,10 @@ class DashboardServer:
                 }
                 
                 try:
-                    import ZX_BOT_websocket
-                    if ZX_BOT_websocket._ws_manager:
-                        ws = ZX_BOT_websocket._ws_manager
+                    #from market_data.websocket_manager import get_ws_manager
+                    ws = get_ws_manager()  # ← USAR la función que importaste
+                    
+                    if ws:  # ← Verificar que existe
                         ws_status['public_connected'] = (
                             ws.public_ws and 
                             ws.public_ws.sock and 
@@ -608,8 +608,8 @@ class DashboardServer:
                             ws.private_ws.sock.connected
                         )
                         ws_status['authenticated'] = ws.authenticated
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"WAR-Could not get WS status: {e}")
                 
                 timeframes_grouped = {}
                 for strat in self.strategies:
