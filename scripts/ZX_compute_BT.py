@@ -286,7 +286,7 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
 
 
 # ============================
-# update_sim_balance - MODIFICADO PARA SHORT
+# MODIFICADO PARA SHORT
 # Usa cash_bank (efectivo total) para calcular equity = cash_bank + valor_long - valor_short
 # ============================
 def update_sim_balance(t_int, open_heap, cash_bank, ts_int_arrays, close_arrays, sim_balance_cols):

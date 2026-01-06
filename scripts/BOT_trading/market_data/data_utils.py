@@ -126,7 +126,7 @@ def load_final_symbols(
         live_symbols = set(df_live.iloc[:, 0].dropna().astype(str))
         final_symbols = set(all_symbols) & live_symbols
         
-        logger.info(f"Loaded {len(final_symbols)} symbols for {strategy} {timeframe}")
+        logger.debug(f"Loaded {len(final_symbols)} symbols for {strategy} {timeframe}")
         return sorted(final_symbols)
         
     except Exception as e:

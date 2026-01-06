@@ -223,11 +223,10 @@ if __name__ == '__main__':
     
     try:
         strategies = load_strategies_from_yaml()
-        print(f"✓ Loaded {len(strategies)} strategies")
-        
+                
         for s in strategies:
             active = "ACTIVE" if s.get('active', True) else "INACTIVE"
-            print(f"  {s['id']:<30} {s['timeframe']:<5} {active}")
+            #print(f"  {s['id']:<30} {s['timeframe']:<5} {active}")
         
     except Exception as e:
         print(f"✗ Error: {e}")

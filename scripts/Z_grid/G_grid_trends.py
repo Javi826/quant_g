@@ -1,6 +1,8 @@
 # === FILE: main_BACKTESTING.py ===
 # ---------------------------------
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 import pandas as pd
 from itertools import product
@@ -24,7 +26,6 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER       = "data/crypto_OOS"
 #DATA_FOLDER       = "data/crypto_2022_OOS"
-#DATA_FOLDER       = "data/crypto_2021_OOS"
 DATA_FOLDER       = "data/crypto_2023_IS"
 TIMEFRAME_MAJOR   = '1Dutc'
 TIMEFRAME_MINOR   = '4H'

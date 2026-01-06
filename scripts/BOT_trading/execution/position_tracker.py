@@ -77,9 +77,9 @@ def calculate_pnl(direction: str,
         >>> calculate_pnl('long', Decimal('100'), Decimal('105'), Decimal('10'))
         50.0  # (105 - 100) * 10
     """
-    entry_float = float(entry_price)
+    entry_float   = float(entry_price)
     current_float = float(current_price)
-    size_float = float(size)
+    size_float    = float(size)
     
     if direction.lower() == 'long':
         pnl = (current_float - entry_float) * size_float
@@ -207,9 +207,9 @@ def check_tp_sl_for_strategy(strat_id: str,
         if current_price is None:
             continue
         
-        direction = pos['direction']
-        tp_price = pos['tp']
-        sl_price = pos['sl']
+        direction   = pos['direction']
+        tp_price    = pos['tp']
+        sl_price    = pos['sl']
         entry_price = pos['entry_price']
         
         current_price = Decimal(str(current_price))

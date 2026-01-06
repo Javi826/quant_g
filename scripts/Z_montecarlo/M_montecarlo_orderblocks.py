@@ -1,6 +1,8 @@
-# === FILE: main_MONTECARLO_.py ===
+# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
 # -----------------------------------------------------------
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 import numpy as np
 import pandas as pd
@@ -13,45 +15,33 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from Z_add_signals_double_top import double_top_short
-from Z_add_signals_double_top import double_top_long
+from Z_add_signals_orderblocks import orderblocks_long
+from Z_add_signals_orderblocks import orderblocks_short
 
-DTYPE             = np.float32
-start_time        = time.time()
-N_JOBS            = -1
-STRATEGY          = "double_top"
+DTYPE               = np.float32
+start_time          = time.time()
+N_JOBS              = -1
+STRATEGY            = "orderblocks"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER       = "data/crypto_2022_IS"
-TIMEFRAME_MINOR   = '4H'
-ORDER_AMOUNT      = 80
-MIN_VOL_USDT      = 10_000_000
+DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '6Hutc'
+ORDER_AMOUNT        = 400
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
-# GRID 
+# PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2,3,4,5] 
-PRICE_TOLERANCE_LIST = [5,10,15] 
-TREND_TH_LIST        = [5,10,15] 
+LOOKBACK_LIST        = [50,100,150]
+TOLERANCE_LIST       = [5,10,20,30,40] 
+IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [3,4,5]
+SL_PCT_LIST          = [5,7.5,10]
 
-
-
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_MINOR_LIST  = [2] 
-# PRICE_TOLERANCE_LIST = [5] 
-# TREND_TH_LIST        = [10] 
-# 
-# TP_PCT_LIST          = [5]
-# SL_PCT_LIST          = [5]
-# =============================================================================
-
-param_names     = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
 # -----------------------------------------------------------------------------
@@ -70,6 +60,10 @@ ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
+def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
+    with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
+        return Parallel(n_jobs=n_jobs)(tasks)
+
 def process_path_IDX(path_idx, paths_minor, param_dict_list):
     all_results = []
     for param_dict in param_dict_list:
@@ -79,11 +73,11 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = double_top_short(
+            signals = orderblocks_short(
                 arr_minor,
-                lookback_minor=param_dict.get('LOOKBACK_MINOR'),
-                price_tolerance=param_dict.get('PRICE_TOLERANCE'),
-                trend_th=param_dict.get('TREND_TH'),
+                lookback=param_dict.get('LOOKBACK'),
+                tolerance=param_dict.get('TOLERANCE'),
+                impulse=param_dict.get('IMPULSE'),
                 live_trading=False
             )
 
@@ -101,10 +95,6 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
         all_results.append(portfolio_record)
 
     return all_results
-
-def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
-    with tqdm_joblib(tqdm(total=len(tasks), desc=desc)):
-        return Parallel(n_jobs=n_jobs)(tasks)
 
 # -----------------------------------------------------------------------------
 # GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME

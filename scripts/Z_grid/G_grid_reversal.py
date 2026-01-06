@@ -1,6 +1,8 @@
 # === FILE: main_BACKTESTING.py ===
 # ---------------------------------
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 import pandas as pd
 from itertools import product
@@ -11,20 +13,20 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_double_top import double_top_short
-from Z_add_signals_double_top import double_top_long
+from Z_add_signals_reversal import reversal_long
+from Z_add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = True
-STRATEGY     = "double_top__4H"
+STRATEGY     = "reversal_long_4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_OOS_2"
+DATA_FOLDER         = "data2/crypto_OOS"
+#DATA_FOLDER         = "data/crypto_2024_short_IS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
@@ -32,29 +34,26 @@ TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
-
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [10] 
-TREND_TH_LIST        = [10] 
- 
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [10]
-# =============================================================================
+LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
+TOLERANCE_LIST       = [5,10,15,20,25,30]
+MA_PERIOD_LIST       = [5,10,25,50]
+
+TP_PCT_LIST          = [3,4,5,6,7,8,9]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [5] 
-TREND_TH_LIST        = [5] 
- 
+LOOKBACK_LIST        = [4] 
+TOLERANCE_LIST       = [20]
+MA_PERIOD_LIST       = [50]
+
 TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [7]
-# =============================================================================
+SL_PCT_LIST          = [10]
 
-
-param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -78,11 +77,11 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = double_top_short(
+        signals = reversal_long(
             arr_minor,
-            lookback_minor=params['LOOKBACK_MINOR'],
-            price_tolerance=params['PRICE_TOLERANCE'], 
-            trend_th=params['TREND_TH'], 
+            lookback=params['LOOKBACK'],
+            tolerance=params['TOLERANCE'],
+            ma_period=params['MA_PERIOD'],
             live_trading=False
         )
 

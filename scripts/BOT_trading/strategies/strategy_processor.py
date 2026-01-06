@@ -126,13 +126,13 @@ class StrategyProcessor:
             logger.debug(f"Using real signal detection for {strat_id}")
             signals = self._detect_real_signals(strat, final_symbols, None)
         
-        logger.info(f"Signals detected  {strat_id}: {len(signals)}")
+        logger.info(f"Signals detected {strat_id}: {len(signals)}")
         
         if not signals:
-            logger.debug(f"No signals for {strat_id}, returning")
+            logger.info(f"No signals for {strat_id}, returning")
             return
         
-        # Reset candle counter when opening new positions - CLONED LOGIC
+        # Reset candle counter when opening new positions 
         reset_strategy_candles(
             strat_id,
             strategy_candles,

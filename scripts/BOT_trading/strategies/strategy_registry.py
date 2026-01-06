@@ -281,7 +281,7 @@ def detect_signals_for_strategy(
             )
             continue
     
-    logger.info(f"Signals detected {strat['id']}: {len(all_signals)}")
+    logger.debug(f"Signals detected {strat['id']}: {len(all_signals)}")
     
     return all_signals
 

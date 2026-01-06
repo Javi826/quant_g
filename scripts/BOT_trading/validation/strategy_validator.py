@@ -212,7 +212,11 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_6_errors += 1
     
     if validation_6_errors == 0:
-        logger.info("Val 06: All TP/SL % within valid ranges (1.5 - 10)")
+        logger.info("Val 06: All TP/SL % within valid ranges.")
+        
+    # En ZX_BOT_validations.py, línea ~129 (antes de VALIDATION 6)
+
+
 
     # --------------------------------------------------------------------
     # VALIDATION 7: IDs

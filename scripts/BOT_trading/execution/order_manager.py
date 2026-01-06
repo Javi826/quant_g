@@ -38,7 +38,7 @@ INITIAL_CAPITAL = None
 # CONFIGURATION
 # ==========================================================================
 def configure_paths(trades_log_path: str, 
-                   initial_capital: float = 3671) -> None:
+                   initial_capital: float = 1000) -> None:
     """
     Configure global paths and settings for order manager.
     

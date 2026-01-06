@@ -1,6 +1,8 @@
-# === FILE: main_MONTECARLO_ ===
+# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
 # -----------------------------------------------------------
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 import numpy as np
 import pandas as pd
@@ -13,20 +15,19 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-#from tools.ZX_optimize_MCf_bs import generate_paths_for_all_symbols_functional
-from Z_add_signals_parity import parity_long
-from Z_add_signals_parity import parity_short
+from Z_add_signals_reversal import reversal_long
+from Z_add_signals_reversal import reversal_short
 
 DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
-STRATEGY            = "parity"
+STRATEGY            = "reversal"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2022_IS"
+DATA_FOLDER         = "../data/crypto_2022_IS"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
@@ -34,17 +35,23 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [15,20,25,30] 
-MA_PERIOD_LIST       = [25,50]
+LOOKBACK_LIST        = [7,8,9] 
+TOLERANCE_LIST       = [20,30,40]
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
+# -----------------------------------------------------------------------------
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
+TOLERANCE_LIST       = [5,10,15,20,25,30]
+MA_PERIOD_LIST       = [50]
+
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
-
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
@@ -70,7 +77,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_short(
+            signals = reversal_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
@@ -101,7 +108,6 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME
 # -----------------------------------------------------------------------------
 paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
-
 results_list = parallel_with_progress([delayed(process_path_IDX)(i, paths_minor, param_dict_list) for i in range(FINAL_N_PATHS)], desc="\n🔄 Evaluating Paths_IDX")
 all_results  = [r for sublist in results_list for r in sublist]
 df_portfolio = pd.DataFrame(all_results)

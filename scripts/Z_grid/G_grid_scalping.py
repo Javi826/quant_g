@@ -1,89 +1,92 @@
-# === FILE: main_BACKTESTING.py ===
+# === FILE: G_grid_entropy.py ===
 # ---------------------------------
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import time
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
+from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
+from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_reversal import reversal_long
-from Z_add_signals_reversal import reversal_short
+from Z_add_signals_scalping import scalping_long
+from Z_add_signals_scalping import scalping_short
 
-start_time   = time.time()
-SAVE_SYMBOLS = False
-MY_SYMBOLS   = True
-STRATEGY     = "reversal_long_4H"
-N_JOBS       = -1
-
+start_time         = time.time()
+SAVE_SYMBOLS       = False
+STRATEGY           ="scalping"
+N_JOBS             =-1
 # -----------------------------------------------------------------------------
-# CONFIGURATION
+# CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data2/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_2024_short_IS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
+DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
-
-ORDER_AMOUNT        = 80
+TIMEFRAME_MINOR     = '15m'
+ORDER_AMOUNT        = 400
 MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
-# PARAMETER GRID
+# GRID: 
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
-TOLERANCE_LIST       = [5,10,15,20,25,30]
-MA_PERIOD_LIST       = [5,10,25,50]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SELL_AFTER_LIST = [0]
 
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [4] 
-TOLERANCE_LIST       = [20]
-MA_PERIOD_LIST       = [50]
+RSI_LIST        = [30,40,50]
+ADX_LIST        = [25,30,35]
+LOOKBACK_LIST   = [10,20,30,40,50]
+TORELANCE_LIST  = [2,5,10,15]
 
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0]
+SL_PCT_LIST     = [2.0,2.5,3.0,3.5,4.0,4.5,5.0,7.5,10]
 
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
-param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
-lists_for_grid = [param_ranges[name] for name in param_names]
+SELL_AFTER_LIST = [0]
 
-# -----------------------------------------------------------------------------
-# LOAD AND FILTER DATA
-# -----------------------------------------------------------------------------
-symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=MY_SYMBOLS)
+RSI_LIST        = [30]
+ADX_LIST        = [35]
+LOOKBACK_LIST   = [50]
+TORELANCE_LIST  = [2]
 
-save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+TP_PCT_LIST     = [4.5]
+SL_PCT_LIST     = [2]
 
-ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
+
+param_names = ['SELL_AFTER','RSI','ADX','LOOKBACK','TORELANCE','TP_PCT','SL_PCT']
+
+lists_for_grid = [globals()[name + "_LIST"] for name in param_names]
 
 # -----------------------------------------------------------------------------
-# FUNCTION TO PROCESS ONE PARAMETER COMBINATION
+# CARGA Y FILTRADO DE DATOS
+# -----------------------------------------------------------------------------
+symbols = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
+
+ohlcv_data, filtered_symbols = filter_symbols(symbols,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=True)
+
+save_filtered_symbols(filtered_symbols, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
+ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
+
+
+# -----------------------------------------------------------------------------
+# FUNCIÓN DE PROCESO PARA UNA COMBINACIÓN
 # -----------------------------------------------------------------------------
 def process_combo(comb):
-    params = dict(zip(param_names, comb))
+    params       = dict(zip(param_names, comb))
     ohlcv_arrays = {}
 
-    for sym in ohlcv_arr_minor.keys():
-        arr_minor = ohlcv_arr_minor[sym]
-
-        signals = reversal_long(
-            arr_minor,
-            lookback=params['LOOKBACK'],
-            tolerance=params['TOLERANCE'],
-            ma_period=params['MA_PERIOD'],
+    for sym, arrs in ohlcv_arr.items():
+        signal = scalping_long(
+            arrs,
+            rsi_max=params.get('RSI'),
+            adx_min=params.get('ADX'),
+            lookback=params.get('LOOKBACK'),
+            tolerance=params.get('TORELANCE'),
             live_trading=False
         )
 
-        ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
+        ohlcv_arrays[sym] = {**arrs, 'signal': signal}
 
     results = run_grid_backtest(
         ohlcv_arrays,
@@ -91,11 +94,12 @@ def process_combo(comb):
         tp_pct=params['TP_PCT'],
         sl_pct=params['SL_PCT'],
         order_amount=ORDER_AMOUNT
+        
     )
     return comb, results
 
 # -----------------------------------------------------------------------------
-# PARALLELIZED BACKTESTING
+# BACKTESTING PARALIZADO
 # -----------------------------------------------------------------------------
 all_combinations = list(product(*lists_for_grid))
 with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinations))) as progress:

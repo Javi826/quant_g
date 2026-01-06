@@ -109,17 +109,17 @@ def log_closed_position(opened_at,
             # Calculate from prices
             if size_val is not None:
                 if direction.lower() == 'long':
-                    profit = (close_price - entry_price) * size_val
+                    profit     = (close_price - entry_price) * size_val
                     profit_pct = ((close_price - entry_price) / entry_price) * 100
                 else:
-                    profit = (entry_price - close_price) * size_val
+                    profit     = (entry_price - close_price) * size_val
                     profit_pct = ((entry_price - close_price) / entry_price) * 100
             else:
                 if direction.lower() == 'long':
-                    profit = (close_price - entry_price) * (usdt_amount / entry_price)
+                    profit     = (close_price - entry_price) * (usdt_amount / entry_price)
                     profit_pct = ((close_price - entry_price) / entry_price) * 100
                 else:
-                    profit = (entry_price - close_price) * (usdt_amount / entry_price)
+                    profit     = (entry_price - close_price) * (usdt_amount / entry_price)
                     profit_pct = ((entry_price - close_price) / entry_price) * 100
 
         closed_at = datetime.now()
