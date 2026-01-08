@@ -184,7 +184,7 @@ class DashboardServer:
         # Parámetros internos que NO queremos mostrar
         EXCLUDE_PARAMS = {'active'}
         
-        declared_names = {s['name'] for s in self.strategies}
+        declared_ids = {s['id'] for s in self.strategies}
         strategies_list = []
         
         # Procesar estrategias declaradas
@@ -219,11 +219,12 @@ class DashboardServer:
             strategies_list.append(strategy_dict)
         
         # Procesar estrategias no declaradas (igual que antes)
-        not_declared = self.implemented_strategies - declared_names
-        for name in sorted(not_declared):
+        # Procesar estrategias no declaradas
+        not_declared = self.implemented_strategies - declared_ids  # ← CORREGIDO
+        for id in sorted(not_declared):
             strategies_list.append({
-                'id': name,
-                'name': name,
+                'id': id,        # ← Usar id en vez de name
+                'name': id,      # ← Usar id en vez de name
                 'timeframe': 'N/A',
                 'direction': 'N/A',
                 'status': 'NOT IMPLE.',

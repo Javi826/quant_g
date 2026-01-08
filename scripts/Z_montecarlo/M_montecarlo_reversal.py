@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
+# === FILE: main_MONTECARLO.py ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -15,8 +15,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from Z_add_signals_reversal import reversal_long
-from Z_add_signals_reversal import reversal_short
+from Z_signals.add_signals_reversal import reversal_long
+from Z_signals.add_signals_reversal import reversal_short
 
 DTYPE               = np.float32
 start_time          = time.time()
@@ -25,9 +25,9 @@ STRATEGY            = "reversal"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2024_IS_short"
+DATA_FOLDER         = "../data/crypto_2022_IS"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 5_000_000
 
@@ -36,17 +36,17 @@ MIN_VOL_USDT        = 5_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [7,8,9] 
-TOLERANCE_LIST       = [20,30,40]
-MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [10,20,30,40]
+MA_PERIOD_LIST       = [25,50]
 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
+LOOKBACK_LIST        = [2,3,4,5,6,7,8,9] 
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 MA_PERIOD_LIST       = [25,50]
 
-TP_PCT_LIST          = [1,2,3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [1,2,3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [1,2,3,4]
+SL_PCT_LIST          = [7,8,9,10]
 
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

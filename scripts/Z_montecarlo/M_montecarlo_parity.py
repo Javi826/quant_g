@@ -15,8 +15,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from Z_add_signals_parity import parity_long
-from Z_add_signals_parity import parity_short
+from Z_signals.add_signals_parity import parity_long
+from Z_signals.add_signals_parity import parity_short
 
 DTYPE               = np.float32
 start_time          = time.time()

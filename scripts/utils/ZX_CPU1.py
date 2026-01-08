@@ -1,34 +1,44 @@
 import psutil
-import time
 from datetime import datetime
 
-CORE = 2
-INTERVAL = 0.1  # cada 0.5 segundos
+CORES = [1, 2]
+INTERVAL = 0.25  # segundos
 
-max_usage = 0
-min_usage = 100
-sum_usage = 0
-count = 0
+stats = {
+    core: {
+        "max": 0,
+        "min": 100,
+        "sum": 0,
+        "count": 0
+    }
+    for core in CORES
+}
 
 print("📊 Monitor iniciado. Ctrl+C para detener y ver estadísticas...")
+
 try:
     while True:
         usage_per_core = psutil.cpu_percent(interval=INTERVAL, percpu=True)
-        core_usage = usage_per_core[CORE]
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
-        # Mostrar en pantalla (opcional)
-        print(f"{datetime.now().strftime('%H:%M:%S.%f')[:-3]} | Core {CORE}: {core_usage:.1f}%")
+        for core in CORES:
+            usage = usage_per_core[core]
+            s = stats[core]
 
-        # Actualizar estadísticas
-        max_usage = max(max_usage, core_usage)
-        min_usage = min(min_usage, core_usage)
-        sum_usage += core_usage
-        count += 1
+            print(f"{timestamp} | Core {core}: {usage:.1f}%")
+
+            s["max"] = max(s["max"], usage)
+            s["min"] = min(s["min"], usage)
+            s["sum"] += usage
+            s["count"] += 1
 
 except KeyboardInterrupt:
-    promedio = sum_usage / count if count > 0 else 0
     print("\n🔚 Monitor detenido")
-    print(f"📈 Estadísticas Core {CORE}:")
-    print(f"Máximo: {max_usage:.1f}%")
-    print(f"Mínimo:  {min_usage:.1f}%")
-    print(f"Promedio: {promedio:.1f}%")
+    for core in CORES:
+        s = stats[core]
+        promedio = s["sum"] / s["count"] if s["count"] > 0 else 0
+
+        print(f"\n📈 Estadísticas Core {core}:")
+        print(f"Máximo:   {s['max']:.1f}%")
+        print(f"Mínimo:   {s['min']:.1f}%")
+        print(f"Promedio: {promedio:.1f}%")

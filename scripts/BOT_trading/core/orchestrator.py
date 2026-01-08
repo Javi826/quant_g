@@ -112,10 +112,10 @@ class BotOrchestrator:
         self.strategy_processor = None
         
         # Runtime state
-        self.all_symbols: List[str] = []
-        self.final_by_strat: Dict[str, List[str]] = {}
+        self.all_symbols: List[str]                  = []
+        self.final_by_strat: Dict[str, List[str]]    = {}
         self.strategies_by_tf: Dict[str, List[Dict]] = {}
-        self.unique_timeframes: List[str] = []
+        self.unique_timeframes: List[str]            = []
         self.next_candle_times: Dict[str, datetime] = {}
         self.last_tpsl_check: float = 0
         
@@ -299,7 +299,7 @@ class BotOrchestrator:
             
             self.final_by_strat[strat['id']] = load_final_symbols(
                 self.all_symbols,
-                strategy=strat['name'],
+                strategy=strat['id'],
                 timeframe=strat['timeframe']
             )
             self.logger.info(

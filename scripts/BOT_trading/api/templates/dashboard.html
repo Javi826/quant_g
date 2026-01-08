@@ -2207,18 +2207,14 @@ async function loadComposeCharts() {
         }
         
         console.log('Selected combinations:', selectedCombinations);
-        
-        const colors = {
-            equity: ['#3fb950', '#58a6ff', '#22d3ee'],  // Verde, Azul, Cian
-            equityAlpha: ['rgba(63, 185, 80, 0.1)', 'rgba(88, 166, 255, 0.1)', 'rgba(34, 211, 238, 0.1)'],
-            drawdown: ['#f85149', '#ff6b6b', '#ff8787'],
-            drawdownAlpha: ['rgba(248, 81, 73, 0.1)', 'rgba(255, 107, 107, 0.1)', 'rgba(255, 135, 135, 0.1)']
-        };
-        
+               
+        // ═══════════════════════════════════════════════════════════
+        // NUEVA LÓGICA: Recolectar TODOS los datos primero
+        // ═══════════════════════════════════════════════════════════
         const equityDatasets = [];
         const drawdownDatasets = [];
         let allDates = [];
-        let colorIndex = 0;
+        const allCombinationsData = [];
         
         for (let i = 0; i < selectedCombinations.length; i++) {
             const combination = selectedCombinations[i];
@@ -2227,10 +2223,9 @@ async function loadComposeCharts() {
             console.log('Combination:', combination);
             console.log('Numbers:', numbers);
             
-            // Convertir números a IDs de estrategias usando allStrategiesList
             const strategies = numbers
                 .map(num => findStrategyIdByNumber(num, allStrategiesList))
-                .filter(id => id);  // Filtrar null values
+                .filter(id => id);
             
             console.log('Converted to strategy IDs:', strategies);
             
@@ -2240,8 +2235,6 @@ async function loadComposeCharts() {
             }
             
             console.log('Fetching data for:', combination);
-            console.log('Strategies:', strategies);
-            console.log('URL:', '/api/equity-data?strategies=' + strategies.join(','));
             
             const res = await fetch('/api/equity-data?strategies=' + strategies.join(','));
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2251,21 +2244,77 @@ async function loadComposeCharts() {
             
             if (!data.dates || !data.equity_pct || !data.drawdown_pct) {
                 console.warn('Invalid data structure for ' + combination, data);
-                continue; // Skip this combination
+                continue;
             }
             
             if (data.dates.length === 0) {
                 console.warn('No data points for ' + combination + ' - skipping');
-                continue; // Skip this combination
+                continue;
             }
             
-            if (colorIndex === 0) {
-                allDates = data.dates;
-            }
+            // Guardar datos para procesar después
+            allCombinationsData.push({
+                combination: combination,
+                dates: data.dates,
+                equity_pct: data.equity_pct,
+                drawdown_pct: data.drawdown_pct
+            });
+        }
+        
+        if (allCombinationsData.length === 0) {
+            alert('⚠️ No valid data found for selected combinations.');
+            return;
+        }
+        
+        // ═══════════════════════════════════════════════════════════
+        // ALINEAR FECHAS: Crear un eje X común con TODAS las fechas
+        // ═══════════════════════════════════════════════════════════
+        const allUniqueDates = new Set();
+        allCombinationsData.forEach(combo => {
+            combo.dates.forEach(date => allUniqueDates.add(date));
+        });
+        
+        allDates = Array.from(allUniqueDates).sort();
+        console.log('Common dates axis:', allDates.length, 'dates');
+        
+        // ═══════════════════════════════════════════════════════════
+        // INTERPOLAR DATOS: Alinear cada dataset a las fechas comunes
+        // ═══════════════════════════════════════════════════════════
+        const colors = {
+            equity: ['#3fb950', '#58a6ff', '#22d3ee'],
+            equityAlpha: ['rgba(63, 185, 80, 0.1)', 'rgba(88, 166, 255, 0.1)', 'rgba(34, 211, 238, 0.1)'],
+            drawdown: ['#f85149', '#ff6b6b', '#ff8787'],
+            drawdownAlpha: ['rgba(248, 81, 73, 0.1)', 'rgba(255, 107, 107, 0.1)', 'rgba(255, 135, 135, 0.1)']
+        };
+        
+        allCombinationsData.forEach((combo, colorIndex) => {
+            // Crear mapa de fecha → valor para interpolación rápida
+            const equityMap = {};
+            const drawdownMap = {};
+            
+            combo.dates.forEach((date, idx) => {
+                equityMap[date] = combo.equity_pct[idx];
+                drawdownMap[date] = combo.drawdown_pct[idx];
+            });
+            
+            // Interpolar a fechas comunes (forward-fill)
+            const alignedEquity = [];
+            const alignedDrawdown = [];
+            let lastEquity = 0;
+            let lastDrawdown = 0;
+            
+            allDates.forEach(date => {
+                if (equityMap[date] !== undefined) {
+                    lastEquity = equityMap[date];
+                    lastDrawdown = drawdownMap[date];
+                }
+                alignedEquity.push(lastEquity);
+                alignedDrawdown.push(lastDrawdown);
+            });
             
             equityDatasets.push({
-                label: combination,
-                data: data.equity_pct,
+                label: combo.combination,
+                data: alignedEquity,
                 borderColor: colors.equity[colorIndex],
                 backgroundColor: 'transparent',
                 borderWidth: 2,
@@ -2275,8 +2324,8 @@ async function loadComposeCharts() {
             });
             
             drawdownDatasets.push({
-                label: combination,
-                data: data.drawdown_pct,
+                label: combo.combination,
+                data: alignedDrawdown,
                 borderColor: colors.drawdown[colorIndex],
                 backgroundColor: colors.drawdownAlpha[colorIndex],
                 borderWidth: 2,
@@ -2284,13 +2333,12 @@ async function loadComposeCharts() {
                 tension: 0.1,
                 fill: true
             });
-            
-            colorIndex++;
-        }
+        });
         
         console.log('Equity datasets:', equityDatasets);
         console.log('Drawdown datasets:', drawdownDatasets);
         console.log('All dates:', allDates);
+
         
         // Validate that we have at least one valid combination
         if (equityDatasets.length === 0) {

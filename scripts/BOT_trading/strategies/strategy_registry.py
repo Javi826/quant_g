@@ -36,10 +36,10 @@ if scripts_dir not in sys.path:
 # IMPORTS - Signal generation functions 
 #===========================================================================
 
-from Z_add_signals_double_top import double_top_long
-from Z_add_signals_reversal import reversal_long, reversal_short
-from Z_add_signals_parity import parity_long, parity_short
-from Z_add_signals_orderblocks import orderblocks_long, orderblocks_short
+from Z_signals.add_signals_double_top import double_top_long
+from Z_signals.add_signals_reversal import reversal_long, reversal_short
+from Z_signals.add_signals_parity import parity_long, parity_short
+from Z_signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
 
 # Import market data utilities
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
@@ -92,15 +92,15 @@ def detect_signals_for_strategy(
         ... }
         >>> signals = detect_signals_for_strategy(strat, ['BTCUSDT', 'ETHUSDT'], None)
     """
-    strategy_name = strat['name']
-    timeframe     = strat['timeframe']
+    strategy_id = strat['id']
+    timeframe   = strat['timeframe']
     
-    logger.info(f"Processing strategy: {strat['id']}")
+    logger.info(f"Processing strategy: {strategy_id}")
     logger.info("-" * 48)
     
     # Validate symbols
     if not final_symbols:
-        logger.error(f"No symbols to process for {strat['id']}")
+        logger.error(f"No symbols to process for {strategy_id}")
         return []
     
     # Fetch OHLCV data for all symbols
@@ -123,7 +123,7 @@ def detect_signals_for_strategy(
             # STRATEGY IMPLEMENTATIONS - Add elif for each new strategy
             # ==============================================================
             
-            if strategy_name == 'double_top_long_4H':
+            if strategy_id == '01_double_top_long_4H':
                 signals = double_top_long(
                     arr,
                     lookback_minor=strat['lookback'],
@@ -132,7 +132,7 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'reversal_long_4H':
+            elif strategy_id == '02_reversal_long_4H':
                 signals = reversal_long(
                     arr,
                     lookback=strat['lookback'],
@@ -141,52 +141,7 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'reversal_long_1H':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'reversal_long_6Hutc':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'reversal_short_4H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'reversal_short_1H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'reversal_short_6Hutc':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'parity_long_4H':
+            elif strategy_id == '03_parity_long_4H':
                 signals = parity_long(
                     arr,
                     lookback=strat['lookback'],
@@ -195,8 +150,8 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'parity_long_1H':
-                signals = parity_long(
+            elif strategy_id == '04_reversal_short_4H':
+                signals = reversal_short(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
@@ -204,16 +159,7 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'parity_long_6Hutc':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_name == 'parity_short_4H':
+            elif strategy_id == '05_parity_short_4H':
                 signals = parity_short(
                     arr,
                     lookback=strat['lookback'],
@@ -222,7 +168,52 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'parity_short_1H':
+            elif strategy_id == '06_reversal_long_1H':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '07_reversal_short_1H':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '08_reversal_long_6Hutc':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '09_reversal_short_6Hutc':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '10_parity_long_1H':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '11_parity_short_1H':
                 signals = parity_short(
                     arr,
                     lookback=strat['lookback'],
@@ -231,8 +222,17 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'orderblocks_long_4H':
-                signals = orderblocks_long(
+            elif strategy_id == '12_parity_long_6Hutc':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '13_orderblocks_short_4H':
+                signals = orderblocks_short(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
@@ -240,8 +240,8 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
             
-            elif strategy_name == 'orderblocks_short_4H':
-                signals = orderblocks_short(
+            elif strategy_id == '14_orderblocks_long_4H':
+                signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
@@ -254,7 +254,7 @@ def detect_signals_for_strategy(
             # ==============================================================
             else:
                 logger.warning(
-                    f"WAR-Strategy '{strategy_name}' not implemented in registry. "
+                    f"WAR-Strategy '{strategy_id}' not implemented in registry. "
                     f"WAR-Add elif in strategies/strategy_registry.py"
                 )
                 continue
@@ -276,11 +276,11 @@ def detect_signals_for_strategy(
         
         except Exception as e:
             logger.error(
-                f"Error detecting signals for {symbol} ({strategy_name}): {e}"
+                f"Error detecting signals for {symbol} ({strategy_id}): {e}"
             )
             continue
     
-    logger.debug(f"Signals detected {strat['id']}: {len(all_signals)}")
+    logger.debug(f"Signals detected {strategy_id}: {len(all_signals)}")
     
     return all_signals
 
@@ -291,32 +291,31 @@ def detect_signals_for_strategy(
 
 def get_implemented_strategies() -> set:
     """
-    Returns set of all implemented strategy names.
+    Returns set of all implemented strategy IDs.
     
     This is used by validation system to ensure strategies in YAML
     are actually implemented.
     
-    IMPORTANT: When adding a new strategy, add its name here!
+    IMPORTANT: When adding a new strategy, add its ID here!
     """
     strategies = {
-        'double_top_long_4H',
-        'reversal_long_4H',
-        'reversal_short_4H',
-        'reversal_long_1H',
-        'reversal_short_1H',
-        'reversal_long_6Hutc',
-        'reversal_short_6Hutc',
-        'parity_long_4H',
-        'parity_short_4H',
-        'parity_long_1H',
-        'parity_short_1H',
-        'parity_long_6Hutc',
-        'orderblocks_long_4H',
-        'orderblocks_short_4H',
+        '01_double_top_long_4H',
+        '02_reversal_long_4H',
+        '03_parity_long_4H',
+        '04_reversal_short_4H',
+        '05_parity_short_4H',
+        '06_reversal_long_1H',
+        '07_reversal_short_1H',
+        '08_reversal_long_6Hutc',
+        '09_reversal_short_6Hutc',
+        '10_parity_long_1H',
+        '11_parity_short_1H',
+        '12_parity_long_6Hutc',
+        '13_orderblocks_short_4H',
+        '14_orderblocks_long_4H',
     }
     return strategies
 
 
 # Create constant for backward compatibility
 IMPLEMENTED_STRATEGIES = get_implemented_strategies()
-

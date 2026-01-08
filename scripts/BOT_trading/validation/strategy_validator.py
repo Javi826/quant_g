@@ -1,4 +1,4 @@
-#ZX_BOT_validations.py
+#validations.py
 """
 Validation functions for bot strategy configuration
 """
@@ -24,14 +24,19 @@ from config.settings import (
 
 def validate_strategy_configuration(strategies, implemented_strategies):
 
-    declared_strategies    = {s['name'] for s in strategies}    
+    # ═══════════════════════════════════════════════════════════
+    # CORREGIDO: Usar IDs en lugar de names
+    # ═══════════════════════════════════════════════════════════
+    declared_strategies    = {s['id'] for s in strategies}  # ← Cambio aquí
     missing_implementation = declared_strategies - implemented_strategies
     unused_implementation  = implemented_strategies - declared_strategies
+    # ═══════════════════════════════════════════════════════════
+    
     errors   = []
     warnings = []
     
     # --------------------------------------------------------------------
-    # VALIDATION 1: Names
+    # VALIDATION 1: IDs (antes era "Names")
     # --------------------------------------------------------------------
     if missing_implementation:
         errors.append(f"Strategies WITHOUT implementation: {missing_implementation}")
@@ -40,7 +45,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         warnings.append(f"Implemented but NOT declared: {unused_implementation}")
     
     if not missing_implementation:
-        logger.info("Val 01: All strategy names implemented")
+        logger.info("Val 01: All strategy IDs implemented")  # ← Cambio aquí
     
     # --------------------------------------------------------------------
     # VALIDATION 2: Coherence direction

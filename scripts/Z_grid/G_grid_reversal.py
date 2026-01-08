@@ -13,12 +13,12 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_reversal import reversal_long
-from Z_add_signals_reversal import reversal_short
+from Z_signals.add_signals_reversal import reversal_long
+from Z_signals.add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = True
+MY_SYMBOLS   = False
 STRATEGY     = "reversal_long_4H"
 N_JOBS       = -1
 
@@ -26,13 +26,14 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "data2/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_2024_OOS_short"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
 #DATA_FOLDER         = "data/crypto_2022_OOS"
 #DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '30m'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 5_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -47,10 +48,10 @@ SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [4] 
-TOLERANCE_LIST       = [20]
+TOLERANCE_LIST       = [30]
 MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [3]
+TP_PCT_LIST          = [2]
 SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

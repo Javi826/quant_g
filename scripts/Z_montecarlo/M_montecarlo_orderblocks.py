@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_functional_sharpe_no_cache_adapted.py ===
+# === FILE: main_MONTECARLO.py ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -15,8 +15,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from Z_add_signals_orderblocks import orderblocks_long
-from Z_add_signals_orderblocks import orderblocks_short
+from Z_signals.add_signals_orderblocks import orderblocks_long
+from Z_signals.add_signals_orderblocks import orderblocks_short
 
 DTYPE               = np.float32
 start_time          = time.time()
@@ -25,10 +25,10 @@ STRATEGY            = "orderblocks"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '6Hutc'
-ORDER_AMOUNT        = 400
-MIN_VOL_USDT        = 10_000_000
+DATA_FOLDER         = "../data/crypto_2024_IS_short"
+TIMEFRAME_MINOR     = '30m'
+ORDER_AMOUNT        = 80
+MIN_VOL_USDT        = 5_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -38,8 +38,8 @@ LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [5,10,20,30,40] 
 IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [3,4,5]
-SL_PCT_LIST          = [5,7.5,10]
+TP_PCT_LIST          = [1,2,3,4]
+SL_PCT_LIST          = [7,8,9,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

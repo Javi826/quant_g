@@ -13,8 +13,8 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE,INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays,compile_grid_results,save_all_trades_to_excel,save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_scalping import scalping_long
-from Z_add_signals_scalping import scalping_short
+from Z_signals.add_signals_scalping import scalping_long
+from Z_signals.add_signals_scalping import scalping_short
 
 start_time         = time.time()
 SAVE_SYMBOLS       = False

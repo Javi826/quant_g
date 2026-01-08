@@ -89,7 +89,6 @@ ACCOUNT_STRATEGIES = {
         '02_reversal_long_4H',
         '03_parity_long_4H',
         '04_reversal_short_4H',
-        #'05_parity_short_4H',
         '06_reversal_long_1H',
         '07_reversal_short_1H',
         '08_reversal_long_6Hutc',

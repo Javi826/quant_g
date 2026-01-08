@@ -13,12 +13,12 @@ from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_double_top import double_top_short
-from Z_add_signals_double_top import double_top_long
+from Z_signals.add_signals_double_top import double_top_short
+from Z_signals.add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = True
+MY_SYMBOLS   = False
 STRATEGY     = "double_top__4H"
 N_JOBS       = -1
 
