@@ -1,7 +1,8 @@
-# === FILE: main_MONTECARLO_.py ===
+# === FILE: main_MONTECARLO_ ===
 # -----------------------------------------------------------
 import os
 import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
 import numpy as np

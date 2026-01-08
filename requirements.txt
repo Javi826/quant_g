@@ -22,6 +22,7 @@ beautifulsoup4==4.14.2
 binaryornot==0.4.4
 black==25.9.0
 bleach==6.2.0
+blinker==1.9.0
 cattrs==25.3.0
 ccxt==4.5.10
 certifi==2025.10.5
@@ -55,6 +56,7 @@ fastjsonschema==2.21.2
 fastparquet==2024.11.0
 fastrlock==0.8.3
 flake8==7.1.2
+Flask==3.1.2
 fonttools==4.60.1
 fqdn==1.5.1
 frozendict==2.4.7
@@ -75,6 +77,7 @@ ipython==9.6.0
 ipython_pygments_lexers==1.1.1
 isoduration==20.11.0
 isort==6.1.0
+itsdangerous==2.2.0
 jaraco.classes==3.4.0
 jaraco.context==6.0.1
 jaraco.functools==4.3.0
@@ -196,6 +199,10 @@ rope==1.14.0
 rpds-py==0.27.1
 rtree==1.4.1
 ruff==0.14.0
+# Editable install with no version control (rust_backtest==0.1.0)
+-e /home/javi/projects/quant/quant_g/scripts
+# Editable install with no version control (rust_backtest_helpers==0.1.0)
+-e /home/javi/projects/quant/quant_g/scripts/rust_backtest_helpers
 scikit-learn==1.7.2
 scipy==1.16.2
 SecretStorage==3.4.0
@@ -243,6 +250,7 @@ webcolors==24.11.1
 webencodings==0.5.1
 websocket-client==1.9.0
 websockets==15.0.1
+Werkzeug==3.1.4
 whatthepatch==1.0.7
 wurlitzer==3.1.1
 yapf==0.43.0

@@ -1,7 +1,8 @@
-# === FILE: main_MONTECARLO.py ===
+# === FILE: main_MONTECARLO_ ===
 # -----------------------------------------------------------
 import os
 import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
 import numpy as np
@@ -15,8 +16,8 @@ from utils.ZX_utils import filter_symbols, final_prints
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from Z_signals.add_signals_reversal import reversal_long
-from Z_signals.add_signals_reversal import reversal_short
+from signals.add_signals_reversal import reversal_long
+from signals.add_signals_reversal import reversal_short
 
 DTYPE               = np.float32
 start_time          = time.time()

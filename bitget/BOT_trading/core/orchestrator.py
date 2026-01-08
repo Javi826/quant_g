@@ -81,13 +81,13 @@ class BotOrchestrator:
         self.logger = logging.getLogger(f'BOT_trading.core.orchestrator.{account_number}')
         
         # Account configuration
-        self.config = get_account_config(account_number)
+        self.config          = get_account_config(account_number)
         self.initial_capital = self.config['initial_capital']
-        self.dashboard_port = self.config['dashboard_port']
-        self.base_dir = self.config['paths']['base_dir']
-        self.state_file = self.config['paths']['state_file']
+        self.dashboard_port  = self.config['dashboard_port']
+        self.base_dir        = self.config['paths']['base_dir']
+        self.state_file      = self.config['paths']['state_file']
         self.trades_log_path = self.config['paths']['trades_file']
-        self.log_file_path = self.config['paths']['log_file']
+        self.log_file_path   = self.config['paths']['log_file']
         
         # API clients
         self.bitget_client = bitget_client

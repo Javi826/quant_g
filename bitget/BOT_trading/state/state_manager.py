@@ -13,7 +13,6 @@ but trade_logger does not import back, avoiding circular dependencies.
 import os
 import json
 import copy
-import time
 import traceback
 from datetime import datetime
 from decimal import Decimal
