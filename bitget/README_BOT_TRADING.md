@@ -1,11 +1,11 @@
-# 🤖 BOT TRADING - DOCUMENTACIÓN TÉCNICA v2.0
+# 🤖 BOT TRADING - DOCUMENTACIÓN TÉCNICA v2.1
 
 **Sistema de Trading Automatizado Multi-Estrategia**
 
 ---
 
-**Versión:** 2.0  
-**Fecha:** 2026-01-06  
+**Versión:** 2.1  
+**Fecha:** 2026-01-08  
 **Python:** 3.12  
 **Framework:** Flask + ccxt + Bitget API  
 
@@ -151,11 +151,11 @@ BOT_trading SYSTEM
 │   ├─ API REST endpoints
 │   └─ Templates HTML
 │
-├─ Funciones de Señales (signals/)
-│   ├─ Z_add_signals_double_top.py
-│   ├─ Z_add_signals_reversal.py
-│   ├─ Z_add_signals_parity.py
-│   └─ Z_add_signals_orderblocks.py
+├─ Funciones de Señales (signals/) ⭐ COMPARTIDO
+│   ├─ add_signals_double_top.py
+│   ├─ add_signals_reversal.py
+│   ├─ add_signals_parity.py
+│   └─ add_signals_orderblocks.py
 │
 └─ Persistence (JSON + Excel)
     ├─ bot_state_XX.json (posiciones + candles)
@@ -187,13 +187,32 @@ Strategy Processor (orchestrator)
 |--------|-----------------|----------------|
 | **core/** | Orquestación y ciclo de vida | orchestrator.py |
 | **strategies/** | Carga y validación de estrategias | strategy_loader.py, strategy_registry.py |
-| **signals/** | Funciones de detección | Z_add_signals_*.py |
+| **signals/** (compartido) | Funciones de detección | add_signals_*.py |
 | **execution/** | Comunicación con broker | bitget_client.py |
 | **api/** | Dashboard web | backend.py, templates/ |
 | **config/** | Configuración central | settings.py |
 | **persistence/** | Estado y logs | bot_state_XX.json, logs/ |
 | **validation/** | Validación de configuración | strategy_validator.py |
 | **bot_utils/** | Utilidades (logger, etc.) | logger.py |
+
+### 2.4 Organización de Carpetas
+
+El proyecto se organiza en 3 áreas principales:
+
+**bitget/BOT_trading/** (Producción)
+- Bot autónomo de trading en vivo
+- Contiene: core, strategies, execution, api, config, persistence
+- **NO contiene** las funciones de señales (están en signals/)
+
+**bitget/signals/** (Compartido)
+- Funciones de detección de señales
+- Indicadores técnicos
+- Usado por BOT_trading (producción) Y development (backtesting)
+
+**bitget/development/** (Desarrollo)
+- Backtesting, análisis, optimización
+- Extracción de datos históricos (parquet_process)
+- Herramientas de desarrollo
 
 ---
 
@@ -246,77 +265,93 @@ Strategy Processor (orchestrator)
 ### 4.1 Árbol Completo
 
 ```
-BOT_trading/
+bitget/                                  # Directorio raíz del proyecto
 │
-├── main.py                              # Entry point del sistema
+├── BOT_trading/                         # 🤖 Bot de producción
+│   │
+│   ├── main.py                          # Entry point del sistema
+│   │
+│   ├── config/                          # Configuración
+│   │   ├── __init__.py
+│   │   ├── settings.py                  # Settings centralizados
+│   │   └── connect_pass.py              # Credenciales (privado)
+│   │
+│   ├── core/                            # Componentes core
+│   │   ├── __init__.py
+│   │   └── orchestrator.py              # BotOrchestrator (cerebro)
+│   │
+│   ├── strategies/                      # Sistema de estrategias ⭐
+│   │   ├── __init__.py
+│   │   ├── strategies.yaml              # Definiciones YAML
+│   │   ├── strategy_registry.py         # Elif explícito ⭐
+│   │   ├── strategy_loader.py           # Cargador de YAML
+│   │   └── strategy_processor.py        # Procesador de señales
+│   │
+│   ├── market_data/                     # Datos de mercado
+│   │   ├── __init__.py
+│   │   ├── api_client.py                # Cliente API de Bitget
+│   │   ├── data_utils.py                # Utilidades de datos
+│   │   └── websocket_manager.py         # WebSocket manager
+│   │
+│   ├── execution/                       # Ejecución de órdenes
+│   │   ├── __init__.py
+│   │   └── bitget_client.py             # Cliente API Bitget
+│   │
+│   ├── api/                             # Dashboard web
+│   │   ├── __init__.py
+│   │   ├── backend.py                   # Flask server + API
+│   │   └── templates/
+│   │       └── dashboard.html
+│   │
+│   ├── analytics/                       # Métricas
+│   │   ├── __init__.py
+│   │   └── metrics.py
+│   │
+│   ├── persistence/                     # Datos persistentes
+│   │   ├── bot_files_00/                # Cuenta 00
+│   │   │   ├── BOT_orchestator_00.log
+│   │   │   ├── bot_trades_00.xlsx
+│   │   │   └── bot_state_00.json
+│   │   ├── bot_files_E1/                # Cuenta E1
+│   │   └── bot_files_01/                # Cuenta 01
+│   │
+│   ├── bot_utils/                       # Utilidades
+│   │   ├── __init__.py
+│   │   └── logger.py
+│   │
+│   └── validation/                      # Validaciones
+│       ├── __init__.py
+│       └── strategy_validator.py
 │
-├── config/                              # Configuración
-│   ├── __init__.py
-│   └── settings.py                      # Settings centralizados
+├── signals/                             # 🔄 Módulo compartido
+│   ├── add_signals_double_top.py
+│   ├── add_signals_reversal.py
+│   ├── add_signals_parity.py
+│   ├── add_signals_orderblocks.py
+│   └── indicators.py                    # Indicadores técnicos
 │
-├── core/                                # Componentes core
-│   ├── __init__.py
-│   └── orchestrator.py                  # BotOrchestrator (cerebro)
-│
-├── strategies/                          # Sistema de estrategias ⭐
-│   ├── __init__.py
-│   ├── strategies.yaml                  # Definiciones YAML
-│   ├── strategy_registry.py             # Elif explícito ⭐
-│   ├── strategy_loader.py               # Cargador de YAML
-│   └── strategy_processor.py            # Procesador de señales
-│
-├── signals/                             # Funciones de señales
-│   ├── __init__.py
-│   ├── Z_add_signals_double_top.py
-│   ├── Z_add_signals_reversal.py
-│   ├── Z_add_signals_parity.py
-│   └── Z_add_signals_orderblocks.py
-│
-├── execution/                           # Ejecución de órdenes
-│   ├── __init__.py
-│   └── bitget_client.py                 # Cliente API Bitget
-│
-├── api/                                 # Dashboard web
-│   ├── __init__.py
-│   ├── backend.py                       # Flask server + API
-│   └── templates/
-│       └── dashboard.html
-│
-├── analytics/                           # Métricas
-│   ├── __init__.py
-│   └── metrics.py
-│
-├── persistence/                         # Datos persistentes
-│   ├── bot_files_00/                    # Cuenta 00
-│   │   ├── BOT_orchestator_00.log
-│   │   ├── bot_trades_00.xlsx
-│   │   └── bot_state_00.json
-│   ├── bot_files_E1/                    # Cuenta E1
-│   └── bot_files_01/                    # Cuenta 01
-│
-├── bot_utils/                           # Utilidades
-│   ├── __init__.py
-│   └── logger.py
-│
-├── validation/                          # Validaciones
-│   ├── __init__.py
-│   └── strategy_validator.py
-│
-└── utils/
-    └── ZZ_connect.py                    # Credenciales (privado)
+└── development/                         # 🛠️ Desarrollo y análisis
+    ├── parquet_process/                 # Extracción de datos históricos
+    ├── backtesters/                     # Backtesting
+    ├── analysis/                        # Análisis de resultados
+    ├── live_trading/                    # Versiones antiguas
+    ├── testing/                         # Tests
+    └── tools/                           # Herramientas
 ```
 
 ### 4.2 Propósito de Cada Directorio
 
 | Directorio | Propósito | Archivos Importantes |
 |------------|-----------|---------------------|
-| **config/** | Configuración central | settings.py |
+| **config/** | Configuración central | settings.py, connect_pass.py |
 | **core/** | Lógica central de orquestación | orchestrator.py |
 | **strategies/** | Sistema de estrategias | strategies.yaml, strategy_registry.py |
-| **signals/** | Implementación de funciones de señales | Z_add_signals_*.py |
+| **signals/** (compartido) | Funciones de detección compartidas | add_signals_*.py, indicators.py |
+| **market_data/** | Datos de mercado y API | api_client.py, data_utils.py |
 | **execution/** | Comunicación con broker | bitget_client.py |
 | **api/** | Dashboard web y API REST | backend.py, dashboard.html |
 | **persistence/** | Estado, logs, trades | JSON, Excel, logs |
+| **development/** | Backtesting y análisis | parquet_process/, backtesters/ |
 
 ---
 
@@ -412,7 +447,7 @@ strategy_registry.py (elif explícito) ⭐
     ↓
 strategy_processor.py (ejecución)
     ↓
-Z_add_signals_*.py (implementación)
+add_signals_*.py (implementación)
 ```
 
 ### 6.2 strategies.yaml - Configuración Declarativa
@@ -638,7 +673,7 @@ Inicializa:
 
 ### 9.1 Estructura General
 
-Todas las funciones en `signals/Z_add_signals_*.py` siguen esta estructura:
+Todas las funciones en `bitget/signals/add_signals_*.py` (módulo compartido entre BOT_trading y development) siguen esta estructura:
 
 **Firma típica:**
 - Parámetros: `ohlcv_array, lookback, tolerance, [parámetros específicos], live_trading`
@@ -655,18 +690,18 @@ Todas las funciones en `signals/Z_add_signals_*.py` siguen esta estructura:
 
 ### 9.2 Funciones Implementadas
 
-**Double Top (`Z_add_signals_double_top.py`):**
+**Double Top (`add_signals_double_top.py`):**
 - `double_top_long()`: Detecta patrón de doble techo para entrar long
 
-**Reversal (`Z_add_signals_reversal.py`):**
+**Reversal (`add_signals_reversal.py`):**
 - `reversal_long()`: Detecta reversión alcista
 - `reversal_short()`: Detecta reversión bajista
 
-**Parity (`Z_add_signals_parity.py`):**
+**Parity (`add_signals_parity.py`):**
 - `parity_long()`: Detecta condición de paridad para long
 - `parity_short()`: Detecta condición de paridad para short
 
-**Order Blocks (`Z_add_signals_orderblocks.py`):**
+**Order Blocks (`add_signals_orderblocks.py`):**
 - `orderblocks_long()`: Detecta order block alcista
 - `orderblocks_short()`: Detecta order block bajista
 
@@ -692,14 +727,20 @@ Todas las funciones en `signals/Z_add_signals_*.py` siguen esta estructura:
 - `MARGIN_MODE`: "crossed"
 - `MARGIN_COIN`: "USDT"
 
-### 10.2 General Bot Settings
+### 10.2 API Request Settings
+
+- `API_TIMEOUT`: 10 segundos
+- `API_MAX_RETRIES`: 3 reintentos
+- `API_LIMIT_LIVE`: 180 velas (límite para trading en vivo)
+
+### 10.3 General Bot Settings
 
 - `HOUR_ZONE`: ZoneInfo('UTC') para timestamps
 - `CHECK_INTERVAL`: 10 segundos entre checks de TP/SL
 - `USE_HARDCODED_SIGNALS`: False (usar señales reales)
 - `DISPLAY_MODE`: "summary"
 
-### 10.3 Account-Specific Settings
+### 10.4 Account-Specific Settings
 
 **Constante: `ACCOUNTS`**
 
@@ -711,7 +752,7 @@ Dict con configuración de cada cuenta:
 | E1 | 1761 USDT | 5001 | Elite Account |
 | 01 | 117 USDT | 5099 | Testing Account |
 
-### 10.4 Strategy Assignment per Account
+### 10.5 Strategy Assignment per Account
 
 **Constante: `ACCOUNT_STRATEGIES`**
 
@@ -727,7 +768,7 @@ Dict que mapea cuentas a listas de strategy IDs:
 - Testing → cuenta 01 solo para nuevas estrategias
 - Flexibilidad operativa
 
-### 10.5 Validation Settings
+### 10.6 Validation Settings
 
 - `MIN_ORDER_AMOUNT`: 40 USDT
 - `MAX_ORDER_AMOUNT`: 100 USDT
@@ -739,7 +780,7 @@ Dict que mapea cuentas a listas de strategy IDs:
 - `MAX_CANDLES`: 51
 - `VALID_TIMEFRAMES`: ['1H', '4H', '6Hutc', '2m', '5m', '15m', '30m']
 
-### 10.6 Helper Functions
+### 10.7 Helper Functions
 
 **`get_account_config(account_number)`**
 - Retorna configuración completa de cuenta
@@ -821,10 +862,13 @@ Cada estrategia es un dict con:
 ### 12.1 Imports
 
 El archivo comienza con imports de todas las funciones de señales desde módulo `signals`:
-- `from signals.Z_add_signals_double_top import double_top_long`
-- `from signals.Z_add_signals_reversal import reversal_long, reversal_short`
-- `from signals.Z_add_signals_parity import parity_long, parity_short`
-- `from signals.Z_add_signals_orderblocks import orderblocks_long, orderblocks_short`
+
+```python
+from signals.add_signals_double_top import double_top_long
+from signals.add_signals_reversal import reversal_long, reversal_short
+from signals.add_signals_parity import parity_long, parity_short
+from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
+```
 
 ### 12.2 Función detect_signals_for_strategy()
 
@@ -1181,16 +1225,26 @@ LOG Y ACTUALIZAR
 ### 19.1 Workflow Simplificado
 
 **PASO 1: Crear función de señal**
-- Ubicación: `signals/Z_add_signals_mi_estrategia.py`
+- Ubicación: `bitget/signals/add_signals_mi_estrategia.py`
 - Implementar función con firma: `mi_estrategia_long(ohlcv_array, lookback, threshold, live_trading)`
 - Retornar array de señales
 
 **PASO 2: Añadir elif en strategy_registry.py**
 - Abrir: `strategies/strategy_registry.py`
-- Añadir import: `from signals.Z_add_signals_mi_estrategia import mi_estrategia_long`
+- Añadir import:
+```python
+from signals.add_signals_mi_estrategia import mi_estrategia_long
+```
 - Añadir bloque elif dentro de `detect_signals_for_strategy()`:
-  - `elif strategy_name == 'mi_estrategia_long_4H':`
-  - Llamar a función con parámetros de `strat`
+```python
+elif strategy_name == 'mi_estrategia_long_4H':
+    signals = mi_estrategia_long(
+        arr,
+        lookback=strat['lookback'],
+        threshold=strat['threshold'],
+        live_trading=True
+    )
+```
 
 **PASO 3: Añadir a get_implemented_strategies()**
 - En mismo archivo `strategy_registry.py`
@@ -1218,14 +1272,14 @@ LOG Y ACTUALIZAR
 ### 19.2 Archivos a Modificar
 
 **Total: 3 archivos**
-1. `signals/Z_add_signals_mi_estrategia.py` (nuevo)
+1. `bitget/signals/add_signals_mi_estrategia.py` (nuevo)
 2. `strategies/strategy_registry.py` (3 cambios: import + elif + set)
 3. `strategies/strategies.yaml` (1 estrategia nueva)
 4. `config/settings.py` (opcional, asignar a cuenta)
 
 ### 19.3 Checklist de Validación
 
-- ✅ Función creada en signals/
+- ✅ Función creada en bitget/signals/
 - ✅ Import añadido en strategy_registry.py
 - ✅ Elif añadido en detect_signals_for_strategy()
 - ✅ Nombre añadido en get_implemented_strategies()
@@ -1347,7 +1401,7 @@ En cada módulo Python:
 **Síntoma:** "Invalid API key" o "Invalid signature"
 
 **Diagnóstico:**
-- Verificar credenciales en `utils/ZZ_connect.py`
+- Verificar credenciales en `config/connect_pass.py`
 - Verificar formato de firma HMAC
 
 **Solución:**
@@ -1478,12 +1532,12 @@ En cada módulo Python:
 
 # 🎉 FIN DEL DOCUMENTO
 
-**Esta es la documentación técnica completa del sistema BOT_trading v2.0.**
+**Esta es la documentación técnica completa del sistema BOT_trading v2.1.**
 
 ---
 
-**Última actualización:** 2026-01-06  
-**Versión:** 2.0  
+**Última actualización:** 2026-01-08  
+**Versión:** 2.1  
 **Autor:** Trading Bot Team  
 **Sistema:** BOT_trading
 
@@ -1493,20 +1547,24 @@ En cada módulo Python:
 
 1. **Arquitectura actual:** Sistema con estrategias definidas en YAML y registro explícito mediante elif en strategy_registry.py
 
-2. **Añadir estrategia:** Solo 3 archivos a modificar (signals/nuevo.py, strategy_registry.py, strategies.yaml)
+2. **Estructura de carpetas:** Separación clara entre BOT_trading (producción), signals (compartido) y development (desarrollo)
 
-3. **Validación:** Sistema valida automáticamente que estrategias en YAML existen en IMPLEMENTED_STRATEGIES
+3. **Añadir estrategia:** Solo 3 archivos a modificar (bitget/signals/nuevo.py, strategy_registry.py, strategies.yaml)
 
-4. **Estado persistente:** Todas las posiciones y contadores se guardan en JSON para recuperación tras crashes
+4. **Validación:** Sistema valida automáticamente que estrategias en YAML existen en IMPLEMENTED_STRATEGIES
 
-5. **TP/SL automático:** Sistema verifica cada 10 segundos todas las posiciones abiertas
+5. **Estado persistente:** Todas las posiciones y contadores se guardan en JSON para recuperación tras crashes
 
-6. **Timeout por velas:** Posiciones se cierran automáticamente tras N velas configuradas
+6. **TP/SL automático:** Sistema verifica cada 10 segundos todas las posiciones abiertas
 
-7. **Sync con broker:** Cada vela cerrada se sincroniza con Bitget para detectar cierres externos
+7. **Timeout por velas:** Posiciones se cierran automáticamente tras N velas configuradas
 
-8. **Dashboard en tiempo real:** Flask server en puerto 5000/5001/5099 según cuenta
+8. **Sync con broker:** Cada vela cerrada se sincroniza con Bitget para detectar cierres externos
 
-9. **Logging dual:** Consola limpia para humanos, archivo detallado para debugging
+9. **Dashboard en tiempo real:** Flask server en puerto 5000/5001/5099 según cuenta
 
-10. **Multi-cuenta:** Soporta 3 cuentas independientes (00, E1, 01) con configuración separada
+10. **Logging dual:** Consola limpia para humanos, archivo detallado para debugging
+
+11. **Multi-cuenta:** Soporta 3 cuentas independientes (00, E1, 01) con configuración separada
+
+12. **Módulo signals compartido:** Las funciones de detección están en bitget/signals/ y son usadas tanto por BOT_trading como por development

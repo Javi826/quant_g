@@ -196,7 +196,7 @@ def get_current_price(symbol: str, max_cache_age: float = 0.5) -> Decimal:
             return price_data['price']
         time.sleep(0.01)
     
-    raise TimeoutError(f"No price-{symbol}")
+    raise TimeoutError(f"No fresh-{symbol}")
 
 
 # ==========================================================================
@@ -423,9 +423,9 @@ def place_order(symbol: str,
     filled_amount = extract_filled_amount(resp_order, size_q)
     exec_price    = get_exec_price(resp_order, last_price)
     
-    # ═══════════════════════════════════════════════════════════════
+    # ===============================================================
     # NUEVO: Log de partial fills
-    # ═══════════════════════════════════════════════════════════════
+    # ===============================================================
     if filled_amount < size_q * Decimal('0.95'):  # Tolerancia 5%
         logger.warning(f"WAR-Partial fill for {symbol}: requested={size_q}, filled={filled_amount}")
     # ═══════════════════════════════════════════════════════════════

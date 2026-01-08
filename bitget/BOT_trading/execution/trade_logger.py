@@ -133,6 +133,7 @@ def log_closed_position(opened_at,
         # Remove timezone info
         if opened_at_dt.tzinfo is not None:
             opened_at_dt = opened_at_dt.replace(tzinfo=None)
+            
         if closed_at.tzinfo is not None:
             closed_at = closed_at.replace(tzinfo=None)
 

@@ -1,6 +1,9 @@
 # === FILE: main_BACKTESTING.py ===
 # ---------------------------------
 import os
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
 import pandas as pd
 from itertools import product
