@@ -1,11 +1,47 @@
+# Virtual environment
 env_quant/
+
+# Data files
 *.parquet
 *.xlsx
 *.h5
 *.pt
-*.log
-*.json
-__pycache__/
 
-scripts/utils/ZZ_connect.py
-scripts/Z_signals/add_signals*
+# Logs
+*.log
+
+# State files
+*.json
+
+# Python cache
+__pycache__/
+**/__pycache__/
+
+# Credentials (IMPORTANTE)
+bitget/BOT_trading/config/connect_pass.py
+
+# Signal modules (si son privados/propietarios)
+bitget/signals/add_signals_*.py
+
+# System files
+.DS_Store
+**/.DS_Store
+._.DS_Store
+**/._.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Pytest
+.pytest_cache/
+**/.pytest_cache/
+
+# Bot persistence (logs, state, trades)
+bitget/BOT_trading/persistence/bitget/signals/add_signals_*.py
