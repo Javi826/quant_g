@@ -8,4 +8,4 @@ env_quant/
 __pycache__/
 
 scripts/utils/ZZ_connect.py
-scripts/Z_add_signals*
+scripts/Z_signals/add_signals*
