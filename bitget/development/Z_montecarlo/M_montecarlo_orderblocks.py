@@ -26,7 +26,6 @@ STRATEGY            = "orderblocks"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2024_IS_short"
 DATA_FOLDER         = "../data/crypto_2022_IS_2"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
@@ -37,11 +36,11 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [5,10,20,30,40] 
-IMPULSE_LIST         = [0.01,0.1,1.0]
+TOLERANCE_LIST       = [35,40,45] 
+IMPULSE_LIST         = [0.005,0.01,0.015]
 
-TP_PCT_LIST          = [3,4,5,6,7,8]
-SL_PCT_LIST          = [5,6,7,8,9,10]
+TP_PCT_LIST          = [2,3,4]
+SL_PCT_LIST          = [9,10,11]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

@@ -26,25 +26,32 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2024_OOS_short"
-#DATA_FOLDER         = "data/crypto_2025_scalping_OOS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
-#DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '30m'
+DATA_FOLDER         = "../data/crypto_OOS"
+#DATA_FOLDER         = "../data/crypto_2022_OOS"
+#DATA_FOLDER         = "../data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 5_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [150]
+TOLERANCE_LIST       = [30] 
+IMPULSE_LIST         = [1.0] 
+
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
+
+SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [50]
-TOLERANCE_LIST       = [10] 
+TOLERANCE_LIST       = [35] 
 IMPULSE_LIST         = [0.01] 
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [9]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [11]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
@@ -71,7 +78,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = orderblocks_long(
+        signals = orderblocks_short(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

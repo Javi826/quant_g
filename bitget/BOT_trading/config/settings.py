@@ -147,7 +147,7 @@ MAX_ORDER_AMOUNT = 100
 MIN_TP_PCT = 1.5
 MAX_TP_PCT = 10
 MIN_SL_PCT = 1.5
-MAX_SL_PCT = 10
+MAX_SL_PCT = 15
 
 # Candles timeout limits
 MIN_CANDLES = 49

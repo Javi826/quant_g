@@ -130,18 +130,20 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         monthly_df = calculate_monthly_metrics(equity_hist, initial_capital)
        
         if not monthly_df.empty:
-            print("\n" + "="*60)
-            print("MONTHLY PERFORMANCE - Best Net_Gain Strategy")
-            print("="*60)
+# =============================================================================
+#             print("\n" + "="*60)
+#             print("MONTHLY PERFORMANCE - Best Net_Gain Strategy")
+#             print("="*60)
+#            
+#             # Formatear la tabla
+#             monthly_display = monthly_df.copy()
+#             monthly_display['Net_Gain_%'] = monthly_display['Net_Gain_%'].apply(lambda x: f"{x:.2f}")
+#             monthly_display['Max_DD_%']   = monthly_display['Max_DD_%'].apply(lambda x: f"{x:.2f}")
+#             monthly_display['Start_Bal']  = monthly_display['Start_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+#             monthly_display['End_Bal']    = monthly_display['End_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
+# =============================================================================
            
-            # Formatear la tabla
-            monthly_display = monthly_df.copy()
-            monthly_display['Net_Gain_%'] = monthly_display['Net_Gain_%'].apply(lambda x: f"{x:.2f}")
-            monthly_display['Max_DD_%']   = monthly_display['Max_DD_%'].apply(lambda x: f"{x:.2f}")
-            monthly_display['Start_Bal']  = monthly_display['Start_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-            monthly_display['End_Bal']    = monthly_display['End_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-           
-            print(monthly_display.to_string(index=False))
+            #print(monthly_display.to_string(index=False))
            
             # Estadísticas agregadas
             print("\n" + "-"*60)
