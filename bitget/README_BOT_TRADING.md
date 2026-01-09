@@ -136,7 +136,7 @@ BOT_trading SYSTEM
 │   ├─ Control de timeframes
 │   └─ Main loop
 │
-├─ Sistema de Estrategias ⭐
+├─ Sistema de Estrategias 
 │   ├─ strategies.yaml (configuración)
 │   ├─ strategy_registry.py (elif explícito)
 │   └─ strategy_loader.py (carga YAML)
@@ -280,10 +280,10 @@ bitget/                                  # Directorio raíz del proyecto
 │   │   ├── __init__.py
 │   │   └── orchestrator.py              # BotOrchestrator (cerebro)
 │   │
-│   ├── strategies/                      # Sistema de estrategias ⭐
+│   ├── strategies/                      # Sistema de estrategias 
 │   │   ├── __init__.py
 │   │   ├── strategies.yaml              # Definiciones YAML
-│   │   ├── strategy_registry.py         # Elif explícito ⭐
+│   │   ├── strategy_registry.py         # Elif explícito 
 │   │   ├── strategy_loader.py           # Cargador de YAML
 │   │   └── strategy_processor.py        # Procesador de señales
 │   │
@@ -1412,38 +1412,6 @@ En cada módulo Python:
 ---
 
 # PARTE 7: REFERENCIA RÁPIDA
-
-## 22. Catálogo de Estrategias
-
-### 22.1 Resumen por Timeframe
-
-| Timeframe | Total | Long | Short |
-|-----------|-------|------|-------|
-| 4H | 7 | 4 | 3 |
-| 1H | 4 | 2 | 2 |
-| 6Hutc | 3 | 2 | 1 |
-| **TOTAL** | **14** | **8** | **6** |
-
-### 22.2 Listado Completo
-
-| ID | Nombre | TF | Dir | TP% | SL% | Cuentas | Estado |
-|----|--------|----|----|-----|-----|---------|--------|
-| 01 | double_top_long_4H | 4H | LONG | 4 | 10 | 00, E1, 01 | ACTIVE |
-| 02 | reversal_long_4H | 4H | LONG | 3 | 10 | 00, E1 | ACTIVE |
-| 03 | parity_long_4H | 4H | LONG | 3 | 10 | 00, E1 | ACTIVE |
-| 04 | reversal_short_4H | 4H | SHORT | 3 | 9 | 00, E1 | ACTIVE |
-| 05 | parity_short_4H | 4H | SHORT | 3 | 9 | 00 | DEPRECATING |
-| 06 | reversal_long_1H | 1H | LONG | 2 | 10 | 00, E1 | ACTIVE |
-| 07 | reversal_short_1H | 1H | SHORT | 1.9 | 5 | 00, E1 | ACTIVE |
-| 08 | reversal_long_6Hutc | 6H | LONG | 4 | 10 | 00, E1 | ACTIVE |
-| 09 | reversal_short_6Hutc | 6H | SHORT | 4 | 7.5 | 00, E1 | ACTIVE |
-| 10 | parity_long_1H | 1H | LONG | 2 | 10 | 00, E1 | ACTIVE |
-| 11 | parity_short_1H | 1H | SHORT | 2 | 7.5 | 00, E1 | ACTIVE |
-| 12 | parity_long_6Hutc | 6H | LONG | 3.5 | 10 | 00 | ACTIVE |
-| 13 | orderblocks_short_4H | 4H | SHORT | 5 | 10 | 00, E1 | ACTIVE |
-| 14 | orderblocks_long_4H | 4H | LONG | 5 | 10 | 00 | ACTIVE |
-
----
 
 ## 23. Estructuras de Datos
 

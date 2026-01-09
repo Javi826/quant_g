@@ -1,36 +1,27 @@
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 
-FOLDER              = "brief_equities"
+FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '4h'
-DATA_FOLDER         = "data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS"
 
 # -------------------------------------------------
-# --- Additional Metrics Functions
+# --- Metrics Functions
 # -------------------------------------------------
 def total_return(df, capital):
+    """Calculate net gain percentage"""
     return (df['balance'].iloc[-1] - capital) / capital * 100
 
-def cagr(df, capital):
-    days = (df['timestamp'].iloc[-1] - df['timestamp'].iloc[0]).days
-    if days <= 0:
-        return 0
-    years = days / 365
-    final_value = df['balance'].iloc[-1]
-    return (final_value / capital) ** (1 / years) - 1
-
-def positive_period_ratio(df):
-    returns = df['balance'].pct_change().dropna()
-    if len(returns) == 0:
-        return 0
-    return (returns > 0).mean() * 100
-
 def profit_factor(df):
+    """Calculate profit factor (gains/losses ratio)"""
     returns = df['balance'].pct_change().dropna()
     gains   = returns[returns > 0].sum()
     losses  = -returns[returns < 0].sum()
@@ -40,6 +31,7 @@ def profit_factor(df):
     return gains / losses
 
 def average_recovery_time(df):
+    """Calculate average recovery time from drawdowns"""
     bal        = df['balance'].values
     peaks      = np.maximum.accumulate(bal)
     underwater = bal < peaks
@@ -57,29 +49,18 @@ def average_recovery_time(df):
         return 0
     return np.mean(recovery_times)
 
-# -------------------------------------------------
-# --- New Smoothness Metrics
-# -------------------------------------------------
-
 def ulcer_index(df):
+    """Calculate Ulcer Index (drawdown pain metric)"""
     balance = df["balance"].values
     peaks = np.maximum.accumulate(balance)
     dd = (balance - peaks) / peaks * 100
     return np.sqrt(np.mean(dd**2))
 
-def rmse_trend(df):
-    df2 = df.reset_index(drop=True)
-    X = np.arange(len(df2)).reshape(-1, 1)
-    y = df2["balance"].values.reshape(-1, 1)
-
-    model = LinearRegression().fit(X, y)
-    trend = model.predict(X)
-    return np.sqrt(np.mean((y - trend) ** 2))
-
 # -------------------------------------------------
 # Function to compute metrics
 # -------------------------------------------------
 def compute_metrics(equity_df, capital, name="Equity"):
+    """Compute all metrics for a given equity curve"""
     df = equity_df.copy()
     df = df.sort_values('timestamp')
 
@@ -90,32 +71,26 @@ def compute_metrics(equity_df, capital, name="Equity"):
     monthly_returns = df.groupby('month')['balance'].last().pct_change()
     consistency = (monthly_returns > 0).mean() * 100
 
-    tr  = total_return(df, capital)
-    cg  = cagr(df, capital) * 100
-    pos = positive_period_ratio(df)
-    pf  = profit_factor(df)
-    rt  = average_recovery_time(df) / 6
-
+    net_gain = total_return(df, capital)
+    pf = profit_factor(df)
+    rt = average_recovery_time(df) / 6
     ui = ulcer_index(df)
-    rm = rmse_trend(df)
 
     return {
         "Curve": name,
         "Volatility_pct": round(volatility, 2),
         "Monthly_pct": round(consistency, 2),
-        "Total_pct": round(tr, 2),
-        "CAGR_pct": round(cg, 2),
-        "PPR_pct": round(pos, 2),
+        "Net_Gain_pct": round(net_gain, 2),
         "Profit_Factor": round(pf, 3) if pf != np.inf else np.inf,
         "Rec_Time": round(rt, 2),
-        "Ulcer_Index": round(ui, 3),
-        "RMSE": round(rm, 3),
+        "Ulcer_Index": round(ui, 3)
     }
 
 # -------------------------------------------------
-# Plot function (unchanged)
+# Plot function
 # -------------------------------------------------
 def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
+    """Plot net gain % and drawdown with BTC comparison"""
     initial_capital = capital
     timestamps = pd.to_datetime(equity_hist['timestamp'])
     balances = np.array(equity_hist['balance'])
@@ -129,7 +104,7 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
     
     fig, ax1 = plt.subplots(figsize=(12,6))
     
-    # --- Línea Bitcoin (antes de plotear Net Gain para poder comparar) ---
+    # --- Bitcoin line for comparison ---
     btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
     btc_df = pd.read_parquet(btc_file)
 
@@ -137,38 +112,37 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
         if isinstance(btc_df.index, pd.DatetimeIndex):
             btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
         else:
-            raise ValueError("El parquet de BTC no tiene columna 'timestamp' ni índice datetime.")
+            raise ValueError("BTC parquet missing 'timestamp' column or datetime index")
 
     btc_df = btc_df[['timestamp', 'close']]
     btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
     btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
 
-    # --- Comparar con BTC para colorear dinámicamente el área ---
-    # Alinear BTC con nuestros timestamps
+    # --- Compare with BTC for dynamic coloring ---
     btc_aligned = np.interp(
-        timestamps.astype(np.int64) / 10**9,  # convertir a segundos
+        timestamps.astype(np.int64) / 10**9,
         btc_df['timestamp'].astype(np.int64) / 10**9,
         btc_df['btc_net_gain_pct']
     )
 
-    # Crear máscaras para cuando superamos o no a BTC
+    # Create masks for when we beat BTC or not
     above_btc = net_gain_pct >= btc_aligned
     below_btc = net_gain_pct < btc_aligned
 
-    # Área verde donde superamos BTC
+    # Green area where we beat BTC
     ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.2, color='green', interpolate=True)
 
-    # Área roja donde NO superamos BTC
+    # Red area where we don't beat BTC
     ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red', interpolate=True)
 
-    # Línea azul siempre (encima de las áreas)
+    # Blue line (always on top)
     ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
 
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Net_Gain_pct", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
-    # Graficar BTC con línea naranja punteada
+    # Plot BTC with orange dashed line
     ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], 
              color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
 
@@ -178,12 +152,12 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
     ax2.set_ylabel("Drawdown", color='red')
     ax2.tick_params(axis='y', labelcolor='red')
     
-    # Calcular valores para etiquetas
-    final_net_gain = net_gain_pct[-1]  # Último valor en lugar del máximo
+    # Calculate values for labels
+    final_net_gain = net_gain_pct[-1]
     max_dd = dd_pct.min()
     final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
     
-    # Añadir etiquetas en el plot
+    # Add labels to plot
     textstr = f'Final Net Gain: {final_net_gain:.2f}%\nMax DD: {max_dd:.2f}%\nBTC Final: {final_btc:.2f}%'
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
@@ -192,7 +166,7 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
     fig.autofmt_xdate()
     ax1.grid(True, linestyle='--', alpha=0.6)
     
-    # Leyenda combinada
+    # Combined legend
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc='best')
@@ -298,20 +272,16 @@ metrics_df = pd.DataFrame(metrics_table)
 metrics_df['Curve'] = metrics_df['Curve'].astype(str)
 
 print("\n📊 FINAL METRICS TABLE (ALL CURVES):\n")
-# Ajuste de la columna Curve para que quede alineada a la izquierda
 metrics_df_display = metrics_df.copy()
 max_len = metrics_df_display['Curve'].str.len().max()
 metrics_df_display['Curve'] = metrics_df_display['Curve'].apply(lambda x: x.ljust(max_len))
 
-print("\n📊 FINAL METRICS TABLE (ALL CURVES):\n")
 print(metrics_df_display.to_string(index=False))
 
-
 # -------------------------------------------------
-# COMBINATIONS SEARCH (unchanged)
+# COMBINATIONS SEARCH
 # -------------------------------------------------
 from itertools import combinations
-
 
 combo_results = []
 named_dfs = dict(zip(file_names, dfs))
@@ -346,71 +316,81 @@ for r in range(1, len(named_dfs) + 1):
         )
         combo_results.append(metrics)
 
+# =============================================================================
+# TOP 10 COMBINATIONS BY DIFFERENT METRICS
+# =============================================================================
+
+print("\n" + "="*80)
+print("🏆 TOP 10 COMBINATIONS BY KEY METRICS")
+print("="*80)
+
 combo_df = pd.DataFrame(combo_results)
-combo_df = combo_df.sort_values("CAGR_pct", ascending=False)
 
-combo_df_display = combo_df.copy()
-max_len_combo = combo_df_display['Curve'].str.len().max()
-combo_df_display['Curve'] = combo_df_display['Curve'].apply(lambda x: x.ljust(max_len_combo))
+# -------------------------------------------------
+# TOP 10 BY NET GAIN (Descending)
+# -------------------------------------------------
+combo_netgain = combo_df.sort_values("Net_Gain_pct", ascending=False).head(10).copy()
+combo_netgain_display = combo_netgain.copy()
+max_len_netgain = combo_netgain_display['Curve'].str.len().max()
+combo_netgain_display['Curve'] = combo_netgain_display['Curve'].apply(lambda x: x.ljust(max_len_netgain))
 
-print("\n🏆 MEJORES COMBINACIONES (ordenadas por CAGR):\n")
-print(combo_df_display.to_string(index=False))
+print("\n📈 TOP 10 COMBINATIONS BY NET GAIN (Highest):\n")
+print(combo_netgain_display.to_string(index=False))
 
+# -------------------------------------------------
+# TOP 10 BY ULCER INDEX (Ascending - lower is better)
+# -------------------------------------------------
+combo_ui = combo_df.sort_values("Ulcer_Index", ascending=True).head(10).copy()
+combo_ui_display = combo_ui.copy()
+max_len_ui = combo_ui_display['Curve'].str.len().max()
+combo_ui_display['Curve'] = combo_ui_display['Curve'].apply(lambda x: x.ljust(max_len_ui))
 
+print("\n🛡️  TOP 10 COMBINATIONS BY ULCER INDEX (Lowest):\n")
+print(combo_ui_display.to_string(index=False))
 
-best_name = combo_df.iloc[0]["Curve"]
-best_combo = best_name.split("+")
+# -------------------------------------------------
+# TOP 10 BY PROFIT FACTOR (Descending)
+# -------------------------------------------------
+combo_pf = combo_df[combo_df['Profit_Factor'] != np.inf].sort_values("Profit_Factor", ascending=False).head(10).copy()
+combo_pf_display = combo_pf.copy()
+max_len_pf = combo_pf_display['Curve'].str.len().max()
+combo_pf_display['Curve'] = combo_pf_display['Curve'].apply(lambda x: x.ljust(max_len_pf))
 
-best_dfs = [named_dfs[name] for name in best_combo]
+print("\n💰 TOP 10 COMBINATIONS BY PROFIT FACTOR (Highest):\n")
+print(combo_pf_display.to_string(index=False))
 
-start = min(df.index.min() for df in best_dfs)
-end   = max(df.index.max() for df in best_dfs)
+print("\n" + "="*80)
+
+# -------------------------------------------------
+# Best combination by Net Gain
+# -------------------------------------------------
+best_name_netgain = combo_netgain.iloc[0]["Curve"]
+best_combo_netgain = best_name_netgain.split("+")
+
+best_dfs_netgain = [named_dfs[name] for name in best_combo_netgain]
+
+start = min(df.index.min() for df in best_dfs_netgain)
+end   = max(df.index.max() for df in best_dfs_netgain)
 common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 
 resampled = []
-for df in best_dfs:
+for df in best_dfs_netgain:
     df_r = df[['balance']].reindex(common_index)
     df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_df_netgain = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
 
-best_capital = INITIAL_CAPITAL * len(best_dfs)
+best_capital = INITIAL_CAPITAL * len(best_dfs_netgain)
 
-plot_netgain_dd(best_df, capital=best_capital,
-                title=f"Best Combination: {best_name}")
-
-# -------------------------------------------------
-# Mejor combinación por CAGR
-# -------------------------------------------------
-best_name_cagr = combo_df.iloc[0]["Curve"]
-best_combo_cagr = best_name_cagr.split("+")
-
-best_dfs_cagr = [named_dfs[name] for name in best_combo_cagr]
-
-start = min(df.index.min() for df in best_dfs_cagr)
-end   = max(df.index.max() for df in best_dfs_cagr)
-common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
-
-resampled = []
-for df in best_dfs_cagr:
-    df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
-    resampled.append(df_r['balance'])
-
-combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_cagr = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-best_capital = INITIAL_CAPITAL * len(best_dfs_cagr)
-
-plot_netgain_dd(best_df_cagr, capital=best_capital,
-                title=f"Best Combination by CAGR: {best_name_cagr}")
-
+plot_netgain_dd(best_df_netgain, capital=best_capital,
+                title=f"Best Combination by Net Gain: {best_name_netgain}")
 
 # -------------------------------------------------
-# Mejor combinación por Ulcer Index (menor)
+# Best combination by Ulcer Index
 # -------------------------------------------------
-best_name_ui = combo_df.loc[combo_df['Ulcer_Index'].idxmin(), "Curve"]
+best_name_ui = combo_ui.iloc[0]["Curve"]
 best_combo_ui = best_name_ui.split("+")
 
 best_dfs_ui = [named_dfs[name] for name in best_combo_ui]
@@ -432,36 +412,10 @@ best_capital = INITIAL_CAPITAL * len(best_dfs_ui)
 plot_netgain_dd(best_df_ui, capital=best_capital,
                 title=f"Best Combination by Ulcer Index: {best_name_ui}")
 
-
 # -------------------------------------------------
-# Mejor combinación por RMSE (menor)
+# Best combination by Profit Factor
 # -------------------------------------------------
-best_name_rmse = combo_df.loc[combo_df['RMSE'].idxmin(), "Curve"]
-best_combo_rmse = best_name_rmse.split("+")
-
-best_dfs_rmse = [named_dfs[name] for name in best_combo_rmse]
-
-start = min(df.index.min() for df in best_dfs_rmse)
-end   = max(df.index.max() for df in best_dfs_rmse)
-common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
-
-resampled = []
-for df in best_dfs_rmse:
-    df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
-    resampled.append(df_r['balance'])
-
-combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_rmse = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-best_capital = INITIAL_CAPITAL * len(best_dfs_rmse)
-
-plot_netgain_dd(best_df_rmse, capital=best_capital,
-                title=f"Best Combination by RMSE: {best_name_rmse}")
-
-# -------------------------------------------------
-# Mejor combinación por Profit Factor (mayor)
-# -------------------------------------------------
-best_name_pf = combo_df.loc[combo_df['Profit_Factor'].idxmax(), "Curve"]
+best_name_pf = combo_pf.iloc[0]["Curve"]
 best_combo_pf = best_name_pf.split("+")
 
 best_dfs_pf = [named_dfs[name] for name in best_combo_pf]
@@ -484,55 +438,73 @@ plot_netgain_dd(best_df_pf, capital=best_capital,
                 title=f"Best Combination by Profit Factor: {best_name_pf}")
 
 # =============================================================================
-# # -------------------------------------------------
-# # Print final personalizado para una combinación específica
-# # -------------------------------------------------
-# 
-# custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
-# 
-# # Filtrar métricas del combo seleccionado
-# custom_metrics = combo_df.loc[combo_df['Curve'] == custom_combo_name]
-# 
-# if not custom_metrics.empty:
-#     # Ajustamos la columna 'Curve' para que el texto empiece a la izquierda
-#     custom_metrics_formatted = custom_metrics.copy()
-#     custom_metrics_formatted['Curve'] = custom_metrics_formatted['Curve'].str.ljust(70)  # ajustar tamaño según convenga
-#     
-#     print("\n📊 METRICS TABLE - COMBINACIÓN PERSONALIZADA:\n")
-#     print(custom_metrics_formatted.to_string(index=False))
-# else:
-#     print(f"⚠️ No se encontraron métricas para la combinación: {custom_combo_name}")
-# 
-# # -------------------------------------------------
-# # Plot personalizado para la misma combinación
-# # -------------------------------------------------
-# 
-# custom_combo_name = "equity_reversal_long+equity_double_top_long+equity_parity_long+equity_reversal_short"
-# 
-# # Filtrar la lista de nombres que componen la combinación
-# custom_combo_list = custom_combo_name.split("+")
-# 
-# # Extraer los DataFrames correspondientes
-# custom_dfs = [named_dfs[name] for name in custom_combo_list]
-# 
-# # Crear índice común
-# start = min(df.index.min() for df in custom_dfs)
-# end   = max(df.index.max() for df in custom_dfs)
-# common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
-# 
-# # Interpolar y combinar balances
-# resampled = []
-# for df in custom_dfs:
-#     df_r = df[['balance']].reindex(common_index)
-#     df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
-#     resampled.append(df_r['balance'])
-# 
-# combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-# custom_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-# 
-# custom_capital = INITIAL_CAPITAL * len(custom_dfs)
-# 
-# # Generar plot
-# plot_netgain_dd(custom_df, capital=custom_capital,
-#                 title=f"Custom Combination: {custom_combo_name}")
+# CORRELATION ANALYSIS
 # =============================================================================
+
+print("\n" + "="*80)
+print("📊 CORRELATION ANALYSIS")
+print("="*80)
+
+# -------------------------------------------------
+# 1. CORRELATION HEATMAP (VISUAL)
+# -------------------------------------------------
+print("\n[1/2] Generating correlation heatmap...")
+
+# Create DataFrame with returns from each strategy
+returns_df = pd.DataFrame()
+
+for name in file_names:
+    if name in correlation_data:
+        returns_df[name] = correlation_data[name]
+
+# Calculate correlation
+correlation_matrix = returns_df.corr()
+
+import seaborn as sns
+
+plt.figure(figsize=(14, 12))
+sns.heatmap(
+    correlation_matrix,
+    annot=True,           # Show correlation values
+    fmt='.2f',            # 2 decimals
+    cmap='RdYlGn_r',      # Red (high corr) → Yellow → Green (low corr)
+    center=0,             # Center colormap at 0
+    square=True,          # Square cells
+    linewidths=0.5,       # Grid lines
+    cbar_kws={"shrink": 0.8}
+)
+plt.title('Correlation Matrix Between Strategies', fontsize=16, pad=20)
+plt.tight_layout()
+plt.show()
+
+# -------------------------------------------------
+# 2. HIGH CORRELATION PAIRS (WARNING)
+# -------------------------------------------------
+print("\n[2/2] Identifying highly correlated pairs...")
+
+high_corr_pairs = []
+
+for i in range(len(correlation_matrix.columns)):
+    for j in range(i + 1, len(correlation_matrix.columns)):
+        corr_value = correlation_matrix.iloc[i, j]
+        
+        if corr_value > 0.7:
+            high_corr_pairs.append((correlation_matrix.columns[i], correlation_matrix.columns[j], corr_value))
+
+print("\n⚠️  PAIRS WITH HIGH POSITIVE CORRELATION (>0.7) - Consider reducing:\n")
+if high_corr_pairs:
+    for strat1, strat2, corr in sorted(high_corr_pairs, key=lambda x: x[2], reverse=True):
+        print(f"   {strat1} + {strat2}: {corr:.3f}")
+else:
+    print("   ✅ No pairs with high positive correlation")
+
+print("\n📚 CORRELATION GUIDE:")
+print("   • >0.7  = High correlation (strategies move together - reduces diversification)")
+print("   • 0.3-0.7 = Medium correlation")
+print("   • <0.3  = Low correlation (good diversification)")
+print("   • Near 0 = Independent strategies (excellent diversification)")
+print("   • Negative = Strategies move opposite (also good for diversification)")
+
+print("\n" + "="*80)
+print("✅ CORRELATION ANALYSIS COMPLETED")
+print("="*80 + "\n")
