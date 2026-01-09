@@ -1,10 +1,16 @@
+# === FILE: main_MONTECARLO_ ===
+# -----------------------------------------------------------
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import numpy as np
 import pandas as pd
 from typing import Dict, List
 import sys
 
 # Importar la función real del backtest
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 
 # =============================================================================
 # FUNCIÓN AUXILIAR PARA CALCULAR WIN RATIO MANUALMENTE
