@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
+import numpy as np
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
@@ -13,8 +14,9 @@ from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_a
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from signals.add_signals_parity import parity_long
-from signals.add_signals_parity import parity_short
+from signals.add_signals_parity import parity_short  
 
+from signals.regime_detection import detect_regime
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
@@ -25,8 +27,8 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -41,25 +43,23 @@ MA_PERIOD_LIST       = [50]
 TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
-#LONG
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [15] 
-MA_PERIOD_LIST       = [25]
+# ===== NUEVOS PARÁMETROS PARA RÉGIMEN =====
+ADX_THRESHOLD_LIST = [20, 25, 30]  # Diferentes niveles de exigencia
+ADX_PERIOD_LIST    = [14,50,75]  # Diferentes períodos de cálculo
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [10]
+REGIME_FILTER_LIST = [
+    None,         # Sin filtro
+    [0],          # Solo RANGING
+    [1],          # Solo UPTREND
+    [2],          # Solo DOWNTREND
+    [1, 2],       # Cualquier trending (evita ranging)
+    [0, 1],       # RANGING + UPTREND (evita downtrend)
+    [0, 2]        # RANGING + DOWNTREND (evita uptrend)
+]
+# ==========================================
 
-#SHORT
-# =============================================================================
-# LOOKBACK_LIST        = [100]
-# TOLERANCE_LIST       = [30] 
-# MA_PERIOD_LIST       = [50]
-# 
-# TP_PCT_LIST          = [3]
-# SL_PCT_LIST          = [9]
-# =============================================================================
-# -----------------------------------------------------------------------------
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT',
+                  'ADX_THRESHOLD','ADX_PERIOD','REGIME_FILTER']  # ← Añadidos
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -83,6 +83,17 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
+        # ===== Detectar régimen con parámetros variables =====
+        regimes = detect_regime(
+            arr_minor, 
+            adx_threshold=params['ADX_THRESHOLD'],  # ← Variable
+            adx_period=params['ADX_PERIOD'],        # ← Variable
+            live_trading=True
+        )
+        arr_minor['regime'] = regimes
+        # =====================================================
+
+        # Generar señales
         signals = parity_long(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
@@ -91,8 +102,16 @@ def process_combo(comb):
             live_trading=False
         )
 
+        # Filtrar por régimen
+        regime_filter = params['REGIME_FILTER']
+        
+        if regime_filter is not None:
+            mask = np.isin(regimes, regime_filter)
+            signals = signals * mask.astype(np.int8)
+
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
 
+    # Backtest
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after=params['SELL_AFTER'],
@@ -106,6 +125,13 @@ def process_combo(comb):
 # PARALLELIZED BACKTESTING
 # -----------------------------------------------------------------------------
 all_combinations = list(product(*lists_for_grid))
+
+print(f"\n📊 GRID SEARCH INFO:")
+print(f"Total combinations: {len(all_combinations):,}")
+print(f"  Strategy params: {3*4*1*3*3} = {3*4*1*3*3}")
+print(f"  Regime params: {3*3*7} = {3*3*7}")
+print(f"  Total: {3*4*1*3*3} × {3*3*7} = {len(all_combinations):,}\n")
+
 with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=N_JOBS)(
         delayed(process_combo)(comb) for comb in all_combinations

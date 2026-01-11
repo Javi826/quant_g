@@ -12,54 +12,50 @@ from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALA
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from signals.add_signals_parity import parity_long
-from signals.add_signals_parity import parity_short
+from signals.add_signals_double_top import double_top_short
+from signals.add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
-STRATEGY     = "parity_long_4H"
+STRATEGY     = "double_top__4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+#DATA_FOLDER         = "data/crypto_OOS_2"
+#DATA_FOLDER         = "data/crypto_2022_OOS"
+#DATA_FOLDER         = "data/crypto_2023_IS"
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
+
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [10,20,30,40] 
-MA_PERIOD_LIST       = [50]
-TP_PCT_LIST          = [3,4,5]
-SL_PCT_LIST          = [8,9,10]
-
-#LONG
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [15] 
-MA_PERIOD_LIST       = [25]
-
-TP_PCT_LIST          = [2]
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [10] 
+TREND_TH_LIST        = [10] 
+ 
+TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
+# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_MINOR_LIST  = [2] 
+PRICE_TOLERANCE_LIST = [5] 
+TREND_TH_LIST        = [5] 
+ 
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [7]
+# =============================================================================
 
-#SHORT
-# =============================================================================
-# LOOKBACK_LIST        = [100]
-# TOLERANCE_LIST       = [30] 
-# MA_PERIOD_LIST       = [50]
-# 
-# TP_PCT_LIST          = [3]
-# SL_PCT_LIST          = [9]
-# =============================================================================
-# -----------------------------------------------------------------------------
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+
+param_names    = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -83,11 +79,11 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = parity_long(
-            arr=arr_minor,
-            lookback=params['LOOKBACK'],
-            tolerance=params['TOLERANCE'],
-            ma_period=params['MA_PERIOD'],
+        signals = double_top_short(
+            arr_minor,
+            lookback_minor=params['LOOKBACK_MINOR'],
+            price_tolerance=params['PRICE_TOLERANCE'], 
+            trend_th=params['TREND_TH'], 
             live_trading=False
         )
 
@@ -121,7 +117,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
+save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

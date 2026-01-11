@@ -16,42 +16,39 @@ from utils.ZX_utils import filter_symbols, final_prints
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from signals.add_signals_parity import parity_long
-from signals.add_signals_parity import parity_short
+from signals.add_signals_double_top import double_top_short
+from signals.add_signals_double_top import double_top_long
 
-DTYPE               = np.float32
-start_time          = time.time()
-N_JOBS              = -1
-STRATEGY            = "parity"
-
+DTYPE             = np.float32
+start_time        = time.time()
+N_JOBS            = -1
+STRATEGY          = "double_top"
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '4H'
-
-ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+DATA_FOLDER       = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR   = '4H'
+ORDER_AMOUNT      = 80
+MIN_VOL_USDT      = 10_000_000
 
 # -----------------------------------------------------------------------------
-# PARAMETER GRID
+# GRID 
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [100,150]
-TOLERANCE_LIST       = [20,25] 
-MA_PERIOD_LIST       = [25]
+LOOKBACK_MINOR_LIST  = [2,3,4,5] 
+PRICE_TOLERANCE_LIST = [5,10,15] 
+TREND_TH_LIST        = [5,10,15] 
 
-TP_PCT_LIST          = [1,2]
-SL_PCT_LIST          = [8,]
+TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
-param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names     = ['SELL_AFTER','LOOKBACK_MINOR','PRICE_TOLERANCE','TREND_TH','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
 param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
-
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 10
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -73,11 +70,11 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_short(
+            signals = double_top_short(
                 arr_minor,
-                lookback=param_dict.get('LOOKBACK'),
-                tolerance=param_dict.get('TOLERANCE'),
-                ma_period=param_dict.get('MA_PERIOD'),
+                lookback_minor=param_dict.get('LOOKBACK_MINOR'),
+                price_tolerance=param_dict.get('PRICE_TOLERANCE'),
+                trend_th=param_dict.get('TREND_TH'),
                 live_trading=False
             )
 

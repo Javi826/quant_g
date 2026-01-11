@@ -153,29 +153,6 @@ def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: i
     
     return int(base_seed) + (int(h, 16) % mod) + int(path_idx)
 
-# EMAIL CONFIG
-# -----------------------------
-EMAIL_FROM     = "jlahoz.ferrandez@gmail.com"
-EMAIL_PASSWORD = "tvli cxgk duwh yzdd"
-EMAIL_TO       = "jlahoz.ferrandez@gmail.com"
-
-def send_email(detected_cryptos):
-    if not detected_cryptos: return
-    msg = MIMEMultipart()
-    msg['From'] = EMAIL_FROM
-    msg['To'] = EMAIL_TO
-    msg['Subject'] = f"Crypto_signals: {', '.join([d['symbol'] for d in detected_cryptos])}"
-    body = "\n".join([f"{d['symbol']} | Signal: {d['signal_type']} | Close: {d['close']:.2f}" for d in detected_cryptos])
-    msg.attach(MIMEText(body, 'plain'))
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(EMAIL_FROM, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"📧 Email sent: {', '.join([d['symbol'] for d in detected_cryptos])}")
-    except Exception as e:
-        print(f"⚠️ Error sending email: {e}")
 
 def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="live_trading/symbols_live"):
 
@@ -214,3 +191,60 @@ def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_na
         else:
             print("⚠️ No equity data to save")
 
+import numpy as np
+
+def align_filter_to_symbol(symbol_timestamps, btc_timestamps, btc_filter):
+    """
+    Alinea un filtro de BTC con los timestamps de un símbolo.
+    
+    Esta función resuelve el problema de que diferentes símbolos pueden tener
+    diferentes fechas de inicio (diferente número de velas), pero queremos
+    aplicar el filtro de BTC basándonos en el MOMENTO temporal, no en el índice.
+    
+    Parameters:
+    -----------
+    symbol_timestamps : np.array
+        Timestamps del símbolo (en formato Unix o datetime64)
+    btc_timestamps : np.array
+        Timestamps de BTC (mismo formato)
+    btc_filter : np.array
+        Filtro de BTC (valores binarios: 0 o 1, o continuos)
+        Debe tener la misma longitud que btc_timestamps
+    
+    Returns:
+    --------
+    aligned_filter : np.array (int8)
+        Filtro alineado con los timestamps del símbolo
+        Mismo tamaño que symbol_timestamps
+        
+    Examples:
+    ---------
+    >>> # BTC tiene 1000 velas desde 2022-01-01
+    >>> # ETH tiene 800 velas desde 2022-01-15 (listado después)
+    >>> btc_vol_filter = detect_volatility(btc_arr)  # 1000 valores
+    >>> eth_timestamps = eth_arr['ts']  # 800 timestamps
+    >>> btc_timestamps = btc_arr['ts']  # 1000 timestamps
+    >>> 
+    >>> aligned = align_filter_to_symbol(eth_timestamps, btc_timestamps, btc_vol_filter)
+    >>> # aligned tiene 800 valores, cada uno corresponde al filtro BTC del mismo momento
+    
+    Notes:
+    ------
+    - Si un timestamp del símbolo no existe en BTC, usa filtro = 1 (permite operar)
+    - Usa búsqueda binaria (searchsorted) para eficiencia O(log n)
+    - Timestamps deben estar ordenados cronológicamente (típico en OHLCV data)
+    """
+    
+    # Crear filtro alineado (inicializado en 1 = permitir por defecto)
+    aligned_filter = np.ones(len(symbol_timestamps), dtype=np.int8)
+    
+    # Para cada timestamp del símbolo, buscar el correspondiente en BTC
+    for i, sym_ts in enumerate(symbol_timestamps):
+        # Búsqueda binaria: encuentra índice donde sym_ts encajaría en btc_timestamps
+        btc_idx = np.searchsorted(btc_timestamps, sym_ts)
+        
+        # Si el índice está dentro del rango Y los timestamps coinciden exactamente
+        if btc_idx < len(btc_filter):
+            aligned_filter[i] = btc_filter[btc_idx]
+    
+    return aligned_filter

@@ -7,6 +7,7 @@ import os
 import json
 import re
 import threading
+import numpy as np
 import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
@@ -62,37 +63,27 @@ class DashboardServer:
     def get_precision_for_price(self, price):
         """
         Determina el número de decimales a mostrar según la magnitud del precio.
-        
-        Args:
-            price: Precio del activo
-        
-        Returns:
-            int: Número de decimales recomendados
         """
         price = abs(float(price))
         
-        if price >= 10000:      # BTC, BNB (50000.0)
+        if price >= 10000:
             return 1
-        elif price >= 1000:     # ETH alto (3000.0)
+        elif price >= 1000:
             return 2
-        elif price >= 100:      # ETH, SOL (300.0)
+        elif price >= 100:
             return 2
-        elif price >= 10:       # ADA, DOT (15.0)
+        elif price >= 10:
             return 3
-        elif price >= 1:        # DOGE, XRP (1.5)
+        elif price >= 1:
             return 4
-        elif price >= 0.01:     # Coins medianos (0.05)
+        elif price >= 0.01:
             return 5
-        else:                   # SHIB, PEPE (0.00001)
+        else:
             return 5
     
     def _load_trades_dataframe(self):
         """
         Carga y valida el DataFrame de trades desde el archivo Excel.
-        
-        Returns:
-            pd.DataFrame: DataFrame de trades si existe y tiene datos
-            None: Si el archivo no existe o está vacío
         """
         if not os.path.exists(self.trades_file):
             return None
@@ -109,12 +100,6 @@ class DashboardServer:
     def _prepare_trades_dataframe(self, df):
         """
         Prepara el DataFrame de trades con columnas de fechas procesadas.
-        
-        Args:
-            df: DataFrame crudo de trades
-        
-        Returns:
-            pd.DataFrame: DataFrame con columnas adicionales
         """
         df = df.copy()
         df['OPEN_AT'] = pd.to_datetime(df['OPEN_AT'])
@@ -123,44 +108,118 @@ class DashboardServer:
         df['DURATION'] = (df['CLOSE_AT'] - df['OPEN_AT']).dt.total_seconds() / 86400
         return df
     
+    def _filter_df_by_dates(self, df, date_from=None, date_to=None):
+        """
+        Filtra DataFrame por rango de fechas.
+        
+        Args:
+            df: DataFrame con columna CLOSE_AT
+            date_from: Fecha inicio (string YYYY-MM-DD o None)
+            date_to: Fecha fin (string YYYY-MM-DD o None)
+        
+        Returns:
+            DataFrame filtrado
+        """
+        if df is None or df.empty:
+            return df
+        
+        df = df.copy()
+        
+        if 'CLOSE_AT' not in df.columns:
+            return df
+        
+        if date_from:
+            try:
+                date_from_dt = pd.to_datetime(date_from)
+                df = df[df['CLOSE_AT'] >= date_from_dt]
+            except:
+                pass
+        
+        if date_to:
+            try:
+                date_to_dt = pd.to_datetime(date_to) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                df = df[df['CLOSE_AT'] <= date_to_dt]
+            except:
+                pass
+        
+        return df
+    
     @staticmethod
     def _extract_number_from_id(strategy_id):
         """
         Extrae el número prefijo del ID de estrategia.
-        
-        Formato esperado: 'NN_nombre_estrategia' donde NN es un número de 2 dígitos.
-        Ejemplo: '02_reversal_long_4H' → '02'
-        
-        Args:
-            strategy_id: ID de la estrategia
-        
-        Returns:
-            str: Número extraído o '??' si no se puede extraer
         """
         if not strategy_id or not isinstance(strategy_id, str):
             return '??'
         
-        # Buscar patrón NN_ al inicio (2 dígitos seguidos de guión bajo)
         match = re.match(r'^(\d{2})_', strategy_id)
         if match:
             return match.group(1)
         
-        # Fallback: buscar cualquier número al inicio
         match = re.match(r'^(\d+)', strategy_id)
         if match:
             return match.group(1).zfill(2)
         
         return '??'
     
+    @staticmethod
+    def _calculate_r_squared(equity_values):
+        """
+        Calcula R² de la equity curve vs línea recta.
+        Mide consistencia del crecimiento.
+        
+        R² = 1.0 → Línea recta perfecta (ideal)
+        R² > 0.9 → Muy consistente
+        R² = 0.7-0.9 → Buena consistencia
+        R² < 0.7 → Equity errática
+        
+        Args:
+            equity_values: Lista o array de valores de equity
+        
+        Returns:
+            float: R² entre 0 y 1
+        """
+        if len(equity_values) < 2:
+            return 0.0
+        
+        try:
+            y = np.array(equity_values).reshape(-1, 1)
+            X = np.arange(len(y)).reshape(-1, 1)
+            
+            # Calcular R² manualmente (sin sklearn para evitar dependencia)
+            y_mean = np.mean(y)
+            
+            # Regresión lineal simple: y = mx + b
+            X_mean = np.mean(X)
+            numerator = np.sum((X - X_mean) * (y - y_mean))
+            denominator = np.sum((X - X_mean) ** 2)
+            
+            if denominator == 0:
+                return 0.0
+            
+            slope = numerator / denominator
+            intercept = y_mean - slope * X_mean
+            
+            # Predicciones
+            y_pred = slope * X + intercept
+            
+            # R²
+            ss_res = np.sum((y - y_pred) ** 2)
+            ss_tot = np.sum((y - y_mean) ** 2)
+            
+            if ss_tot == 0:
+                return 1.0 if ss_res == 0 else 0.0
+            
+            r_squared = 1 - (ss_res / ss_tot)
+            
+            return round(float(max(0, min(1, r_squared))), 3)
+        except Exception as e:
+            logger.error(f"Error calculating R²: {e}")
+            return 0.0
+    
     def _calculate_capital_allocation(self, num_strategies=None):
         """
         Calcula el capital asignado por estrategia.
-        
-        Args:
-            num_strategies: Número de estrategias para dividir el capital
-        
-        Returns:
-            float: Capital asignado por estrategia
         """
         if num_strategies is None:
             num_strategies = len(self.implemented_strategies)
@@ -173,29 +232,22 @@ class DashboardServer:
     def _get_full_strategies_list_with_numbers(self):
         """
         Genera la lista completa de estrategias con numeración extraída de los IDs.
-        DINÁMICO: Extrae TODOS los parámetros del YAML automáticamente.
         """
-        # Parámetros comunes que SIEMPRE deben aparecer
         COMMON_PARAMS = {
             'id', 'name', 'timeframe', 'direction', 'active',
             'tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'
         }
         
-        # Parámetros internos que NO queremos mostrar
         EXCLUDE_PARAMS = {'active'}
         
         declared_ids = {s['id'] for s in self.strategies}
         strategies_list = []
         
-        # Procesar estrategias declaradas
         for strat in self.strategies:
             is_active = strat.get('active', True)
             status = 'ACTIVE' if is_active else 'DEPRECATING'
             symbols_count = len(self.symbols_by_strategy.get(strat['id'], []))
             
-            # ═══════════════════════════════════════════════════════════
-            # NUEVO: Extraer TODOS los parámetros dinámicamente
-            # ═══════════════════════════════════════════════════════════
             strategy_dict = {
                 'id': strat['id'],
                 'name': strat.get('name', strat['id']),
@@ -205,26 +257,21 @@ class DashboardServer:
                 'symbols_count': symbols_count
             }
             
-            # Añadir todos los demás parámetros del YAML (excepto los excluidos)
             for key, value in strat.items():
                 if key not in strategy_dict and key not in EXCLUDE_PARAMS:
                     strategy_dict[key] = value if value is not None else 'N/A'
             
-            # Asegurar que parámetros comunes existen (aunque no estén en YAML)
             for param in COMMON_PARAMS - EXCLUDE_PARAMS - {'id', 'name'}:
                 if param not in strategy_dict:
                     strategy_dict[param] = 'N/A'
-            # ═══════════════════════════════════════════════════════════
             
             strategies_list.append(strategy_dict)
         
-        # Procesar estrategias no declaradas (igual que antes)
-        # Procesar estrategias no declaradas
-        not_declared = self.implemented_strategies - declared_ids  # ← CORREGIDO
+        not_declared = self.implemented_strategies - declared_ids
         for id in sorted(not_declared):
             strategies_list.append({
-                'id': id,        # ← Usar id en vez de name
-                'name': id,      # ← Usar id en vez de name
+                'id': id,
+                'name': id,
                 'timeframe': 'N/A',
                 'direction': 'N/A',
                 'status': 'NOT IMPLE.',
@@ -235,7 +282,6 @@ class DashboardServer:
                 'sell_after_ncandles': 'N/A'
             })
         
-        # Ordenar y añadir números
         strategies_list.sort(key=lambda x: x['id'])
         for strat in strategies_list:
             strat['number'] = self._extract_number_from_id(strat['id'])
@@ -273,23 +319,19 @@ class DashboardServer:
                     new_lines = f.readlines()
                     self.app.last_log_position = f.tell()
                 
-                # Filter logs: remove ANSI codes and extract message
                 import re
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
                 
                 clean_lines = []
                 for line in new_lines:
-                    # Remove ANSI color codes
                     line = ansi_escape.sub('', line)
                     line = line.strip()
                     
                     if line:
                         if ' - ' in line:
-                            # Get only the message (last part after ' - ')
                             message = line.split(' - ')[-1]
                             clean_lines.append(message)
                         else:
-                            # If no ' - ' separator, keep the whole line
                             clean_lines.append(line)
                 
                 return jsonify({
@@ -405,7 +447,6 @@ class DashboardServer:
                             tp_price      = float(pos['tp'])
                             sl_price      = float(pos['sl'])
                             
-                            # Calcular PnL
                             if direction == 'long':
                                 pnl = (float(current_price) - entry_price) * size
                             else:
@@ -413,7 +454,6 @@ class DashboardServer:
                             
                             candles = state.get('strategy_candles', {}).get(strategy_id, 0)
                             
-                            # PRECISIÓN DINÁMICA
                             precision = self.get_precision_for_price(current_price)
                             
                             current_price_rounded = round(float(current_price), precision)
@@ -421,13 +461,10 @@ class DashboardServer:
                             sl_rounded = round(sl_price, precision)
                             entry_rounded = round(entry_price, precision)
                             
-                            # CALCULAR DISTANCIAS (Δ%)
                             if direction == 'long':
-                                # LONG: TP arriba, SL abajo
                                 distance_to_tp = ((tp_price - float(current_price)) / float(current_price)) * 100
                                 distance_to_sl = ((float(current_price) - sl_price) / float(current_price)) * 100
                             else:
-                                # SHORT: TP abajo, SL arriba
                                 distance_to_tp = ((float(current_price) - tp_price) / float(current_price)) * 100
                                 distance_to_sl = ((sl_price - float(current_price)) / float(current_price)) * 100
                             
@@ -462,7 +499,6 @@ class DashboardServer:
                 import os
                 import signal
                 
-                # ⭐ CORREGIDO: Buscar main.py en vez de BOT_orchestator_WS.py
                 result = subprocess.run(
                     ['pgrep', '-f', f'main.py --account {self.account_number}'],
                     capture_output=True,
@@ -473,7 +509,6 @@ class DashboardServer:
                 if result.returncode == 0 and result.stdout.strip():
                     pid = int(result.stdout.strip())
                     
-                    # Enviar SIGTERM (señal de terminación limpia)
                     os.kill(pid, signal.SIGTERM)
                     
                     logger.info(f"Stop signal sent to PID {pid}")
@@ -501,7 +536,6 @@ class DashboardServer:
             try:
                 import subprocess
                 
-                # ⭐ CORREGIDO: Buscar main.py en vez de BOT_orchestator_WS.py
                 result = subprocess.run(
                     ['pgrep', '-f', f'main.py --account {self.account_number}'],
                     capture_output=True,
@@ -594,10 +628,9 @@ class DashboardServer:
                 }
                 
                 try:
-                    #from market_data.websocket_manager import get_ws_manager
-                    ws = get_ws_manager()  # ← USAR la función que importaste
+                    ws = get_ws_manager()
                     
-                    if ws:  # ← Verificar que existe
+                    if ws:
                         ws_status['public_connected'] = (
                             ws.public_ws and 
                             ws.public_ws.sock and 
@@ -670,9 +703,17 @@ class DashboardServer:
                 from itertools import combinations
                 
                 metric = request.args.get('metric', 'profit_factor')
+                date_from = request.args.get('date_from', None)
+                date_to = request.args.get('date_to', None)
                 
                 df = self._load_trades_dataframe()
                 if df is None:
+                    return jsonify([])
+                
+                df = self._prepare_trades_dataframe(df)
+                df = self._filter_df_by_dates(df, date_from, date_to)
+                
+                if df.empty:
                     return jsonify([])
                 
                 strategies_list = self._get_full_strategies_list_with_numbers()
@@ -710,7 +751,12 @@ class DashboardServer:
                             include_profit_pct=True
                         )
                         
-                        # Extraer números directamente de los IDs
+                        # Calcular R² de la equity curve
+                        daily_profit = metrics.get('daily_profit')
+                        r_squared = 0.0
+                        if daily_profit is not None and not daily_profit.empty and 'equity_usd' in daily_profit.columns:
+                            r_squared = self._calculate_r_squared(daily_profit['equity_usd'].values)
+                        
                         combo_numbers = [self._extract_number_from_id(s) for s in combo]
                         combo_str = '+'.join(combo_numbers)
                         
@@ -723,14 +769,14 @@ class DashboardServer:
                             'weekly_win_pct': metrics['weekly_win_pct'],
                             'win_rate': metrics['win_rate'],
                             'max_dd': metrics['max_dd'],
-                            'ulcer_index': metrics['ulcer_index'],
+                            'r_squared': r_squared,
                             'sharpe_ratio': metrics['sharpe_ratio']
                         })
                 
                 if metric == 'max_dd':
                     results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
-                elif metric == 'ulcer_index':
-                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=False)
+                elif metric == 'r_squared':
+                    results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
                 else:
                     results_sorted = sorted(results, key=lambda x: x[metric], reverse=True)
                 
@@ -738,6 +784,65 @@ class DashboardServer:
                 
             except Exception as e:
                 print(f"Error-in compose: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/monthly-analysis')
+        def get_monthly_analysis():
+            """
+            Devuelve Profit % por mes para las estrategias seleccionadas.
+            """
+            try:
+                strategies_param = request.args.get('strategies', '')
+                selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
+                
+                if not selected_strategies:
+                    return jsonify({'error': 'No strategies selected'}), 400
+                
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify([])
+                
+                df = self._prepare_trades_dataframe(df)
+                df = df[df['STRATEGY'].isin(selected_strategies)]
+                
+                if df.empty:
+                    return jsonify([])
+                
+                # Calcular capital asignado
+                num_strategies_with_trades = len(df['STRATEGY'].unique())
+                capital_per_strat = self._calculate_capital_allocation(num_strategies_with_trades)
+                capital_assigned = capital_per_strat * len(selected_strategies)
+                
+                # Agrupar por mes
+                df['month'] = df['CLOSE_AT'].dt.to_period('M')
+                
+                results = []
+                
+                for month in sorted(df['month'].unique()):
+                    df_month = df[df['month'] == month]
+                    
+                    num_trades = len(df_month)
+                    total_profit = df_month['PROFIT'].sum()
+                    profit_pct = (total_profit / capital_assigned * 100) if capital_assigned > 0 else 0
+                    
+                    positive_trades = len(df_month[df_month['PROFIT'] > 0])
+                    win_rate = (positive_trades / num_trades * 100) if num_trades > 0 else 0
+                    
+                    results.append({
+                        'month': str(month),
+                        'month_name': month.strftime('%b %Y'),
+                        'num_trades': num_trades,
+                        'profit_usd': round(total_profit, 2),
+                        'profit_pct': round(profit_pct, 2),
+                        'win_rate': round(win_rate, 1)
+                    })
+                
+                return jsonify(results)
+                
+            except Exception as e:
+                print(f"Error in monthly analysis: {e}")
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
@@ -822,11 +927,17 @@ class DashboardServer:
                 
                 strategies_param = request.args.get('strategies', '')
                 selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
+                date_from = request.args.get('date_from', None)
+                date_to = request.args.get('date_to', None)
                 
                 if not selected_strategies:
                     return jsonify({'error': 'Error-No strategies selected'}), 400
                 
                 df = df[df['STRATEGY'].isin(selected_strategies)]
+                
+                # Preparar y filtrar por fechas
+                df = self._prepare_trades_dataframe(df)
+                df = self._filter_df_by_dates(df, date_from, date_to)
                 
                 if df.empty:
                     num_selected = len(selected_strategies)
@@ -843,12 +954,11 @@ class DashboardServer:
                         'weekly_win_pct': 0,
                         'win_rate': 0,
                         'max_dd': 0,
-                        'ulcer_index': 0,
+                        'r_squared': 0,
                         'sharpe_ratio': 0,
                         'message': 'No trades found for selected strategies'
                     })
                 
-                df = self._prepare_trades_dataframe(df)
                 df = df.sort_values('CLOSE_AT')
                 df['date_str'] = df['CLOSE_AT'].dt.strftime('%Y-%m-%d')
                 
@@ -865,6 +975,8 @@ class DashboardServer:
                 
                 daily_profit = metrics_data['daily_profit']
                 
+                r_squared = 0.0
+                
                 if not daily_profit.empty:
                     daily_profit['date_str'] = daily_profit['date'].astype(str)
                     
@@ -875,6 +987,9 @@ class DashboardServer:
                     
                     daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
                     daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
+                    
+                    # Calcular R²
+                    r_squared = self._calculate_r_squared(daily_profit['equity_usd'].values)
                     
                     dates = daily_profit['date_str'].tolist()
                     equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
@@ -897,7 +1012,7 @@ class DashboardServer:
                     'weekly_win_pct': metrics_data['weekly_win_pct'],
                     'win_rate': metrics_data['win_rate'],
                     'max_dd': metrics_data['max_dd'],
-                    'ulcer_index': metrics_data['ulcer_index'],
+                    'r_squared': r_squared,
                     'sharpe_ratio': metrics_data['sharpe_ratio']
                 })
                 
@@ -911,9 +1026,9 @@ class DashboardServer:
             return
         
         def run_server():
-            import logging  # ← Añadir este import
-            log = logging.getLogger('werkzeug')  # ← CORRECTO
-            log.setLevel(logging.ERROR)  # ← Cambiar logger.ERROR a logging.ERROR
+            import logging
+            log = logging.getLogger('werkzeug')
+            log.setLevel(logging.ERROR)
             
             try:
                 self.app.run(
@@ -948,7 +1063,6 @@ class DashboardServer:
 
 def create_dashboard_template(base_dir):
     """Crea el archivo HTML del dashboard si no existe en ruta común"""
-    # Templates should be in api/ directory
     api_dir = os.path.join(os.path.dirname(__file__))
     templates_dir = os.path.join(api_dir, 'templates')
     os.makedirs(templates_dir, exist_ok=True)

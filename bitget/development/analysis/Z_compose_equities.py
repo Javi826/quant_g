@@ -49,12 +49,23 @@ def average_recovery_time(df):
         return 0
     return np.mean(recovery_times)
 
-def ulcer_index(df):
-    """Calculate Ulcer Index (drawdown pain metric)"""
-    balance = df["balance"].values
-    peaks = np.maximum.accumulate(balance)
-    dd = (balance - peaks) / peaks * 100
-    return np.sqrt(np.mean(dd**2))
+def equity_r_squared(df):
+    """
+    R² de la equity curve vs línea recta.
+    Mide consistencia del crecimiento.
+    
+    R² = 1.0 → Línea recta perfecta (ideal)
+    R² = 0.9 → Muy consistente
+    R² = 0.7 → Algo de ruido
+    R² = 0.5 → Muy errático
+    """
+    y = df['balance'].values.reshape(-1, 1)
+    X = np.arange(len(y)).reshape(-1, 1)
+    
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    return model.score(X, y)
 
 # -------------------------------------------------
 # Function to compute metrics
@@ -74,7 +85,7 @@ def compute_metrics(equity_df, capital, name="Equity"):
     net_gain = total_return(df, capital)
     pf = profit_factor(df)
     rt = average_recovery_time(df) / 6
-    ui = ulcer_index(df)
+    r2 = equity_r_squared(df)
 
     return {
         "Curve": name,
@@ -83,7 +94,7 @@ def compute_metrics(equity_df, capital, name="Equity"):
         "Net_Gain_pct": round(net_gain, 2),
         "Profit_Factor": round(pf, 3) if pf != np.inf else np.inf,
         "Rec_Time": round(rt, 2),
-        "Ulcer_Index": round(ui, 3)
+        "R_Squared": round(r2, 3)
     }
 
 # -------------------------------------------------
@@ -338,15 +349,15 @@ print("\n📈 TOP 10 COMBINATIONS BY NET GAIN (Highest):\n")
 print(combo_netgain_display.to_string(index=False))
 
 # -------------------------------------------------
-# TOP 10 BY ULCER INDEX (Ascending - lower is better)
+# TOP 10 BY R² (Descending - higher is better)
 # -------------------------------------------------
-combo_ui = combo_df.sort_values("Ulcer_Index", ascending=True).head(10).copy()
-combo_ui_display = combo_ui.copy()
-max_len_ui = combo_ui_display['Curve'].str.len().max()
-combo_ui_display['Curve'] = combo_ui_display['Curve'].apply(lambda x: x.ljust(max_len_ui))
+combo_r2 = combo_df.sort_values("R_Squared", ascending=False).head(10).copy()
+combo_r2_display = combo_r2.copy()
+max_len_r2 = combo_r2_display['Curve'].str.len().max()
+combo_r2_display['Curve'] = combo_r2_display['Curve'].apply(lambda x: x.ljust(max_len_r2))
 
-print("\n🛡️  TOP 10 COMBINATIONS BY ULCER INDEX (Lowest):\n")
-print(combo_ui_display.to_string(index=False))
+print("\n📐 TOP 10 COMBINATIONS BY R² (Most Consistent):\n")
+print(combo_r2_display.to_string(index=False))
 
 # -------------------------------------------------
 # TOP 10 BY PROFIT FACTOR (Descending)
@@ -388,29 +399,29 @@ plot_netgain_dd(best_df_netgain, capital=best_capital,
                 title=f"Best Combination by Net Gain: {best_name_netgain}")
 
 # -------------------------------------------------
-# Best combination by Ulcer Index
+# Best combination by R²
 # -------------------------------------------------
-best_name_ui = combo_ui.iloc[0]["Curve"]
-best_combo_ui = best_name_ui.split("+")
+best_name_r2 = combo_r2.iloc[0]["Curve"]
+best_combo_r2 = best_name_r2.split("+")
 
-best_dfs_ui = [named_dfs[name] for name in best_combo_ui]
+best_dfs_r2 = [named_dfs[name] for name in best_combo_r2]
 
-start = min(df.index.min() for df in best_dfs_ui)
-end   = max(df.index.max() for df in best_dfs_ui)
+start = min(df.index.min() for df in best_dfs_r2)
+end   = max(df.index.max() for df in best_dfs_r2)
 common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 
 resampled = []
-for df in best_dfs_ui:
+for df in best_dfs_r2:
     df_r = df[['balance']].reindex(common_index)
     df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_ui = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-best_capital = INITIAL_CAPITAL * len(best_dfs_ui)
+best_df_r2 = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital = INITIAL_CAPITAL * len(best_dfs_r2)
 
-plot_netgain_dd(best_df_ui, capital=best_capital,
-                title=f"Best Combination by Ulcer Index: {best_name_ui}")
+plot_netgain_dd(best_df_r2, capital=best_capital,
+                title=f"Best Combination by R² (Consistency): {best_name_r2}")
 
 # -------------------------------------------------
 # Best combination by Profit Factor
@@ -465,12 +476,12 @@ import seaborn as sns
 plt.figure(figsize=(14, 12))
 sns.heatmap(
     correlation_matrix,
-    annot=True,           # Show correlation values
-    fmt='.2f',            # 2 decimals
-    cmap='RdYlGn_r',      # Red (high corr) → Yellow → Green (low corr)
-    center=0,             # Center colormap at 0
-    square=True,          # Square cells
-    linewidths=0.5,       # Grid lines
+    annot=True,
+    fmt='.2f',
+    cmap='RdYlGn_r',
+    center=0,
+    square=True,
+    linewidths=0.5,
     cbar_kws={"shrink": 0.8}
 )
 plt.title('Correlation Matrix Between Strategies', fontsize=16, pad=20)
@@ -505,6 +516,12 @@ print("   • <0.3  = Low correlation (good diversification)")
 print("   • Near 0 = Independent strategies (excellent diversification)")
 print("   • Negative = Strategies move opposite (also good for diversification)")
 
+print("\n📐 R² GUIDE:")
+print("   • R² = 1.0  → Perfect straight line (ideal)")
+print("   • R² > 0.9  → Very consistent growth")
+print("   • R² = 0.7-0.9 → Good consistency")
+print("   • R² < 0.7  → Erratic equity curve")
+
 print("\n" + "="*80)
-print("✅ CORRELATION ANALYSIS COMPLETED")
+print("✅ ANALYSIS COMPLETED")
 print("="*80 + "\n")

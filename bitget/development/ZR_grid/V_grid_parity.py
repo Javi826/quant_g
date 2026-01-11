@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
+import numpy as np
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
@@ -11,14 +12,15 @@ from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel,align_filter_to_symbol
 from signals.add_signals_parity import parity_long
 from signals.add_signals_parity import parity_short
+from signals.volatility_detection import detect_volatility 
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
-STRATEGY     = "parity_long_4H"
+STRATEGY     = "parity_long_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -41,25 +43,21 @@ MA_PERIOD_LIST       = [50]
 TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
-#LONG
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [15] 
-MA_PERIOD_LIST       = [25]
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [30] 
+MA_PERIOD_LIST       = [50]
 
 TP_PCT_LIST          = [2]
 SL_PCT_LIST          = [10]
 
-#SHORT
-# =============================================================================
-# LOOKBACK_LIST        = [100]
-# TOLERANCE_LIST       = [30] 
-# MA_PERIOD_LIST       = [50]
-# 
-# TP_PCT_LIST          = [3]
-# SL_PCT_LIST          = [9]
-# =============================================================================
-# -----------------------------------------------------------------------------
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+# VOLATILITY FILTER 
+USE_VOL_FILTER_LIST   = [True]  
+CHAOS_PERCENTILE_LIST = [99]
+ATR_PERIOD_LIST       = [14] 
+
+
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT',
+                  'USE_VOL_FILTER','CHAOS_PERCENTILE','ATR_PERIOD']  
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -80,9 +78,23 @@ def process_combo(comb):
     params = dict(zip(param_names, comb))
     ohlcv_arrays = {}
 
+    btc_arr = ohlcv_arr_minor.get('BTCUSDT')
+    
+    if btc_arr is None:
+        raise ValueError("BTCUSDT no in data.")
+    
+    if params['USE_VOL_FILTER']:
+        btc_vol_filter = detect_volatility(
+            btc_arr,
+            atr_period=params['ATR_PERIOD'],
+            chaos_percentile=params['CHAOS_PERCENTILE']
+        )
+    else:
+        btc_vol_filter = None
+
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
-
+    
         signals = parity_long(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
@@ -90,7 +102,14 @@ def process_combo(comb):
             ma_period=params['MA_PERIOD'],
             live_trading=False
         )
-
+        if params['USE_VOL_FILTER'] and btc_vol_filter is not None:
+            aligned_filter = align_filter_to_symbol(
+                symbol_timestamps=arr_minor['ts'],
+                btc_timestamps=btc_arr['ts'],
+                btc_filter=btc_vol_filter
+            )
+            signals = signals * aligned_filter
+            
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
 
     results = run_grid_backtest(
@@ -101,11 +120,11 @@ def process_combo(comb):
         order_amount=ORDER_AMOUNT
     )
     return comb, results
-
 # -----------------------------------------------------------------------------
 # PARALLELIZED BACKTESTING
 # -----------------------------------------------------------------------------
 all_combinations = list(product(*lists_for_grid))
+
 with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinations))) as progress:
     grid_results_list = Parallel(n_jobs=N_JOBS)(
         delayed(process_combo)(comb) for comb in all_combinations

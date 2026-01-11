@@ -389,17 +389,16 @@
         .log-line.error { color: #f85149; }
         .log-line.default { color: #8b949e; }
         
-        /* NUEVAS CLASES BRILLANTES */
         .log-line.tp-hit {
-            color: #10ff10;                              /* Verde brillante */
+            color: #10ff10;
             font-weight: 700;
-            text-shadow: 0 0 8px rgba(16, 255, 16, 0.6); /* Glow verde */
+            text-shadow: 0 0 8px rgba(16, 255, 16, 0.6);
         }
         
         .log-line.sl-hit {
-            color: #8B1538;                          /* Granate normal */
+            color: #8B1538;
             font-weight: 700;
-            text-shadow: none;                       /* Sin brillo */
+            text-shadow: none;
         }
         
         .logs-content::-webkit-scrollbar,
@@ -617,9 +616,9 @@
         }
         
         .delta-sl-close {
-            color: #ff10ff;                              /* ⭐ Magenta brillante */
+            color: #ff10ff;
             font-weight: 700;
-            text-shadow: 0 0 8px rgba(255, 16, 255, 0.6); /* ⭐ Glow magenta */
+            text-shadow: 0 0 8px rgba(255, 16, 255, 0.6);
         }
         
         .badge {
@@ -804,6 +803,61 @@
             background: #4a9eff;
             transform: translateY(-1px);
         }
+        
+        /* Date filter styles */
+        .date-filter-container {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #1c2128;
+            border-radius: 8px;
+            border: 1px solid #21262d;
+            flex-wrap: wrap;
+        }
+        
+        .date-filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .date-filter-group label {
+            color: #8b949e;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .date-filter-group input[type="date"] {
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #1c2128;
+            border: 1px solid #21262d;
+        }
+        
+        .date-filter-group input[type="date"]:focus {
+            outline: none;
+            border-color: #388bfd;
+        }
+        
+        .btn-clear-dates {
+            background: rgba(248, 81, 73, 0.15);
+            color: #ff7b72;
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-clear-dates:hover {
+            background: rgba(248, 81, 73, 0.25);
+        }
     </style>
 </head>
 <body>
@@ -942,12 +996,25 @@
                     <div class="tabs-container" style="margin-top: 20px;">
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('monthly')">Monthly</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                     </div>
                     
                     <div id="equity-subtab-curves" class="tab-content active">
-                        <button class="update-chart-btn" onclick="updateEquityChart()">🔄 Update Chart</button>
+                        <!-- Date Filter for Curves -->
+                        <div class="date-filter-container">
+                            <div class="date-filter-group">
+                                <label>From:</label>
+                                <input type="date" id="curves-date-from">
+                            </div>
+                            <div class="date-filter-group">
+                                <label>To:</label>
+                                <input type="date" id="curves-date-to">
+                            </div>
+                            <button class="btn-clear-dates" onclick="clearCurvesDates()">Clear</button>
+                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="updateEquityChart()">🔄 Update Chart</button>
+                        </div>
                         
                         <div class="strategy-checkboxes" id="strategy-checkboxes">
                             <div class="checkbox-item">
@@ -987,8 +1054,8 @@
                                     <span id="metric-max-dd" style="color: #f85149; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
-                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Ulcer:</span>
-                                    <span id="metric-ulcer-index" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
+                                    <span style="color: #8b949e; font-size: 17px; font-weight: 600;">R²:</span>
+                                    <span id="metric-r-squared" style="color: #c9d1d9; font-size: 23px; font-weight: 700; margin-left: 8px;">-</span>
                                 </div>
                                 <div>
                                     <span style="color: #8b949e; font-size: 17px; font-weight: 600;">Sharpe:</span>
@@ -1009,20 +1076,35 @@
                     <div id="equity-subtab-compose" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Combinations - TOP 10</h3>
                         
-                        <div style="margin-bottom: 20px; display: flex; gap: 20px; align-items: center;">
-                            <label style="color: #8b949e; font-size: 18px; font-weight: 600;">📊 Sort by:</label>
-                            <select id="compose-metric" style="padding: 10px 15px; font-size: 16px; border-radius: 6px; background: #1c2128; color: #c9d1d9; border: 1px solid #21262d;">
-                                <option value="num_trades">#trades</option>
-                                <option value="total_profit_pct">Profit_%</option>
-                                <option value="total_profit_usd">Profit_$</option>
-                                <option value="profit_factor">Profit Factor</option>
-                                <option value="weekly_win_pct">Weekly_%</option>
-                                <option value="win_rate">Win Rate</option>
-                                <option value="max_dd">Max DD (lowest)</option>
-                                <option value="ulcer_index">Ulcer (lowest)</option>
-                                <option value="sharpe_ratio">Sharpe</option>
-                            </select>
-                            <button class="update-chart-btn" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
+                        <!-- Date Filter for Compose -->
+                        <div class="date-filter-container">
+                            <div class="date-filter-group">
+                                <label>From:</label>
+                                <input type="date" id="compose-date-from">
+                            </div>
+                            <div class="date-filter-group">
+                                <label>To:</label>
+                                <input type="date" id="compose-date-to">
+                            </div>
+                            <button class="btn-clear-dates" onclick="clearComposeDates()">Clear</button>
+                        </div>
+                        
+                        <div class="date-filter-container" style="margin-top: 10px;">
+                            <div class="date-filter-group">
+                                <label>📊 Sort by:</label>
+                                <select id="compose-metric" style="padding: 8px 12px; font-size: 14px; border-radius: 6px; background: #0d1117; color: #c9d1d9; border: 1px solid #21262d;">
+                                    <option value="num_trades">#trades</option>
+                                    <option value="total_profit_pct">Profit_%</option>
+                                    <option value="total_profit_usd">Profit_$</option>
+                                    <option value="profit_factor">Profit Factor</option>
+                                    <option value="weekly_win_pct">Weekly_%</option>
+                                    <option value="win_rate">Win Rate</option>
+                                    <option value="max_dd">Max DD (lowest)</option>
+                                    <option value="r_squared">R² (highest)</option>
+                                    <option value="sharpe_ratio">Sharpe</option>
+                                </select>
+                            </div>
+                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
                         </div>
                         
                         <div id="compose-container">
@@ -1039,6 +1121,25 @@
                             </div>
                             <div style="height: 400px;">
                                 <canvas id="compose-drawdown-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="equity-subtab-monthly" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Monthly Performance</h3>
+                        
+                        <div class="strategy-checkboxes" id="monthly-strategy-checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="monthly-strat-all" value="ALL" checked>
+                                <label for="monthly-strat-all">ALL STRATEGIES</label>
+                            </div>
+                        </div>
+                        
+                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd; margin-bottom: 20px;" onclick="loadMonthlyAnalysis()">🔄 Update Monthly</button>
+                        
+                        <div id="monthly-container" style="margin-top: 20px;">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Select strategies and click "Update Monthly"
                             </div>
                         </div>
                     </div>
@@ -1177,7 +1278,8 @@ const COLORS = {
 
 const METRIC_THRESHOLDS = {
     profitFactor: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
-    sharpeRatio: { excellent: 2.0, good: 1.5, acceptable: 1.0 }
+    sharpeRatio: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
+    rSquared: { excellent: 0.9, good: 0.7, acceptable: 0.5 }
 };
 
 const CHART_DEFAULTS = {
@@ -1202,6 +1304,13 @@ function getMetricColor(value, withGlow = false) {
     }
 }
 
+function getRSquaredColor(value) {
+    if (value >= 0.9) return { color: COLORS.purple, shadow: '0 0 10px rgba(109, 40, 217, 0.8)' };
+    if (value >= 0.7) return { color: COLORS.green, shadow: 'none' };
+    if (value >= 0.5) return { color: COLORS.yellow, shadow: 'none' };
+    return { color: COLORS.red, shadow: 'none' };
+}
+
 function getPositiveNegativeColor(value) {
     return value >= 0 ? COLORS.green : COLORS.red;
 }
@@ -1211,19 +1320,12 @@ function applyMetricColor(element, value, type = 'profitFactor') {
         const { color, shadow } = getMetricColor(value, true);
         element.style.color = color;
         element.style.textShadow = shadow;
+    } else if (type === 'rSquared') {
+        const { color, shadow } = getRSquaredColor(value);
+        element.style.color = color;
+        element.style.textShadow = shadow;
     } else if (type === 'positiveNegative') {
         element.style.color = getPositiveNegativeColor(value);
-    }
-}
-
-function getMetricStyleClass(value, type = 'profitFactor') {
-    if (type === 'profitFactor' || type === 'sharpe') {
-        const { color, shadow } = getMetricColor(value, true);
-        return shadow !== 'none' 
-            ? `style="color: ${color}; text-shadow: ${shadow};"` 
-            : `style="color: ${color};"`;
-    } else if (type === 'positiveNegative') {
-        return `style="color: ${getPositiveNegativeColor(value)};"`;
     }
 }
 
@@ -1267,6 +1369,35 @@ function getBaseChartConfig(title, reverseY = false) {
     };
     if (reverseY) config.scales.y.reverse = true;
     return config;
+}
+
+// Date filter helper functions
+function clearCurvesDates() {
+    document.getElementById('curves-date-from').value = '';
+    document.getElementById('curves-date-to').value = '';
+}
+
+function clearComposeDates() {
+    document.getElementById('compose-date-from').value = '';
+    document.getElementById('compose-date-to').value = '';
+}
+
+function getCurvesDateParams() {
+    const dateFrom = document.getElementById('curves-date-from').value;
+    const dateTo = document.getElementById('curves-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+function getComposeDateParams() {
+    const dateFrom = document.getElementById('compose-date-from').value;
+    const dateTo = document.getElementById('compose-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
 }
 
 async function waitForBackend() {
@@ -1432,34 +1563,29 @@ function switchTab(tabName) {
 }
 
 function switchEquitySubTab(subTabName) {
-    document.querySelectorAll('#tab-equity .tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#tab-equity .tabs-container .tab-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
     document.querySelectorAll('#tab-equity .tab-content').forEach(content => content.classList.remove('active'));
     document.getElementById('equity-subtab-' + subTabName).classList.add('active');
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
     if (subTabName === 'weekday') loadWeekDayAnalysis();
+    if (subTabName === 'monthly') initMonthlyTab();
     if (subTabName === 'compose') {
-        // Solo mostrar mensaje inicial si la tabla está vacía
         const container = document.getElementById('compose-container');
         const currentContent = container.innerHTML.trim();
         
-        // Si está vacío O solo tiene mensaje placeholder, mostrar mensaje inicial
         if (currentContent === '' || currentContent.includes('Select a metric')) {
             container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
             document.getElementById('compose-plot-btn').style.display = 'none';
         }
-        // Si ya hay tabla con datos, NO hacer nada (mantener estado)
     }
 }
 
 function getLogClass(line) {
-    if (line.includes('TP for')) return 'tp-hit';      //  COLORES LOG
-    if (line.includes('SL for')) return 'sl-hit';      //  Granate brillante
-    if (
-        line.includes('SHORT') || 
-        line.includes('LONG')
-    ) return 'info';
+    if (line.includes('TP for')) return 'tp-hit';
+    if (line.includes('SL for')) return 'sl-hit';
+    if (line.includes('SHORT') || line.includes('LONG')) return 'info';
     if (line.includes('Error')) return 'error';
     if (line.includes('WAR')) return 'warning';
     return 'default';
@@ -1511,7 +1637,6 @@ function setPositionsView(view) {
     document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
     
-    // Restaurar título original si no es vista Symbols
     if (view !== 'symbols') {
         const headerSpan = document.querySelector('#tab-positions .content-section h2 span');
         if (headerSpan) {
@@ -1618,7 +1743,6 @@ function renderCompactView(container, positions) {
 }
 
 function renderDetailedView(container, positions) {
-    // Calcular deltaTp para todas las posiciones y ordenar (menor primero)
     const positionsWithDelta = positions.map(pos => {
         const currentPrice = parseFloat(pos.current_price || pos.entry_price);
         const tp = parseFloat(pos.tp);
@@ -1633,10 +1757,8 @@ function renderDetailedView(container, positions) {
         return { ...pos, _deltaTp: deltaTp };
     });
     
-    // Ordenar por deltaTp ascendente (menor = más cerca de TP)
     const sortedPositions = positionsWithDelta.sort((a, b) => a._deltaTp - b._deltaTp);
     
-    // ⭐ HEADERS MODIFICADOS - Eliminadas columnas Delta TP y Delta SL
     const html = '<table><thead><tr>' +
         '<th>Strategy</th>' +
         '<th>Symbol</th>' +
@@ -1644,8 +1766,8 @@ function renderDetailedView(container, positions) {
         '<th>Entry</th>' +
         '<th>Current</th>' +
         '<th>Size</th>' +
-        '<th>TP (Δ%)</th>' +          // ⭐ MODIFICADO
-        '<th>SL (Δ%)</th>' +          // ⭐ MODIFICADO
+        '<th>TP (Δ%)</th>' +
+        '<th>SL (Δ%)</th>' +
         '<th>PnL</th>' +
         '<th style="text-align: right;">Candles</th>' +
         '</tr></thead><tbody>' +
@@ -1653,21 +1775,18 @@ function renderDetailedView(container, positions) {
             const pnl = pos.current_pnl || 0;
             const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
             
-            // ⭐ Usar valores del backend (con precisión dinámica)
             const currentPrice = pos.current_price;
             const tp = pos.tp;
             const sl = pos.sl;
             const entryPrice = pos.entry_price;
             const precision = pos.precision || 2;
             
-            // ⭐ Usar deltas del backend
             const deltaTp = pos.distance_to_tp_pct || 0;
             const deltaSl = pos.distance_to_sl_pct || 0;
             
             const deltaTpClass = Math.abs(deltaTp) < 1 ? 'delta-tp-close' : 'delta-tp';
             const deltaSlClass = Math.abs(deltaSl) < 1 ? 'delta-sl-close' : 'delta-sl';
             
-            // ⭐ CELDAS MODIFICADAS - TP y SL fusionados con Delta
             return '<tr>' +
                 '<td>' + pos.strategy + '</td>' +
                 '<td>' + pos.symbol + '</td>' +
@@ -1686,10 +1805,8 @@ function renderDetailedView(container, positions) {
 }
 
 function renderSymbolsView(container, positions) {
-    // Agrupar posiciones por símbolo + side (LONG/SHORT)
     const groupedBySymbolSide = {};
     positions.forEach(pos => {
-        // Clave única: "BTCUSDT_LONG", "BTCUSDT_SHORT", etc.
         const key = pos.symbol + '_' + pos.direction.toUpperCase();
         
         if (!groupedBySymbolSide[key]) {
@@ -1704,21 +1821,17 @@ function renderSymbolsView(container, positions) {
         groupedBySymbolSide[key].totalSize += parseFloat(pos.size);
         groupedBySymbolSide[key].totalPnl += (pos.current_pnl || 0);
         
-        // Extraer número del ID de estrategia (02, 05, etc.)
         const strategyNumber = extractNumberFromId(pos.strategy);
         groupedBySymbolSide[key].strategies.add(strategyNumber);
     });
     
-    // Ordenar por símbolo + side (alfabético, luego LONG antes que SHORT)
     const sortedKeys = Object.keys(groupedBySymbolSide).sort((a, b) => {
         const dataA = groupedBySymbolSide[a];
         const dataB = groupedBySymbolSide[b];
         
-        // Primero ordenar por símbolo
         if (dataA.symbol !== dataB.symbol) {
             return dataA.symbol.localeCompare(dataB.symbol);
         }
-        // Si mismo símbolo, LONG antes que SHORT
         if (dataA.side === 'LONG' && dataB.side === 'SHORT') return -1;
         if (dataA.side === 'SHORT' && dataB.side === 'LONG') return 1;
         return 0;
@@ -1729,7 +1842,6 @@ function renderSymbolsView(container, positions) {
         return;
     }
     
-    // Contar LONGs y SHORTs
     let longCount = 0;
     let shortCount = 0;
     sortedKeys.forEach(key => {
@@ -1737,13 +1849,11 @@ function renderSymbolsView(container, positions) {
         else if (groupedBySymbolSide[key].side === 'SHORT') shortCount++;
     });
     
-    // Actualizar header con número de posiciones únicas
     const headerSpan = document.querySelector('#tab-positions .content-section h2 span');
     if (headerSpan) {
         headerSpan.textContent = 'Active Positions - 🪙 ' + sortedKeys.length + ' Unique Positions (' + longCount + ' LONG / ' + shortCount + ' SHORT)';
     }
     
-    // Generar HTML de tabla
     const html = '<table><thead><tr>' +
         '<th>#</th>' +
         '<th>Symbol</th>' +
@@ -1758,9 +1868,7 @@ function renderSymbolsView(container, positions) {
             const sideClass = data.side === 'LONG' ? 'direction-long' : 'direction-short';
             const num = String(index + 1).padStart(2, '0');
             
-            // Convertir Set a array, ordenar y formatear
             const stratNumbers = Array.from(data.strategies).sort((a, b) => {
-                // Ordenar numéricamente
                 const numA = parseInt(a) || 0;
                 const numB = parseInt(b) || 0;
                 return numA - numB;
@@ -1848,9 +1956,6 @@ async function loadBotConfig() {
         } else {
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
             
-            // ═══════════════════════════════════════════════════════════
-            // NUEVO: Recopilar TODOS los parámetros únicos
-            // ═══════════════════════════════════════════════════════════
             const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
             const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
@@ -1866,14 +1971,8 @@ async function loadBotConfig() {
             
             const extraParamKeysArray = Array.from(extraParamKeys).sort();
             
-            // ═══════════════════════════════════════════════════════════
-            // NUEVO: Generar THEAD dinámicamente
-            // ═══════════════════════════════════════════════════════════
             let dynamicHeaders = '';
             extraParamKeysArray.forEach(key => {
-                // ═══════════════════════════════════════════════════════════
-                // NUEVO: Solo primera palabra (antes del primer _)
-                // ═══════════════════════════════════════════════════════════
                 const firstWord = key.split('_')[0];
                 const displayName = firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
                 dynamicHeaders += '<th>' + displayName + '</th>';
@@ -1892,9 +1991,6 @@ async function loadBotConfig() {
                 dynamicHeaders +
                 '<th>Status</th>';
             
-            // ═══════════════════════════════════════════════════════════
-            // NUEVO: Generar TBODY dinámicamente
-            // ═══════════════════════════════════════════════════════════
             strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
                 let statusBadge = '';
                 if (strat.status === 'ACTIVE') {
@@ -1907,7 +2003,6 @@ async function loadBotConfig() {
                 
                 const num = String(index + 1).padStart(2, '0');
                 
-                // Columnas fijas
                 const fixedCols = 
                     '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
                     '<td>' + strat.id + '</td>' +
@@ -1915,7 +2010,6 @@ async function loadBotConfig() {
                     '<td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td>' +
                     '<td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td>';
                 
-                // Columnas comunes
                 let commonCols = '';
                 commonKeys.forEach(key => {
                     const value = strat[key] !== undefined ? strat[key] : 'N/A';
@@ -1923,7 +2017,6 @@ async function loadBotConfig() {
                     commonCols += '<td>' + display + '</td>';
                 });
                 
-                // Columnas dinámicas (mismo orden que headers)
                 let extraCols = '';
                 extraParamKeysArray.forEach(key => {
                     const value = strat[key];
@@ -1977,7 +2070,6 @@ async function loadEquityTab() {
             const label = document.createElement('label');
             label.htmlFor = 'strat-' + strat.id;
             
-            // Extraer nombre sin el prefijo numérico (NN_)
             const displayName = strat.id.replace(/^\d{2}_/, '');
             label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
             
@@ -1998,7 +2090,7 @@ async function loadEquityTab() {
         
         document.getElementById('strat-all').addEventListener('change', function() {
             const isChecked = this.checked;
-            document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]').forEach(cb => {
+            document.querySelectorAll('#strategy-checkboxes input[type="checkbox"]').forEach(cb => {
                 if (cb.id !== 'strat-all') cb.checked = isChecked;
             });
         });
@@ -2010,12 +2102,115 @@ async function loadEquityTab() {
     }
 }
 
+async function initMonthlyTab() {
+    try {
+        const res = await fetch('/api/bot-config');
+        const data = await res.json();
+        
+        allStrategiesList = data.strategies || [];
+        
+        const checkboxContainer = document.getElementById('monthly-strategy-checkboxes');
+        const allCheckbox = checkboxContainer.querySelector('#monthly-strat-all').parentElement;
+        
+        checkboxContainer.innerHTML = '';
+        checkboxContainer.appendChild(allCheckbox);
+        
+        allStrategiesList.forEach((strat) => {
+            const div = document.createElement('div');
+            div.className = 'checkbox-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'monthly-strat-' + strat.id;
+            checkbox.value = strat.id;
+            checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
+            
+            const label = document.createElement('label');
+            label.htmlFor = 'monthly-strat-' + strat.id;
+            
+            const displayName = strat.id.replace(/^\d{2}_/, '');
+            label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
+            
+            if (strat.status === 'ACTIVE') {
+                label.style.color = '#ffffff';
+                label.style.fontWeight = '600';
+            } else if (strat.status === 'DEPRECATING') {
+                label.style.color = '#d29922';
+            } else {
+                label.style.color = '#8b949e';
+                label.style.fontStyle = 'italic';
+            }
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            checkboxContainer.appendChild(div);
+        });
+        
+        document.getElementById('monthly-strat-all').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('#monthly-strategy-checkboxes input[type="checkbox"]').forEach(cb => {
+                if (cb.id !== 'monthly-strat-all') cb.checked = isChecked;
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error initializing monthly tab:', error);
+    }
+}
+
+async function loadMonthlyAnalysis() {
+    try {
+        const selectedStrategies = [];
+        document.querySelectorAll('#monthly-strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
+            if (cb.value !== 'ALL') {
+                selectedStrategies.push(cb.value);
+            }
+        });
+        
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+        
+        const res = await fetch('/api/monthly-analysis?strategies=' + selectedStrategies.join(','));
+        const data = await res.json();
+        const container = document.getElementById('monthly-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available for selected strategies</div>';
+            return;
+        }
+        
+        const html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 10px 0;">' +
+            data.map(row => {
+                const profitPctClass = row.profit_pct >= 0 ? '#3fb950' : '#f85149';
+                const profitUsdClass = row.profit_usd >= 0 ? '#3fb950' : '#f85149';
+                const prefixPct = row.profit_pct >= 0 ? '+' : '';
+                const prefixUsd = row.profit_usd >= 0 ? '+$' : '$';
+                
+                return '<div style="background: #1c2128; border: 1px solid #21262d; border-radius: 8px; padding: 15px 20px; min-width: 100px; text-align: center;">' +
+                    '<div style="color: ' + profitPctClass + '; font-size: 18px; font-weight: 700; margin-bottom: 4px;">' + prefixPct + row.profit_pct.toFixed(1) + '%</div>' +
+                    '<div style="color: ' + profitUsdClass + '; font-size: 14px; font-weight: 600; margin-bottom: 8px;">' + prefixUsd + row.profit_usd.toFixed(0) + '</div>' +
+                    '<div style="color: #58a6ff; font-size: 13px; font-weight: 600; text-transform: uppercase;">' + row.month_name + '</div>' +
+                    '</div>';
+            }).join('') +
+            '</div>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading monthly analysis:', error);
+        document.getElementById('monthly-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
 async function loadComposeAnalysis() {
     try {
         document.querySelectorAll('.compose-checkbox').forEach(cb => cb.checked = false);
         
         const metric = document.getElementById('compose-metric').value;
-        const res = await fetch('/api/compose-analysis?metric=' + metric);
+        const dateParams = getComposeDateParams();
+        const res = await fetch('/api/compose-analysis?metric=' + metric + dateParams);
         
         if (!res.ok) throw new Error('HTTP ' + res.status);
         
@@ -2034,12 +2229,18 @@ async function loadComposeAnalysis() {
             return value.toFixed(decimals) + suffix;
         }
         
-        function getMetricClass(value, metric_type) {
+        function getRSquaredStyle(value) {
+            if (!isFinite(value)) return '';
+            if (value >= 0.9) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
+            if (value >= 0.7) return 'style="color: #3fb950;"';
+            if (value >= 0.5) return 'style="color: #d29922;"';
+            return 'style="color: #f85149;"';
+        }
+        
+        function getMetricStyle(value, metric_type) {
             if (!isFinite(value)) return '';
             
-            if (metric_type === 'profit_pct' || metric_type === 'profit_usd') {
-                return value >= 0 ? 'direction-long' : 'direction-short';
-            } else if (metric_type === 'profit_factor' || metric_type === 'sharpe') {
+            if (metric_type === 'profit_factor' || metric_type === 'sharpe') {
                 if (value >= 2.0) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
                 if (value >= 1.5) return 'style="color: #3fb950;"';
                 if (value >= 1.0) return 'style="color: #d29922;"';
@@ -2056,7 +2257,7 @@ async function loadComposeAnalysis() {
             'weekly_win_pct': 'Weekly_%',
             'win_rate': 'Win Rate',
             'max_dd': 'Max DD',
-            'ulcer_index': 'Ulcer',
+            'r_squared': 'R²',
             'sharpe_ratio': 'Sharpe'
         };
         
@@ -2073,7 +2274,7 @@ async function loadComposeAnalysis() {
             '<th' + (highlightCol === 'Weekly_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly_%</th>' +
             '<th' + (highlightCol === 'Win Rate' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Win Rate</th>' +
             '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
-            '<th' + (highlightCol === 'Ulcer' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Ulcer</th>' +
+            '<th' + (highlightCol === 'R²' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>R²</th>' +
             '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
             '</tr></thead><tbody>' +
             data.map((row, idx) => {
@@ -2084,14 +2285,15 @@ async function loadComposeAnalysis() {
                 const weeklyWin = formatNumber(row.weekly_win_pct, 1, '%');
                 const winRate = formatNumber(row.win_rate, 1, '%');
                 const maxDD = formatNumber(row.max_dd, 2, '%');
-                const ulcerIndex = formatNumber(row.ulcer_index, 2);
+                const rSquared = formatNumber(row.r_squared, 3);
                 const sharpe = formatNumber(row.sharpe_ratio, 2);
                 
                 const profitPctClass = isFinite(row.total_profit_pct) ? (row.total_profit_pct >= 0 ? 'direction-long' : 'direction-short') : '';
                 const profitUSDClass = isFinite(row.total_profit_usd) ? (row.total_profit_usd >= 0 ? 'direction-long' : 'direction-short') : '';
                 
-                const pfStyle = getMetricClass(row.profit_factor, 'profit_factor');
-                const sharpeStyle = getMetricClass(row.sharpe_ratio, 'sharpe');
+                const pfStyle = getMetricStyle(row.profit_factor, 'profit_factor');
+                const sharpeStyle = getMetricStyle(row.sharpe_ratio, 'sharpe');
+                const r2Style = getRSquaredStyle(row.r_squared);
                 
                 const ntStyle = highlightCol === '#trades' ? 'font-weight: 900;' : '';
                 const tpStyle = highlightCol === 'Profit_%' ? 'font-weight: 900;' : '';
@@ -2100,7 +2302,7 @@ async function loadComposeAnalysis() {
                 const wwStyle = highlightCol === 'Weekly_%' ? 'font-weight: 900;' : '';
                 const wrStyle = highlightCol === 'Win Rate' ? 'font-weight: 900;' : '';
                 const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
-                const uiStyle = highlightCol === 'Ulcer' ? 'font-weight: 900;' : '';
+                const r2Highlight = highlightCol === 'R²' ? 'font-weight: 900;' : '';
                 const sharpeHighlight = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
                 
                 const prefixProfitPct = (isFinite(row.total_profit_pct) && row.total_profit_pct >= 0) ? '+' : '';
@@ -2117,7 +2319,7 @@ async function loadComposeAnalysis() {
                     '<td style="' + wwStyle + '">' + weeklyWin + '</td>' +
                     '<td style="' + wrStyle + '">' + winRate + '</td>' +
                     '<td style="color: #f85149; ' + ddStyle + '">' + maxDD + '</td>' +
-                    '<td style="' + uiStyle + '">' + ulcerIndex + '</td>' +
+                    '<td ' + r2Style + ' style="' + r2Highlight + '">' + rSquared + '</td>' +
                     '<td ' + sharpeStyle + ' style="' + sharpeHighlight + '">' + sharpe + '</td>' +
                     '</tr>';
             }).join('') +
@@ -2149,24 +2351,16 @@ function checkComposeLimit() {
 let composeEquityChart = null;
 let composeDrawdownChart = null;
 
-/**
- * Extrae el número prefijo del ID de estrategia.
- * Formato esperado: 'NN_nombre_estrategia' donde NN es un número de 2 dígitos.
- * @param {string} strategyId - ID de la estrategia
- * @returns {string} Número extraído o '??' si no se puede extraer
- */
 function extractNumberFromId(strategyId) {
     if (!strategyId || typeof strategyId !== 'string') {
         return '??';
     }
     
-    // Buscar patrón NN_ al inicio (2 dígitos seguidos de guión bajo)
     const match = strategyId.match(/^(\d{2})_/);
     if (match) {
         return match[1];
     }
     
-    // Fallback: buscar cualquier número al inicio
     const fallbackMatch = strategyId.match(/^(\d+)/);
     if (fallbackMatch) {
         return fallbackMatch[1].padStart(2, '0');
@@ -2175,18 +2369,11 @@ function extractNumberFromId(strategyId) {
     return '??';
 }
 
-/**
- * Busca el ID completo de una estrategia dado su número prefijo.
- * @param {string} number - Número de la estrategia (ej: '02')
- * @param {Array} strategiesList - Lista de estrategias
- * @returns {string|null} ID completo o null si no se encuentra
- */
 function findStrategyIdByNumber(number, strategiesList) {
     if (!strategiesList || strategiesList.length === 0) {
         return null;
     }
     
-    // Buscar estrategia que empiece con "NN_"
     const found = strategiesList.find(s => s.id && s.id.startsWith(number + '_'));
     return found ? found.id : null;
 }
@@ -2206,11 +2393,8 @@ async function loadComposeCharts() {
             return;
         }
         
-        console.log('Selected combinations:', selectedCombinations);
-               
-        // ═══════════════════════════════════════════════════════════
-        // NUEVA LÓGICA: Recolectar TODOS los datos primero
-        // ═══════════════════════════════════════════════════════════
+        const dateParams = getComposeDateParams();
+        
         const equityDatasets = [];
         const drawdownDatasets = [];
         let allDates = [];
@@ -2220,39 +2404,26 @@ async function loadComposeCharts() {
             const combination = selectedCombinations[i];
             const numbers = combination.split('+');
             
-            console.log('Combination:', combination);
-            console.log('Numbers:', numbers);
-            
             const strategies = numbers
                 .map(num => findStrategyIdByNumber(num, allStrategiesList))
                 .filter(id => id);
             
-            console.log('Converted to strategy IDs:', strategies);
-            
             if (strategies.length === 0) {
-                console.warn('No valid strategy IDs found for ' + combination);
                 continue;
             }
             
-            console.log('Fetching data for:', combination);
-            
-            const res = await fetch('/api/equity-data?strategies=' + strategies.join(','));
+            const res = await fetch('/api/equity-data?strategies=' + strategies.join(',') + dateParams);
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             
-            console.log('Data received for ' + combination + ':', data);
-            
             if (!data.dates || !data.equity_pct || !data.drawdown_pct) {
-                console.warn('Invalid data structure for ' + combination, data);
                 continue;
             }
             
             if (data.dates.length === 0) {
-                console.warn('No data points for ' + combination + ' - skipping');
                 continue;
             }
             
-            // Guardar datos para procesar después
             allCombinationsData.push({
                 combination: combination,
                 dates: data.dates,
@@ -2266,20 +2437,13 @@ async function loadComposeCharts() {
             return;
         }
         
-        // ═══════════════════════════════════════════════════════════
-        // ALINEAR FECHAS: Crear un eje X común con TODAS las fechas
-        // ═══════════════════════════════════════════════════════════
         const allUniqueDates = new Set();
         allCombinationsData.forEach(combo => {
             combo.dates.forEach(date => allUniqueDates.add(date));
         });
         
         allDates = Array.from(allUniqueDates).sort();
-        console.log('Common dates axis:', allDates.length, 'dates');
         
-        // ═══════════════════════════════════════════════════════════
-        // INTERPOLAR DATOS: Alinear cada dataset a las fechas comunes
-        // ═══════════════════════════════════════════════════════════
         const colors = {
             equity: ['#3fb950', '#58a6ff', '#22d3ee'],
             equityAlpha: ['rgba(63, 185, 80, 0.1)', 'rgba(88, 166, 255, 0.1)', 'rgba(34, 211, 238, 0.1)'],
@@ -2288,7 +2452,6 @@ async function loadComposeCharts() {
         };
         
         allCombinationsData.forEach((combo, colorIndex) => {
-            // Crear mapa de fecha → valor para interpolación rápida
             const equityMap = {};
             const drawdownMap = {};
             
@@ -2297,7 +2460,6 @@ async function loadComposeCharts() {
                 drawdownMap[date] = combo.drawdown_pct[idx];
             });
             
-            // Interpolar a fechas comunes (forward-fill)
             const alignedEquity = [];
             const alignedDrawdown = [];
             let lastEquity = 0;
@@ -2334,15 +2496,9 @@ async function loadComposeCharts() {
                 fill: true
             });
         });
-        
-        console.log('Equity datasets:', equityDatasets);
-        console.log('Drawdown datasets:', drawdownDatasets);
-        console.log('All dates:', allDates);
 
-        
-        // Validate that we have at least one valid combination
         if (equityDatasets.length === 0) {
-            alert('⚠️ No valid data found for selected combinations.\n\nThis can happen if:\n- Strategies have no closed trades\n- Strategy names don\'t match Excel data\n\nCheck browser console (F12) for details.');
+            alert('⚠️ No valid data found for selected combinations.');
             return;
         }
         
@@ -2351,7 +2507,6 @@ async function loadComposeCharts() {
             return;
         }
         
-        // Destroy old charts if they exist
         if (composeEquityChart) {
             composeEquityChart.destroy();
             composeEquityChart = null;
@@ -2361,15 +2516,8 @@ async function loadComposeCharts() {
             composeDrawdownChart = null;
         }
         
-        // Create equity chart
         const equityCanvas = document.getElementById('compose-equity-chart');
-        if (!equityCanvas) {
-            throw new Error('Equity canvas not found');
-        }
         const equityCtx = equityCanvas.getContext('2d');
-        if (!equityCtx) {
-            throw new Error('Cannot get equity canvas context');
-        }
         composeEquityChart = new Chart(equityCtx, {
             type: 'line',
             data: {
@@ -2409,17 +2557,8 @@ async function loadComposeCharts() {
             }
         });
         
-        console.log('Equity chart created:', composeEquityChart);
-        
-        // Create drawdown chart
         const drawdownCanvas = document.getElementById('compose-drawdown-chart');
-        if (!drawdownCanvas) {
-            throw new Error('Drawdown canvas not found');
-        }
         const drawdownCtx = drawdownCanvas.getContext('2d');
-        if (!drawdownCtx) {
-            throw new Error('Cannot get drawdown canvas context');
-        }
         composeDrawdownChart = new Chart(drawdownCtx, {
             type: 'line',
             data: {
@@ -2460,12 +2599,9 @@ async function loadComposeCharts() {
             }
         });
         
-        console.log('Drawdown chart created:', composeDrawdownChart);
-        
     } catch (error) {
         console.error('Error loading compose charts:', error);
-        console.error('Error stack:', error.stack);
-        alert('❌ Error loading charts:\n\n' + error.message + '\n\nCheck browser console (F12) for details');
+        alert('❌ Error loading charts:\n\n' + error.message);
     }
 }
 
@@ -2524,7 +2660,7 @@ async function loadWeekDayAnalysis() {
 async function updateEquityChart() {
     try {
         const selectedStrategies = [];
-        document.querySelectorAll('.strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
+        document.querySelectorAll('#strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
             if (cb.value !== 'ALL') {
                 selectedStrategies.push(cb.value);
             }
@@ -2535,7 +2671,8 @@ async function updateEquityChart() {
             return;
         }
         
-        const res = await fetch('/api/equity-data?strategies=' + selectedStrategies.join(','));
+        const dateParams = getCurvesDateParams();
+        const res = await fetch('/api/equity-data?strategies=' + selectedStrategies.join(',') + dateParams);
         const data = await res.json();
         
         if (!data.dates || data.dates.length === 0) {
@@ -2555,7 +2692,7 @@ async function updateEquityChart() {
         document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
         document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
         document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
-        document.getElementById('metric-ulcer-index').textContent = data.ulcer_index || 0;
+        document.getElementById('metric-r-squared').textContent = data.r_squared || 0;
         document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
         
         const pctElement = document.getElementById('metric-profit-pct');
@@ -2566,6 +2703,9 @@ async function updateEquityChart() {
         
         const pfElement = document.getElementById('metric-profit-factor');
         applyMetricColor(pfElement, data.profit_factor, 'profitFactor');
+        
+        const r2Element = document.getElementById('metric-r-squared');
+        applyMetricColor(r2Element, data.r_squared, 'rSquared');
         
         const sharpeElement = document.getElementById('metric-sharpe');
         applyMetricColor(sharpeElement, data.sharpe_ratio, 'sharpe');
@@ -2712,15 +2852,14 @@ function clearLogs() {
     }
 }
 
-// Configuración de intervalos de polling adaptativo
 const POLLING_CONFIG = {
     data: {
-        active: 5000,      // 5 segundos cuando pestaña visible
-        inactive: 90000    // 15 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
+        active: 5000,
+        inactive: 90000
     },
     logs: {
-        active: 2000,      // 2 segundos cuando pestaña visible
-        inactive: 90000     // 5 segundos cuando pestaña oculta (no se usa actualmente, solo se para)
+        active: 2000,
+        inactive: 90000
     }
 };
 
@@ -2735,20 +2874,16 @@ function updateClock() {
 }
 
 function startPolling() {
-    // Detener polling previo si existe (para evitar duplicados al cambiar de pestaña)
     stopPolling();
     
-    // Carga inmediata de datos
     loadData();
     loadLogs();
     updateClock();
     
-    // Determinar intervalos según visibilidad de la pestaña
     const isActive = !document.hidden;
     const dataDelay = isActive ? POLLING_CONFIG.data.active : POLLING_CONFIG.data.inactive;
     const logsDelay = isActive ? POLLING_CONFIG.logs.active : POLLING_CONFIG.logs.inactive;
     
-    // Iniciar polling con intervalos apropiados
     dataInterval = setInterval(() => loadData().catch(console.error), dataDelay);
     logsInterval = setInterval(() => loadLogs().catch(console.error), logsDelay);
     setInterval(updateClock, 1000);
@@ -2764,8 +2899,7 @@ document.addEventListener('visibilitychange', () => {
     else startPolling();
 });
 
-// Forzar vista Compact al inicio (comentar línea siguiente para recordar última vista)
-const savedView = 'compact';  // localStorage.getItem('positionsView') || 'compact';
+const savedView = 'compact';
 currentPositionsView = savedView;
 
 async function initializeDashboard() {

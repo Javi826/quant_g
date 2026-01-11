@@ -3,6 +3,7 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
+
 def tf_to_pandas_freq(tf):
     tf = tf.lower().replace("utc", "")
     return tf.upper()
@@ -33,8 +34,9 @@ def prepare_ohlcv_arrays(ohlcv_data):
             'close': df['close'].to_numpy(dtype=np.float64),
             'volume_quote': df['volume_quote'].to_numpy(dtype=np.float64),
             'low_time': (pd.to_datetime(df['low_time']).to_numpy(dtype='datetime64[ns]')),
-            'high_time': (pd.to_datetime(df['high_time']).to_numpy(dtype='datetime64[ns]'))
+            'high_time': (pd.to_datetime(df['high_time']).to_numpy(dtype='datetime64[ns]'))          
         }
+        
     return ohlcv_arr
 
 
@@ -55,6 +57,44 @@ def extract_ohlcv_from_path(paths_per_symbol, path_idx, ts_index=None, dtype=np.
             'low_time': np.array(arr[:, 4], dtype='datetime64[ns]'),
             'high_time': np.array(arr[:, 5], dtype='datetime64[ns]'),
         }
+
+    return ohlcv_arrays
+
+def extract_ohlcv_from_path_v(paths_per_symbol, path_idx, ts_index=None, dtype=np.float32, raw_columns=[]):
+    """
+    Extrae OHLCV de un path específico.
+    
+    Parameters:
+    -----------
+    raw_columns : list
+        Lista de nombres de columnas raw adicionales (ej: ['btc_open', 'btc_high', 'btc_low', 'btc_close'])
+        Se extraen en orden desde el índice 7 en adelante.
+    """
+    ohlcv_arrays = {}
+
+    for sym, arr_paths in paths_per_symbol.items():
+        if path_idx >= arr_paths.shape[0]:
+            continue
+
+        arr = arr_paths[path_idx]  # (n_obs, n_features)
+        
+        result = {
+            'ts': ts_index if ts_index is not None else np.arange(arr.shape[0]),
+            'open': arr[:, 0].astype(dtype),
+            'low':  arr[:, 1].astype(dtype),
+            'high': arr[:, 2].astype(dtype),
+            'close': arr[:, 3].astype(dtype),
+            'low_time': np.array(arr[:, 4], dtype='datetime64[ns]'),
+            'high_time': np.array(arr[:, 5], dtype='datetime64[ns]'),
+        }
+        
+        # Extraer raw_columns (btc_open, btc_high, etc.) desde índice 7+
+        for i, col_name in enumerate(raw_columns):
+            col_idx = 7 + i  # Índices 7, 8, 9, 10...
+            if col_idx < arr.shape[1]:
+                result[col_name] = arr[:, col_idx].astype(dtype)
+        
+        ohlcv_arrays[sym] = result
 
     return ohlcv_arrays
 

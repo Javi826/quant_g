@@ -27,38 +27,47 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
     df_portfolio = df.sort_values(by="Net_Gain", ascending=False).reset_index(drop=True)
    
     # -----------------------------
-    # Mutual Information + Pearson correlation
+    # Mutual Information + Pearson correlation - COMENTADO
     # -----------------------------
-    if df_portfolio.empty or df_portfolio.shape[0] < 5:
-        mi_series = pd.Series([None]*len(parameters), index=parameters)
-        pearson_series = pd.Series([None]*len(parameters), index=parameters)
-    else:
-        y = df_portfolio["Net_Gain"].values
-        X = df_portfolio[parameters].copy()
-        discrete_flags = [X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer) for col in X.columns]
+    # if df_portfolio.empty or df_portfolio.shape[0] < 5:
+    #     mi_series = pd.Series([None]*len(parameters), index=parameters)
+    #     pearson_series = pd.Series([None]*len(parameters), index=parameters)
+    # else:
+    #     y = df_portfolio["Net_Gain"].values
+    #     X = df_portfolio[parameters].copy()
+    #     discrete_flags = [X[col].dtype == bool or np.issubdtype(X[col].dtype, np.integer) for col in X.columns]
 
-        X_mi = X.copy()
-        for col in X_mi.columns:
-            if X_mi[col].dtype == bool:
-                X_mi[col] = X_mi[col].astype(int)
+    #     X_mi = X.copy()
+    #     for col in X_mi.columns:
+    #         if X_mi[col].dtype == bool:
+    #             X_mi[col] = X_mi[col].astype(int)
 
-        mi_values = mutual_info_regression(X_mi, y, discrete_features=discrete_flags, random_state=42)
-        mi_series = pd.Series(mi_values, index=parameters)
+    #     mi_values = mutual_info_regression(X_mi, y, discrete_features=discrete_flags, random_state=42)
+    #     mi_series = pd.Series(mi_values, index=parameters)
 
-        pearson_values = []
-        for col in X.columns:
-            x_col = X[col].astype(int) if X[col].dtype == bool else X[col]
-            if x_col.nunique() > 1:
-                corr, _ = pearsonr(x_col, y)
-            else:
-                corr = np.nan
-            pearson_values.append(corr)
-        pearson_series = pd.Series(pearson_values, index=parameters)
+    #     pearson_values = []
+    #     for col in X.columns:
+    #         x_col = X[col].astype(int) if X[col].dtype == bool else X[col]
+    #         if x_col.nunique() > 1:
+    #             corr, _ = pearsonr(x_col, y)
+    #         else:
+    #             corr = np.nan
+    #         pearson_values.append(corr)
+    #     pearson_series = pd.Series(pearson_values, index=parameters)
 
+    # analysis_df = pd.DataFrame({
+    #     'Mutual_Information': mi_series,
+    #     'Pearson_Correlation': pearson_series
+    # }).sort_values(by='Mutual_Information', ascending=False)
+   
+    # ===== REEMPLAZO TEMPORAL: Series vacías =====
+    mi_series = pd.Series([None]*len(parameters), index=parameters)
+    pearson_series = pd.Series([None]*len(parameters), index=parameters)
     analysis_df = pd.DataFrame({
         'Mutual_Information': mi_series,
         'Pearson_Correlation': pearson_series
-    }).sort_values(by='Mutual_Information', ascending=False)
+    })
+    # ==============================================
    
     # Incluir duration_m en las métricas mostradas (duration en minutos)
     metric_columns = ['Net_Gain_pct', 'Win_Ratio', 'Sharpe', 'DD_pct', 'Num_Signals', 'duration_m']
@@ -275,18 +284,68 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
 
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):
-
+    import ast
+    
     # -----------------------------
     # RESUMEN POR COMBINACIÓN
     # -----------------------------
     summary_results = []
-    combos_present  = df_portfolio[param_names].drop_duplicates().to_dict(orient='records')
+    
+    # ===== CONVERTIR LISTAS A STRINGS PARA drop_duplicates() =====
+    df_temp = df_portfolio.copy()
+    list_columns = []
+    
+    for col in param_names:
+        # Detectar si la columna contiene listas
+        if df_temp[col].apply(lambda x: isinstance(x, list)).any():
+            list_columns.append(col)
+            # Convertir listas a strings
+            df_temp[col] = df_temp[col].apply(lambda x: str(x) if isinstance(x, list) else x)
+    
+    # Ahora drop_duplicates funciona (todo son strings o valores normales)
+    combos_present = df_temp[param_names].drop_duplicates().to_dict(orient='records')
+    # ==============================================================
 
     for comb in combos_present:
+        # ===== CREAR FILTRO CORRECTO PARA LISTAS =====
         filt = np.ones(len(df_portfolio), dtype=bool)
+        
         for k, v in comb.items():
-            filt &= (df_portfolio[k] == v)
+            col_values = df_portfolio[k]
+            
+            # Si es una columna con listas (estaba en list_columns)
+            if k in list_columns:
+                # Normalizar v a lista o None
+                if v is None or pd.isna(v):
+                    v_normalized = None
+                elif isinstance(v, list):
+                    v_normalized = v
+                elif isinstance(v, str):
+                    if v in ["None", "nan", "NaN"]:
+                        v_normalized = None
+                    else:
+                        try:
+                            v_normalized = ast.literal_eval(v)
+                        except:
+                            v_normalized = None
+                else:
+                    v_normalized = None
+                
+                # Comparar
+                if v_normalized is None:
+                    filt &= col_values.isna() | (col_values == None)
+                else:
+                    filt &= col_values.apply(lambda x: x == v_normalized if isinstance(x, list) else False)
+            else:
+                # Comparación normal (números, strings, etc.)
+                filt &= (col_values == v)
+        # ==============================================
+        
         subset = df_portfolio[filt]
+
+        # Skip si no hay datos para esta combinación
+        if subset.empty:
+            continue
 
         port_balances  = subset['Portfolio_Final_Balance'].dropna()
         port_dd        = subset['DD'].dropna() if 'DD' in subset.columns else pd.Series(dtype=float)
