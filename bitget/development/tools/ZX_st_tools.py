@@ -185,7 +185,7 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True
         return
     
     # Forzar que el archivo se guarde dentro de la carpeta "brief_trades"
-    folder = "brief_trades"
+    folder = "../brief_trades"
     os.makedirs(folder, exist_ok=True)
     
     # Extraer solo el nombre del archivo (sin carpetas que pueda tener filename)
