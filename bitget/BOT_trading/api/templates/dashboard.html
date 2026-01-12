@@ -965,6 +965,21 @@
             <div id="tab-analysis" class="tab-content">
                 <div class="content-section">
                     <h2>Strategy Analysis</h2>
+                    
+                    <!-- Date Filter for Strategy Analysis -->
+                    <div class="date-filter-container">
+                        <div class="date-filter-group">
+                            <label>From:</label>
+                            <input type="date" id="analysis-date-from">
+                        </div>
+                        <div class="date-filter-group">
+                            <label>To:</label>
+                            <input type="date" id="analysis-date-to">
+                        </div>
+                        <button class="btn-clear-dates" onclick="clearAnalysisDates()">Clear</button>
+                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadStrategyAnalysis()">🔄 Update</button>
+                    </div>
+                    
                     <div id="analysis-container">Loading...</div>
                 </div>
             </div>
@@ -1374,6 +1389,20 @@ function getBaseChartConfig(title, reverseY = false) {
     };
     if (reverseY) config.scales.y.reverse = true;
     return config;
+}
+
+function clearAnalysisDates() {
+    document.getElementById('analysis-date-from').value = '';
+    document.getElementById('analysis-date-to').value = '';
+}
+
+function getAnalysisDateParams() {
+    const dateFrom = document.getElementById('analysis-date-from').value;
+    const dateTo = document.getElementById('analysis-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
 }
 
 // Date filter helper functions
@@ -1896,7 +1925,8 @@ function renderSymbolsView(container, positions) {
 
 async function loadStrategyAnalysis() {
     try {
-        const res = await fetch('/api/strategy-analysis');
+        const dateParams = getAnalysisDateParams();
+        const res = await fetch('/api/strategy-analysis?' + dateParams);
         const data = await res.json();
         const container = document.getElementById('analysis-container');
         

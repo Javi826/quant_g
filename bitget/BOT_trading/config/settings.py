@@ -201,20 +201,41 @@ LOG_BACKUP_COUNT = 5
 LOG_NAMESPACE = "BOT_trading"
 
 # ==========================================================================
-# RISK MANAGEMENT (Future)
+# MARKET REGIME SETTINGS
 # ==========================================================================
+# Add this section to the end of config/settings.py
 
-# Maximum open positions per strategy
-MAX_POSITIONS_PER_STRATEGY = 5
+# Enable/disable regime-based position sizing
+REGIME_SIZING_ENABLED = False  # Switch principal (False por defecto hasta validar)
 
-# Maximum total open positions
-MAX_TOTAL_POSITIONS = 20
+# BTC settings for regime calculation
+BTC_SYMBOL = 'BTCUSDT'
+REGIME_LOOKBACK_BARS = 200
 
-# Maximum daily loss (% of capital)
-MAX_DAILY_LOSS_PCT = 5.0
+# Metric calculation windows
+REGIME_HURST_WINDOW = 100
+REGIME_ER_WINDOW = 14
+REGIME_ATR_WINDOW = 14
+REGIME_PE_WINDOW = 50
+REGIME_PE_ORDER = 3
 
-# Circuit breaker - pause trading if hit
-ENABLE_CIRCUIT_BREAKER = False
+# Family classification thresholds
+# Order matters: first match wins. 'ranging' is default (empty rules).
+REGIME_FAMILIES = {
+    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
+    'ranging': {}  # Default catch-all
+}
+
+# Position sizing multipliers per family
+REGIME_FAMILY_SIZING = {
+    'trending': 1.5,   # 50% larger positions in trending markets
+    'volatile': 0.5,   # 50% smaller positions in volatile markets
+    'ranging': 1.0,    # Normal size in ranging markets
+}
+
+# Logging
+LOG_REGIME_DECISIONS = True  # Log every regime classification
 
 # ==========================================================================
 # HELPER FUNCTIONS

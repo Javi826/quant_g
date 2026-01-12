@@ -567,11 +567,18 @@ class DashboardServer:
         @self.app.route('/api/strategy-analysis')
         def get_strategy_analysis():
             try:
+                date_from = request.args.get('date_from', None)
+                date_to = request.args.get('date_to', None)
+                
                 df = self._load_trades_dataframe()
                 if df is None:
                     return jsonify([])
                 
                 df = self._prepare_trades_dataframe(df)
+                df = self._filter_df_by_dates(df, date_from, date_to)
+                
+                if df.empty:
+                    return jsonify([])
                 
                 results = []
                 

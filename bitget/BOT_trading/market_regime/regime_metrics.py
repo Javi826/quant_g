@@ -215,4 +215,3 @@ def calc_all_metrics(
         'atr_pct': calc_atr_pct(high, low, close, atr_window),
         'permutation_entropy': calc_permutation_entropy(close, pe_window, pe_order)
     }
-
