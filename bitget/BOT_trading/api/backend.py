@@ -810,10 +810,11 @@ class DashboardServer:
                 if df.empty:
                     return jsonify([])
                 
-                # Calcular capital asignado
-                num_strategies_with_trades = len(df['STRATEGY'].unique())
+                # Calcular capital asignado - usar solo estrategias CON trades (igual que header)
+                strategies_with_trades = df['STRATEGY'].unique()
+                num_strategies_with_trades = len(strategies_with_trades)
                 capital_per_strat = self._calculate_capital_allocation(num_strategies_with_trades)
-                capital_assigned = capital_per_strat * len(selected_strategies)
+                capital_assigned = capital_per_strat * num_strategies_with_trades
                 
                 # Agrupar por mes
                 df['month'] = df['CLOSE_AT'].dt.to_period('M')

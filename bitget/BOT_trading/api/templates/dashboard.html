@@ -833,14 +833,19 @@
             padding: 8px 12px;
             font-size: 14px;
             border-radius: 6px;
-            background: #ffffff;
-            color: #1c2128;
+            background: #0d1117;
+            color: #ffffff;
             border: 1px solid #21262d;
         }
         
         .date-filter-group input[type="date"]:focus {
             outline: none;
             border-color: #388bfd;
+        }
+        
+        .date-filter-group input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
         }
         
         .btn-clear-dates {
@@ -939,7 +944,7 @@
                 <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
                 <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
                 <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
-                <button class="tab-btn" onclick="switchTab('config')">Config & Connections</button>
+                <button class="tab-btn" onclick="switchTab('config')">Config</button>
                 <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
             </div>
             
@@ -2078,7 +2083,7 @@ async function loadEquityTab() {
                 label.style.fontWeight = '600';
             } else if (strat.status === 'DEPRECATING') {
                 label.style.color = '#d29922';
-            } else if (strat.status === 'NOT IMPLEMENTED') {
+            } else {
                 label.style.color = '#8b949e';
                 label.style.fontStyle = 'italic';
             }

@@ -17,16 +17,16 @@ from signals.add_signals_parity import parity_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "parity_long_4H"
+MY_SYMBOLS   = True
+STRATEGY     = "parity_short_4H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -42,12 +42,12 @@ TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
 #LONG
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [15] 
-MA_PERIOD_LIST       = [25]
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [30] 
+MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [9]
 
 #SHORT
 # =============================================================================
@@ -83,7 +83,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = parity_long(
+        signals = parity_short(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
