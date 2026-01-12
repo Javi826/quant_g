@@ -31,8 +31,11 @@ from market_regime.strategy_profiler import StrategyProfiler
 # CONFIGURATION - EDIT HERE
 # =============================================================================
 MODE = 'batch'                  # 'single' or 'batch'
-GENERATOR = 'parity'            # For batch: processes all {GENERATOR}_*
-STRATEGY = 'parity_long_4H_OOS'  # For single: specific strategy
+GENERATOR = 'reversal'            # For batch: processes all {GENERATOR}_*
+STRATEGY = 'parity_long_4H_IS'  # For single: specific strategy
+
+# Metric source
+USE_OWN_SYMBOL = True           # True = use each trade's own symbol, False = use BTC as proxy
 
 # Base directory (project root)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,7 +46,7 @@ OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output')
 
 # OHLC folders - set both for auto-detection, or just OHLC_FOLDER for manual
 OHLC_FOLDER_IS = os.path.join(BASE_DIR, 'data', 'crypto_2022_IS')
-OHLC_FOLDER_OOS = os.path.join(BASE_DIR, 'data', 'crypto_OOS_2')
+OHLC_FOLDER_OOS = os.path.join(BASE_DIR, 'data', 'crypto_OOS')
 OHLC_FOLDER = None  # If set, overrides auto-detection and uses this for all
 
 # =============================================================================
@@ -108,6 +111,7 @@ def full_analysis(
         print(f"\n📂 Trades: {trades_path}")
         print(f"📂 OHLC: {ohlc_folder}")
         print(f"⏱️  Timeframe: {timeframe}")
+        print(f"📊 Metric Source: {'OWN SYMBOL' if USE_OWN_SYMBOL else 'BTCUSDT (proxy)'}")
     
     # Step 1: Analyze trades
     if verbose:
@@ -118,7 +122,8 @@ def full_analysis(
     analyzer = TradeAnalyzer(
         trades_path=trades_path,
         ohlc_folder=ohlc_folder,
-        timeframe=timeframe
+        timeframe=timeframe,
+        use_own_symbol=USE_OWN_SYMBOL
     )
     
     df_enriched = analyzer.analyze(verbose=verbose)

@@ -1,341 +1,228 @@
 """
-market_regime/regime_metrics.py
+market_regime/regime_metrics.py - LIBRARY-ONLY VERSION
 
-Funciones puras para calcular métricas de régimen de mercado.
-Cada función recibe arrays numpy y devuelve un valor float.
+Calculates market regime metrics using ONLY proven libraries.
+NO fallback implementations - if library is missing, raises ImportError.
 
-Métricas:
-- Hurst Exponent: persistencia de tendencia
-- Efficiency Ratio: direccionalidad vs ruido
-- ATR%: volatilidad normalizada
-- Permutation Entropy: complejidad/aleatoriedad
+REQUIRED Dependencies:
+    pip install nolds ta neurokit2 pandas
+
+Metrics:
+- Hurst Exponent: trend persistence (>0.5 = trending, <0.5 = mean-reverting)
+- Efficiency Ratio: directional movement quality (1 = perfect trend, 0 = choppy)
+- ATR %: volatility as percentage of price
+- Permutation Entropy: price predictability (0 = deterministic, 1 = random)
 """
 
 import numpy as np
-from typing import Union
+import pandas as pd
+from typing import Dict
+import warnings
+
+# Suppress warnings from external libraries
+warnings.filterwarnings('ignore')
 
 
-def calc_hurst(closes: np.ndarray, window: int = 100) -> float:
+import nolds
+from ta.volatility import AverageTrueRange
+import neurokit2 as nk
+
+print("✅ All required libraries loaded successfully!")
+
+
+def calc_hurst(close: np.ndarray, window: int = 100) -> float:
     """
-    Calcula el exponente de Hurst usando el método R/S (Rescaled Range).
-    
-    Interpretación:
-        H < 0.5  → Mean-reverting (anti-persistente)
-        H = 0.5  → Random walk
-        H > 0.5  → Trending (persistente)
+    Calculates Hurst Exponent using nolds library.
     
     Args:
-        closes: Array de precios de cierre
-        window: Número de observaciones a usar (mínimo ~100 para estabilidad)
+        close: Array of closing prices
+        window: Lookback window
     
     Returns:
-        float: Exponente de Hurst [0, 1]
+        Hurst exponent (0-1). >0.5 = trending, <0.5 = mean-reverting
     """
-    if len(closes) < window:
+    if len(close) < window:
         return np.nan
     
-    ts = closes[-window:]
+    series = close[-window:]
     
-    # Calcular retornos
-    returns = np.diff(ts) / ts[:-1]
-    returns = returns[np.isfinite(returns)]
-    
-    if len(returns) < 20:
-        return np.nan
-    
-    # Método R/S simplificado
-    n = len(returns)
-    
-    # Dividir en subseries de diferentes tamaños
-    max_k = min(n // 2, 50)
-    if max_k < 4:
-        return np.nan
-    
-    rs_values = []
-    ns_values = []
-    
-    for size in range(10, max_k + 1, 2):
-        num_subseries = n // size
-        if num_subseries < 1:
-            continue
-            
-        rs_list = []
-        for i in range(num_subseries):
-            subseries = returns[i * size:(i + 1) * size]
-            
-            mean_sub = np.mean(subseries)
-            centered = subseries - mean_sub
-            cumsum = np.cumsum(centered)
-            
-            R = np.max(cumsum) - np.min(cumsum)
-            S = np.std(subseries, ddof=1)
-            
-            if S > 0:
-                rs_list.append(R / S)
+    try:
+        # Use nolds library (R/S method)
+        H = nolds.hurst_rs(series, nvals=None, fit='poly')
         
-        if rs_list:
-            rs_values.append(np.mean(rs_list))
-            ns_values.append(size)
+        # Clip to valid range [0, 1]
+        return float(np.clip(H, 0.0, 1.0))
     
-    if len(rs_values) < 3:
+    except Exception as e:
+        # If calculation fails (e.g., insufficient data variation)
         return np.nan
-    
-    # Regresión log-log para obtener H
-    log_n = np.log(ns_values)
-    log_rs = np.log(rs_values)
-    
-    # H = pendiente de la regresión
-    slope, _ = np.polyfit(log_n, log_rs, 1)
-    
-    # Clamp a [0, 1]
-    return float(np.clip(slope, 0.0, 1.0))
 
 
-def calc_efficiency_ratio(closes: np.ndarray, window: int = 14) -> float:
+def calc_efficiency_ratio(close: np.ndarray, window: int = 14) -> float:
     """
-    Calcula el Efficiency Ratio (ER) de Kaufman.
+    Calculates Kaufman's Efficiency Ratio.
     
-    ER = |Cambio neto| / Suma de cambios absolutos
-    
-    Interpretación:
-        ER → 1: Tendencia limpia, poco ruido
-        ER → 0: Mercado lateral/ruidoso
+    This is a simple metric - no library implementation needed.
+    Formula: ER = |price_change| / sum(|price_changes|)
     
     Args:
-        closes: Array de precios de cierre
-        window: Período de lookback
+        close: Array of closing prices
+        window: Lookback window
     
     Returns:
-        float: Efficiency Ratio [0, 1]
+        Efficiency ratio (0-1). 1 = perfect trend, 0 = choppy
     """
-    if len(closes) < window + 1:
-        return np.nan
-    
-    ts = closes[-(window + 1):]
-    
-    # Cambio neto (direccional)
-    net_change = abs(ts[-1] - ts[0])
-    
-    # Suma de cambios absolutos (volatilidad/ruido)
-    abs_changes = np.abs(np.diff(ts))
-    total_change = np.sum(abs_changes)
-    
-    if total_change == 0:
-        return np.nan
-    
-    er = net_change / total_change
-    
-    return float(np.clip(er, 0.0, 1.0))
-
-
-def calc_atr_pct(ohlc: dict, window: int = 14) -> float:
-    """
-    Calcula el ATR como porcentaje del precio (ATR%).
-    
-    ATR% = (ATR / Close) * 100
-    
-    Interpretación:
-        Alto ATR% → Alta volatilidad
-        Bajo ATR% → Baja volatilidad
-    
-    Args:
-        ohlc: Dict con keys 'high', 'low', 'close' (arrays numpy)
-        window: Período del ATR
-    
-    Returns:
-        float: ATR como porcentaje del precio
-    """
-    high = ohlc['high']
-    low = ohlc['low']
-    close = ohlc['close']
-    
     if len(close) < window + 1:
         return np.nan
     
-    # True Range
-    tr = np.zeros(len(close))
-    tr[0] = high[0] - low[0]
+    series = close[-(window + 1):]
     
-    for i in range(1, len(close)):
-        hl = high[i] - low[i]
-        hc = abs(high[i] - close[i - 1])
-        lc = abs(low[i] - close[i - 1])
-        tr[i] = max(hl, hc, lc)
+    # Net change (direction)
+    net_change = abs(series[-1] - series[0])
     
-    # ATR = SMA del True Range
-    atr = np.mean(tr[-window:])
+    # Sum of absolute changes (volatility)
+    abs_changes = np.abs(np.diff(series))
+    total_change = np.sum(abs_changes)
     
-    # ATR como porcentaje del precio actual
-    current_price = close[-1]
-    if current_price == 0:
-        return np.nan
+    if total_change == 0:
+        return 0.0  # No movement = zero efficiency
     
-    atr_pct = (atr / current_price) * 100
+    er = net_change / total_change
     
-    return float(atr_pct)
+    # Ensure valid range
+    return float(np.clip(er, 0.0, 1.0))
 
 
-def calc_permutation_entropy(closes: np.ndarray, window: int = 50, order: int = 3, delay: int = 1) -> float:
+def calc_atr_pct(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int = 14) -> float:
     """
-    Calcula la Permutation Entropy normalizada.
-    
-    Mide la complejidad/aleatoriedad de la serie temporal basándose
-    en los patrones ordinales de los datos.
-    
-    Interpretación:
-        PE → 0: Serie muy predecible/estructurada
-        PE → 1: Serie muy aleatoria/caótica
+    Calculates Average True Range as percentage of price using ta library.
     
     Args:
-        closes: Array de precios de cierre
-        window: Número de observaciones a usar
-        order: Orden de la permutación (típicamente 3-7)
-        delay: Delay entre elementos (típicamente 1)
+        high: Array of high prices
+        low: Array of low prices
+        close: Array of closing prices
+        window: Lookback window
     
     Returns:
-        float: Permutation Entropy normalizada [0, 1]
+        ATR as percentage of current price
     """
-    from math import factorial
-    
-    if len(closes) < window:
+    if len(close) < window + 1 or len(high) < window or len(low) < window:
         return np.nan
     
-    ts = np.asarray(closes[-window:], dtype=np.float64)
-    n = len(ts)
-    
-    # Número de vectores embebidos
-    n_vectors = n - (order - 1) * delay
-    if n_vectors < 10:
-        return np.nan
-    
-    # Contar patrones de permutación
-    max_patterns = factorial(order)
-    pattern_counts = {}
-    
-    for i in range(n_vectors):
-        # Extraer vector de orden elementos con delay
-        indices = [i + j * delay for j in range(order)]
-        pattern_values = np.array([ts[idx] for idx in indices])
+    try:
+        # Convert to pandas Series (required by ta library)
+        high_series = pd.Series(high, dtype=float)
+        low_series = pd.Series(low, dtype=float)
+        close_series = pd.Series(close, dtype=float)
         
-        # Obtener el patrón ordinal (ranking)
-        pattern = tuple(np.argsort(pattern_values).tolist())
-        pattern_counts[pattern] = pattern_counts.get(pattern, 0) + 1
+        # Calculate ATR using ta library
+        atr_indicator = AverageTrueRange(
+            high=high_series,
+            low=low_series,
+            close=close_series,
+            window=window,
+            fillna=False
+        )
+        
+        atr_values = atr_indicator.average_true_range()
+        atr        = atr_values.iloc[-1]
+        
+        # Convert to percentage of current price
+        current_price = close[-1]
+        
+        if current_price == 0 or np.isnan(current_price) or np.isnan(atr):
+            return np.nan
+        
+        atr_pct = (atr / current_price) * 100
+        
+        # Sanity check (ATR% should be reasonable)
+        if atr_pct < 0 or atr_pct > 100:
+            return np.nan
+        
+        return float(atr_pct)
     
-    total_patterns = sum(pattern_counts.values())
-    if total_patterns == 0:
+    except Exception as e:
         return np.nan
-    
-    # Calcular entropía de Shannon
-    entropy = 0.0
-    for count in pattern_counts.values():
-        p = count / total_patterns
-        if p > 0:
-            entropy -= p * np.log2(p)
-    
-    # Normalizar por entropía máxima posible
-    max_entropy = np.log2(max_patterns)
-    if max_entropy == 0:
-        return np.nan
-    
-    normalized_entropy = entropy / max_entropy
-    
-    return float(np.clip(normalized_entropy, 0.0, 1.0))
 
 
-def calc_all_metrics(ohlc: dict, 
-                     hurst_window: int = 100,
-                     er_window: int = 14,
-                     atr_window: int = 14,
-                     pe_window: int = 50,
-                     pe_order: int = 3) -> dict:
+def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
     """
-    Calcula todas las métricas de régimen en un solo llamado.
+    Calculates Permutation Entropy using neurokit2 library.
     
     Args:
-        ohlc: Dict con keys 'open', 'high', 'low', 'close' (arrays numpy)
-        hurst_window: Ventana para Hurst
-        er_window: Ventana para Efficiency Ratio
-        atr_window: Ventana para ATR
-        pe_window: Ventana para Permutation Entropy
-        pe_order: Orden para Permutation Entropy
+        close: Array of closing prices
+        window: Lookback window
+        order: Embedding dimension (pattern length)
     
     Returns:
-        dict: {
-            'hurst': float,
-            'efficiency_ratio': float,
-            'atr_pct': float,
-            'permutation_entropy': float
-        }
+        Normalized entropy (0-1). 0 = deterministic, 1 = random
     """
-    closes = ohlc['close']
+    if len(close) < window:
+        return np.nan
+    
+    series = close[-window:]
+    
+    try:
+        # Calculate permutation entropy using neurokit2
+        pe = nk.entropy_permutation(series, dimension=order, delay=1)
+        
+        # Normalize to [0, 1] range
+        # Maximum entropy for permutation entropy is log2(order!)
+        from math import factorial
+        max_entropy = np.log2(factorial(order))
+        
+        if max_entropy == 0:
+            return np.nan
+        
+        pe_normalized = pe / max_entropy
+        
+        # Ensure valid range
+        return float(np.clip(pe_normalized, 0.0, 1.0))
+    
+    except Exception as e:
+        return np.nan
+
+
+def calc_all_metrics(
+    ohlc: Dict[str, np.ndarray],
+    hurst_window: int = 100,
+    er_window: int = 14,
+    atr_window: int = 14,
+    pe_window: int = 50,
+    pe_order: int = 3
+) -> Dict[str, float]:
+    """
+    Calculates all regime metrics from OHLC data using proven libraries.
+    
+    Args:
+        ohlc: Dict with 'open', 'high', 'low', 'close' arrays
+        hurst_window: Window for Hurst exponent
+        er_window: Window for Efficiency Ratio
+        atr_window: Window for ATR
+        pe_window: Window for Permutation Entropy
+        pe_order: Order for Permutation Entropy
+    
+    Returns:
+        Dict with all metrics
+    """
+    close = ohlc['close']
+    high = ohlc['high']
+    low = ohlc['low']
     
     return {
-        'hurst': calc_hurst(closes, hurst_window),
-        'efficiency_ratio': calc_efficiency_ratio(closes, er_window),
-        'atr_pct': calc_atr_pct(ohlc, atr_window),
-        'permutation_entropy': calc_permutation_entropy(closes, pe_window, pe_order)
+        'hurst': calc_hurst(close, hurst_window),
+        'efficiency_ratio': calc_efficiency_ratio(close, er_window),
+        'atr_pct': calc_atr_pct(high, low, close, atr_window),
+        'permutation_entropy': calc_permutation_entropy(close, pe_window, pe_order)
     }
 
 
-# =============================================================================
-# FUNCIONES AUXILIARES PARA CLASIFICACIÓN DE RÉGIMEN
-# =============================================================================
-
-def classify_regime(metrics: dict) -> str:
-    """
-    Clasificación simple del régimen basada en las métricas.
-    
-    Returns:
-        str: 'trending', 'mean_reverting', 'volatile', 'calm', 'chaotic', 'unknown'
-    """
-    h = metrics.get('hurst', np.nan)
-    er = metrics.get('efficiency_ratio', np.nan)
-    atr = metrics.get('atr_pct', np.nan)
-    pe = metrics.get('permutation_entropy', np.nan)
-    
-    # Si faltan métricas, no podemos clasificar
-    if any(np.isnan([h, er, atr, pe])):
-        return 'unknown'
-    
-    # Reglas de clasificación (ajustables)
-    if h > 0.55 and er > 0.5:
-        return 'trending'
-    elif h < 0.45 and er < 0.3:
-        return 'mean_reverting'
-    elif atr > 5.0 and pe > 0.8:
-        return 'chaotic'
-    elif atr > 4.0:
-        return 'volatile'
-    elif atr < 2.0 and pe < 0.7:
-        return 'calm'
-    else:
-        return 'neutral'
-
-
-if __name__ == "__main__":
-    # Test básico
-    np.random.seed(42)
-    
-    # Simular datos OHLC
-    n = 200
-    close = 100 + np.cumsum(np.random.randn(n) * 0.5)
-    high = close + np.abs(np.random.randn(n)) * 0.3
-    low = close - np.abs(np.random.randn(n)) * 0.3
-    open_ = close + np.random.randn(n) * 0.1
-    
-    ohlc = {
-        'open': open_,
-        'high': high,
-        'low': low,
-        'close': close
-    }
-    
-    print("=== Test de Métricas de Régimen ===\n")
-    
-    metrics = calc_all_metrics(ohlc)
-    
-    print(f"Hurst Exponent:      {metrics['hurst']:.4f}")
-    print(f"Efficiency Ratio:    {metrics['efficiency_ratio']:.4f}")
-    print(f"ATR%:                {metrics['atr_pct']:.4f}")
-    print(f"Permutation Entropy: {metrics['permutation_entropy']:.4f}")
-    print(f"\nRégimen detectado:   {classify_regime(metrics)}")
+# Print success message on import
+print("="*70)
+print("REGIME METRICS - Using Library Implementations")
+print("="*70)
+print("  Hurst Exponent:        ✅ nolds.hurst_rs()")
+print("  Efficiency Ratio:      ✅ Custom (simple formula)")
+print("  ATR %:                 ✅ ta.volatility.AverageTrueRange()")
+print("  Permutation Entropy:   ✅ neurokit2.entropy_permutation()")
+print("="*70)

@@ -6,6 +6,7 @@ Analyzes strategy performance with regime filters.
 MODES:
 - 'single': Analyzes an individual strategy, tests all filter combinations
 - 'confluence': Analyzes ALL strategies by generator OR direction, looks for robust rules
+- 'families': Tests predefined regime families on ALL enriched files
 
 FILTER_BY:
 - 'generator': Groups by generator (e.g., all parity_*)
@@ -37,13 +38,31 @@ except ImportError:
 # =============================================================================
 # CONFIGURATION - EDIT HERE
 # =============================================================================
-MODE = 'confluence'           # 'single' or 'confluence'
+MODE = 'sizing'               # 'single', 'confluence', 'families', or 'sizing'
 FILTER_BY = 'generator'       # 'generator' or 'direction' (for confluence mode)
-GENERATOR = 'reversal'          # For FILTER_BY='generator': searches all {GENERATOR}_*
-DIRECTION = 'short'            # For FILTER_BY='direction': searches all *_{DIRECTION}_*
+GENERATOR = 'parity'          # For FILTER_BY='generator': searches all {GENERATOR}_*
+DIRECTION = 'long'            # For FILTER_BY='direction': searches all *_{DIRECTION}_*
 STRATEGY = 'parity_long_4H_IS'   # For single mode: specific strategy
 INITIAL_CAPITAL = 800         # Initial capital for profit % calculation
-SHOW_PLOTS = True             # Show equity curve plots
+SHOW_PLOTS = False            # Show equity curve plots
+
+# =============================================================================
+# PREDEFINED FAMILIES - Edit thresholds as needed
+# =============================================================================
+FAMILIES = {
+    'trending':     {'hurst': ('>', 0.55)},
+    'volatile':     {'atr_pct': ('>', 2.0)},
+    'ranging':      {},  # Default: everything else
+}
+
+# =============================================================================
+# FAMILY SIZING - Multipliers for position sizing by family
+# =============================================================================
+FAMILY_SIZING = {
+    'trending':  1.5,   # More size in trending
+    'volatile':  1.0,   # Less in volatile
+    'ranging':   1.0,   # Less in ranging
+}
 # =============================================================================
 
 
@@ -996,6 +1015,440 @@ def run_confluence_mode(filter_by: str, filter_value: str):
 
 
 # =============================================================================
+# FAMILIES MODE - Tests predefined families on all enriched files
+# =============================================================================
+
+def find_all_enriched_files(output_folder: str = None) -> List[str]:
+    """Finds all trades_enriched_*.xlsx files in output folder."""
+    if output_folder is None:
+        output_folder = get_output_folder()
+    
+    path = Path(output_folder)
+    files = list(path.glob('trades_enriched_*.xlsx'))
+    
+    # Extract strategy names
+    strategies = []
+    for f in files:
+        name = f.stem.replace('trades_enriched_', '')
+        strategies.append(name)
+    
+    return sorted(strategies)
+
+
+def run_families_mode():
+    """Tests predefined families on all enriched files."""
+    output_folder = get_output_folder()
+    
+    print("=" * 140)
+    print("📊 FAMILIES MODE - Testing predefined regime families")
+    print("=" * 140)
+    
+    # Show families being tested
+    print(f"\n📋 Predefined families:")
+    for family_name, rules in FAMILIES.items():
+        rules_str = ' & '.join([f"{m}{op}{v}" for m, (op, v) in rules.items()])
+        print(f"   • {family_name:20s}: {rules_str}")
+    
+    # Find all enriched files
+    strategies = find_all_enriched_files(output_folder)
+    
+    if not strategies:
+        print(f"\n❌ No enriched files found in: {output_folder}")
+        print(f"   Run run_analysis.py first to generate trades_enriched_*.xlsx files")
+        return
+    
+    print(f"\n📁 Enriched files found: {len(strategies)}")
+    for s in strategies:
+        print(f"   • {s}")
+    
+    # Store results for final summary
+    summary_results = []
+    
+    # Process each strategy
+    for strategy in strategies:
+        print("\n" + "=" * 140)
+        print(f"📊 FAMILY ANALYSIS: {strategy}")
+        print("=" * 140)
+        
+        try:
+            df = load_enriched_trades(strategy, output_folder)
+            
+            # Baseline (no filter)
+            base = calculate_metrics(df)
+            
+            # Table header
+            print(f"\n{'FAMILY':<20} {'TR_BASE':>8} {'TR_ACTV':>8} {'%_ACTV':>7} │ {'PROFIT':>10} {'PROFIT%':>9} │ {'WIN%':>7} │ {'DD%':>7}")
+            print("-" * 100)
+            
+            # Baseline row
+            print(f"{'NO_FILTER':<20} {base['num_trades']:>8} {base['num_trades']:>8} {'100.0':>6}% │ {base['profit_total']:>10.2f} {base['profit_pct']:>8.2f}% │ {base['win_rate']:>6.1f}% │ {base['max_dd_pct']:>6.2f}%")
+            
+            # Track best family (by profit, among real families only)
+            best_family = None
+            best_profit = float('-inf')
+            best_metrics = None
+            best_filtered_df = None
+            
+            # Test each family
+            family_results = []
+            for family_name, rules in FAMILIES.items():
+                filtered_df = apply_filter(df, rules)
+                filt = calculate_metrics(filtered_df)
+                
+                pct_active = (filt['num_trades'] / base['num_trades'] * 100) if base['num_trades'] > 0 else 0
+                
+                # Track best family (must have at least 1 trade)
+                if filt['num_trades'] > 0 and filt['profit_total'] > best_profit:
+                    best_profit = filt['profit_total']
+                    best_family = family_name
+                    best_metrics = filt
+                    best_filtered_df = filtered_df.copy()
+                
+                marker = ""
+                if filt['num_trades'] > 0:
+                    if filt['profit_total'] > base['profit_total']:
+                        marker = "✅"
+                    elif filt['profit_total'] < 0:
+                        marker = "❌"
+                
+                print(f"{family_name:<20} {base['num_trades']:>8} {filt['num_trades']:>8} {pct_active:>6.1f}% │ {filt['profit_total']:>10.2f} {filt['profit_pct']:>8.2f}% │ {filt['win_rate']:>6.1f}% │ {filt['max_dd_pct']:>6.2f}% {marker}")
+                
+                family_results.append({
+                    'family': family_name,
+                    'metrics': filt,
+                    'pct_active': pct_active
+                })
+            
+            print("-" * 100)
+            
+            # Best family for this strategy
+            if best_family and best_metrics:
+                if best_profit > base['profit_total']:
+                    print(f"\n🏆 Best family: {best_family} (profit: {best_profit:.2f} vs baseline: {base['profit_total']:.2f})")
+                else:
+                    print(f"\n⚠️  Best family: {best_family} (profit: {best_profit:.2f}, but baseline is better: {base['profit_total']:.2f})")
+            else:
+                print(f"\n❌ No family has any trades")
+                best_family = list(FAMILIES.keys())[0]  # Default to first family
+                best_metrics = {'num_trades': 0, 'profit_total': 0, 'win_rate': 0, 'max_dd_pct': 0}
+                best_filtered_df = pd.DataFrame()
+            
+            # Store for summary and plots
+            pct_active = (best_metrics['num_trades'] / base['num_trades'] * 100) if base['num_trades'] > 0 and best_metrics['num_trades'] > 0 else 0.0
+            summary_results.append({
+                'strategy': strategy,
+                'best_family': best_family,
+                'tr_base': base['num_trades'],
+                'tr_active': best_metrics['num_trades'],
+                'pct_active': pct_active,
+                'profit_base': base['profit_total'],
+                'profit_family': best_metrics['profit_total'],
+                'win_base': base['win_rate'],
+                'win_family': best_metrics['win_rate'],
+                'dd_base': base['max_dd_pct'],
+                'dd_family': best_metrics['max_dd_pct'],
+                'df_base': df.copy(),
+                'df_filtered': best_filtered_df,
+            })
+            
+        except Exception as e:
+            print(f"\n❌ Error processing {strategy}: {e}")
+    
+    # Final summary
+    print("\n" + "=" * 140)
+    print("📊 SUMMARY - BEST FAMILY PER STRATEGY")
+    print("=" * 140)
+    
+    # Header
+    print(f"\n{'STRATEGY':<30} {'FAMILY':<18} {'TR_BASE':>8} {'TR_ACTV':>8} {'%_ACTV':>7} │ {'PROFIT_B':>9} {'PROFIT_F':>9} {'':>2} │ {'WIN%_B':>7} {'WIN%_F':>7} {'':>2} │ {'DD%_B':>7} {'DD%_F':>7} {'':>2}")
+    print("-" * 145)
+    
+    for r in summary_results:
+        profit_ok = "✅" if r['profit_family'] > r['profit_base'] else "❌"
+        win_ok = "✅" if r['win_family'] > r['win_base'] else "❌"
+        dd_ok = "✅" if r['dd_family'] < r['dd_base'] else "❌"
+        
+        print(f"{r['strategy']:<30} {r['best_family']:<18} {r['tr_base']:>8} {r['tr_active']:>8} {r['pct_active']:>6.1f}% │ {r['profit_base']:>9.2f} {r['profit_family']:>9.2f} {profit_ok:>2} │ {r['win_base']:>6.1f}% {r['win_family']:>6.1f}% {win_ok:>2} │ {r['dd_base']:>6.2f}% {r['dd_family']:>6.2f}% {dd_ok:>2}")
+    
+    print("-" * 145)
+    
+    # Calculate averages
+    n = len(summary_results)
+    if n > 0:
+        avg_tr_base = sum(r['tr_base'] for r in summary_results) / n
+        avg_tr_active = sum(r['tr_active'] for r in summary_results) / n
+        avg_pct_active = sum(r['pct_active'] for r in summary_results) / n
+        avg_profit_base = sum(r['profit_base'] for r in summary_results) / n
+        avg_profit_family = sum(r['profit_family'] for r in summary_results) / n
+        avg_win_base = sum(r['win_base'] for r in summary_results) / n
+        avg_win_family = sum(r['win_family'] for r in summary_results) / n
+        avg_dd_base = sum(r['dd_base'] for r in summary_results) / n
+        avg_dd_family = sum(r['dd_family'] for r in summary_results) / n
+        
+        avg_profit_ok = "✅" if avg_profit_family > avg_profit_base else "❌"
+        avg_win_ok = "✅" if avg_win_family > avg_win_base else "❌"
+        avg_dd_ok = "✅" if avg_dd_family < avg_dd_base else "❌"
+        
+        print(f"{'AVERAGE':<30} {'-':<18} {avg_tr_base:>8.0f} {avg_tr_active:>8.0f} {avg_pct_active:>6.1f}% │ {avg_profit_base:>9.2f} {avg_profit_family:>9.2f} {avg_profit_ok:>2} │ {avg_win_base:>6.1f}% {avg_win_family:>6.1f}% {avg_win_ok:>2} │ {avg_dd_base:>6.2f}% {avg_dd_family:>6.2f}% {avg_dd_ok:>2}")
+    
+    print("-" * 145)
+    
+    # Count families used
+    family_counts = {}
+    for r in summary_results:
+        fam = r['best_family']
+        family_counts[fam] = family_counts.get(fam, 0) + 1
+    
+    print(f"\n📊 Family usage:")
+    for fam, count in sorted(family_counts.items(), key=lambda x: -x[1]):
+        print(f"   • {fam:<20s}: {count} strategies")
+    
+    # =================================================================
+    # PLOTS - Generate all plots at the end
+    # =================================================================
+    
+    if SHOW_PLOTS:
+        print("\n" + "=" * 140)
+        print("📊 GENERATING PLOTS")
+        print("=" * 140)
+        
+        for r in summary_results:
+            if r['tr_active'] > 0 and r['df_filtered'] is not None and len(r['df_filtered']) > 0:
+                plot_equity_comparison(
+                    df_base=r['df_base'],
+                    df_filtered=r['df_filtered'],
+                    title=f"{r['strategy']} - No Filter vs {r['best_family']}",
+                    initial_capital=INITIAL_CAPITAL
+                )
+            else:
+                print(f"   ⚠️  Skipping plot for {r['strategy']} - no trades in best family")
+    
+    print("\n" + "=" * 140)
+
+
+# =============================================================================
+# SIZING MODE - Tests position sizing by family on all enriched files
+# =============================================================================
+
+def classify_trade_family(row: pd.Series) -> str:
+    """Classifies a single trade into a family based on its metrics.
+    
+    Checks families in order (first match wins). 'ranging' should be last as default.
+    """
+    for family_name, rules in FAMILIES.items():
+        if not rules:  # Empty rules = default family (ranging)
+            continue
+        
+        match = True
+        for metric, (op, val) in rules.items():
+            if metric not in row or pd.isna(row[metric]):
+                match = False
+                break
+            
+            if op == '>' and not (row[metric] > val):
+                match = False
+                break
+            elif op == '<' and not (row[metric] < val):
+                match = False
+                break
+            elif op == '>=' and not (row[metric] >= val):
+                match = False
+                break
+            elif op == '<=' and not (row[metric] <= val):
+                match = False
+                break
+        
+        if match:
+            return family_name
+    
+    # Default to the family with empty rules (ranging)
+    for family_name, rules in FAMILIES.items():
+        if not rules:
+            return family_name
+    
+    return 'unknown'
+
+
+def run_sizing_mode():
+    """Tests position sizing by family on all enriched files."""
+    output_folder = get_output_folder()
+    
+    print("=" * 140)
+    print("📊 SIZING MODE - Position sizing by regime family")
+    print("=" * 140)
+    
+    # Show families and sizing
+    print(f"\n📋 Family sizing multipliers:")
+    for family_name, multiplier in FAMILY_SIZING.items():
+        rules = FAMILIES.get(family_name, {})
+        rules_str = ' & '.join([f"{m}{op}{v}" for m, (op, v) in rules.items()]) if rules else "(default)"
+        print(f"   • {family_name:15s}: x{multiplier:.1f}  [{rules_str}]")
+    
+    # Find all enriched files
+    strategies = find_all_enriched_files(output_folder)
+    
+    if not strategies:
+        print(f"\n❌ No enriched files found in: {output_folder}")
+        print(f"   Run run_analysis.py first to generate trades_enriched_*.xlsx files")
+        return
+    
+    print(f"\n📁 Enriched files found: {len(strategies)}")
+    for s in strategies:
+        print(f"   • {s}")
+    
+    # Store results for final summary
+    summary_results = []
+    
+    # Process each strategy
+    for strategy in strategies:
+        print("\n" + "=" * 140)
+        print(f"📊 SIZING ANALYSIS: {strategy}")
+        print("=" * 140)
+        
+        try:
+            df = load_enriched_trades(strategy, output_folder)
+            
+            # Classify each trade into a family
+            df['family'] = df.apply(classify_trade_family, axis=1)
+            
+            # Apply sizing multiplier
+            df['sizing_mult'] = df['family'].map(FAMILY_SIZING).fillna(1.0)
+            df['profit_sized'] = df['profit'] * df['sizing_mult']
+            
+            # Show family distribution
+            family_counts = df['family'].value_counts()
+            print(f"\n📋 Trade distribution by family:")
+            for fam, count in family_counts.items():
+                pct = count / len(df) * 100
+                mult = FAMILY_SIZING.get(fam, 1.0)
+                print(f"   • {fam:15s}: {count:5d} trades ({pct:5.1f}%) x{mult:.1f}")
+            
+            # Calculate metrics
+            profit_base = df['profit'].sum()
+            profit_sized = df['profit_sized'].sum()
+            delta_pct = ((profit_sized - profit_base) / abs(profit_base) * 100) if profit_base != 0 else 0
+            
+            # Calculate drawdown for both
+            df_sorted = df.sort_values('buy_time').copy()
+            
+            # Base DD
+            df_sorted['cum_profit_base'] = df_sorted['profit'].cumsum()
+            df_sorted['running_max_base'] = df_sorted['cum_profit_base'].cummax()
+            df_sorted['dd_base'] = df_sorted['running_max_base'] - df_sorted['cum_profit_base']
+            max_dd_base = df_sorted['dd_base'].max()
+            max_dd_base_pct = (max_dd_base / INITIAL_CAPITAL) * 100
+            
+            # Sized DD
+            df_sorted['cum_profit_sized'] = df_sorted['profit_sized'].cumsum()
+            df_sorted['running_max_sized'] = df_sorted['cum_profit_sized'].cummax()
+            df_sorted['dd_sized'] = df_sorted['running_max_sized'] - df_sorted['cum_profit_sized']
+            max_dd_sized = df_sorted['dd_sized'].max()
+            max_dd_sized_pct = (max_dd_sized / INITIAL_CAPITAL) * 100
+            
+            # Win rate (same for both)
+            win_rate = (df['profit'] > 0).mean() * 100
+            
+            # Show results
+            print(f"\n{'METRIC':<20} {'BASE':>12} {'SIZED':>12} {'Δ':>10}")
+            print("-" * 60)
+            print(f"{'Profit':<20} {profit_base:>12.2f} {profit_sized:>12.2f} {delta_pct:>+9.1f}%")
+            print(f"{'Max DD%':<20} {max_dd_base_pct:>11.2f}% {max_dd_sized_pct:>11.2f}%")
+            print(f"{'Win%':<20} {win_rate:>11.1f}% {win_rate:>11.1f}%")
+            print("-" * 60)
+            
+            profit_ok = "✅" if profit_sized > profit_base else "❌"
+            print(f"\n{'Result:':<20} {profit_ok} Profit {'improved' if profit_sized > profit_base else 'decreased'} by {abs(delta_pct):.1f}%")
+            
+            # Store for summary
+            summary_results.append({
+                'strategy': strategy,
+                'num_trades': len(df),
+                'profit_base': profit_base,
+                'profit_sized': profit_sized,
+                'delta_pct': delta_pct,
+                'win_rate': win_rate,
+                'dd_base': max_dd_base_pct,
+                'dd_sized': max_dd_sized_pct,
+                'df_sorted': df_sorted,
+            })
+            
+        except Exception as e:
+            print(f"\n❌ Error processing {strategy}: {e}")
+    
+    # Final summary
+    print("\n" + "=" * 140)
+    print("📊 SUMMARY - POSITION SIZING RESULTS")
+    print("=" * 140)
+    
+    # Header
+    print(f"\n{'STRATEGY':<30} {'TRADES':>8} │ {'PROFIT_B':>10} {'PROFIT_S':>10} {'Δ%':>8} {'':>2} │ {'WIN%':>7} │ {'DD%_B':>8} {'DD%_S':>8} {'':>2}")
+    print("-" * 120)
+    
+    for r in summary_results:
+        profit_ok = "✅" if r['profit_sized'] > r['profit_base'] else "❌"
+        dd_ok = "✅" if r['dd_sized'] < r['dd_base'] else "❌"
+        
+        print(f"{r['strategy']:<30} {r['num_trades']:>8} │ {r['profit_base']:>10.2f} {r['profit_sized']:>10.2f} {r['delta_pct']:>+7.1f}% {profit_ok:>2} │ {r['win_rate']:>6.1f}% │ {r['dd_base']:>7.2f}% {r['dd_sized']:>7.2f}% {dd_ok:>2}")
+    
+    print("-" * 120)
+    
+    # Calculate averages
+    n = len(summary_results)
+    if n > 0:
+        avg_trades = sum(r['num_trades'] for r in summary_results) / n
+        avg_profit_base = sum(r['profit_base'] for r in summary_results) / n
+        avg_profit_sized = sum(r['profit_sized'] for r in summary_results) / n
+        avg_delta_pct = ((avg_profit_sized - avg_profit_base) / abs(avg_profit_base) * 100) if avg_profit_base != 0 else 0
+        avg_win_rate = sum(r['win_rate'] for r in summary_results) / n
+        avg_dd_base = sum(r['dd_base'] for r in summary_results) / n
+        avg_dd_sized = sum(r['dd_sized'] for r in summary_results) / n
+        
+        avg_profit_ok = "✅" if avg_profit_sized > avg_profit_base else "❌"
+        avg_dd_ok = "✅" if avg_dd_sized < avg_dd_base else "❌"
+        
+        print(f"{'AVERAGE':<30} {avg_trades:>8.0f} │ {avg_profit_base:>10.2f} {avg_profit_sized:>10.2f} {avg_delta_pct:>+7.1f}% {avg_profit_ok:>2} │ {avg_win_rate:>6.1f}% │ {avg_dd_base:>7.2f}% {avg_dd_sized:>7.2f}% {avg_dd_ok:>2}")
+    
+    print("-" * 120)
+    
+    # =================================================================
+    # PLOTS - Generate all plots at the end
+    # =================================================================
+    
+    if SHOW_PLOTS:
+        print("\n" + "=" * 140)
+        print("📊 GENERATING PLOTS")
+        print("=" * 140)
+        
+        for r in summary_results:
+            df_sorted = r['df_sorted']
+            
+            if not HAS_MATPLOTLIB:
+                print("⚠️  matplotlib not available, skipping plots")
+                break
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(14, 6))
+            
+            # Plot both equity curves
+            ax.plot(df_sorted['buy_time'], df_sorted['cum_profit_base'], 
+                    color='blue', linewidth=1.5, label=f'Base (profit: {r["profit_base"]:.2f})', alpha=0.7)
+            ax.plot(df_sorted['buy_time'], df_sorted['cum_profit_sized'], 
+                    color='green', linewidth=1.5, label=f'Sized (profit: {r["profit_sized"]:.2f})', alpha=0.9)
+            
+            ax.axhline(y=0, color='gray', linestyle='--', linewidth=0.5)
+            ax.set_ylabel('Cumulative Profit')
+            ax.set_xlabel('Time')
+            ax.set_title(f"{r['strategy']} - Base vs Position Sizing (Δ {r['delta_pct']:+.1f}%)")
+            ax.legend(loc='upper left')
+            ax.grid(True, linestyle='--', alpha=0.3)
+            
+            plt.tight_layout()
+            plt.show()
+    
+    print("\n" + "=" * 140)
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -1008,6 +1461,10 @@ if __name__ == "__main__":
             print(f"   Generator: {GENERATOR}")
         else:
             print(f"   Direction: {DIRECTION}")
+    elif MODE == 'families':
+        print(f"📋 Families: {len(FAMILIES)}")
+    elif MODE == 'sizing':
+        print(f"📋 Sizing families: {len(FAMILY_SIZING)}")
     print(f"💰 Initial capital: {INITIAL_CAPITAL}")
     print(f"📊 Show plots: {SHOW_PLOTS}")
     print()
@@ -1022,6 +1479,10 @@ if __name__ == "__main__":
         else:
             print(f"❌ Unknown FILTER_BY: {FILTER_BY}")
             print(f"   Use 'generator' or 'direction'")
+    elif MODE == 'families':
+        run_families_mode()
+    elif MODE == 'sizing':
+        run_sizing_mode()
     else:
         print(f"❌ Unknown mode: {MODE}")
-        print(f"   Use 'single' or 'confluence'")
+        print(f"   Use 'single', 'confluence', 'families', or 'sizing'")
