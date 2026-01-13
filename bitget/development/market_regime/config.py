@@ -60,8 +60,8 @@ FAMILIES = {
 # POSITION SIZING MULTIPLIERS
 # =============================================================================
 FAMILY_SIZING = {
-    'trending': 2.0,
-    'volatile': 0.0,
+    'trending': 1.8,
+    'volatile': 0,
     'ranging': 1.0,
 }
 

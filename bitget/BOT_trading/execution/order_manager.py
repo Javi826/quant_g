@@ -428,10 +428,9 @@ def place_order(symbol: str,
     # ===============================================================
     if filled_amount < size_q * Decimal('0.95'):  # Tolerancia 5%
         logger.warning(f"WAR-Partial fill for {symbol}: requested={size_q}, filled={filled_amount}")
-    # ═══════════════════════════════════════════════════════════════
     
-    logger.info(f"{direction.upper():<6} {symbol:<10} | Size: {filled_amount:<8} | "
-      f"Price: {exec_price:<10}")
+    logger.info(f"{direction.upper():<6} {symbol:<10} | Amount: ${usdt_amount:.2f} | "
+           f"Price: {exec_price}")
        
 
     return resp_order

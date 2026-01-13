@@ -197,7 +197,6 @@ def get_current_regime(timeframe: str) -> Tuple[str, Optional[Dict[str, float]]]
     
     family = classify_regime(metrics)
     
-
     logger.debug(
         f"Regime classified as '{family}' for {timeframe} | "
         f"Metrics: hurst={metrics.get('hurst', 0):.3f}, "
@@ -229,8 +228,7 @@ def get_regime_multiplier(symbol: str, timeframe: str) -> float:
         # Get multiplier for this family
         multiplier = REGIME_FAMILY_SIZING.get(family, 1.0)
         
-
-        logger.info(f"Regime sizing: {family} → {multiplier}x multiplier")
+        # Logging is handled by orchestrator
         
         return multiplier
         

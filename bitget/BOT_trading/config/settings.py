@@ -203,7 +203,6 @@ LOG_NAMESPACE = "BOT_trading"
 # ==========================================================================
 # MARKET REGIME SETTINGS
 # ==========================================================================
-# Add this section to the end of config/settings.py
 
 # Enable/disable regime-based position sizing
 REGIME_SIZING_ENABLED = False  # Switch principal (False por defecto hasta validar)

@@ -6,12 +6,14 @@ This module contains the StrategyProcessor class which coordinates:
 - Order placement
 - Position tracking
 - Balance management
+
+MODIFICATION: Added support for regime-based position sizing via adjusted_order_amount parameter
 """
 
 import time
 import logging
 from decimal import Decimal
-from typing import Dict, List, Callable, Any
+from typing import Dict, List, Callable, Any, Optional
 
 # Setup module logger
 logger = logging.getLogger('BOT_trading.strategies.processor')
@@ -78,7 +80,8 @@ class StrategyProcessor:
         final_symbols: List[str],
         exchange,
         open_positions: Dict,
-        strategy_candles: Dict
+        strategy_candles: Dict,
+        adjusted_order_amount: Optional[float] = None
     ) -> None:
         """
         Process a strategy: detect signals and place orders if needed.
@@ -97,15 +100,27 @@ class StrategyProcessor:
             exchange: Exchange connection (for balance check)
             open_positions: Dictionary of open positions by strategy
             strategy_candles: Dictionary of candle counters by strategy
+            adjusted_order_amount: Optional regime-adjusted order amount.
+                                  If None, uses strat['order_amount']
         
         Returns:
             None
         """
         strat_id = strat['id']
         
-        logger.info(f"Processing strategy: {strat_id}")
-        logger.info("-" * 48)
+        # ====================================================================
+        # REGIME-BASED POSITION SIZING (NEW)
+        # ====================================================================
+        # Use adjusted amount if provided, otherwise use config amount
+        order_amount = adjusted_order_amount if adjusted_order_amount is not None else strat['order_amount']
         
+        # Log if regime adjustment is active
+        if adjusted_order_amount is not None and adjusted_order_amount != strat['order_amount']:
+            logger.debug(
+                f"[REGIME] {strat_id}: Base=${strat['order_amount']:.2f} → "
+                f"Adjusted=${order_amount:.2f} (multiplier={order_amount/strat['order_amount']:.2f}x)"
+            )
+                
         # ====================================================================
         # SIGNAL DETECTION 
         # ====================================================================
@@ -138,22 +153,23 @@ class StrategyProcessor:
         # PROCESS ALL SIGNALS 
         # ====================================================================
         for sig in signals:
-            # Check balance before each order - 
+            # Check balance before each order - USE ADJUSTED AMOUNT
             usdt_balance = self.get_balance(exchange)
             logger.debug(f"Current balance: {usdt_balance:.2f} USDT")
             
-            if usdt_balance < strat['order_amount']:
+            if usdt_balance < order_amount:
                 logger.warning(
-                    f"WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']}"
+                    f"WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']} "
+                    f"(needs {order_amount:.2f} USDT)"
                 )
                 continue
             
-            # Place order
-            logger.debug(f"Placing order for {sig['symbol']}")
+            # Place order - USE ADJUSTED AMOUNT
+            logger.debug(f"Placing order for {sig['symbol']} with ${order_amount:.2f}")
             resp_order = place_order(
                 symbol=sig['symbol'],
                 direction=strat['direction'],
-                usdt_amount=strat['order_amount'],
+                usdt_amount=order_amount,  # ← USING ADJUSTED AMOUNT
                 send_request_func=self.send_request
             )
             
@@ -186,7 +202,7 @@ class StrategyProcessor:
                     entry_price = entry_price_from_fills if entry_price_from_fills is not None else Decimal(str(sig.get('close', 0)))
                     logger.debug(f"Using fills data: size={size}, price={entry_price}")
                 
-                # Add position to tracking
+                # Add position to tracking - USE ADJUSTED AMOUNT
                 add_position(
                     strat_id=strat_id,
                     symbol=sig['symbol'],
@@ -200,7 +216,7 @@ class StrategyProcessor:
                     strategy_candles=strategy_candles,
                     state_file=self.state_file,
                     hour_zone=self.hour_zone,
-                    usdt_amount=strat['order_amount']
+                    usdt_amount=order_amount  # ← USING ADJUSTED AMOUNT
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:

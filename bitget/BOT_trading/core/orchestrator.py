@@ -22,6 +22,7 @@ if parent_dir not in sys.path:
 # Now do imports
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
+from market_regime.regime_classifier import get_regime_multiplier
 from validation import validate_strategy_configuration
 from analytics import BotState
 from api.backend import DashboardServer, create_dashboard_template
@@ -39,7 +40,7 @@ from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
 from config.settings import get_account_config, get_account_strategies, HOUR_ZONE
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,DISPLAY_MODE
-
+from config.settings import REGIME_FAMILY_SIZING
 
 class BotOrchestrator:
     """
@@ -119,6 +120,9 @@ class BotOrchestrator:
         # Control flags
         self._running = False
         self._initialized = False
+        
+        #Marke regime
+        self.regime_cache: Dict[str, float] = {}
         
     # ======================================================================
     # PUBLIC API
@@ -430,6 +434,11 @@ class BotOrchestrator:
         # Sync with broker
         sync_broker(self.open_positions, self.strategy_candles, self.state_file)
         
+        # ========================================================================
+        # NEW: Update regime for closed timeframes
+        # ========================================================================
+        self._update_regime_for_timeframes(closed_timeframes)
+        
         now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
         self.logger.info(f"Searching Signals... - {now}")
         self.logger.info(f"{'-' * 48}")
@@ -438,11 +447,11 @@ class BotOrchestrator:
         strategies_to_process = []
         for tf in closed_timeframes:
             strategies_to_process.extend(self.strategies_by_tf[tf])
-        
+                
         # Process candle timeouts
         self._process_candle_timeouts(strategies_to_process)
         
-        # Search for new signals
+        # Search for new signals (will use regime cache)
         self._search_signals(strategies_to_process)
         
         self.logger.info("Signal cycle completed")
@@ -452,6 +461,7 @@ class BotOrchestrator:
         self._update_next_candle_times(closed_timeframes)
         
         self.last_tpsl_check = time.time()
+
     
     def _process_candle_timeouts(self, strategies_to_process: List[Dict]) -> None:
         """
@@ -511,6 +521,24 @@ class BotOrchestrator:
             if num_positions > 0:
                 continue
             
+            # ====================================================================
+            # NEW: Get regime multiplier and adjust order amount
+            # ====================================================================
+            timeframe = strat['timeframe']
+            regime_multiplier = self.regime_cache.get(timeframe, 1.0)
+            if regime_multiplier == 0:
+                self.logger.info(f"[REGIME] Skipping {strat_id}: multiplier=0 (regime blocks trading)")
+                continue
+            base_order_amount = strat['order_amount']
+            adjusted_order_amount = base_order_amount * regime_multiplier
+            
+            self.logger.debug(
+                f"[REGIME] {strat_id}: TF={timeframe}, "
+                f"Base=${base_order_amount:.2f}, "
+                f"Multiplier={regime_multiplier}x, "
+                f"Adjusted=${adjusted_order_amount:.2f}"
+            )
+            
             # Process strategy with retry logic
             try:
                 self.strategy_processor.process(
@@ -518,7 +546,8 @@ class BotOrchestrator:
                     final_symbols=self.final_by_strat.get(strat['id'], []),
                     exchange=self.exchange,
                     open_positions=self.open_positions,
-                    strategy_candles=self.strategy_candles
+                    strategy_candles=self.strategy_candles,
+                    adjusted_order_amount=adjusted_order_amount  # ← NEW PARAMETER
                 )
             except Exception as e:
                 self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
@@ -532,7 +561,8 @@ class BotOrchestrator:
                         final_symbols=self.final_by_strat.get(strat['id'], []),
                         exchange=self.exchange,
                         open_positions=self.open_positions,
-                        strategy_candles=self.strategy_candles
+                        strategy_candles=self.strategy_candles,
+                        adjusted_order_amount=adjusted_order_amount  # ← NEW PARAMETER
                     )
                     self.logger.info(f"Retry successful for {strat_id}")
                 except Exception as e2:
@@ -578,6 +608,45 @@ class BotOrchestrator:
     # ======================================================================
     # HELPER METHODS (Private)
     # ======================================================================
+    
+    # ----------------------------------------------------------------------------
+    # CHANGE 3: Add new method (after _calculate_next_candles, around line 350)
+    # ----------------------------------------------------------------------------
+    
+    def _update_regime_for_timeframes(self, closed_timeframes: List[str]) -> None:
+        """
+        Update regime multipliers for timeframes that just closed.
+        
+        This method calculates the market regime for each closed timeframe
+        and caches the multiplier for use in position sizing.
+        
+        Args:
+            closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
+        """
+        self.logger.info(f"[REGIME] Updating regime for timeframes: {closed_timeframes}")
+        
+        for tf in closed_timeframes:
+            try:
+                # Calculate regime multiplier for this timeframe
+                multiplier = get_regime_multiplier('BTCUSDT', tf)
+                
+                # Cache the multiplier
+                self.regime_cache[tf] = multiplier
+                
+                family_name = 'unknown'
+                from config.settings import REGIME_FAMILY_SIZING
+                for family, mult in REGIME_FAMILY_SIZING.items():
+                    if mult == multiplier:
+                        family_name = family.upper()
+                        break
+                
+                self.logger.info(f"[REGIME] {tf}: {family_name} (multiplier={multiplier}x)")
+                
+            except Exception as e:
+                # On error, use 1.0 (no adjustment)
+                self.logger.error(f"[REGIME] Error calculating regime for {tf}: {e}")
+                self.regime_cache[tf] = 1.0
+                self.logger.debug(f"[REGIME] {tf}: using fallback multiplier=1.0x (error)")
     
     def _send_request_wrapper(
         self,

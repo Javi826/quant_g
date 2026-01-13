@@ -864,7 +864,20 @@
             background: rgba(248, 81, 73, 0.25);
         }
         
+        /* Fix emoji number rendering in rules and dates */
+        input[type="date"],
+        input[type="datetime-local"],
+        #regime-card-volatile-rules,
+        #regime-card-ranging-rules,
+        #regime-card-trending-rules {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-variant-numeric: lining-nums tabular-nums !important;
+            -webkit-font-feature-settings: "tnum" 1 !important;
+            font-feature-settings: "tnum" 1 !important;
+        }
+        
         /* Market Regime Animations */
+        .regime-card-active {
             opacity: 1 !important;
         }
         
@@ -923,35 +936,35 @@
         <div class="main-panel">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-label">💵 Closed P/L</div>
+                    <div class="stat-label">Closed P/L</div>
                     <div class="stat-value positive" id="total-profit">$-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📊 Profit %</div>
+                    <div class="stat-label">Profit %</div>
                     <div class="stat-value positive" id="profit-pct">-%</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📋 Trades</div>
+                    <div class="stat-label">Trades</div>
                     <div class="stat-value neutral" id="trades-num">-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">🎯 Win Rate</div>
+                    <div class="stat-label">Win Rate</div>
                     <div class="stat-value neutral" id="trades-pct">-%</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📊 Positions</div>
+                    <div class="stat-label">Positions</div>
                     <div class="stat-value neutral" id="total-positions">-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📈 Open P/L</div>
+                    <div class="stat-label">Open P/L</div>
                     <div class="stat-value positive" id="open-pnl">$-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">₿ BTC Price</div>
+                    <div class="stat-label">BTC Price</div>
                     <div class="stat-value warning" id="btc-price">$-</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📊 Market Regime</div>
+                    <div class="stat-label">Market Regime</div>
                     <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px;">-</div>
                     <div style="font-size: 13px; color: #8b949e; margin-top: 8px;" id="regime-timeframe">Loading...</div>
                 </div>
@@ -1320,6 +1333,9 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            
             <div id="tab-config" class="tab-content">
                 <div class="content-section">
                     <h2>Bot Configuration & Status</h2>
@@ -1807,37 +1823,36 @@ function updateRegimeUI(data) {
     function createColoredBar(value, reverse = false) {
         const totalBlocks = 20;
         const filledBlocks = Math.round(value * totalBlocks);
-        const emptyBlocks = totalBlocks - filledBlocks;
         
+        // Determine single color based on value (not position)
+        let fillColor;
+        
+        if (reverse) {
+            // For ATR and PE (lower is better): green → yellow → red
+            if (value < 0.33) {
+                fillColor = '#3fb950'; // Green (low value is good)
+            } else if (value < 0.66) {
+                fillColor = '#f59e0b'; // Yellow (medium value)
+            } else {
+                fillColor = '#f85149'; // Red (high value is bad)
+            }
+        } else {
+            // For Hurst and ER (higher is better): red → yellow → green
+            if (value < 0.33) {
+                fillColor = '#f85149'; // Red (low value is bad)
+            } else if (value < 0.66) {
+                fillColor = '#f59e0b'; // Yellow (medium value)
+            } else {
+                fillColor = '#3fb950'; // Green (high value is good)
+            }
+        }
+        
+        // Build HTML with single color for all filled blocks
         let html = '';
         
         for (let i = 0; i < totalBlocks; i++) {
             if (i < filledBlocks) {
-                // Color based on position (red → yellow → green)
-                let color;
-                const position = i / totalBlocks;
-                
-                if (reverse) {
-                    // For ATR and PE (lower is better): green → yellow → red
-                    if (position < 0.33) {
-                        color = '#3fb950'; // Green
-                    } else if (position < 0.66) {
-                        color = '#f59e0b'; // Yellow
-                    } else {
-                        color = '#f85149'; // Red
-                    }
-                } else {
-                    // For Hurst and ER (higher is better): red → yellow → green
-                    if (position < 0.33) {
-                        color = '#f85149'; // Red
-                    } else if (position < 0.66) {
-                        color = '#f59e0b'; // Yellow
-                    } else {
-                        color = '#3fb950'; // Green
-                    }
-                }
-                
-                html += '<span style="color: ' + color + ';">█</span>';
+                html += '<span style="color: ' + fillColor + ';">█</span>';
             } else {
                 html += '<span style="color: #2d333b;">█</span>';
             }
