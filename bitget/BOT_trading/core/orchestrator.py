@@ -634,7 +634,6 @@ class BotOrchestrator:
                 self.regime_cache[tf] = multiplier
                 
                 family_name = 'unknown'
-                from config.settings import REGIME_FAMILY_SIZING
                 for family, mult in REGIME_FAMILY_SIZING.items():
                     if mult == multiplier:
                         family_name = family.upper()

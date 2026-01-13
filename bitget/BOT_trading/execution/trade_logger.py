@@ -5,6 +5,7 @@ This module is responsible for:
 - Logging closed positions to Excel file
 - Calculating profit and fees
 - Managing trade history
+- Tracking market regime at position open
 
 This module is intentionally separated from order_manager and position_tracker
 to avoid circular dependencies. It does not import from any execution submodules.
@@ -47,7 +48,9 @@ def log_closed_position(opened_at,
                        size: Decimal,
                        profit_from_api: Optional[Decimal] = None,
                        fee_from_api: Optional[Decimal] = None,
-                       bot_state=None) -> None:
+                       bot_state=None,
+                       regime_family: Optional[str] = None,
+                       regime_multiplier: Optional[float] = None) -> None:
     """
     Log a closed position to Excel file.
     
@@ -70,6 +73,8 @@ def log_closed_position(opened_at,
         profit_from_api: Profit from API (if available)
         fee_from_api: Fee from API (if available)
         bot_state: Bot state object for profit tracking
+        regime_family: Market regime family when position opened ('volatile', 'ranging', 'trending')
+        regime_multiplier: Multiplier applied based on regime (0, 0.5, 1.0, 1.5, etc.)
     """
     if TRADES_LOG_PATH is None:
         logger.warning("WAR-TRADES_LOG_PATH not configured. Trade not logged.")
@@ -140,7 +145,7 @@ def log_closed_position(opened_at,
         # Calculate duration
         delta_days = (closed_at - opened_at_dt).total_seconds() / (3600 * 24)
 
-        # Build record
+        # Build record with regime tracking
         new_record = {
             'OPEN_AT': opened_at_dt.strftime('%Y-%m-%d %H:%M:%S'),
             'CLOSE_AT': closed_at.strftime('%Y-%m-%d %H:%M:%S'),
@@ -155,7 +160,9 @@ def log_closed_position(opened_at,
             'PROFIT': round(profit, 2),
             'FEE': round(fee, 4) if profit_from_api is not None else 0,
             'PROFIT_PCT': round(profit_pct, 1),
-            'REASON_OUT': reason
+            'REASON_OUT': reason,
+            'REGIME_FAMILY': regime_family if regime_family else 'unknown',
+            'REGIME_MULTIPLIER': round(regime_multiplier, 1) if regime_multiplier is not None else 1.0
         }
 
         # Append to Excel
@@ -171,7 +178,12 @@ def log_closed_position(opened_at,
         if bot_state is not None:
             bot_state.closed_total_profit += profit
 
-        logger.info(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
+        # Enhanced logging with regime info
+        regime_info = ""
+        if regime_family:
+            regime_info = f" | Regime: {regime_family.upper()} ({regime_multiplier}x)"
+        
+        logger.info(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%){regime_info}")
 
     except Exception as e:
         logger.error(f"Error-logging to Excel: {e}")

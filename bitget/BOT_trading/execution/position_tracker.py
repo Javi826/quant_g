@@ -6,6 +6,7 @@ This module handles:
 - Calculating TP/SL prices
 - Monitoring positions for TP/SL hits
 - Managing position state
+- Tracking market regime at position open
 
 This module imports from order_manager for closing positions and
 from trade_logger for logging, but neither imports back, avoiding
@@ -104,7 +105,9 @@ def add_position(strat_id: str,
                 strategy_candles: Dict, 
                 state_file: str,
                 hour_zone, 
-                usdt_amount: float = 0) -> None:
+                usdt_amount: float = 0,
+                regime_family: Optional[str] = None,
+                regime_multiplier: Optional[float] = None) -> None:
     """
     Add a new position to tracking system.
     
@@ -127,6 +130,8 @@ def add_position(strat_id: str,
         state_file: Path to state file
         hour_zone: Timezone for timestamps
         usdt_amount: USDT amount invested
+        regime_family: Market regime family at position open
+        regime_multiplier: Regime multiplier applied
     """
     from state.state_manager import save_state_local
     
@@ -144,7 +149,9 @@ def add_position(strat_id: str,
         'sl': sl_price,
         'order_id': order_id,
         'opened_at': datetime.now(hour_zone),
-        'usdt_amount': usdt_amount
+        'usdt_amount': usdt_amount,
+        'regime_family': regime_family if regime_family else 'unknown',
+        'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0
     }
     
     open_positions[strat_id].append(position)
@@ -158,7 +165,7 @@ def check_tp_sl_for_strategy(strat_id: str,
                              strat_config: Dict,
                              open_positions: Dict, 
                              strategy_candles: Dict,
-                             state_file: str, 
+                            state_file: str, 
                              send_request_func,
                              table: Optional[Any] = None,
                              pnl_accumulator: Optional[Dict] = None,
@@ -228,7 +235,9 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
                 'usdt_amount': pos.get('usdt_amount', 0),
-                'entry_price': pos['entry_price']
+                'entry_price': pos['entry_price'],
+                'regime_family': pos.get('regime_family', 'unknown'),
+                'regime_multiplier': pos.get('regime_multiplier', 1.0)
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 
                             reason="TP", position_data=position_data, bot_state=bot_state):
@@ -239,7 +248,9 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'opened_at': pos['opened_at'],
                 'strategy_id': strat_id,
                 'usdt_amount': pos.get('usdt_amount', 0),
-                'entry_price': pos['entry_price']
+                'entry_price': pos['entry_price'],
+                'regime_family': pos.get('regime_family', 'unknown'),
+                'regime_multiplier': pos.get('regime_multiplier', 1.0)
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 
                             reason="SL", position_data=position_data, bot_state=bot_state):
@@ -283,7 +294,6 @@ def check_all_tp_sl(strategies: List[Dict],
         get_current_price_func: Unused (kept for compatibility)
         display_mode: Unused (kept for compatibility)
         account_number: Unused (kept for compatibility)
-
         bot_state: Bot state for profit tracking
     
     Returns:
