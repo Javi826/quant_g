@@ -863,6 +863,19 @@
         .btn-clear-dates:hover {
             background: rgba(248, 81, 73, 0.25);
         }
+        
+        /* Market Regime Animations */
+            opacity: 1 !important;
+        }
+        
+        .regime-card-inactive {
+            opacity: 0.5;
+            filter: grayscale(0.3);
+        }
+        
+        .regime-family-card {
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -937,6 +950,11 @@
                     <div class="stat-label">₿ BTC Price</div>
                     <div class="stat-value warning" id="btc-price">$-</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-label">📊 Market Regime</div>
+                    <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px;">-</div>
+                    <div style="font-size: 13px; color: #8b949e; margin-top: 8px;" id="regime-timeframe">Loading...</div>
+                </div>
             </div>
             
             <div class="tabs-container">
@@ -944,6 +962,7 @@
                 <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
                 <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
                 <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
+                <button class="tab-btn" onclick="switchTab('regime')">Market Regime</button>
                 <button class="tab-btn" onclick="switchTab('config')">Configuration</button>
                 <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
             </div>
@@ -1172,6 +1191,119 @@
                     <div id="equity-subtab-weekday" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
                         <div id="weekday-container">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tab-regime" class="tab-content">
+                <div class="content-section">
+                    <h2>
+                        <span>Market Regime Analysis</span>
+                        <div class="view-selector">
+                            <button class="view-btn active" onclick="setRegimeTimeframe('4H')">4H</button>
+                            <button class="view-btn" onclick="setRegimeTimeframe('1H')">1H</button>
+                            <button class="view-btn" onclick="setRegimeTimeframe('6Hutc')">6Hutc</button>
+                        </div>
+                    </h2>
+                    <!-- Regime Family Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+                        <!-- VOLATILE Card -->
+                        <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
+                            <div style="font-size: 18px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
+                            <div id="regime-card-volatile-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">0.5x</div>
+                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
+                                Reduce positions<br>High volatility + unpredictable
+                            </div>
+                        </div>
+                        
+                        <!-- RANGING Card -->
+                        <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
+                            <div style="font-size: 18px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
+                            <div id="regime-card-ranging-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.0x</div>
+                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
+                                Normal sizing<br>Lateral without clear trend
+                            </div>
+                        </div>
+                        
+                        <!-- TRENDING Card -->
+                        <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
+                            <div style="font-size: 18px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
+                            <div id="regime-card-trending-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.5x</div>
+                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
+                                Increase positions<br>Strong directional movement
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Metrics with Colored Blocks -->
+                    <div class="config-card">
+                        <h3>Technical Metrics</h3>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">
+                            <!-- Hurst Exponent -->
+                            <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Hurst Exponent</div>
+                                    <div style="font-size: 20px; font-weight: 700; color: #58a6ff;" id="regime-metric-hurst">-</div>
+                                </div>
+                                <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-hurst">
+                                    <span style="color: #2d333b;">████████████████████</span>
+                                </div>
+                                <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
+                                    <span>&lt;0.5 Mean-rev</span>
+                                    <span>=0.5 Random</span>
+                                    <span>&gt;0.5 Trending</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Efficiency Ratio -->
+                            <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Efficiency Ratio</div>
+                                    <div style="font-size: 20px; font-weight: 700; color: #22d3ee;" id="regime-metric-er">-</div>
+                                </div>
+                                <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-er">
+                                    <span style="color: #2d333b;">████████████████████</span>
+                                </div>
+                                <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
+                                    <span>0.0 Choppy</span>
+                                    <span>0.5 Moderate</span>
+                                    <span>1.0 Trend</span>
+                                </div>
+                            </div>
+                            
+                            <!-- ATR Percentage -->
+                            <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">ATR Percentage</div>
+                                    <div style="font-size: 20px; font-weight: 700; color: #f59e0b;" id="regime-metric-atr">-</div>
+                                </div>
+                                <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-atr">
+                                    <span style="color: #2d333b;">████████████████████</span>
+                                </div>
+                                <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
+                                    <span>0% Low</span>
+                                    <span>2% Normal</span>
+                                    <span>5%+ High</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Permutation Entropy -->
+                            <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Permutation Entropy</div>
+                                    <div style="font-size: 20px; font-weight: 700; color: #a78bfa;" id="regime-metric-pe">-</div>
+                                </div>
+                                <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-pe">
+                                    <span style="color: #2d333b;">████████████████████</span>
+                                </div>
+                                <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
+                                    <span>0.0 Predictable</span>
+                                    <span>0.5 Moderate</span>
+                                    <span>1.0 Random</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1499,6 +1631,243 @@ let drawdownChart = null;
 let allStrategiesList = [];
 let isStoppingBot = false;
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MARKET REGIME FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+let currentRegimeTimeframe = '4H';
+
+function getRegimeBadgeStyle(family) {
+    const styles = {
+        'trending': { bg: '#3fb950', color: '#ffffff', text: 'TRENDING' },
+        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },
+        'ranging': { bg: '#58a6ff', color: '#ffffff', text: 'RANGING' },
+        'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' }
+    };
+    return styles[family] || styles['default'];
+}
+
+function setRegimeTimeframe(timeframe) {
+    currentRegimeTimeframe = timeframe;
+    
+    // Update active button
+    document.querySelectorAll('#tab-regime .view-selector .view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent === timeframe) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Load regime data
+    loadRegimeData();
+}
+
+async function loadRegimeData() {
+    try {
+        const res = await fetch('/api/regime/current?timeframe=' + currentRegimeTimeframe);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
+        const data = await res.json();
+        
+        if (!data.success) {
+            console.error('Regime API error:', data.error);
+            updateRegimeUI({
+                family: 'error',
+                multiplier: 1.0,
+                metrics: {},
+                timeframe: currentRegimeTimeframe
+            });
+            return;
+        }
+        
+        updateRegimeUI(data);
+        
+    } catch (error) {
+        console.error('Error loading regime data:', error);
+        updateRegimeUI({
+            family: 'error',
+            multiplier: 1.0,
+            metrics: {},
+            timeframe: currentRegimeTimeframe
+        });
+    }
+}
+
+function updateRegimeUI(data) {
+    const family = data.family || 'default';
+    const multiplier = data.multiplier || 1.0;
+    const metrics = data.metrics || {};
+    const timeframe = data.timeframe || currentRegimeTimeframe;
+    const allFamilies = data.all_families || {'volatile': 0.5, 'ranging': 1.0, 'trending': 1.5};
+    
+    // Get badge style
+    const badgeStyle = getRegimeBadgeStyle(family);
+    
+    // Update header stat card
+    const regimeBadge = document.getElementById('regime-badge');
+    if (regimeBadge) {
+        regimeBadge.textContent = badgeStyle.text;
+        regimeBadge.style.color = badgeStyle.bg;
+    }
+    
+    const regimeTimeframeEl = document.getElementById('regime-timeframe');
+    if (regimeTimeframeEl) {
+        regimeTimeframeEl.textContent = timeframe + ' | ' + multiplier.toFixed(1) + 'x sizing';
+    }
+    
+    // Update family cards with multipliers and active state
+    const families = ['volatile', 'ranging', 'trending'];
+    const familyColors = {
+        'volatile': '#f85149',
+        'ranging': '#58a6ff',
+        'trending': '#3fb950'
+    };
+    
+    families.forEach(f => {
+        const card = document.getElementById('regime-card-' + f);
+        const multiplierSpan = document.getElementById('regime-card-' + f + '-multiplier');
+        
+        if (card) {
+            // Set multiplier
+            if (multiplierSpan) {
+                const mult = allFamilies[f] || 1.0;
+                multiplierSpan.textContent = mult.toFixed(1) + 'x';
+            }
+            
+            // Set active/inactive state (NO animation)
+            if (f === family.toLowerCase()) {
+                // Active card
+                card.style.border = '2px solid ' + familyColors[f];
+                card.style.opacity = '1';
+                if (multiplierSpan) {
+                    multiplierSpan.style.color = familyColors[f];
+                }
+            } else {
+                // Inactive card
+                card.style.border = '2px solid #21262d';
+                card.style.opacity = '0.5';
+                if (multiplierSpan) {
+                    multiplierSpan.style.color = '#8b949e';
+                }
+            }
+        }
+    });
+    
+    // Helper function to create colored block bar
+    function createColoredBar(value, reverse = false) {
+        const totalBlocks = 20;
+        const filledBlocks = Math.round(value * totalBlocks);
+        const emptyBlocks = totalBlocks - filledBlocks;
+        
+        let html = '';
+        
+        for (let i = 0; i < totalBlocks; i++) {
+            if (i < filledBlocks) {
+                // Color based on position (red → yellow → green)
+                let color;
+                const position = i / totalBlocks;
+                
+                if (reverse) {
+                    // For ATR and PE (lower is better): green → yellow → red
+                    if (position < 0.33) {
+                        color = '#3fb950'; // Green
+                    } else if (position < 0.66) {
+                        color = '#f59e0b'; // Yellow
+                    } else {
+                        color = '#f85149'; // Red
+                    }
+                } else {
+                    // For Hurst and ER (higher is better): red → yellow → green
+                    if (position < 0.33) {
+                        color = '#f85149'; // Red
+                    } else if (position < 0.66) {
+                        color = '#f59e0b'; // Yellow
+                    } else {
+                        color = '#3fb950'; // Green
+                    }
+                }
+                
+                html += '<span style="color: ' + color + ';">█</span>';
+            } else {
+                html += '<span style="color: #2d333b;">█</span>';
+            }
+        }
+        
+        return html;
+    }
+    
+    // Update metrics with colored block bars
+    const hurst = metrics.hurst;
+    const er = metrics.efficiency_ratio;
+    const atr = metrics.atr_pct;
+    const pe = metrics.permutation_entropy;
+    
+    // Hurst Exponent (0-1 range, higher is better)
+    if (hurst !== undefined && hurst !== null && !isNaN(hurst)) {
+        document.getElementById('regime-metric-hurst').textContent = hurst.toFixed(3);
+        const hurstBar = document.getElementById('regime-bar-hurst');
+        if (hurstBar) {
+            hurstBar.innerHTML = createColoredBar(hurst, false);
+        }
+    } else {
+        document.getElementById('regime-metric-hurst').textContent = '-';
+        const hurstBar = document.getElementById('regime-bar-hurst');
+        if (hurstBar) {
+            hurstBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // Efficiency Ratio (0-1 range, higher is better)
+    if (er !== undefined && er !== null && !isNaN(er)) {
+        document.getElementById('regime-metric-er').textContent = er.toFixed(3);
+        const erBar = document.getElementById('regime-bar-er');
+        if (erBar) {
+            erBar.innerHTML = createColoredBar(er, false);
+        }
+    } else {
+        document.getElementById('regime-metric-er').textContent = '-';
+        const erBar = document.getElementById('regime-bar-er');
+        if (erBar) {
+            erBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // ATR Percentage (scale 0-5% to 0-1, lower is better)
+    if (atr !== undefined && atr !== null && !isNaN(atr)) {
+        document.getElementById('regime-metric-atr').textContent = atr.toFixed(2) + '%';
+        const atrBar = document.getElementById('regime-bar-atr');
+        if (atrBar) {
+            const atrScaled = Math.min(atr / 5, 1.0);
+            atrBar.innerHTML = createColoredBar(atrScaled, true);
+        }
+    } else {
+        document.getElementById('regime-metric-atr').textContent = '-';
+        const atrBar = document.getElementById('regime-bar-atr');
+        if (atrBar) {
+            atrBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // Permutation Entropy (0-1 range, lower is better)
+    if (pe !== undefined && pe !== null && !isNaN(pe)) {
+        document.getElementById('regime-metric-pe').textContent = pe.toFixed(3);
+        const peBar = document.getElementById('regime-bar-pe');
+        if (peBar) {
+            peBar.innerHTML = createColoredBar(pe, true);
+        }
+    } else {
+        document.getElementById('regime-metric-pe').textContent = '-';
+        const peBar = document.getElementById('regime-bar-pe');
+        if (peBar) {
+            peBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// END MARKET REGIME FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
 async function stopBot() {
     if (isStoppingBot) return;
     if (!confirm('WARNING: STOP TRADING BOT?\n\nThis will terminate the bot process.\n\nAre you sure?')) return;
@@ -1594,6 +1963,7 @@ function switchTab(tabName) {
     if (tabName === 'analysis') loadStrategyAnalysis();
     if (tabName === 'config') loadBotConfig();
     if (tabName === 'equity') loadEquityTab();
+    if (tabName === 'regime') loadRegimeData();
 }
 
 function switchEquitySubTab(subTabName) {
@@ -2869,6 +3239,10 @@ async function loadData() {
                 }).join('');
             }
         });
+        
+        // Load regime data (non-blocking)
+        loadRegimeData().catch(console.error);
+        
     } catch (error) {
         console.error('Error:', error);
     } finally {

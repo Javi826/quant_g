@@ -21,8 +21,8 @@ import warnings
 
 # Suppress warnings from external libraries
 warnings.filterwarnings('ignore')
-
-
+import logging
+logger = logging.getLogger('BOT_trading.market_regime.regime_metrics')
 import nolds
 from ta.volatility import AverageTrueRange
 import neurokit2 as nk
@@ -162,12 +162,25 @@ def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3
     
     series = close[-window:]
     
+    # Check for constant/near-constant values
+    if np.std(series) < 1e-8:
+        return 0.0
+    
     try:
         # Calculate permutation entropy using neurokit2
-        pe = nk.entropy_permutation(series, dimension=order, delay=1)
+        pe_result = nk.entropy_permutation(series, dimension=order, delay=1)
+        
+        # Extract value from tuple (neurokit2 returns tuple)
+        if isinstance(pe_result, tuple):
+            pe = pe_result[0]
+        else:
+            pe = pe_result
+        
+        # Check if result is valid
+        if pe is None or np.isnan(pe) or np.isinf(pe):
+            return np.nan
         
         # Normalize to [0, 1] range
-        # Maximum entropy for permutation entropy is log2(order!)
         from math import factorial
         max_entropy = np.log2(factorial(order))
         

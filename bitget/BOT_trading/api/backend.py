@@ -17,6 +17,19 @@ logger = logging.getLogger('BOT_trading.api.backend')
 
 from analytics.metrics import MetricsCalculator
 
+# ═══════════════════════════════════════════════════════════════════════════
+# MARKET REGIME IMPORT
+# ═══════════════════════════════════════════════════════════════════════════
+try:
+    from market_regime.regime_classifier import get_regime_info
+    from config.settings import REGIME_FAMILIES, REGIME_FAMILY_SIZING
+    REGIME_MODULE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"WAR-Market regime module not available: {e}")
+    REGIME_MODULE_AVAILABLE = False
+    REGIME_FAMILIES = {}
+    REGIME_FAMILY_SIZING = {}
+
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -1026,6 +1039,119 @@ class DashboardServer:
                 
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+        
+        # ═══════════════════════════════════════════════════════════════════════════
+        # MARKET REGIME ENDPOINTS
+        # ═══════════════════════════════════════════════════════════════════════════
+        
+        @self.app.route('/api/regime/current')
+        def get_regime_current():
+            """
+            Obtiene el régimen de mercado actual para un timeframe específico.
+            
+            Query params:
+                timeframe: Timeframe a analizar (ej: '4H', '1H', '6Hutc')
+            
+            Returns:
+                JSON con family, multiplier, metrics, thresholds, all_families, all_thresholds
+            """
+            if not REGIME_MODULE_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'error': 'Market regime module not available',
+                    'family': 'ranging',
+                    'multiplier': 1.0,
+                    'metrics': {},
+                    'timeframe': request.args.get('timeframe', '4H'),
+                    'all_families': {},
+                    'all_thresholds': {}
+                }), 200
+            
+            try:
+                timeframe = request.args.get('timeframe', '4H')
+                
+                # Validar timeframe
+                valid_timeframes = ['1H', '4H', '6Hutc', '2m', '5m', '15m', '30m']
+                if timeframe not in valid_timeframes:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Invalid timeframe. Valid: {valid_timeframes}',
+                        'family': 'ranging',
+                        'multiplier': 1.0,
+                        'metrics': {},
+                        'timeframe': timeframe,
+                        'all_families': {},
+                        'all_thresholds': {}
+                    }), 400
+                
+                # Obtener régimen actual
+                regime_info = get_regime_info(timeframe)
+                
+                # Retornar info completa incluyendo todas las familias
+                return jsonify({
+                    'success': True,
+                    'timeframe': timeframe,
+                    'family': regime_info['family'],
+                    'multiplier': regime_info['multiplier'],
+                    'metrics': regime_info['metrics'],
+                    'thresholds': regime_info.get('thresholds', {}),
+                    'all_families': REGIME_FAMILY_SIZING,
+                    'all_thresholds': REGIME_FAMILIES
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting regime: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'family': 'ranging',
+                    'multiplier': 1.0,
+                    'metrics': {},
+                    'timeframe': request.args.get('timeframe', '4H'),
+                    'all_families': {},
+                    'all_thresholds': {}
+                }), 500
+        
+        @self.app.route('/api/regime/history')
+        def get_regime_history():
+            """
+            Obtiene el historial de régimen de mercado (PLACEHOLDER).
+            
+            Query params:
+                timeframe: Timeframe a analizar (ej: '4H', '1H')
+                bars: Número de barras históricas (default: 24)
+            
+            Returns:
+                JSON con historial de regímenes
+            """
+            if not REGIME_MODULE_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'error': 'Market regime module not available',
+                    'history': []
+                }), 200
+            
+            try:
+                timeframe = request.args.get('timeframe', '4H')
+                bars = int(request.args.get('bars', 24))
+                
+                # PLACEHOLDER: Por ahora retornar estructura vacía
+                # TODO: Implementar tracking histórico de regímenes
+                return jsonify({
+                    'success': True,
+                    'timeframe': timeframe,
+                    'bars': bars,
+                    'history': [],
+                    'message': 'Historical tracking not yet implemented'
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting regime history: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'history': []
+                }), 500
     
     def start(self, host='0.0.0.0', port=5000):
         """Inicia el servidor del dashboard"""

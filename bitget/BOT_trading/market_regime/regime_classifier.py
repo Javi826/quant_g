@@ -10,56 +10,45 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
 
-from market_data.api_client import _call_history_candles, to_dataframe_from_api
-from market_data.data_utils import normalize_live_ohlcv, df_to_arrays_live
+from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from market_regime.regime_metrics import calc_all_metrics
 from config.settings import (
-    BTC_SYMBOL,
-    REGIME_LOOKBACK_BARS,
+    REGIME_REFERENCE_SYMBOL,
     REGIME_FAMILIES,
     REGIME_FAMILY_SIZING,
     REGIME_HURST_WINDOW,
     REGIME_ER_WINDOW,
     REGIME_ATR_WINDOW,
     REGIME_PE_WINDOW,
-    REGIME_PE_ORDER,
-    LOG_REGIME_DECISIONS
+    REGIME_PE_ORDER
 )
 
-logger = logging.getLogger('BOT_trading.market_regime')
+logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
 
 def fetch_btc_ohlcv(timeframe: str, limit: int = None) -> Optional[pd.DataFrame]:
     """
     Fetch BTC OHLCV data for regime calculation.
     
+    Uses the same data fetching logic as trading strategies to ensure consistency.
+    
     Args:
         timeframe: Timeframe (e.g., '4H', '1H', '6Hutc')
-        limit: Number of bars to fetch (default from settings)
+        limit: Number of bars to fetch (not used, kept for compatibility)
     
     Returns:
         DataFrame with OHLCV data or None on error
     """
-    if limit is None:
-        limit = REGIME_LOOKBACK_BARS
-    
     try:
-        logger.debug(f"Fetching {limit} bars of {BTC_SYMBOL} {timeframe} for regime calculation")
+        logger.debug(f"Fetching {REGIME_REFERENCE_SYMBOL} {timeframe} data for regime calculation")
         
-        candles = _call_history_candles(
-            symbol=BTC_SYMBOL,
-            granularity=timeframe,
-            limit=limit
-        )
+        # Use the same fetch function as strategies
+        ohlcv_data = fetch_ohlcv_data([REGIME_REFERENCE_SYMBOL], timeframe)
         
-        if not candles:
-            logger.warning(f"No candle data returned for {BTC_SYMBOL} {timeframe}")
-            return None
+        df = ohlcv_data.get(REGIME_REFERENCE_SYMBOL)
         
-        df = to_dataframe_from_api(candles)
-        
-        if df.empty:
-            logger.warning(f"Empty DataFrame after parsing {BTC_SYMBOL} {timeframe}")
+        if df is None or df.empty:
+            logger.warning(f"No data returned for {REGIME_REFERENCE_SYMBOL} {timeframe}")
             return None
         
         logger.debug(f"Successfully fetched {len(df)} bars")
@@ -81,17 +70,17 @@ def calculate_regime_metrics(timeframe: str) -> Optional[Dict[str, float]]:
         Dict with metrics or None on error
     """
     try:
-        # Fetch BTC data
-        df = fetch_btc_ohlcv(timeframe, limit=REGIME_LOOKBACK_BARS)
+        # Fetch BTC data using same method as strategies
+        df = fetch_btc_ohlcv(timeframe)
         
         if df is None or df.empty:
             logger.error("Cannot calculate regime metrics: no BTC data")
             return None
         
-        # Normalize DataFrame
+        # Normalize DataFrame (same as strategies)
         df_norm = normalize_live_ohlcv(df)
         
-        # Convert to arrays
+        # Convert to arrays (same as strategies)
         arrays = df_to_arrays_live(df_norm)
         
         # Prepare OHLC dict for metrics calculation
@@ -208,14 +197,14 @@ def get_current_regime(timeframe: str) -> Tuple[str, Optional[Dict[str, float]]]
     
     family = classify_regime(metrics)
     
-    if LOG_REGIME_DECISIONS:
-        logger.info(
-            f"Regime classified as '{family}' for {timeframe} | "
-            f"Metrics: hurst={metrics.get('hurst', 0):.3f}, "
-            f"er={metrics.get('efficiency_ratio', 0):.3f}, "
-            f"atr%={metrics.get('atr_pct', 0):.2f}, "
-            f"pe={metrics.get('permutation_entropy', 0):.3f}"
-        )
+
+    logger.debug(
+        f"Regime classified as '{family}' for {timeframe} | "
+        f"Metrics: hurst={metrics.get('hurst', 0):.3f}, "
+        f"er={metrics.get('efficiency_ratio', 0):.3f}, "
+        f"atr%={metrics.get('atr_pct', 0):.2f}, "
+        f"pe={metrics.get('permutation_entropy', 0):.3f}"
+    )
     
     return family, metrics
 
@@ -240,8 +229,8 @@ def get_regime_multiplier(symbol: str, timeframe: str) -> float:
         # Get multiplier for this family
         multiplier = REGIME_FAMILY_SIZING.get(family, 1.0)
         
-        if LOG_REGIME_DECISIONS:
-            logger.info(f"Regime sizing: {family} → {multiplier}x multiplier")
+
+        logger.info(f"Regime sizing: {family} → {multiplier}x multiplier")
         
         return multiplier
         

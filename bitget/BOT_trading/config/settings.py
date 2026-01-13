@@ -209,15 +209,15 @@ LOG_NAMESPACE = "BOT_trading"
 REGIME_SIZING_ENABLED = False  # Switch principal (False por defecto hasta validar)
 
 # BTC settings for regime calculation
-BTC_SYMBOL = 'BTCUSDT'
-REGIME_LOOKBACK_BARS = 200
+REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
+REGIME_LOOKBACK_BARS    = 150
 
 # Metric calculation windows
 REGIME_HURST_WINDOW = 100
-REGIME_ER_WINDOW = 14
-REGIME_ATR_WINDOW = 14
-REGIME_PE_WINDOW = 50
-REGIME_PE_ORDER = 3
+REGIME_ER_WINDOW    = 14
+REGIME_ATR_WINDOW   = 14
+REGIME_PE_WINDOW    = 50
+REGIME_PE_ORDER     = 3
 
 # Family classification thresholds
 # Order matters: first match wins. 'ranging' is default (empty rules).
@@ -233,9 +233,6 @@ REGIME_FAMILY_SIZING = {
     'volatile': 0.5,   # 50% smaller positions in volatile markets
     'ranging': 1.0,    # Normal size in ranging markets
 }
-
-# Logging
-LOG_REGIME_DECISIONS = True  # Log every regime classification
 
 # ==========================================================================
 # HELPER FUNCTIONS
