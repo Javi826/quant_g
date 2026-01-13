@@ -204,9 +204,6 @@ LOG_NAMESPACE = "BOT_trading"
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-# Enable/disable regime-based position sizing
-REGIME_SIZING_ENABLED = False  # Switch principal (False por defecto hasta validar)
-
 # BTC settings for regime calculation
 REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
 
@@ -227,9 +224,9 @@ REGIME_FAMILIES = {
 
 # Position sizing multipliers per family
 REGIME_FAMILY_SIZING = {
-    'trending': 1.5,   # 50% larger positions in trending markets
-    'volatile': 0.5,   # 50% smaller positions in volatile markets
-    'ranging': 1.0,    # Normal size in ranging markets
+    'trending': 1.8,   
+    'volatile': 0.0,   
+    'ranging': 1.0,    
 }
 
 # ==========================================================================

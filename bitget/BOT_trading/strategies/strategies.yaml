@@ -22,7 +22,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 2
     tolerance: 15
     trend_th: 5
@@ -38,7 +38,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 4
     tolerance: 20
     ma_period: 50
@@ -54,7 +54,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 150
     tolerance: 40
     ma_period: 50
@@ -70,7 +70,7 @@ strategies:
     active: true
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 4
     tolerance: 25
     ma_period: 50
@@ -86,7 +86,7 @@ strategies:
     active: false
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 100
     tolerance: 30
     ma_period: 50
@@ -102,7 +102,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 7
     tolerance: 40
     ma_period: 25
@@ -118,7 +118,7 @@ strategies:
     active: true
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 5
     tolerance: 30
     ma_period: 50
@@ -134,7 +134,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 3
     tolerance: 20
     ma_period: 50
@@ -150,7 +150,7 @@ strategies:
     active: true
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 6
     tolerance: 30
     ma_period: 25
@@ -166,7 +166,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 150
     tolerance: 15
     ma_period: 25
@@ -182,7 +182,7 @@ strategies:
     active: true
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 150
     tolerance: 20
     ma_period: 50
@@ -198,7 +198,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 50
     tolerance: 40
     ma_period: 25
@@ -214,7 +214,7 @@ strategies:
     active: true
     direction: 'short'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 50
     tolerance: 35
     impulse: 0.01
@@ -230,7 +230,7 @@ strategies:
     active: true
     direction: 'long'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 50
     tolerance: 40
     impulse: 0.01

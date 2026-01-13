@@ -1039,10 +1039,102 @@ class DashboardServer:
                 
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
-        
-        # ═══════════════════════════════════════════════════════════════════════════
+        ##ddd
+        @self.app.route('/api/correlation-matrix', methods=['POST'])
+        def get_correlation_matrix():
+            """Calculate correlation matrix between selected strategies."""
+            try:
+                import pandas as pd
+                
+                # Get selected strategies from request
+                data = request.get_json()
+                selected_strategies = data.get('strategies', [])
+                
+                if not selected_strategies:
+                    return jsonify({'error': 'No strategies selected'}), 400
+                
+                # Load trades from Excel
+                if not os.path.exists(self.trades_file):
+                    return jsonify({'error': 'No trades data available'}), 404
+                
+                df = pd.read_excel(self.trades_file)
+                
+                if df.empty:
+                    return jsonify({'error': 'Trades file is empty'}), 404
+                
+                # Filter by selected strategies
+                df = df[df['STRATEGY'].isin(selected_strategies)]
+                
+                if df.empty:
+                    return jsonify({'error': 'No trades found for selected strategies'}), 404
+                
+                # Group by strategy and date, calculate daily returns
+                returns_by_strategy = {}
+                for strat_id in selected_strategies:
+                    strat_df = df[df['STRATEGY'] == strat_id].copy()
+                    
+                    if strat_df.empty:
+                        continue
+                    
+                    # Convert to datetime and get date
+                    strat_df['date'] = pd.to_datetime(strat_df['CLOSE_AT']).dt.date
+                    
+                    # Sum daily profits
+                    daily_returns = strat_df.groupby('date')['PROFIT'].sum()
+                    returns_by_strategy[strat_id] = daily_returns
+                
+                if len(returns_by_strategy) < 2:
+                    return jsonify({'error': 'Need at least 2 strategies with trades'}), 400
+                
+                # Create DataFrame and calculate correlation
+                returns_df = pd.DataFrame(returns_by_strategy)
+                
+                # Fill NaN with 0 (days with no trades)
+                returns_df = returns_df.fillna(0)
+                
+                # Calculate correlation matrix
+                corr_matrix = returns_df.corr()
+                
+                # Find high correlation pairs (>0.7)
+                high_corr_pairs = []
+                strategies_list = list(corr_matrix.columns)
+                
+                for i in range(len(strategies_list)):
+                    for j in range(i + 1, len(strategies_list)):
+                        corr_value = corr_matrix.iloc[i, j]
+                        
+                        if pd.notna(corr_value) and corr_value > 0.7:
+                            high_corr_pairs.append({
+                                'strat1': strategies_list[i],
+                                'strat2': strategies_list[j],
+                                'correlation': round(float(corr_value), 3)
+                            })
+                
+                # Sort by correlation (highest first)
+                high_corr_pairs.sort(key=lambda x: x['correlation'], reverse=True)
+                
+                # Convert matrix to dict (handle NaN values)
+                matrix_dict = {}
+                for col in corr_matrix.columns:
+                    matrix_dict[col] = {}
+                    for idx in corr_matrix.index:
+                        val = corr_matrix.loc[idx, col]
+                        matrix_dict[col][idx] = round(float(val), 3) if pd.notna(val) else 0
+                
+                return jsonify({
+                    'success': True,
+                    'matrix': matrix_dict,
+                    'strategies': strategies_list,
+                    'high_corr_pairs': high_corr_pairs
+                })
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
+        # ===========================================================================
         # MARKET REGIME ENDPOINTS
-        # ═══════════════════════════════════════════════════════════════════════════
+        # ===========================================================================
         
         @self.app.route('/api/regime/current')
         def get_regime_current():

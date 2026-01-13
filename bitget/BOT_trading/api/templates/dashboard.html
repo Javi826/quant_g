@@ -889,6 +889,76 @@
         .regime-family-card {
             transition: all 0.3s ease;
         }
+        
+        /* Correlation Matrix Styles */
+        .correlation-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        
+        .correlation-table th,
+        .correlation-table td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #30363d;
+            min-width: 80px;
+        }
+        
+        .correlation-table th {
+            background: #21262d;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .correlation-table th:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+            background: #21262d;
+        }
+        
+        .correlation-table td:first-child {
+            position: sticky;
+            left: 0;
+            background: #0d1117;
+            font-weight: 600;
+            text-align: left;
+            padding-left: 12px;
+        }
+        
+        .correlation-cell {
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .corr-pair-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            transition: background 0.2s ease;
+        }
+        
+        .corr-pair-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+        
+        .corr-pair-strategies {
+            color: #c9d1d9;
+            font-weight: 500;
+        }
+        
+        .corr-pair-value {
+            color: #f85149;
+            font-weight: 600;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -1049,6 +1119,7 @@
                         <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('monthly')">Monthly</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('correlation')">Correlation</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                     </div>
@@ -1205,6 +1276,39 @@
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
                         <div id="weekday-container">Loading...</div>
                     </div>
+                    
+                    <div id="equity-subtab-correlation" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Correlation Analysis</h3>
+                        
+                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd; margin-bottom: 20px;" onclick="updateCorrelationAnalysis()">🔄 Update Correlation</button>
+                        
+                        <div class="strategy-checkboxes" id="correlation-strategy-checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="correlation-strat-all" value="ALL" checked>
+                                <label for="correlation-strat-all">ALL STRATEGIES</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Correlation Matrix -->
+                        <div class="config-card" style="margin-top: 20px;">
+                            <h3>Correlation Matrix</h3>
+                            <div id="correlation-matrix-container" style="overflow-x: auto;">
+                                <p style="color: #8b949e; text-align: center; padding: 40px;">
+                                    Select strategies and click "Update Correlation" to generate matrix
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- High Correlation Pairs -->
+                        <div class="config-card" style="margin-top: 20px;">
+                            <h3>⚠️ High Correlation Pairs (>0.7)</h3>
+                            <div id="high-corr-pairs" style="min-height: 60px;">
+                                <p style="color: #8b949e; text-align: center; padding: 20px;">
+                                    No data yet - click "Update Correlation"
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1223,7 +1327,7 @@
                         <!-- VOLATILE Card -->
                         <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                             <div style="font-size: 39px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
-                            <div id="regime-card-volatile-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">0.5x</div>
+                            <div id="regime-card-volatile-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                             <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                                 <div id="regime-card-volatile-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                     Loading rules...
@@ -1237,7 +1341,7 @@
                         <!-- RANGING Card -->
                         <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                             <div style="font-size: 39px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
-                            <div id="regime-card-ranging-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.0x</div>
+                            <div id="regime-card-ranging-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                             <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                                 <div id="regime-card-ranging-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                     Loading rules...
@@ -1251,7 +1355,7 @@
                         <!-- TRENDING Card -->
                         <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                             <div style="font-size: 39px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
-                            <div id="regime-card-trending-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.5x</div>
+                            <div id="regime-card-trending-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                             <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                                 <div id="regime-card-trending-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                     Loading rules...
@@ -1726,7 +1830,15 @@ function updateRegimeUI(data) {
     const multiplier = data.multiplier || 1.0;
     const metrics = data.metrics || {};
     const timeframe = data.timeframe || currentRegimeTimeframe;
-    const allFamilies = data.all_families || {'volatile': 0.5, 'ranging': 1.0, 'trending': 1.5};
+    // CRITICAL: all_families must come from backend (settings.py)
+    // If backend fails, show error instead of using outdated hardcoded values
+    const allFamilies = data.all_families;
+    
+    if (!allFamilies || Object.keys(allFamilies).length === 0) {
+        console.error('Backend did not return all_families - check REGIME_FAMILY_SIZING in settings.py');
+        regimeContainer.innerHTML = '<div style="color: #f85149; padding: 40px; text-align: center;">Error: Market regime configuration not available. Check backend logs.</div>';
+        return;
+    }
     const allThresholds = data.all_thresholds || {};
     
     // Get badge style
@@ -1789,7 +1901,7 @@ function updateRegimeUI(data) {
         if (card) {
             // Set multiplier
             if (multiplierSpan) {
-                const mult = allFamilies[f] || 1.0;
+                const mult = (f in allFamilies) ? allFamilies[f] : 1.0;
                 multiplierSpan.textContent = mult.toFixed(1) + 'x';
             }
             
@@ -2040,6 +2152,7 @@ function switchEquitySubTab(subTabName) {
     if (subTabName === 'symbols') loadSymbolsAnalysis();
     if (subTabName === 'weekday') loadWeekDayAnalysis();
     if (subTabName === 'monthly') initMonthlyTab();
+    if (subTabName === 'correlation') initCorrelationTab();
     if (subTabName === 'compose') {
         const container = document.getElementById('compose-container');
         const currentContent = container.innerHTML.trim();
@@ -2512,58 +2625,104 @@ async function loadBotConfig() {
     }
 }
 
+// =============================================================================
+// GENERIC CHECKBOX FUNCTIONS (Used by Curves, Monthly, Correlation)
+// =============================================================================
+
+/**
+ * Initialize strategy checkboxes for a tab
+ * @param {string} containerId - ID of checkbox container div
+ * @param {string} checkboxPrefix - Prefix for individual checkbox IDs (e.g., 'strat-')
+ * @param {string} allCheckboxId - ID of "ALL STRATEGIES" checkbox
+ * @returns {Promise<Array>} Array of strategies from API
+ */
+async function initStrategyCheckboxes(containerId, checkboxPrefix, allCheckboxId) {
+    const res = await fetch('/api/bot-config');
+    const data = await res.json();
+    
+    const strategies = data.strategies || [];
+    
+    const checkboxContainer = document.getElementById(containerId);
+    const allCheckbox = checkboxContainer.querySelector(`#${allCheckboxId}`).parentElement;
+    
+    // Clear and re-add ALL checkbox
+    checkboxContainer.innerHTML = '';
+    checkboxContainer.appendChild(allCheckbox);
+    
+    // Create checkbox for each strategy
+    strategies.forEach((strat) => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = checkboxPrefix + strat.id;
+        checkbox.value = strat.id;
+        checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
+        
+        const label = document.createElement('label');
+        label.htmlFor = checkboxPrefix + strat.id;
+        
+        const displayName = strat.id.replace(/^\d{2}_/, '');
+        label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
+        
+        // Color coding by status
+        if (strat.status === 'ACTIVE') {
+            label.style.color = '#ffffff';
+            label.style.fontWeight = '600';
+        } else if (strat.status === 'DEPRECATING') {
+            label.style.color = '#d29922';
+        } else {
+            label.style.color = '#8b949e';
+            label.style.fontStyle = 'italic';
+        }
+        
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        checkboxContainer.appendChild(div);
+    });
+    
+    // Setup "ALL" checkbox toggle - use cloneNode to avoid duplicate listeners
+    const allCheckboxInput = document.getElementById(allCheckboxId);
+    const newAllCheckbox = allCheckboxInput.cloneNode(true);
+    allCheckboxInput.parentNode.replaceChild(newAllCheckbox, allCheckboxInput);
+    
+    newAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        document.querySelectorAll(`#${containerId} input[type="checkbox"]`).forEach(cb => {
+            if (cb.id !== allCheckboxId) cb.checked = isChecked;
+        });
+    });
+    
+    return strategies;
+}
+
+/**
+ * Get selected strategy IDs from a checkbox container
+ * @param {string} containerId - ID of checkbox container div
+ * @returns {Array<string>} Array of selected strategy IDs (excludes "ALL")
+ */
+function getSelectedStrategies(containerId) {
+    const selected = [];
+    document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`).forEach(cb => {
+        if (cb.value !== 'ALL') {
+            selected.push(cb.value);
+        }
+    });
+    return selected;
+}
+
+// =============================================================================
+// END GENERIC CHECKBOX FUNCTIONS
+// =============================================================================
+
 async function loadEquityTab() {
     try {
-        const res = await fetch('/api/bot-config');
-        const data = await res.json();
-        
-        allStrategiesList = data.strategies || [];
-        
-        const allStrategies = allStrategiesList;
-        
-        const checkboxContainer = document.getElementById('strategy-checkboxes');
-        const allCheckbox = checkboxContainer.querySelector('#strat-all').parentElement;
-        
-        checkboxContainer.innerHTML = '';
-        checkboxContainer.appendChild(allCheckbox);
-        
-        allStrategies.forEach((strat) => {
-            const div = document.createElement('div');
-            div.className = 'checkbox-item';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'strat-' + strat.id;
-            checkbox.value = strat.id;
-            checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
-            
-            const label = document.createElement('label');
-            label.htmlFor = 'strat-' + strat.id;
-            
-            const displayName = strat.id.replace(/^\d{2}_/, '');
-            label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
-            
-            if (strat.status === 'ACTIVE') {
-                label.style.color = '#ffffff';
-                label.style.fontWeight = '600';
-            } else if (strat.status === 'DEPRECATING') {
-                label.style.color = '#d29922';
-            } else {
-                label.style.color = '#8b949e';
-                label.style.fontStyle = 'italic';
-            }
-            
-            div.appendChild(checkbox);
-            div.appendChild(label);
-            checkboxContainer.appendChild(div);
-        });
-        
-        document.getElementById('strat-all').addEventListener('change', function() {
-            const isChecked = this.checked;
-            document.querySelectorAll('#strategy-checkboxes input[type="checkbox"]').forEach(cb => {
-                if (cb.id !== 'strat-all') cb.checked = isChecked;
-            });
-        });
+        allStrategiesList = await initStrategyCheckboxes(
+            'strategy-checkboxes',
+            'strat-',
+            'strat-all'
+        );
         
         await updateEquityChart();
         
@@ -2574,54 +2733,11 @@ async function loadEquityTab() {
 
 async function initMonthlyTab() {
     try {
-        const res = await fetch('/api/bot-config');
-        const data = await res.json();
-        
-        allStrategiesList = data.strategies || [];
-        
-        const checkboxContainer = document.getElementById('monthly-strategy-checkboxes');
-        const allCheckbox = checkboxContainer.querySelector('#monthly-strat-all').parentElement;
-        
-        checkboxContainer.innerHTML = '';
-        checkboxContainer.appendChild(allCheckbox);
-        
-        allStrategiesList.forEach((strat) => {
-            const div = document.createElement('div');
-            div.className = 'checkbox-item';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.id = 'monthly-strat-' + strat.id;
-            checkbox.value = strat.id;
-            checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
-            
-            const label = document.createElement('label');
-            label.htmlFor = 'monthly-strat-' + strat.id;
-            
-            const displayName = strat.id.replace(/^\d{2}_/, '');
-            label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
-            
-            if (strat.status === 'ACTIVE') {
-                label.style.color = '#ffffff';
-                label.style.fontWeight = '600';
-            } else if (strat.status === 'DEPRECATING') {
-                label.style.color = '#d29922';
-            } else {
-                label.style.color = '#8b949e';
-                label.style.fontStyle = 'italic';
-            }
-            
-            div.appendChild(checkbox);
-            div.appendChild(label);
-            checkboxContainer.appendChild(div);
-        });
-        
-        document.getElementById('monthly-strat-all').addEventListener('change', function() {
-            const isChecked = this.checked;
-            document.querySelectorAll('#monthly-strategy-checkboxes input[type="checkbox"]').forEach(cb => {
-                if (cb.id !== 'monthly-strat-all') cb.checked = isChecked;
-            });
-        });
+        allStrategiesList = await initStrategyCheckboxes(
+            'monthly-strategy-checkboxes',
+            'monthly-strat-',
+            'monthly-strat-all'
+        );
         
     } catch (error) {
         console.error('Error initializing monthly tab:', error);
@@ -2630,12 +2746,7 @@ async function initMonthlyTab() {
 
 async function loadMonthlyAnalysis() {
     try {
-        const selectedStrategies = [];
-        document.querySelectorAll('#monthly-strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
-            if (cb.value !== 'ALL') {
-                selectedStrategies.push(cb.value);
-            }
-        });
+        const selectedStrategies = getSelectedStrategies('monthly-strategy-checkboxes');
         
         if (selectedStrategies.length === 0) {
             alert('Please select at least one strategy');
@@ -3129,12 +3240,7 @@ async function loadWeekDayAnalysis() {
 
 async function updateEquityChart() {
     try {
-        const selectedStrategies = [];
-        document.querySelectorAll('#strategy-checkboxes input[type="checkbox"]:checked').forEach(cb => {
-            if (cb.value !== 'ALL') {
-                selectedStrategies.push(cb.value);
-            }
-        });
+        const selectedStrategies = getSelectedStrategies('strategy-checkboxes');
         
         if (selectedStrategies.length === 0) {
             alert('Please select at least one strategy');
@@ -3386,6 +3492,145 @@ async function initializeDashboard() {
     await loadBotConfig();
     startPolling();
 }
+
+// =============================================================================
+// CORRELATION ANALYSIS
+// =============================================================================
+
+async function initCorrelationTab() {
+    try {
+        allStrategiesList = await initStrategyCheckboxes(
+            'correlation-strategy-checkboxes',
+            'correlation-strat-',
+            'correlation-strat-all'
+        );
+        
+    } catch (error) {
+        console.error('Error loading correlation tab:', error);
+    }
+}
+
+function getSelectedCorrelationStrategies() {
+    return getSelectedStrategies('correlation-strategy-checkboxes');
+}
+
+async function updateCorrelationAnalysis() {
+    const selected = getSelectedCorrelationStrategies();
+    
+    if (selected.length < 2) {
+        alert('Please select at least 2 strategies to calculate correlation');
+        return;
+    }
+    
+    // Show loading
+    document.getElementById('correlation-matrix-container').innerHTML = '<p style="text-align: center; padding: 40px; color: #8b949e;">Calculating correlation...</p>';
+    document.getElementById('high-corr-pairs').innerHTML = '<p style="text-align: center; padding: 20px; color: #8b949e;">Calculating...</p>';
+    
+    try {
+        const res = await fetch('/api/correlation-matrix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ strategies: selected })
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            document.getElementById('correlation-matrix-container').innerHTML = `<p style="color: #f85149; text-align: center; padding: 40px;">${data.error}</p>`;
+            document.getElementById('high-corr-pairs').innerHTML = `<p style="color: #f85149; text-align: center; padding: 20px;">${data.error}</p>`;
+            return;
+        }
+        
+        renderCorrelationMatrix(data.matrix, data.strategies);
+        renderHighCorrelationPairs(data.high_corr_pairs);
+        
+    } catch (error) {
+        console.error('Error calculating correlation:', error);
+        document.getElementById('correlation-matrix-container').innerHTML = '<p style="color: #f85149; text-align: center; padding: 40px;">Error calculating correlation</p>';
+    }
+}
+
+function renderCorrelationMatrix(matrix, strategies) {
+    const container = document.getElementById('correlation-matrix-container');
+    
+    let html = '<table class="correlation-table"><thead><tr><th></th>';
+    
+    // Header row - SOLO NÚMEROS
+    strategies.forEach(strat => {
+        const number = strat.split('_')[0];  // Solo el número
+        html += `<th>${number}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Data rows - SOLO NÚMEROS
+    strategies.forEach(strat1 => {
+        const number1 = strat1.split('_')[0];  // Solo el número
+        html += `<tr><td>${number1}</td>`;
+        
+        strategies.forEach(strat2 => {
+            const corr = matrix[strat1][strat2];
+            const color = getCorrelationColor(corr);
+            const displayValue = corr === 1.0 ? '1.00' : corr.toFixed(2);
+            
+            html += `<td class="correlation-cell" style="background-color: ${color};" title="${strat1} vs ${strat2}: ${displayValue}">${displayValue}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function getCorrelationColor(corr) {
+    // High correlation (>0.7) = LIGHT RED
+    if (corr > 0.7 && corr < 1.0) return 'rgb(255, 150, 150)';  // Light red
+    
+    // Perfect correlation (1.0) = DARK BLUE (diagonal)
+    if (corr === 1.0) return 'rgb(10, 50, 120)';  // Very dark blue for diagonal
+    
+    // Blue gradient from dark to light (solid colors, no transparency)
+    if (corr >= 0.6) return 'rgb(30, 90, 180)';     // Dark blue
+    if (corr >= 0.5) return 'rgb(40, 110, 200)';    // Medium-dark blue
+    if (corr >= 0.4) return 'rgb(60, 140, 220)';    // Medium blue
+    if (corr >= 0.3) return 'rgb(80, 160, 235)';    // Medium-light blue
+    if (corr >= 0.2) return 'rgb(110, 180, 245)';   // Light blue
+    if (corr >= 0.1) return 'rgb(140, 200, 250)';   // Very light blue
+    if (corr >= 0) return 'rgb(170, 215, 252)';     // Pale blue
+    if (corr >= -0.2) return 'rgb(190, 225, 253)';  // Very pale blue
+    if (corr >= -0.4) return 'rgb(210, 235, 254)';  // Almost white blue
+    return 'rgb(230, 245, 255)';                     // Lightest blue
+}
+
+function renderHighCorrelationPairs(pairs) {
+    const container = document.getElementById('high-corr-pairs');
+    
+    if (pairs.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #3fb950; padding: 20px;">✅ No pairs with high positive correlation (>0.7)</p>';
+        return;
+    }
+    
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    
+    pairs.forEach(pair => {
+        const num1 = pair.strat1.split('_')[0];  // Solo el número
+        const num2 = pair.strat2.split('_')[0];  // Solo el número
+        
+        html += `
+            <div class="corr-pair-item">
+                <span class="corr-pair-strategies">${num1} + ${num2}</span>
+                <span class="corr-pair-value">${pair.correlation.toFixed(3)}</span>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// =============================================================================
+// END CORRELATION ANALYSIS
+// =============================================================================
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDashboard);
