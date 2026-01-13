@@ -1209,28 +1209,43 @@
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
                         <!-- VOLATILE Card -->
                         <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                            <div style="font-size: 18px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
+                            <div style="font-size: 39px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
                             <div id="regime-card-volatile-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">0.5x</div>
-                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
-                                Reduce positions<br>High volatility + unpredictable
+                            <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
+                                <div id="regime-card-volatile-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                                    Loading rules...
+                                </div>
+                                <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                                    High volatility + unpredictable
+                                </div>
                             </div>
                         </div>
                         
                         <!-- RANGING Card -->
                         <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                            <div style="font-size: 18px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
+                            <div style="font-size: 39px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
                             <div id="regime-card-ranging-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.0x</div>
-                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
-                                Normal sizing<br>Lateral without clear trend
+                            <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
+                                <div id="regime-card-ranging-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                                    Loading rules...
+                                </div>
+                                <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                                    Lateral without clear trend
+                                </div>
                             </div>
                         </div>
                         
                         <!-- TRENDING Card -->
                         <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                            <div style="font-size: 18px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
+                            <div style="font-size: 39px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
                             <div id="regime-card-trending-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">1.5x</div>
-                            <div style="font-size: 12px; color: #6b7280; line-height: 1.6;">
-                                Increase positions<br>Strong directional movement
+                            <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
+                                <div id="regime-card-trending-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                                    Loading rules...
+                                </div>
+                                <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                                    Strong directional movement
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1305,9 +1320,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-            
             <div id="tab-config" class="tab-content">
                 <div class="content-section">
                     <h2>Bot Configuration & Status</h2>
@@ -1699,6 +1711,7 @@ function updateRegimeUI(data) {
     const metrics = data.metrics || {};
     const timeframe = data.timeframe || currentRegimeTimeframe;
     const allFamilies = data.all_families || {'volatile': 0.5, 'ranging': 1.0, 'trending': 1.5};
+    const allThresholds = data.all_thresholds || {};
     
     // Get badge style
     const badgeStyle = getRegimeBadgeStyle(family);
@@ -1715,17 +1728,47 @@ function updateRegimeUI(data) {
         regimeTimeframeEl.textContent = timeframe + ' | ' + multiplier.toFixed(1) + 'x sizing';
     }
     
-    // Update family cards with multipliers and active state
+    // Helper function to format rules
+    function formatRules(familyName) {
+        const rules = allThresholds[familyName] || {};
+        
+        if (Object.keys(rules).length === 0) {
+            return 'Default - All other conditions';
+        }
+        
+        const metricNames = {
+            'hurst': 'Hurst',
+            'efficiency_ratio': 'ER',
+            'atr_pct': 'ATR%',
+            'permutation_entropy': 'PE'
+        };
+        
+        const parts = [];
+        for (const [metric, [op, threshold]] of Object.entries(rules)) {
+            const name = metricNames[metric] || metric;
+            parts.push(name + ' ' + op + ' ' + threshold);
+        }
+        
+        return parts.join(' AND ');
+    }
+    
+    // Update family cards with multipliers, rules, and active state
     const families = ['volatile', 'ranging', 'trending'];
     const familyColors = {
         'volatile': '#f85149',
         'ranging': '#58a6ff',
         'trending': '#3fb950'
     };
+    const familyBgColors = {
+        'volatile': 'rgba(248, 81, 73, 0.15)',
+        'ranging': 'rgba(88, 166, 255, 0.15)',
+        'trending': 'rgba(63, 185, 80, 0.15)'
+    };
     
     families.forEach(f => {
         const card = document.getElementById('regime-card-' + f);
         const multiplierSpan = document.getElementById('regime-card-' + f + '-multiplier');
+        const rulesSpan = document.getElementById('regime-card-' + f + '-rules');
         
         if (card) {
             // Set multiplier
@@ -1734,10 +1777,16 @@ function updateRegimeUI(data) {
                 multiplierSpan.textContent = mult.toFixed(1) + 'x';
             }
             
-            // Set active/inactive state (NO animation)
+            // Set rules
+            if (rulesSpan) {
+                rulesSpan.textContent = formatRules(f);
+            }
+            
+            // Set active/inactive state with colored background
             if (f === family.toLowerCase()) {
                 // Active card
                 card.style.border = '2px solid ' + familyColors[f];
+                card.style.background = familyBgColors[f]; // Soft colored background
                 card.style.opacity = '1';
                 if (multiplierSpan) {
                     multiplierSpan.style.color = familyColors[f];
@@ -1745,6 +1794,7 @@ function updateRegimeUI(data) {
             } else {
                 // Inactive card
                 card.style.border = '2px solid #21262d';
+                card.style.background = '#1c2128'; // Normal background
                 card.style.opacity = '0.5';
                 if (multiplierSpan) {
                     multiplierSpan.style.color = '#8b949e';

@@ -210,7 +210,6 @@ REGIME_SIZING_ENABLED = False  # Switch principal (False por defecto hasta valid
 
 # BTC settings for regime calculation
 REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
-REGIME_LOOKBACK_BARS    = 150
 
 # Metric calculation windows
 REGIME_HURST_WINDOW = 100
