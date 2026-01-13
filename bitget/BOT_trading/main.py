@@ -8,6 +8,7 @@ Clean entry point that instantiates and runs the BotOrchestrator.
 import os
 import sys
 import argparse
+import logging
 
 # Add parent directory to path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,12 +17,13 @@ from execution import BitgetClient
 from bot_utils.logger import setup_logger
 from core import BotOrchestrator
 from config.settings import get_account_config
-
+from config.settings import ACCOUNT_MULTIPLIERS, DEFAULT_ACCOUNT_MULTIPLIER
 # Credentials
 from config.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
 from config.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
 from config.connect_pass import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
 from config.connect_pass import connect_bitget_00, connect_bitget_01, connect_bitget_E1
+
 
 def main():
     """Main entry point."""
@@ -67,6 +69,7 @@ def main():
     
     # Setup logger
     setup_logger(base_dir, logfile_name=os.path.basename(log_file))
+    logger = logging.getLogger('BOT_trading')
     
     # Parse --set-active argument
     active_strategy_ids = None
@@ -80,6 +83,23 @@ def main():
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
         active_strategy_ids=active_strategy_ids
     )
+    
+    # =======================================================================
+    # APPLY ACCOUNT MULTIPLIER PRESET
+    # =======================================================================
+   
+    account_multiplier = ACCOUNT_MULTIPLIERS.get(account_number, DEFAULT_ACCOUNT_MULTIPLIER)
+    
+    if account_multiplier != 1.0:
+        logger.info(f"ACCOUNT PRESET: Applying {account_multiplier}x multiplier to all order amounts")
+        
+        for strategy in bot.strategies:
+            if 'order_amount' in strategy:
+                original = strategy['order_amount']
+                strategy['order_amount'] = round(original * account_multiplier, 2)
+                logger.info(f"    └─ {strategy['id']}: ${original} → ${strategy['order_amount']}")
+    else:
+        logger.info(f"ACCOUNT PRESET: Using standard sizing (1.0x)")
     
     bot.run()
 

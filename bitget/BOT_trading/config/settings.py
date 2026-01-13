@@ -61,6 +61,21 @@ ACCOUNTS = {
 }
 
 # ==========================================================================
+# ACCOUNT MULTIPLIERS (PRESET)
+# ==========================================================================
+# Applied once at startup to scale all order_amount values
+# This allows different accounts to trade with different position sizes
+# Rest of the code is agnostic to this multiplier
+
+ACCOUNT_MULTIPLIERS = {
+    '00': 1.0,   
+    'E1': 1.0,   
+    '01': 1.0    
+}
+
+# Default multiplier if account not in ACCOUNT_MULTIPLIERS
+DEFAULT_ACCOUNT_MULTIPLIER = 1.0
+# ==========================================================================
 # STRATEGY ASSIGNMENT PER ACCOUNT
 # ==========================================================================
 
