@@ -17,9 +17,9 @@ logger = logging.getLogger('BOT_trading.api.backend')
 
 from analytics.metrics import MetricsCalculator
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ===========================================================================
 # MARKET REGIME IMPORT
-# ═══════════════════════════════════════════════════════════════════════════
+# ===========================================================================
 try:
     from market_regime.regime_classifier import get_regime_info
     from config.settings import REGIME_FAMILIES, REGIME_FAMILY_SIZING
@@ -1132,9 +1132,94 @@ class DashboardServer:
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
-        # ===========================================================================
-        # MARKET REGIME ENDPOINTS
-        # ===========================================================================
+        
+        @self.app.route('/api/analytics/regime')
+        def get_regime_analytics():
+            """
+            Analytics by market regime: trades, P&L, and win rate per regime family.
+            
+            Returns:
+                JSON with stats per regime (trending, ranging, volatile, unknown)
+                
+            Example response:
+            {
+                "success": true,
+                "data": {
+                    "trending": {
+                        "trades": 45,
+                        "total_trades": 120,
+                        "pnl": 156.80,
+                        "winrate": 68.9
+                    },
+                    "ranging": {
+                        "trades": 32,
+                        "total_trades": 120,
+                        "pnl": 45.20,
+                        "winrate": 53.1
+                    },
+                    "volatile": {
+                        "trades": 12,
+                        "total_trades": 120,
+                        "pnl": -23.40,
+                        "winrate": 41.7
+                    },
+                    "unknown": {
+                        "trades": 5,
+                        "total_trades": 120,
+                        "pnl": 12.10,
+                        "winrate": 60.0
+                    }
+                }
+            }
+            """
+            try:
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify({'error': 'No trades data available'}), 404
+                
+                # Check if regime columns exist
+                if 'REGIME_FAMILY' not in df.columns:
+                    return jsonify({
+                        'error': 'No regime data in trades file (old format)',
+                        'data': {}
+                    }), 200
+                
+                # Fill NaN with 'unknown'
+                df['REGIME_FAMILY'] = df['REGIME_FAMILY'].fillna('unknown')
+                
+                # Calculate total trades
+                total_trades = len(df)
+                
+                # Group by regime
+                results = {}
+                for regime in df['REGIME_FAMILY'].unique():
+                    df_regime = df[df['REGIME_FAMILY'] == regime]
+                    
+                    trades_count = len(df_regime)
+                    pnl = df_regime['PROFIT'].sum()
+                    positive_trades = len(df_regime[df_regime['PROFIT'] > 0])
+                    winrate = (positive_trades / trades_count * 100) if trades_count > 0 else 0
+                    
+                    results[regime] = {
+                        'trades': int(trades_count),
+                        'total_trades': int(total_trades),
+                        'pnl': round(float(pnl), 2),
+                        'winrate': round(float(winrate), 1)
+                    }
+                
+                return jsonify({
+                    'success': True,
+                    'data': results
+                })
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
+
+        # ==============================================================================
+        # EXACT LOCATION IN FILE
+        # ==============================================================================
         
         @self.app.route('/api/regime/current')
         def get_regime_current():

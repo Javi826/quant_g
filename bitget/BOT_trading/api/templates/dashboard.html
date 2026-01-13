@@ -1120,6 +1120,7 @@
                         <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('monthly')">Monthly</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('correlation')">Correlation</button>
+                        <button class="tab-btn" onclick="switchEquitySubTab('regime')">Regime</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                         <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                     </div>
@@ -1275,6 +1276,15 @@
                     <div id="equity-subtab-weekday" class="tab-content">
                         <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
                         <div id="weekday-container">Loading...</div>
+                    </div>
+                    
+                    <div id="equity-subtab-regime" class="tab-content">
+                        <h3 style="margin-bottom: 20px; color: #c9d1d9;">Performance by Market Regime</h3>
+                        <div id="regime-analytics-container">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Loading regime analytics...
+                            </div>
+                        </div>
                     </div>
                     
                     <div id="equity-subtab-correlation" class="tab-content">
@@ -1981,13 +1991,27 @@ function updateRegimeUI(data) {
     
     // Hurst Exponent (0-1 range, higher is better)
     if (hurst !== undefined && hurst !== null && !isNaN(hurst)) {
-        document.getElementById('regime-metric-hurst').textContent = hurst.toFixed(3);
+        const hurstElement = document.getElementById('regime-metric-hurst');
+        hurstElement.textContent = hurst.toFixed(3);
+        
+        // Set color to match bar color
+        let hurstColor;
+        if (hurst < 0.33) {
+            hurstColor = '#f85149'; // Red (low value is bad)
+        } else if (hurst < 0.66) {
+            hurstColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            hurstColor = '#3fb950'; // Green (high value is good)
+        }
+        hurstElement.style.color = hurstColor;
+        
         const hurstBar = document.getElementById('regime-bar-hurst');
         if (hurstBar) {
             hurstBar.innerHTML = createColoredBar(hurst, false);
         }
     } else {
         document.getElementById('regime-metric-hurst').textContent = '-';
+        document.getElementById('regime-metric-hurst').style.color = '#58a6ff';
         const hurstBar = document.getElementById('regime-bar-hurst');
         if (hurstBar) {
             hurstBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
@@ -1996,13 +2020,27 @@ function updateRegimeUI(data) {
     
     // Efficiency Ratio (0-1 range, higher is better)
     if (er !== undefined && er !== null && !isNaN(er)) {
-        document.getElementById('regime-metric-er').textContent = er.toFixed(3);
+        const erElement = document.getElementById('regime-metric-er');
+        erElement.textContent = er.toFixed(3);
+        
+        // Set color to match bar color
+        let erColor;
+        if (er < 0.33) {
+            erColor = '#f85149'; // Red (low value is bad)
+        } else if (er < 0.66) {
+            erColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            erColor = '#3fb950'; // Green (high value is good)
+        }
+        erElement.style.color = erColor;
+        
         const erBar = document.getElementById('regime-bar-er');
         if (erBar) {
             erBar.innerHTML = createColoredBar(er, false);
         }
     } else {
         document.getElementById('regime-metric-er').textContent = '-';
+        document.getElementById('regime-metric-er').style.color = '#22d3ee';
         const erBar = document.getElementById('regime-bar-er');
         if (erBar) {
             erBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
@@ -2011,14 +2049,28 @@ function updateRegimeUI(data) {
     
     // ATR Percentage (scale 0-5% to 0-1, lower is better)
     if (atr !== undefined && atr !== null && !isNaN(atr)) {
-        document.getElementById('regime-metric-atr').textContent = atr.toFixed(2) + '%';
+        const atrElement = document.getElementById('regime-metric-atr');
+        atrElement.textContent = atr.toFixed(2) + '%';
+        
+        // Set color to match bar color (reverse - lower is better)
+        const atrScaled = Math.min(atr / 5, 1.0);
+        let atrColor;
+        if (atrScaled < 0.33) {
+            atrColor = '#3fb950'; // Green (low value is good)
+        } else if (atrScaled < 0.66) {
+            atrColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            atrColor = '#f85149'; // Red (high value is bad)
+        }
+        atrElement.style.color = atrColor;
+        
         const atrBar = document.getElementById('regime-bar-atr');
         if (atrBar) {
-            const atrScaled = Math.min(atr / 5, 1.0);
             atrBar.innerHTML = createColoredBar(atrScaled, true);
         }
     } else {
         document.getElementById('regime-metric-atr').textContent = '-';
+        document.getElementById('regime-metric-atr').style.color = '#f59e0b';
         const atrBar = document.getElementById('regime-bar-atr');
         if (atrBar) {
             atrBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
@@ -2027,13 +2079,27 @@ function updateRegimeUI(data) {
     
     // Permutation Entropy (0-1 range, lower is better)
     if (pe !== undefined && pe !== null && !isNaN(pe)) {
-        document.getElementById('regime-metric-pe').textContent = pe.toFixed(3);
+        const peElement = document.getElementById('regime-metric-pe');
+        peElement.textContent = pe.toFixed(3);
+        
+        // Set color to match bar color (reverse - lower is better)
+        let peColor;
+        if (pe < 0.33) {
+            peColor = '#3fb950'; // Green (low value is good)
+        } else if (pe < 0.66) {
+            peColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            peColor = '#f85149'; // Red (high value is bad)
+        }
+        peElement.style.color = peColor;
+        
         const peBar = document.getElementById('regime-bar-pe');
         if (peBar) {
             peBar.innerHTML = createColoredBar(pe, true);
         }
     } else {
         document.getElementById('regime-metric-pe').textContent = '-';
+        document.getElementById('regime-metric-pe').style.color = '#a78bfa';
         const peBar = document.getElementById('regime-bar-pe');
         if (peBar) {
             peBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
@@ -2153,6 +2219,7 @@ function switchEquitySubTab(subTabName) {
     if (subTabName === 'weekday') loadWeekDayAnalysis();
     if (subTabName === 'monthly') initMonthlyTab();
     if (subTabName === 'correlation') initCorrelationTab();
+    if (subTabName === 'regime') loadRegimeAnalytics();
     if (subTabName === 'compose') {
         const container = document.getElementById('compose-container');
         const currentContent = container.innerHTML.trim();
@@ -3237,6 +3304,103 @@ async function loadWeekDayAnalysis() {
         document.getElementById('weekday-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
+
+// =============================================================================
+// REGIME ANALYTICS
+// =============================================================================
+
+async function loadRegimeAnalytics() {
+    try {
+        const res = await fetch('/api/analytics/regime');
+        
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+        
+        const response = await res.json();
+        const container = document.getElementById('regime-analytics-container');
+        
+        if (!response.success || !response.data || Object.keys(response.data).length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
+                (response.error || 'No regime data available yet') +
+                '</div>';
+            return;
+        }
+        
+        const data = response.data;
+        
+        // Sort regimes by priority: trending > ranging > volatile > unknown
+        const regimeOrder = ['trending', 'ranging', 'volatile', 'unknown'];
+        const sortedRegimes = Object.keys(data).sort((a, b) => {
+            const indexA = regimeOrder.indexOf(a);
+            const indexB = regimeOrder.indexOf(b);
+            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        });
+        
+        // Colors for each regime
+        const regimeColors = {
+            'trending': { bar: '#3fb950', text: '#3fb950', bg: 'rgba(63, 185, 80, 0.1)' },
+            'ranging': { bar: '#58a6ff', text: '#58a6ff', bg: 'rgba(88, 166, 255, 0.1)' },
+            'volatile': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },
+            'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
+        };
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+        
+        sortedRegimes.forEach(regime => {
+            const stats = data[regime];
+            const colors = regimeColors[regime] || regimeColors['unknown'];
+            
+            const winrateWidth = Math.round(stats.winrate);
+            const pnlClass = stats.pnl >= 0 ? 'direction-long' : 'direction-short';
+            const pnlPrefix = stats.pnl >= 0 ? '+$' : '$';
+            
+            html += `
+                <div style="background: ${colors.bg}; border: 1px solid ${colors.bar}; border-radius: 8px; padding: 20px;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
+                            ${regime}
+                        </div>
+                        <div style="font-size: 16px; color: #8b949e;">
+                            ${stats.trades}/${stats.total_trades} trades
+                        </div>
+                    </div>
+                    
+                    <!-- Win Rate Bar -->
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #8b949e; font-size: 14px; font-weight: 600;">Win Rate</span>
+                            <span style="color: ${colors.text}; font-size: 14px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
+                        </div>
+                        <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- P&L -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #8b949e; font-size: 14px; font-weight: 600;">P&L</span>
+                        <span class="${pnlClass}" style="font-size: 18px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading regime analytics:', error);
+        document.getElementById('regime-analytics-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading regime data</div>';
+    }
+}
+
+// =============================================================================
+// END REGIME ANALYTICS
+// =============================================================================
 
 async function updateEquityChart() {
     try {
