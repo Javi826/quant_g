@@ -596,7 +596,9 @@ def close_position(symbol: str,
                             size=size,
                             profit_from_api=profit_from_api,
                             fee_from_api=fee_from_api,
-                            bot_state=bot_state
+                            bot_state=bot_state,
+                            regime_family=position_data.get('regime_family', 'unknown'),
+                            regime_multiplier=position_data.get('regime_multiplier', 1.0)
                         )
             
             return True
@@ -619,7 +621,9 @@ def close_position(symbol: str,
                             reason="OUT_OF_MARGIN",
                             size=size,
                             profit_from_api=None,
-                            fee_from_api=None
+                            fee_from_api=None,
+                            regime_family=position_data.get('regime_family', 'unknown'),
+                            regime_multiplier=position_data.get('regime_multiplier', 1.0)
                         )
                 return True  # Remove from open_positions
             return False
