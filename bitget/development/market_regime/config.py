@@ -21,7 +21,7 @@ TRADES_PATTERN = 'all_trades_*.xlsx'
 OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS_2')
 
 # Output: folder for enriched trades
-OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_2')
+OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_1')
 
 # =============================================================================
 # BTC SETTINGS
