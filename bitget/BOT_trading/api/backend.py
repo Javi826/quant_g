@@ -22,13 +22,13 @@ from analytics.metrics import MetricsCalculator
 # ===========================================================================
 try:
     from market_regime.regime_classifier import get_regime_info
-    from config.settings import REGIME_FAMILIES, REGIME_FAMILY_SIZING, REGIME_FAMILY_MATRIX
+    from config.settings import REGIME_FAMILIES, REGIME_GLOBAL, REGIME_FAMILY_MATRIX
     REGIME_MODULE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"WAR-Market regime module not available: {e}")
     REGIME_MODULE_AVAILABLE = False
     REGIME_FAMILIES = {}
-    REGIME_FAMILY_SIZING = {}
+    REGIME_GLOBAL = {}
 
 
 class DashboardServer:
@@ -1311,7 +1311,7 @@ class DashboardServer:
                     'multiplier': regime_info['multiplier'],
                     'metrics': regime_info['metrics'],
                     'thresholds': regime_info.get('thresholds', {}),
-                    'all_families': REGIME_FAMILY_SIZING,
+                    'all_families': REGIME_GLOBAL,
                     'all_thresholds': REGIME_FAMILIES
                 })
                 

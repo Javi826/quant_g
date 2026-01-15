@@ -21,7 +21,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
-    regime_family: 'trending'
+    regime_family: 'ranging'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 2
@@ -228,7 +228,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'short'
-    regime_family: 'trending'
+    regime_family: 'global'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -245,7 +245,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
-    regime_family: 'trending'
+    regime_family: 'global'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50

@@ -18,10 +18,10 @@ TRADES_FOLDER = os.path.join(BASE_DIR, 'brief_trades')
 TRADES_PATTERN = 'all_trades_*.xlsx'
 
 # Input: OHLC folder with BTC parquet
-OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS')
+OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS_2')
 
 # Output: folder for enriched trades
-OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output')
+OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_2')
 
 # =============================================================================
 # BTC SETTINGS
@@ -44,7 +44,7 @@ PE_ORDER     = 3
 # Order matters: first match wins. 'ranging' should be last (default).
 FAMILIES = {
    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2)},
+    'volatile': {'atr_pct': ('>', 1.5)},
     'ranging': {},  # Default: everything else
 }
 

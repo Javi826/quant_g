@@ -223,6 +223,151 @@ let allStrategiesList = [];
 let isStoppingBot = false;
 
 // ═══════════════════════════════════════════════════════════════════════════
+// POSITION SORT FEATURE (NEW)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let positionSortBy = 'tp';
+
+function sortPositionsBy(type) {
+    positionSortBy = type;
+    
+    // Update button states
+    const buttons = document.querySelectorAll('#sort-buttons .view-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    // Find and activate the clicked button
+    buttons.forEach(btn => {
+        if (btn.textContent.trim().toUpperCase() === type.toUpperCase()) {
+            btn.classList.add('active');
+        }
+    });
+    
+    renderPositions(cachedPositions);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// END POSITION SORT FEATURE
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGIME MATRIX FUNCTIONS (NEW)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function getFamilyColor(family) {
+    const colors = {
+        'trending': '#3fb950',
+        'ranging': '#58a6ff',
+        'volatile': '#f85149',
+        'Global': '#8b949e'
+    };
+    return colors[family] || '#8b949e';
+}
+
+async function loadRegimeSizing() {
+    try {
+        const res = await fetch('/api/regime/current?timeframe=4H');
+        const data = await res.json();
+        
+        if (data.success && data.all_families) {
+            window.REGIME_SIZING = data.all_families;
+        }
+    } catch (error) {
+        console.error('Error loading regime sizing:', error);
+    }
+}
+
+async function loadRegimeGlobalMatrix() {
+    try {
+        const res = await fetch('/api/regime/matrix');
+        const data = await res.json();
+        
+        if (!data.success) {
+            console.error('Failed to load regime matrix:', data.error);
+            return;
+        }
+        
+        // Store in window for global access
+        window.REGIME_MATRIX = data.matrix;
+        
+        const tbody = document.getElementById('regime-global-matrix-body');
+        if (!tbody) return;
+        
+        const families = ['trending', 'ranging', 'volatile'];
+        
+        let html = '';
+        families.forEach(family => {
+            const mults = data.matrix[family];
+            if (!mults) return;
+            
+            html += `<tr>
+                <td style="color: ${getFamilyColor(family)}; font-weight: 600; text-transform: uppercase;">${family}</td>
+                <td>${mults.trending}x</td>
+                <td>${mults.ranging}x</td>
+                <td>${mults.volatile}x</td>
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading global regime matrix:', error);
+    }
+}
+
+function renderRegimeStrategyMatrix(strategies) {
+    const tbody = document.getElementById('regime-strategy-matrix-body');
+    if (!tbody) return;
+    
+    // Sort strategies by ID
+    const sorted = strategies.sort((a, b) => a.id.localeCompare(b.id));
+    
+    let html = '';
+    sorted.forEach((strat, index) => {
+        const num = String(index + 1).padStart(2, '0');
+        const family = strat.regime_family || 'Global';
+        const familyColor = getFamilyColor(family);
+        
+        // Get multipliers based on family
+        let mults;
+        if (strat.regime_family && window.REGIME_MATRIX && window.REGIME_MATRIX[strat.regime_family]) {
+            // Custom: read from REGIME_FAMILY_MATRIX
+            mults = {
+                trending: window.REGIME_MATRIX[strat.regime_family].trending,
+                ranging: window.REGIME_MATRIX[strat.regime_family].ranging,
+                volatile: window.REGIME_MATRIX[strat.regime_family].volatile
+            };
+        } else {
+            // Global: read from REGIME_FAMILY_SIZING
+            if (window.REGIME_SIZING) {
+                mults = {
+                    trending: window.REGIME_SIZING.trending,
+                    ranging: window.REGIME_SIZING.ranging,
+                    volatile: window.REGIME_SIZING.volatile
+                };
+            } else {
+                // Fallback if sizing not loaded yet
+                mults = { trending: '-', ranging: '-', volatile: '-' };
+            }
+        }
+        
+        html += `<tr>
+            <td style="color: #8b949e; font-weight: 600;">${num}</td>
+            <td>${strat.id}</td>
+            <td style="color: ${familyColor}; font-weight: 600;">${family}</td>
+            <td style="color: #c9d1d9;">${mults.trending}x</td>
+            <td style="color: #c9d1d9;">${mults.ranging}x</td>
+            <td style="color: #c9d1d9;">${mults.volatile}x</td>
+        </tr>`;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// END REGIME MATRIX FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -342,7 +487,7 @@ function updateRegimeUI(data) {
         return parts.join(' AND ');
     }
     
-    // Update family cards with multipliers, rules, and active state
+    // Update family cards with rules and active state (NO MULTIPLIERS)
     const families = ['volatile', 'ranging', 'trending'];
     const familyColors = {
         'volatile': '#f85149',
@@ -357,16 +502,9 @@ function updateRegimeUI(data) {
     
     families.forEach(f => {
         const card = document.getElementById('regime-card-' + f);
-        const multiplierSpan = document.getElementById('regime-card-' + f + '-multiplier');
         const rulesSpan = document.getElementById('regime-card-' + f + '-rules');
         
         if (card) {
-            // Set multiplier
-            if (multiplierSpan) {
-                const mult = (f in allFamilies) ? allFamilies[f] : 1.0;
-                multiplierSpan.textContent = mult.toFixed(1) + 'x';
-            }
-            
             // Set rules
             if (rulesSpan) {
                 rulesSpan.textContent = formatRules(f);
@@ -378,17 +516,11 @@ function updateRegimeUI(data) {
                 card.style.border = '2px solid ' + familyColors[f];
                 card.style.background = familyBgColors[f]; // Soft colored background
                 card.style.opacity = '1';
-                if (multiplierSpan) {
-                    multiplierSpan.style.color = familyColors[f];
-                }
             } else {
                 // Inactive card
                 card.style.border = '2px solid #21262d';
                 card.style.background = '#1c2128'; // Normal background
                 card.style.opacity = '0.5';
-                if (multiplierSpan) {
-                    multiplierSpan.style.color = '#8b949e';
-                }
             }
         }
     });
@@ -844,21 +976,36 @@ function renderCompactView(container, positions) {
 }
 
 function renderDetailedView(container, positions) {
+    // MODIFIED: Use positionSortBy to determine sort field
     const positionsWithDelta = positions.map(pos => {
         const currentPrice = parseFloat(pos.current_price || pos.entry_price);
         const tp = parseFloat(pos.tp);
+        const sl = parseFloat(pos.sl);
         
-        let deltaTp;
+        let deltaTp, deltaSl;
         if (pos.direction.toLowerCase() === 'long') {
             deltaTp = ((tp - currentPrice) / currentPrice * 100);
+            deltaSl = ((currentPrice - sl) / currentPrice * 100);
         } else {
             deltaTp = ((currentPrice - tp) / currentPrice * 100);
+            deltaSl = ((sl - currentPrice) / currentPrice * 100);
         }
         
-        return { ...pos, _deltaTp: deltaTp };
+        return { ...pos, _deltaTp: deltaTp, _deltaSl: deltaSl };
     });
     
-    const sortedPositions = positionsWithDelta.sort((a, b) => a._deltaTp - b._deltaTp);
+    // MODIFIED: Sort based on positionSortBy variable
+    const sortedPositions = positionsWithDelta.sort((a, b) => {
+        if (positionSortBy === 'tp') {
+            return a._deltaTp - b._deltaTp;
+        } else {
+            return a._deltaSl - b._deltaSl;
+        }
+    });
+    
+    // Determine active button class
+    const tpBtnClass = positionSortBy === 'tp' ? 'view-btn active' : 'view-btn';
+    const slBtnClass = positionSortBy === 'sl' ? 'view-btn active' : 'view-btn';
     
     const html = '<table><thead><tr>' +
         '<th>Strategy</th>' +
@@ -867,8 +1014,8 @@ function renderDetailedView(container, positions) {
         '<th>Entry</th>' +
         '<th>Current</th>' +
         '<th>Size</th>' +
-        '<th>TP (Δ%)</th>' +
-        '<th>SL (Δ%)</th>' +
+        '<th>TP (Δ%) <button class="' + tpBtnClass + '" onclick="sortPositionsBy(\'tp\')" style="margin-left: 8px; font-size: 11px; padding: 2px 8px;">TP</button></th>' +
+        '<th>SL (Δ%) <button class="' + slBtnClass + '" onclick="sortPositionsBy(\'sl\')" style="margin-left: 8px; font-size: 11px; padding: 2px 8px;">SL</button></th>' +
         '<th>PnL</th>' +
         '<th style="text-align: right;">Candles</th>' +
         '</tr></thead><tbody>' +
@@ -1058,7 +1205,7 @@ async function loadBotConfig() {
         } else {
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
             
-            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count'];
+            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count', 'regime_family'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
             const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
             
@@ -1130,15 +1277,11 @@ async function loadBotConfig() {
             }).join('');
         }
         
-        const timeframesContainer = document.getElementById('timeframes-container');
-        if (!data.timeframes || Object.keys(data.timeframes).length === 0) {
-            timeframesContainer.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 20px;">No timeframes</div>';
-        } else {
-            timeframesContainer.innerHTML = Object.entries(data.timeframes)
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([tf, strategies]) => '<div class="timeframe-item"><div class="timeframe-header">' + tf + ' (' + strategies.length + ' strategies)</div><div class="timeframe-strategies">' + strategies.join(', ') + '</div></div>')
-                .join('');
-        }
+        // MODIFIED: Call new regime matrix functions
+        await loadRegimeSizing();
+        await loadRegimeGlobalMatrix();
+        renderRegimeStrategyMatrix(data.strategies);
+        
     } catch (error) {
         console.error('Error:', error);
     }

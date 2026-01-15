@@ -19,8 +19,8 @@ from signals.add_signals_double_top import double_top_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "double_top__4H"
+MY_SYMBOLS   = True
+STRATEGY     = "double_top_4H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -49,11 +49,11 @@ SL_PCT_LIST          = [10]
 # =============================================================================
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_MINOR_LIST  = [2] 
-PRICE_TOLERANCE_LIST = [5] 
+PRICE_TOLERANCE_LIST = [15] 
 TREND_TH_LIST        = [5] 
  
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [7]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [10]
 # =============================================================================
 
 
@@ -81,7 +81,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = double_top_short(
+        signals = double_top_long(
             arr_minor,
             lookback_minor=params['LOOKBACK_MINOR'],
             price_tolerance=params['PRICE_TOLERANCE'], 
@@ -119,7 +119,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=True)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

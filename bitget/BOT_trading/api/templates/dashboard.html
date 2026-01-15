@@ -427,12 +427,11 @@
                         <button class="view-btn" onclick="setRegimeTimeframe('6Hutc')">6Hutc</button>
                     </div>
                 </h2>
-                <!-- Regime Family Cards -->
+                <!-- Regime Family Cards (MODIFIED - NO MULTIPLIERS) -->
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
                     <!-- VOLATILE Card -->
                     <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                         <div style="font-size: 39px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
-                        <div id="regime-card-volatile-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                         <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                             <div id="regime-card-volatile-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
@@ -446,7 +445,6 @@
                     <!-- RANGING Card -->
                     <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                         <div style="font-size: 39px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
-                        <div id="regime-card-ranging-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                         <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                             <div id="regime-card-ranging-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
@@ -460,7 +458,6 @@
                     <!-- TRENDING Card -->
                     <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
                         <div style="font-size: 39px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
-                        <div id="regime-card-trending-multiplier" style="font-size: 24px; font-weight: 600; color: #8b949e; margin-bottom: 12px;">--</div>
                         <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
                             <div id="regime-card-trending-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
@@ -549,8 +546,78 @@
             <div class="content-section">
                 <h2>Bot Configuration & Status</h2>
                 
+                <!-- 1. STRATEGIES LIST (unchanged) -->
                 <div class="config-card">
-                    <h3>🌐 WebSocket Connections</h3>
+                    <h3>Strategies List</h3>
+                    <div style="overflow-x: auto;">
+                        <table id="strategies-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>ID</th>
+                                    <th>TF</th>
+                                    <th>Side</th>
+                                    <th>Symbols</th>
+                                    <th>TP%</th>
+                                    <th>SL%</th>
+                                    <th>Amount</th>
+                                    <th>Candles</th>
+                                    <th>Params</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="strategies-body">
+                                <tr><td colspan="15" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 2. MARKET REGIME STRATEGY MATRIX (NEW) -->
+                <div class="config-card">
+                    <h3>Market Regime Strategy Matrix</h3>
+                    <div style="overflow-x: auto;">
+                        <table id="regime-strategy-matrix">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Strategy</th>
+                                    <th>Family</th>
+                                    <th>Trending</th>
+                                    <th>Ranging</th>
+                                    <th>Volatile</th>
+                                </tr>
+                            </thead>
+                            <tbody id="regime-strategy-matrix-body">
+                                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 3. REGIME FAMILY MATRIX (NEW) -->
+                <div class="config-card">
+                    <h3>Regime Family Matrix</h3>
+                    <div style="overflow-x: auto;">
+                        <table id="regime-global-matrix">
+                            <thead>
+                                <tr>
+                                    <th>Family</th>
+                                    <th>Trending</th>
+                                    <th>Ranging</th>
+                                    <th>Volatile</th>
+                                </tr>
+                            </thead>
+                            <tbody id="regime-global-matrix-body">
+                                <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 4. WEBSOCKET (moved here) -->
+                <div class="config-card">
+                    <h3>WebSocket Connections</h3>
                     <div class="config-row">
                         <span class="config-label">Public Channel:</span>
                         <span class="ws-indicator" id="ws-public">
@@ -574,8 +641,9 @@
                     </div>
                 </div>
                 
+                <!-- 5. CONFIGURATION (moved here) -->
                 <div class="config-card">
-                    <h3>⚙️ Configuration</h3>
+                    <h3>Configuration</h3>
                     <div class="config-row">
                         <span class="config-label">Account:</span>
                         <span class="config-value" id="config-account">-</span>
@@ -602,36 +670,7 @@
                     </div>
                 </div>
                 
-                <div class="config-card">
-                    <h3>📋 Strategies List</h3>
-                    <div style="overflow-x: auto;">
-                        <table id="strategies-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>ID</th>
-                                    <th>TF</th>
-                                    <th>Side</th>
-                                    <th>Symbols</th>
-                                    <th>TP%</th>
-                                    <th>SL%</th>
-                                    <th>Amount</th>
-                                    <th>Candles</th>
-                                    <th>Params</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="strategies-body">
-                                <tr><td colspan="15" style="text-align: center;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <div class="config-card">
-                    <h3>⏰ Timeframes</h3>
-                    <div id="timeframes-container">Loading...</div>
-                </div>
+                <!-- TIMEFRAMES SECTION ELIMINATED -->
             </div>
         </div>
     </div>

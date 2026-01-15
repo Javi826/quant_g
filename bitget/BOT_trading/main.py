@@ -16,7 +16,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from execution import BitgetClient
 from bot_utils.logger import setup_logger
 from core import BotOrchestrator
-from config.settings import get_account_config
+from config.utils import get_account_config
 from config.settings import ACCOUNT_MULTIPLIERS, DEFAULT_ACCOUNT_MULTIPLIER
 # Credentials
 from config.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00

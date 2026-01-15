@@ -77,7 +77,9 @@ def load_state(state_file: str) -> Tuple[Dict, Dict]:
                     'sl': Decimal(pos.get('sl')),
                     'order_id': pos.get('order_id'),
                     'opened_at': datetime.fromisoformat(pos.get('opened_at')),
-                    'usdt_amount': float(pos.get('usdt_amount', 0))
+                    'usdt_amount': float(pos.get('usdt_amount', 0)),
+                    'regime_family': pos.get('regime_family', 'unknown'),
+                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0))
                 })
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
@@ -139,7 +141,9 @@ def save_state_local(open_positions: Dict,
                     'sl': str(pos['sl']),
                     'order_id': pos['order_id'],
                     'opened_at': pos['opened_at'].isoformat(),
-                    'usdt_amount': float(pos.get('usdt_amount', 0))
+                    'usdt_amount': float(pos.get('usdt_amount', 0)),
+                    'regime_family': pos.get('regime_family', 'unknown'),
+                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0))
                 })
 
         state_data = {

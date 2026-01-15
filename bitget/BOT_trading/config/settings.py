@@ -9,36 +9,6 @@ from zoneinfo import ZoneInfo
 import os
 
 # ==========================================================================
-# EXCHANGE SETTINGS
-# ==========================================================================
-
-# Bitget API
-BASE_URL     = "https://api.bitget.com"
-PRODUCT_TYPE = "USDT-FUTURES"
-MARGIN_MODE  = "crossed"  
-MARGIN_COIN  = "USDT"
-
-# API request settings
-API_TIMEOUT     = 10  # seconds
-API_MAX_RETRIES = 3
-API_LIMIT_DATA  = 180  # Limit for live trading candle fetch
-
-# ==========================================================================
-# GENERAL BOT SETTINGS
-# ==========================================================================
-
-# Timezone
-HOUR_ZONE = ZoneInfo('UTC')
-
-# Check intervals (seconds)
-CHECK_INTERVAL = 10  
-
-# Signal detection mode
-USE_HARDCODED_SIGNALS = False  
-
-DISPLAY_MODE ="summary"
-
-# ==========================================================================
 # ACCOUNT-SPECIFIC SETTINGS
 # ==========================================================================
 
@@ -59,28 +29,18 @@ ACCOUNTS = {
         "description": "Testing Account"
     }
 }
-
-# ==========================================================================
-# ACCOUNT MULTIPLIERS (PRESET)
-# ==========================================================================
-# Applied once at startup to scale all order_amount values
-# This allows different accounts to trade with different position sizes
-# Rest of the code is agnostic to this multiplier
-
 ACCOUNT_MULTIPLIERS = {
     '00': 1.0,   
     'E1': 1.0,   
     '01': 1.0    
 }
 
-# Default multiplier if account not in ACCOUNT_MULTIPLIERS
 DEFAULT_ACCOUNT_MULTIPLIER = 1.0
+
 # ==========================================================================
 # STRATEGY ASSIGNMENT PER ACCOUNT
 # ==========================================================================
 
-# Maps account numbers to strategy IDs
-# Strategy IDs reference strategies defined in config/strategies.yaml
 ACCOUNT_STRATEGIES = {
     "00": [
         
@@ -123,6 +83,74 @@ ACCOUNT_STRATEGIES = {
 }
 
 # ==========================================================================
+# STRATEGY CONFIGURATION & VALIDATION
+# ==========================================================================
+
+# Strategy type required parameters
+# When adding a new strategy function, add its required params here
+STRATEGY_TYPE_REQUIRED_PARAMS = {
+    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
+    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
+    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
+    'parity_long': ['lookback', 'tolerance', 'ma_period'],
+    'parity_short': ['lookback', 'tolerance', 'ma_period'],
+    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
+    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
+    'ranging_long': ['lookback', 'tolerance', 'range'],
+    'ranging_short': ['lookback', 'tolerance', 'range'],
+}
+
+# Common parameters required for ALL strategies
+COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction','regime_family']
+
+# ==========================================================================
+# MARKET REGIME SETTINGS
+# ==========================================================================
+
+# BTC settings for regime calculation
+REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
+
+# Metric calculation windows
+REGIME_HURST_WINDOW = 100
+REGIME_ER_WINDOW    = 14
+REGIME_ATR_WINDOW   = 14
+REGIME_PE_WINDOW    = 50
+REGIME_PE_ORDER     = 3
+
+# Family classification thresholds
+# Order matters: first match wins. 'ranging' is default (empty rules).
+REGIME_FAMILIES = {
+    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+    'volatile': {'atr_pct': ('>', 1.5)},
+    'ranging': {}  # Default catch-all
+}
+
+
+REGIME_FAMILY_MATRIX = {
+    'trending': {
+        'trending': 1.8,   
+        'ranging': 1.0,    
+        'volatile': 0.0    
+    },
+    'ranging': {
+        'trending': 1.0,   
+        'ranging': 1.8,    
+        'volatile': 0.0    
+    },
+    'volatile': {
+        'trending': 0.0,  
+        'ranging': 0.0,    
+        'volatile': 0.0    
+    }
+}
+
+REGIME_GLOBAL = {
+    'trending': 1.0,   
+    'ranging': 1.0,
+    'volatile': 1.0,    
+}
+
+# ==========================================================================
 # VALIDATION SETTINGS
 # ==========================================================================
 
@@ -144,195 +172,38 @@ MAX_CANDLES = 51
 VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
 
 # ==========================================================================
-# STRATEGY CONFIGURATION & VALIDATION
+# EXCHANGE SETTINGS
 # ==========================================================================
-
-# Timeframe suffixes for strategy name parsing
-TIMEFRAME_SUFFIXES = ['_4H', '_1H', '_6Hutc', '_12H', '_8H', '_30m']
-
-# Strategy type required parameters
-# When adding a new strategy function, add its required params here
-STRATEGY_TYPE_REQUIRED_PARAMS = {
-    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
-    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
-    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
-    'parity_long': ['lookback', 'tolerance', 'ma_period'],
-    'parity_short': ['lookback', 'tolerance', 'ma_period'],
-    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
-    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'ranging_long': ['lookback', 'tolerance', 'range'],
-    'ranging_short': ['lookback', 'tolerance', 'range'],
-}
-
-# Common parameters required for ALL strategies
-COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction']
+# Bitget API
+BASE_URL        = "https://api.bitget.com"
+PRODUCT_TYPE    = "USDT-FUTURES"
+MARGIN_MODE     = "crossed"  
+MARGIN_COIN     = "USDT"
+API_LIMIT_DATA  = 180  # Limit for live trading candle fetch
 
 # ==========================================================================
-# PATHS CONFIGURATION
+# GENERAL BOT SETTINGS
+# ==========================================================================
+HOUR_ZONE             = ZoneInfo('UTC')
+CHECK_INTERVAL        = 10  
+USE_HARDCODED_SIGNALS = False  
+PERSISTENCE_DIR       = "persistence"
+
+# ==========================================================================
+# API - WEBSOCKET SETTINGS
 # ==========================================================================
 
-# Base directory for bot files (relative to live_trading2/)
-PERSISTENCE_DIR = "persistence"
-
-def get_account_paths(account_number: str) -> dict:
-    """
-    Get all file paths for a specific account.
-    
-    Args:
-        account_number: Account number (e.g., "01", "E1")
-    
-    Returns:
-        Dictionary with all paths for the account
-    """
-    base_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        PERSISTENCE_DIR,
-        f'bot_files_{account_number}'
-    )
-    
-    return {
-        'base_dir': base_dir,
-        'state_file': os.path.join(base_dir, f'bot_state_{account_number}.json'),
-        'trades_file': os.path.join(base_dir, f'bot_trades_{account_number}.xlsx'),
-        'log_file': os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
-    }
-# ==========================================================================
-# WEBSOCKET SETTINGS
-# ==========================================================================
-
-WS_PUBLIC_URL  = "wss://ws.bitget.com/v2/ws/public"
-WS_PRIVATE_URL = "wss://ws.bitget.com/v2/ws/private"
+WS_PUBLIC_URL   = "wss://ws.bitget.com/v2/ws/public"
+WS_PRIVATE_URL  = "wss://ws.bitget.com/v2/ws/private"
+API_TIMEOUT     = 10  #seconds
+API_MAX_RETRIES = 3
 
 # ==========================================================================
 # logger SETTINGS
 # ==========================================================================
-
-# Log levels
 CONSOLE_LOG_LEVEL = "INFO"
 FILE_LOG_LEVEL    = "INFO"
-
-# Log rotation
-LOG_MAX_BYTES    = 10 * 1024 * 1024  
-LOG_BACKUP_COUNT = 5
-
-# logger namespace
-LOG_NAMESPACE = "BOT_trading"
-
-# ==========================================================================
-# MARKET REGIME SETTINGS
-# ==========================================================================
-
-# BTC settings for regime calculation
-REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
-
-# Metric calculation windows
-REGIME_HURST_WINDOW = 100
-REGIME_ER_WINDOW    = 14
-REGIME_ATR_WINDOW   = 14
-REGIME_PE_WINDOW    = 50
-REGIME_PE_ORDER     = 3
-
-# Family classification thresholds
-# Order matters: first match wins. 'ranging' is default (empty rules).
-REGIME_FAMILIES = {
-    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0)},
-    'ranging': {}  # Default catch-all
-}
-
-# ==========================================================================
-# REGIME FAMILY MATRIX
-# ==========================================================================
-# Defines position sizing multipliers based on:
-# - Strategy family (trending/ranging/volatile)
-# - Current market regime (trending/ranging/volatile)
-#
-# Usage: REGIME_FAMILY_MATRIX[strategy_family][market_regime]
-# Example: REGIME_FAMILY_MATRIX['trending']['trending'] = 1.8
-#
-# Interpretation:
-# - 'trending' strategies perform best in trending markets (1.8x)
-# - 'ranging' strategies perform best in ranging markets (1.8x)
-# - 'volatile' strategies can exploit volatile markets (1.5x)
-# - Most strategies avoid volatile markets (0.0x)
-# ==========================================================================
-
-REGIME_FAMILY_MATRIX = {
-    'trending': {
-        'trending': 1.8,   # Trending strategy in trending market → max sizing
-        'ranging': 1.0,    # Trending strategy in ranging market → normal sizing
-        'volatile': 0.0    # Trending strategy in volatile market → no trading
-    },
-    'ranging': {
-        'trending': 1.0,   # Ranging strategy in trending market → normal sizing
-        'ranging': 1.8,    # Ranging strategy in ranging market → max sizing
-        'volatile': 0.0    # Ranging strategy in volatile market → no trading
-    },
-    'volatile': {
-        'trending': 0.0,   # Volatile strategy in trending market → reduced sizing
-        'ranging': 0.0,    # Volatile strategy in ranging market → reduced sizing
-        'volatile': 0.0    # Volatile strategy in volatile market → aggressive sizing
-    }
-}
-
-# Legacy global multipliers (fallback for strategies without regime_family)
-# Used when strategy doesn't specify regime_family in YAML
-REGIME_FAMILY_SIZING = {
-    'trending': 1.8,   
-    'volatile': 0.0,   
-    'ranging': 1.0,    
-}
-
-# ==========================================================================
-# HELPER FUNCTIONS
-# ==========================================================================
-
-def get_account_config(account_number: str) -> dict:
-    """
-    Get complete configuration for an account.
-    
-    Args:
-        account_number: Account number
-    
-    Returns:
-        Dictionary with account configuration
-    
-    Raises:
-        ValueError: If account number is invalid
-    """
-    if account_number not in ACCOUNTS:
-        available = ', '.join(ACCOUNTS.keys())
-        raise ValueError(
-            f"Invalid account number: {account_number}. "
-            f"Available: {available}"
-        )
-    
-    config = ACCOUNTS[account_number].copy()
-    config['account_number'] = account_number
-    config['paths'] = get_account_paths(account_number)
-    
-    return config
-
-
-def get_account_strategies(account_number: str) -> list:
-    """
-    Get list of strategy IDs assigned to an account.
-    
-    Args:
-        account_number: Account number (e.g., "01", "E1")
-    
-    Returns:
-        List of strategy IDs
-    
-    Raises:
-        ValueError: If account number is invalid
-    """
-    if account_number not in ACCOUNT_STRATEGIES:
-        available = ', '.join(ACCOUNT_STRATEGIES.keys())
-        raise ValueError(
-            f"Invalid account number: {account_number}. "
-            f"Available: {available}"
-        )
-    
-    return ACCOUNT_STRATEGIES[account_number]
+LOG_MAX_BYTES     = 10 * 1024 * 1024  
+LOG_BACKUP_COUNT  = 5
+LOG_NAMESPACE     = "BOT_trading"
 

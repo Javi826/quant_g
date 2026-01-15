@@ -19,9 +19,9 @@ from signals.add_signals_ranging import ranging_short
 
 
 start_time   = time.time()
-SAVE_SYMBOLS = True
+SAVE_SYMBOLS = False
 MY_SYMBOLS   = True
-STRATEGY     = "ranging_long_6Hutc"
+STRATEGY     = "ranging_long_4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -29,7 +29,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -47,11 +47,11 @@ SL_PCT_LIST          = [2.5,5,7.5,10]
 
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [10] 
-TOLERANCE_LIST       = [5]
+TOLERANCE_LIST       = [10]
 RANGE_LIST           = [25]
 
-TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [6]
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -87,7 +87,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = ranging_short(
+        signals = ranging_long(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -125,7 +125,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=True)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

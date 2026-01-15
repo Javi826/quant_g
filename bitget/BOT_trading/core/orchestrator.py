@@ -25,7 +25,7 @@ from market_data import load_final_symbols, init_websocket
 from market_regime.regime_classifier import get_current_regime
 
 
-from validation import validate_strategy_configuration,validate_settings,validate_regime_configuration
+from validation import validate_strategy_configuration,validate_settings
 
 from analytics import BotState
 from api.backend import DashboardServer, create_dashboard_template
@@ -41,9 +41,9 @@ from bot_utils import get_unique_timeframes
 
 from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
-from config.settings import get_account_config, get_account_strategies, HOUR_ZONE
-from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,DISPLAY_MODE
-from config.settings import REGIME_FAMILY_SIZING,REGIME_FAMILY_MATRIX
+from config.utils import get_account_config, get_account_strategies
+from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
+from config.settings import REGIME_GLOBAL,REGIME_FAMILY_MATRIX
 
 class BotOrchestrator:
     """
@@ -277,12 +277,7 @@ class BotOrchestrator:
         strat_errors, strat_warnings = validate_strategy_configuration(self.strategies, IMPLEMENTED_STRATEGIES)
         all_errors.extend(strat_errors)
         all_warnings.extend(strat_warnings)
-        
-        # 2. Regime
-        regime_errors, regime_warnings = validate_regime_configuration()
-        all_errors.extend(regime_errors)
-        all_warnings.extend(regime_warnings)
-        
+                
         # 3. Settings
         settings_errors, settings_warnings = validate_settings()
         all_errors.extend(settings_errors)
@@ -555,14 +550,14 @@ class BotOrchestrator:
             strategy_family = strat.get('regime_family')
             
             # Calcular multiplier
-            if strategy_family:
+            if strategy_family == 'global':
+                # Estrategia con multiplicadores globales
+                multiplier = REGIME_GLOBAL[market_regime]
+                source = 'global'
+            else:
                 # Estrategia con familia custom
                 multiplier = REGIME_FAMILY_MATRIX[strategy_family][market_regime]
                 source = 'strategy-specific'
-            else:
-                # Fallback a global (legacy)
-                multiplier = REGIME_FAMILY_SIZING[market_regime]
-                source = 'global'
             
             # Skip si multiplier = 0
             if multiplier == 0:
@@ -633,11 +628,7 @@ class BotOrchestrator:
                 self.strategy_candles,
                 self.state_file,
                 self._send_request_wrapper,
-                HOUR_ZONE,
                 check_tp_sl_for_strategy,
-                get_current_price,
-                DISPLAY_MODE,
-                account_number=self.account_number,
                 bot_state=self.bot_state
             )
             self.last_tpsl_check = current_time

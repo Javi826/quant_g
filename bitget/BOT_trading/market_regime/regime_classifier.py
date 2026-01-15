@@ -12,16 +12,10 @@ from typing import Dict, Optional, Tuple
 
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from market_regime.regime_metrics import calc_all_metrics
-from config.settings import (
-    REGIME_REFERENCE_SYMBOL,
-    REGIME_FAMILIES,
-    REGIME_FAMILY_SIZING,
-    REGIME_HURST_WINDOW,
-    REGIME_ER_WINDOW,
-    REGIME_ATR_WINDOW,
-    REGIME_PE_WINDOW,
-    REGIME_PE_ORDER
-)
+from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GLOBAL
+from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
+from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
+
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
@@ -226,7 +220,7 @@ def get_regime_multiplier(symbol: str, timeframe: str) -> float:
         family, metrics = get_current_regime(timeframe)
         
         # Get multiplier for this family
-        multiplier = REGIME_FAMILY_SIZING.get(family, 1.0)
+        multiplier = REGIME_GLOBAL.get(family, 1.0)
         
         # Logging is handled by orchestrator
         
@@ -250,7 +244,7 @@ def get_regime_info(timeframe: str) -> Dict:
     """
     try:
         family, metrics = get_current_regime(timeframe)
-        multiplier = REGIME_FAMILY_SIZING.get(family, 1.0)
+        multiplier = REGIME_GLOBAL.get(family, 1.0)
         
         return {
             'timeframe': timeframe,

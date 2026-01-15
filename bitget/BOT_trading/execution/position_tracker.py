@@ -167,7 +167,6 @@ def check_tp_sl_for_strategy(strat_id: str,
                              strategy_candles: Dict,
                             state_file: str, 
                              send_request_func,
-                             table: Optional[Any] = None,
                              pnl_accumulator: Optional[Dict] = None,
                              bot_state=None) -> None:
     """
@@ -187,7 +186,6 @@ def check_tp_sl_for_strategy(strat_id: str,
         strategy_candles: Dictionary of candle counters
         state_file: Path to state file
         send_request_func: Function to send REST requests
-        table: Display table (unused, kept for compatibility)
         pnl_accumulator: Dictionary to accumulate PnL
         bot_state: Bot state for profit tracking
     """
@@ -270,11 +268,7 @@ def check_all_tp_sl(strategies: List[Dict],
                    strategy_candles: Dict, 
                    state_file: str,
                    send_request_func, 
-                   hour_zone,
                    check_tp_sl_for_strategy_func,
-                   get_current_price_func: Optional[Any] = None,
-                   display_mode: str = "simple",
-                   account_number: Optional[str] = None,
                    bot_state=None) -> Dict:
     """
     Check TP/SL for all strategies (simplified for dashboard).
@@ -289,17 +283,12 @@ def check_all_tp_sl(strategies: List[Dict],
         strategy_candles: Dictionary of candle counters
         state_file: Path to state file
         send_request_func: Function to send REST requests
-        hour_zone: Timezone
         check_tp_sl_for_strategy_func: Function to check TP/SL
-        get_current_price_func: Unused (kept for compatibility)
-        display_mode: Unused (kept for compatibility)
-        account_number: Unused (kept for compatibility)
         bot_state: Bot state for profit tracking
     
     Returns:
         Dictionary with total unrealized PnL
     """
-    now = datetime.now(hour_zone).strftime('%Y-%m-%d %H:%M:%S')
     
     # PnL accumulator
     pnl_accumulator = {'total': 0.0}
@@ -313,7 +302,7 @@ def check_all_tp_sl(strategies: List[Dict],
             strat_pnl_acc = {'total': 0.0}
             check_tp_sl_for_strategy_func(
                 strat_id, strat, open_positions, strategy_candles,
-                state_file, send_request_func, None, strat_pnl_acc, bot_state
+                state_file, send_request_func, strat_pnl_acc, bot_state
             )
             pnl_accumulator['total'] += strat_pnl_acc['total']
     
