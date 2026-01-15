@@ -22,7 +22,7 @@ from analytics.metrics import MetricsCalculator
 # ===========================================================================
 try:
     from market_regime.regime_classifier import get_regime_info
-    from config.settings import REGIME_FAMILIES, REGIME_FAMILY_SIZING
+    from config.settings import REGIME_FAMILIES, REGIME_FAMILY_SIZING, REGIME_FAMILY_MATRIX
     REGIME_MODULE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"WAR-Market regime module not available: {e}")
@@ -707,7 +707,8 @@ class DashboardServer:
                         'direction': strat['direction'],
                         'tp_pct': strat['tp_pct'],
                         'sl_pct': strat['sl_pct'],
-                        'order_amount': strat.get('order_amount', 0)
+                        'order_amount': strat.get('order_amount', 0),
+                        'regime_family': strat.get('regime_family', None)
                     })
                 
                 return jsonify({
@@ -716,6 +717,44 @@ class DashboardServer:
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/regime/matrix')
+        def get_regime_matrix():
+            """
+            Returns REGIME_FAMILY_MATRIX from settings.py
+            
+            Returns:
+                JSON with matrix structure:
+                {
+                    'success': True,
+                    'matrix': {
+                        'trending': {'trending': 1.8, 'ranging': 1.0, 'volatile': 0.0},
+                        'ranging': {'trending': 1.0, 'ranging': 1.8, 'volatile': 0.0},
+                        'volatile': {'trending': 0.5, 'ranging': 0.5, 'volatile': 1.5}
+                    }
+                }
+            """
+            try:
+                from config.settings import REGIME_FAMILY_MATRIX
+                
+                return jsonify({
+                    'success': True,
+                    'matrix': REGIME_FAMILY_MATRIX
+                })
+            except ImportError as e:
+                logger.error(f"Error importing REGIME_FAMILY_MATRIX: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': 'REGIME_FAMILY_MATRIX not available',
+                    'matrix': {}
+                }), 500
+            except Exception as e:
+                logger.error(f"Error getting regime matrix: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'matrix': {}
+                }), 500
         
         @self.app.route('/api/compose-analysis')
         def get_compose_analysis():

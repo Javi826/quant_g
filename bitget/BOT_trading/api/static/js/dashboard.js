@@ -1,0 +1,2264 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// BOT_trading Dashboard JavaScript
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COLORS = {
+    purple: '#6d28d9',
+    green: '#3fb950',
+    yellow: '#d29922',
+    red: '#f85149',
+    textPrimary: '#c9d1d9',
+    textSecondary: '#8b949e',
+    gridDark: '#21262d',
+    borderYellow: '#facc15',
+    white: '#ffffff',
+    blue: '#58a6ff',
+    equityPositive: '#3fb950',
+    equityNegative: '#f85149',
+    drawdownRed: '#f85149',
+    drawdownRedAlpha: 'rgba(248, 81, 73, 0.1)'
+};
+
+const METRIC_THRESHOLDS = {
+    profitFactor: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
+    sharpeRatio: { excellent: 2.0, good: 1.5, acceptable: 1.0 },
+    rSquared: { excellent: 0.9, good: 0.7, acceptable: 0.5 }
+};
+
+const CHART_DEFAULTS = {
+    fontSize: { title: 20, axis: 16 },
+    gridColor: COLORS.gridDark,
+    borderColor: COLORS.borderYellow,
+    borderWidth: 1,
+    textColor: COLORS.white,
+    titleColor: COLORS.textPrimary
+};
+
+function getMetricColor(value, withGlow = false) {
+    const thresholds = METRIC_THRESHOLDS.profitFactor;
+    if (value >= thresholds.excellent) {
+        return { color: COLORS.purple, shadow: withGlow ? '0 0 10px rgba(109, 40, 217, 0.8)' : 'none' };
+    } else if (value >= thresholds.good) {
+        return { color: COLORS.green, shadow: 'none' };
+    } else if (value >= thresholds.acceptable) {
+        return { color: COLORS.yellow, shadow: 'none' };
+    } else {
+        return { color: COLORS.red, shadow: 'none' };
+    }
+}
+
+function getRSquaredColor(value) {
+    if (value >= 0.9) return { color: COLORS.purple, shadow: '0 0 10px rgba(109, 40, 217, 0.8)' };
+    if (value >= 0.7) return { color: COLORS.green, shadow: 'none' };
+    if (value >= 0.5) return { color: COLORS.yellow, shadow: 'none' };
+    return { color: COLORS.red, shadow: 'none' };
+}
+
+function getPositiveNegativeColor(value) {
+    return value >= 0 ? COLORS.green : COLORS.red;
+}
+
+function applyMetricColor(element, value, type = 'profitFactor') {
+    if (type === 'profitFactor' || type === 'sharpe') {
+        const { color, shadow } = getMetricColor(value, true);
+        element.style.color = color;
+        element.style.textShadow = shadow;
+    } else if (type === 'rSquared') {
+        const { color, shadow } = getRSquaredColor(value);
+        element.style.color = color;
+        element.style.textShadow = shadow;
+    } else if (type === 'positiveNegative') {
+        element.style.color = getPositiveNegativeColor(value);
+    }
+}
+
+function getBaseChartConfig(title, reverseY = false) {
+    const config = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            title: { 
+                display: true, 
+                text: title,
+                color: CHART_DEFAULTS.titleColor,
+                font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+            }
+        },
+        scales: {
+            x: { 
+                ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                } 
+            },
+            y: { 
+                ticks: { 
+                    color: CHART_DEFAULTS.textColor,
+                    font: { size: CHART_DEFAULTS.fontSize.axis },
+                    callback: function(value) { return value.toFixed(1) + '%'; }
+                }, 
+                grid: { 
+                    color: CHART_DEFAULTS.gridColor,
+                    drawBorder: true,
+                    borderColor: CHART_DEFAULTS.borderColor,
+                    borderWidth: CHART_DEFAULTS.borderWidth
+                }
+            }
+        }
+    };
+    if (reverseY) config.scales.y.reverse = true;
+    return config;
+}
+
+function clearAnalysisDates() {
+    document.getElementById('analysis-date-from').value = '';
+    document.getElementById('analysis-date-to').value = '';
+}
+
+function getAnalysisDateParams() {
+    const dateFrom = document.getElementById('analysis-date-from').value;
+    const dateTo = document.getElementById('analysis-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+// Date filter helper functions
+function clearCurvesDates() {
+    document.getElementById('curves-date-from').value = '';
+    document.getElementById('curves-date-to').value = '';
+}
+
+function clearComposeDates() {
+    document.getElementById('compose-date-from').value = '';
+    document.getElementById('compose-date-to').value = '';
+}
+
+function getCurvesDateParams() {
+    const dateFrom = document.getElementById('curves-date-from').value;
+    const dateTo = document.getElementById('curves-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+function getComposeDateParams() {
+    const dateFrom = document.getElementById('compose-date-from').value;
+    const dateTo = document.getElementById('compose-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+async function waitForBackend() {
+    const maxAttempts = 30;
+    let attempts = 0;
+    const splash = document.getElementById('loading-splash');
+    const statusText = document.getElementById('loading-status');
+    const attemptCount = document.getElementById('attempt-count');
+    const errorBox = document.getElementById('loading-error');
+    
+    splash.classList.remove('hidden');
+    splash.style.opacity = '1';
+    splash.style.display = 'flex';
+    errorBox.classList.remove('visible');
+    
+    while (attempts < maxAttempts) {
+        attempts++;
+        attemptCount.textContent = attempts;
+        
+        try {
+            const response = await fetch('/api/status', { 
+                method: 'GET',
+                cache: 'no-cache',
+                headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'running' || data.account) {
+                    statusText.innerHTML = '✅ Connected successfully!';
+                    statusText.style.color = '#4ade80';
+                    await new Promise(r => setTimeout(r, 500));
+                    splash.style.transition = 'opacity 0.3s ease';
+                    splash.style.opacity = '0';
+                    await new Promise(r => setTimeout(r, 300));
+                    splash.classList.add('hidden');
+                    splash.style.display = 'none';
+                    return true;
+                }
+            }
+        } catch (error) {}
+        await new Promise(r => setTimeout(r, 1000));
+    }
+    
+    errorBox.classList.add('visible');
+    setTimeout(() => {
+        splash.style.transition = 'opacity 0.5s ease';
+        splash.style.opacity = '0';
+        setTimeout(() => {
+            splash.classList.add('hidden');
+            splash.style.display = 'none';
+        }, 500);
+    }, 5000);
+    return false;
+}
+
+let autoScroll = true;
+let isLoadingData = false;
+let isLoadingLogs = false;
+let currentPositionsView = 'compact';
+let cachedPositions = [];
+let currentTab = 'positions';
+let equityChart = null;
+let drawdownChart = null;
+let allStrategiesList = [];
+let isStoppingBot = false;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MARKET REGIME FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+let currentRegimeTimeframe = '4H';
+
+function getRegimeBadgeStyle(family) {
+    const styles = {
+        'trending': { bg: '#3fb950', color: '#ffffff', text: 'TRENDING' },
+        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },
+        'ranging': { bg: '#58a6ff', color: '#ffffff', text: 'RANGING' },
+        'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' }
+    };
+    return styles[family] || styles['default'];
+}
+
+function setRegimeTimeframe(timeframe) {
+    currentRegimeTimeframe = timeframe;
+    
+    // Update active button
+    document.querySelectorAll('#tab-regime .view-selector .view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent === timeframe) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Load regime data
+    loadRegimeData();
+}
+
+async function loadRegimeData() {
+    try {
+        const res = await fetch('/api/regime/current?timeframe=' + currentRegimeTimeframe);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
+        const data = await res.json();
+        
+        if (!data.success) {
+            console.error('Regime API error:', data.error);
+            updateRegimeUI({
+                family: 'error',
+                multiplier: 1.0,
+                metrics: {},
+                timeframe: currentRegimeTimeframe
+            });
+            return;
+        }
+        
+        updateRegimeUI(data);
+        
+    } catch (error) {
+        console.error('Error loading regime data:', error);
+        updateRegimeUI({
+            family: 'error',
+            multiplier: 1.0,
+            metrics: {},
+            timeframe: currentRegimeTimeframe
+        });
+    }
+}
+
+function updateRegimeUI(data) {
+    const family = data.family || 'default';
+    const multiplier = data.multiplier || 1.0;
+    const metrics = data.metrics || {};
+    const timeframe = data.timeframe || currentRegimeTimeframe;
+    // CRITICAL: all_families must come from backend (settings.py)
+    // If backend fails, show error instead of using outdated hardcoded values
+    const allFamilies = data.all_families;
+    
+    if (!allFamilies || Object.keys(allFamilies).length === 0) {
+        console.error('Backend did not return all_families - check REGIME_FAMILY_SIZING in settings.py');
+        const regimeContainer = document.getElementById('tab-regime');
+        if (regimeContainer) {
+            regimeContainer.innerHTML = '<div style="color: #f85149; padding: 40px; text-align: center;">Error: Market regime configuration not available. Check backend logs.</div>';
+        }
+        return;
+    }
+    const allThresholds = data.all_thresholds || {};
+    
+    // Get badge style
+    const badgeStyle = getRegimeBadgeStyle(family);
+    
+    // Update header stat card
+    const regimeBadge = document.getElementById('regime-badge');
+    if (regimeBadge) {
+        regimeBadge.textContent = badgeStyle.text;
+        regimeBadge.style.color = badgeStyle.bg;
+    }
+    
+    const regimeTimeframeEl = document.getElementById('regime-timeframe');
+    if (regimeTimeframeEl) {
+        regimeTimeframeEl.textContent = timeframe + ' | ' + multiplier.toFixed(1) + 'x sizing';
+    }
+    
+    // Helper function to format rules
+    function formatRules(familyName) {
+        const rules = allThresholds[familyName] || {};
+        
+        if (Object.keys(rules).length === 0) {
+            return 'Default - All other conditions';
+        }
+        
+        const metricNames = {
+            'hurst': 'Hurst',
+            'efficiency_ratio': 'ER',
+            'atr_pct': 'ATR%',
+            'permutation_entropy': 'PE'
+        };
+        
+        const parts = [];
+        for (const [metric, [op, threshold]] of Object.entries(rules)) {
+            const name = metricNames[metric] || metric;
+            parts.push(name + ' ' + op + ' ' + threshold);
+        }
+        
+        return parts.join(' AND ');
+    }
+    
+    // Update family cards with multipliers, rules, and active state
+    const families = ['volatile', 'ranging', 'trending'];
+    const familyColors = {
+        'volatile': '#f85149',
+        'ranging': '#58a6ff',
+        'trending': '#3fb950'
+    };
+    const familyBgColors = {
+        'volatile': 'rgba(248, 81, 73, 0.15)',
+        'ranging': 'rgba(88, 166, 255, 0.15)',
+        'trending': 'rgba(63, 185, 80, 0.15)'
+    };
+    
+    families.forEach(f => {
+        const card = document.getElementById('regime-card-' + f);
+        const multiplierSpan = document.getElementById('regime-card-' + f + '-multiplier');
+        const rulesSpan = document.getElementById('regime-card-' + f + '-rules');
+        
+        if (card) {
+            // Set multiplier
+            if (multiplierSpan) {
+                const mult = (f in allFamilies) ? allFamilies[f] : 1.0;
+                multiplierSpan.textContent = mult.toFixed(1) + 'x';
+            }
+            
+            // Set rules
+            if (rulesSpan) {
+                rulesSpan.textContent = formatRules(f);
+            }
+            
+            // Set active/inactive state with colored background
+            if (f === family.toLowerCase()) {
+                // Active card
+                card.style.border = '2px solid ' + familyColors[f];
+                card.style.background = familyBgColors[f]; // Soft colored background
+                card.style.opacity = '1';
+                if (multiplierSpan) {
+                    multiplierSpan.style.color = familyColors[f];
+                }
+            } else {
+                // Inactive card
+                card.style.border = '2px solid #21262d';
+                card.style.background = '#1c2128'; // Normal background
+                card.style.opacity = '0.5';
+                if (multiplierSpan) {
+                    multiplierSpan.style.color = '#8b949e';
+                }
+            }
+        }
+    });
+    
+    // Helper function to create colored block bar
+    function createColoredBar(value, reverse = false) {
+        const totalBlocks = 20;
+        const filledBlocks = Math.round(value * totalBlocks);
+        
+        // Determine single color based on value (not position)
+        let fillColor;
+        
+        if (reverse) {
+            // For ATR and PE (lower is better): green → yellow → red
+            if (value < 0.33) {
+                fillColor = '#3fb950'; // Green (low value is good)
+            } else if (value < 0.66) {
+                fillColor = '#f59e0b'; // Yellow (medium value)
+            } else {
+                fillColor = '#f85149'; // Red (high value is bad)
+            }
+        } else {
+            // For Hurst and ER (higher is better): red → yellow → green
+            if (value < 0.33) {
+                fillColor = '#f85149'; // Red (low value is bad)
+            } else if (value < 0.66) {
+                fillColor = '#f59e0b'; // Yellow (medium value)
+            } else {
+                fillColor = '#3fb950'; // Green (high value is good)
+            }
+        }
+        
+        // Build HTML with single color for all filled blocks
+        let html = '';
+        
+        for (let i = 0; i < totalBlocks; i++) {
+            if (i < filledBlocks) {
+                html += '<span style="color: ' + fillColor + ';">█</span>';
+            } else {
+                html += '<span style="color: #2d333b;">█</span>';
+            }
+        }
+        
+        return html;
+    }
+    
+    // Update metrics with colored block bars
+    const hurst = metrics.hurst;
+    const er = metrics.efficiency_ratio;
+    const atr = metrics.atr_pct;
+    const pe = metrics.permutation_entropy;
+    
+    // Hurst Exponent (0-1 range, higher is better)
+    if (hurst !== undefined && hurst !== null && !isNaN(hurst)) {
+        const hurstElement = document.getElementById('regime-metric-hurst');
+        hurstElement.textContent = hurst.toFixed(3);
+        
+        // Set color to match bar color
+        let hurstColor;
+        if (hurst < 0.33) {
+            hurstColor = '#f85149'; // Red (low value is bad)
+        } else if (hurst < 0.66) {
+            hurstColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            hurstColor = '#3fb950'; // Green (high value is good)
+        }
+        hurstElement.style.color = hurstColor;
+        
+        const hurstBar = document.getElementById('regime-bar-hurst');
+        if (hurstBar) {
+            hurstBar.innerHTML = createColoredBar(hurst, false);
+        }
+    } else {
+        document.getElementById('regime-metric-hurst').textContent = '-';
+        document.getElementById('regime-metric-hurst').style.color = '#58a6ff';
+        const hurstBar = document.getElementById('regime-bar-hurst');
+        if (hurstBar) {
+            hurstBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // Efficiency Ratio (0-1 range, higher is better)
+    if (er !== undefined && er !== null && !isNaN(er)) {
+        const erElement = document.getElementById('regime-metric-er');
+        erElement.textContent = er.toFixed(3);
+        
+        // Set color to match bar color
+        let erColor;
+        if (er < 0.33) {
+            erColor = '#f85149'; // Red (low value is bad)
+        } else if (er < 0.66) {
+            erColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            erColor = '#3fb950'; // Green (high value is good)
+        }
+        erElement.style.color = erColor;
+        
+        const erBar = document.getElementById('regime-bar-er');
+        if (erBar) {
+            erBar.innerHTML = createColoredBar(er, false);
+        }
+    } else {
+        document.getElementById('regime-metric-er').textContent = '-';
+        document.getElementById('regime-metric-er').style.color = '#22d3ee';
+        const erBar = document.getElementById('regime-bar-er');
+        if (erBar) {
+            erBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // ATR Percentage (scale 0-5% to 0-1, lower is better)
+    if (atr !== undefined && atr !== null && !isNaN(atr)) {
+        const atrElement = document.getElementById('regime-metric-atr');
+        atrElement.textContent = atr.toFixed(2) + '%';
+        
+        // Set color to match bar color (reverse - lower is better)
+        const atrScaled = Math.min(atr / 5, 1.0);
+        let atrColor;
+        if (atrScaled < 0.33) {
+            atrColor = '#3fb950'; // Green (low value is good)
+        } else if (atrScaled < 0.66) {
+            atrColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            atrColor = '#f85149'; // Red (high value is bad)
+        }
+        atrElement.style.color = atrColor;
+        
+        const atrBar = document.getElementById('regime-bar-atr');
+        if (atrBar) {
+            atrBar.innerHTML = createColoredBar(atrScaled, true);
+        }
+    } else {
+        document.getElementById('regime-metric-atr').textContent = '-';
+        document.getElementById('regime-metric-atr').style.color = '#f59e0b';
+        const atrBar = document.getElementById('regime-bar-atr');
+        if (atrBar) {
+            atrBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+    
+    // Permutation Entropy (0-1 range, lower is better)
+    if (pe !== undefined && pe !== null && !isNaN(pe)) {
+        const peElement = document.getElementById('regime-metric-pe');
+        peElement.textContent = pe.toFixed(3);
+        
+        // Set color to match bar color (reverse - lower is better)
+        let peColor;
+        if (pe < 0.33) {
+            peColor = '#3fb950'; // Green (low value is good)
+        } else if (pe < 0.66) {
+            peColor = '#f59e0b'; // Yellow (medium value)
+        } else {
+            peColor = '#f85149'; // Red (high value is bad)
+        }
+        peElement.style.color = peColor;
+        
+        const peBar = document.getElementById('regime-bar-pe');
+        if (peBar) {
+            peBar.innerHTML = createColoredBar(pe, true);
+        }
+    } else {
+        document.getElementById('regime-metric-pe').textContent = '-';
+        document.getElementById('regime-metric-pe').style.color = '#a78bfa';
+        const peBar = document.getElementById('regime-bar-pe');
+        if (peBar) {
+            peBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// END MARKET REGIME FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function stopBot() {
+    if (isStoppingBot) return;
+    if (!confirm('WARNING: STOP TRADING BOT?\n\nThis will terminate the bot process.\n\nAre you sure?')) return;
+    isStoppingBot = true;
+    
+    const overlay = document.getElementById('stop-overlay');
+    const statusDiv = document.getElementById('stop-status');
+    statusDiv.innerHTML = '';
+    overlay.classList.add('active');
+    
+    addStopLog('Initializing stop sequence...');
+    addStopLog('Stop signal requested');
+    
+    try {
+        const stopResponse = await fetch('/api/bot/stop', { method: 'POST' });
+        if (!stopResponse.ok) throw new Error('Failed to send stop signal');
+        
+        const stopData = await stopResponse.json();
+        addStopLog('Stop signal sent (SIGTERM) to PID ' + stopData.pid, 'success');
+        
+        let attempts = 0;
+        const maxAttempts = 30;
+        let botStoppedConfirmed = false;
+        
+        const verifyInterval = setInterval(async () => {
+            attempts++;
+            addStopLog('Verifying shutdown... (' + attempts + '/' + maxAttempts + ')');
+            
+            try {
+                const verifyResponse = await fetch('/api/bot/verify-stopped', {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (verifyResponse.ok) {
+                    const status = await verifyResponse.json();
+                    if (!status.running) {
+                        clearInterval(verifyInterval);
+                        botStoppedConfirmed = true;
+                        addStopLog('Process verified as terminated', 'success');
+                        addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
+                        document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
+                        document.getElementById('stop-title').style.color = COLORS.green;
+                        return;
+                    }
+                }
+            } catch (error) {
+                clearInterval(verifyInterval);
+                botStoppedConfirmed = true;
+                addStopLog('Backend stopped responding', 'success');
+                addStopLog('Flask server terminated (expected)', 'success');
+                addStopLog('✅ BOT STOPPED SUCCESSFULLY', 'success');
+                document.getElementById('stop-title').textContent = '✅ BOT STOPPED';
+                document.getElementById('stop-title').style.color = COLORS.green;
+                return;
+            }
+            
+            if (attempts >= maxAttempts && !botStoppedConfirmed) {
+                clearInterval(verifyInterval);
+                addStopLog('⚠️ VERIFICATION TIMEOUT', 'warning');
+                addStopLog('Bot may still be running. Check manually.', 'warning');
+                document.getElementById('stop-title').textContent = '⚠️ TIMEOUT';
+                document.getElementById('stop-title').style.color = COLORS.yellow;
+            }
+        }, 1000);
+        
+    } catch (error) {
+        if (error.message.includes('fetch') || error.name === 'TypeError') {
+            addStopLog('⚠️ Backend not responding', 'warning');
+            addStopLog('Bot may have already stopped', 'warning');
+        } else {
+            addStopLog('❌ ERROR: ' + error.message, 'error');
+        }
+    }
+}
+
+function addStopLog(message, className = '') {
+    const statusDiv = document.getElementById('stop-status');
+    const line = document.createElement('div');
+    line.className = 'stop-status-line' + (className ? ' ' + className : '');
+    line.textContent = message;
+    statusDiv.appendChild(line);
+    statusDiv.scrollTop = statusDiv.scrollHeight;
+}
+
+function switchTab(tabName) {
+    currentTab = tabName;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    if (tabName === 'analysis') loadStrategyAnalysis();
+    if (tabName === 'config') loadBotConfig();
+    if (tabName === 'equity') loadEquityTab();
+    if (tabName === 'regime') loadRegimeData();
+}
+
+function switchEquitySubTab(subTabName) {
+    document.querySelectorAll('#tab-equity .tabs-container .tab-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelectorAll('#tab-equity .tab-content').forEach(content => content.classList.remove('active'));
+    document.getElementById('equity-subtab-' + subTabName).classList.add('active');
+    
+    if (subTabName === 'symbols') loadSymbolsAnalysis();
+    if (subTabName === 'weekday') loadWeekDayAnalysis();
+    if (subTabName === 'monthly') initMonthlyTab();
+    if (subTabName === 'correlation') initCorrelationTab();
+    if (subTabName === 'regime') loadRegimeAnalytics();
+    if (subTabName === 'compose') {
+        const container = document.getElementById('compose-container');
+        const currentContent = container.innerHTML.trim();
+        
+        if (currentContent === '' || currentContent.includes('Select a metric')) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">Select a metric and click "Show TOP 10"</div>';
+            document.getElementById('compose-plot-btn').style.display = 'none';
+        }
+    }
+}
+
+function getLogClass(line) {
+    if (line.includes('TP for')) return 'tp-hit';
+    if (line.includes('SL for')) return 'sl-hit';
+    if (line.includes('SHORT') || line.includes('LONG')) return 'info';
+    if (line.includes('Error')) return 'error';
+    if (line.includes('WAR')) return 'warning';
+    return 'default';
+}
+
+
+async function loadLogs() {
+    if (isLoadingLogs) return;
+    isLoadingLogs = true;
+    try {
+        const res = await fetch('/api/logs/stream');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        
+        if (data.logs && data.logs.length > 0) {
+            const logsContent = document.getElementById('logs-content');
+            if (logsContent.children.length === 1 && logsContent.children[0].textContent.includes('Waiting')) {
+                logsContent.innerHTML = '';
+            }
+            
+            const fragment = document.createDocumentFragment();
+            data.logs.forEach(log => {
+                const logLine = document.createElement('div');
+                logLine.className = 'log-line ' + getLogClass(log);
+                logLine.textContent = log;
+                fragment.appendChild(logLine);
+            });
+            logsContent.appendChild(fragment);
+            
+            while (logsContent.children.length > 500) {
+                logsContent.removeChild(logsContent.firstChild);
+            }
+            
+            if (autoScroll) {
+                requestAnimationFrame(() => {
+                    logsContent.scrollTop = logsContent.scrollHeight;
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading logs:', error);
+    } finally {
+        isLoadingLogs = false;
+    }
+}
+
+function setPositionsView(view) {
+    currentPositionsView = view;
+    document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    if (view !== 'symbols') {
+        const headerSpan = document.querySelector('#tab-positions .content-section h2 span');
+        if (headerSpan) {
+            headerSpan.textContent = 'Active Positions';
+        }
+    }
+    
+    renderPositions(cachedPositions);
+    localStorage.setItem('positionsView', view);
+}
+
+function renderPositions(positions) {
+    cachedPositions = positions;
+    const container = document.getElementById('positions-container');
+    
+    if (!positions || positions.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No active positions</div>';
+        return;
+    }
+    
+    if (currentPositionsView === 'compact') {
+        renderCompactView(container, positions);
+    } else if (currentPositionsView === 'detailed') {
+        renderDetailedView(container, positions);
+    } else if (currentPositionsView === 'symbols') {
+        renderSymbolsView(container, positions);
+    }
+}
+
+function renderCompactView(container, positions) {
+    const groupedByStrategy = {};
+    positions.forEach(pos => {
+        if (!groupedByStrategy[pos.strategy]) {
+            groupedByStrategy[pos.strategy] = {
+                positions: [],
+                totalPnl: 0,
+                direction: pos.direction,
+                opened_at: pos.opened_at,
+                candles: pos.candles,
+                max_candles: pos.max_candles
+            };
+        }
+        groupedByStrategy[pos.strategy].positions.push(pos);
+        groupedByStrategy[pos.strategy].totalPnl += (pos.current_pnl || 0);
+    });
+    
+    let allEntries = [];
+    
+    if (allStrategiesList && allStrategiesList.length > 0) {
+        const allActiveDeprecating = allStrategiesList.filter(s => 
+            s.status === 'ACTIVE' || s.status === 'DEPRECATING'
+        );
+        
+        allActiveDeprecating.forEach(strat => {
+            if (groupedByStrategy[strat.id]) {
+                allEntries.push([strat.id, groupedByStrategy[strat.id]]);
+            } else {
+                allEntries.push([strat.id, {
+                    positions: [],
+                    totalPnl: 0,
+                    direction: strat.direction,
+                    opened_at: null,
+                    candles: 0,
+                    max_candles: 50,
+                    isEmpty: true
+                }]);
+            }
+        });
+    } else {
+        allEntries = Object.entries(groupedByStrategy);
+    }
+    
+    const sortedEntries = allEntries.sort((a, b) => a[0].localeCompare(b[0]));
+    
+    if (sortedEntries.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No active positions</div>';
+        return;
+    }
+    
+    const html = '<table><thead><tr><th>#</th><th>Strategy</th><th>Side</th><th>Opened</th><th style="text-align: right;">Candles</th><th style="text-align: center;">#pos</th><th>PnL</th></tr></thead><tbody>' +
+        sortedEntries.map(([strategyId, data], index) => {
+            const pnl = data.totalPnl;
+            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+            const num = String(index + 1).padStart(2, '0');
+            
+            let openedDateStr = '-';
+            if (data.opened_at) {
+                try {
+                    const date = new Date(data.opened_at);
+                    openedDateStr = date.toISOString().split('T')[0];
+                } catch {
+                    openedDateStr = String(data.opened_at).substring(0, 10);
+                }
+            }
+            
+            if (data.isEmpty) {
+                return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strategyId + '</td><td class="direction-' + data.direction.toLowerCase() + '">' + data.direction.toUpperCase() + '</td><td>-</td><td style="text-align: right;">-</td><td style="text-align: center; color: #f85149; font-weight: 600;">0</td><td>-</td></tr>';
+            }
+            
+            return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + strategyId + '</td><td class="direction-' + data.direction.toLowerCase() + '">' + data.direction.toUpperCase() + '</td><td>' + openedDateStr + '</td><td style="text-align: right;">' + (data.candles || 0) + '/' + (data.max_candles || 50) + '</td><td style="text-align: center; color: #58a6ff; font-weight: 600;">' + data.positions.length + '</td><td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td></tr>';
+        }).join('') +
+        '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function renderDetailedView(container, positions) {
+    const positionsWithDelta = positions.map(pos => {
+        const currentPrice = parseFloat(pos.current_price || pos.entry_price);
+        const tp = parseFloat(pos.tp);
+        
+        let deltaTp;
+        if (pos.direction.toLowerCase() === 'long') {
+            deltaTp = ((tp - currentPrice) / currentPrice * 100);
+        } else {
+            deltaTp = ((currentPrice - tp) / currentPrice * 100);
+        }
+        
+        return { ...pos, _deltaTp: deltaTp };
+    });
+    
+    const sortedPositions = positionsWithDelta.sort((a, b) => a._deltaTp - b._deltaTp);
+    
+    const html = '<table><thead><tr>' +
+        '<th>Strategy</th>' +
+        '<th>Symbol</th>' +
+        '<th>Side</th>' +
+        '<th>Entry</th>' +
+        '<th>Current</th>' +
+        '<th>Size</th>' +
+        '<th>TP (Δ%)</th>' +
+        '<th>SL (Δ%)</th>' +
+        '<th>PnL</th>' +
+        '<th style="text-align: right;">Candles</th>' +
+        '</tr></thead><tbody>' +
+        sortedPositions.map(pos => {
+            const pnl = pos.current_pnl || 0;
+            const pnlClass = pnl >= 0 ? 'direction-long' : 'direction-short';
+            
+            const currentPrice = pos.current_price;
+            const tp = pos.tp;
+            const sl = pos.sl;
+            const entryPrice = pos.entry_price;
+            const precision = pos.precision || 2;
+            
+            const deltaTp = pos.distance_to_tp_pct || 0;
+            const deltaSl = pos.distance_to_sl_pct || 0;
+            
+            const deltaTpClass = Math.abs(deltaTp) < 1 ? 'delta-tp-close' : 'delta-tp';
+            const deltaSlClass = Math.abs(deltaSl) < 1 ? 'delta-sl-close' : 'delta-sl';
+            
+            return '<tr>' +
+                '<td>' + pos.strategy + '</td>' +
+                '<td>' + pos.symbol + '</td>' +
+                '<td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td>' +
+                '<td>$' + entryPrice.toFixed(precision) + '</td>' +
+                '<td>$' + currentPrice.toFixed(precision) + '</td>' +
+                '<td>' + parseFloat(pos.size).toFixed(4) + '</td>' +
+                '<td>$' + tp.toFixed(precision) + ' <span class="' + deltaTpClass + '">(Δ' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%)</span></td>' +
+                '<td>$' + sl.toFixed(precision) + ' <span class="' + deltaSlClass + '">(Δ' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%)</span></td>' +
+                '<td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td>' +
+                '<td style="text-align: right;">' + (pos.candles || 0) + '/' + (pos.max_candles || 50) + '</td>' +
+                '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function renderSymbolsView(container, positions) {
+    const groupedBySymbolSide = {};
+    positions.forEach(pos => {
+        const key = pos.symbol + '_' + pos.direction.toUpperCase();
+        
+        if (!groupedBySymbolSide[key]) {
+            groupedBySymbolSide[key] = {
+                symbol: pos.symbol,
+                side: pos.direction.toUpperCase(),
+                totalSize: 0,
+                totalPnl: 0,
+                strategies: new Set()
+            };
+        }
+        groupedBySymbolSide[key].totalSize += parseFloat(pos.size);
+        groupedBySymbolSide[key].totalPnl += (pos.current_pnl || 0);
+        
+        const strategyNumber = extractNumberFromId(pos.strategy);
+        groupedBySymbolSide[key].strategies.add(strategyNumber);
+    });
+    
+    const sortedKeys = Object.keys(groupedBySymbolSide).sort((a, b) => {
+        const dataA = groupedBySymbolSide[a];
+        const dataB = groupedBySymbolSide[b];
+        
+        if (dataA.symbol !== dataB.symbol) {
+            return dataA.symbol.localeCompare(dataB.symbol);
+        }
+        if (dataA.side === 'LONG' && dataB.side === 'SHORT') return -1;
+        if (dataA.side === 'SHORT' && dataB.side === 'LONG') return 1;
+        return 0;
+    });
+    
+    if (sortedKeys.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No active positions</div>';
+        return;
+    }
+    
+    let longCount = 0;
+    let shortCount = 0;
+    sortedKeys.forEach(key => {
+        if (groupedBySymbolSide[key].side === 'LONG') longCount++;
+        else if (groupedBySymbolSide[key].side === 'SHORT') shortCount++;
+    });
+    
+    const headerSpan = document.querySelector('#tab-positions .content-section h2 span');
+    if (headerSpan) {
+        headerSpan.textContent = 'Active Positions - 🪙 ' + sortedKeys.length + ' Unique Positions (' + longCount + ' LONG / ' + shortCount + ' SHORT)';
+    }
+    
+    const html = '<table><thead><tr>' +
+        '<th>#</th>' +
+        '<th>Symbol</th>' +
+        '<th>Side</th>' +
+        '<th>Total Size</th>' +
+        '<th>Strategies</th>' +
+        '<th>PnL</th>' +
+        '</tr></thead><tbody>' +
+        sortedKeys.map((key, index) => {
+            const data = groupedBySymbolSide[key];
+            const pnlClass = data.totalPnl >= 0 ? 'direction-long' : 'direction-short';
+            const sideClass = data.side === 'LONG' ? 'direction-long' : 'direction-short';
+            const num = String(index + 1).padStart(2, '0');
+            
+            const stratNumbers = Array.from(data.strategies).sort((a, b) => {
+                const numA = parseInt(a) || 0;
+                const numB = parseInt(b) || 0;
+                return numA - numB;
+            });
+            const stratDisplay = '[' + stratNumbers.join(', ') + ']';
+            
+            return '<tr>' +
+                '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+                '<td style="color: #58a6ff; font-weight: 600;">' + data.symbol + '</td>' +
+                '<td class="' + sideClass + '">' + data.side + '</td>' +
+                '<td>' + data.totalSize.toFixed(4) + '</td>' +
+                '<td style="color: #c9d1d9;">' + stratDisplay + '</td>' +
+                '<td class="' + pnlClass + '">' + (data.totalPnl >= 0 ? '+' : '') + '$' + data.totalPnl.toFixed(2) + '</td>' +
+                '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    
+    container.innerHTML = html;
+}
+
+async function loadStrategyAnalysis() {
+    try {
+        const dateParams = getAnalysisDateParams();
+        const res = await fetch('/api/strategy-analysis?' + dateParams);
+        const data = await res.json();
+        const container = document.getElementById('analysis-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data</div>';
+            return;
+        }
+        
+        const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
+        
+        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+            sortedData.map(s => {
+                const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadBotConfig() {
+    try {
+        const res = await fetch('/api/bot-config');
+        const data = await res.json();
+        
+        allStrategiesList = data.strategies || [];
+        
+        document.getElementById('config-account').textContent = data.account || '-';
+        document.getElementById('config-capital').textContent = '$' + (data.initial_capital || 0).toLocaleString();
+        document.getElementById('config-total-strat').textContent = data.stats.total || 0;
+        document.getElementById('config-active-strat').textContent = data.stats.active || 0;
+        document.getElementById('config-deprecating-strat').textContent = data.stats.deprecating || 0;
+        document.getElementById('config-not-implemented-strat').textContent = data.stats.not_implemented || 0;
+        
+        const wsPublic = document.getElementById('ws-public');
+        const wsPrivate = document.getElementById('ws-private');
+        const wsAuth = document.getElementById('ws-auth');
+        
+        if (data.websocket_status.public_connected) {
+            wsPublic.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+        } else {
+            wsPublic.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+        }
+        
+        if (data.websocket_status.private_connected) {
+            wsPrivate.innerHTML = '<span class="ws-dot connected"></span><span>Connected</span>';
+        } else {
+            wsPrivate.innerHTML = '<span class="ws-dot disconnected"></span><span>Disconnected</span>';
+        }
+        
+        if (data.websocket_status.authenticated) {
+            wsAuth.innerHTML = '<span class="ws-dot connected"></span><span>Authenticated</span>';
+        } else {
+            wsAuth.innerHTML = '<span class="ws-dot disconnected"></span><span>Not Authenticated</span>';
+        }
+        
+        const strategiesBody = document.getElementById('strategies-body');
+        if (!data.strategies || data.strategies.length === 0) {
+            strategiesBody.innerHTML = '<tr><td colspan="15" style="text-align: center;">No strategies</td></tr>';
+        } else {
+            const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
+            
+            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count'];
+            const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
+            const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
+            
+            const extraParamKeys = new Set();
+            sortedStrategies.forEach(strat => {
+                Object.keys(strat).forEach(key => {
+                    if (!excludeKeys.has(key)) {
+                        extraParamKeys.add(key);
+                    }
+                });
+            });
+            
+            const extraParamKeysArray = Array.from(extraParamKeys).sort();
+            
+            let dynamicHeaders = '';
+            extraParamKeysArray.forEach(key => {
+                const firstWord = key.split('_')[0];
+                const displayName = firstWord.charAt(0).toUpperCase() + firstWord.slice(1);
+                dynamicHeaders += '<th>' + displayName + '</th>';
+            });
+            
+            document.querySelector('#strategies-table thead tr').innerHTML = 
+                '<th>#</th>' +
+                '<th>ID</th>' +
+                '<th>TF</th>' +
+                '<th>Side</th>' +
+                '<th>Symbols</th>' +
+                '<th>TP%</th>' +
+                '<th>SL%</th>' +
+                '<th>Amount</th>' +
+                '<th>Candles</th>' +
+                dynamicHeaders +
+                '<th>Status</th>';
+            
+            strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
+                let statusBadge = '';
+                if (strat.status === 'ACTIVE') {
+                    statusBadge = '<span class="badge badge-active">Active</span>';
+                } else if (strat.status === 'DEPRECATING') {
+                    statusBadge = '<span class="badge badge-deprecating">Deprecating</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-not-implemented">Not Impl.</span>';
+                }
+                
+                const num = String(index + 1).padStart(2, '0');
+                
+                const fixedCols = 
+                    '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+                    '<td>' + strat.id + '</td>' +
+                    '<td>' + strat.timeframe + '</td>' +
+                    '<td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td>' +
+                    '<td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td>';
+                
+                let commonCols = '';
+                commonKeys.forEach(key => {
+                    const value = strat[key] !== undefined ? strat[key] : 'N/A';
+                    const display = key === 'order_amount' ? '$' + value : value;
+                    commonCols += '<td>' + display + '</td>';
+                });
+                
+                let extraCols = '';
+                extraParamKeysArray.forEach(key => {
+                    const value = strat[key];
+                    const display = (value !== undefined && value !== 'N/A') ? value : '-';
+                    extraCols += '<td>' + display + '</td>';
+                });
+                
+                return '<tr>' + fixedCols + commonCols + extraCols + '<td>' + statusBadge + '</td></tr>';
+            }).join('');
+        }
+        
+        const timeframesContainer = document.getElementById('timeframes-container');
+        if (!data.timeframes || Object.keys(data.timeframes).length === 0) {
+            timeframesContainer.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 20px;">No timeframes</div>';
+        } else {
+            timeframesContainer.innerHTML = Object.entries(data.timeframes)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([tf, strategies]) => '<div class="timeframe-item"><div class="timeframe-header">' + tf + ' (' + strategies.length + ' strategies)</div><div class="timeframe-strategies">' + strategies.join(', ') + '</div></div>')
+                .join('');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// =============================================================================
+// GENERIC CHECKBOX FUNCTIONS (Used by Curves, Monthly, Correlation)
+// =============================================================================
+
+/**
+ * Initialize strategy checkboxes for a tab
+ * @param {string} containerId - ID of checkbox container div
+ * @param {string} checkboxPrefix - Prefix for individual checkbox IDs (e.g., 'strat-')
+ * @param {string} allCheckboxId - ID of "ALL STRATEGIES" checkbox
+ * @returns {Promise<Array>} Array of strategies from API
+ */
+async function initStrategyCheckboxes(containerId, checkboxPrefix, allCheckboxId) {
+    const res = await fetch('/api/bot-config');
+    const data = await res.json();
+    
+    const strategies = data.strategies || [];
+    
+    const checkboxContainer = document.getElementById(containerId);
+    const allCheckbox = checkboxContainer.querySelector(`#${allCheckboxId}`).parentElement;
+    
+    // Clear and re-add ALL checkbox
+    checkboxContainer.innerHTML = '';
+    checkboxContainer.appendChild(allCheckbox);
+    
+    // Create checkbox for each strategy
+    strategies.forEach((strat) => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = checkboxPrefix + strat.id;
+        checkbox.value = strat.id;
+        checkbox.checked = (strat.status === 'ACTIVE' || strat.status === 'DEPRECATING');
+        
+        const label = document.createElement('label');
+        label.htmlFor = checkboxPrefix + strat.id;
+        
+        const displayName = strat.id.replace(/^\d{2}_/, '');
+        label.textContent = '[' + strat.number + '] ' + displayName + ' (' + strat.status + ')';
+        
+        // Color coding by status
+        if (strat.status === 'ACTIVE') {
+            label.style.color = '#ffffff';
+            label.style.fontWeight = '600';
+        } else if (strat.status === 'DEPRECATING') {
+            label.style.color = '#d29922';
+        } else {
+            label.style.color = '#8b949e';
+            label.style.fontStyle = 'italic';
+        }
+        
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        checkboxContainer.appendChild(div);
+    });
+    
+    // Setup "ALL" checkbox toggle - use cloneNode to avoid duplicate listeners
+    const allCheckboxInput = document.getElementById(allCheckboxId);
+    const newAllCheckbox = allCheckboxInput.cloneNode(true);
+    allCheckboxInput.parentNode.replaceChild(newAllCheckbox, allCheckboxInput);
+    
+    newAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        document.querySelectorAll(`#${containerId} input[type="checkbox"]`).forEach(cb => {
+            if (cb.id !== allCheckboxId) cb.checked = isChecked;
+        });
+    });
+    
+    return strategies;
+}
+
+/**
+ * Get selected strategy IDs from a checkbox container
+ * @param {string} containerId - ID of checkbox container div
+ * @returns {Array<string>} Array of selected strategy IDs (excludes "ALL")
+ */
+function getSelectedStrategies(containerId) {
+    const selected = [];
+    document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`).forEach(cb => {
+        if (cb.value !== 'ALL') {
+            selected.push(cb.value);
+        }
+    });
+    return selected;
+}
+
+// =============================================================================
+// END GENERIC CHECKBOX FUNCTIONS
+// =============================================================================
+
+async function loadEquityTab() {
+    try {
+        allStrategiesList = await initStrategyCheckboxes(
+            'strategy-checkboxes',
+            'strat-',
+            'strat-all'
+        );
+        
+        await updateEquityChart();
+        
+    } catch (error) {
+        console.error('Error loading equity tab:', error);
+    }
+}
+
+async function initMonthlyTab() {
+    try {
+        allStrategiesList = await initStrategyCheckboxes(
+            'monthly-strategy-checkboxes',
+            'monthly-strat-',
+            'monthly-strat-all'
+        );
+        
+    } catch (error) {
+        console.error('Error initializing monthly tab:', error);
+    }
+}
+
+async function loadMonthlyAnalysis() {
+    try {
+        const selectedStrategies = getSelectedStrategies('monthly-strategy-checkboxes');
+        
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+        
+        const res = await fetch('/api/monthly-analysis?strategies=' + selectedStrategies.join(','));
+        const data = await res.json();
+        const container = document.getElementById('monthly-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available for selected strategies</div>';
+            return;
+        }
+        
+        const html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 10px 0;">' +
+            data.map(row => {
+                const profitPctClass = row.profit_pct >= 0 ? '#3fb950' : '#f85149';
+                const profitUsdClass = row.profit_usd >= 0 ? '#3fb950' : '#f85149';
+                const prefixPct = row.profit_pct >= 0 ? '+' : '';
+                const prefixUsd = row.profit_usd >= 0 ? '+$' : '$';
+                
+                return '<div style="background: #1c2128; border: 1px solid #21262d; border-radius: 8px; padding: 15px 20px; min-width: 100px; text-align: center;">' +
+                    '<div style="color: ' + profitPctClass + '; font-size: 18px; font-weight: 700; margin-bottom: 4px;">' + prefixPct + row.profit_pct.toFixed(1) + '%</div>' +
+                    '<div style="color: ' + profitUsdClass + '; font-size: 14px; font-weight: 600; margin-bottom: 8px;">' + prefixUsd + row.profit_usd.toFixed(0) + '</div>' +
+                    '<div style="color: #58a6ff; font-size: 13px; font-weight: 600; text-transform: uppercase;">' + row.month_name + '</div>' +
+                    '</div>';
+            }).join('') +
+            '</div>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading monthly analysis:', error);
+        document.getElementById('monthly-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+async function loadComposeAnalysis() {
+    try {
+        document.querySelectorAll('.compose-checkbox').forEach(cb => cb.checked = false);
+        
+        const metric = document.getElementById('compose-metric').value;
+        const dateParams = getComposeDateParams();
+        const res = await fetch('/api/compose-analysis?metric=' + metric + dateParams);
+        
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
+        const data = await res.json();
+        const container = document.getElementById('compose-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            document.getElementById('compose-plot-btn').style.display = 'none';
+            return;
+        }
+        
+        function formatNumber(value, decimals = 2, suffix = '') {
+            if (value === null || value === undefined) return '-';
+            if (!isFinite(value)) return '-';
+            return value.toFixed(decimals) + suffix;
+        }
+        
+        function getRSquaredStyle(value) {
+            if (!isFinite(value)) return '';
+            if (value >= 0.9) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
+            if (value >= 0.7) return 'style="color: #3fb950;"';
+            if (value >= 0.5) return 'style="color: #d29922;"';
+            return 'style="color: #f85149;"';
+        }
+        
+        function getMetricStyle(value, metric_type) {
+            if (!isFinite(value)) return '';
+            
+            if (metric_type === 'profit_factor' || metric_type === 'sharpe') {
+                if (value >= 2.0) return 'style="color: #6d28d9; text-shadow: 0 0 10px rgba(109, 40, 217, 0.8);"';
+                if (value >= 1.5) return 'style="color: #3fb950;"';
+                if (value >= 1.0) return 'style="color: #d29922;"';
+                return 'style="color: #f85149;"';
+            }
+            return '';
+        }
+        
+        const metricNames = {
+            'num_trades': '#trades',
+            'total_profit_pct': 'Profit_%',
+            'total_profit_usd': 'Profit_$',
+            'profit_factor': 'Profit Factor',
+            'weekly_win_pct': 'Weekly_%',
+            'win_rate': 'Win Rate',
+            'max_dd': 'Max DD',
+            'r_squared': 'R²',
+            'sharpe_ratio': 'Sharpe'
+        };
+        
+        const highlightCol = metricNames[metric];
+        
+        const html = '<table><thead><tr>' +
+            '<th style="width: 40px;"></th>' +
+            '<th>#</th>' +
+            '<th>Combination</th>' +
+            '<th' + (highlightCol === '#trades' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>#trades</th>' +
+            '<th' + (highlightCol === 'Profit_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_%</th>' +
+            '<th' + (highlightCol === 'Profit_$' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit_$</th>' +
+            '<th' + (highlightCol === 'Profit Factor' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Profit Factor</th>' +
+            '<th' + (highlightCol === 'Weekly_%' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Weekly_%</th>' +
+            '<th' + (highlightCol === 'Win Rate' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Win Rate</th>' +
+            '<th' + (highlightCol === 'Max DD' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Max DD</th>' +
+            '<th' + (highlightCol === 'R²' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>R²</th>' +
+            '<th' + (highlightCol === 'Sharpe' ? ' style="font-weight: 900; color: #58a6ff;"' : '') + '>Sharpe</th>' +
+            '</tr></thead><tbody>' +
+            data.map((row, idx) => {
+                const numTrades = row.num_trades || 0;
+                const totalProfitPct = formatNumber(row.total_profit_pct, 1, '%');
+                const profitUSD = formatNumber(row.total_profit_usd, 2);
+                const profitFactor = formatNumber(row.profit_factor, 2);
+                const weeklyWin = formatNumber(row.weekly_win_pct, 1, '%');
+                const winRate = formatNumber(row.win_rate, 1, '%');
+                const maxDD = formatNumber(row.max_dd, 2, '%');
+                const rSquared = formatNumber(row.r_squared, 3);
+                const sharpe = formatNumber(row.sharpe_ratio, 2);
+                
+                const profitPctClass = isFinite(row.total_profit_pct) ? (row.total_profit_pct >= 0 ? 'direction-long' : 'direction-short') : '';
+                const profitUSDClass = isFinite(row.total_profit_usd) ? (row.total_profit_usd >= 0 ? 'direction-long' : 'direction-short') : '';
+                
+                const pfStyle = getMetricStyle(row.profit_factor, 'profit_factor');
+                const sharpeStyle = getMetricStyle(row.sharpe_ratio, 'sharpe');
+                const r2Style = getRSquaredStyle(row.r_squared);
+                
+                const ntStyle = highlightCol === '#trades' ? 'font-weight: 900;' : '';
+                const tpStyle = highlightCol === 'Profit_%' ? 'font-weight: 900;' : '';
+                const puStyle = highlightCol === 'Profit_$' ? 'font-weight: 900;' : '';
+                const pfHighlight = highlightCol === 'Profit Factor' ? 'font-weight: 900;' : '';
+                const wwStyle = highlightCol === 'Weekly_%' ? 'font-weight: 900;' : '';
+                const wrStyle = highlightCol === 'Win Rate' ? 'font-weight: 900;' : '';
+                const ddStyle = highlightCol === 'Max DD' ? 'font-weight: 900;' : '';
+                const r2Highlight = highlightCol === 'R²' ? 'font-weight: 900;' : '';
+                const sharpeHighlight = highlightCol === 'Sharpe' ? 'font-weight: 900;' : '';
+                
+                const prefixProfitPct = (isFinite(row.total_profit_pct) && row.total_profit_pct >= 0) ? '+' : '';
+                const prefixProfitUSD = (isFinite(row.total_profit_usd) && row.total_profit_usd >= 0) ? '+$' : '$';
+                
+                return '<tr>' +
+                    '<td><input type="checkbox" class="compose-checkbox" value="' + row.combination + '" onchange="checkComposeLimit()"></td>' +
+                    '<td style="color: #8b949e; font-weight: 600;">' + (idx + 1) + '</td>' +
+                    '<td style="color: #58a6ff; font-weight: 600;">' + row.combination + '</td>' +
+                    '<td style="' + ntStyle + '">' + numTrades + '</td>' +
+                    '<td class="' + profitPctClass + '" style="' + tpStyle + '">' + prefixProfitPct + totalProfitPct + '</td>' +
+                    '<td class="' + profitUSDClass + '" style="' + puStyle + '">' + prefixProfitUSD + profitUSD + '</td>' +
+                    '<td ' + pfStyle + ' style="' + pfHighlight + '">' + profitFactor + '</td>' +
+                    '<td style="' + wwStyle + '">' + weeklyWin + '</td>' +
+                    '<td style="' + wrStyle + '">' + winRate + '</td>' +
+                    '<td style="color: #f85149; ' + ddStyle + '">' + maxDD + '</td>' +
+                    '<td ' + r2Style + ' style="' + r2Highlight + '">' + rSquared + '</td>' +
+                    '<td ' + sharpeStyle + ' style="' + sharpeHighlight + '">' + sharpe + '</td>' +
+                    '</tr>';
+            }).join('') +
+            '</tbody></table>';
+        
+        container.innerHTML = html;
+        document.getElementById('compose-plot-btn').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error in compose:', error);
+        document.getElementById('compose-plot-btn').style.display = 'none';
+        document.getElementById('compose-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">' +
+            '<div style="font-size: 18px; margin-bottom: 10px;">❌ Error loading data</div>' +
+            '<div style="font-size: 14px; color: #8b949e;">Check browser console (F12) for details</div>' +
+            '<div style="font-size: 12px; color: #8b949e; margin-top: 10px;">Error: ' + error.message + '</div>' +
+            '</div>';
+    }
+}
+
+function checkComposeLimit() {
+    const checkboxes = document.querySelectorAll('.compose-checkbox:checked');
+    if (checkboxes.length > 3) {
+        alert('Maximum 3 combinations can be selected for plotting');
+        event.target.checked = false;
+    }
+}
+
+let composeEquityChart = null;
+let composeDrawdownChart = null;
+
+function extractNumberFromId(strategyId) {
+    if (!strategyId || typeof strategyId !== 'string') {
+        return '??';
+    }
+    
+    const match = strategyId.match(/^(\d{2})_/);
+    if (match) {
+        return match[1];
+    }
+    
+    const fallbackMatch = strategyId.match(/^(\d+)/);
+    if (fallbackMatch) {
+        return fallbackMatch[1].padStart(2, '0');
+    }
+    
+    return '??';
+}
+
+function findStrategyIdByNumber(number, strategiesList) {
+    if (!strategiesList || strategiesList.length === 0) {
+        return null;
+    }
+    
+    const found = strategiesList.find(s => s.id && s.id.startsWith(number + '_'));
+    return found ? found.id : null;
+}
+
+async function loadComposeCharts() {
+    try {
+        const checkboxes = document.querySelectorAll('.compose-checkbox:checked');
+        const selectedCombinations = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (selectedCombinations.length === 0) {
+            alert('Please select at least one combination to plot');
+            return;
+        }
+        
+        if (selectedCombinations.length > 3) {
+            alert('Maximum 3 combinations can be selected');
+            return;
+        }
+        
+        const dateParams = getComposeDateParams();
+        
+        const equityDatasets = [];
+        const drawdownDatasets = [];
+        let allDates = [];
+        const allCombinationsData = [];
+        
+        for (let i = 0; i < selectedCombinations.length; i++) {
+            const combination = selectedCombinations[i];
+            const numbers = combination.split('+');
+            
+            const strategies = numbers
+                .map(num => findStrategyIdByNumber(num, allStrategiesList))
+                .filter(id => id);
+            
+            if (strategies.length === 0) {
+                continue;
+            }
+            
+            const res = await fetch('/api/equity-data?strategies=' + strategies.join(',') + dateParams);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            
+            if (!data.dates || !data.equity_pct || !data.drawdown_pct) {
+                continue;
+            }
+            
+            if (data.dates.length === 0) {
+                continue;
+            }
+            
+            allCombinationsData.push({
+                combination: combination,
+                dates: data.dates,
+                equity_pct: data.equity_pct,
+                drawdown_pct: data.drawdown_pct
+            });
+        }
+        
+        if (allCombinationsData.length === 0) {
+            alert('⚠️ No valid data found for selected combinations.');
+            return;
+        }
+        
+        const allUniqueDates = new Set();
+        allCombinationsData.forEach(combo => {
+            combo.dates.forEach(date => allUniqueDates.add(date));
+        });
+        
+        allDates = Array.from(allUniqueDates).sort();
+        
+        const colors = {
+            equity: ['#3fb950', '#58a6ff', '#22d3ee'],
+            equityAlpha: ['rgba(63, 185, 80, 0.1)', 'rgba(88, 166, 255, 0.1)', 'rgba(34, 211, 238, 0.1)'],
+            drawdown: ['#f85149', '#ff6b6b', '#ff8787'],
+            drawdownAlpha: ['rgba(248, 81, 73, 0.1)', 'rgba(255, 107, 107, 0.1)', 'rgba(255, 135, 135, 0.1)']
+        };
+        
+        allCombinationsData.forEach((combo, colorIndex) => {
+            const equityMap = {};
+            const drawdownMap = {};
+            
+            combo.dates.forEach((date, idx) => {
+                equityMap[date] = combo.equity_pct[idx];
+                drawdownMap[date] = combo.drawdown_pct[idx];
+            });
+            
+            const alignedEquity = [];
+            const alignedDrawdown = [];
+            let lastEquity = 0;
+            let lastDrawdown = 0;
+            
+            allDates.forEach(date => {
+                if (equityMap[date] !== undefined) {
+                    lastEquity = equityMap[date];
+                    lastDrawdown = drawdownMap[date];
+                }
+                alignedEquity.push(lastEquity);
+                alignedDrawdown.push(lastDrawdown);
+            });
+            
+            equityDatasets.push({
+                label: combo.combination,
+                data: alignedEquity,
+                borderColor: colors.equity[colorIndex],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.1,
+                fill: false
+            });
+            
+            drawdownDatasets.push({
+                label: combo.combination,
+                data: alignedDrawdown,
+                borderColor: colors.drawdown[colorIndex],
+                backgroundColor: colors.drawdownAlpha[colorIndex],
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.1,
+                fill: true
+            });
+        });
+
+        if (equityDatasets.length === 0) {
+            alert('⚠️ No valid data found for selected combinations.');
+            return;
+        }
+        
+        if (allDates.length === 0) {
+            alert('⚠️ No dates available in the data.');
+            return;
+        }
+        
+        if (composeEquityChart) {
+            composeEquityChart.destroy();
+            composeEquityChart = null;
+        }
+        if (composeDrawdownChart) {
+            composeDrawdownChart.destroy();
+            composeDrawdownChart = null;
+        }
+        
+        const equityCanvas = document.getElementById('compose-equity-chart');
+        const equityCtx = equityCanvas.getContext('2d');
+        composeEquityChart = new Chart(equityCtx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: equityDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        display: true, 
+                        position: 'top',
+                        labels: { color: COLORS.white, font: { size: 14 } }
+                    },
+                    title: { 
+                        display: true, 
+                        text: 'Equity - Comparison',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    },
+                    y: { 
+                        ticks: { 
+                            color: CHART_DEFAULTS.textColor, 
+                            font: { size: CHART_DEFAULTS.fontSize.axis },
+                            callback: function(value) { return value.toFixed(1) + '%'; }
+                        }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    }
+                }
+            }
+        });
+        
+        const drawdownCanvas = document.getElementById('compose-drawdown-chart');
+        const drawdownCtx = drawdownCanvas.getContext('2d');
+        composeDrawdownChart = new Chart(drawdownCtx, {
+            type: 'line',
+            data: {
+                labels: allDates,
+                datasets: drawdownDatasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        display: true, 
+                        position: 'top',
+                        labels: { color: COLORS.white, font: { size: 14 } }
+                    },
+                    title: { 
+                        display: true, 
+                        text: 'Drawdown - Comparison',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    },
+                    y: { 
+                        reverse: true,
+                        ticks: { 
+                            color: CHART_DEFAULTS.textColor, 
+                            font: { size: CHART_DEFAULTS.fontSize.axis },
+                            callback: function(value) { return value.toFixed(1) + '%'; }
+                        }, 
+                        grid: { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                    }
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error loading compose charts:', error);
+        alert('❌ Error loading charts:\n\n' + error.message);
+    }
+}
+
+async function loadSymbolsAnalysis() {
+    try {
+        const res = await fetch('/api/symbols-analysis');
+        const data = await res.json();
+        const container = document.getElementById('symbols-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        const sortedData = data.sort((a, b) => b.Win_Pct - a.Win_Pct);
+        
+        const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+            sortedData.map(s => {
+                const profitClass = s.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
+                const avgProfitClass = s.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + s.Symbol + '</td><td>' + s.Total_Trades + '</td><td>' + s.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_Profit >= 0 ? '+' : '') + '$' + s.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (s.Avg_Profit >= 0 ? '+' : '') + '$' + s.Avg_Profit.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading symbols analysis:', error);
+        document.getElementById('symbols-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+async function loadWeekDayAnalysis() {
+    try {
+        const res = await fetch('/api/weekday-analysis');
+        const data = await res.json();
+        const container = document.getElementById('weekday-container');
+        
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+            return;
+        }
+        
+        const html = '<table><thead><tr><th>Day</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+            data.map(d => {
+                const profitClass = d.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
+                const avgProfitClass = d.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
+                return '<tr><td>' + d.Day + '</td><td>' + d.Total_Trades + '</td><td>' + d.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (d.Total_Profit >= 0 ? '+' : '') + '$' + d.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (d.Avg_Profit >= 0 ? '+' : '') + '$' + d.Avg_Profit.toFixed(2) + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading weekday analysis:', error);
+        document.getElementById('weekday-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+// =============================================================================
+// REGIME ANALYTICS
+// =============================================================================
+
+async function loadRegimeAnalytics() {
+    try {
+        const res = await fetch('/api/analytics/regime');
+        
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+        
+        const response = await res.json();
+        const container = document.getElementById('regime-analytics-container');
+        
+        if (!response.success || !response.data || Object.keys(response.data).length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
+                (response.error || 'No regime data available yet') +
+                '</div>';
+            return;
+        }
+        
+        const data = response.data;
+        
+        // Sort regimes by priority: trending > ranging > volatile > unknown
+        const regimeOrder = ['trending', 'ranging', 'volatile', 'unknown'];
+        const sortedRegimes = Object.keys(data).sort((a, b) => {
+            const indexA = regimeOrder.indexOf(a);
+            const indexB = regimeOrder.indexOf(b);
+            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        });
+        
+        // Colors for each regime
+        const regimeColors = {
+            'trending': { bar: '#3fb950', text: '#3fb950', bg: 'rgba(63, 185, 80, 0.1)' },
+            'ranging': { bar: '#58a6ff', text: '#58a6ff', bg: 'rgba(88, 166, 255, 0.1)' },
+            'volatile': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },
+            'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
+        };
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+        
+        sortedRegimes.forEach(regime => {
+            const stats = data[regime];
+            const colors = regimeColors[regime] || regimeColors['unknown'];
+            
+            const winrateWidth = Math.round(stats.winrate);
+            const pnlClass = stats.pnl >= 0 ? 'direction-long' : 'direction-short';
+            const pnlPrefix = stats.pnl >= 0 ? '+$' : '$';
+            
+            html += `
+                <div style="background: ${colors.bg}; border: 1px solid ${colors.bar}; border-radius: 8px; padding: 20px;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
+                            ${regime}
+                        </div>
+                        <div style="font-size: 16px; color: #8b949e;">
+                            ${stats.trades}/${stats.total_trades} trades
+                        </div>
+                    </div>
+                    
+                    <!-- Win Rate Bar -->
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #8b949e; font-size: 14px; font-weight: 600;">Win Rate</span>
+                            <span style="color: ${colors.text}; font-size: 14px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
+                        </div>
+                        <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- P&L -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #8b949e; font-size: 14px; font-weight: 600;">P&L</span>
+                        <span class="${pnlClass}" style="font-size: 18px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading regime analytics:', error);
+        document.getElementById('regime-analytics-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading regime data</div>';
+    }
+}
+
+// =============================================================================
+// END REGIME ANALYTICS
+// =============================================================================
+
+async function updateEquityChart() {
+    try {
+        const selectedStrategies = getSelectedStrategies('strategy-checkboxes');
+        
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+        
+        const dateParams = getCurvesDateParams();
+        const res = await fetch('/api/equity-data?strategies=' + selectedStrategies.join(',') + dateParams);
+        const data = await res.json();
+        
+        if (!data.dates || data.dates.length === 0) {
+            const strategiesStr = selectedStrategies.join(', ');
+            alert(`No trades found for:\n${strategiesStr}\n\n${data.message || 'These strategies have no closed trades yet.'}`);
+            return;
+        }
+        
+        document.getElementById('equity-metrics').style.display = 'block';
+        document.getElementById('metric-num-trades').textContent = data.num_trades || 0;
+        
+        const profitPct = ((data.total_profit_usd / data.capital_assigned) * 100) || 0;
+        document.getElementById('metric-profit-pct').textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+        
+        document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
+        document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
+        document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
+        document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
+        document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
+        document.getElementById('metric-r-squared').textContent = data.r_squared || 0;
+        document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
+        
+        const pctElement = document.getElementById('metric-profit-pct');
+        applyMetricColor(pctElement, profitPct, 'positiveNegative');
+        
+        const puElement = document.getElementById('metric-profit-usd');
+        applyMetricColor(puElement, data.total_profit_usd, 'positiveNegative');
+        
+        const pfElement = document.getElementById('metric-profit-factor');
+        applyMetricColor(pfElement, data.profit_factor, 'profitFactor');
+        
+        const r2Element = document.getElementById('metric-r-squared');
+        applyMetricColor(r2Element, data.r_squared, 'rSquared');
+        
+        const sharpeElement = document.getElementById('metric-sharpe');
+        applyMetricColor(sharpeElement, data.sharpe_ratio, 'sharpe');
+        
+        if (equityChart) equityChart.destroy();
+        if (drawdownChart) drawdownChart.destroy();
+        
+        const finalEquity = data.equity_pct[data.equity_pct.length - 1] || 0;
+        const equityColor = finalEquity >= 0 ? COLORS.equityPositive : COLORS.equityNegative;
+        
+        const ctxEquity = document.getElementById('equityChart').getContext('2d');
+        equityChart = new Chart(ctxEquity, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Equity (%)',
+                    data: data.equity_pct,
+                    borderColor: equityColor,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: getBaseChartConfig('Equity Curve - ' + selectedStrategies.length + ' strategies selected', false)
+        });
+        
+        const ctxDD = document.getElementById('drawdownChart').getContext('2d');
+        drawdownChart = new Chart(ctxDD, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Drawdown (%)',
+                    data: data.drawdown_pct,
+                    borderColor: COLORS.drawdownRed,
+                    backgroundColor: COLORS.drawdownRedAlpha,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: getBaseChartConfig('Drawdown - ' + selectedStrategies.length + ' strategies selected', true)
+        });
+        
+    } catch (error) {
+        console.error('Error updating equity chart:', error);
+        alert('Error loading equity data: ' + error.message);
+    }
+}
+
+async function loadData() {
+    if (isLoadingData) return;
+    isLoadingData = true;
+    try {
+        const statusRes = await fetch('/api/status');
+        if (!statusRes.ok) throw new Error('HTTP ' + statusRes.status);
+        const status = await statusRes.json();
+        
+        requestAnimationFrame(() => {
+            document.getElementById('total-positions').textContent = status.total_positions || 0;
+            
+            const totalProfit = status.total_profit || 0;
+            const profitEl = document.getElementById('total-profit');
+            profitEl.textContent = '$' + totalProfit.toFixed(2);
+            profitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'positive' : 'negative');
+            
+            const openPnl = status.open_pnl || 0;
+            const openPnlEl = document.getElementById('open-pnl');
+            openPnlEl.textContent = '$' + openPnl.toFixed(2);
+            openPnlEl.className = 'stat-value ' + (openPnl >= 0 ? 'positive' : 'negative');
+            
+            const profitPct = status.profit_pct || 0;
+            const profitPctEl = document.getElementById('profit-pct');
+            profitPctEl.textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+            profitPctEl.className = 'stat-value ' + (profitPct >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('trades-num').textContent = status.num_trades || 0;
+            const tradesPct = status.trades_pct || 0;
+            document.getElementById('trades-pct').textContent = tradesPct.toFixed(1) + '%';
+            const btcPrice = status.btc_price || 0;
+            document.getElementById('btc-price').textContent = '$' + btcPrice.toLocaleString();
+        });
+        
+        const posRes = await fetch('/api/positions');
+        if (!posRes.ok) throw new Error('HTTP ' + posRes.status);
+        const positions = await posRes.json();
+        
+        requestAnimationFrame(() => {
+            if (currentTab === 'positions') renderPositions(positions);
+        });
+        
+        const tradesRes = await fetch('/api/trades/recent');
+        if (!tradesRes.ok) throw new Error('HTTP ' + tradesRes.status);
+        const trades = await tradesRes.json();
+        
+        requestAnimationFrame(() => {
+            const tradesBody = document.getElementById('trades-body');
+            if (!trades || trades.length === 0) {
+                tradesBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No trades</td></tr>';
+            } else {
+                tradesBody.innerHTML = trades.reverse().map(trade => {
+                    const profitClass = trade.PROFIT >= 0 ? 'direction-long' : 'direction-short';
+                    let reasonBadge = '';
+                    if (trade.REASON_OUT === 'TP') {
+                        reasonBadge = '<span class="badge badge-tp">TP</span>';
+                    } else if (trade.REASON_OUT === 'SL') {
+                        reasonBadge = '<span class="badge badge-sl">SL</span>';
+                    } else {
+                        reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
+                    }
+                    return '<tr>' +
+                        '<td>' + new Date(trade.CLOSE_AT).toLocaleString() + '</td>' +
+                        '<td>' + trade.STRATEGY + '</td>' +
+                        '<td>' + trade.SYMBOL + '</td>' +
+                        '<td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td>' +
+                        '<td>' + parseFloat(trade.SIZE || 0).toFixed(4) + '</td>' +
+                        '<td>$' + parseFloat(trade.PRICE_ENTRY || 0).toFixed(2) + '</td>' +
+                        '<td>$' + parseFloat(trade.PRICE_CLOSE || 0).toFixed(2) + '</td>' +
+                        '<td class="' + profitClass + '">' + (trade.PROFIT >= 0 ? '+' : '') + '$' + trade.PROFIT.toFixed(2) + '</td>' +
+                        '<td class="' + profitClass + '">' + (trade.PROFIT_PCT >= 0 ? '+' : '') + trade.PROFIT_PCT.toFixed(2) + '%</td>' +
+                        '<td>' + reasonBadge + '</td>' +
+                        '</tr>';
+                }).join('');
+            }
+        });
+        
+        // Load regime data (non-blocking)
+        loadRegimeData().catch(console.error);
+        
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        isLoadingData = false;
+    }
+}
+
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('auto-scroll-btn').textContent = autoScroll ? 'Auto' : 'Manual';
+}
+
+function clearLogs() {
+    if (confirm('Clear all logs?')) {
+        document.getElementById('logs-content').innerHTML = '<div class="log-line default">Logs cleared</div>';
+    }
+}
+
+const POLLING_CONFIG = {
+    data: {
+        active: 5000,
+        inactive: 90000
+    },
+    logs: {
+        active: 2000,
+        inactive: 90000
+    }
+};
+
+let dataInterval, logsInterval;
+
+function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const clockEl = document.getElementById('live-clock');
+    if (clockEl) {
+        clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+}
+
+function startPolling() {
+    stopPolling();
+    
+    loadData();
+    loadLogs();
+    updateClock();
+    
+    const isActive = !document.hidden;
+    const dataDelay = isActive ? POLLING_CONFIG.data.active : POLLING_CONFIG.data.inactive;
+    const logsDelay = isActive ? POLLING_CONFIG.logs.active : POLLING_CONFIG.logs.inactive;
+    
+    dataInterval = setInterval(() => loadData().catch(console.error), dataDelay);
+    logsInterval = setInterval(() => loadLogs().catch(console.error), logsDelay);
+    setInterval(updateClock, 1000);
+}
+
+function stopPolling() {
+    if (dataInterval) clearInterval(dataInterval);
+    if (logsInterval) clearInterval(logsInterval);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopPolling();
+    else startPolling();
+});
+
+const savedView = 'compact';
+currentPositionsView = savedView;
+
+async function initializeDashboard() {
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        if (btn.textContent.toLowerCase().includes(savedView)) btn.classList.add('active');
+        else btn.classList.remove('active');
+    });
+    
+    const backendReady = await waitForBackend();
+    await loadBotConfig();
+    startPolling();
+}
+
+// =============================================================================
+// CORRELATION ANALYSIS
+// =============================================================================
+
+async function initCorrelationTab() {
+    try {
+        allStrategiesList = await initStrategyCheckboxes(
+            'correlation-strategy-checkboxes',
+            'correlation-strat-',
+            'correlation-strat-all'
+        );
+        
+    } catch (error) {
+        console.error('Error loading correlation tab:', error);
+    }
+}
+
+function getSelectedCorrelationStrategies() {
+    return getSelectedStrategies('correlation-strategy-checkboxes');
+}
+
+async function updateCorrelationAnalysis() {
+    const selected = getSelectedCorrelationStrategies();
+    
+    if (selected.length < 2) {
+        alert('Please select at least 2 strategies to calculate correlation');
+        return;
+    }
+    
+    // Show loading
+    document.getElementById('correlation-matrix-container').innerHTML = '<p style="text-align: center; padding: 40px; color: #8b949e;">Calculating correlation...</p>';
+    document.getElementById('high-corr-pairs').innerHTML = '<p style="text-align: center; padding: 20px; color: #8b949e;">Calculating...</p>';
+    
+    try {
+        const res = await fetch('/api/correlation-matrix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ strategies: selected })
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            document.getElementById('correlation-matrix-container').innerHTML = `<p style="color: #f85149; text-align: center; padding: 40px;">${data.error}</p>`;
+            document.getElementById('high-corr-pairs').innerHTML = `<p style="color: #f85149; text-align: center; padding: 20px;">${data.error}</p>`;
+            return;
+        }
+        
+        renderCorrelationMatrix(data.matrix, data.strategies);
+        renderHighCorrelationPairs(data.high_corr_pairs);
+        
+    } catch (error) {
+        console.error('Error calculating correlation:', error);
+        document.getElementById('correlation-matrix-container').innerHTML = '<p style="color: #f85149; text-align: center; padding: 40px;">Error calculating correlation</p>';
+    }
+}
+
+function renderCorrelationMatrix(matrix, strategies) {
+    const container = document.getElementById('correlation-matrix-container');
+    
+    let html = '<table class="correlation-table"><thead><tr><th></th>';
+    
+    // Header row - SOLO NÚMEROS
+    strategies.forEach(strat => {
+        const number = strat.split('_')[0];  // Solo el número
+        html += `<th>${number}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    // Data rows - SOLO NÚMEROS
+    strategies.forEach(strat1 => {
+        const number1 = strat1.split('_')[0];  // Solo el número
+        html += `<tr><td>${number1}</td>`;
+        
+        strategies.forEach(strat2 => {
+            const corr = matrix[strat1][strat2];
+            const color = getCorrelationColor(corr);
+            const displayValue = corr === 1.0 ? '1.00' : corr.toFixed(2);
+            
+            html += `<td class="correlation-cell" style="background-color: ${color};" title="${strat1} vs ${strat2}: ${displayValue}">${displayValue}</td>`;
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function getCorrelationColor(corr) {
+    // High correlation (>0.7) = LIGHT RED
+    if (corr > 0.7 && corr < 1.0) return 'rgb(255, 150, 150)';  // Light red
+    
+    // Perfect correlation (1.0) = DARK BLUE (diagonal)
+    if (corr === 1.0) return 'rgb(10, 50, 120)';  // Very dark blue for diagonal
+    
+    // Blue gradient from dark to light (solid colors, no transparency)
+    if (corr >= 0.6) return 'rgb(30, 90, 180)';     // Dark blue
+    if (corr >= 0.5) return 'rgb(40, 110, 200)';    // Medium-dark blue
+    if (corr >= 0.4) return 'rgb(60, 140, 220)';    // Medium blue
+    if (corr >= 0.3) return 'rgb(80, 160, 235)';    // Medium-light blue
+    if (corr >= 0.2) return 'rgb(110, 180, 245)';   // Light blue
+    if (corr >= 0.1) return 'rgb(140, 200, 250)';   // Very light blue
+    if (corr >= 0) return 'rgb(170, 215, 252)';     // Pale blue
+    if (corr >= -0.2) return 'rgb(190, 225, 253)';  // Very pale blue
+    if (corr >= -0.4) return 'rgb(210, 235, 254)';  // Almost white blue
+    return 'rgb(230, 245, 255)';                     // Lightest blue
+}
+
+function renderHighCorrelationPairs(pairs) {
+    const container = document.getElementById('high-corr-pairs');
+    
+    if (pairs.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #3fb950; padding: 20px;">✅ No pairs with high positive correlation (>0.7)</p>';
+        return;
+    }
+    
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    
+    pairs.forEach(pair => {
+        const num1 = pair.strat1.split('_')[0];  // Solo el número
+        const num2 = pair.strat2.split('_')[0];  // Solo el número
+        
+        html += `
+            <div class="corr-pair-item">
+                <span class="corr-pair-strategies">${num1} + ${num2}</span>
+                <span class="corr-pair-value">${pair.correlation.toFixed(3)}</span>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// =============================================================================
+// END CORRELATION ANALYSIS
+// =============================================================================
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeDashboard);
+} else {
+    initializeDashboard();
+}
+
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+        initializeDashboard();
+    }
+});
