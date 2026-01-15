@@ -243,7 +243,9 @@ def sync_broker(open_positions: Dict,
                         reason="NOT_FOUND",
                         size=pos['size'],
                         profit_from_api=None,
-                        fee_from_api=None
+                        fee_from_api=None,
+                        regime_family=pos.get('regime_family', 'unknown'),
+                        regime_multiplier=pos.get('regime_multiplier', 1.0)
                     )
                     
                     positions_to_remove.append(i)
