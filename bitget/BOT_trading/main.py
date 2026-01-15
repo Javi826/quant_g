@@ -70,7 +70,7 @@ def main():
     # Setup logger
     setup_logger(base_dir, logfile_name=os.path.basename(log_file))
     logger = logging.getLogger('BOT_trading')
-    
+        
     # Parse --set-active argument
     active_strategy_ids = None
     if args.set_active:
@@ -97,10 +97,10 @@ def main():
             if 'order_amount' in strategy:
                 original = strategy['order_amount']
                 strategy['order_amount'] = round(original * account_multiplier, 2)
-                logger.info(f"    └─ {strategy['id']}: ${original} → ${strategy['order_amount']}")
+                logger.info(f"└─ {strategy['id']}: ${original} → ${strategy['order_amount']}")
     else:
         logger.info(f"ACCOUNT PRESET: Using standard sizing (1.0x)")
-    
+    # =======================================================================
     bot.run()
 
 if __name__ == '__main__':

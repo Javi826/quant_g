@@ -145,7 +145,7 @@ def calc_atr_pct(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: i
         return np.nan
 
 
-def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
+def calc_permutation_entropyÑÑÑ(close: np.ndarray, window: int = 50, order: int = 3) -> float:
     """
     Calculates Permutation Entropy using neurokit2 library.
     
@@ -182,7 +182,55 @@ def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3
     except Exception as e:
         return np.nan
 
-
+def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
+    """
+    Calculates Permutation Entropy using neurokit2 library.
+    
+    Args:
+        close: Array of closing prices
+        window: Lookback window
+        order: Embedding dimension (pattern length)
+    
+    Returns:
+        Normalized entropy (0-1). 0 = deterministic, 1 = random
+    """
+    if len(close) < window:
+        return np.nan
+    
+    series = close[-window:]
+    
+    # Check for constant/near-constant values
+    if np.std(series) < 1e-8:
+        return 0.0
+    
+    try:
+        # Calculate permutation entropy using neurokit2
+        pe_result = nk.entropy_permutation(series, dimension=order, delay=1)
+        
+        # Extract value from tuple (neurokit2 returns tuple)
+        if isinstance(pe_result, tuple):
+            pe = pe_result[0]
+        else:
+            pe = pe_result
+        
+        # Check if result is valid
+        if pe is None or np.isnan(pe) or np.isinf(pe):
+            return np.nan
+        
+        # Normalize to [0, 1] range
+        from math import factorial
+        max_entropy = np.log2(factorial(order))
+        
+        if max_entropy == 0:
+            return np.nan
+        
+        pe_normalized = pe / max_entropy
+        
+        # Ensure valid range
+        return float(np.clip(pe_normalized, 0.0, 1.0))
+    
+    except Exception as e:
+        return np.nan
 def calc_all_metrics(
     ohlc: Dict[str, np.ndarray],
     hurst_window: int = 100,

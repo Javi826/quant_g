@@ -14,23 +14,22 @@ from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALA
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from Z_add_signals_doji import doji_long
-from Z_add_signals_doji import doji_short
+from signals.add_signals_ranging import ranging_long
+from signals.add_signals_ranging import ranging_short
 
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
-STRATEGY     = "doji_long_1H"
+SAVE_SYMBOLS = True
+MY_SYMBOLS   = True
+STRATEGY     = "ranging_long_6Hutc"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "data/crypto_OOS"
-#DATA_FOLDER         = "data/crypto_2024_short_IS"
-#DATA_FOLDER         = "data/crypto_2022_OOS"
-#DATA_FOLDER         = "data/crypto_2023_IS"
-TIMEFRAME_MINOR     = '4H'
+DATA_FOLDER         = "../data/crypto_OOS"
+#DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '6Hutc'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -39,20 +38,33 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [3,4,5,6] 
+LOOKBACK_LIST        = [10,20,30] 
 TOLERANCE_LIST       = [5,10,15]
+RANGE_LIST           = [15,20,25]
 
 TP_PCT_LIST          = [2.5,5,7.5,10]
 SL_PCT_LIST          = [2.5,5,7.5,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [3] 
-TOLERANCE_LIST       = [15]
+LOOKBACK_LIST        = [10] 
+TOLERANCE_LIST       = [5]
+RANGE_LIST           = [25]
 
-TP_PCT_LIST          = [10]
-SL_PCT_LIST          = [7.5]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [6]
 
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','TP_PCT','SL_PCT']
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# LOOKBACK_LIST        = [10] 
+# TOLERANCE_LIST       = [5]
+# RANGE_LIST           = [20]
+# 
+# TP_PCT_LIST          = [4]
+# SL_PCT_LIST          = [9]
+# =============================================================================
+
+
+param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','RANGE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -60,8 +72,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50)
-
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=MY_SYMBOLS)
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
@@ -76,10 +87,11 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = doji_long(
+        signals = ranging_short(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
+            range_str=params['RANGE'],
             live_trading=False
         )
 
@@ -113,7 +125,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names,f"all_trades_{TIMEFRAME_MINOR}.xlsx", save=False)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

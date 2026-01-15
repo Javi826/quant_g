@@ -139,30 +139,20 @@ def report_backtesting(df, parameters, data_folder, initial_capital, show_plots=
         monthly_df = calculate_monthly_metrics(equity_hist, initial_capital)
        
         if not monthly_df.empty:
-# =============================================================================
-#             print("\n" + "="*60)
-#             print("MONTHLY PERFORMANCE - Best Net_Gain Strategy")
-#             print("="*60)
-#            
-#             # Formatear la tabla
-#             monthly_display = monthly_df.copy()
-#             monthly_display['Net_Gain_%'] = monthly_display['Net_Gain_%'].apply(lambda x: f"{x:.2f}")
-#             monthly_display['Max_DD_%']   = monthly_display['Max_DD_%'].apply(lambda x: f"{x:.2f}")
-#             monthly_display['Start_Bal']  = monthly_display['Start_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-#             monthly_display['End_Bal']    = monthly_display['End_Bal'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
-# =============================================================================
            
             #print(monthly_display.to_string(index=False))
-           
+            winning_months = (monthly_df['Net_Gain_%'] > 0).sum()
+            total_months   = len(monthly_df)
+            winning_pct    = (winning_months / total_months) * 100 if total_months > 0 else 0
             # Estadísticas agregadas
             print("\n" + "-"*60)
             print("MONTHLY STATISTICS")
             print("-"*60)
-            print(f"Average Monthly Gain: {monthly_df['Net_Gain_%'].mean():.2f}%")
-            print(f"Best Month:           {monthly_df['Net_Gain_%'].max():.2f}%")
-            print(f"Worst Month:          {monthly_df['Net_Gain_%'].min():.2f}%")
-            print(f"Winning Months:       {(monthly_df['Net_Gain_%'] > 0).sum()} / {len(monthly_df)}")
-            print(f"Average Monthly DD:   {monthly_df['Max_DD_%'].mean():.2f}%")
+            #print(f"Average Monthly Gain: {monthly_df['Net_Gain_%'].mean():.2f}%")
+            #print(f"Best Month:           {monthly_df['Net_Gain_%'].max():.2f}%")
+            #print(f"Worst Month:          {monthly_df['Net_Gain_%'].min():.2f}%")
+            print(f"Winning Months:       {winning_months} / {total_months} ({winning_pct:.2f}%)")
+            #print(f"Average Monthly DD:   {monthly_df['Max_DD_%'].mean():.2f}%")
             print()
  
     # -----------------------------

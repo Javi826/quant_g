@@ -40,6 +40,7 @@ from signals.add_signals_double_top import double_top_long
 from signals.add_signals_reversal import reversal_long, reversal_short
 from signals.add_signals_parity import parity_long, parity_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
+from signals.add_signals_ranging import ranging_long, ranging_short
 
 # Import market data utilities
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
@@ -56,11 +57,6 @@ def detect_signals_for_strategy(
     use_hardcoded: bool = False
 ) -> list:
     """
-    Detect trading signals for a strategy across multiple symbols.
-    
-    This function maintains EXACT SAME LOGIC as the old signal_detector.py
-    but with explicit elif structure instead of registry lookup.
-    
     Args:
         strat: Strategy configuration dictionary from YAML containing:
             - id: Strategy identifier
@@ -80,16 +76,7 @@ def detect_signals_for_strategy(
             {'symbol': 'ETHUSDT', 'close': 3245.2, 'timestamp': ...},
             ...
         ]
-    
-    Example:
-        >>> strat = {
-        ...     'id': '02_reversal_long_4H',
-        ...     'name': 'reversal_long_4H',
-        ...     'timeframe': '4H',
-        ...     'lookback': 4,
-        ...     'tolerance': 20,
-        ...     'ma_period': 50
-        ... }
+
         >>> signals = detect_signals_for_strategy(strat, ['BTCUSDT', 'ETHUSDT'], None)
     """
     strategy_id = strat['id']
@@ -248,6 +235,24 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
+                
+            elif strategy_id == '15_ranging_long_4H':
+                signals = ranging_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    range_str=strat['range'],
+                    live_trading=True
+                )
+                
+            elif strategy_id == '16_ranging_short_6Hutc':
+                signals = ranging_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    range_str=strat['range'],
+                    live_trading=True
+                )
             
             # ==============================================================
             # STRATEGY NOT IMPLEMENTED
@@ -313,6 +318,8 @@ def get_implemented_strategies() -> set:
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
         '14_orderblocks_long_4H',
+        '15_ranging_long_4H',
+        '16_ranging_short_6Hutc',
     }
     return strategies
 

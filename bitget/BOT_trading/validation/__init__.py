@@ -1,9 +1,14 @@
 """
-Validation module - Strategy configuration validation.
+Validation Module
 """
-
-from .strategy_validator import validate_strategy_configuration
+from .validation_module import (
+    validate_settings,
+    validate_regime_configuration,
+    validate_strategy_configuration
+)
 
 __all__ = [
-    'validate_strategy_configuration',
+    'validate_settings',
+    'validate_regime_configuration',
+    'validate_strategy_configuration'
 ]

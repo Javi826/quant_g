@@ -104,6 +104,10 @@ def load_final_symbols(
     Returns:
         Sorted list of filtered symbols
     
+    Raises:
+        FileNotFoundError: If symbol file doesn't exist
+        ValueError: If file is empty or invalid
+    
     Example:
         >>> all_syms = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
         >>> filtered = load_final_symbols(all_syms, 'reversal_long', '4H')
@@ -112,21 +116,57 @@ def load_final_symbols(
     """
     folder = os.path.join(os.path.dirname(__file__), "..", "symbols_live")
     folder = os.path.abspath(folder)
+    path_live = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
+    
+    # Check if file exists
+    if not os.path.exists(path_live):
+        error_msg = (
+            f"Symbol file not found for strategy '{strategy}' timeframe '{timeframe}'\n"
+            f"Expected file: {path_live}\n"
+            f"Please create this file with the symbols for this strategy."
+        )
+        logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
     
     try:
-        path_live = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
         logger.debug(f"Loading symbols from: {path_live}")
         
         df_live = pd.read_excel(path_live)
+        
+        # Check if file is empty
+        if df_live.empty:
+            error_msg = f"Symbol file is empty: {path_live}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         live_symbols = set(df_live.iloc[:, 0].dropna().astype(str))
+        
+        # Check if any symbols found
+        if not live_symbols:
+            error_msg = f"No valid symbols found in: {path_live}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         final_symbols = set(all_symbols) & live_symbols
+        
+        # Warn if no intersection
+        if not final_symbols:
+            logger.warning(
+                f"No symbols match between file and exchange for {strategy} {timeframe}. "
+                f"File has {len(live_symbols)} symbols, but none are available on exchange."
+            )
         
         logger.debug(f"Loaded {len(final_symbols)} symbols for {strategy} {timeframe}")
         return sorted(final_symbols)
         
+    except (FileNotFoundError, ValueError):
+        # Re-raise these to stop the bot
+        raise
+        
     except Exception as e:
-        logger.error(f"Error-loading symbols for {strategy} {timeframe}: {e}")
-        return []
+        error_msg = f"Unexpected error loading symbols for {strategy} {timeframe}: {e}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
 
 def fetch_ohlcv_data(symbols: list, timeframe: str) -> dict:

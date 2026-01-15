@@ -97,7 +97,9 @@ ACCOUNT_STRATEGIES = {
         '11_parity_short_1H',
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
-        '14_orderblocks_long_4H'
+        '14_orderblocks_long_4H',
+        '15_ranging_long_4H',
+        '16_ranging_short_6Hutc'
     ],
     "E1": [
         
@@ -119,36 +121,6 @@ ACCOUNT_STRATEGIES = {
         '07_reversal_short_1H'
     ]
 }
-
-# ==========================================================================
-# PATHS CONFIGURATION
-# ==========================================================================
-
-# Base directory for bot files (relative to live_trading2/)
-PERSISTENCE_DIR = "persistence"
-
-def get_account_paths(account_number: str) -> dict:
-    """
-    Get all file paths for a specific account.
-    
-    Args:
-        account_number: Account number (e.g., "01", "E1")
-    
-    Returns:
-        Dictionary with all paths for the account
-    """
-    base_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        PERSISTENCE_DIR,
-        f'bot_files_{account_number}'
-    )
-    
-    return {
-        'base_dir': base_dir,
-        'state_file': os.path.join(base_dir, f'bot_state_{account_number}.json'),
-        'trades_file': os.path.join(base_dir, f'bot_trades_{account_number}.xlsx'),
-        'log_file': os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
-    }
 
 # ==========================================================================
 # VALIDATION SETTINGS
@@ -188,11 +160,42 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'parity_short': ['lookback', 'tolerance', 'ma_period'],
     'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
     'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
+    'ranging_long': ['lookback', 'tolerance', 'range'],
+    'ranging_short': ['lookback', 'tolerance', 'range'],
 }
 
 # Common parameters required for ALL strategies
 COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction']
 
+# ==========================================================================
+# PATHS CONFIGURATION
+# ==========================================================================
+
+# Base directory for bot files (relative to live_trading2/)
+PERSISTENCE_DIR = "persistence"
+
+def get_account_paths(account_number: str) -> dict:
+    """
+    Get all file paths for a specific account.
+    
+    Args:
+        account_number: Account number (e.g., "01", "E1")
+    
+    Returns:
+        Dictionary with all paths for the account
+    """
+    base_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        PERSISTENCE_DIR,
+        f'bot_files_{account_number}'
+    )
+    
+    return {
+        'base_dir': base_dir,
+        'state_file': os.path.join(base_dir, f'bot_state_{account_number}.json'),
+        'trades_file': os.path.join(base_dir, f'bot_trades_{account_number}.xlsx'),
+        'log_file': os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
+    }
 # ==========================================================================
 # WEBSOCKET SETTINGS
 # ==========================================================================
@@ -233,11 +236,47 @@ REGIME_PE_ORDER     = 3
 # Order matters: first match wins. 'ranging' is default (empty rules).
 REGIME_FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
+    'volatile': {'atr_pct': ('>', 2.0)},
     'ranging': {}  # Default catch-all
 }
 
-# Position sizing multipliers per family
+# ==========================================================================
+# REGIME FAMILY MATRIX
+# ==========================================================================
+# Defines position sizing multipliers based on:
+# - Strategy family (trending/ranging/volatile)
+# - Current market regime (trending/ranging/volatile)
+#
+# Usage: REGIME_FAMILY_MATRIX[strategy_family][market_regime]
+# Example: REGIME_FAMILY_MATRIX['trending']['trending'] = 1.8
+#
+# Interpretation:
+# - 'trending' strategies perform best in trending markets (1.8x)
+# - 'ranging' strategies perform best in ranging markets (1.8x)
+# - 'volatile' strategies can exploit volatile markets (1.5x)
+# - Most strategies avoid volatile markets (0.0x)
+# ==========================================================================
+
+REGIME_FAMILY_MATRIX = {
+    'trending': {
+        'trending': 1.8,   # Trending strategy in trending market → max sizing
+        'ranging': 1.0,    # Trending strategy in ranging market → normal sizing
+        'volatile': 0.0    # Trending strategy in volatile market → no trading
+    },
+    'ranging': {
+        'trending': 1.0,   # Ranging strategy in trending market → normal sizing
+        'ranging': 1.8,    # Ranging strategy in ranging market → max sizing
+        'volatile': 0.0    # Ranging strategy in volatile market → no trading
+    },
+    'volatile': {
+        'trending': 0.0,   # Volatile strategy in trending market → reduced sizing
+        'ranging': 0.0,    # Volatile strategy in ranging market → reduced sizing
+        'volatile': 0.0    # Volatile strategy in volatile market → aggressive sizing
+    }
+}
+
+# Legacy global multipliers (fallback for strategies without regime_family)
+# Used when strategy doesn't specify regime_family in YAML
 REGIME_FAMILY_SIZING = {
     'trending': 1.8,   
     'volatile': 0.0,   
@@ -297,39 +336,3 @@ def get_account_strategies(account_number: str) -> list:
     
     return ACCOUNT_STRATEGIES[account_number]
 
-
-def validate_settings():
-    """
-    Validate that settings.py is correctly configured.
-    
-    Raises:
-        ValueError: If settings are invalid
-    """
-    # Validate account ports are unique
-    ports = [acc['dashboard_port'] for acc in ACCOUNTS.values()]
-    if len(ports) != len(set(ports)):
-        raise ValueError("Dashboard ports must be unique across accounts")
-    
-    # Validate timeframes
-    if not VALID_TIMEFRAMES:
-        raise ValueError("VALID_TIMEFRAMES cannot be empty")
-    
-    # Validate limits
-    if MIN_ORDER_AMOUNT >= MAX_ORDER_AMOUNT:
-        raise ValueError("MIN_ORDER_AMOUNT must be less than MAX_ORDER_AMOUNT")
-    
-    if MIN_TP_PCT >= MAX_TP_PCT:
-        raise ValueError("MIN_TP_PCT must be less than MAX_TP_PCT")
-    
-    # Validate URLs
-    if not BASE_URL.startswith("https://"):
-        raise ValueError("BASE_URL must use HTTPS")
-    
-    # Validate account strategies mapping
-    for account_num in ACCOUNTS.keys():
-        if account_num not in ACCOUNT_STRATEGIES:
-            raise ValueError(f"Account {account_num} missing in ACCOUNT_STRATEGIES")
-
-
-# Validate on import
-validate_settings()

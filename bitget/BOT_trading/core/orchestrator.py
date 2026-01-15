@@ -22,8 +22,11 @@ if parent_dir not in sys.path:
 # Now do imports
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime.regime_classifier import get_regime_multiplier
-from validation import validate_strategy_configuration
+from market_regime.regime_classifier import get_current_regime
+
+
+from validation import validate_strategy_configuration,validate_settings,validate_regime_configuration
+
 from analytics import BotState
 from api.backend import DashboardServer, create_dashboard_template
 
@@ -40,7 +43,7 @@ from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
 from config.settings import get_account_config, get_account_strategies, HOUR_ZONE
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,DISPLAY_MODE
-from config.settings import REGIME_FAMILY_SIZING
+from config.settings import REGIME_FAMILY_SIZING,REGIME_FAMILY_MATRIX
 
 class BotOrchestrator:
     """
@@ -122,7 +125,7 @@ class BotOrchestrator:
         self._initialized = False
         
         #Marke regime
-        self.regime_cache: Dict[str, float] = {}
+        self.regime_cache: Dict[str, str] = {}
         
     # ======================================================================
     # PUBLIC API
@@ -254,37 +257,57 @@ class BotOrchestrator:
                 self.bot_state.closed_total_profit = df['PROFIT'].sum()
     
     def _load_and_validate_strategies(self) -> None:
-        """Load strategies from YAML and validate configuration."""
         # Load strategies
         strategy_ids = get_account_strategies(self.account_number)
         self.strategies = load_strategies(strategy_ids)
         
-        # Apply --set-active if provided
+        # Apply --set-active
         if self.active_strategy_ids:
             from strategies.strategy_loader import apply_set_active_argument
             apply_set_active_argument(self.strategies, self.active_strategy_ids)
         
         # Validate
-        self.logger.info(f"Validating strategy configuration...")
+        self.logger.info(f"Validating configuration...")
         self.logger.info(f"{'-' * 48}")
         
-        errors, warnings = validate_strategy_configuration(self.strategies,IMPLEMENTED_STRATEGIES)
+        all_errors = []
+        all_warnings = []
+              
+        # 1. Strategies
+        strat_errors, strat_warnings = validate_strategy_configuration(self.strategies, IMPLEMENTED_STRATEGIES)
+        all_errors.extend(strat_errors)
+        all_warnings.extend(strat_warnings)
         
-        if errors:
+        # 2. Regime
+        regime_errors, regime_warnings = validate_regime_configuration()
+        all_errors.extend(regime_errors)
+        all_warnings.extend(regime_warnings)
+        
+        # 3. Settings
+        settings_errors, settings_warnings = validate_settings()
+        all_errors.extend(settings_errors)
+        all_warnings.extend(settings_warnings)
+        
+        
+        # Check errors
+        if all_errors:
             self.logger.error(f"{'=' * 48}")
             self.logger.error(f"CONFIGURATION ERRORS FOUND:\n")
-            for err in errors:
+            for err in all_errors:
                 self.logger.error(f"  {err}")
             self.logger.error(f"\n⛔ BOT STOPPED - Fix configuration")
             self.logger.error(f"{'=' * 48}\n")
-            raise ValueError("Invalid strategy configuration")
+            
+            # FLUSH antes de raise
+            for handler in logging.getLogger('BOT_trading').handlers:
+                handler.flush()
+            
+            raise ValueError("Invalid configuration")
         
-        if warnings:
+        if all_warnings:
             self.logger.warning(f"CONFIGURATION WARNINGS:")
-            for warn in warnings:
+            for warn in all_warnings:
                 self.logger.warning(f"{warn}")
-        else:
-            self.logger.info("All strategies validated successfully\n")
     
     def _load_market_symbols(self) -> None:
         """Load market symbols for each strategy."""
@@ -525,19 +548,43 @@ class BotOrchestrator:
             # NEW: Get regime multiplier and adjust order amount
             # ====================================================================
             timeframe = strat['timeframe']
-            regime_multiplier = self.regime_cache.get(timeframe, 1.0)
-            if regime_multiplier == 0:
-                self.logger.info(f"[REGIME] Skipping {strat_id}: multiplier=0 (regime blocks trading)")
-                continue
-            base_order_amount = strat['order_amount']
-            adjusted_order_amount = base_order_amount * regime_multiplier
+            # Obtener régimen de mercado
+            market_regime = self.regime_cache.get(timeframe, 'ranging')
             
-            self.logger.debug(
-                f"[REGIME] {strat_id}: TF={timeframe}, "
-                f"Base=${base_order_amount:.2f}, "
-                f"Multiplier={regime_multiplier}x, "
-                f"Adjusted=${adjusted_order_amount:.2f}"
+            # Obtener familia de estrategia
+            strategy_family = strat.get('regime_family')
+            
+            # Calcular multiplier
+            if strategy_family:
+                # Estrategia con familia custom
+                multiplier = REGIME_FAMILY_MATRIX[strategy_family][market_regime]
+                source = 'strategy-specific'
+            else:
+                # Fallback a global (legacy)
+                multiplier = REGIME_FAMILY_SIZING[market_regime]
+                source = 'global'
+            
+            # Skip si multiplier = 0
+            if multiplier == 0:
+                self.logger.info(
+                    f"[REGIME] Skip {strat_id}: {market_regime} market, "
+                    f"multiplier=0 ({source})"
+                )
+                continue
+            
+            # Calcular order amount ajustado
+            base_order_amount = strat['order_amount']
+            adjusted_order_amount = base_order_amount * multiplier
+            
+            self.logger.info(
+                f"[REGIME] {strat_id}: Market={market_regime}, "
+                f"Strategy_family={strategy_family or 'none'}, "
+                f"Base=${base_order_amount:.0f}, "
+                f"Multiplier={multiplier}x ({source}), "
+                f"Adjusted=${adjusted_order_amount:.0f}"
             )
+            
+
             
             # Process strategy with retry logic
             try:
@@ -547,7 +594,9 @@ class BotOrchestrator:
                     exchange=self.exchange,
                     open_positions=self.open_positions,
                     strategy_candles=self.strategy_candles,
-                    adjusted_order_amount=adjusted_order_amount  # ← NEW PARAMETER
+                    adjusted_order_amount=adjusted_order_amount,
+                    regime_family=market_regime,           # ← AÑADIR
+                    regime_multiplier=multiplier    # ← AÑADIR# ← NEW PARAMETER
                 )
             except Exception as e:
                 self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
@@ -562,7 +611,9 @@ class BotOrchestrator:
                         exchange=self.exchange,
                         open_positions=self.open_positions,
                         strategy_candles=self.strategy_candles,
-                        adjusted_order_amount=adjusted_order_amount  # ← NEW PARAMETER
+                        adjusted_order_amount=adjusted_order_amount,
+                        regime_family=market_regime,           # ← AÑADIR
+                        regime_multiplier=multiplier    # ← AÑADIR# ← NEW PARAMETER# ← NEW PARAMETER
                     )
                     self.logger.info(f"Retry successful for {strat_id}")
                 except Exception as e2:
@@ -627,25 +678,22 @@ class BotOrchestrator:
         
         for tf in closed_timeframes:
             try:
-                # Calculate regime multiplier for this timeframe
-                multiplier = get_regime_multiplier('BTCUSDT', tf)
+                family, metrics = get_current_regime(tf)
+                if family == 'default':
+                    family = 'ranging'
+                self.regime_cache[tf] = family  # Guarda 'trending'
                 
-                # Cache the multiplier
-                self.regime_cache[tf] = multiplier
-                
-                family_name = 'unknown'
-                for family, mult in REGIME_FAMILY_SIZING.items():
-                    if mult == multiplier:
-                        family_name = family.upper()
-                        break
-                
-                self.logger.info(f"[REGIME] {tf}: {family_name} (multiplier={multiplier}x)")
+                self.logger.info(
+                    f"[REGIME] {tf}: {family.upper()} "
+                    f"(hurst={metrics.get('hurst', 0):.2f}, "
+                    f"er={metrics.get('efficiency_ratio', 0):.2f})"
+                )
                 
             except Exception as e:
                 # On error, use 1.0 (no adjustment)
                 self.logger.error(f"[REGIME] Error calculating regime for {tf}: {e}")
-                self.regime_cache[tf] = 1.0
-                self.logger.debug(f"[REGIME] {tf}: using fallback multiplier=1.0x (error)")
+                self.regime_cache[tf] = 'ranging'
+                self.logger.debug(f"[REGIME] {tf}: using fallback regime='ranging' (error)")
     
     def _send_request_wrapper(
         self,

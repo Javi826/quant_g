@@ -42,27 +42,27 @@ PE_ORDER     = 3
 # FAMILY CLASSIFICATION THRESHOLDS
 # =============================================================================
 # Order matters: first match wins. 'ranging' should be last (default).
+FAMILIES = {
+   'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+    'volatile': {'atr_pct': ('>', 2)},
+    'ranging': {},  # Default: everything else
+}
+
 # =============================================================================
 # FAMILIES = {
-#     'trending': {'hurst': ('>', 0.55)},
-#     'volatile': {'atr_pct': ('>', 2.0)},
-#     'ranging': {},  # Default: everything else
+#     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+#     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
+#     'ranging': {}
 # }
 # =============================================================================
-
-FAMILIES = {
-    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
-    'ranging': {}
-}
 
 # =============================================================================
 # POSITION SIZING MULTIPLIERS
 # =============================================================================
 FAMILY_SIZING = {
-    'trending': 1.8,
-    'volatile': 0,
-    'ranging': 1.0,
+    'trending': 1.0,
+    'volatile':0,
+    'ranging': 1.8,
 }
 
 # =============================================================================

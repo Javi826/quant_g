@@ -21,6 +21,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 2
@@ -37,6 +38,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 4
@@ -53,6 +55,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -69,6 +72,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 4
@@ -85,6 +89,7 @@ strategies:
     timeframe: '4H'
     active: false
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 100
@@ -101,6 +106,7 @@ strategies:
     timeframe: '1H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 7
@@ -108,6 +114,7 @@ strategies:
     ma_period: 25
     tp_pct: 2
     sl_pct: 10
+
 
   # ------------------------------------------------------------------------
   # STRATEGY 07: Reversal Short (1H)
@@ -117,6 +124,7 @@ strategies:
     timeframe: '1H'
     active: true
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 5
@@ -133,6 +141,7 @@ strategies:
     timeframe: '6Hutc'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 3
@@ -149,6 +158,7 @@ strategies:
     timeframe: '6Hutc'
     active: true
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 6
@@ -156,6 +166,7 @@ strategies:
     ma_period: 25
     tp_pct: 4
     sl_pct: 7.5
+
 
   # ------------------------------------------------------------------------
   # STRATEGY 10: Parity Long (1H)
@@ -165,6 +176,7 @@ strategies:
     timeframe: '1H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -181,6 +193,7 @@ strategies:
     timeframe: '1H'
     active: true
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -188,6 +201,7 @@ strategies:
     ma_period: 50
     tp_pct: 2
     sl_pct: 7.5
+
 
   # ------------------------------------------------------------------------
   # STRATEGY 12: Parity Long (6Hutc)
@@ -197,6 +211,7 @@ strategies:
     timeframe: '6Hutc'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -213,6 +228,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'short'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -229,6 +245,7 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
+    regime_family: 'trending'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -236,3 +253,39 @@ strategies:
     impulse: 0.01
     tp_pct: 5
     sl_pct: 10
+    
+  # ------------------------------------------------------------------------
+  # STRATEGY 15: ranging long (4H)
+  # ------------------------------------------------------------------------
+  - id: '15_ranging_long_4H'
+    name: 'ranging_long_4H'
+    timeframe: '4H'
+    active: true
+    direction: 'long'
+    regime_family: 'ranging'
+    sell_after_ncandles: 50
+    order_amount: 80
+    lookback: 10
+    tolerance: 10
+    range: 25
+    tp_pct: 5
+    sl_pct: 10
+
+      
+  # ------------------------------------------------------------------------
+  # STRATEGY 16: ranging short (6Hutc)
+  # ------------------------------------------------------------------------
+  - id: '16_ranging_short_6Hutc'
+    name: 'ranging_short_6Hutc'
+    timeframe: '6Hutc'
+    active: true
+    direction: 'short'
+    regime_family: 'ranging'
+    sell_after_ncandles: 50
+    order_amount: 80
+    lookback: 10
+    tolerance: 5
+    range: 25
+    tp_pct: 4
+    sl_pct: 6
+

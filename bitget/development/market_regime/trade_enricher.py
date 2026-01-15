@@ -42,6 +42,7 @@ def extract_timeframe(filename: str) -> str:
     Examples:
         all_trades_parity_long_4H_IS.xlsx → 4H
         all_trades_reversal_short_1H_OOS.xlsx → 1H
+        all_trades_parity_long_6Hutc_IS.xlsx → 6Hutc
         all_trades_parity_long_4H.xlsx → 4H
     """
     # Remove extension and prefix
@@ -54,11 +55,11 @@ def extract_timeframe(filename: str) -> str:
     if parts[-1].upper() in ['IS', 'OOS']:
         parts = parts[:-1]
     
-    # Timeframe should be last part (e.g., '4H', '1H', '6H')
+    # Timeframe should be last part (e.g., '4H', '1H', '6Hutc')
     if parts:
-        timeframe = parts[-1].upper()
-        # Validate it looks like a timeframe
-        if any(c.isdigit() for c in timeframe) and timeframe.endswith('H'):
+        timeframe = parts[-1]
+        # Validate it looks like a timeframe (contains digit and H)
+        if any(c.isdigit() for c in timeframe.upper()) and 'H' in timeframe.upper():
             return timeframe
     
     # Default fallback

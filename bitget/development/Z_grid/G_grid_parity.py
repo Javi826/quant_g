@@ -17,14 +17,14 @@ from signals.add_signals_parity import parity_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "parity_short_4H_OOS"
+MY_SYMBOLS   = True
+STRATEGY     = "parity_short_4H_2"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 
