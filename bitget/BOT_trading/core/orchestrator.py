@@ -69,7 +69,8 @@ class BotOrchestrator:
         account_number: str,
         bitget_client: BitgetClient,
         connect_bitget_func: callable,
-        active_strategy_ids: Optional[List[str]] = None
+        active_strategy_ids: Optional[List[str]] = None,
+        account_multiplier: float = 1.0
     ):
         """
         Initialize the bot orchestrator.
@@ -126,6 +127,7 @@ class BotOrchestrator:
         
         #Marke regime
         self.regime_cache: Dict[str, str] = {}
+        self.account_multiplier = account_multiplier
         
     # ======================================================================
     # PUBLIC API
@@ -176,7 +178,7 @@ class BotOrchestrator:
         
         self._initialized = True
         self.logger.info("BOT Initialization completed\n")
-    
+        
     def shutdown(self) -> None:
         """
         Gracefully shutdown the bot.
@@ -255,11 +257,20 @@ class BotOrchestrator:
             df = pd.read_excel(self.trades_log_path)
             if not df.empty:
                 self.bot_state.closed_total_profit = df['PROFIT'].sum()
+                
     
     def _load_and_validate_strategies(self) -> None:
         # Load strategies
-        strategy_ids = get_account_strategies(self.account_number)
+        strategy_ids    = get_account_strategies(self.account_number)
         self.strategies = load_strategies(strategy_ids)
+        if self.account_multiplier != 1.0:
+           self.logger.info(f"[ACCOUNT] Applying {self.account_multiplier}x multiplier")  # ← AÑADIR ESTE LOG
+           for strat in self.strategies:
+               original = strat['order_amount']
+               strat['order_amount'] = round(original * self.account_multiplier, 2)
+               self.logger.info(
+                   f"[ACCOUNT]   {strat['id']}: ${original} → ${strat['order_amount']}"
+               )
         
         # Apply --set-active
         if self.active_strategy_ids:

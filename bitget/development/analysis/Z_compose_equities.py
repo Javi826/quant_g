@@ -509,18 +509,7 @@ if high_corr_pairs:
 else:
     print("   ✅ No pairs with high positive correlation")
 
-print("\n📚 CORRELATION GUIDE:")
-print("   • >0.7  = High correlation (strategies move together - reduces diversification)")
-print("   • 0.3-0.7 = Medium correlation")
-print("   • <0.3  = Low correlation (good diversification)")
-print("   • Near 0 = Independent strategies (excellent diversification)")
-print("   • Negative = Strategies move opposite (also good for diversification)")
 
-print("\n📐 R² GUIDE:")
-print("   • R² = 1.0  → Perfect straight line (ideal)")
-print("   • R² > 0.9  → Very consistent growth")
-print("   • R² = 0.7-0.9 → Good consistency")
-print("   • R² < 0.7  → Erratic equity curve")
 
 print("\n" + "="*80)
 print("✅ ANALYSIS COMPLETED")

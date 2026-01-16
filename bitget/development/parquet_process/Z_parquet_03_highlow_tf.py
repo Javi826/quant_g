@@ -10,7 +10,7 @@ input_folder  = BASE_DIR / "data" / "crypto_2022_2_clean"
 output_folder = BASE_DIR / "data" / "crypto_2022_2_hl"
 
 # Pair of timeframes to process: [higher_timeframe, intrabar_timeframe]
-timeframes_to_consider = ["6Hutc", "1H"]
+timeframes_to_consider = ["1H", "30m"]
 
 output_folder.mkdir(exist_ok=True, parents=True)
 

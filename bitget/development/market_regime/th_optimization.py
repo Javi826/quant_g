@@ -1,7 +1,7 @@
 """
 market_regime/optimize_thresholds.py
 
-Optimizes volatile family thresholds to improve portfolio drawdown.
+Optimizes volatile family thresholds to improve portfolio drawdown or profit.
 Tests multiple configurations and shows detailed comparison.
 
 Usage:
@@ -16,6 +16,15 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from market_regime.config import OUTPUT_FOLDER, FAMILIES, FAMILY_SIZING, INITIAL_CAPITAL
+from market_regime.position_sizer import apply_sizing
+
+
+# =============================================================================
+# OPTIMIZATION SETTINGS
+# =============================================================================
+
+# Choose optimization target: 'dd' or 'profit'
+OPTIMIZE_FOR = 'dd'  # 'dd' = minimize drawdown, 'profit' = maximize profit
 
 
 # =============================================================================
@@ -32,13 +41,13 @@ THRESHOLD_CONFIGS = [
     {'atr_pct': 3.0, 'pe': None},
     
     # ATR + PE combinations
-    {'atr_pct': 1.5, 'pe': 0.80},
-    {'atr_pct': 1.5, 'pe': 0.85},
-    {'atr_pct': 2.0, 'pe': 0.80},
-    {'atr_pct': 2.0, 'pe': 0.85},
-    {'atr_pct': 2.0, 'pe': 0.90},
-    {'atr_pct': 2.5, 'pe': 0.85},
-    {'atr_pct': 2.5, 'pe': 0.90},
+    {'atr_pct': 1.5, 'pe': 0.10},
+    {'atr_pct': 1.5, 'pe': 0.15},
+    {'atr_pct': 2.0, 'pe': 0.20},
+    {'atr_pct': 2.0, 'pe': 0.25},
+    {'atr_pct': 2.0, 'pe': 0.30},
+    {'atr_pct': 2.5, 'pe': 0.35},
+    {'atr_pct': 2.5, 'pe': 0.40},
 ]
 
 # Define generator display order
@@ -180,15 +189,19 @@ def print_portfolio_summary(metrics: dict):
 def run_optimization():
     """Runs threshold optimization and prints results."""
     
-    # Import here to avoid circular import
-    from market_regime.position_sizer import apply_sizing
+    # Validate optimization target
+    if OPTIMIZE_FOR not in ['dd', 'profit']:
+        raise ValueError("OPTIMIZE_FOR must be 'dd' or 'profit'")
+    
+    goal_text = "Minimize drawdown (negative ΔDD% = improvement)" if OPTIMIZE_FOR == 'dd' else "Maximize profit (positive ΔProfit% = improvement)"
     
     print("=" * 160)
     print("THRESHOLD OPTIMIZATION - Finding best volatile thresholds")
     print("=" * 160)
     print(f"\nTesting {len(THRESHOLD_CONFIGS)} configurations...")
     print(f"Sizing strategy: {FAMILY_SIZING}")
-    print(f"Goal: Maximize drawdown reduction (negative ΔDD% = improvement)\n")
+    print(f"Optimization target: {OPTIMIZE_FOR.upper()}")
+    print(f"Goal: {goal_text}\n")
     
     all_results = []
     
@@ -214,7 +227,8 @@ def run_optimization():
                 output_folder=OUTPUT_FOLDER,
                 families=families,
                 sizing=FAMILY_SIZING,
-                initial_capital=INITIAL_CAPITAL
+                initial_capital=INITIAL_CAPITAL,
+                show_plots=False
             )
         
         # Extract metrics
@@ -236,17 +250,27 @@ def run_optimization():
     # FINAL COMPARISON TABLE
     # =================================================================
     print(f"\n\n{'='*160}")
-    print("FINAL COMPARISON - All Configurations Ranked by DD Improvement")
-    print(f"{'='*160}\n")
     
-    # Sort by DD delta (most negative = best improvement)
-    all_results.sort(key=lambda x: x['portfolio_dd_delta'])
+    if OPTIMIZE_FOR == 'dd':
+        print("FINAL COMPARISON - All Configurations Ranked by DD Improvement")
+        # Sort by DD delta (most negative = best improvement)
+        all_results.sort(key=lambda x: x['portfolio_dd_delta'])
+    else:  # profit
+        print("FINAL COMPARISON - All Configurations Ranked by Profit")
+        # Sort by profit delta % (most positive = best improvement)
+        all_results.sort(key=lambda x: x['profit_delta_pct'], reverse=True)
+    
+    print(f"{'='*160}\n")
     
     print(f"{'#':<4} {'ATR>':<8} {'PE>':<8} {'TRADES_BASE':>12} {'TRADES_SIZED':>13} {'PROFIT_BASE':>13} {'PROFIT_SIZED':>15} {'ΔProfit%':>11} {'VOL_PROFIT':>12} {'DD_BASE':>10} {'DD_SIZED':>12} {'ΔDD%':>10}")
     print("-" * 160)
     
     for r in all_results:
-        rank_icon = "🏆" if r == all_results[0] else "✅" if r['portfolio_dd_delta'] < 0 else "❌"
+        if OPTIMIZE_FOR == 'dd':
+            rank_icon = "🏆" if r == all_results[0] else "✅" if r['portfolio_dd_delta'] < 0 else "❌"
+        else:
+            rank_icon = "🏆" if r == all_results[0] else "✅" if r['profit_delta_pct'] > 0 else "❌"
+        
         pe_str = f"{r['pe_threshold']:.2f}" if r['pe_threshold'] != 'None' else "None"
         profit_ok = "✅" if r['total_profit_sized'] > r['total_profit_base'] else "❌"
         
@@ -256,7 +280,7 @@ def run_optimization():
     # Best configuration summary
     best = all_results[0]
     print(f"\n{'='*160}")
-    print("🏆 BEST CONFIGURATION:")
+    print(f"🏆 BEST CONFIGURATION (optimized for {OPTIMIZE_FOR.upper()}):")
     print(f"{'='*160}")
     print(f"  Thresholds: atr_pct > {best['atr_threshold']}" + (f", permutation_entropy > {best['pe_threshold']}" if best['pe_threshold'] != 'None' else ""))
     print(f"  Trades: {best['total_trades_base']} → {best['total_trades_sized']} (filtered: {best['trades_filtered']})")

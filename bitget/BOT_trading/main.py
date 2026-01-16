@@ -75,31 +75,16 @@ def main():
     active_strategy_ids = None
     if args.set_active:
         active_strategy_ids = [s.strip() for s in args.set_active.split(',')]
-    
+    account_multiplier = ACCOUNT_MULTIPLIERS.get(account_number, DEFAULT_ACCOUNT_MULTIPLIER)
     # Create and run bot
     bot = BotOrchestrator(
         account_number=account_number,
         bitget_client=BITGET_CLIENTS[account_number],
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
-        active_strategy_ids=active_strategy_ids
+        active_strategy_ids=active_strategy_ids,
+        account_multiplier=account_multiplier  # ← PASAR AQUÍ
     )
     
-    # =======================================================================
-    # APPLY ACCOUNT MULTIPLIER PRESET
-    # =======================================================================
-   
-    account_multiplier = ACCOUNT_MULTIPLIERS.get(account_number, DEFAULT_ACCOUNT_MULTIPLIER)
-    
-    if account_multiplier != 1.0:
-        logger.info(f"ACCOUNT PRESET: Applying {account_multiplier}x multiplier to all order amounts")
-        
-        for strategy in bot.strategies:
-            if 'order_amount' in strategy:
-                original = strategy['order_amount']
-                strategy['order_amount'] = round(original * account_multiplier, 2)
-                logger.info(f"└─ {strategy['id']}: ${original} → ${strategy['order_amount']}")
-    else:
-        logger.info(f"ACCOUNT PRESET: Using standard sizing (1.0x)")
     # =======================================================================
     bot.run()
 

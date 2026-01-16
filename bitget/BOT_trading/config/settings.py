@@ -31,7 +31,7 @@ ACCOUNTS = {
 }
 ACCOUNT_MULTIPLIERS = {
     '00': 1.0,   
-    'E1': 1.0,   
+    'E1': 0.5,   
     '01': 1.0    
 }
 
@@ -73,7 +73,11 @@ ACCOUNT_STRATEGIES = {
         '09_reversal_short_6Hutc',
         '10_parity_long_1H',
         '11_parity_short_1H',
-        '13_orderblocks_short_4H'
+        '12_parity_long_6Hutc',
+        '13_orderblocks_short_4H',
+        '14_orderblocks_long_4H',
+        '15_ranging_long_4H',
+        '16_ranging_short_6Hutc'
     ],
     "01": [
         # Only testing strategies
@@ -101,8 +105,8 @@ REGIME_PE_ORDER     = 3
 # Order matters: first match wins. 'ranging' is default (empty rules).
 REGIME_FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0)},
-    'ranging': {}  # Default catch-all
+    'volatile': {'atr_pct': ('>', 1.5)},
+    'ranging': {}  
 }
 
 

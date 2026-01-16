@@ -17,7 +17,7 @@ def monitor_cpu(interval=0.01):
                 print(f"Core {i}: {u:5.1f}%")
             time.sleep(interval)
     except KeyboardInterrupt:
-        print("\n🔚 Monitor detenido")
+        print("\n🔚 Monitor stopped")
 
 # Ejemplo de uso:
-monitor_cpu(interval=1)
+monitor_cpu(interval=0.5)

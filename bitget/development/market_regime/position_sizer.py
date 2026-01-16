@@ -185,7 +185,8 @@ def apply_sizing(
     output_folder: str = None,
     families: dict = None,
     sizing: dict = None,
-    initial_capital: float = None
+    initial_capital: float = None,
+    show_plots: bool = True
 ) -> list:
     """Applies position sizing to all enriched files."""
     output_folder = output_folder or OUTPUT_FOLDER
@@ -218,21 +219,22 @@ def apply_sizing(
         results.append(r)
         print_file_results(r)
         
-        try:
-            import matplotlib.pyplot as plt
-            df_plot = r['df']
-            plt.figure(figsize=(10, 5))
-            plt.plot(df_plot['buy_time'], df_plot['equity_base'], label='Equity Base')
-            plt.plot(df_plot['buy_time'], df_plot['equity_sized'], label='Equity Regime Sizing')
-            plt.title(f"Equity Curve – {r['strategy']}")
-            plt.xlabel("Time")
-            plt.ylabel("Equity")
-            plt.legend()
-            plt.grid(alpha=0.3)
-            plt.tight_layout()
-            plt.show()
-        except Exception as e:
-            print(f"⚠️ Plot skipped for {r['strategy']} ({e})")
+        if show_plots:
+            try:
+                import matplotlib.pyplot as plt
+                df_plot = r['df']
+                plt.figure(figsize=(10, 5))
+                plt.plot(df_plot['buy_time'], df_plot['equity_base'], label='Equity Base')
+                plt.plot(df_plot['buy_time'], df_plot['equity_sized'], label='Equity Regime Sizing')
+                plt.title(f"Equity Curve – {r['strategy']}")
+                plt.xlabel("Time")
+                plt.ylabel("Equity")
+                plt.legend()
+                plt.grid(alpha=0.3)
+                plt.tight_layout()
+                plt.show()
+            except Exception as e:
+                print(f"⚠️ Plot skipped for {r['strategy']} ({e})")
     
     # Sort results by generator order
     results.sort(key=lambda x: GENERATOR_ORDER.index(x['generator']) if x['generator'] in GENERATOR_ORDER else 999)
@@ -259,9 +261,9 @@ def apply_sizing(
     # =================================================================
     # RESUMEN POR FAMILIA
     # =================================================================
-    print(f"\n{'='*135}")
+    print(f"\n{'='*150}")
     print("RESUMEN POR FAMILIA (todas las estrategias agregadas)")
-    print(f"{'='*135}")
+    print(f"{'='*150}")
     
     family_aggregates = {}
     for fam in combined_df['family'].unique():
@@ -281,8 +283,11 @@ def apply_sizing(
             'dd_sized_pct': calculate_max_dd_pct(fam_df['equity_sized'])
         }
     
-    print(f"\n{'FAMILY':<15} {'TRADES_BASE':>12} {'TRADES_SIZING':>14} {'PROFIT_BASE':>13} {'PROFIT_SIZING':>15} {'Δ%':>8} {'DD%_BASE':>10} {'DD%_SIZING':>12} {'ΔDD%':>8}")
-    print("-" * 135)
+    # Calculate total trades for percentage calculation
+    total_trades_base_all = sum(agg['trades_base'] for agg in family_aggregates.values())
+    
+    print(f"\n{'FAMILY':<15} {'TRADES_BASE':>12} {'TRADES_%':>10} {'TRADES_SIZING':>14} {'PROFIT_BASE':>13} {'PROFIT_SIZING':>15} {'Δ%':>8} {'DD%_BASE':>10} {'DD%_SIZING':>12} {'ΔDD%':>8}")
+    print("-" * 150)
     
     total_trades_base = 0
     total_trades_sizing = 0
@@ -291,32 +296,34 @@ def apply_sizing(
     
     for fam in sorted(family_aggregates.keys()):
         agg = family_aggregates[fam]
+        trades_pct = (agg['trades_base'] / total_trades_base_all * 100) if total_trades_base_all > 0 else 0
         delta_pct = ((agg['profit_s'] - agg['profit_b']) / abs(agg['profit_b']) * 100) if agg['profit_b'] != 0 else 0
         dd_delta_pct = agg['dd_sized_pct'] - agg['dd_base_pct']
         profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else "❌"
         dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else "❌"
         
-        print(f"{fam:<15} {agg['trades_base']:>12} {agg['trades_sizing']:>14} {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
+        print(f"{fam:<15} {agg['trades_base']:>12} {trades_pct:>9.1f}% {agg['trades_sizing']:>14} {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
         
         total_trades_base += agg['trades_base']
         total_trades_sizing += agg['trades_sizing']
         total_profit_base += agg['profit_b']
         total_profit_sizing += agg['profit_s']
     
-    print("-" * 135)
+    print("-" * 150)
     
     # TOTAL: Use portfolio-level DD
+    total_trades_pct = 100.0
     total_delta_pct = ((total_profit_sizing - total_profit_base) / abs(total_profit_base) * 100) if total_profit_base != 0 else 0
     total_profit_ok = "✅" if total_profit_sizing > total_profit_base else "❌"
     total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
-    print(f"{'TOTAL':<15} {total_trades_base:>12} {total_trades_sizing:>14} {total_profit_base:>13.2f} {total_profit_sizing:>15.2f} {total_profit_ok} {total_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
+    print(f"{'TOTAL':<15} {total_trades_base:>12} {total_trades_pct:>9.1f}% {total_trades_sizing:>14} {total_profit_base:>13.2f} {total_profit_sizing:>15.2f} {total_profit_ok} {total_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
     
     # =================================================================
     # RESUMEN POR GENERADOR
     # =================================================================
-    print(f"\n{'='*135}")
+    print(f"\n{'='*165}")
     print("RESUMEN POR GENERADOR (todas las estrategias agregadas)")
-    print(f"{'='*135}")
+    print(f"{'='*165}")
     
     generator_aggregates = {}
     for gen in combined_df['strategy'].apply(lambda x: extract_generator(x)).unique():
@@ -337,8 +344,11 @@ def apply_sizing(
             'dd_sized_pct': calculate_max_dd_pct(gen_combined['equity_sized'])
         }
     
-    print(f"\n{'GENERATOR':<15} {'TRADES_BASE':>12} {'TRADES_SIZING':>14} {'PROFIT_BASE':>13} {'PROFIT_SIZING':>15} {'Δ%':>8} {'DD%_BASE':>10} {'DD%_SIZING':>12} {'ΔDD%':>8}")
-    print("-" * 135)
+    # Calculate total trades for percentage calculation
+    gen_total_trades_base_all = sum(agg['trades_base'] for agg in generator_aggregates.values())
+    
+    print(f"\n{'GENERATOR':<15} {'TRADES_BASE':>12} {'TRADES_%':>10} {'TRADES_SIZING':>14} {'TRADES_ACTIVE%':>15} {'PROFIT_BASE':>13} {'PROFIT_SIZING':>15} {'Δ%':>8} {'DD%_BASE':>10} {'DD%_SIZING':>12} {'ΔDD%':>8}")
+    print("-" * 165)
     
     gen_total_trades_base = 0
     gen_total_trades_sizing = 0
@@ -350,25 +360,29 @@ def apply_sizing(
     
     for gen in sorted_gens:
         agg = generator_aggregates[gen]
+        trades_pct = (agg['trades_base'] / gen_total_trades_base_all * 100) if gen_total_trades_base_all > 0 else 0
+        trades_active_pct = (agg['trades_sizing'] / agg['trades_base'] * 100) if agg['trades_base'] > 0 else 0
         delta_pct = ((agg['profit_s'] - agg['profit_b']) / abs(agg['profit_b']) * 100) if agg['profit_b'] != 0 else 0
         dd_delta_pct = agg['dd_sized_pct'] - agg['dd_base_pct']
         profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else "❌"
         dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else "❌"
         
-        print(f"{gen:<15} {agg['trades_base']:>12} {agg['trades_sizing']:>14} {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
+        print(f"{gen:<15} {agg['trades_base']:>12} {trades_pct:>9.1f}% {agg['trades_sizing']:>14} {trades_active_pct:>14.1f}% {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
         
         gen_total_trades_base += agg['trades_base']
         gen_total_trades_sizing += agg['trades_sizing']
         gen_total_profit_base += agg['profit_b']
         gen_total_profit_sizing += agg['profit_s']
     
-    print("-" * 135)
+    print("-" * 165)
     
     # TOTAL: Use portfolio-level DD
+    gen_total_trades_pct = 100.0
+    gen_total_trades_active_pct = (gen_total_trades_sizing / gen_total_trades_base * 100) if gen_total_trades_base > 0 else 0
     gen_total_delta_pct = ((gen_total_profit_sizing - gen_total_profit_base) / abs(gen_total_profit_base) * 100) if gen_total_profit_base != 0 else 0
     gen_total_profit_ok = "✅" if gen_total_profit_sizing > gen_total_profit_base else "❌"
     gen_total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
-    print(f"{'TOTAL':<15} {gen_total_trades_base:>12} {gen_total_trades_sizing:>14} {gen_total_profit_base:>13.2f} {gen_total_profit_sizing:>15.2f} {gen_total_profit_ok} {gen_total_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {gen_total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
+    print(f"{'TOTAL':<15} {gen_total_trades_base:>12} {gen_total_trades_pct:>9.1f}% {gen_total_trades_sizing:>14} {gen_total_trades_active_pct:>14.1f}% {gen_total_profit_base:>13.2f} {gen_total_profit_sizing:>15.2f} {gen_total_profit_ok} {gen_total_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {gen_total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
     
     # =================================================================
     # SUMMARY - ALL STRATEGIES
