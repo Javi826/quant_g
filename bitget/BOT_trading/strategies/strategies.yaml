@@ -108,7 +108,7 @@ strategies:
     direction: 'long'
     regime_family: 'trending'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 7
     tolerance: 40
     ma_period: 25
@@ -126,7 +126,7 @@ strategies:
     direction: 'short'
     regime_family: 'trending'
     sell_after_ncandles: 50
-    order_amount: 40
+    order_amount: 80
     lookback: 5
     tolerance: 30
     ma_period: 50

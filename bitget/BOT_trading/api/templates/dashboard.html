@@ -5,10 +5,10 @@
 <style>
     {% if account == '00' %}
     #loading-splash {
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        background: linear-gradient(135deg, #1e3a5f 0%, #0a1929 100%);
     }
     .header {
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        background: linear-gradient(135deg, #1e3a5f 0%, #0a1929 100%);
     }
     .account-badge {
         background: rgba(37, 99, 235, 0.25);
@@ -53,6 +53,53 @@
         color: #93c5fd;
     }
     {% endif %}
+    
+    /* Badge styles for strategy status */
+    .badge {
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .badge-active {
+        background: rgba(74, 222, 128, 0.15);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+        color: #4ade80;
+    }
+    .badge-deprecating {
+        background: rgba(139, 148, 158, 0.15);
+        border: 1px solid rgba(139, 148, 158, 0.3);
+        color: #8b949e;
+    }
+    .badge-not-implemented {
+        background: rgba(210, 153, 34, 0.15);
+        border: 1px solid rgba(210, 153, 34, 0.3);
+        color: #d29922;
+    }
+    
+    /* Exit reason badges (Recent Trades table) - LARGER */
+    .badge-tp {
+        padding: 6px 14px;
+        font-size: 13px;
+        background: rgba(74, 222, 128, 0.25);
+        border: 1px solid rgba(74, 222, 128, 0.5);
+        color: #4ade80;
+    }
+    .badge-sl {
+        padding: 6px 14px;
+        font-size: 13px;
+        background: rgba(239, 68, 68, 0.25);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #ef4444;
+    }
+    .badge-timeout {
+        padding: 6px 14px;
+        font-size: 13px;
+        background: rgba(139, 148, 158, 0.25);
+        border: 1px solid rgba(139, 148, 158, 0.5);
+        color: #8b949e;
+    }
 </style>
 {% endblock %}
 

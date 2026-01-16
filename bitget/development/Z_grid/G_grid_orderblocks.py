@@ -20,7 +20,7 @@ from signals.add_signals_orderblocks import orderblocks_short
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = True
-STRATEGY     = "orderblocks_long_4H"
+STRATEGY     = "orderblocks_long_4H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -38,17 +38,9 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [150]
-TOLERANCE_LIST       = [30] 
-IMPULSE_LIST         = [1.0] 
-
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [10]
-
-SELL_AFTER_LIST      = [0]  
+IMPULSE_LIST         = [0.01] 
 LOOKBACK_LIST        = [50]
 TOLERANCE_LIST       = [40] 
-IMPULSE_LIST         = [0.01] 
 
 TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]

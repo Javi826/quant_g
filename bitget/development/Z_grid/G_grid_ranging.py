@@ -20,8 +20,8 @@ from signals.add_signals_ranging import ranging_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = True
-STRATEGY     = "ranging_long_4H"
+MY_SYMBOLS   = False
+STRATEGY     = "ranging_short_6Hutc_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -47,8 +47,8 @@ SL_PCT_LIST          = [2.5,5,7.5,10]
 
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [10] 
-TOLERANCE_LIST       = [10]
 RANGE_LIST           = [25]
+TOLERANCE_LIST       = [10]
 
 TP_PCT_LIST          = [5]
 SL_PCT_LIST          = [10]
@@ -125,7 +125,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=True)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
 save_equity_to_excel(grid_results_list,"brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

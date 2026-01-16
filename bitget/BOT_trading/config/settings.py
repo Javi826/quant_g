@@ -82,26 +82,6 @@ ACCOUNT_STRATEGIES = {
     ]
 }
 
-# ==========================================================================
-# STRATEGY CONFIGURATION & VALIDATION
-# ==========================================================================
-
-# Strategy type required parameters
-# When adding a new strategy function, add its required params here
-STRATEGY_TYPE_REQUIRED_PARAMS = {
-    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
-    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
-    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
-    'parity_long': ['lookback', 'tolerance', 'ma_period'],
-    'parity_short': ['lookback', 'tolerance', 'ma_period'],
-    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
-    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'ranging_long': ['lookback', 'tolerance', 'range'],
-    'ranging_short': ['lookback', 'tolerance', 'range'],
-}
-
-# Common parameters required for ALL strategies
-COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction','regime_family']
 
 # ==========================================================================
 # MARKET REGIME SETTINGS
@@ -121,7 +101,7 @@ REGIME_PE_ORDER     = 3
 # Order matters: first match wins. 'ranging' is default (empty rules).
 REGIME_FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 1.5)},
+    'volatile': {'atr_pct': ('>', 2.0)},
     'ranging': {}  # Default catch-all
 }
 

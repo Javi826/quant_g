@@ -324,12 +324,23 @@ function renderRegimeStrategyMatrix(strategies) {
     let html = '';
     sorted.forEach((strat, index) => {
         const num = String(index + 1).padStart(2, '0');
-        const family = strat.regime_family || 'Global';
-        const familyColor = getFamilyColor(family);
+        
+        // Distinguish between null, 'global', and actual regime families
+        let family, familyColor;
+        if (strat.regime_family === null || strat.regime_family === undefined) {
+            family = 'NOT IMPLE.';
+            familyColor = '#8b949e'; // Gray color
+        } else if (strat.regime_family.toLowerCase() === 'global') {
+            family = 'GLOBAL';
+            familyColor = '#c9d1d9'; // White/light color
+        } else {
+            family = strat.regime_family.toUpperCase();
+            familyColor = getFamilyColor(strat.regime_family);
+        }
         
         // Get multipliers based on family
         let mults;
-        if (strat.regime_family && window.REGIME_MATRIX && window.REGIME_MATRIX[strat.regime_family]) {
+        if (strat.regime_family && strat.regime_family !== null && strat.regime_family.toLowerCase() !== 'global' && window.REGIME_MATRIX && window.REGIME_MATRIX[strat.regime_family]) {
             // Custom: read from REGIME_FAMILY_MATRIX
             mults = {
                 trending: window.REGIME_MATRIX[strat.regime_family].trending,
@@ -337,7 +348,7 @@ function renderRegimeStrategyMatrix(strategies) {
                 volatile: window.REGIME_MATRIX[strat.regime_family].volatile
             };
         } else {
-            // Global: read from REGIME_FAMILY_SIZING
+            // Global or Not imple.: read from REGIME_FAMILY_SIZING
             if (window.REGIME_SIZING) {
                 mults = {
                     trending: window.REGIME_SIZING.trending,

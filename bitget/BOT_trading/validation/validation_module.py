@@ -8,10 +8,30 @@ logger = logging.getLogger('BOT_trading.validation.validation_module')
 
 from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_TP_PCT
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
-from config.settings import VALID_TIMEFRAMES, STRATEGY_TYPE_REQUIRED_PARAMS
-from config.settings import COMMON_REQUIRED_PARAMS, REGIME_FAMILIES, REGIME_GLOBAL, REGIME_REFERENCE_SYMBOL, REGIME_FAMILY_MATRIX
+from config.settings import VALID_TIMEFRAMES
+from config.settings import REGIME_FAMILIES, REGIME_GLOBAL, REGIME_REFERENCE_SYMBOL, REGIME_FAMILY_MATRIX
 from config.settings import ACCOUNTS, ACCOUNT_STRATEGIES, BASE_URL
 
+# ==========================================================================
+# STRATEGY CONFIGURATION & VALIDATION
+# ==========================================================================
+
+# Strategy type required parameters
+# When adding a new strategy function, add its required params here
+STRATEGY_TYPE_REQUIRED_PARAMS = {
+    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
+    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
+    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
+    'parity_long': ['lookback', 'tolerance', 'ma_period'],
+    'parity_short': ['lookback', 'tolerance', 'ma_period'],
+    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
+    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
+    'ranging_long': ['lookback', 'tolerance', 'range'],
+    'ranging_short': ['lookback', 'tolerance', 'range'],
+}
+
+# Common parameters required for ALL strategies
+COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction','regime_family']
 
 # ==========================================================================
 # SETTINGS VALIDATION
