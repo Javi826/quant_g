@@ -25,11 +25,7 @@ def get_hardcoded_signals(
     
     for symbol in symbols:
         # Fetch current price from API
-        code, resp = send_request_func(
-            "GET",
-            "/api/v2/mix/market/ticker",
-            params={"productType": product_type, "symbol": symbol}
-        )
+        code, resp = send_request_func("GET","/api/v2/mix/market/ticker",params={"productType": product_type, "symbol": symbol})
         
         # Default fallback price
         current_price = 50000.0

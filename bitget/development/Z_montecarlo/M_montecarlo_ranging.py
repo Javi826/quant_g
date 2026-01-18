@@ -23,11 +23,13 @@ DTYPE             = np.float32
 start_time        = time.time()
 N_JOBS            = -1
 STRATEGY          = "ranging"
+MY_SYMBOLS        = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
-# -----------------------------------------------------------------------------
-DATA_FOLDER       = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR   = '6Hutc'
+# -----------------------------------------------------------------------------.
+DATA_FOLDER         = "../data/crypto_OOS_2025"
+#DATA_FOLDER       = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 80
 MIN_VOL_USDT      = 10_000_000
 
@@ -41,6 +43,14 @@ RANGE_LIST           = [15,20,25]
 
 TP_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
 SL_PCT_LIST          = [2,3,4,5,6,7,8,9,10]
+
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [10] 
+RANGE_LIST           = [25]
+TOLERANCE_LIST       = [10]
+
+TP_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','RANGE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -56,7 +66,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=MY_SYMBOLS)
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -70,7 +80,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = ranging_short(
+            signals = ranging_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

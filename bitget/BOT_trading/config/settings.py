@@ -103,10 +103,18 @@ REGIME_PE_ORDER     = 3
 
 # Family classification thresholds
 # Order matters: first match wins. 'ranging' is default (empty rules).
+# =============================================================================
+# REGIME_FAMILIES = {
+#     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+#     'volatile': {'atr_pct': ('>', 1.5)},
+#     'ranging': {}  
+# }
+# =============================================================================
+
 REGIME_FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 1.5)},
-    'ranging': {}  
+    'volatile': {'atr_pct': ('>', 1.5), 'permutation_entropy': ('>', 0.1)},
+    'ranging': {}
 }
 
 

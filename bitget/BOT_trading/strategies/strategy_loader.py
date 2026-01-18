@@ -29,7 +29,7 @@ def load_strategies_from_yaml(yaml_path: Optional[str] = None) -> List[Dict]:
     if yaml_path is None:
         # Default: strategies/strategies.yaml (in same directory as this file)
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        yaml_path = os.path.join(current_dir, 'strategies.yaml')
+        yaml_path   = os.path.join(os.path.dirname(current_dir), 'config', 'strategies.yaml')
     
     if not os.path.exists(yaml_path):
         raise FileNotFoundError(f"Strategies YAML file not found: {yaml_path}")

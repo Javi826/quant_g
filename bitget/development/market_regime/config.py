@@ -12,16 +12,16 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Input: folder with trades files
-TRADES_FOLDER = os.path.join(BASE_DIR, 'brief_trades')
+TRADES_FOLDER = os.path.join(BASE_DIR, 'brief_trades_2025')
 
 # Input: pattern to match trades files (glob pattern)
 TRADES_PATTERN = 'all_trades_*.xlsx'
 
 # Input: OHLC folder with BTC parquet
-OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS')
+OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS_2025')
 
 # Output: folder for enriched trades
-OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_1')
+OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_2025')
 
 # =============================================================================
 # BTC SETTINGS
@@ -50,19 +50,25 @@ PE_ORDER     = 3
 # }
 # =============================================================================
 
+# =============================================================================
+# FAMILIES = {
+#     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+#     'volatile': {'atr_pct': ('>', 1.5), 'permutation_entropy': ('>', 0.1)},
+#     'ranging': {}
+# }
+# =============================================================================
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
     'volatile': {'atr_pct': ('>', 1.5), 'permutation_entropy': ('>', 0.1)},
     'ranging': {}
 }
-
 # =============================================================================
 # POSITION SIZING MULTIPLIERS
 # =============================================================================
 FAMILY_SIZING = {
     'trending': 1.0,
     'volatile':0,
-    'ranging': 1.1,
+    'ranging': 1.8,
 }
 
 # =============================================================================

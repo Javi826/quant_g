@@ -89,9 +89,9 @@ strategies:
     timeframe: '4H'
     active: false
     direction: 'short'
-    regime_family: 'trending'
+    regime_family: 'global'
     sell_after_ncandles: 50
-    order_amount: 80
+    order_amount: 40
     lookback: 100
     tolerance: 30
     ma_period: 50
