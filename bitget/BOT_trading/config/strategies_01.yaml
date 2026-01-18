@@ -1,0 +1,52 @@
+# ==========================================================================
+# TRADING STRATEGIES CONFIGURATION
+# ==========================================================================
+# 
+# This file defines all trading strategies used by the bot.
+# Each strategy must have all required parameters defined.
+#
+# IMPORTANT: 
+# - Strategy IDs must match those in config/settings.py ACCOUNT_STRATEGIES
+# - All strategies must be listed here even if inactive
+# - Parameter validation happens at bot startup
+#
+# ==========================================================================
+
+strategies:
+
+  # ------------------------------------------------------------------------
+  # STRATEGY 06: Reversal Long (1H)
+  # ------------------------------------------------------------------------
+  - id: '06_reversal_long_1H'
+    name: 'reversal_long_1H'
+    timeframe: '1H'
+    active: true
+    direction: 'long'
+    regime_family: 'trending'
+    sell_after_ncandles: 50
+    order_amount: 80
+    lookback: 7
+    tolerance: 40
+    ma_period: 25
+    tp_pct: 2
+    sl_pct: 10
+
+
+  # ------------------------------------------------------------------------
+  # STRATEGY 07: Reversal Short (1H)
+  # ------------------------------------------------------------------------
+  - id: '07_reversal_short_1H'
+    name: 'reversal_short_1H'
+    timeframe: '1H'
+    active: true
+    direction: 'short'
+    regime_family: 'trending'
+    sell_after_ncandles: 50
+    order_amount: 80
+    lookback: 5
+    tolerance: 30
+    ma_period: 50
+    tp_pct: 1.9
+    sl_pct: 5
+
+

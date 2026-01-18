@@ -29,13 +29,6 @@ ACCOUNTS = {
         "description": "Testing Account"
     }
 }
-ACCOUNT_MULTIPLIERS = {
-    '00': 1.0,   
-    'E1': 0.5,   
-    '01': 1.0    
-}
-
-DEFAULT_ACCOUNT_MULTIPLIER = 1.0
 
 # ==========================================================================
 # STRATEGY ASSIGNMENT PER ACCOUNT

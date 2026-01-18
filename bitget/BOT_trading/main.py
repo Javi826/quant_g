@@ -17,7 +17,6 @@ from execution import BitgetClient
 from bot_utils.logger import setup_logger
 from core import BotOrchestrator
 from config.utils import get_account_config
-from config.settings import ACCOUNT_MULTIPLIERS, DEFAULT_ACCOUNT_MULTIPLIER
 # Credentials
 from config.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
 from config.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
@@ -75,14 +74,12 @@ def main():
     active_strategy_ids = None
     if args.set_active:
         active_strategy_ids = [s.strip() for s in args.set_active.split(',')]
-    account_multiplier = ACCOUNT_MULTIPLIERS.get(account_number, DEFAULT_ACCOUNT_MULTIPLIER)
     # Create and run bot
     bot = BotOrchestrator(
         account_number=account_number,
         bitget_client=BITGET_CLIENTS[account_number],
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
-        active_strategy_ids=active_strategy_ids,
-        account_multiplier=account_multiplier  # ← PASAR AQUÍ
+        active_strategy_ids=active_strategy_ids
     )
     
     # =======================================================================

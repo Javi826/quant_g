@@ -149,7 +149,7 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
         'close': subset['close'].values.astype(np.float64)
     }
     
-    return calc_all_metrics(
+    metrics = calc_all_metrics(
         ohlc,
         hurst_window=HURST_WINDOW,
         er_window=ER_WINDOW,
@@ -157,6 +157,23 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
         pe_window=PE_WINDOW,
         pe_order=PE_ORDER
     )
+    
+    # Calculate moving averages
+    # MA_50: need at least 50 bars before current
+    if idx >= 49:
+        ma_50_data = btc_df.iloc[idx - 49:idx + 1]['close'].values
+        metrics['ma_50'] = float(np.mean(ma_50_data))
+    else:
+        metrics['ma_50'] = np.nan
+    
+    # MA_200: need at least 200 bars before current
+    if idx >= 199:
+        ma_200_data = btc_df.iloc[idx - 199:idx + 1]['close'].values
+        metrics['ma_200'] = float(np.mean(ma_200_data))
+    else:
+        metrics['ma_200'] = np.nan
+    
+    return metrics
 
 
 def enrich_single_file(
@@ -201,7 +218,7 @@ def enrich_single_file(
         print(f"            BTC:    {btc_min} → {btc_max}")
     
     # Initialize columns
-    metric_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy']
+    metric_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'ma_200']
     for col in metric_cols:
         trades_df[col] = np.nan
     
