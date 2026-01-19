@@ -1,26 +1,25 @@
 """
-market_regime module - Regime-based position sizing for BOT_trading
+Market regime classification and position sizing.
 
 This module provides:
-- Regime metrics calculation (Hurst, ER, ATR%, Permutation Entropy)
-- Market regime classification (trending, ranging, volatile)
-- Position sizing multipliers based on current regime
-
-Usage:
-    from market_regime.regime_classifier import get_regime_multiplier
-    
-    multiplier = get_regime_multiplier('BTCUSDT', '4H')
-    adjusted_size = base_size * multiplier
+- Regime classification: Detect market state (trending/ranging/volatile)
+- Direction detection: Detect trend direction (uptrend/dwtrend)
+- Position sizing: Adjust order amounts based on regime/direction alignment
 """
 
-from market_regime.regime_classifier import (
-    get_regime_multiplier,
+from .regime_classifier import (
     get_current_regime,
-    get_regime_metrics
+    get_current_direction,
+    get_regime_multiplier,
+    get_regime_info,
 )
 
+from .position_sizer import PositionSizer
+
 __all__ = [
-    'get_regime_multiplier',
     'get_current_regime',
-    'get_regime_metrics'
+    'get_current_direction',
+    'get_regime_multiplier',
+    'get_regime_info',
+    'PositionSizer',
 ]

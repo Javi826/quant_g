@@ -304,7 +304,7 @@ def get_regime_info(timeframe: str) -> Dict:
             'success': False,
             'error': str(e)
         }
-def get_current_direction(timeframe: str) -> str:
+def get_current_direction(timeframe: str) -> Tuple[str, Optional[float], Optional[float]]:
     """
     Get current BTC direction (uptrend/dwtrend) based on price vs MA50.
     
@@ -312,14 +312,17 @@ def get_current_direction(timeframe: str) -> str:
         timeframe: Timeframe to analyze
     
     Returns:
-        'uptrend' or 'dwtrend'
+        Tuple of (direction, btc_price, btc_ma50)
+        - direction: 'uptrend' or 'dwtrend'
+        - btc_price: Current BTC price or None
+        - btc_ma50: 50-period MA or None
     """
     try:
         df = fetch_btc_ohlcv(timeframe)
         
         if df is None or df.empty or len(df) < 50:
             logger.warning("Insufficient data for direction calculation, defaulting to uptrend")
-            return 'uptrend'
+            return 'uptrend', None, None
         
         # Get current price (last close)
         btc_price = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
@@ -338,8 +341,8 @@ def get_current_direction(timeframe: str) -> str:
             f"Price: ${btc_price:.2f} | MA50: ${btc_ma50:.2f}"
         )
         
-        return direction
+        return direction, btc_price, btc_ma50
         
     except Exception as e:
         logger.error(f"Error calculating direction: {e}")
-        return 'uptrend'  # Fallback
+        return 'uptrend', None, None  # Fallback

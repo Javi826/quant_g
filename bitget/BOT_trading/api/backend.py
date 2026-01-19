@@ -573,7 +573,8 @@ class DashboardServer:
                 if df is None:
                     return jsonify([])
                 
-                recent = df.tail(15).to_dict('records')
+                # ✅ SOLUCIÓN: Reemplazar NaN con None antes de serializar
+                recent = df.tail(15).replace({np.nan: None}).to_dict('records')
                 return jsonify(recent)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500

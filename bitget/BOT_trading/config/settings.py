@@ -78,33 +78,20 @@ REGIME_GENERAL = {
 # ==========================================================================
 DIRECTION_MA_REFERENCE = 'ma_50'
 
-# =============================================================================
-# DIRECTION_MATRIX = {
-#     'uptrend': {
-#         'uptrend': 1.0,
-#         'dwtrend': 0
-#     },
-#     'dwtrend': {
-#         'uptrend': 0,
-#         'dwtrend': 1.0
-#     }
-# }
-# =============================================================================
+DIRECTION_MATRIX = {
+    'long_only': {     
+        'uptrend': 1.0, 
+        'dwtrend': 0
+    },
+    'short_only': {     
+        'uptrend': 0,
+        'dwtrend': 1.0  
+    }
+}
 
 DIRECTION_GENERAL = {
     'uptrend': 1.0,
     'dwtrend': 1.0
-}
-
-DIRECTION_MATRIX = {
-    'long_only': {      # ← KEY cambiada (era 'uptrend')
-        'uptrend': 1.0, # ← VALUE sin cambiar (condición real)
-        'dwtrend': 0
-    },
-    'short_only': {     # ← KEY cambiada (era 'dwtrend')
-        'uptrend': 0,
-        'dwtrend': 1.0  # ← VALUE sin cambiar (condición real)
-    }
 }
 
 # ==========================================================================

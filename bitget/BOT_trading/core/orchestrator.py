@@ -22,7 +22,7 @@ if parent_dir not in sys.path:
 # Now do imports
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime.regime_classifier import get_current_regime, get_current_direction
+from market_regime import get_current_regime, get_current_direction, PositionSizer
 
 
 from validation import validate_strategy_configuration,validate_settings
@@ -127,6 +127,7 @@ class BotOrchestrator:
         #Marke regime
         self.regime_cache: Dict[str, str] = {}
         self.direction_cache: Dict[str, str] = {}
+        self.position_sizer: Optional[PositionSizer] = None
         
     # ======================================================================
     # PUBLIC API
@@ -303,6 +304,8 @@ class BotOrchestrator:
             self.logger.warning(f"CONFIGURATION WARNINGS:")
             for warn in all_warnings:
                 self.logger.warning(f"{warn}")
+                
+        self.position_sizer = PositionSizer(self.logger)
     
     def _load_market_symbols(self) -> None:
         """Load market symbols for each strategy."""
@@ -521,99 +524,49 @@ class BotOrchestrator:
                 )
     
     def _search_signals(self, strategies_to_process: List[Dict]) -> None:
-        """
-        Search for new trading signals.
-        
-        Args:
-            strategies_to_process: Strategies to check for signals
-        """
-        for strat in strategies_to_process:
-            strat_id = strat['id']
+            """
+            Search for new trading signals.
             
-            # Skip deprecated strategies
-            if not strat.get('active', True):
-                continue
-            
-            # Skip if already has positions
-            num_positions = len(self.open_positions.get(strat_id, []))
-            if num_positions > 0:
-                continue
-            
-            # ====================================================================
-            # STEP 1: Calculate REGIME multiplier
-            # ====================================================================
-            timeframe = strat['timeframe']
-            market_regime = self.regime_cache.get(timeframe, 'ranging')
-            strategy_family = strat.get('regime_family')
-            
-            if strategy_family == 'general':
-                regime_mult = REGIME_GENERAL[market_regime]
-                regime_source = 'general'
-            else:
-                regime_mult = REGIME_MATRIX[strategy_family][market_regime]
-                regime_source = 'strategy-specific'
-            
-            # ====================================================================
-            # STEP 2: Calculate DIRECTION multiplier
-            # ====================================================================
-            market_direction = self.direction_cache.get(timeframe, 'uptrend')
-            dir_mode = strat.get('dir_mode')
-            
-            if dir_mode == 'general':
-                direction_mult = DIRECTION_GENERAL[market_direction]
-                dir_source = 'general'
-            else:
-                direction_mult = DIRECTION_MATRIX[dir_mode][market_direction]
-                dir_source = 'strategy-specific'
-            
-            # ====================================================================
-            # STEP 3: MULTIPLY both multipliers (coherente con lógica actual)
-            # ====================================================================
-            final_mult = regime_mult * direction_mult
-            
-            # Skip if final = 0
-            if final_mult == 0:
-                self.logger.info(
-                    f"[SIZING] Skip {strat_id}: "
-                    f"regime={market_regime}({regime_mult}x), "
-                    f"dir={market_direction}({direction_mult}x), "
-                    f"final=0x → BLOCKED"
-                )
-                continue
-            
-            # Calculate adjusted amount
-            base_order_amount = strat['order_amount']
-            adjusted_order_amount = base_order_amount * final_mult
-            
-            self.logger.info(
-                f"[SIZING] {strat_id}: "
-                f"Market=[{market_regime}, {market_direction}] | "
-                f"Base=${base_order_amount:.0f} × "
-                f"regime({regime_mult:.1f}) × "
-                f"dir({direction_mult:.1f}) = "
-                f"${adjusted_order_amount:.0f}"
-            )
-                     
-            # Process strategy with retry logic
-            try:
-                self.strategy_processor.process(
-                    strat=strat,
-                    final_symbols=self.final_by_strat.get(strat['id'], []),
-                    exchange=self.exchange,
-                    open_positions=self.open_positions,
-                    strategy_candles=self.strategy_candles,
-                    adjusted_order_amount=adjusted_order_amount,
-                    regime_family=market_regime,
-                    regime_multiplier=regime_mult,
-                    direction=market_direction,
-                    direction_multiplier=direction_mult
-                )
-            except Exception as e:
-                self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
+            Args:
+                strategies_to_process: Strategies to check for signals
+            """
+            for strat in strategies_to_process:
+                strat_id = strat['id']
                 
-                # Retry once
-                self.logger.info(f"Retrying {strat_id} after 3 seconds...")
-                time.sleep(3)
+                # Skip deprecated strategies
+                if not strat.get('active', True):
+                    continue
+                
+                # Skip if already has positions
+                num_positions = len(self.open_positions.get(strat_id, []))
+                if num_positions > 0:
+                    continue
+                
+                # Get market state from cache
+                timeframe = strat['timeframe']
+                market_regime = self.regime_cache.get(timeframe, 'ranging')
+                market_direction = self.direction_cache.get(timeframe, 'uptrend')
+                
+                # Calculate adjusted amount using PositionSizer
+                adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
+                    base_amount=strat['order_amount'],
+                    strategy_family=strat.get('regime_family'),
+                    dir_mode=strat.get('dir_mode'),
+                    market_regime=market_regime,
+                    market_direction=market_direction
+                )
+                
+                # Check if blocked
+                if metadata['blocked']:
+                    log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                    self.logger.info(log_msg)
+                    continue
+                
+                # Log sizing decision
+                log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                self.logger.info(log_msg)
+                
+                # Process strategy with retry logic
                 try:
                     self.strategy_processor.process(
                         strat=strat,
@@ -621,15 +574,34 @@ class BotOrchestrator:
                         exchange=self.exchange,
                         open_positions=self.open_positions,
                         strategy_candles=self.strategy_candles,
-                        adjusted_order_amount=adjusted_order_amount,
-                        regime_family=market_regime,
-                        regime_multiplier=regime_mult,
-                        direction=market_direction,
-                        direction_multiplier=direction_mult
+                        adjusted_order_amount=adjusted_amount,
+                        regime_family=metadata['market_regime'],
+                        regime_multiplier=metadata['regime_multiplier'],
+                        direction=metadata['market_direction'],
+                        direction_multiplier=metadata['direction_multiplier']
                     )
-                    self.logger.info(f"Retry successful for {strat_id}")
-                except Exception as e2:
-                    self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
+                except Exception as e:
+                    self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
+                    
+                    # Retry once
+                    self.logger.info(f"Retrying {strat_id} after 3 seconds...")
+                    time.sleep(3)
+                    try:
+                        self.strategy_processor.process(
+                            strat=strat,
+                            final_symbols=self.final_by_strat.get(strat['id'], []),
+                            exchange=self.exchange,
+                            open_positions=self.open_positions,
+                            strategy_candles=self.strategy_candles,
+                            adjusted_order_amount=adjusted_amount,
+                            regime_family=metadata['market_regime'],
+                            regime_multiplier=metadata['regime_multiplier'],
+                            direction=metadata['market_direction'],
+                            direction_multiplier=metadata['direction_multiplier']
+                        )
+                        self.logger.info(f"Retry successful for {strat_id}")
+                    except Exception as e2:
+                        self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
     
     def _periodic_tpsl_check(self, current_time: float) -> None:
         """
@@ -673,36 +645,41 @@ class BotOrchestrator:
     # ----------------------------------------------------------------------------
     
     def _update_regime_for_timeframes(self, closed_timeframes: List[str]) -> None:
-        """
-        Update regime AND direction for timeframes that just closed.
-        
-        Args:
-            closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
-        """
-        self.logger.info(f"[REGIME] Updating regime & direction for: {closed_timeframes}")
-        
-        for tf in closed_timeframes:
-            try:
-                # 1. Calculate REGIME
-                family, metrics = get_current_regime(tf)
-                if family == 'default':
-                    family = 'ranging'
-                self.regime_cache[tf] = family
-                
-                # 2. Calculate DIRECTION
-                direction = get_current_direction(tf)
-                self.direction_cache[tf] = direction
-                
-                self.logger.info(
-                    f"[REGIME] {tf}: REGIME={family.upper()}, DIRECTION={direction.upper()} "
-                    f"(hurst={metrics.get('hurst', 0):.2f}, "
-                    f"er={metrics.get('efficiency_ratio', 0):.2f})"
-                )
-                
-            except Exception as e:
-                self.logger.error(f"[REGIME] Error for {tf}: {e}")
-                self.regime_cache[tf] = 'ranging'
-                self.direction_cache[tf] = 'uptrend'
+            """
+            Update regime AND direction for timeframes that just closed.
+            
+            Args:
+                closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
+            """
+            self.logger.info(f"[REGIME] Updating regime & direction for: {closed_timeframes}")
+            
+            for tf in closed_timeframes:
+                try:
+                    # 1. Calculate REGIME
+                    family, metrics = get_current_regime(tf)
+                    if family == 'default':
+                        family = 'ranging'
+                    self.regime_cache[tf] = family
+                    
+                    # 2. Calculate DIRECTION (now returns price and MA50)
+                    direction, btc_price, btc_ma50 = get_current_direction(tf)
+                    self.direction_cache[tf] = direction
+                    
+                    # Format price/MA50 strings for logging
+                    price_str = f"${btc_price:.2f}" if btc_price else "N/A"
+                    ma50_str = f"${btc_ma50:.2f}" if btc_ma50 else "N/A"
+                    
+                    self.logger.info(
+                        f"[REGIME] {tf}: REGIME={family.upper()}, DIRECTION={direction.upper()} "
+                        f"(BTC={price_str}, MA50={ma50_str}, "
+                        f"hurst={metrics.get('hurst', 0):.2f}, "
+                        f"er={metrics.get('efficiency_ratio', 0):.2f})"
+                    )
+                    
+                except Exception as e:
+                    self.logger.error(f"[REGIME] Error for {tf}: {e}")
+                    self.regime_cache[tf] = 'ranging'
+                    self.direction_cache[tf] = 'uptrend'
     
     def _send_request_wrapper(
         self,
