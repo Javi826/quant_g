@@ -82,8 +82,10 @@ class StrategyProcessor:
         open_positions: Dict,
         strategy_candles: Dict,
         adjusted_order_amount: Optional[float] = None,
-        regime_family: str = 'unknown',           # ← AÑADIR
-        regime_multiplier: float = 1.0  
+        regime_family: str = 'unknown',
+        regime_multiplier: float = 1.0,
+        direction: str = 'unknown',                    # ← NUEVO
+        direction_multiplier: float = 1.0              # ← NUEVO
     ) -> None:
         """
         Process a strategy: detect signals and place orders if needed.
@@ -220,7 +222,9 @@ class StrategyProcessor:
                     hour_zone=self.hour_zone,
                     usdt_amount=order_amount,
                     regime_family=regime_family,        # ← AÑADIR
-                    regime_multiplier=regime_multiplier  # ← AÑADIR# ← USING ADJUSTED AMOUNT
+                    regime_multiplier=regime_multiplier ,
+                    direction_mode=direction,                      # ← NUEVO
+                    direction_multiplier=direction_multiplier# ← AÑADIR# ← USING ADJUSTED AMOUNT
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:

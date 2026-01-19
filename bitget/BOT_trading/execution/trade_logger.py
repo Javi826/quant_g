@@ -50,7 +50,9 @@ def log_closed_position(opened_at,
                        fee_from_api: Optional[Decimal] = None,
                        bot_state=None,
                        regime_family: Optional[str] = None,
-                       regime_multiplier: Optional[float] = None) -> None:
+                       regime_multiplier: Optional[float] = None,
+                       direction_mode: Optional[str] = None,             
+                       direction_multiplier: Optional[float] = None) -> None:  
     """
     Log a closed position to Excel file.
     
@@ -162,7 +164,9 @@ def log_closed_position(opened_at,
             'PROFIT_PCT': round(profit_pct, 1),
             'REASON_OUT': reason,
             'REGIME_FAMILY': regime_family if regime_family else 'unknown',
-            'REGIME_MULTIPLIER': round(regime_multiplier, 1) if regime_multiplier is not None else 1.0
+            'REGIME_MULTIPLIER': round(regime_multiplier, 1) if regime_multiplier is not None else 1.0,
+            'DIRECTION_MODE': direction_mode if direction_mode else 'unknown',               # ← NUEVO
+            'DIRECTION_MULTIPLIER': round(direction_multiplier, 1) if direction_multiplier is not None else 1.0  # ← NUEVO
         }
 
         # Append to Excel

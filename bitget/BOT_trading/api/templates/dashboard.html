@@ -474,42 +474,90 @@
                         <button class="view-btn" onclick="setRegimeTimeframe('6Hutc')">6Hutc</button>
                     </div>
                 </h2>
-                <!-- Regime Family Cards (MODIFIED - NO MULTIPLIERS) -->
+                
+                <!-- ✅ PRIMERA FILA: BTC TREND CARDS (ALTURA IGUAL, PRECIOS HORIZONTALES) -->
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
-                    <!-- VOLATILE Card -->
-                    <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                        <div style="font-size: 39px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
-                            <div id="regime-card-volatile-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                    <!-- Card LEFT: DOWNTREND -->
+                    <div id="btc-card-short" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                            DOWNTREND
+                        </div>
+                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
+                            <div style="font-size: 14px; color: #6b7280; line-height: 1.4;">
+                                BTC below MA50
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Card CENTER: BTC INFO (PRECIOS EN HORIZONTAL) -->
+                    <div id="btc-card-info" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">BTC TREND</div>
+                        <!-- PRECIOS EN HORIZONTAL -->
+                        <div style="display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #21262d; padding-top: 12px; margin-top: 8px; gap: 20px;">
+                            <!-- Price -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Price</div>
+                                <div id="btc-trend-price" style="font-size: 28px; color: #c9d1d9; font-weight: 700;">$-</div>
+                            </div>
+                            <!-- MA50 -->
+                            <div style="flex: 1;">
+                                <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">MA50</div>
+                                <div id="btc-trend-ma50" style="font-size: 28px; color: #c9d1d9; font-weight: 700;">$-</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Card RIGHT: UPTREND -->
+                    <div id="btc-card-long" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #3fb950; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                            UPTREND
+                        </div>
+                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
+                            <div style="font-size: 14px; color: #6b7280; line-height: 1.4;">
+                                BTC above MA50
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ✅ SEGUNDA FILA: REGIME CARDS (COLORES ACTUALIZADOS) -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+                    <!-- VOLATILE Card - ROJO -->
+                    <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
+                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
+                            <div id="regime-card-volatile-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
                             </div>
-                            <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
                                 High volatility + unpredictable
                             </div>
                         </div>
                     </div>
                     
-                    <!-- RANGING Card -->
-                    <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                        <div style="font-size: 39px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">RANGING</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
-                            <div id="regime-card-ranging-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                    <!-- RANGING Card - GRIS CLARO -->
+                    <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #9ca3af; margin-bottom: 8px;">RANGING</div>
+                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
+                            <div id="regime-card-ranging-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
                             </div>
-                            <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
                                 Lateral without clear trend
                             </div>
                         </div>
                     </div>
                     
-                    <!-- TRENDING Card -->
-                    <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 24px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease;">
-                        <div style="font-size: 39px; font-weight: 700; color: #3fb950; margin-bottom: 8px;">TRENDING</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 12px; margin-top: 12px;">
-                            <div id="regime-card-trending-rules" style="font-size: 16px; color: #8b949e; margin-bottom: 8px; font-family: monospace; font-weight: 500;">
+                    <!-- TRENDING Card - AZUL -->
+                    <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div style="font-size: 32px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">TRENDING</div>
+                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
+                            <div id="regime-card-trending-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
                                 Loading rules...
                             </div>
-                            <div style="font-size: 18px; color: #6b7280; line-height: 1.6;">
+                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
                                 Strong directional movement
                             </div>
                         </div>
@@ -593,7 +641,7 @@
             <div class="content-section">
                 <h2>Bot Configuration & Status</h2>
                 
-                <!-- 1. STRATEGIES LIST (unchanged) -->
+                <!-- 1. STRATEGIES LIST (✅ MODIFICADO: Añadida columna Dir Mode) -->
                 <div class="config-card">
                     <h3>Strategies List</h3>
                     <div style="overflow-x: auto;">
@@ -610,17 +658,18 @@
                                     <th>Amount</th>
                                     <th>Candles</th>
                                     <th>Params</th>
+                                    <th>Dir Mode</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="strategies-body">
-                                <tr><td colspan="15" style="text-align: center;">Loading...</td></tr>
+                                <tr><td colspan="12" style="text-align: center;">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
                 
-                <!-- 2. MARKET REGIME STRATEGY MATRIX (NEW) -->
+                <!-- 2. MARKET REGIME STRATEGY MATRIX (✅ MODIFICADO: Añadida columna Dir Mode) -->
                 <div class="config-card">
                     <h3>Market Regime Strategy Matrix</h3>
                     <div style="overflow-x: auto;">
@@ -633,10 +682,11 @@
                                     <th>Trending</th>
                                     <th>Ranging</th>
                                     <th>Volatile</th>
+                                    <th>Dir Mode</th>
                                 </tr>
                             </thead>
                             <tbody id="regime-strategy-matrix-body">
-                                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                                <tr><td colspan="7" style="text-align: center;">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -646,7 +696,7 @@
                 <div class="config-card">
                     <h3>Regime Family Matrix</h3>
                     <div style="overflow-x: auto;">
-                        <table id="regime-global-matrix">
+                        <table id="regime-general-matrix">
                             <thead>
                                 <tr>
                                     <th>Family</th>
@@ -655,7 +705,7 @@
                                     <th>Volatile</th>
                                 </tr>
                             </thead>
-                            <tbody id="regime-global-matrix-body">
+                            <tbody id="regime-general-matrix-body">
                                 <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
                             </tbody>
                         </table>

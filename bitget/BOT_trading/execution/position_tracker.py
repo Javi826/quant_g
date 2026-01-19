@@ -107,7 +107,9 @@ def add_position(strat_id: str,
                 hour_zone, 
                 usdt_amount: float = 0,
                 regime_family: Optional[str] = None,
-                regime_multiplier: Optional[float] = None) -> None:
+                regime_multiplier: Optional[float] = None,
+                direction_mode: Optional[str] = None,              # ← NUEVO
+                direction_multiplier: Optional[float] = None) -> None:  # ← NUEVO
     """
     Add a new position to tracking system.
     
@@ -151,7 +153,9 @@ def add_position(strat_id: str,
         'opened_at': datetime.now(hour_zone),
         'usdt_amount': usdt_amount,
         'regime_family': regime_family if regime_family else 'unknown',
-        'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0
+        'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0,
+        'direction_mode': direction_mode if direction_mode else 'unknown',               # ← NUEVO
+        'direction_multiplier': direction_multiplier if direction_multiplier is not None else 1.0  # ← NUEVO
     }
     
     open_positions[strat_id].append(position)
@@ -235,7 +239,9 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'usdt_amount': pos.get('usdt_amount', 0),
                 'entry_price': pos['entry_price'],
                 'regime_family': pos.get('regime_family', 'unknown'),
-                'regime_multiplier': pos.get('regime_multiplier', 1.0)
+                'regime_multiplier': pos.get('regime_multiplier', 1.0),
+                'direction_mode': pos.get('direction_mode', 'unknown'),              # ← NUEVO
+                'direction_multiplier': pos.get('direction_multiplier', 1.0)
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 
                             reason="TP", position_data=position_data, bot_state=bot_state):
@@ -248,7 +254,9 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'usdt_amount': pos.get('usdt_amount', 0),
                 'entry_price': pos['entry_price'],
                 'regime_family': pos.get('regime_family', 'unknown'),
-                'regime_multiplier': pos.get('regime_multiplier', 1.0)
+                'regime_multiplier': pos.get('regime_multiplier', 1.0),
+                'direction_mode': pos.get('direction_mode', 'unknown'),              # ← NUEVO
+                'direction_multiplier': pos.get('direction_multiplier', 1.0)  
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 
                             reason="SL", position_data=position_data, bot_state=bot_state):

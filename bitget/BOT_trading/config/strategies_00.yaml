@@ -21,7 +21,8 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
-    regime_family: 'global'
+    regime_family: 'ranging'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 2
@@ -39,6 +40,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 4
@@ -56,6 +58,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -73,6 +76,7 @@ strategies:
     active: true
     direction: 'short'
     regime_family: 'trending'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 4
@@ -89,7 +93,8 @@ strategies:
     timeframe: '4H'
     active: false
     direction: 'short'
-    regime_family: 'global'
+    regime_family: 'general'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 40
     lookback: 100
@@ -107,6 +112,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 7
@@ -125,6 +131,7 @@ strategies:
     active: true
     direction: 'short'
     regime_family: 'trending'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 5
@@ -142,6 +149,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 3
@@ -159,6 +167,7 @@ strategies:
     active: true
     direction: 'short'
     regime_family: 'trending'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 6
@@ -177,6 +186,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -194,6 +204,7 @@ strategies:
     active: true
     direction: 'short'
     regime_family: 'trending'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 150
@@ -212,6 +223,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'trending'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -228,7 +240,8 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'short'
-    regime_family: 'global'
+    regime_family: 'general'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -245,7 +258,8 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
-    regime_family: 'global'
+    regime_family: 'general'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 50
@@ -263,6 +277,7 @@ strategies:
     active: true
     direction: 'long'
     regime_family: 'ranging'
+    dir_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 10
@@ -281,6 +296,7 @@ strategies:
     active: true
     direction: 'short'
     regime_family: 'ranging'
+    dir_mode: 'short_only'
     sell_after_ncandles: 50
     order_amount: 80
     lookback: 10

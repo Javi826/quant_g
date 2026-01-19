@@ -1,10 +1,9 @@
-# config/utils.py
 """
 Configuration utility functions
 """
 import os
-from typing import Dict, List
-from .settings import ACCOUNTS, ACCOUNT_STRATEGIES, PERSISTENCE_DIR
+from typing import Dict
+from .settings import ACCOUNTS, PERSISTENCE_DIR
 
 
 def get_account_paths(account_number: str) -> dict:
@@ -39,13 +38,49 @@ def get_account_config(account_number: str) -> Dict:
     return config
 
 
-def get_account_strategies(account_number: str) -> List[str]:
-    """Get list of strategy IDs assigned to an account."""
-    if account_number not in ACCOUNT_STRATEGIES:
-        available = ', '.join(ACCOUNT_STRATEGIES.keys())
+def get_strategies_yaml_path(account_number: str) -> str:
+    """
+    Get path to strategies YAML file for specific account.
+    
+    Each account has its own YAML file with pre-configured strategies
+    and order amounts already adjusted for that account.
+    
+    Args:
+        account_number: Account identifier ('00', 'E1', '01')
+    
+    Returns:
+        Full path to strategies_XX.yaml file
+    
+    Raises:
+        ValueError: If account number is invalid
+        FileNotFoundError: If YAML file doesn't exist
+    
+    Example:
+        >>> get_strategies_yaml_path('00')
+        '/path/to/config/strategies_00.yaml'
+        
+        >>> get_strategies_yaml_path('E1')
+        '/path/to/config/strategies_E1.yaml'
+    """
+    if account_number not in ACCOUNTS:
+        available = ', '.join(ACCOUNTS.keys())
         raise ValueError(
             f"Invalid account number: {account_number}. "
             f"Available: {available}"
         )
     
-    return ACCOUNT_STRATEGIES[account_number]
+    # Get config directory (same directory as this file)
+    config_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Build path to account-specific YAML
+    yaml_filename = f"strategies_{account_number}.yaml"
+    yaml_path = os.path.join(config_dir, yaml_filename)
+    
+    # Verify file exists
+    if not os.path.exists(yaml_path):
+        raise FileNotFoundError(
+            f"Strategies YAML not found for account {account_number}: {yaml_path}\n"
+            f"Expected file: {yaml_filename}"
+        )
+    
+    return yaml_path

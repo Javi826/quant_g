@@ -255,10 +255,10 @@ function sortPositionsBy(type) {
 
 function getFamilyColor(family) {
     const colors = {
-        'trending': '#3fb950',
-        'ranging': '#58a6ff',
-        'volatile': '#f85149',
-        'Global': '#8b949e'
+        'trending': '#58a6ff',      // AZUL (cambiado de verde)
+        'ranging': '#9ca3af',        // GRIS CLARO (cambiado de gris oscuro)
+        'volatile': '#f85149',       // ROJO (sin cambios)
+        'general': '#4b5563'
     };
     return colors[family] || '#8b949e';
 }
@@ -276,7 +276,7 @@ async function loadRegimeSizing() {
     }
 }
 
-async function loadRegimeGlobalMatrix() {
+async function loadRegimeGeneralMatrix() {
     try {
         const res = await fetch('/api/regime/matrix');
         const data = await res.json();
@@ -286,10 +286,9 @@ async function loadRegimeGlobalMatrix() {
             return;
         }
         
-        // Store in window for global access
         window.REGIME_MATRIX = data.matrix;
         
-        const tbody = document.getElementById('regime-global-matrix-body');
+        const tbody = document.getElementById('regime-general-matrix-body');
         if (!tbody) return;
         
         const families = ['trending', 'ranging', 'volatile'];
@@ -310,68 +309,8 @@ async function loadRegimeGlobalMatrix() {
         tbody.innerHTML = html;
         
     } catch (error) {
-        console.error('Error loading global regime matrix:', error);
+        console.error('Error loading general regime matrix:', error);
     }
-}
-
-function renderRegimeStrategyMatrix(strategies) {
-    const tbody = document.getElementById('regime-strategy-matrix-body');
-    if (!tbody) return;
-    
-    // Sort strategies by ID
-    const sorted = strategies.sort((a, b) => a.id.localeCompare(b.id));
-    
-    let html = '';
-    sorted.forEach((strat, index) => {
-        const num = String(index + 1).padStart(2, '0');
-        
-        // Distinguish between null, 'global', and actual regime families
-        let family, familyColor;
-        if (strat.regime_family === null || strat.regime_family === undefined) {
-            family = 'NOT IMPLE.';
-            familyColor = '#8b949e'; // Gray color
-        } else if (strat.regime_family.toLowerCase() === 'global') {
-            family = 'GLOBAL';
-            familyColor = '#c9d1d9'; // White/light color
-        } else {
-            family = strat.regime_family.toUpperCase();
-            familyColor = getFamilyColor(strat.regime_family);
-        }
-        
-        // Get multipliers based on family
-        let mults;
-        if (strat.regime_family && strat.regime_family !== null && strat.regime_family.toLowerCase() !== 'global' && window.REGIME_MATRIX && window.REGIME_MATRIX[strat.regime_family]) {
-            // Custom: read from REGIME_FAMILY_MATRIX
-            mults = {
-                trending: window.REGIME_MATRIX[strat.regime_family].trending,
-                ranging: window.REGIME_MATRIX[strat.regime_family].ranging,
-                volatile: window.REGIME_MATRIX[strat.regime_family].volatile
-            };
-        } else {
-            // Global or Not imple.: read from REGIME_FAMILY_SIZING
-            if (window.REGIME_SIZING) {
-                mults = {
-                    trending: window.REGIME_SIZING.trending,
-                    ranging: window.REGIME_SIZING.ranging,
-                    volatile: window.REGIME_SIZING.volatile
-                };
-            } else {
-                // Fallback if sizing not loaded yet
-                mults = { trending: '-', ranging: '-', volatile: '-' };
-            }
-        }
-        
-        html += `<tr>
-            <td style="color: #8b949e; font-weight: 600;">${num}</td>
-            <td>${strat.id}</td>
-            <td style="color: ${familyColor}; font-weight: 600;">${family}</td>
-            <td style="color: #c9d1d9;">${mults.trending}x</td>
-            <td style="color: #c9d1d9;">${mults.ranging}x</td>
-            <td style="color: #c9d1d9;">${mults.volatile}x</td>
-        </tr>`;
-    });
-    
-    tbody.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -386,9 +325,9 @@ let currentRegimeTimeframe = '4H';
 
 function getRegimeBadgeStyle(family) {
     const styles = {
-        'trending': { bg: '#3fb950', color: '#ffffff', text: 'TRENDING' },
-        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },
-        'ranging': { bg: '#58a6ff', color: '#ffffff', text: 'RANGING' },
+        'trending': { bg: '#58a6ff', color: '#ffffff', text: 'TRENDING' },      // AZUL
+        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },      // ROJO
+        'ranging': { bg: '#9ca3af', color: '#ffffff', text: 'RANGING' },        // GRIS CLARO
         'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' }
     };
     return styles[family] || styles['default'];
@@ -459,7 +398,79 @@ function updateRegimeUI(data) {
     }
     const allThresholds = data.all_thresholds || {};
     
-    // Get badge style
+    // ✅ NUEVO: Renderizar las 3 cards de BTC trend
+    const btcPrice = data.btc_price;
+    const btcMa50 = data.btc_ma50;
+    const btcTrend = data.btc_trend;
+    
+    // Update BTC trend cards
+    const btcCardShort = document.getElementById('btc-card-short');
+    const btcCardInfo = document.getElementById('btc-card-info');
+    const btcCardLong = document.getElementById('btc-card-long');
+    
+    if (btcCardInfo) {
+        // Update center card with BTC info
+        const priceEl = document.getElementById('btc-trend-price');
+        const ma50El = document.getElementById('btc-trend-ma50');
+        const statusEl = document.getElementById('btc-trend-status');
+        
+        if (priceEl && btcPrice !== undefined && btcPrice !== null) {
+            priceEl.textContent = '$' + btcPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        
+        if (ma50El && btcMa50 !== undefined && btcMa50 !== null) {
+            ma50El.textContent = '$' + btcMa50.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        
+        if (statusEl && btcTrend) {
+            if (btcTrend === 'uptrend') {
+                statusEl.textContent = '⬆️ UPTREND';
+                statusEl.style.color = '#3fb950'; // Verde
+            } else if (btcTrend === 'downtrend') {
+                statusEl.textContent = '⬇️ DOWNTREND';
+                statusEl.style.color = '#f85149'; // Rojo
+            } else {
+                statusEl.textContent = '-';
+                statusEl.style.color = '#c9d1d9';
+            }
+        }
+    }
+    
+    // Highlight active card based on btcTrend
+    if (btcCardShort && btcCardLong && btcTrend) {
+        if (btcTrend === 'downtrend') {
+            // SHORT card activa
+            btcCardShort.style.border = '2px solid #f85149';
+            btcCardShort.style.background = 'rgba(248, 81, 73, 0.15)';
+            btcCardShort.style.opacity = '1';
+            
+            // LONG card inactiva
+            btcCardLong.style.border = '2px solid #21262d';
+            btcCardLong.style.background = '#1c2128';
+            btcCardLong.style.opacity = '0.5';
+        } else if (btcTrend === 'uptrend') {
+            // LONG card activa
+            btcCardLong.style.border = '2px solid #3fb950';
+            btcCardLong.style.background = 'rgba(63, 185, 80, 0.15)';
+            btcCardLong.style.opacity = '1';
+            
+            // SHORT card inactiva
+            btcCardShort.style.border = '2px solid #21262d';
+            btcCardShort.style.background = '#1c2128';
+            btcCardShort.style.opacity = '0.5';
+        } else {
+            // Ambas inactivas
+            btcCardShort.style.border = '2px solid #21262d';
+            btcCardShort.style.background = '#1c2128';
+            btcCardShort.style.opacity = '0.5';
+            
+            btcCardLong.style.border = '2px solid #21262d';
+            btcCardLong.style.background = '#1c2128';
+            btcCardLong.style.opacity = '0.5';
+        }
+    }
+    
+        // Get badge style
     const badgeStyle = getRegimeBadgeStyle(family);
     
     // Update header stat card
@@ -471,7 +482,22 @@ function updateRegimeUI(data) {
     
     const regimeTimeframeEl = document.getElementById('regime-timeframe');
     if (regimeTimeframeEl) {
-        regimeTimeframeEl.textContent = timeframe + ' | ' + multiplier.toFixed(1) + 'x sizing';
+        // Determinar símbolo y texto de dirección
+        let dirSymbol = '';
+        let dirText = '';
+        
+        if (btcTrend === 'uptrend') {
+            dirSymbol = '↑';
+            dirText = 'UP';
+        } else if (btcTrend === 'downtrend' || btcTrend === 'dwtrend') {
+            dirSymbol = '↓';
+            dirText = 'DW';
+        } else {
+            dirSymbol = '•';
+            dirText = '--';
+        }
+        
+        regimeTimeframeEl.textContent = timeframe + ' | ' + dirSymbol + dirText;
     }
     
     // Helper function to format rules
@@ -501,14 +527,14 @@ function updateRegimeUI(data) {
     // Update family cards with rules and active state (NO MULTIPLIERS)
     const families = ['volatile', 'ranging', 'trending'];
     const familyColors = {
-        'volatile': '#f85149',
-        'ranging': '#58a6ff',
-        'trending': '#3fb950'
+        'volatile': '#f85149',       // ROJO
+        'ranging': '#9ca3af',         // GRIS CLARO
+        'trending': '#58a6ff'         // AZUL
     };
     const familyBgColors = {
         'volatile': 'rgba(248, 81, 73, 0.15)',
-        'ranging': 'rgba(88, 166, 255, 0.15)',
-        'trending': 'rgba(63, 185, 80, 0.15)'
+        'ranging': 'rgba(156, 163, 175, 0.15)',
+        'trending': 'rgba(88, 166, 255, 0.15)'
     };
     
     families.forEach(f => {
@@ -1174,6 +1200,72 @@ async function loadStrategyAnalysis() {
     }
 }
 
+// =============================================================================
+// REGIME STRATEGY MATRIX
+// =============================================================================
+
+async function renderRegimeStrategyMatrix(strategies) {
+    try {
+        const res = await fetch('/api/regime/strategies');
+        const data = await res.json();
+        
+        if (!data.success) {
+            console.error('Failed to load regime strategies:', data.error);
+            return;
+        }
+        
+        const tbody = document.getElementById('regime-strategy-matrix-body');
+        if (!tbody) return;
+        
+        const strategiesData = data.strategies || [];
+        
+        if (strategiesData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No strategies</td></tr>';
+            return;
+        }
+        
+        // Sort by ID
+        const sorted = strategiesData.sort((a, b) => a.id.localeCompare(b.id));
+        
+        let html = '';
+        sorted.forEach((strat, idx) => {
+            const num = String(idx + 1).padStart(2, '0');
+            
+            // Color coding for regime_family
+            let familyColor = getFamilyColor(strat.regime_family);
+            
+            // Color coding for dir_mode
+            let dirColor;
+            if (strat.dir_mode === 'long_only') {
+                dirColor = '#3fb950';  // Verde
+            } else if (strat.dir_mode === 'short_only') {
+                dirColor = '#f85149';  // Rojo
+            } else {
+                dirColor = '#8b949e';  // Gris para general
+            }
+            
+            html += `<tr>
+                <td style="color: #8b949e; font-weight: 600;">${num}</td>
+                <td>${strat.id}</td>
+                <td style="color: ${familyColor}; font-weight: 600; text-transform: uppercase;">${strat.regime_family}</td>
+                <td>${strat.regime_trending !== '-' ? strat.regime_trending + 'x' : '-'}</td>
+                <td>${strat.regime_ranging !== '-' ? strat.regime_ranging + 'x' : '-'}</td>
+                <td>${strat.regime_volatile !== '-' ? strat.regime_volatile + 'x' : '-'}</td>
+                <td style="color: ${dirColor}; font-weight: 600; text-transform: uppercase;">${strat.dir_mode}</td>
+            </tr>`;
+        });
+        
+        tbody.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error rendering regime strategy matrix:', error);
+    }
+}
+
+// =============================================================================
+// END REGIME STRATEGY MATRIX
+// =============================================================================
+
 async function loadBotConfig() {
     try {
         const res = await fetch('/api/bot-config');
@@ -1216,7 +1308,8 @@ async function loadBotConfig() {
         } else {
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
             
-            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count', 'regime_family'];
+            // ✅ MODIFICACIÓN: Añadido 'dir_mode' a fixedKeys
+            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count', 'regime_family', 'dir_mode'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
             const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
             
@@ -1238,6 +1331,7 @@ async function loadBotConfig() {
                 dynamicHeaders += '<th>' + displayName + '</th>';
             });
             
+            // ✅ MODIFICACIÓN: Añadida columna Dir Mode
             document.querySelector('#strategies-table thead tr').innerHTML = 
                 '<th>#</th>' +
                 '<th>ID</th>' +
@@ -1284,13 +1378,26 @@ async function loadBotConfig() {
                     extraCols += '<td>' + display + '</td>';
                 });
                 
+                // ✅ MODIFICACIÓN: Añadida columna Dir Mode con color
+                let dirMode = strat.dir_mode || 'general';
+                let dirModeColor;
+                if (dirMode === 'long') {
+                    dirModeColor = '#3fb950'; // Verde
+                } else if (dirMode === 'short') {
+                    dirModeColor = '#f85149'; // Rojo
+                } else {
+                    dirModeColor = '#8b949e'; // Gris para 'general'
+                }
+                
+                const dirModeCol = '<td style="color: ' + dirModeColor + '; font-weight: 600; text-transform: uppercase;">' + dirMode + '</td>';
+                
                 return '<tr>' + fixedCols + commonCols + extraCols + '<td>' + statusBadge + '</td></tr>';
             }).join('');
         }
         
         // MODIFIED: Call new regime matrix functions
         await loadRegimeSizing();
-        await loadRegimeGlobalMatrix();
+        await loadRegimeGeneralMatrix();
         renderRegimeStrategyMatrix(data.strategies);
         
     } catch (error) {
@@ -1943,11 +2050,11 @@ async function loadRegimeAnalytics() {
             return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
         });
         
-        // Colors for each regime
+        // Colors for each regime - UPDATED
         const regimeColors = {
-            'trending': { bar: '#3fb950', text: '#3fb950', bg: 'rgba(63, 185, 80, 0.1)' },
-            'ranging': { bar: '#58a6ff', text: '#58a6ff', bg: 'rgba(88, 166, 255, 0.1)' },
-            'volatile': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },
+            'trending': { bar: '#58a6ff', text: '#58a6ff', bg: 'rgba(88, 166, 255, 0.1)' },        // AZUL
+            'ranging': { bar: '#9ca3af', text: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)' },        // GRIS CLARO
+            'volatile': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },        // ROJO
             'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
         };
         

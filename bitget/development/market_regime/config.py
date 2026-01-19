@@ -39,42 +39,40 @@ PE_ORDER     = 3
 #     'ranging': {},  # Default: everything else
 # }
 # =============================================================================
-# =============================================================================
-# FAMILIES = {
-#     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-#     'volatile': {'atr_pct': ('>', 1.5), 'permutation_entropy': ('>', 0.1)},
-#     'ranging': {}
-# }
-# =============================================================================
+
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 1.5), 'permutation_entropy': ('>', 0.1)},
+    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
     'ranging': {}
 }
 # =============================================================================
 # POSITION SIZING MULTIPLIERS
 # =============================================================================
 FAMILY_SIZING = {
-    'trending': 1.8,
-    'volatile': 0,
+    'trending': 1.0,
+    'volatile': 1.0,
     'ranging': 1.0,
 }
 
 # =============================================================================
-# DIRECTION SIZING MULTIPLIERS (based on BTC MA50 vs MA200)
+# DIRECTION SIZING MULTIPLIERS (based on BTC price vs MA)
 # =============================================================================
 # Applied based on BTC trend and trade direction:
-#   - uptrend: MA50 > MA200
-#   - downtrend: MA50 <= MA200
+#   - uptrend: price > selected MA
+#   - downtrend: price <= selected MA
 # Set all to 1.0 to disable direction filtering (backward compatible)
+
+# Choose which MA to use for trend detection: 'ma_20', 'ma_50', or 'ma_200'
+DIRECTION_MA_REFERENCE = 'ma_50'  # Options: 'ma_20', 'ma_50', 'ma_200'
+
 DIRECTION_SIZING = {
     'long': {
-        'uptrend': 1.2,      # Multiplier for long trades when MA50 > MA200
-        'downtrend': 0     # Multiplier for long trades when MA50 <= MA200
+        'uptrend': 1.0,      # Multiplier for long trades when price > MA
+        'downtrend': 0     # Multiplier for long trades when price <= MA
     },
     'short': {
-        'uptrend': 0,      # Multiplier for short trades when MA50 > MA200
-        'downtrend': 1.2     # Multiplier for short trades when MA50 <= MA200
+        'uptrend': 0,      # Multiplier for short trades when price > MA
+        'downtrend': 1.0     # Multiplier for short trades when price <= MA
     }
 }
 
@@ -82,3 +80,13 @@ DIRECTION_SIZING = {
 # CAPITAL
 # =============================================================================
 INITIAL_CAPITAL = 800
+
+# =============================================================================
+# DATE RANGE FILTER (optional)
+# =============================================================================
+# Filter trades by date range for split testing
+# Format: tuple of (start_date, end_date) as strings 'YYYY-MM-DD'
+# Examples:
+#DATE_RANGE_FILTER = ('2025-01-01', '2025-06-30')  # H1
+#DATE_RANGE_FILTER = ('2025-07-01', '2025-12-31')  # H2
+DATE_RANGE_FILTER = None

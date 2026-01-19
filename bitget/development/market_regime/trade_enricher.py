@@ -158,7 +158,17 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
         pe_order=PE_ORDER
     )
     
+    # Get current close price
+    current_close = float(btc_df.iloc[idx]['close'])
+    
     # Calculate moving averages
+    # MA_20: need at least 20 bars before current
+    if idx >= 19:
+        ma_20_data = btc_df.iloc[idx - 19:idx + 1]['close'].values
+        metrics['ma_20'] = float(np.mean(ma_20_data))
+    else:
+        metrics['ma_20'] = np.nan
+    
     # MA_50: need at least 50 bars before current
     if idx >= 49:
         ma_50_data = btc_df.iloc[idx - 49:idx + 1]['close'].values
@@ -172,6 +182,11 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
         metrics['ma_200'] = float(np.mean(ma_200_data))
     else:
         metrics['ma_200'] = np.nan
+    
+    # Calculate price vs MA ratios (for trend detection)
+    metrics['price_vs_ma_20'] = current_close / metrics['ma_20'] if not np.isnan(metrics['ma_20']) else np.nan
+    metrics['price_vs_ma_50'] = current_close / metrics['ma_50'] if not np.isnan(metrics['ma_50']) else np.nan
+    metrics['price_vs_ma_200'] = current_close / metrics['ma_200'] if not np.isnan(metrics['ma_200']) else np.nan
     
     return metrics
 
@@ -218,7 +233,9 @@ def enrich_single_file(
         print(f"            BTC:    {btc_min} → {btc_max}")
     
     # Initialize columns
-    metric_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'ma_200']
+    metric_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 
+                   'ma_20', 'ma_50', 'ma_200', 
+                   'price_vs_ma_20', 'price_vs_ma_50', 'price_vs_ma_200']
     for col in metric_cols:
         trades_df[col] = np.nan
     

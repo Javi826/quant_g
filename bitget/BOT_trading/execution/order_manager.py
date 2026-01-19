@@ -598,7 +598,9 @@ def close_position(symbol: str,
                             fee_from_api=fee_from_api,
                             bot_state=bot_state,
                             regime_family=position_data.get('regime_family', 'unknown'),
-                            regime_multiplier=position_data.get('regime_multiplier', 1.0)
+                            regime_multiplier=position_data.get('regime_multiplier', 1.0),
+                            direction_mode=position_data.get('direction_mode', 'unknown'),              # ← NUEVO
+                            direction_multiplier=position_data.get('direction_multiplier', 1.0)  
                         )
             
             return True
@@ -623,7 +625,9 @@ def close_position(symbol: str,
                             profit_from_api=None,
                             fee_from_api=None,
                             regime_family=position_data.get('regime_family', 'unknown'),
-                            regime_multiplier=position_data.get('regime_multiplier', 1.0)
+                            regime_multiplier=position_data.get('regime_multiplier', 1.0),
+                            direction_mode=position_data.get('direction_mode', 'unknown'),              # ← NUEVO
+                            direction_multiplier=position_data.get('direction_multiplier', 1.0)
                         )
                 return True  # Remove from open_positions
             return False

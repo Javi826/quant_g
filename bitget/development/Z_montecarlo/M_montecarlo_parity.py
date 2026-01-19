@@ -23,15 +23,17 @@ DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
 STRATEGY            = "parity"
+MY_SYMBOLS          = False
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2022_IS"
+DATA_FOLDER         = "../data/crypto_OOS_2025"
+#DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 5_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -42,7 +44,15 @@ TOLERANCE_LIST       = [20,25]
 MA_PERIOD_LIST       = [25]
 
 TP_PCT_LIST          = [1,2]
-SL_PCT_LIST          = [8,]
+SL_PCT_LIST          = [8]
+
+#LONG
+LOOKBACK_LIST        = [150]
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [40] 
+
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -51,7 +61,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 10
+FINAL_N_PATHS        = 1000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -59,7 +69,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=MY_SYMBOLS)
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -73,7 +83,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = parity_short(
+            signals = parity_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

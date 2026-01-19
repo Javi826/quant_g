@@ -79,7 +79,9 @@ def load_state(state_file: str) -> Tuple[Dict, Dict]:
                     'opened_at': datetime.fromisoformat(pos.get('opened_at')),
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
                     'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0))
+                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
+                    'direction_mode': pos.get('direction_mode', 'unknown'),        # ← NUEVO
+                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0))  # ← NUEVO
                 })
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
@@ -143,7 +145,9 @@ def save_state_local(open_positions: Dict,
                     'opened_at': pos['opened_at'].isoformat(),
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
                     'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0))
+                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
+                    'direction_mode': pos.get('direction_mode', 'unknown'),        # ← NUEVO
+                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0)) 
                 })
 
         state_data = {
@@ -245,7 +249,9 @@ def sync_broker(open_positions: Dict,
                         profit_from_api=None,
                         fee_from_api=None,
                         regime_family=pos.get('regime_family', 'unknown'),
-                        regime_multiplier=pos.get('regime_multiplier', 1.0)
+                        regime_multiplier=pos.get('regime_multiplier', 1.0),
+                        direction_mode=pos.get('direction_mode', 'unknown'),          # ← NUEVO
+                        direction_multiplier=pos.get('direction_multiplier', 1.0)  
                     )
                     
                     positions_to_remove.append(i)

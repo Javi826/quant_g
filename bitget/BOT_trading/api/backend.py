@@ -22,13 +22,14 @@ from analytics.metrics import MetricsCalculator
 # ===========================================================================
 try:
     from market_regime.regime_classifier import get_regime_info
-    from config.settings import REGIME_FAMILIES, REGIME_GLOBAL, REGIME_FAMILY_MATRIX
+    from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_MATRIX
     REGIME_MODULE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"WAR-Market regime module not available: {e}")
     REGIME_MODULE_AVAILABLE = False
     REGIME_FAMILIES = {}
-    REGIME_GLOBAL = {}
+    REGIME_GENERAL = {}
+    REGIME_MATRIX = {}
 
 
 class DashboardServer:
@@ -721,7 +722,7 @@ class DashboardServer:
         @self.app.route('/api/regime/matrix')
         def get_regime_matrix():
             """
-            Returns REGIME_FAMILY_MATRIX from settings.py
+            Returns REGIME_MATRIX from settings.py
             
             Returns:
                 JSON with matrix structure:
@@ -735,17 +736,17 @@ class DashboardServer:
                 }
             """
             try:
-                from config.settings import REGIME_FAMILY_MATRIX
+                from config.settings import REGIME_MATRIX
                 
                 return jsonify({
                     'success': True,
-                    'matrix': REGIME_FAMILY_MATRIX
+                    'matrix': REGIME_MATRIX
                 })
             except ImportError as e:
-                logger.error(f"Error importing REGIME_FAMILY_MATRIX: {e}")
+                logger.error(f"Error importing REGIME_MATRIX: {e}")
                 return jsonify({
                     'success': False,
-                    'error': 'REGIME_FAMILY_MATRIX not available',
+                    'error': 'REGIME_MATRIX not available',
                     'matrix': {}
                 }), 500
             except Exception as e:
@@ -754,6 +755,63 @@ class DashboardServer:
                     'success': False,
                     'error': str(e),
                     'matrix': {}
+                }), 500
+            
+        @self.app.route('/api/regime/strategies')
+        def get_regime_strategies():
+            """
+            Returns strategies with their regime_family and dir_mode for the matrix table.
+            """
+            try:
+                from config.settings import REGIME_MATRIX, REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
+                
+                strategies_info = []
+                
+                for idx, strat in enumerate(self.strategies, 1):
+                    regime_family = strat.get('regime_family', 'general')  # ← CAMBIADO
+                    dir_mode = strat.get('dir_mode', 'general')            # ← CAMBIADO
+                    
+                    # Get multipliers from matrices
+                    regime_mults = {}
+                    if regime_family and regime_family != 'general':  # ← CAMBIADO
+                        regime_mults = REGIME_MATRIX.get(regime_family, {})
+                    else:
+                        # ← NUEVO: Si es 'general', usar REGIME_GENERAL
+                        regime_mults = REGIME_GENERAL
+                    
+                    dir_mults = {}
+                    if dir_mode and dir_mode != 'general':  # ← CAMBIADO
+                        dir_mults = DIRECTION_MATRIX.get(dir_mode, {})
+                    else:
+                        # ← NUEVO: Si es 'general', usar DIRECTION_GENERAL
+                        dir_mults = DIRECTION_GENERAL
+                    
+                    strategies_info.append({
+                        'number': idx,
+                        'id': strat['id'],
+                        'regime_family': regime_family or 'general',  # ← CAMBIADO
+                        'dir_mode': dir_mode or 'general',            # ← CAMBIADO
+                        'regime_trending': regime_mults.get('trending', '-'),
+                        'regime_ranging': regime_mults.get('ranging', '-'),
+                        'regime_volatile': regime_mults.get('volatile', '-'),
+                        'active': strat.get('active', True)
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'strategies': strategies_info,
+                    'regime_matrix': REGIME_MATRIX,
+                    'regime_general': REGIME_GENERAL,        # ← NUEVO
+                    'direction_matrix': DIRECTION_MATRIX,
+                    'direction_general': DIRECTION_GENERAL   # ← NUEVO
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting regime strategies: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'strategies': []
                 }), 500
         
         @self.app.route('/api/compose-analysis')
@@ -1311,7 +1369,10 @@ class DashboardServer:
                     'multiplier': regime_info['multiplier'],
                     'metrics': regime_info['metrics'],
                     'thresholds': regime_info.get('thresholds', {}),
-                    'all_families': REGIME_GLOBAL,
+                    'btc_price': regime_info.get('btc_price'),           
+                    'btc_ma50': regime_info.get('btc_ma50'),             
+                    'btc_trend': regime_info.get('btc_trend'),           
+                    'all_families': REGIME_GENERAL,
                     'all_thresholds': REGIME_FAMILIES
                 })
                 

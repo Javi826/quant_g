@@ -20,7 +20,7 @@ from signals.add_signals_orderblocks import orderblocks_short
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = True
-STRATEGY     = "orderblocks_long_4H_OOS"
+STRATEGY     = "orderblocks_short_4H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------

@@ -12,7 +12,7 @@ from typing import Dict, Optional, Tuple
 
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from market_regime.regime_metrics import calc_all_metrics
-from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GLOBAL
+from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
 
@@ -220,7 +220,7 @@ def get_regime_multiplier(symbol: str, timeframe: str) -> float:
         family, metrics = get_current_regime(timeframe)
         
         # Get multiplier for this family
-        multiplier = REGIME_GLOBAL.get(family, 1.0)
+        multiplier = REGIME_GENERAL.get(family, 1.0)
         
         # Logging is handled by orchestrator
         
@@ -240,11 +240,43 @@ def get_regime_info(timeframe: str) -> Dict:
         timeframe: Timeframe to analyze
     
     Returns:
-        Dict with regime info including family, metrics, multiplier
+        Dict with regime info including family, metrics, multiplier, BTC price/MA50/trend
     """
     try:
         family, metrics = get_current_regime(timeframe)
-        multiplier = REGIME_GLOBAL.get(family, 1.0)
+        multiplier = REGIME_GENERAL.get(family, 1.0)
+        
+        # NEW: Calculate BTC price, MA50, and trend
+        btc_price = None
+        btc_ma50 = None
+        btc_trend = 'unknown'
+        
+        try:
+            # Fetch BTC data
+            df = fetch_btc_ohlcv(timeframe)
+            
+            if df is not None and not df.empty and len(df) >= 50:
+                # Get current price (last close)
+                btc_price = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
+                
+                # Calculate MA50
+                btc_ma50 = float(pd.to_numeric(df['close'], errors='coerce').tail(50).mean())
+                
+                # Determine trend
+                if btc_price > btc_ma50:
+                    btc_trend = 'uptrend'
+                else:
+                    btc_trend = 'downtrend'
+                
+                logger.debug(
+                    f"BTC trend: {btc_trend} | Price: ${btc_price:.2f} | "
+                    f"MA50: ${btc_ma50:.2f}"
+                )
+            else:
+                logger.warning("Insufficient BTC data for MA50 calculation")
+                
+        except Exception as e:
+            logger.error(f"Error calculating BTC price/MA50: {e}")
         
         return {
             'timeframe': timeframe,
@@ -252,6 +284,9 @@ def get_regime_info(timeframe: str) -> Dict:
             'multiplier': multiplier,
             'metrics': metrics or {},
             'thresholds': REGIME_FAMILIES.get(family, {}),
+            'btc_price': btc_price,
+            'btc_ma50': btc_ma50,
+            'btc_trend': btc_trend,
             'success': True
         }
         
@@ -263,6 +298,48 @@ def get_regime_info(timeframe: str) -> Dict:
             'multiplier': 1.0,
             'metrics': {},
             'thresholds': {},
+            'btc_price': None,
+            'btc_ma50': None,
+            'btc_trend': 'unknown',
             'success': False,
             'error': str(e)
         }
+def get_current_direction(timeframe: str) -> str:
+    """
+    Get current BTC direction (uptrend/dwtrend) based on price vs MA50.
+    
+    Args:
+        timeframe: Timeframe to analyze
+    
+    Returns:
+        'uptrend' or 'dwtrend'
+    """
+    try:
+        df = fetch_btc_ohlcv(timeframe)
+        
+        if df is None or df.empty or len(df) < 50:
+            logger.warning("Insufficient data for direction calculation, defaulting to uptrend")
+            return 'uptrend'
+        
+        # Get current price (last close)
+        btc_price = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
+        
+        # Calculate MA50
+        btc_ma50 = float(pd.to_numeric(df['close'], errors='coerce').tail(50).mean())
+        
+        # Determine direction
+        if btc_price > btc_ma50:
+            direction = 'uptrend'
+        else:
+            direction = 'dwtrend'
+        
+        logger.debug(
+            f"BTC direction: {direction} | "
+            f"Price: ${btc_price:.2f} | MA50: ${btc_ma50:.2f}"
+        )
+        
+        return direction
+        
+    except Exception as e:
+        logger.error(f"Error calculating direction: {e}")
+        return 'uptrend'  # Fallback

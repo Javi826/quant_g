@@ -22,7 +22,7 @@ if parent_dir not in sys.path:
 # Now do imports
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime.regime_classifier import get_current_regime
+from market_regime.regime_classifier import get_current_regime, get_current_direction
 
 
 from validation import validate_strategy_configuration,validate_settings
@@ -41,9 +41,9 @@ from bot_utils import get_unique_timeframes
 
 from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
-from config.utils import get_account_config, get_account_strategies
+from config.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
-from config.settings import REGIME_GLOBAL,REGIME_FAMILY_MATRIX
+from config.settings import REGIME_GENERAL, REGIME_MATRIX, DIRECTION_MATRIX, DIRECTION_GENERAL
 
 class BotOrchestrator:
     """
@@ -126,6 +126,7 @@ class BotOrchestrator:
         
         #Marke regime
         self.regime_cache: Dict[str, str] = {}
+        self.direction_cache: Dict[str, str] = {}
         
     # ======================================================================
     # PUBLIC API
@@ -222,8 +223,7 @@ class BotOrchestrator:
         Useful for applying strategy parameter changes without downtime.
         """
         self.logger.info("Reloading strategies...")
-        strategy_ids = get_account_strategies(self.account_number)
-        self.strategies = load_strategies(strategy_ids)
+        self.strategies = load_strategies(self.account_number)
         
         if self.active_strategy_ids:
             from strategies.strategy_loader import apply_set_active_argument
@@ -259,8 +259,7 @@ class BotOrchestrator:
     
     def _load_and_validate_strategies(self) -> None:
         # Load strategies
-        strategy_ids    = get_account_strategies(self.account_number)
-        self.strategies = load_strategies(strategy_ids)
+        self.strategies = load_strategies(self.account_number)
         
         # Apply --set-active
         if self.active_strategy_ids:
@@ -541,47 +540,60 @@ class BotOrchestrator:
                 continue
             
             # ====================================================================
-            # NEW: Get regime multiplier and adjust order amount
+            # STEP 1: Calculate REGIME multiplier
             # ====================================================================
             timeframe = strat['timeframe']
-            # Obtener régimen de mercado
             market_regime = self.regime_cache.get(timeframe, 'ranging')
-            
-            # Obtener familia de estrategia
             strategy_family = strat.get('regime_family')
             
-            # Calcular multiplier
-            if strategy_family == 'global':
-                # Estrategia con multiplicadores globales
-                multiplier = REGIME_GLOBAL[market_regime]
-                source = 'global'
+            if strategy_family == 'general':
+                regime_mult = REGIME_GENERAL[market_regime]
+                regime_source = 'general'
             else:
-                # Estrategia con familia custom
-                multiplier = REGIME_FAMILY_MATRIX[strategy_family][market_regime]
-                source = 'strategy-specific'
+                regime_mult = REGIME_MATRIX[strategy_family][market_regime]
+                regime_source = 'strategy-specific'
             
-            # Skip si multiplier = 0
-            if multiplier == 0:
+            # ====================================================================
+            # STEP 2: Calculate DIRECTION multiplier
+            # ====================================================================
+            market_direction = self.direction_cache.get(timeframe, 'uptrend')
+            dir_mode = strat.get('dir_mode')
+            
+            if dir_mode == 'general':
+                direction_mult = DIRECTION_GENERAL[market_direction]
+                dir_source = 'general'
+            else:
+                direction_mult = DIRECTION_MATRIX[dir_mode][market_direction]
+                dir_source = 'strategy-specific'
+            
+            # ====================================================================
+            # STEP 3: MULTIPLY both multipliers (coherente con lógica actual)
+            # ====================================================================
+            final_mult = regime_mult * direction_mult
+            
+            # Skip if final = 0
+            if final_mult == 0:
                 self.logger.info(
-                    f"[REGIME] Skip {strat_id}: {market_regime} market, "
-                    f"multiplier=0 ({source})"
+                    f"[SIZING] Skip {strat_id}: "
+                    f"regime={market_regime}({regime_mult}x), "
+                    f"dir={market_direction}({direction_mult}x), "
+                    f"final=0x → BLOCKED"
                 )
                 continue
             
-            # Calcular order amount ajustado
+            # Calculate adjusted amount
             base_order_amount = strat['order_amount']
-            adjusted_order_amount = base_order_amount * multiplier
+            adjusted_order_amount = base_order_amount * final_mult
             
             self.logger.info(
-                f"[REGIME] {strat_id}: Market={market_regime}, "
-                f"Strategy_family={strategy_family or 'none'}, "
-                f"Base=${base_order_amount:.0f}, "
-                f"Multiplier={multiplier}x ({source}), "
-                f"Adjusted=${adjusted_order_amount:.0f}"
+                f"[SIZING] {strat_id}: "
+                f"Market=[{market_regime}, {market_direction}] | "
+                f"Base=${base_order_amount:.0f} × "
+                f"regime({regime_mult:.1f}) × "
+                f"dir({direction_mult:.1f}) = "
+                f"${adjusted_order_amount:.0f}"
             )
-            
-
-            
+                     
             # Process strategy with retry logic
             try:
                 self.strategy_processor.process(
@@ -591,8 +603,10 @@ class BotOrchestrator:
                     open_positions=self.open_positions,
                     strategy_candles=self.strategy_candles,
                     adjusted_order_amount=adjusted_order_amount,
-                    regime_family=market_regime,           # ← AÑADIR
-                    regime_multiplier=multiplier    # ← AÑADIR# ← NEW PARAMETER
+                    regime_family=market_regime,
+                    regime_multiplier=regime_mult,
+                    direction=market_direction,
+                    direction_multiplier=direction_mult
                 )
             except Exception as e:
                 self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
@@ -608,8 +622,10 @@ class BotOrchestrator:
                         open_positions=self.open_positions,
                         strategy_candles=self.strategy_candles,
                         adjusted_order_amount=adjusted_order_amount,
-                        regime_family=market_regime,           # ← AÑADIR
-                        regime_multiplier=multiplier    # ← AÑADIR# ← NEW PARAMETER# ← NEW PARAMETER
+                        regime_family=market_regime,
+                        regime_multiplier=regime_mult,
+                        direction=market_direction,
+                        direction_multiplier=direction_mult
                     )
                     self.logger.info(f"Retry successful for {strat_id}")
                 except Exception as e2:
@@ -658,34 +674,35 @@ class BotOrchestrator:
     
     def _update_regime_for_timeframes(self, closed_timeframes: List[str]) -> None:
         """
-        Update regime multipliers for timeframes that just closed.
-        
-        This method calculates the market regime for each closed timeframe
-        and caches the multiplier for use in position sizing.
+        Update regime AND direction for timeframes that just closed.
         
         Args:
             closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
         """
-        self.logger.info(f"[REGIME] Updating regime for timeframes: {closed_timeframes}")
+        self.logger.info(f"[REGIME] Updating regime & direction for: {closed_timeframes}")
         
         for tf in closed_timeframes:
             try:
+                # 1. Calculate REGIME
                 family, metrics = get_current_regime(tf)
                 if family == 'default':
                     family = 'ranging'
-                self.regime_cache[tf] = family  # Guarda 'trending'
+                self.regime_cache[tf] = family
+                
+                # 2. Calculate DIRECTION
+                direction = get_current_direction(tf)
+                self.direction_cache[tf] = direction
                 
                 self.logger.info(
-                    f"[REGIME] {tf}: {family.upper()} "
+                    f"[REGIME] {tf}: REGIME={family.upper()}, DIRECTION={direction.upper()} "
                     f"(hurst={metrics.get('hurst', 0):.2f}, "
                     f"er={metrics.get('efficiency_ratio', 0):.2f})"
                 )
                 
             except Exception as e:
-                # On error, use 1.0 (no adjustment)
-                self.logger.error(f"[REGIME] Error calculating regime for {tf}: {e}")
+                self.logger.error(f"[REGIME] Error for {tf}: {e}")
                 self.regime_cache[tf] = 'ranging'
-                self.logger.debug(f"[REGIME] {tf}: using fallback regime='ranging' (error)")
+                self.direction_cache[tf] = 'uptrend'
     
     def _send_request_wrapper(
         self,
