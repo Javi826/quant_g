@@ -235,16 +235,7 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '15_ranging_long_4H':
-                signals = ranging_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    range_str=strat['range'],
-                    live_trading=True
-                )
-                
+                                
             elif strategy_id == '16_ranging_short_6Hutc':
                 signals = ranging_short(
                     arr,
@@ -318,7 +309,6 @@ def get_implemented_strategies() -> set:
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
         '14_orderblocks_long_4H',
-        '15_ranging_long_4H',
         '16_ranging_short_6Hutc',
     }
     return strategies

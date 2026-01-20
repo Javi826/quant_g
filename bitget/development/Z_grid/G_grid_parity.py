@@ -17,8 +17,8 @@ from signals.add_signals_parity import parity_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "parity_short_1H_OOS"
+MY_SYMBOLS   = True
+STRATEGY     = "parity_short_4H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -26,7 +26,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 2_000_000
@@ -42,12 +42,12 @@ TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
 #LONG
-LOOKBACK_LIST        = [150]
+LOOKBACK_LIST        = [100]
 MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [20] 
+TOLERANCE_LIST       = [30] 
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [7.5]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [9]
 
 #SHORT
 # =============================================================================

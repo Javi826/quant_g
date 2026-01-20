@@ -19,7 +19,7 @@ ACCOUNTS = {
         "description": "Main Account"
     },
     "E1": {
-        "initial_capital": 1761,
+        "initial_capital": 1660,
         "dashboard_port": 5001,
         "description": "Elite Account"
     },

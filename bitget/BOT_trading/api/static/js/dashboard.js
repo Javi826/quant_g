@@ -1277,7 +1277,7 @@ async function loadBotConfig() {
             // ✅ MODIFICACIÓN: Añadido 'dir_mode' a fixedKeys
             const fixedKeys = ['id', 'name', 'number', 'timeframe', 'status', 'symbols_count'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
-            const excludeKeys = new Set([...fixedKeys, ...commonKeys, 'direction', 'family_sizing', 'direction_mode', 'active']);
+            const excludeKeys = new Set([...fixedKeys, ...commonKeys, 'direction', 'family_sizing', 'direction_mode', 'active', 'regime_trending', 'regime_ranging', 'regime_volatile']);
             
             const extraParamKeys = new Set();
             sortedStrategies.forEach(strat => {

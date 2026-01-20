@@ -28,9 +28,9 @@ MY_SYMBOLS          = False
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 1_500_000
@@ -48,10 +48,10 @@ SL_PCT_LIST          = [8]
 
 #LONG
 LOOKBACK_LIST        = [150]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [40] 
+MA_PERIOD_LIST       = [25]
+TOLERANCE_LIST       = [15] 
 
-TP_PCT_LIST          = [3]
+TP_PCT_LIST          = [2]
 SL_PCT_LIST          = [10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
@@ -61,7 +61,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 1000
+FINAL_N_PATHS        = 2000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 

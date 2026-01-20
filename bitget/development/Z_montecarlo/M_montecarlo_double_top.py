@@ -27,7 +27,7 @@ MY_SYMBOLS        = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2"
+DATA_FOLDER         = "../data/crypto_OOS"
 #DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER       = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR   = '4H'

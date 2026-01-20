@@ -99,7 +99,7 @@ strategies:
   - id: '05_parity_short_4H'
     name: 'parity_short_4H'
     timeframe: '4H'
-    active: false
+    active: true
     direction: 'short'
     regime_trending: 1.0
     regime_ranging: 1.0
@@ -295,28 +295,7 @@ strategies:
     impulse: 0.01
     tp_pct: 5
     sl_pct: 10
-    
-  # ------------------------------------------------------------------------
-  # STRATEGY 15: ranging long (4H)
-  # ------------------------------------------------------------------------
-  - id: '15_ranging_long_4H'
-    name: 'ranging_long_4H'
-    timeframe: '4H'
-    active: true
-    direction: 'long'
-    regime_trending: 0
-    regime_ranging: 0
-    regime_volatile: 1.0
-    direction_mode: 'general'
-    sell_after_ncandles: 50
-    order_amount: 40
-    lookback: 10
-    tolerance: 10
-    range: 25
-    tp_pct: 5
-    sl_pct: 10
-
-      
+          
   # ------------------------------------------------------------------------
   # STRATEGY 16: ranging short (6Hutc)
   # ------------------------------------------------------------------------
