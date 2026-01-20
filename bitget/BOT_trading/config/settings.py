@@ -14,7 +14,7 @@ import os
 
 ACCOUNTS = {
     "00": {
-        "initial_capital": 3671,
+        "initial_capital": 3431,
         "dashboard_port": 5000,
         "description": "Main Account"
     },
@@ -46,25 +46,8 @@ REGIME_PE_ORDER     = 3
 
 REGIME_FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.5)},
+    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging': {}
-}
-REGIME_MATRIX = {
-    'trending': {
-        'trending': 1.5,   
-        'ranging': 1.0,    
-        'volatile': 1.0    
-    },
-    'ranging': {
-        'trending': 1.0,   
-        'ranging': 1.5,    
-        'volatile': 1.0    
-    },
-    'volatile': {
-        'trending': 0.0,  
-        'ranging': 0.0,    
-        'volatile': 0.0    
-    }
 }
 
 REGIME_GENERAL = {
@@ -76,7 +59,6 @@ REGIME_GENERAL = {
 # ==========================================================================
 # DIRECTION SIZING (BTC TREND FILTER)
 # ==========================================================================
-DIRECTION_MA_REFERENCE = 'ma_50'
 
 DIRECTION_MATRIX = {
     'long_only': {     

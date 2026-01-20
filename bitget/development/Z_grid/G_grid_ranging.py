@@ -20,8 +20,8 @@ from signals.add_signals_ranging import ranging_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "ranging_long_4H_OOS"
+MY_SYMBOLS   = True
+STRATEGY     = "ranging_short_6Hutc_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -29,7 +29,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '6Hutc'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -48,10 +48,10 @@ SL_PCT_LIST          = [2.5,5,7.5,10]
 SELL_AFTER_LIST      = [0]  
 LOOKBACK_LIST        = [10] 
 RANGE_LIST           = [25]
-TOLERANCE_LIST       = [10]
+TOLERANCE_LIST       = [5]
 
-TP_PCT_LIST          = [5]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [6]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -87,7 +87,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = ranging_long(
+        signals = ranging_short(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

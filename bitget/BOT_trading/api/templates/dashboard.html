@@ -100,9 +100,9 @@
         border: 1px solid rgba(139, 148, 158, 0.5);
         color: #8b949e;
     }
+
 </style>
 {% endblock %}
-
 {% block content %}
 <div id="loading-splash">
     <div class="loading-content">
@@ -669,7 +669,7 @@
                     </div>
                 </div>
                 
-                <!-- 2. MARKET REGIME STRATEGY MATRIX (✅ MODIFICADO: Añadida columna Dir Mode) -->
+                <!-- 2. MARKET REGIME STRATEGY MATRIX -->
                 <div class="config-card">
                     <h3>Market Regime Strategy Matrix</h3>
                     <div style="overflow-x: auto;">
@@ -678,7 +678,6 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Strategy</th>
-                                    <th>Family</th>
                                     <th>Trending</th>
                                     <th>Ranging</th>
                                     <th>Volatile</th>
@@ -686,32 +685,11 @@
                                 </tr>
                             </thead>
                             <tbody id="regime-strategy-matrix-body">
-                                <tr><td colspan="7" style="text-align: center;">Loading...</td></tr>
+                                <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
-                </div>
-                
-                <!-- 3. REGIME FAMILY MATRIX (NEW) -->
-                <div class="config-card">
-                    <h3>Regime Family Matrix</h3>
-                    <div style="overflow-x: auto;">
-                        <table id="regime-general-matrix">
-                            <thead>
-                                <tr>
-                                    <th>Family</th>
-                                    <th>Trending</th>
-                                    <th>Ranging</th>
-                                    <th>Volatile</th>
-                                </tr>
-                            </thead>
-                            <tbody id="regime-general-matrix-body">
-                                <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
+                </div>               
                 <!-- 4. WEBSOCKET (moved here) -->
                 <div class="config-card">
                     <h3>WebSocket Connections</h3>

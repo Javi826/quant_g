@@ -553,6 +553,12 @@ td {
     font-size: 19px;
     color: #c9d1d9;
 }
+/* Multiplier columns in regime matrix - bold */
+#regime-strategy-matrix tbody td:nth-child(3),
+#regime-strategy-matrix tbody td:nth-child(4),
+#regime-strategy-matrix tbody td:nth-child(5) {
+    font-weight: 700;
+}
 
 tbody tr {
     transition: background 0.15s ease;

@@ -42,7 +42,7 @@ PE_ORDER     = 3
 
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.8)},
+    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging': {}
 }
 # =============================================================================
@@ -77,6 +77,21 @@ DIRECTION_SIZING = {
 }
 
 # =============================================================================
+# DIRECTION DETECTION METHOD
+# =============================================================================
+# Method for detecting market direction:
+#   'price_vs_ma': Compare current price vs single MA
+#   'ma_cross': Compare two moving averages (e.g., MA50 vs MA200)
+DIRECTION_METHOD = 'price_vs_ma'  # Options: 'price_vs_ma', 'ma_cross'
+
+# For 'price_vs_ma' method:
+DIRECTION_MA_PERIOD = 50  # Compare price vs this MA period
+
+# For 'ma_cross' method:  
+DIRECTION_MA_FAST = 50   # Fast MA period
+DIRECTION_MA_SLOW = 200  # Slow MA period
+
+# =============================================================================
 # CAPITAL
 # =============================================================================
 INITIAL_CAPITAL = 800
@@ -87,6 +102,6 @@ INITIAL_CAPITAL = 800
 # Filter trades by date range for split testing
 # Format: tuple of (start_date, end_date) as strings 'YYYY-MM-DD'
 # Examples:
-#DATE_RANGE_FILTER = ('2025-01-01', '2025-06-30')  # H1
+DATE_RANGE_FILTER = ('2025-01-01', '2025-06-30')  # H1
 #DATE_RANGE_FILTER = ('2025-07-01', '2025-12-31')  # H2
-DATE_RANGE_FILTER = None
+#DATE_RANGE_FILTER = None

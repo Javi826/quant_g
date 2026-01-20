@@ -123,23 +123,36 @@ def load_trades(trades_file: str) -> pd.DataFrame:
 
 def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: int) -> dict:
     """
-    Gets BTC metrics at a specific time.
+    Gets BTC metrics BEFORE buy_time using only CLOSED candles.
     
-    REQUIRES EXACT MATCH on timestamp.
-    Uses lookback bars BEFORE buy_time for calculation.
+    CRITICAL FIX:
+    - buy_time represents entry at candle OPEN (e.g., 08:00)
+    - At 08:00, the 08:00-12:00 candle is opening (NOT closed yet)
+    - We must use data up to the PREVIOUS candle (04:00-08:00)
+    
+    NO LOOKAHEAD BIAS.
     """
-    # Find exact match
-    exact_match = btc_df[btc_df['ts'] == buy_time]
     
-    if len(exact_match) == 0:
-        return None  # No match, will be handled by caller
+    # ==========================================
+    # FIX: Use ONLY candles that closed BEFORE buy_time
+    # ==========================================
+    closed_candles = btc_df[btc_df['ts'] < buy_time]  # Changed from '==' to '<'
     
-    idx = exact_match.index[0]
+    if len(closed_candles) == 0:
+        return None  # No historical data available
+    
+    # Take LAST closed candle (most recent complete data)
+    idx = closed_candles.index[-1]
+    
+    # ==========================================
+    # REST OF CODE UNCHANGED
+    # ==========================================
     start_idx = max(0, idx - lookback + 1)
     
     if idx - start_idx < 20:
         return None  # Insufficient data
     
+    # Now subset contains ONLY closed candles
     subset = btc_df.iloc[start_idx:idx + 1]
     
     ohlc = {
@@ -158,7 +171,7 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
         pe_order=PE_ORDER
     )
     
-    # Get current close price
+    # Get current close price (from last CLOSED candle)
     current_close = float(btc_df.iloc[idx]['close'])
     
     # Calculate moving averages
@@ -187,6 +200,19 @@ def get_metrics_at_time(btc_df: pd.DataFrame, buy_time: pd.Timestamp, lookback: 
     metrics['price_vs_ma_20'] = current_close / metrics['ma_20'] if not np.isnan(metrics['ma_20']) else np.nan
     metrics['price_vs_ma_50'] = current_close / metrics['ma_50'] if not np.isnan(metrics['ma_50']) else np.nan
     metrics['price_vs_ma_200'] = current_close / metrics['ma_200'] if not np.isnan(metrics['ma_200']) else np.nan
+    
+    # ==========================================
+    # NEW: Calculate MA cross ratios
+    # ==========================================
+    if not np.isnan(metrics['ma_50']) and not np.isnan(metrics['ma_200']):
+        metrics['ma_50_vs_ma_200'] = metrics['ma_50'] / metrics['ma_200']
+    else:
+        metrics['ma_50_vs_ma_200'] = np.nan
+    
+    if not np.isnan(metrics['ma_20']) and not np.isnan(metrics['ma_50']):
+        metrics['ma_20_vs_ma_50'] = metrics['ma_20'] / metrics['ma_50']
+    else:
+        metrics['ma_20_vs_ma_50'] = np.nan
     
     return metrics
 
@@ -232,10 +258,11 @@ def enrich_single_file(
         print(f"            Trades: {trades_min} → {trades_max}")
         print(f"            BTC:    {btc_min} → {btc_max}")
     
-    # Initialize columns
+    # Initialize columns (UPDATED with new MA cross columns)
     metric_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 
                    'ma_20', 'ma_50', 'ma_200', 
-                   'price_vs_ma_20', 'price_vs_ma_50', 'price_vs_ma_200']
+                   'price_vs_ma_20', 'price_vs_ma_50', 'price_vs_ma_200',
+                   'ma_50_vs_ma_200', 'ma_20_vs_ma_50']
     for col in metric_cols:
         trades_df[col] = np.nan
     
@@ -254,7 +281,26 @@ def enrich_single_file(
         else:
             errors += 1
     
+    # ==========================================
+    # NEW: DROP ROWS WITH NaN IN CRITICAL COLUMNS
+    # ==========================================
+    trades_before_drop = len(trades_df)
+    
+    # Drop rows where ANY of the critical metric columns is NaN
+    critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy',
+                     'ma_50', 'price_vs_ma_50']  # Only check essential columns
+    
+    trades_df = trades_df.dropna(subset=critical_cols).reset_index(drop=True)
+    
+    trades_after_drop = len(trades_df)
+    dropped_rows = trades_before_drop - trades_after_drop
+    
+    if dropped_rows > 0:
+        print(f"        ⚠️  Dropped {dropped_rows} rows with incomplete metrics")
+    
     print(f"        Enriched: {success}/{num_trades} ({errors} errors)")
+    print(f"        Final trades: {trades_after_drop}")
+    # ==========================================
     
     # Add metadata
     trades_df['btc_symbol'] = BTC_SYMBOL
@@ -271,6 +317,8 @@ def enrich_single_file(
         'strategy': strategy_name,
         'timeframe': timeframe,
         'num_trades': num_trades,
+        'num_trades_final': trades_after_drop,  # NEW
+        'dropped': dropped_rows,  # NEW
         'success': success,
         'errors': errors,
         'output_file': output_file

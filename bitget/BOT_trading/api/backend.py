@@ -22,14 +22,13 @@ from analytics.metrics import MetricsCalculator
 # ===========================================================================
 try:
     from market_regime.regime_classifier import get_regime_info
-    from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_MATRIX
+    from config.settings import REGIME_FAMILIES, REGIME_GENERAL
     REGIME_MODULE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"WAR-Market regime module not available: {e}")
     REGIME_MODULE_AVAILABLE = False
     REGIME_FAMILIES = {}
     REGIME_GENERAL = {}
-    REGIME_MATRIX = {}
 
 
 class DashboardServer:
@@ -710,7 +709,7 @@ class DashboardServer:
                         'tp_pct': strat['tp_pct'],
                         'sl_pct': strat['sl_pct'],
                         'order_amount': strat.get('order_amount', 0),
-                        'regime_family': strat.get('regime_family', None)
+                        'family_sizing': strat.get('family_sizing', None)
                     })
                 
                 return jsonify({
@@ -719,92 +718,41 @@ class DashboardServer:
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/regime/matrix')
-        def get_regime_matrix():
-            """
-            Returns REGIME_MATRIX from settings.py
-            
-            Returns:
-                JSON with matrix structure:
-                {
-                    'success': True,
-                    'matrix': {
-                        'trending': {'trending': 1.8, 'ranging': 1.0, 'volatile': 0.0},
-                        'ranging': {'trending': 1.0, 'ranging': 1.8, 'volatile': 0.0},
-                        'volatile': {'trending': 0.5, 'ranging': 0.5, 'volatile': 1.5}
-                    }
-                }
-            """
-            try:
-                from config.settings import REGIME_MATRIX
-                
-                return jsonify({
-                    'success': True,
-                    'matrix': REGIME_MATRIX
-                })
-            except ImportError as e:
-                logger.error(f"Error importing REGIME_MATRIX: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': 'REGIME_MATRIX not available',
-                    'matrix': {}
-                }), 500
-            except Exception as e:
-                logger.error(f"Error getting regime matrix: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'matrix': {}
-                }), 500
             
         @self.app.route('/api/regime/strategies')
         def get_regime_strategies():
             """
-            Returns strategies with their regime_family and dir_mode for the matrix table.
+            Returns strategies with their regime multipliers and direction_mode for the matrix table.
             """
             try:
-                from config.settings import REGIME_MATRIX, REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
+                from config.settings import DIRECTION_MATRIX, DIRECTION_GENERAL
                 
                 strategies_info = []
                 
                 for idx, strat in enumerate(self.strategies, 1):
-                    regime_family = strat.get('regime_family', 'general')  # ← CAMBIADO
-                    dir_mode = strat.get('dir_mode', 'general')            # ← CAMBIADO
+                    direction_mode = strat.get('direction_mode', 'general')
                     
-                    # Get multipliers from matrices
-                    regime_mults = {}
-                    if regime_family and regime_family != 'general':  # ← CAMBIADO
-                        regime_mults = REGIME_MATRIX.get(regime_family, {})
-                    else:
-                        # ← NUEVO: Si es 'general', usar REGIME_GENERAL
-                        regime_mults = REGIME_GENERAL
-                    
-                    dir_mults = {}
-                    if dir_mode and dir_mode != 'general':  # ← CAMBIADO
-                        dir_mults = DIRECTION_MATRIX.get(dir_mode, {})
-                    else:
-                        # ← NUEVO: Si es 'general', usar DIRECTION_GENERAL
-                        dir_mults = DIRECTION_GENERAL
+                    # Get regime multipliers directly from strategy config
+                    regime_trending = strat.get('regime_trending', 1.0)
+                    regime_ranging = strat.get('regime_ranging', 1.0)
+                    regime_volatile = strat.get('regime_volatile', 1.0)
                     
                     strategies_info.append({
                         'number': idx,
                         'id': strat['id'],
-                        'regime_family': regime_family or 'general',  # ← CAMBIADO
-                        'dir_mode': dir_mode or 'general',            # ← CAMBIADO
-                        'regime_trending': regime_mults.get('trending', '-'),
-                        'regime_ranging': regime_mults.get('ranging', '-'),
-                        'regime_volatile': regime_mults.get('volatile', '-'),
+                        'direction_mode': direction_mode,
+                        'regime_trending': regime_trending,
+                        'regime_ranging': regime_ranging,
+                        'regime_volatile': regime_volatile,
                         'active': strat.get('active', True)
                     })
                 
                 return jsonify({
                     'success': True,
                     'strategies': strategies_info,
-                    'regime_matrix': REGIME_MATRIX,
-                    'regime_general': REGIME_GENERAL,        # ← NUEVO
+                    'regime_general': REGIME_GENERAL,
                     'direction_matrix': DIRECTION_MATRIX,
-                    'direction_general': DIRECTION_GENERAL   # ← NUEVO
+                    'direction_general': DIRECTION_GENERAL
                 })
                 
             except Exception as e:

@@ -80,8 +80,8 @@ def load_state(state_file: str) -> Tuple[Dict, Dict]:
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
                     'regime_family': pos.get('regime_family', 'unknown'),
                     'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
-                    'direction_mode': pos.get('direction_mode', 'unknown'),        # ← NUEVO
-                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0))  # ← NUEVO
+                    'market_direction': pos.get('market_direction', 'unknown'),
+                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0))
                 })
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
@@ -146,7 +146,7 @@ def save_state_local(open_positions: Dict,
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
                     'regime_family': pos.get('regime_family', 'unknown'),
                     'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
-                    'direction_mode': pos.get('direction_mode', 'unknown'),        # ← NUEVO
+                    'market_direction': pos.get('market_direction', 'unknown'),
                     'direction_multiplier': float(pos.get('direction_multiplier', 1.0)) 
                 })
 
@@ -250,7 +250,7 @@ def sync_broker(open_positions: Dict,
                         fee_from_api=None,
                         regime_family=pos.get('regime_family', 'unknown'),
                         regime_multiplier=pos.get('regime_multiplier', 1.0),
-                        direction_mode=pos.get('direction_mode', 'unknown'),          # ← NUEVO
+                        market_direction=pos.get('market_direction', 'unknown'),
                         direction_multiplier=pos.get('direction_multiplier', 1.0)  
                     )
                     

@@ -2,7 +2,7 @@
 Position sizing based on market regime and direction alignment.
 
 Calculates adjusted order amounts by applying multipliers from:
-- REGIME_MATRIX: Strategy family vs market regime alignment
+- regime_trending/ranging/volatile: Strategy's own regime multipliers (from YAML)
 - DIRECTION_MATRIX: Strategy direction mode vs market direction alignment
 """
 
@@ -11,7 +11,6 @@ from typing import Dict, Tuple, Optional
 
 from config.settings import (
     REGIME_GENERAL,
-    REGIME_MATRIX,
     DIRECTION_GENERAL,
     DIRECTION_MATRIX
 )
@@ -30,8 +29,10 @@ class PositionSizer:
         sizer = PositionSizer(logger)
         adjusted_amount, metadata = sizer.calculate_adjusted_amount(
             base_amount=40.0,
-            strategy_family='trending',
-            dir_mode='long_only',
+            regime_trending=1.5,
+            regime_ranging=1.0,
+            regime_volatile=1.0,
+            direction_mode='long_only',
             market_regime='trending',
             market_direction='uptrend'
         )
@@ -49,24 +50,28 @@ class PositionSizer:
     def calculate_adjusted_amount(
         self,
         base_amount: float,
-        strategy_family: Optional[str],
-        dir_mode: Optional[str],
-        market_regime: str,
-        market_direction: str
+        regime_trending: float = 1.0,
+        regime_ranging: float = 1.0,
+        regime_volatile: float = 1.0,
+        direction_mode: Optional[str] = 'general',
+        market_regime: str = 'ranging',
+        market_direction: str = 'uptrend'
     ) -> Tuple[float, Dict]:
         """
         Calculate adjusted order amount based on regime/direction alignment.
         
         This implements the EXACT logic from orchestrator._search_signals():
-        1. Get regime multiplier (strategy_family vs market_regime)
-        2. Get direction multiplier (dir_mode vs market_direction)
+        1. Get regime multiplier (regime_trending/ranging/volatile vs market_regime)
+        2. Get direction multiplier (direction_mode vs market_direction)
         3. Multiply both: final_mult = regime_mult × direction_mult
         4. Apply to base: adjusted_amount = base_amount × final_mult
         
         Args:
             base_amount: Base order amount from strategy config
-            strategy_family: Strategy's regime family ('trending', 'ranging', 'volatile', 'general', or None)
-            dir_mode: Strategy's direction mode ('long_only', 'short_only', 'general', or None)
+            regime_trending: Strategy's trending multiplier
+            regime_ranging: Strategy's ranging multiplier
+            regime_volatile: Strategy's volatile multiplier
+            direction_mode: Strategy's direction mode ('long_only', 'short_only', 'general')
             market_regime: Current market regime from classifier
             market_direction: Current market direction from classifier
         
@@ -89,8 +94,10 @@ class PositionSizer:
             >>> sizer = PositionSizer(logger)
             >>> amount, meta = sizer.calculate_adjusted_amount(
             ...     base_amount=40.0,
-            ...     strategy_family='trending',
-            ...     dir_mode='long_only',
+            ...     regime_trending=1.8,
+            ...     regime_ranging=1.0,
+            ...     regime_volatile=0.5,
+            ...     direction_mode='long_only',
             ...     market_regime='trending',
             ...     market_direction='uptrend'
             ... )
@@ -99,12 +106,12 @@ class PositionSizer:
         """
         # STEP 1: Calculate REGIME multiplier (cloned from orchestrator)
         regime_mult, regime_source = self._get_regime_multiplier(
-            strategy_family, market_regime
+            regime_trending, regime_ranging, regime_volatile, market_regime
         )
         
         # STEP 2: Calculate DIRECTION multiplier (cloned from orchestrator)
         direction_mult, dir_source = self._get_direction_multiplier(
-            dir_mode, market_direction
+            direction_mode, market_direction
         )
         
         # STEP 3: MULTIPLY both multipliers (cloned from orchestrator)
@@ -131,62 +138,65 @@ class PositionSizer:
     
     def _get_regime_multiplier(
         self,
-        strategy_family: Optional[str],
+        regime_trending: float,
+        regime_ranging: float,
+        regime_volatile: float,
         market_regime: str
     ) -> Tuple[float, str]:
         """
         Get regime multiplier for strategy.
         
-        EXACT logic from orchestrator STEP 1:
-        - If strategy_family == 'general' → use REGIME_GENERAL
-        - Else if strategy_family exists → use REGIME_MATRIX[family][regime]
-        - Else → use REGIME_GENERAL (fallback)
+        Selects the appropriate multiplier based on current market regime.
         
         Args:
-            strategy_family: Strategy's regime family
+            regime_trending: Strategy's trending multiplier
+            regime_ranging: Strategy's ranging multiplier
+            regime_volatile: Strategy's volatile multiplier
             market_regime: Current market regime
         
         Returns:
             Tuple of (multiplier, source_description)
         """
-        if strategy_family == 'general':
-            mult = REGIME_GENERAL[market_regime]
-            source = 'general'
-        elif strategy_family:
-            mult = REGIME_MATRIX[strategy_family][market_regime]
-            source = 'strategy-specific'
+        # Select multiplier based on market regime
+        if market_regime == 'trending':
+            mult = regime_trending
+        elif market_regime == 'ranging':
+            mult = regime_ranging
+        elif market_regime == 'volatile':
+            mult = regime_volatile
         else:
-            # Fallback when no family defined
+            # Fallback to REGIME_GENERAL if unknown regime
             mult = REGIME_GENERAL.get(market_regime, 1.0)
-            source = 'general'
+        
+        source = 'strategy-specific'
         
         return mult, source
     
     def _get_direction_multiplier(
         self,
-        dir_mode: Optional[str],
+        direction_mode: Optional[str],
         market_direction: str
     ) -> Tuple[float, str]:
         """
         Get direction multiplier for strategy.
         
         EXACT logic from orchestrator STEP 2:
-        - If dir_mode == 'general' → use DIRECTION_GENERAL
-        - Else if dir_mode exists → use DIRECTION_MATRIX[mode][direction]
+        - If direction_mode == 'general' → use DIRECTION_GENERAL
+        - Else if direction_mode exists → use DIRECTION_MATRIX[mode][direction]
         - Else → no adjustment (1.0)
         
         Args:
-            dir_mode: Strategy's direction mode
+            direction_mode: Strategy's direction mode
             market_direction: Current market direction
         
         Returns:
             Tuple of (multiplier, source_description)
         """
-        if dir_mode == 'general':
+        if direction_mode == 'general':
             mult = DIRECTION_GENERAL[market_direction]
             source = 'general'
-        elif dir_mode:
-            mult = DIRECTION_MATRIX[dir_mode][market_direction]
+        elif direction_mode:
+            mult = DIRECTION_MATRIX[direction_mode][market_direction]
             source = 'strategy-specific'
         else:
             # No direction mode defined
@@ -228,7 +238,7 @@ class PositionSizer:
                 f"[SIZING] {strategy_id}: "
                 f"Market=[{metadata['market_regime']}, {metadata['market_direction']}] | "
                 f"Base=${metadata['base_amount']:.0f} × "
-                f"regime({metadata['regime_multiplier']:.1f}) × "
-                f"dir({metadata['direction_multiplier']:.1f}) = "
+                f"regime({metadata['regime_multiplier']:.1f}x) × "
+                f"dir({metadata['direction_multiplier']:.1f}x) = "
                 f"${metadata['adjusted_amount']:.0f}"
             )

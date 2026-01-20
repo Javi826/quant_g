@@ -27,9 +27,9 @@ MY_SYMBOLS        = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2"
 #DATA_FOLDER         = "../data/crypto_OOS_2025"
-DATA_FOLDER       = "../data/crypto_2022_IS"
+#DATA_FOLDER       = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 80
 MIN_VOL_USDT      = 10_000_000
@@ -51,7 +51,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 100
+FINAL_N_PATHS        = 1000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 

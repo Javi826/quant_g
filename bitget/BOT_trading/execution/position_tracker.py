@@ -108,8 +108,8 @@ def add_position(strat_id: str,
                 usdt_amount: float = 0,
                 regime_family: Optional[str] = None,
                 regime_multiplier: Optional[float] = None,
-                direction_mode: Optional[str] = None,              # ← NUEVO
-                direction_multiplier: Optional[float] = None) -> None:  # ← NUEVO
+                market_direction: Optional[str] = None,            
+                direction_multiplier: Optional[float] = None) -> None: 
     """
     Add a new position to tracking system.
     
@@ -154,7 +154,7 @@ def add_position(strat_id: str,
         'usdt_amount': usdt_amount,
         'regime_family': regime_family if regime_family else 'unknown',
         'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0,
-        'direction_mode': direction_mode if direction_mode else 'unknown',               # ← NUEVO
+        'market_direction': market_direction if market_direction else 'unknown',
         'direction_multiplier': direction_multiplier if direction_multiplier is not None else 1.0  # ← NUEVO
     }
     
@@ -240,7 +240,7 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'entry_price': pos['entry_price'],
                 'regime_family': pos.get('regime_family', 'unknown'),
                 'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                'direction_mode': pos.get('direction_mode', 'unknown'),              # ← NUEVO
+                'market_direction': pos.get('market_direction', 'unknown'),           # ← NUEVO
                 'direction_multiplier': pos.get('direction_multiplier', 1.0)
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 
@@ -255,7 +255,7 @@ def check_tp_sl_for_strategy(strat_id: str,
                 'entry_price': pos['entry_price'],
                 'regime_family': pos.get('regime_family', 'unknown'),
                 'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                'direction_mode': pos.get('direction_mode', 'unknown'),              # ← NUEVO
+                'market_direction': pos.get('market_direction', 'unknown'),             # ← NUEVO
                 'direction_multiplier': pos.get('direction_multiplier', 1.0)  
             }
             if close_position(symbol, pos['size'], direction, send_request_func, 

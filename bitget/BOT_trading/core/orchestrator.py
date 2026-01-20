@@ -43,7 +43,7 @@ from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
 from config.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
-from config.settings import REGIME_GENERAL, REGIME_MATRIX, DIRECTION_MATRIX, DIRECTION_GENERAL
+from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
 
 class BotOrchestrator:
     """
@@ -548,10 +548,13 @@ class BotOrchestrator:
                 market_direction = self.direction_cache.get(timeframe, 'uptrend')
                 
                 # Calculate adjusted amount using PositionSizer
+                # Calculate adjusted amount using PositionSizer
                 adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
                     base_amount=strat['order_amount'],
-                    strategy_family=strat.get('regime_family'),
-                    dir_mode=strat.get('dir_mode'),
+                    regime_trending=strat.get('regime_trending', 1.0),
+                    regime_ranging=strat.get('regime_ranging', 1.0),
+                    regime_volatile=strat.get('regime_volatile', 1.0),
+                    direction_mode=strat.get('direction_mode', 'general'),
                     market_regime=market_regime,
                     market_direction=market_direction
                 )

@@ -223,7 +223,7 @@ class StrategyProcessor:
                     usdt_amount=order_amount,
                     regime_family=regime_family,        # ← AÑADIR
                     regime_multiplier=regime_multiplier ,
-                    direction_mode=direction,                      # ← NUEVO
+                    market_direction=direction,                      # ← NUEVO
                     direction_multiplier=direction_multiplier# ← AÑADIR# ← USING ADJUSTED AMOUNT
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")

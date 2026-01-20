@@ -9,7 +9,7 @@ logger = logging.getLogger('BOT_trading.validation.validation_module')
 from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_TP_PCT
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
 from config.settings import VALID_TIMEFRAMES
-from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_REFERENCE_SYMBOL, REGIME_MATRIX
+from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_REFERENCE_SYMBOL
 from config.settings import ACCOUNTS, BASE_URL
 
 # ==========================================================================
@@ -32,7 +32,7 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 
 # Common parameters required for ALL strategies
 # Common parameters required for ALL strategies
-COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction', 'regime_family', 'dir_mode']
+COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction', 'regime_trending', 'regime_ranging', 'regime_volatile', 'direction_mode']
 # ==========================================================================
 # SETTINGS VALIDATION
 # ==========================================================================
@@ -339,101 +339,7 @@ def validate_settings():
     if validation_s14_errors == 0:
         logger.info(f"Val S14: REGIME_REFERENCE_SYMBOL = '{REGIME_REFERENCE_SYMBOL}'")
     
-    # ========================================================================
-    # Val S15: REGIME_MATRIX structure
-    # ========================================================================
-    validation_s15_errors = 0
-    
-    # Check if matrix exists
-    if not REGIME_MATRIX:
-        errors.append("REGIME_MATRIX is empty or not defined")
-        validation_s15_errors += 1
-    else:
-        # Required families
-        required_families = {'trending', 'ranging', 'volatile'}
-        configured_families = set(REGIME_MATRIX.keys())
-        
-        # Check all families present
-        missing_families = required_families - configured_families
-        if missing_families:
-            errors.append(
-                f"REGIME_MATRIX missing families: {missing_families}"
-            )
-            validation_s15_errors += 1
-        
-        # Validate each family's multipliers
-        for family in required_families:
-            if family not in REGIME_MATRIX:
-                continue
-            
-            family_mults = REGIME_MATRIX[family]
-            
-            # Check structure is dict
-            if not isinstance(family_mults, dict):
-                errors.append(
-                    f"REGIME_MATRIX['{family}'] must be dict, "
-                    f"got {type(family_mults)}"
-                )
-                validation_s15_errors += 1
-                continue
-            
-            # Check all regimes present
-            missing_regimes = required_families - set(family_mults.keys())
-            if missing_regimes:
-                errors.append(
-                    f"REGIME_MATRIX['{family}'] missing regimes: {missing_regimes}"
-                )
-                validation_s15_errors += 1
-            
-            # Validate multiplier values
-            for regime, multiplier in family_mults.items():
-                if not isinstance(multiplier, (int, float)):
-                    errors.append(
-                        f"REGIME_MATRIX['{family}']['{regime}'] must be numeric, "
-                        f"got {type(multiplier)}"
-                    )
-                    validation_s15_errors += 1
-                elif multiplier < 0:
-                    errors.append(
-                        f"REGIME_MATRIX['{family}']['{regime}'] = {multiplier} "
-                        f"(must be >= 0)"
-                    )
-                    validation_s15_errors += 1
-                elif multiplier > 5.0:
-                    warnings.append(
-                        f"REGIME_MATRIX['{family}']['{regime}'] = {multiplier} "
-                        f"(>5.0 is very aggressive)"
-                    )
-    
-    if validation_s15_errors == 0:
-        logger.info("Val S15: REGIME_MATRIX structure valid")
-    
-    # ========================================================================
-    # Val S16: REGIME_MATRIX coherence check
-    # ========================================================================
-    validation_s16_errors = 0
-    
-    if REGIME_MATRIX:
-        required_families = {'trending', 'ranging', 'volatile'}
-        
-        # Coherence check: each family should have max multiplier in its own regime
-        for family in required_families:
-            if family not in REGIME_MATRIX:
-                continue
-            
-            family_mults = REGIME_MATRIX[family]
-            own_regime_mult = family_mults.get(family, 0)
-            max_mult = max(family_mults.values())
-            
-            if own_regime_mult < max_mult and own_regime_mult > 0:
-                warnings.append(
-                    f"REGIME_MATRIX['{family}'] has max multiplier "
-                    f"({max_mult}) in regime other than own '{family}' ({own_regime_mult}). "
-                    f"Consider if this is intentional."
-                )
-    
-    if validation_s16_errors == 0:
-        logger.info("Val S16: REGIME_MATRIX coherence checked")
+  
     
     # ========================================================================
     # Val S17: Account numbers format
@@ -743,53 +649,89 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     if validation_y10_errors == 0:
         logger.info("Val Y10: All IDs have correct prefix format (NN_name)")
     
-    # ========================================================================
-    # Val Y11: regime_family field
+# ========================================================================
+    # Val Y11: regime multipliers (trending, ranging, volatile)
     # ========================================================================
     validation_y11_errors = 0
-    
-    valid_families = {'trending', 'ranging', 'volatile', 'general'}
-    strategies_without_family = []
     
     for strat in strategies:
         strat_id = strat.get('id', 'UNKNOWN')
         
-        if 'regime_family' not in strat:
-            strategies_without_family.append(strat_id)
-            continue
-        
-        regime_family = strat['regime_family']
-        
-        # Validate type
-        if not isinstance(regime_family, str):
+        # Check regime_trending
+        if 'regime_trending' not in strat:
             errors.append(
-                f"Strategy '{strat_id}' regime_family must be string, "
-                f"got {type(regime_family)}"
+                f"Strategy '{strat_id}' missing required field 'regime_trending'"
             )
             validation_y11_errors += 1
-            continue
+        else:
+            val = strat['regime_trending']
+            if not isinstance(val, (int, float)):
+                errors.append(
+                    f"Strategy '{strat_id}' regime_trending must be numeric, got {type(val)}"
+                )
+                validation_y11_errors += 1
+            elif val < 0:
+                errors.append(
+                    f"Strategy '{strat_id}' regime_trending = {val} (must be >= 0)"
+                )
+                validation_y11_errors += 1
+            elif val > 5.0:
+                warnings.append(
+                    f"Strategy '{strat_id}' regime_trending = {val} (>5.0 is very aggressive)"
+                )
         
-        # Validate value
-        if regime_family not in valid_families:
+        # Check regime_ranging
+        if 'regime_ranging' not in strat:
             errors.append(
-                f"Strategy '{strat_id}' has invalid regime_family='{regime_family}' "
-                f"(valid: {valid_families})"
+                f"Strategy '{strat_id}' missing required field 'regime_ranging'"
             )
             validation_y11_errors += 1
-    
-    # Warning for strategies without regime_family
-    if strategies_without_family:
-        warnings.append(
-            f"{len(strategies_without_family)} strategies without 'regime_family' "
-            f"(will use REGIME_GENERAL fallback): {strategies_without_family}"
-        )
+        else:
+            val = strat['regime_ranging']
+            if not isinstance(val, (int, float)):
+                errors.append(
+                    f"Strategy '{strat_id}' regime_ranging must be numeric, got {type(val)}"
+                )
+                validation_y11_errors += 1
+            elif val < 0:
+                errors.append(
+                    f"Strategy '{strat_id}' regime_ranging = {val} (must be >= 0)"
+                )
+                validation_y11_errors += 1
+            elif val > 5.0:
+                warnings.append(
+                    f"Strategy '{strat_id}' regime_ranging = {val} (>5.0 is very aggressive)"
+                )
+        
+        # Check regime_volatile
+        if 'regime_volatile' not in strat:
+            errors.append(
+                f"Strategy '{strat_id}' missing required field 'regime_volatile'"
+            )
+            validation_y11_errors += 1
+        else:
+            val = strat['regime_volatile']
+            if not isinstance(val, (int, float)):
+                errors.append(
+                    f"Strategy '{strat_id}' regime_volatile must be numeric, got {type(val)}"
+                )
+                validation_y11_errors += 1
+            elif val < 0:
+                errors.append(
+                    f"Strategy '{strat_id}' regime_volatile = {val} (must be >= 0)"
+                )
+                validation_y11_errors += 1
+            elif val > 5.0:
+                warnings.append(
+                    f"Strategy '{strat_id}' regime_volatile = {val} (>5.0 is very aggressive)"
+                )
     
     if validation_y11_errors == 0:
-        logger.info("Val Y11: All strategy regime_family values valid")
-    
+        logger.info("Val Y11: All regime multipliers valid")
 
     # ========================================================================
-    # Val Y12: dir_mode field
+# ========================================================================
+    # Val Y12: direction_mode field
     # ========================================================================
     validation_y12_errors = 0
     
@@ -799,41 +741,41 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     for strat in strategies:
         strat_id = strat.get('id', 'UNKNOWN')
         
-        if 'dir_mode' not in strat:
+        if 'direction_mode' not in strat:
             strategies_without_dir_mode.append(strat_id)
             continue
         
-        dir_mode = strat['dir_mode']
+        direction_mode = strat['direction_mode']
         
         # Validate type
-        if not isinstance(dir_mode, str):
+        if not isinstance(direction_mode, str):
             errors.append(
-                f"Strategy '{strat_id}' dir_mode must be string, "
-                f"got {type(dir_mode)}"
+                f"Strategy '{strat_id}' direction_mode must be string, "
+                f"got {type(direction_mode)}"
             )
             validation_y12_errors += 1
             continue
         
         # Validate value
-        if dir_mode not in valid_dir_modes:
+        if direction_mode not in valid_dir_modes:
             errors.append(
-                f"Strategy '{strat_id}' has invalid dir_mode='{dir_mode}' "
+                f"Strategy '{strat_id}' has invalid direction_mode='{direction_mode}' "
                 f"(valid: {valid_dir_modes})"
             )
             validation_y12_errors += 1
     
-    # Warning for strategies without dir_mode
+    # Warning for strategies without direction_mode
     if strategies_without_dir_mode:
         warnings.append(
-            f"{len(strategies_without_dir_mode)} strategies without 'dir_mode' "
+            f"{len(strategies_without_dir_mode)} strategies without 'direction_mode' "
             f"(will default to 'general'): {strategies_without_dir_mode}"
         )
     
     if validation_y12_errors == 0:
-        logger.info("Val Y12: All strategy dir_mode values valid")
+        logger.info("Val Y12: All strategy direction_mode values valid")
     
 
-    # ========================================================================
+ # ========================================================================
     # Val Y13: Coherencia entre direction y dir_mode
     # ========================================================================
     validation_y13_errors = 0

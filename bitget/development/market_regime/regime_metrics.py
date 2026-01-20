@@ -145,42 +145,7 @@ def calc_atr_pct(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: i
         return np.nan
 
 
-def calc_permutation_entropyÑÑÑ(close: np.ndarray, window: int = 50, order: int = 3) -> float:
-    """
-    Calculates Permutation Entropy using neurokit2 library.
-    
-    Args:
-        close: Array of closing prices
-        window: Lookback window
-        order: Embedding dimension (pattern length)
-    
-    Returns:
-        Normalized entropy (0-1). 0 = deterministic, 1 = random
-    """
-    if len(close) < window:
-        return np.nan
-    
-    series = close[-window:]
-    
-    try:
-        # Calculate permutation entropy using neurokit2
-        pe = nk.entropy_permutation(series, dimension=order, delay=1)
-        
-        # Normalize to [0, 1] range
-        # Maximum entropy for permutation entropy is log2(order!)
-        from math import factorial
-        max_entropy = np.log2(factorial(order))
-        
-        if max_entropy == 0:
-            return np.nan
-        
-        pe_normalized = pe / max_entropy
-        
-        # Ensure valid range
-        return float(np.clip(pe_normalized, 0.0, 1.0))
-    
-    except Exception as e:
-        return np.nan
+
 
 def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
     """

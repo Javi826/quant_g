@@ -28,7 +28,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -45,12 +45,12 @@ TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [6] 
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [30]
+LOOKBACK_LIST        = [4] 
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [20]
 
-TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [7.5]
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -76,7 +76,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_short(
+        signals = reversal_long(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

@@ -276,47 +276,6 @@ async function loadRegimeSizing() {
     }
 }
 
-async function loadRegimeGeneralMatrix() {
-    try {
-        const res = await fetch('/api/regime/matrix');
-        const data = await res.json();
-        
-        if (!data.success) {
-            console.error('Failed to load regime matrix:', data.error);
-            return;
-        }
-        
-        window.REGIME_MATRIX = data.matrix;
-        
-        const tbody = document.getElementById('regime-general-matrix-body');
-        if (!tbody) return;
-        
-        const families = ['trending', 'ranging', 'volatile'];
-        
-        let html = '';
-        families.forEach(family => {
-            const mults = data.matrix[family];
-            if (!mults) return;
-            
-            html += `<tr>
-                <td style="color: ${getFamilyColor(family)}; font-weight: 600; text-transform: uppercase;">${family}</td>
-                <td>${mults.trending}x</td>
-                <td>${mults.ranging}x</td>
-                <td>${mults.volatile}x</td>
-            </tr>`;
-        });
-        
-        tbody.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading general regime matrix:', error);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// END REGIME MATRIX FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════
-
 // ═══════════════════════════════════════════════════════════════════════════
 // MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1203,7 +1162,6 @@ async function loadStrategyAnalysis() {
 // =============================================================================
 // REGIME STRATEGY MATRIX
 // =============================================================================
-
 async function renderRegimeStrategyMatrix(strategies) {
     try {
         const res = await fetch('/api/regime/strategies');
@@ -1220,7 +1178,7 @@ async function renderRegimeStrategyMatrix(strategies) {
         const strategiesData = data.strategies || [];
         
         if (strategiesData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No strategies</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No strategies</td></tr>';
             return;
         }
         
@@ -1231,27 +1189,36 @@ async function renderRegimeStrategyMatrix(strategies) {
         sorted.forEach((strat, idx) => {
             const num = String(idx + 1).padStart(2, '0');
             
-            // Color coding for regime_family
-            let familyColor = getFamilyColor(strat.regime_family);
+            // Color coding for multipliers
+            // Color coding for multipliers
+            const getMultiplierColor = (val) => {
+                if (val === '-' || val === 0) return '#6b7280';  // Gray for blocked
+                if (val === 1) return '#c9d1d9';  // White for 1x
+                if (val > 1) return '#58a6ff';   // Blue for >1x
+                return '#f85149';  // Red for <1x
+            };
             
-            // Color coding for dir_mode
+            // Color coding for direction_mode
             let dirColor;
-            if (strat.dir_mode === 'long_only') {
-                dirColor = '#3fb950';  // Verde
-            } else if (strat.dir_mode === 'short_only') {
-                dirColor = '#f85149';  // Rojo
+            if (strat.direction_mode === 'long_only') {
+                dirColor = '#3fb950';  // Green
+            } else if (strat.direction_mode === 'short_only') {
+                dirColor = '#f85149';  // Red
             } else {
-                dirColor = '#8b949e';  // Gris para general
+                dirColor = '#8b949e';  // Gray for general
             }
+            
+            const trendVal = strat.regime_trending;
+            const rangVal = strat.regime_ranging;
+            const volVal = strat.regime_volatile;
             
             html += `<tr>
                 <td style="color: #8b949e; font-weight: 600;">${num}</td>
                 <td>${strat.id}</td>
-                <td style="color: ${familyColor}; font-weight: 600; text-transform: uppercase;">${strat.regime_family}</td>
-                <td>${strat.regime_trending !== '-' ? strat.regime_trending + 'x' : '-'}</td>
-                <td>${strat.regime_ranging !== '-' ? strat.regime_ranging + 'x' : '-'}</td>
-                <td>${strat.regime_volatile !== '-' ? strat.regime_volatile + 'x' : '-'}</td>
-                <td style="color: ${dirColor}; font-weight: 600; text-transform: uppercase;">${strat.dir_mode}</td>
+                <td style="color: ${getMultiplierColor(trendVal)}; font-weight: 700;">${trendVal !== '-' ? trendVal + 'x' : '-'}</td>
+                <td style="color: ${getMultiplierColor(rangVal)}; font-weight: 700;">${rangVal !== '-' ? rangVal + 'x' : '-'}</td>
+                <td style="color: ${getMultiplierColor(volVal)}; font-weight: 700;">${volVal !== '-' ? volVal + 'x' : '-'}</td>
+                <td style="color: ${dirColor}; font-weight: 600; text-transform: uppercase;">${strat.direction_mode}</td>
             </tr>`;
         });
         
@@ -1261,7 +1228,6 @@ async function renderRegimeStrategyMatrix(strategies) {
         console.error('Error rendering regime strategy matrix:', error);
     }
 }
-
 // =============================================================================
 // END REGIME STRATEGY MATRIX
 // =============================================================================
@@ -1309,9 +1275,9 @@ async function loadBotConfig() {
             const sortedStrategies = data.strategies.sort((a, b) => a.id.localeCompare(b.id));
             
             // ✅ MODIFICACIÓN: Añadido 'dir_mode' a fixedKeys
-            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'direction', 'status', 'symbols_count', 'regime_family', 'dir_mode'];
+            const fixedKeys = ['id', 'name', 'number', 'timeframe', 'status', 'symbols_count'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
-            const excludeKeys = new Set([...fixedKeys, ...commonKeys]);
+            const excludeKeys = new Set([...fixedKeys, ...commonKeys, 'direction', 'family_sizing', 'direction_mode', 'active']);
             
             const extraParamKeys = new Set();
             sortedStrategies.forEach(strat => {
@@ -1333,17 +1299,16 @@ async function loadBotConfig() {
             
             // ✅ MODIFICACIÓN: Añadida columna Dir Mode
             document.querySelector('#strategies-table thead tr').innerHTML = 
-                '<th>#</th>' +
-                '<th>ID</th>' +
-                '<th>TF</th>' +
-                '<th>Side</th>' +
-                '<th>Symbols</th>' +
-                '<th>TP%</th>' +
-                '<th>SL%</th>' +
-                '<th>Amount</th>' +
-                '<th>Candles</th>' +
-                dynamicHeaders +
-                '<th>Status</th>';
+                            '<th>#</th>' +
+                            '<th>ID</th>' +
+                            '<th>TF</th>' +
+                            '<th>Symbols</th>' +
+                            '<th>TP%</th>' +
+                            '<th>SL%</th>' +
+                            '<th>Amount</th>' +
+                            '<th>Candles</th>' +
+                            dynamicHeaders +
+                            '<th>Status</th>';
             
             strategiesBody.innerHTML = sortedStrategies.map((strat, index) => {
                 let statusBadge = '';
@@ -1361,7 +1326,6 @@ async function loadBotConfig() {
                     '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
                     '<td>' + strat.id + '</td>' +
                     '<td>' + strat.timeframe + '</td>' +
-                    '<td class="direction-' + strat.direction.toLowerCase() + '">' + strat.direction.toUpperCase() + '</td>' +
                     '<td style="text-align: center; color: #58a6ff;">' + strat.symbols_count + '</td>';
                 
                 let commonCols = '';
@@ -1377,27 +1341,13 @@ async function loadBotConfig() {
                     const display = (value !== undefined && value !== 'N/A') ? value : '-';
                     extraCols += '<td>' + display + '</td>';
                 });
-                
-                // ✅ MODIFICACIÓN: Añadida columna Dir Mode con color
-                let dirMode = strat.dir_mode || 'general';
-                let dirModeColor;
-                if (dirMode === 'long') {
-                    dirModeColor = '#3fb950'; // Verde
-                } else if (dirMode === 'short') {
-                    dirModeColor = '#f85149'; // Rojo
-                } else {
-                    dirModeColor = '#8b949e'; // Gris para 'general'
-                }
-                
-                const dirModeCol = '<td style="color: ' + dirModeColor + '; font-weight: 600; text-transform: uppercase;">' + dirMode + '</td>';
-                
+                             
                 return '<tr>' + fixedCols + commonCols + extraCols + '<td>' + statusBadge + '</td></tr>';
             }).join('');
         }
         
         // MODIFIED: Call new regime matrix functions
         await loadRegimeSizing();
-        await loadRegimeGeneralMatrix();
         renderRegimeStrategyMatrix(data.strategies);
         
     } catch (error) {
