@@ -21,10 +21,10 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'long'
-    regime_trending: 0
+    regime_trending: 1.0
     regime_ranging: 1.0
-    regime_volatile: 0
-    direction_mode: 'general'
+    regime_volatile: 1.0
+    direction_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 40
     lookback: 2
@@ -82,7 +82,7 @@ strategies:
     active: true
     direction: 'short'
     regime_trending: 1.0
-    regime_ranging: 0
+    regime_ranging: 1.0
     regime_volatile: 1.0
     direction_mode: 'general'
     sell_after_ncandles: 50
@@ -122,9 +122,9 @@ strategies:
     active: true
     direction: 'long'
     regime_trending: 1.0
-    regime_ranging: 1.0
-    regime_volatile: 1.0
-    direction_mode: 'general'
+    regime_ranging: 0
+    regime_volatile: 0
+    direction_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 40
     lookback: 7
@@ -164,8 +164,8 @@ strategies:
     direction: 'long'
     regime_trending: 1.0
     regime_ranging: 1.0
-    regime_volatile: 1.0
-    direction_mode: 'general'
+    regime_volatile: 0
+    direction_mode: 'long_only'
     sell_after_ncandles: 50
     order_amount: 40
     lookback: 3
@@ -245,7 +245,7 @@ strategies:
     active: true
     direction: 'long'
     regime_trending: 1.0
-    regime_ranging: 0
+    regime_ranging: 1.0
     regime_volatile: 0
     direction_mode: 'long_only'
     sell_after_ncandles: 50
@@ -264,10 +264,10 @@ strategies:
     timeframe: '4H'
     active: true
     direction: 'short'
-    regime_trending: 1.0
-    regime_ranging: 0
+    regime_trending: 0
+    regime_ranging: 1.0
     regime_volatile: 0
-    direction_mode: 'short_only'
+    direction_mode: 'general'
     sell_after_ncandles: 50
     order_amount: 40
     lookback: 50
@@ -275,26 +275,6 @@ strategies:
     impulse: 0.01
     tp_pct: 4
     sl_pct: 11
-
-  # ------------------------------------------------------------------------
-  # STRATEGY 14: Order Blocks Long (4H)
-  # ------------------------------------------------------------------------
-  - id: '14_orderblocks_long_4H'
-    name: 'orderblocks_long_4H'
-    timeframe: '4H'
-    active: true
-    direction: 'long'
-    regime_trending: 1.0
-    regime_ranging: 0
-    regime_volatile: 0
-    direction_mode: 'long_only'
-    sell_after_ncandles: 50
-    order_amount: 40
-    lookback: 50
-    tolerance: 40
-    impulse: 0.01
-    tp_pct: 5
-    sl_pct: 10
           
   # ------------------------------------------------------------------------
   # STRATEGY 16: ranging short (6Hutc)

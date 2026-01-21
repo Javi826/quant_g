@@ -308,7 +308,6 @@ def get_implemented_strategies() -> set:
         '11_parity_short_1H',
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
-        '14_orderblocks_long_4H',
         '16_ranging_short_6Hutc',
     }
     return strategies

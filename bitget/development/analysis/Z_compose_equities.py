@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 
-FOLDER              = "../brief_equities_2025"
+FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '4h'
 DATA_FOLDER         = "../data/crypto_OOS_2025"

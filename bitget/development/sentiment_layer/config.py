@@ -1,6 +1,6 @@
 """
-market_regime/config.py
-Centralized configuration for regime-based position sizing.
+sentiment_layer/config.py
+Centralized configuration for sentiment-based position sizing.
 """
 import os
 
@@ -10,241 +10,215 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Input: folder with trades files
-TRADES_FOLDER = os.path.join(BASE_DIR,'market_regime', 'brief_trades_2025')
+TRADES_FOLDER = os.path.join(BASE_DIR, 'sentiment_layer', 'brief_trades_2025')
 
 # Input: pattern to match trades files (glob pattern)
 TRADES_PATTERN = 'all_trades_*.xlsx'
 
-# Input: OHLC folder with BTC parquet
-OHLC_FOLDER = os.path.join(BASE_DIR, 'data', 'crypto_OOS_2025')
+# Input: Sentiment folder with fear_greed parquet files
+SENTIMENT_FOLDER = os.path.join(BASE_DIR, 'sentiment_layer', 'data_sentiment')
 
 # Output: folder for enriched trades
-OUTPUT_FOLDER = os.path.join(BASE_DIR, 'market_regime', 'output_2025')
+OUTPUT_FOLDER = os.path.join(BASE_DIR, 'sentiment_layer', 'output_2025')
 
 # =============================================================================
-# BTC SETTINGS
+# SENTIMENT SETTINGS
 # =============================================================================
-BTC_SYMBOL    = 'BTCUSDT'
-LOOKBACK_BARS = 100
+LOOKBACK_BARS = 100  # For future sentiment metrics (e.g., rolling averages)
 
 # =============================================================================
-# METRIC WINDOWS
+# SENTIMENT CLASSIFICATION THRESHOLDS
 # =============================================================================
-HURST_WINDOW = 100
-ER_WINDOW    = 14
-ATR_WINDOW   = 14
-PE_WINDOW    = 50
-PE_ORDER     = 3
+SENTIMENT_THRESHOLDS = {
+    'fear': ('<', 0.45),
+    'neutral': ('>=', 0.45, '<=', 0.55),
+    'greed': ('>', 0.55)
+}
 
 # =============================================================================
-# FAMILY CLASSIFICATION THRESHOLDS
+# SENTIMENT STATE CLASSIFICATION
 # =============================================================================
-FAMILIES = {
-    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
-    'ranging': {}  # Default: everything else
+SENTIMENT_STATES = {
+    'fear': {'fear_greed_norm': ('<', 0.45)},
+    'neutral': {'fear_greed_norm': ('>=', 0.45, '<=', 0.55)},
+    'greed': {'fear_greed_norm': ('>', 0.55)}
 }
 
 # =============================================================================
 # GLOBAL MULTIPLIERS (applied on top of individual strategy configs)
 # =============================================================================
-# These multipliers are applied to ALL strategies as a global boost/reduction
-# Example: If strategy has regime_trending=1.0 and GLOBAL trending=1.5,
-#          final multiplier for trending trades = 1.0 * 1.5 = 1.5
-#
-# Use cases:
-# - Boost aggressive strategies: Set trending=1.5, volatile=1.5
-# - Reduce risk globally: Set all to 0.5
-# - Favor longs vs shorts: Set long=1.5, short=0.8
-
-GLOBAL_REGIME_MULTIPLIERS = {
-    'trending': 1.0,   # Multiplier applied to all trending regime trades
-    'ranging': 1.0,    # Multiplier applied to all ranging regime trades
-    'volatile': 1.0    # Multiplier applied to all volatile regime trades
+GLOBAL_SENTIMENT_MULTIPLIERS = {
+    'fear': 1.0,
+    'neutral': 1.0,
+    'greed': 1.0
 }
 
 GLOBAL_DIRECTION_MULTIPLIERS = {
-    'long': 1.0,    # Multiplier applied to all long direction strategies
-    'short': 1.0    # Multiplier applied to all short direction strategies
+    'long': 1.0,
+    'short': 1.0
 }
 
 # =============================================================================
-# STRATEGY CONFIGURATIONS (from analysis FULL 2025)
+# STRATEGY CONFIGURATIONS
 # =============================================================================
-# Individual strategy configs for regime and direction filtering
-# Based on statistical analysis of OOS data
+# Individual strategy configs for sentiment filtering
+# To be populated based on statistical analysis
 
 STRATEGY_CONFIGS = {
     # STRATEGY 01: Double Top Long (4H)
     'double_top_long_4H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': True
     },
     
     # STRATEGY 02: Reversal Long (4H)
     'reversal_long_4H': {
-        'regime_trending': 0.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 03: Parity Long (4H)
     'parity_long_4H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 0.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 04: Reversal Short (4H)
     'reversal_short_4H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 05: Parity Short (4H)
     'parity_short_4H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'short_only',
         'active': True
     },
     
     # STRATEGY 06: Reversal Long (1H)
     'reversal_long_1H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 0.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': True
     },
     
     # STRATEGY 07: Reversal Short (1H)
     'reversal_short_1H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 08: Reversal Long (6Hutc)
     'reversal_long_6Hutc': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': True
     },
     
     # STRATEGY 09: Reversal Short (6Hutc)
     'reversal_short_6Hutc': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 10: Parity Long (1H)
     'parity_long_1H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 0.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': True
     },
     
     # STRATEGY 11: Parity Short (1H)
     'parity_short_1H': {
-        'regime_trending': 0.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 12: Parity Long (6Hutc)
     'parity_long_6Hutc': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': True
     },
     
     # STRATEGY 13: Order Blocks Short (4H)
     'orderblocks_short_4H': {
-        'regime_trending': 0.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # STRATEGY 16: Ranging Short (6Hutc)
     'ranging_short_6Hutc': {
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     },
     
     # INACTIVE STRATEGIES
-    # STRATEGY 14: Order Blocks Long (4H) - DESACTIVADA (profit negativo)
+    # STRATEGY 14: Order Blocks Long (4H)
     'orderblocks_long_4H': {
-        'regime_trending': 1.0,
-        'regime_ranging': 0.0,
-        'regime_volatile': 0.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'long_only',
         'active': False
     },
     
-    # STRATEGY 15: Ranging Long (4H) - DESACTIVADA (profit muy bajo)
+    # STRATEGY 15: Ranging Long (4H)
     'ranging_long_4H': {
-        'regime_trending': 0.0,
-        'regime_ranging': 0.0,
-        'regime_volatile': 1.0,
+        'sentiment_fear': 1.0,
+        'sentiment_neutral': 1.0,
+        'sentiment_greed': 1.0,
         'direction_mode': 'general',
         'active': True
     }
 }
 
 # =============================================================================
-# LEGACY CONFIGS (mantener por compatibilidad si no existe strategy config)
+# LEGACY CONFIGS (mantener por compatibilidad)
 # =============================================================================
-FAMILY_SIZING = {
-    'trending': 1.0,
-    'volatile': 1.0,
-    'ranging': 1.0,
+SENTIMENT_SIZING = {
+    'fear': 1.0,
+    'neutral': 1.0,
+    'greed': 1.0
 }
-
-# =============================================================================
-# DIRECTION DETECTION
-# =============================================================================
-# Choose which MA to use for trend detection: 'ma_20', 'ma_50', or 'ma_200'
-DIRECTION_MA_REFERENCE = 'ma_50'
-
-# Method for detecting market direction
-DIRECTION_METHOD = 'price_vs_ma'
-
-# For 'price_vs_ma' method:
-DIRECTION_MA_PERIOD = 50
-
-# For 'ma_cross' method:  
-DIRECTION_MA_FAST = 50
-DIRECTION_MA_SLOW = 200
 
 # =============================================================================
 # CAPITAL

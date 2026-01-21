@@ -18,8 +18,9 @@ from glob import glob
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from market_regime.config import (
-    OUTPUT_FOLDER, FAMILIES, FAMILY_SIZING, DIRECTION_SIZING, 
-    DIRECTION_MA_REFERENCE, INITIAL_CAPITAL, DATE_RANGE_FILTER
+    OUTPUT_FOLDER, FAMILIES, STRATEGY_CONFIGS, 
+    DIRECTION_MA_REFERENCE, INITIAL_CAPITAL, DATE_RANGE_FILTER,
+    GLOBAL_REGIME_MULTIPLIERS, GLOBAL_DIRECTION_MULTIPLIERS
 )
 
 
@@ -71,64 +72,79 @@ def extract_generator(strategy_name: str) -> str:
 def extract_direction(strategy_name: str) -> str:
     """Extracts direction (long/short) from strategy name."""
     name_lower = strategy_name.lower()
-    if '_long' in name_lower:
+    if 'long' in name_lower:
         return 'long'
-    elif '_short' in name_lower:
+    elif 'short' in name_lower:
         return 'short'
     else:
         return 'unknown'
 
 
-def calculate_direction_multiplier(row: pd.Series, trade_direction: str, direction_sizing: dict, 
-                                  ma_reference: str = 'ma_50') -> float:
-    """
-    Calculates direction multiplier based on BTC price vs selected MA.
-    
-    Logic:
-    - If all multipliers are 1.0: no filtering (backward compatible)
-    - uptrend: price_vs_ma > 1.0 (price above MA)
-    - downtrend: price_vs_ma <= 1.0 (price below MA)
-    - If MA data missing: return 1.0 (no filtering)
-    
-    Args:
-        row: Trade row with metrics
-        trade_direction: 'long' or 'short'
-        direction_sizing: Dict with multipliers
-        ma_reference: Which MA to use ('ma_20', 'ma_50', 'ma_200')
-    """
-    # Check if direction sizing is disabled (all at 1.0)
-    long_config = direction_sizing.get('long', {})
-    short_config = direction_sizing.get('short', {})
-    
-    all_ones = (
-        long_config.get('uptrend', 1.0) == 1.0 and
-        long_config.get('downtrend', 1.0) == 1.0 and
-        short_config.get('uptrend', 1.0) == 1.0 and
-        short_config.get('downtrend', 1.0) == 1.0
-    )
-    
-    if all_ones:
-        return 1.0  # No direction filtering
-    
-    # Get price_vs_ma ratio based on ma_reference
+def is_uptrend(row: pd.Series, ma_reference: str = 'ma_50') -> bool:
+    """Check if market is in uptrend (price > MA)."""
     price_vs_ma_col = f'price_vs_{ma_reference}'
     price_vs_ma = row.get(price_vs_ma_col)
     
-    # If MA data missing, no filtering
     if pd.isna(price_vs_ma):
+        return False
+    
+    return price_vs_ma > 1.0
+
+
+def calculate_regime_multiplier(row: pd.Series, strategy_config: dict) -> float:
+    """
+    Calculates regime multiplier based on strategy config.
+    
+    Args:
+        row: Trade row with family classification
+        strategy_config: Strategy config from STRATEGY_CONFIGS
+    
+    Returns:
+        Multiplier (0.0 or 1.0) based on family and strategy config
+    """
+    family = row.get('family', 'unknown')
+    
+    # Get regime multipliers from strategy config
+    regime_mult = {
+        'trending': strategy_config.get('regime_trending', 1.0),
+        'volatile': strategy_config.get('regime_volatile', 1.0),
+        'ranging': strategy_config.get('regime_ranging', 1.0)
+    }
+    
+    return regime_mult.get(family, 1.0)
+
+
+def calculate_direction_multiplier(row: pd.Series, strategy_config: dict, 
+                                  ma_reference: str = 'ma_50') -> float:
+    """
+    Calculates direction multiplier based on strategy config and direction_mode.
+    
+    Args:
+        row: Trade row with metrics
+        strategy_config: Strategy config from STRATEGY_CONFIGS
+        ma_reference: Which MA to use ('ma_20', 'ma_50', 'ma_200')
+    
+    Returns:
+        Multiplier (0.0 or 1.0) based on direction_mode
+    """
+    direction_mode = strategy_config.get('direction_mode', 'general')
+    
+    # If general mode, no filtering
+    if direction_mode == 'general':
         return 1.0
     
-    # Determine trend: uptrend if price above MA (ratio > 1.0)
-    is_uptrend = price_vs_ma > 1.0
-    trend = 'uptrend' if is_uptrend else 'downtrend'
+    # Check if uptrend
+    uptrend = is_uptrend(row, ma_reference)
     
-    # Get multiplier for this trade direction and trend
-    if trade_direction == 'long':
-        return long_config.get(trend, 1.0)
-    elif trade_direction == 'short':
-        return short_config.get(trend, 1.0)
+    # Apply direction filter
+    if direction_mode == 'long_only':
+        # Only trade in uptrend
+        return 1.0 if uptrend else 0.0
+    elif direction_mode == 'short_only':
+        # Only trade in downtrend
+        return 0.0 if uptrend else 1.0
     else:
-        return 1.0  # unknown direction
+        return 1.0
 
 
 def load_enriched_trades(filepath: str) -> pd.DataFrame:
@@ -160,9 +176,21 @@ def calculate_max_dd_pct(equity_curve: pd.Series) -> float:
     return float(np.max(drawdown_pct))
 
 
-def process_single_file(filepath: str, families: dict, sizing: dict, direction_sizing: dict, initial_capital: float, date_range: tuple = None) -> dict:
+def process_single_file(filepath: str, families: dict, initial_capital: float, date_range: tuple = None) -> dict:
     """Processes a single enriched file and returns results."""
-    strategy = Path(filepath).stem.replace('trades_enriched_', '')
+    strategy = Path(filepath).stem.replace('trades_enriched_', '').replace('_OOS', '')
+    
+    # Get strategy config
+    strategy_config = STRATEGY_CONFIGS.get(strategy)
+    
+    if strategy_config is None:
+        print(f"⚠️  Strategy '{strategy}' not found in STRATEGY_CONFIGS, skipping...")
+        return None
+    
+    if not strategy_config.get('active', True):
+        print(f"⚠️  Strategy '{strategy}' is inactive, skipping...")
+        return None
+    
     df = load_enriched_trades(filepath)
     
     # Apply date range filter if specified
@@ -175,21 +203,31 @@ def process_single_file(filepath: str, families: dict, sizing: dict, direction_s
     # Extract direction from strategy name
     trade_direction = extract_direction(strategy)
     
-    # Classify and apply family sizing
+    # Classify trades by family
     df['family'] = df.apply(lambda row: classify_trade(row, families), axis=1)
-    df['family_mult'] = df['family'].map(sizing).fillna(1.0)
     
-    # Apply direction sizing
-    df['direction_mult'] = df.apply(
-        lambda row: calculate_direction_multiplier(
-            row, trade_direction, direction_sizing, 
-            ma_reference=DIRECTION_MA_REFERENCE
-        ),
+    # Apply regime multiplier
+    df['regime_mult'] = df.apply(
+        lambda row: calculate_regime_multiplier(row, strategy_config), 
         axis=1
     )
     
-    # Combined multiplier
-    df['sizing_mult'] = df['family_mult'] * df['direction_mult']
+    # Apply direction multiplier
+    df['direction_mult'] = df.apply(
+        lambda row: calculate_direction_multiplier(row, strategy_config, DIRECTION_MA_REFERENCE),
+        axis=1
+    )
+    
+    # APPLY GLOBAL MULTIPLIERS
+    # Global regime multiplier (based on family)
+    df['global_regime_mult'] = df['family'].map(GLOBAL_REGIME_MULTIPLIERS).fillna(1.0)
+    
+    # Global direction multiplier (based on strategy direction)
+    global_direction_mult = GLOBAL_DIRECTION_MULTIPLIERS.get(trade_direction, 1.0)
+    df['global_direction_mult'] = global_direction_mult
+    
+    # Combined multiplier = strategy_regime * strategy_direction * global_regime * global_direction
+    df['sizing_mult'] = df['regime_mult'] * df['direction_mult'] * df['global_regime_mult'] * df['global_direction_mult']
     df['profit_sized'] = df['profit'] * df['sizing_mult']
     
     # Sort by time
@@ -248,7 +286,8 @@ def process_single_file(filepath: str, families: dict, sizing: dict, direction_s
         'dd_sized_pct': dd_sized_pct,
         'dd_delta_pct': dd_delta_pct,
         'family_stats': family_stats,
-        'df': df
+        'df': df,
+        'config': strategy_config
     }
 
 
@@ -258,8 +297,13 @@ def print_file_results(r: dict):
     print(f"STRATEGY: {r['strategy']}")
     print(f"{'='*70}")
     
-    profit_ok = "✅" if r['profit_sized'] > r['profit_base'] else "❌"
-    dd_ok = "✅" if r['dd_sized_pct'] < r['dd_base_pct'] else "❌"
+    # Print config
+    config = r.get('config', {})
+    print(f"Config: T={config.get('regime_trending', 1.0)} R={config.get('regime_ranging', 1.0)} V={config.get('regime_volatile', 1.0)} | {config.get('direction_mode', 'general')}")
+    
+    # CHANGED: Use 🟢 when delta = 0
+    profit_ok = "✅" if r['profit_sized'] > r['profit_base'] else ("🟢" if r['profit_sized'] == r['profit_base'] else "❌")
+    dd_ok = "✅" if r['dd_sized_pct'] < r['dd_base_pct'] else ("🟢" if r['dd_sized_pct'] == r['dd_base_pct'] else "❌")
     
     print(f"Trades: {r['num_trades']} (base) → {r['trades_sizing']} (sizing)  |  Win%: {r['win_rate_base']:.1f}% → {r['win_rate_sized']:.1f}%")
     print(f"Profit:  {r['profit_base']:>8.2f} → {r['profit_sized']:>8.2f}  ({r['delta_pct']:+.1f}%) {profit_ok}")
@@ -275,16 +319,12 @@ def print_file_results(r: dict):
 def apply_sizing(
     output_folder: str = None,
     families: dict = None,
-    sizing: dict = None,
-    direction_sizing: dict = None,
     initial_capital: float = None,
     show_plots: bool = True
 ) -> list:
     """Applies position sizing to all enriched files."""
     output_folder = output_folder or OUTPUT_FOLDER
     families = families or FAMILIES
-    sizing = sizing or FAMILY_SIZING
-    direction_sizing = direction_sizing or DIRECTION_SIZING
     initial_capital = initial_capital or INITIAL_CAPITAL
     
     print("=" * 70)
@@ -294,20 +334,24 @@ def apply_sizing(
     if DATE_RANGE_FILTER:
         print(f"\n⚠️  DATE RANGE FILTER ACTIVE: {DATE_RANGE_FILTER[0]} → {DATE_RANGE_FILTER[1]}")
     
-    print("\nSizing configuration:")
-    for fam, mult in sizing.items():
-        rules = families.get(fam, {})
+    print("\nFamily classification:")
+    for fam, rules in families.items():
         rules_str = ' & '.join([f"{m}{op}{v}" for m, (op, v) in rules.items()]) if rules else "(default)"
-        print(f"  {fam:<12}: x{mult:.1f}  [{rules_str}]")
+        print(f"  {fam:<12}: [{rules_str}]")
     
-    print("\nDirection sizing:")
-    print(f"  MA reference: {DIRECTION_MA_REFERENCE}")
-    long_cfg = direction_sizing.get('long', {})
-    short_cfg = direction_sizing.get('short', {})
-    print(f"  long  uptrend (price>{DIRECTION_MA_REFERENCE}):   x{long_cfg.get('uptrend', 1.0):.1f}")
-    print(f"  long  downtrend (price<={DIRECTION_MA_REFERENCE}): x{long_cfg.get('downtrend', 1.0):.1f}")
-    print(f"  short uptrend (price>{DIRECTION_MA_REFERENCE}):   x{short_cfg.get('uptrend', 1.0):.1f}")
-    print(f"  short downtrend (price<={DIRECTION_MA_REFERENCE}): x{short_cfg.get('downtrend', 1.0):.1f}")
+    print(f"\nDirection detection: price_vs_{DIRECTION_MA_REFERENCE}")
+    print(f"  uptrend:   price > {DIRECTION_MA_REFERENCE}")
+    print(f"  downtrend: price <= {DIRECTION_MA_REFERENCE}")
+    
+    print(f"\nGlobal regime multipliers:")
+    for regime, mult in GLOBAL_REGIME_MULTIPLIERS.items():
+        print(f"  {regime:<12}: x{mult:.2f}")
+    
+    print(f"\nGlobal direction multipliers:")
+    for direction, mult in GLOBAL_DIRECTION_MULTIPLIERS.items():
+        print(f"  {direction:<12}: x{mult:.2f}")
+    
+    print(f"\nActive strategies: {sum(1 for cfg in STRATEGY_CONFIGS.values() if cfg.get('active', True))}/{len(STRATEGY_CONFIGS)}")
     
     pattern = os.path.join(output_folder, "trades_enriched_*.xlsx")
     files = sorted(glob(pattern))
@@ -320,7 +364,9 @@ def apply_sizing(
     
     results = []
     for f in files:
-        r = process_single_file(f, families, sizing, direction_sizing, initial_capital, date_range=DATE_RANGE_FILTER)
+        r = process_single_file(f, families, initial_capital, date_range=DATE_RANGE_FILTER)
+        if r is None:
+            continue
         results.append(r)
         print_file_results(r)
         
@@ -465,9 +511,10 @@ def apply_sizing(
         delta_pct = ((agg['profit_s'] - agg['profit_b']) / abs(agg['profit_b']) * 100) if agg['profit_b'] != 0 else 0
         win_delta_pct = agg['win_rate_sized'] - agg['win_rate_base']
         dd_delta_pct = agg['dd_sized_pct'] - agg['dd_base_pct']
-        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else "❌"
-        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else "❌"
-        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else "❌"
+        # CHANGED: Use 🟢 when delta = 0
+        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else ("🟢" if agg['profit_s'] == agg['profit_b'] else "❌")
+        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else ("🟢" if agg['win_rate_sized'] == agg['win_rate_base'] else "❌")
+        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else ("🟢" if agg['dd_sized_pct'] == agg['dd_base_pct'] else "❌")
         
         print(f"{fam:<15} {agg['trades_base']:>12} {trades_pct:>9.1f}% {agg['trades_sizing']:>14} {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['win_rate_base']:>9.1f}% {agg['win_rate_sized']:>11.1f}% {win_ok} {win_delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
         
@@ -481,9 +528,10 @@ def apply_sizing(
     # TOTAL: Use portfolio-level DD and WIN%
     total_trades_pct = 100.0
     total_delta_pct = ((total_profit_sizing - total_profit_base) / abs(total_profit_base) * 100) if total_profit_base != 0 else 0
-    total_profit_ok = "✅" if total_profit_sizing > total_profit_base else "❌"
-    total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else "❌"
-    total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
+    # CHANGED: Use 🟢 when delta = 0
+    total_profit_ok = "✅" if total_profit_sizing > total_profit_base else ("🟢" if total_profit_sizing == total_profit_base else "❌")
+    total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else ("🟢" if portfolio_win_rate_sized == portfolio_win_rate_base else "❌")
+    total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else ("🟢" if portfolio_dd_sized_pct == portfolio_dd_base_pct else "❌")
     print(f"{'TOTAL':<15} {total_trades_base:>12} {total_trades_pct:>9.1f}% {total_trades_sizing:>14} {total_profit_base:>13.2f} {total_profit_sizing:>15.2f} {total_profit_ok} {total_delta_pct:>+6.1f}% {portfolio_win_rate_base:>9.1f}% {portfolio_win_rate_sized:>11.1f}% {total_win_ok} {portfolio_win_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
     
     # =================================================================
@@ -534,9 +582,10 @@ def apply_sizing(
         delta_pct = ((agg['profit_s'] - agg['profit_b']) / abs(agg['profit_b']) * 100) if agg['profit_b'] != 0 else 0
         win_delta_pct = agg['win_rate_sized'] - agg['win_rate_base']
         dd_delta_pct = agg['dd_sized_pct'] - agg['dd_base_pct']
-        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else "❌"
-        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else "❌"
-        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else "❌"
+        # CHANGED: Use 🟢 when delta = 0
+        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else ("🟢" if agg['profit_s'] == agg['profit_b'] else "❌")
+        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else ("🟢" if agg['win_rate_sized'] == agg['win_rate_base'] else "❌")
+        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else ("🟢" if agg['dd_sized_pct'] == agg['dd_base_pct'] else "❌")
         
         print(f"{direction:<15} {agg['trades_base']:>12} {trades_pct:>9.1f}% {agg['trades_sizing']:>14} {trades_active_pct:>14.1f}% {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['win_rate_base']:>9.1f}% {agg['win_rate_sized']:>11.1f}% {win_ok} {win_delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
         
@@ -551,9 +600,10 @@ def apply_sizing(
     dir_total_trades_pct = 100.0
     dir_total_trades_active_pct = (dir_total_trades_sizing / dir_total_trades_base * 100) if dir_total_trades_base > 0 else 0
     dir_total_delta_pct = ((dir_total_profit_sizing - dir_total_profit_base) / abs(dir_total_profit_base) * 100) if dir_total_profit_base != 0 else 0
-    dir_total_profit_ok = "✅" if dir_total_profit_sizing > dir_total_profit_base else "❌"
-    dir_total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else "❌"
-    dir_total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
+    # CHANGED: Use 🟢 when delta = 0
+    dir_total_profit_ok = "✅" if dir_total_profit_sizing > dir_total_profit_base else ("🟢" if dir_total_profit_sizing == dir_total_profit_base else "❌")
+    dir_total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else ("🟢" if portfolio_win_rate_sized == portfolio_win_rate_base else "❌")
+    dir_total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else ("🟢" if portfolio_dd_sized_pct == portfolio_dd_base_pct else "❌")
     print(f"{'TOTAL':<15} {dir_total_trades_base:>12} {dir_total_trades_pct:>9.1f}% {dir_total_trades_sizing:>14} {dir_total_trades_active_pct:>14.1f}% {dir_total_profit_base:>13.2f} {dir_total_profit_sizing:>15.2f} {dir_total_profit_ok} {dir_total_delta_pct:>+6.1f}% {portfolio_win_rate_base:>9.1f}% {portfolio_win_rate_sized:>11.1f}% {dir_total_win_ok} {portfolio_win_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {dir_total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
     
     # =================================================================
@@ -605,9 +655,10 @@ def apply_sizing(
         delta_pct = ((agg['profit_s'] - agg['profit_b']) / abs(agg['profit_b']) * 100) if agg['profit_b'] != 0 else 0
         win_delta_pct = agg['win_rate_sized'] - agg['win_rate_base']
         dd_delta_pct = agg['dd_sized_pct'] - agg['dd_base_pct']
-        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else "❌"
-        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else "❌"
-        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else "❌"
+        # CHANGED: Use 🟢 when delta = 0
+        profit_ok = "✅" if agg['profit_s'] > agg['profit_b'] else ("🟢" if agg['profit_s'] == agg['profit_b'] else "❌")
+        win_ok = "✅" if agg['win_rate_sized'] > agg['win_rate_base'] else ("🟢" if agg['win_rate_sized'] == agg['win_rate_base'] else "❌")
+        dd_ok = "✅" if agg['dd_sized_pct'] < agg['dd_base_pct'] else ("🟢" if agg['dd_sized_pct'] == agg['dd_base_pct'] else "❌")
         
         print(f"{gen:<15} {agg['trades_base']:>12} {trades_pct:>9.1f}% {agg['trades_sizing']:>14} {trades_active_pct:>14.1f}% {agg['profit_b']:>13.2f} {agg['profit_s']:>15.2f} {profit_ok} {delta_pct:>+6.1f}% {agg['win_rate_base']:>9.1f}% {agg['win_rate_sized']:>11.1f}% {win_ok} {win_delta_pct:>+6.1f}% {agg['dd_base_pct']:>9.1f}% {agg['dd_sized_pct']:>11.1f}% {dd_ok} {dd_delta_pct:>+6.1f}%")
         
@@ -622,9 +673,10 @@ def apply_sizing(
     gen_total_trades_pct = 100.0
     gen_total_trades_active_pct = (gen_total_trades_sizing / gen_total_trades_base * 100) if gen_total_trades_base > 0 else 0
     gen_total_delta_pct = ((gen_total_profit_sizing - gen_total_profit_base) / abs(gen_total_profit_base) * 100) if gen_total_profit_base != 0 else 0
-    gen_total_profit_ok = "✅" if gen_total_profit_sizing > gen_total_profit_base else "❌"
-    gen_total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else "❌"
-    gen_total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
+    # CHANGED: Use 🟢 when delta = 0
+    gen_total_profit_ok = "✅" if gen_total_profit_sizing > gen_total_profit_base else ("🟢" if gen_total_profit_sizing == gen_total_profit_base else "❌")
+    gen_total_win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else ("🟢" if portfolio_win_rate_sized == portfolio_win_rate_base else "❌")
+    gen_total_dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else ("🟢" if portfolio_dd_sized_pct == portfolio_dd_base_pct else "❌")
     print(f"{'TOTAL':<15} {gen_total_trades_base:>12} {gen_total_trades_pct:>9.1f}% {gen_total_trades_sizing:>14} {gen_total_trades_active_pct:>14.1f}% {gen_total_profit_base:>13.2f} {gen_total_profit_sizing:>15.2f} {gen_total_profit_ok} {gen_total_delta_pct:>+6.1f}% {portfolio_win_rate_base:>9.1f}% {portfolio_win_rate_sized:>11.1f}% {gen_total_win_ok} {portfolio_win_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>11.1f}% {gen_total_dd_ok} {portfolio_dd_delta_pct:>+6.1f}%")
     
     # =================================================================
@@ -638,9 +690,10 @@ def apply_sizing(
     print("-" * 145)
     
     for r in results:
-        profit_ok = "✅" if r['profit_sized'] > r['profit_base'] else "❌"
-        win_ok = "✅" if r['win_rate_sized'] > r['win_rate_base'] else "❌"
-        dd_ok = "✅" if r['dd_sized_pct'] < r['dd_base_pct'] else "❌"
+        # CHANGED: Use 🟢 when delta = 0
+        profit_ok = "✅" if r['profit_sized'] > r['profit_base'] else ("🟢" if r['profit_sized'] == r['profit_base'] else "❌")
+        win_ok = "✅" if r['win_rate_sized'] > r['win_rate_base'] else ("🟢" if r['win_rate_sized'] == r['win_rate_base'] else "❌")
+        dd_ok = "✅" if r['dd_sized_pct'] < r['dd_base_pct'] else ("🟢" if r['dd_sized_pct'] == r['dd_base_pct'] else "❌")
         print(f"{r['strategy']:<30} {r['num_trades']:>12} {r['trades_sizing']:>14} {r['profit_base']:>13.2f} {r['profit_sized']:>12.2f} {profit_ok} {r['delta_pct']:>+6.1f}% {r['win_rate_base']:>9.1f}% {r['win_rate_sized']:>11.1f}% {win_ok} {r['win_delta_pct']:>+6.1f}% {r['dd_base_pct']:>9.1f}% {r['dd_sized_pct']:>10.1f}% {r['dd_delta_pct']:>+7.1f}% {dd_ok}")
     
     print("-" * 145)
@@ -654,9 +707,10 @@ def apply_sizing(
         total_delta = ((total_profit_s - total_profit_b) / abs(total_profit_b) * 100) if total_profit_b != 0 else 0
         
         # TOTAL: Use portfolio-level DD and WIN%
-        profit_ok = "✅" if total_profit_s > total_profit_b else "❌"
-        win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else "❌"
-        dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else "❌"
+        # CHANGED: Use 🟢 when delta = 0
+        profit_ok = "✅" if total_profit_s > total_profit_b else ("🟢" if total_profit_s == total_profit_b else "❌")
+        win_ok = "✅" if portfolio_win_rate_sized > portfolio_win_rate_base else ("🟢" if portfolio_win_rate_sized == portfolio_win_rate_base else "❌")
+        dd_ok = "✅" if portfolio_dd_sized_pct < portfolio_dd_base_pct else ("🟢" if portfolio_dd_sized_pct == portfolio_dd_base_pct else "❌")
         print(f"{'TOTAL':<30} {total_trades_base:>12} {total_trades_sizing:>14} {total_profit_b:>13.2f} {total_profit_s:>12.2f} {profit_ok} {total_delta:>+6.1f}% {portfolio_win_rate_base:>9.1f}% {portfolio_win_rate_sized:>11.1f}% {win_ok} {portfolio_win_delta_pct:>+6.1f}% {portfolio_dd_base_pct:>9.1f}% {portfolio_dd_sized_pct:>10.1f}% {portfolio_dd_delta_pct:>+7.1f}% {dd_ok}")
     
     print(f"\n{'='*145}")
