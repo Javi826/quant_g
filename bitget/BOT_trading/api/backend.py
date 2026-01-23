@@ -1,4 +1,5 @@
 """
+backend.py
 Módulo de dashboard web para el bot de trading.
 Se ejecuta en un thread separado y proporciona visualización en tiempo real.
 """
@@ -488,6 +489,7 @@ class DashboardServer:
                                 'entry_price': entry_rounded,
                                 'current_price': current_price_rounded,
                                 'size': size,
+                                'usdt_amount': pos.get('usdt_amount', 0),
                                 'tp': tp_rounded,
                                 'sl': sl_rounded,
                                 'current_pnl': float(pnl),
@@ -598,6 +600,7 @@ class DashboardServer:
                 
                 num_strategies = df['STRATEGY'].nunique()
                 capital_per_strategy = self._calculate_capital_allocation(num_strategies)
+                total_profit_all = df['PROFIT'].sum()
                 
                 for strategy in sorted(df['STRATEGY'].unique()):
                     df_strategy = df[df['STRATEGY'] == strategy]
@@ -621,6 +624,10 @@ class DashboardServer:
                     pct_oom = (oom_count / total_reasons * 100) if total_reasons > 0 else 0
                     pct_timeout = (timeout_count / total_reasons * 100) if total_reasons > 0 else 0
                     
+                    # Calculate Total % (contribution to total profit)
+                    # Calculate Total % (contribution to total profit)
+                    total_pct = (total_profit / abs(total_profit_all) * 100) if total_profit_all != 0 else 0
+                    
                     results.append({
                         'Strategy': strategy,
                         'date_fo': date_fo.strftime('%Y-%m-%d'),
@@ -628,6 +635,7 @@ class DashboardServer:
                         'Trades_pct': round(pct_positive, 2),
                         'Total_profit': round(total_profit, 2),
                         'Profit_pct': round(profit_pct, 2),
+                        'Total_pct': round(total_pct, 2),  # <-- NUEVA COLUMNA
                         'TP_pct': round(pct_tp, 2),
                         'SL_pct': round(pct_sl, 2),
                         'OOM_pct': round(pct_oom, 2),
@@ -1247,6 +1255,56 @@ class DashboardServer:
                     winrate = (positive_trades / trades_count * 100) if trades_count > 0 else 0
                     
                     results[regime] = {
+                        'trades': int(trades_count),
+                        'total_trades': int(total_trades),
+                        'pnl': round(float(pnl), 2),
+                        'winrate': round(float(winrate), 1)
+                    }
+                
+                return jsonify({
+                    'success': True,
+                    'data': results
+                })
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
+            
+        @self.app.route('/api/analytics/market-direction')
+        def get_market_direction_analytics():
+            """
+            Analytics by market direction: trades, P&L, and win rate per direction.
+            """
+            try:
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify({'error': 'No trades data available'}), 404
+                
+                # Check if column exists
+                if 'MARKET_DIRECTION' not in df.columns:
+                    return jsonify({
+                        'error': 'No market direction data in trades file',
+                        'data': {}
+                    }), 200
+                
+                # Fill NaN with 'unknown'
+                df['MARKET_DIRECTION'] = df['MARKET_DIRECTION'].fillna('unknown')
+                
+                # Calculate total trades
+                total_trades = len(df)
+                
+                # Group by direction
+                results = {}
+                for direction in df['MARKET_DIRECTION'].unique():
+                    df_dir = df[df['MARKET_DIRECTION'] == direction]
+                    
+                    trades_count = len(df_dir)
+                    pnl = df_dir['PROFIT'].sum()
+                    positive_trades = len(df_dir[df_dir['PROFIT'] > 0])
+                    winrate = (positive_trades / trades_count * 100) if trades_count > 0 else 0
+                    
+                    results[direction] = {
                         'trades': int(trades_count),
                         'total_trades': int(total_trades),
                         'pnl': round(float(pnl), 2),

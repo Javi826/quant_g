@@ -1,6 +1,6 @@
-// ═══════════════════════════════════════════════════════════════════════════
+// dashboard.js===========================================================================
 // BOT_trading Dashboard JavaScript
-// ═══════════════════════════════════════════════════════════════════════════
+// ===========================================================================
 
 const COLORS = {
     purple: '#6d28d9',
@@ -221,7 +221,7 @@ let equityChart = null;
 let drawdownChart = null;
 let allStrategiesList = [];
 let isStoppingBot = false;
-
+let currentRegimeAnalyticsMode = 'regime';
 // ═══════════════════════════════════════════════════════════════════════════
 // POSITION SORT FEATURE (NEW)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -433,30 +433,41 @@ function updateRegimeUI(data) {
     const badgeStyle = getRegimeBadgeStyle(family);
     
     // Update header stat card
-    const regimeBadge = document.getElementById('regime-badge');
-    if (regimeBadge) {
-        regimeBadge.textContent = badgeStyle.text;
-        regimeBadge.style.color = badgeStyle.bg;
+    // Update header stat card
+    const regimeText = document.getElementById('regime-text');
+    const regimeDirection = document.getElementById('regime-direction');
+    const regimeTimeframeEl = document.getElementById('regime-timeframe');
+    
+    if (regimeText) {
+        regimeText.textContent = badgeStyle.text;
+        regimeText.style.color = badgeStyle.bg;
     }
     
-    const regimeTimeframeEl = document.getElementById('regime-timeframe');
-    if (regimeTimeframeEl) {
-        // Determinar símbolo y texto de dirección
+    if (regimeDirection && btcTrend) {
         let dirSymbol = '';
         let dirText = '';
+        let dirColor = '#8b949e';
         
         if (btcTrend === 'uptrend') {
-            dirSymbol = '↑';
+            dirSymbol = '';
             dirText = 'UP';
+            dirColor = '#3fb950';  // Green
         } else if (btcTrend === 'downtrend' || btcTrend === 'dwtrend') {
-            dirSymbol = '↓';
+            dirSymbol = '';
             dirText = 'DW';
+            dirColor = '#f85149';  // Red
         } else {
             dirSymbol = '•';
             dirText = '--';
+            dirColor = '#8b949e';  // Gray
         }
         
-        regimeTimeframeEl.textContent = timeframe + ' | ' + dirSymbol + dirText;
+        regimeDirection.textContent = dirSymbol + dirText;
+        regimeDirection.style.color = dirColor;
+    }
+    
+    if (regimeTimeframeEl) {
+        regimeTimeframeEl.textContent = timeframe;
     }
     
     // Helper function to format rules
@@ -1009,7 +1020,7 @@ function renderDetailedView(container, positions) {
         '<th>Side</th>' +
         '<th>Entry</th>' +
         '<th>Current</th>' +
-        '<th>Size</th>' +
+        '<th>Amount</th>' +
         '<th>TP (Δ%) <button class="' + tpBtnClass + '" onclick="sortPositionsBy(\'tp\')" style="margin-left: 8px; font-size: 11px; padding: 2px 8px;">TP</button></th>' +
         '<th>SL (Δ%) <button class="' + slBtnClass + '" onclick="sortPositionsBy(\'sl\')" style="margin-left: 8px; font-size: 11px; padding: 2px 8px;">SL</button></th>' +
         '<th>PnL</th>' +
@@ -1037,7 +1048,7 @@ function renderDetailedView(container, positions) {
                 '<td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td>' +
                 '<td>$' + entryPrice.toFixed(precision) + '</td>' +
                 '<td>$' + currentPrice.toFixed(precision) + '</td>' +
-                '<td>' + parseFloat(pos.size).toFixed(4) + '</td>' +
+                '<td>$' + parseFloat(pos.usdt_amount).toFixed(2) + '</td>' +
                 '<td>$' + tp.toFixed(precision) + ' <span class="' + deltaTpClass + '">(Δ' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%)</span></td>' +
                 '<td>$' + sl.toFixed(precision) + ' <span class="' + deltaSlClass + '">(Δ' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%)</span></td>' +
                 '<td class="' + pnlClass + '">' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + '</td>' +
@@ -1147,10 +1158,10 @@ async function loadStrategyAnalysis() {
         
         const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
-        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>Total %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
             sortedData.map(s => {
                 const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + (s.Total_pct >= 0 ? '+' : '') + s.Total_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
             }).join('') +
             '</tbody></table>';
         container.innerHTML = html;
@@ -2025,7 +2036,7 @@ async function loadRegimeAnalytics() {
                         <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
                             ${regime}
                         </div>
-                        <div style="font-size: 16px; color: #8b949e;">
+                        <div style="font-size: 24px; color: #8b949e;">
                             ${stats.trades}/${stats.total_trades} trades
                         </div>
                     </div>
@@ -2033,8 +2044,8 @@ async function loadRegimeAnalytics() {
                     <!-- Win Rate Bar -->
                     <div style="margin-bottom: 15px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span style="color: #8b949e; font-size: 14px; font-weight: 600;">Win Rate</span>
-                            <span style="color: ${colors.text}; font-size: 14px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
+                            <span style="color: #8b949e; font-size: 21px; font-weight: 600;">Win Rate</span>
+                            <span style="color: ${colors.text}; font-size: 21px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
                         </div>
                         <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
                             <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
@@ -2043,8 +2054,8 @@ async function loadRegimeAnalytics() {
                     
                     <!-- P&L -->
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #8b949e; font-size: 14px; font-weight: 600;">P&L</span>
-                        <span class="${pnlClass}" style="font-size: 18px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
+                        <span style="color: #8b949e; font-size: 21px; font-weight: 600;">P&L</span>
+                        <span class="${pnlClass}" style="font-size: 27px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
                     </div>
                 </div>
             `;
@@ -2058,6 +2069,122 @@ async function loadRegimeAnalytics() {
         console.error('Error loading regime analytics:', error);
         document.getElementById('regime-analytics-container').innerHTML = 
             '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading regime data</div>';
+    }
+}
+
+// =============================================================================
+// REGIME ANALYTICS MODE SELECTOR
+// =============================================================================
+
+function setRegimeAnalyticsMode(mode) {
+    currentRegimeAnalyticsMode = mode;
+    
+    // Update button states
+    document.querySelectorAll('#equity-subtab-regime .view-selector .view-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if ((mode === 'regime' && btn.textContent.includes('Market Regime')) ||
+            (mode === 'direction' && btn.textContent.includes('Market Direction'))) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Load corresponding data
+    if (mode === 'regime') {
+        loadRegimeAnalytics();
+    } else {
+        loadMarketDirectionAnalytics();
+    }
+}
+
+// =============================================================================
+// MARKET DIRECTION ANALYTICS
+// =============================================================================
+
+async function loadMarketDirectionAnalytics() {
+    try {
+        const res = await fetch('/api/analytics/market-direction');
+        
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+        
+        const response = await res.json();
+        const container = document.getElementById('regime-analytics-container');
+        
+        if (!response.success || !response.data || Object.keys(response.data).length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
+                (response.error || 'No market direction data available yet') +
+                '</div>';
+            return;
+        }
+        
+        const data = response.data;
+        
+        // Sort directions: uptrend > downtrend > unknown
+        const directionOrder = ['uptrend', 'dwtrend', 'unknown'];
+        const sortedDirections = Object.keys(data).sort((a, b) => {
+            const indexA = directionOrder.indexOf(a);
+            const indexB = directionOrder.indexOf(b);
+            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+        });
+        
+        // Colors for each direction
+        const directionColors = {
+            'uptrend': { bar: '#3fb950', text: '#3fb950', bg: 'rgba(63, 185, 80, 0.1)' },      // Green
+            'dwtrend': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },   // Red
+            'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
+        };
+        
+        let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
+        
+        sortedDirections.forEach(direction => {
+            const stats = data[direction];
+            const colors = directionColors[direction] || directionColors['unknown'];
+            
+            const winrateWidth = Math.round(stats.winrate);
+            const pnlClass = stats.pnl >= 0 ? 'direction-long' : 'direction-short';
+            const pnlPrefix = stats.pnl >= 0 ? '+$' : '$';
+            
+            html += `
+                <div style="background: ${colors.bg}; border: 1px solid ${colors.bar}; border-radius: 8px; padding: 20px;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
+                            ${direction}
+                        </div>
+                        <div style="font-size: 24px; color: #8b949e;">
+                            ${stats.trades}/${stats.total_trades} trades
+                        </div>
+                    </div>
+                    
+                    <!-- Win Rate Bar -->
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: #8b949e; font-size: 21px; font-weight: 600;">Win Rate</span>
+                            <span style="color: ${colors.text}; font-size: 21px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
+                        </div>
+                        <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
+                            <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- P&L -->
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #8b949e; font-size: 21px; font-weight: 600;">P&L</span>
+                        <span class="${pnlClass}" style="font-size: 27px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading market direction analytics:', error);
+        document.getElementById('regime-analytics-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading market direction data</div>';
     }
 }
 
@@ -2227,7 +2354,7 @@ async function loadData() {
                         '<td>' + trade.STRATEGY + '</td>' +
                         '<td>' + trade.SYMBOL + '</td>' +
                         '<td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td>' +
-                        '<td>' + parseFloat(trade.SIZE || 0).toFixed(4) + '</td>' +
+                        '<td>$' + parseFloat(trade.USDT_AMOUNT || 0).toFixed(2) + '</td>' +
                         '<td>$' + parseFloat(trade.PRICE_ENTRY || 0).toFixed(2) + '</td>' +
                         '<td>$' + parseFloat(trade.PRICE_CLOSE || 0).toFixed(2) + '</td>' +
                         '<td class="' + profitClass + '">' + (trade.PROFIT >= 0 ? '+' : '') + '$' + trade.PROFIT.toFixed(2) + '</td>' +

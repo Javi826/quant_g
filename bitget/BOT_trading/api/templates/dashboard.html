@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block extra_head %}
-<!-- Account-specific gradient colors (inline because they use Jinja2 variables) -->
+<!-- dashboard.html Account-specific gradient colors (inline because they use Jinja2 variables) -->
 <style>
     {% if account == '00' %}
     #loading-splash {
@@ -161,7 +161,7 @@
     <div class="main-panel">
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Closed P/L</div>
+                <div class="stat-label" style="text-transform: none;">CLOSED PnL</div>
                 <div class="stat-value positive" id="total-profit">$-</div>
             </div>
             <div class="stat-card">
@@ -181,7 +181,7 @@
                 <div class="stat-value neutral" id="total-positions">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Open P/L</div>
+                <div class="stat-label" style="text-transform: none;">OPEN PnL</div>
                 <div class="stat-value positive" id="open-pnl">$-</div>
             </div>
             <div class="stat-card">
@@ -190,7 +190,10 @@
             </div>
             <div class="stat-card">
                 <div class="stat-label">Market Regime</div>
-                <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px;">-</div>
+                <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
+                    <span id="regime-text">-</span>
+                    <span id="regime-direction" style="font-size: 24px; line-height: 1; vertical-align: middle;">•</span>
+                </div>
                 <div style="font-size: 13px; color: #8b949e; margin-top: 8px;" id="regime-timeframe">Loading...</div>
             </div>
         </div>
@@ -251,7 +254,7 @@
                             <th>Strategy</th>
                             <th>Symbol</th>
                             <th>Side</th>
-                            <th>Size</th>
+                            <th>Amount</th>
                             <th>Entry</th>
                             <th>Close</th>
                             <th>Profit</th>
@@ -434,7 +437,13 @@
                 </div>
                 
                 <div id="equity-subtab-regime" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Performance by Market Regime</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #c9d1d9;">Performance by Market Regime</h3>
+                        <div class="view-selector">
+                            <button class="view-btn active" onclick="setRegimeAnalyticsMode('regime')">Market Regime</button>
+                            <button class="view-btn" onclick="setRegimeAnalyticsMode('direction')">Market Direction</button>
+                        </div>
+                    </div>
                     <div id="regime-analytics-container">
                         <div style="text-align: center; color: #8b949e; padding: 40px;">
                             Loading regime analytics...
