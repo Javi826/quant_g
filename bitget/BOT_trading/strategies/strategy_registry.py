@@ -40,7 +40,9 @@ from signals.add_signals_double_top import double_top_long
 from signals.add_signals_reversal import reversal_long, reversal_short
 from signals.add_signals_parity import parity_long, parity_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
-from signals.add_signals_ranging import ranging_long, ranging_short
+from signals.add_signals_ranging import ranging_short
+from signals.add_signals_flag import flag_long, flag_short
+
 
 # Import market data utilities
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
@@ -244,6 +246,46 @@ def detect_signals_for_strategy(
                     range_str=strat['range'],
                     live_trading=True
                 )
+                
+            elif strategy_id == '17_flag_long_4H':
+                signals = flag_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '18_flag_long_1H':
+                signals = flag_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '19_flag_short_4H':
+                signals = flag_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+            
+            elif strategy_id == '20_flag_short_1H':
+                signals = flag_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
             
             # ==============================================================
             # STRATEGY NOT IMPLEMENTED
@@ -309,6 +351,10 @@ def get_implemented_strategies() -> set:
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
         '16_ranging_short_6Hutc',
+        '17_flag_long_4H',
+        '18_flag_long_1H',
+        '19_flag_short_4H',
+        '20_flag_short_1H',
     }
     return strategies
 

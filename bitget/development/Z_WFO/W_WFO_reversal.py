@@ -1,7 +1,8 @@
 # Z_WFO_backtest_multi_tf.py (MAIN - Multi-Timeframe Strategy)
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import time
 import numpy as np
 import pandas as pd
@@ -9,9 +10,9 @@ from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, final_prints
 from tools.ZX_WFO import walk_forward_optimization
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_reversal import reversal_long
-from Z_add_signals_reversal import reversal_short
+from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from signals.add_signals_reversal import reversal_long
+from signals.add_signals_reversal import reversal_short
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -22,18 +23,18 @@ STRATEGY            = "reversal"
 DATA_FOLDER       = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 80
-MIN_VOL_USDT      = 10_000_000
+MIN_VOL_USDT      = 2_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LEFT_LOOKBACK_LIST   = [1,2,3,4,5,6,7,8,9,10] 
-TOLERANCE_LIST       = [5,10,15,20,25,30]
+LEFT_LOOKBACK_LIST   = [4] 
+TOLERANCE_LIST       = [20]
 MA_PERIOD_LIST       = [50]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [10]
 
 param_names    = ['SELL_AFTER','LEFT_LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -72,9 +73,9 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = reversal_short(
+        signals = reversal_long(
             arr=arr_minor,
-            left_lookback=params.get('LEFT_LOOKBACK'),
+            lookback=params.get('LEFT_LOOKBACK'),
             tolerance=params.get('TOLERANCE'),
             ma_period=params.get('MA_PERIOD'),
             live_trading=False
@@ -146,7 +147,7 @@ for sym in ohlcv_arr_minor.keys():
     
     signals = reversal_short(
         arr=arr_minor,
-        left_lookback=best_params_wfo['LEFT_LOOKBACK'],
+        lookback=best_params_wfo['LEFT_LOOKBACK'],
         tolerance=best_params_wfo['TOLERANCE'],
         ma_period=best_params_wfo['MA_PERIOD'],
         live_trading=False

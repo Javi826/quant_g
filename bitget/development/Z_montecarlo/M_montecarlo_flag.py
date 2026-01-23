@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_ ===
+# === FILE: main_MONTECARLO_flag ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -14,19 +14,21 @@ from joblib import Parallel, delayed
 from utils.ZX_analysis import report_montecarlo
 from utils.ZX_utils import filter_symbols, final_prints
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
+from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results, get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from signals.add_signals_engulfing_long import simple_channel_long
+from signals.add_signals_flag import flag_long
+from signals.add_signals_flag import flag_short
+
 
 DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
-STRATEGY            = "engulfing"
+STRATEGY            = "flag_pattern"
 MY_SYMBOLS          = False
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
@@ -37,32 +39,68 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST           = [0]  
-LOOKBACK_LIST             = [10,15,20,30,40] 
-TOUCHES_LIST              = [2,3,4]
-PIVOT_WINDOW_LIST         = [1,2,3]
-TOL_CHANNEL_LIST          = [5,10,15]
-BREAKOUT_BODY_FACTOR_LIST = [5,10,15,20]
+LOOKBACK_LIST             = [5,10,15,20]
+IMPULSE_LIST              = [3,5,7,10]
+FLAG_LIST                 = [40,50,60]
+MA_PERIOD_LIST            = [25,50]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9]
+TP_PCT_LIST               = [2,3,4,5]
+SL_PCT_LIST               = [7,8,9,10]
 
 # =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [7] 
-# MA_PERIOD_LIST       = [25]
-# TOLERANCE_LIST       = [40]
+# #4HLONG-9(2025) 
+# SELL_AFTER_LIST           = [0]  
+# LOOKBACK_LIST             = [15]
+# IMPULSE_MIN_PCT_LIST      = [3]
+# FLAG_MAX_RANGE_PCT_LIST   = [40]
+# MA_PERIOD_LIST            = [50]
 # 
-# TP_PCT_LIST          = [4]
-# SL_PCT_LIST          = [10]
+# TP_PCT_LIST               = [4]
+# SL_PCT_LIST               = [10]
+# =============================================================================
+
+# =============================================================================
+# #4HSHORT-23(2025) 
+# SELL_AFTER_LIST           = [0]  
+# LOOKBACK_LIST             = [10]
+# IMPULSE_MIN_PCT_LIST      = [3]
+# FLAG_MAX_RANGE_PCT_LIST   = [50]
+# MA_PERIOD_LIST            = [50]
+# 
+# TP_PCT_LIST               = [3]
+# SL_PCT_LIST               = [9]
+# =============================================================================
+
+# =============================================================================
+# #1HLONG-3(2025) 
+# SELL_AFTER_LIST           = [0]  
+# LOOKBACK_LIST             = [20]
+# IMPULSE_MIN_PCT_LIST      = [3]
+# FLAG_MAX_RANGE_PCT_LIST   = [40]
+# MA_PERIOD_LIST            = [50]
+# 
+# TP_PCT_LIST               = [2]
+# SL_PCT_LIST               = [10]
+# =============================================================================
+
+#1HSHORT-9 
+# =============================================================================
+# SELL_AFTER_LIST           = [0]  
+# LOOKBACK_LIST             = [20]
+# IMPULSE_MIN_PCT_LIST      = [3]
+# FLAG_MAX_RANGE_PCT_LIST   = [60]
+# MA_PERIOD_LIST            = [25]
+# 
+# TP_PCT_LIST               = [2]
+# SL_PCT_LIST               = [8]
 # =============================================================================
 
 param_names = [
     'SELL_AFTER',
     'LOOKBACK',
-    'TOUCHES',
-    'PIVOT_WINDOW',
-    'TOL_CHANNEL',
-    'BREAKOUT_BODY_FACTOR',
+    'IMPULSE',
+    'FLAG',
+    'MA_PERIOD',
     'TP_PCT',
     'SL_PCT'
 ]
@@ -71,7 +109,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 50
+FINAL_N_PATHS        = 1000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -79,7 +117,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=MY_SYMBOLS)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS)
 
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
@@ -93,13 +131,12 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = simple_channel_long(
+            signals = flag_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
-                touches=param_dict.get('TOUCHES'),
-                pivot_window=param_dict.get('PIVOT_WINDOW'),
-                tol_channel=param_dict.get('TOL_CHANNEL'),
-                breakout_body_factor=param_dict.get('BREAKOUT_BODY_FACTOR'),
+                impulse=param_dict.get('IMPULSE'),
+                flag=param_dict.get('FLAG'),
+                ma_period=param_dict.get('MA_PERIOD'),
                 live_trading=False
             )
 
@@ -125,7 +162,7 @@ def parallel_with_progress(tasks, desc: str, n_jobs: int = N_JOBS):
 # -----------------------------------------------------------------------------
 # GENERATE & EVALUATE PATHS FOR MINOR TIMEFRAME
 # -----------------------------------------------------------------------------
-paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor,n_paths=FINAL_N_PATHS,n_obs=FINAL_N_OBS_PER_PATH,raw_columns=[])
+paths_minor  = generate_paths_for_all_symbols_functional(ohlcv_data_minor, n_paths=FINAL_N_PATHS, n_obs=FINAL_N_OBS_PER_PATH, raw_columns=[])
 results_list = parallel_with_progress([delayed(process_path_IDX)(i, paths_minor, param_dict_list) for i in range(FINAL_N_PATHS)], desc="\n🔄 Evaluating Paths_IDX")
 all_results  = [r for sublist in results_list for r in sublist]
 df_portfolio = pd.DataFrame(all_results)

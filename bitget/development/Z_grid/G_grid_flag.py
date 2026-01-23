@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_ ===
+# === FILE: main_MONTECARLO_flag ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -13,60 +13,82 @@ from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from signals.add_signals_engulfing_long import simple_channel_long
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints, save_equity_to_excel
+from signals.add_signals_flag import flag_long
+from signals.add_signals_flag import flag_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
+SAVE_SYMBOLS = True
 MY_SYMBOLS   = False
-STRATEGY     = "engulfing"
+STRATEGY     = "flag_long_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '4H'
+TIMEFRAME_MINOR     = '1H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 5_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST           = [0]  
-LOOKBACK_LIST             = [10,15,20,30,40] 
-TOUCHES_LIST              = [2,3,4]
-PIVOT_WINDOW_LIST         = [1,2,3]
-TOL_CHANNEL_LIST          = [0,5,10,15]
-BREAKOUT_BODY_FACTOR_LIST = [5,10,15,20]
+SELL_AFTER_LIST  = [0]  
+LOOKBACK_LIST    = [20]
+IMPULSE_LIST     = [3]
+FLAG_LIST        = [40]
+MA_PERIOD_LIST   = [50]
 
-TP_PCT_LIST               = [3,4,5,6,7,8,9]
-SL_PCT_LIST               = [3,4,5,6,7,8,9]
+TP_PCT_LIST      = [1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
+SL_PCT_LIST      = [9,5,9.6,9.7,9.8,9.9,10,10.1,10.2,10.3,10.4,10.5]
+
+#4HLONG-9(2025) 
+SELL_AFTER_LIST    = [0]  
+LOOKBACK_LIST      = [15]
+IMPULSE_LIST       = [3]
+FLAG_LIST          = [40]
+MA_PERIOD_LIST     = [50]
+
+TP_PCT_LIST        = [4]
+SL_PCT_LIST        = [10]
+
+#4HSHORT-23(2025) 
+SELL_AFTER_LIST    = [0]  
+LOOKBACK_LIST      = [10]
+IMPULSE_LIST       = [3]
+FLAG_LIST          = [50]
+MA_PERIOD_LIST     = [50]
+
+TP_PCT_LIST        = [3]
+SL_PCT_LIST        = [9]
+
+#1HLONG-3(2025) 
+SELL_AFTER_LIST    = [0]  
+LOOKBACK_LIST      = [20]
+IMPULSE_LIST       = [3]
+FLAG_MAX_LIST      = [40]
+MA_PERIOD_LIST     = [50]
+
+TP_PCT_LIST        = [2]
+SL_PCT_LIST        = [10]
 
 # =============================================================================
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [30] 
-# TOUCHES_LIST              = [3]
-# PIVOT_WINDOW_LIST         = [1]
-# TOL_CHANNEL_LIST          = [0]
-# BREAKOUT_BODY_FACTOR_LIST = [50]
+# #1HSHORT-9 
+# SELL_AFTER_LIST    = [0]  
+# LOOKBACK_LIST      = [20]
+# IMPULSE_LIST       = [3]
+# FLAG_MAX_LIST      = [60]
+# MA_PERIOD_LIST     = [25]
 # 
-# TP_PCT_LIST               = [6]
-# SL_PCT_LIST               = [9]
+# TP_PCT_LIST        = [2]
+# SL_PCT_LIST        = [8]
 # =============================================================================
 
-param_names = [
-    'SELL_AFTER',
-    'LOOKBACK',
-    'TOUCHES',
-    'PIVOT_WINDOW',
-    'TOL_CHANNEL',
-    'BREAKOUT_BODY_FACTOR',
-    'TP_PCT',
-    'SL_PCT'
-]
+
+param_names = ['SELL_AFTER','LOOKBACK','IMPULSE','FLAG','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -74,7 +96,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=MY_SYMBOLS)
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS)
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
@@ -89,13 +111,12 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = simple_channel_long(
+        signals = flag_long(
                 arr_minor,
                 lookback=params['LOOKBACK'],
-                touches=params['TOUCHES'],
-                pivot_window=params['PIVOT_WINDOW'],
-                tol_channel=params['TOL_CHANNEL'],
-                breakout_body_factor=params['BREAKOUT_BODY_FACTOR'],
+                impulse=params['IMPULSE'],
+                flag=params['FLAG'],
+                ma_period=params['MA_PERIOD'],
                 live_trading=False
             )
 
@@ -130,7 +151,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
+save_equity_to_excel(grid_results_list, "../brief_equities", INITIAL_BALANCE, STRATEGY, save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

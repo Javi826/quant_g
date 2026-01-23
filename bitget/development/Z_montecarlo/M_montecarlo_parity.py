@@ -23,14 +23,14 @@ DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
 STRATEGY            = "parity"
-MY_SYMBOLS          = False
+MY_SYMBOLS          = True
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 1_500_000
@@ -47,12 +47,12 @@ TP_PCT_LIST          = [1,2]
 SL_PCT_LIST          = [8]
 
 #LONG
-LOOKBACK_LIST        = [150]
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [15] 
+LOOKBACK_LIST        = [50,100,150]
+MA_PERIOD_LIST       = [25,30]
+TOLERANCE_LIST       = [10,20,30,40] 
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [2,3,4,5,6]
+SL_PCT_LIST          = [7,8,9,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -61,7 +61,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 2000
+FINAL_N_PATHS        = 10
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -70,7 +70,10 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=MY_SYMBOLS)
-
+from utils.ZX_utils import symbols_to_include
+missing = [s for s in symbols_to_include if s not in filtered_minor]
+if missing:
+    print(f"⚠️  Símbolos sin archivo en {DATA_FOLDER}: {missing}")
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------------------

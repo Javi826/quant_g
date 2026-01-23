@@ -16,7 +16,6 @@ from config.settings import ACCOUNTS, BASE_URL
 # STRATEGY CONFIGURATION & VALIDATION
 # ==========================================================================
 
-# Strategy type required parameters
 # When adding a new strategy function, add its required params here
 STRATEGY_TYPE_REQUIRED_PARAMS = {
     'double_top_long': ['lookback', 'tolerance', 'trend_th'],
@@ -28,9 +27,10 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
     'ranging_long': ['lookback', 'tolerance', 'range'],
     'ranging_short': ['lookback', 'tolerance', 'range'],
+    'flag_long': ['lookback', 'impulse', 'flag', 'ma_period'],
+    'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 
-# Common parameters required for ALL strategies
 # Common parameters required for ALL strategies
 COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction', 'regime_trending', 'regime_ranging', 'regime_volatile', 'direction_mode']
 # ==========================================================================
@@ -574,7 +574,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         logger.info("Val Y7: All sell_after_ncandles within range")
     
     # ========================================================================
-    # Vcomo puedo comprobar la logica?al Y8: Unique strategy names
+    # Y8: Unique strategy names
     # ========================================================================
     validation_y8_errors = 0
     names = [s.get('name') for s in strategies]

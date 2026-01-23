@@ -295,3 +295,87 @@ strategies:
     range: 25
     tp_pct: 4
     sl_pct: 6
+    
+  # ------------------------------------------------------------------------
+  # STRATEGY 17: flag long (4H)
+  # ------------------------------------------------------------------------
+  - id: '17_flag_long_4H'
+    name: 'flag_long_4H'
+    timeframe: '4H'
+    active: true
+    direction: 'long'
+    regime_trending: 1.0
+    regime_ranging: 1.0
+    regime_volatile: 1.0
+    direction_mode: 'general'
+    sell_after_ncandles: 50
+    order_amount: 40
+    lookback: 13
+    impulse: 5
+    flag: 40
+    ma_period: 50
+    tp_pct: 4
+    sl_pct: 10
+    
+  # ------------------------------------------------------------------------
+  # STRATEGY 18: flag long (1H)
+  # ------------------------------------------------------------------------
+  - id: '18_flag_long_1H'
+    name: 'flag_long_1H'
+    timeframe: '1H'
+    active: true
+    direction: 'long'
+    regime_trending: 1.0
+    regime_ranging: 1.0
+    regime_volatile: 1.0
+    direction_mode: 'long_only'
+    sell_after_ncandles: 50
+    order_amount: 40
+    lookback: 20
+    impulse: 3
+    flag: 40
+    ma_period: 50
+    tp_pct: 2
+    sl_pct: 10
+    
+    # ------------------------------------------------------------------------
+  # STRATEGY 19: flag short (4H)
+  # ------------------------------------------------------------------------
+  - id: '19_flag_short_4H'
+    name: 'flag_short_4H'
+    timeframe: '4H'
+    active: true
+    direction: 'short'
+    regime_trending: 1.0
+    regime_ranging: 1.0
+    regime_volatile: 1.0
+    direction_mode: 'general'
+    sell_after_ncandles: 50
+    order_amount: 40
+    lookback: 10
+    impulse: 3
+    flag: 50
+    ma_period: 50
+    tp_pct: 3
+    sl_pct: 9
+    
+    # ------------------------------------------------------------------------
+  # STRATEGY 20: flag short (1H)
+  # ------------------------------------------------------------------------
+  - id: '20_flag_short_1H'
+    name: 'flag_short_1H'
+    timeframe: '1H'
+    active: true
+    direction: 'short'
+    regime_trending: 1.0
+    regime_ranging: 1.0
+    regime_volatile: 1.0
+    direction_mode: 'general'
+    sell_after_ncandles: 50
+    order_amount: 40
+    lookback: 20
+    impulse: 3
+    flag: 60
+    ma_period: 25
+    tp_pct: 2
+    sl_pct: 8

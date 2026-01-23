@@ -58,14 +58,14 @@ FAMILIES = {
 # - Favor longs vs shorts: Set long=1.5, short=0.8
 
 GLOBAL_REGIME_MULTIPLIERS = {
-    'trending': 1.0,   # Multiplier applied to all trending regime trades
-    'ranging': 1.0,    # Multiplier applied to all ranging regime trades
-    'volatile': 1.0    # Multiplier applied to all volatile regime trades
+    'trending': 1.5,   # Multiplier applied to all trending regime trades
+    'ranging': 1.5,    # Multiplier applied to all ranging regime trades
+    'volatile': 1.5    # Multiplier applied to all volatile regime trades
 }
 
 GLOBAL_DIRECTION_MULTIPLIERS = {
-    'long': 1.0,    # Multiplier applied to all long direction strategies
-    'short': 1.0    # Multiplier applied to all short direction strategies
+    'long': 1.5,    # Multiplier applied to all long direction strategies
+    'short': 1.5    # Multiplier applied to all short direction strategies
 }
 
 # =============================================================================
