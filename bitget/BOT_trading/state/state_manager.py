@@ -3,7 +3,7 @@ State Manager - Handles bot state persistence and broker synchronization.
 
 This module is responsible for:
 - Loading bot state from JSON file
-- Saving bot state to JSON file
+- Saving bot state to JSON file (PRIMARY + dual-write to PostgreSQL)
 - Synchronizing local state with broker positions
 
 This module imports from trade_logger for logging removed positions,
@@ -20,41 +20,110 @@ from typing import Dict, Tuple
 
 from market_data import get_ws_manager
 from execution.trade_logger import log_closed_position
+from config.settings import POSTGRES_CONFIG
 
 import logging
 logger = logging.getLogger('BOT_trading.execution.state_manager')
 
 
 # ==========================================================================
+# POSTGRESQL CONFIGURATION (DUAL-WRITE)
+# ==========================================================================
+POSTGRES_ENABLED = True
+# ==========================================================================
 # STATE PERSISTENCE
 # ==========================================================================
-def load_state(state_file: str) -> Tuple[Dict, Dict]:
+def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
     """
-    Load bot state from JSON file.
-    
-    This function reads the JSON state file and reconstructs:
-    - Open positions with proper Decimal types
-    - Strategy candle counters
+    Load bot state from PostgreSQL (primary) with JSON fallback.
     
     Args:
-        state_file: Path to state JSON file
+        account_number: Account identifier ('00', 'E1', '01')
+        state_file: Path to JSON file (for fallback only)
     
     Returns:
-        Tuple of (open_positions, strategy_candles) dictionaries
-    
-    Example:
-        >>> positions, candles = load_state('bot_state_E1.json')
-        >>> print(f"Loaded {sum(len(p) for p in positions.values())} positions")
+        Tuple of (OPEN_POSITIONS, STRATEGY_CANDLES)
     """
     
     OPEN_POSITIONS = {}
     STRATEGY_CANDLES = {}
     
-    logger.info(f"Loading BOT state...")
+    logger.info(f"Loading state for account {account_number}...")
+    
+    # ======================================================================
+    # PRIMARY: Try PostgreSQL first
+    # ======================================================================
+    if POSTGRES_ENABLED:
+        try:
+            import psycopg2
+            
+            conn = psycopg2.connect(**POSTGRES_CONFIG)
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT state_data FROM bot_state WHERE account = %s",
+                (account_number,)
+            )
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if result:
+                # Parse JSON from PostgreSQL
+                data = result[0]
+                
+                STRATEGY_CANDLES = data.get('strategy_candles', {})
+                positions_data = data.get('positions', {})
+                
+                # Reconstruct positions with Decimal types
+                for strat_id, positions in positions_data.items():
+                    OPEN_POSITIONS[strat_id] = []
+                    for pos in positions:
+                        OPEN_POSITIONS[strat_id].append({
+                            'symbol': pos.get('symbol'),
+                            'size': Decimal(pos.get('size')),
+                            'entry_price': Decimal(pos.get('entry_price')),
+                            'direction': pos.get('direction'),
+                            'tp': Decimal(pos.get('tp')),
+                            'sl': Decimal(pos.get('sl')),
+                            'order_id': pos.get('order_id'),
+                            'opened_at': datetime.fromisoformat(pos.get('opened_at')),
+                            'usdt_amount': float(pos.get('usdt_amount', 0)),
+                            'regime_family': pos.get('regime_family', 'unknown'),
+                            'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
+                            'market_direction': pos.get('market_direction', 'unknown'),
+                            'direction_multiplier': float(pos.get('direction_multiplier', 1.0))
+                        })
+                
+                total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
+                
+                logger.info(f"✓ State loaded from PostgreSQL: {total_positions} positions")
+                logger.info(f"{'-' * 48}")
+                
+                # Display summary
+                for strat_id, positions in OPEN_POSITIONS.items():
+                    if positions:
+                        candles = STRATEGY_CANDLES.get(strat_id, 0)
+                        logger.info(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
+                
+                return OPEN_POSITIONS, STRATEGY_CANDLES
+            else:
+                logger.warning(f"No state found in PostgreSQL for account {account_number}")
+                # Fall through to JSON fallback
+                
+        except Exception as e:
+            logger.error(f"✗ PostgreSQL load failed: {e}")
+            logger.info("Falling back to JSON...")
+            # Fall through to JSON fallback
+    
+    # ======================================================================
+    # FALLBACK: Load from JSON
+    # ======================================================================
+    logger.info(f"Loading from JSON fallback: {state_file}")
     
     if not os.path.exists(state_file):
         logger.info(f"No previous state file found")
-        logger.info(f"{'=' * 20}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
     
     try:
@@ -86,7 +155,7 @@ def load_state(state_file: str) -> Tuple[Dict, Dict]:
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
-        logger.info(f"Total positions recovered: {total_positions}")
+        logger.info(f"✓ State loaded from JSON: {total_positions} positions")
         logger.info(f"{'-' * 48}")
         
         # Display summary
@@ -95,35 +164,21 @@ def load_state(state_file: str) -> Tuple[Dict, Dict]:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
                 logger.info(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
         
-        logger.info(f"State loaded successfully")
-        
         return OPEN_POSITIONS, STRATEGY_CANDLES
         
     except Exception as e:
-        logger.error(f"Error-loading state: {e}")
+        logger.error(f"✗ Error loading state from JSON: {e}")
         traceback.print_exc()
-        logger.info(f"{'=' * 120}\n")
         return OPEN_POSITIONS, STRATEGY_CANDLES
 
 
-def save_state_local(open_positions: Dict, 
-                     strategy_candles: Dict, 
-                     state_file: str) -> None:
-    """
-    Save bot state to JSON file.
-    
-    This function serializes the current bot state including:
-    - All open positions (converting Decimal to string)
-    - Candle counters for each strategy
-    
-    Args:
-        open_positions: Dictionary of open positions by strategy
-        strategy_candles: Dictionary of candle counters by strategy
-        state_file: Path to state JSON file
-    
-    Example:
-        >>> save_state_local(positions, candles, 'bot_state_E1.json')
-    """
+def save_state_local(
+    open_positions: Dict,
+    strategy_candles: Dict,
+    account_number: str,
+    state_file: str
+) -> None:
+
     try:
         # Deep copy to avoid modifying original
         positions_copy = copy.deepcopy(open_positions)
@@ -155,9 +210,66 @@ def save_state_local(open_positions: Dict,
             'strategy_candles': strategy_candles_copy
         }
 
-        # Write to file
-        with open(state_file, 'w') as f:
-            json.dump(state_data, f, indent=2)
+        # ======================================================================
+        # DUAL-WRITE: JSON (PRIMARY) + PostgreSQL (BACKUP)
+        # ======================================================================
+        
+        json_success = False
+        postgres_success = False
+        
+        # Write to JSON (primary)
+        try:
+            with open(state_file, 'w') as f:
+                json.dump(state_data, f, indent=2)
+            json_success = True
+        except Exception as e:
+            logger.error(f"✗ JSON state save failed: {e}")
+        
+        # Write to PostgreSQL (dual-write backup)
+        if POSTGRES_ENABLED:
+            try:
+                import psycopg2
+                from psycopg2 import sql
+                
+                # Use account_number parameter directly (no extraction needed)
+                account = account_number
+                
+                # Connect and upsert
+                conn = psycopg2.connect(**POSTGRES_CONFIG)
+                cursor = conn.cursor()
+                
+                upsert_query = sql.SQL("""
+                    INSERT INTO bot_state (account, state_data, updated_at)
+                    VALUES (%(account)s, %(state_data)s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (account)
+                    DO UPDATE SET
+                        state_data = EXCLUDED.state_data,
+                        updated_at = CURRENT_TIMESTAMP
+                """)
+                
+                cursor.execute(upsert_query, {
+                    'account': account,
+                    'state_data': json.dumps(state_data)
+                })
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                postgres_success = True
+            except Exception as e:
+                logger.error(f"✗ PostgreSQL state save failed: {e}")
+        
+        # Log dual-write status (only if verbose)
+        status_indicators = []
+        if postgres_success:
+            status_indicators.append("PG✓")
+        if json_success:
+            status_indicators.append("JSON✓")
+        
+        if status_indicators:
+            total_positions = sum(len(p) for p in open_positions.values())
+            logger.debug(f"[{' '.join(status_indicators)}] State saved: {total_positions} positions")
             
     except Exception as e:
         logger.error(f"Error-saving state: {e}")
@@ -168,32 +280,10 @@ def save_state_local(open_positions: Dict,
 # BROKER SYNCHRONIZATION
 # ==========================================================================
 def sync_broker(open_positions: Dict, 
-                strategy_candles: Dict, 
+                strategy_candles: Dict,
+                account_number: str,
                 state_file: str) -> None:
-    """
-    Synchronize local positions with broker via WebSocket.
-    
-    This function:
-    1. Refreshes WebSocket position data
-    2. Checks each local position against broker
-    3. Removes positions that no longer exist in broker
-    4. Logs removed positions as NOT_FOUND
-    
-    This is critical for recovering from:
-    - Manual closes in broker interface
-    - Liquidations
-    - Stop losses triggered by broker
-    
-    Args:
-        open_positions: Dictionary of open positions
-        strategy_candles: Dictionary of candle counters
-        state_file: Path to state file
-    
-    Example:
-        >>> sync_broker(positions, candles, 'bot_state_E1.json')
-        Position BTCUSDT doesn't exist in broker - treating as SL
-        Sync with broker completed: 1 position(s) removed
-    """
+
     total_removed = 0
     
     if not get_ws_manager():
@@ -274,7 +364,7 @@ def sync_broker(open_positions: Dict,
     
     # Save state if changes were made
     if total_removed > 0:
-        save_state_local(open_positions, strategy_candles, state_file)
+        save_state_local(open_positions, strategy_candles, account_number, state_file)
         logger.info(f"Sync with broker completed: {total_removed} position(s) removed")
     else:
         logger.info(f"Sync with broker completed.")

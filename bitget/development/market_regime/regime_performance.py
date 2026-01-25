@@ -251,9 +251,9 @@ def format_significance(p_value: float) -> str:
 
 def print_single_strategy_all_dimensions(r: dict):
     """Prints all 3 dimension tables for a single strategy."""
-    print(f"\n{'='*200}")
-    print(f"STRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)")
-    print(f"{'='*200}")
+    print(f"\n\033[93m{'='*200}\033[0m")
+    print(f"\033[93mSTRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)\033[0m")
+    print(f"\033[93m{'='*200}\033[0m")
     
     # TABLE 1: BY FAMILY
     print(f"\n{'─'*120}")

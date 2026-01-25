@@ -49,6 +49,7 @@ class StrategyProcessor:
         send_request_func: Callable,
         get_balance_func: Callable,
         hour_zone,
+        account_number: str, 
         state_file: str,
         use_hardcoded: bool = False
     ):
@@ -65,6 +66,7 @@ class StrategyProcessor:
         self.send_request = send_request_func
         self.get_balance = get_balance_func
         self.hour_zone = hour_zone
+        self.account_number = account_number
         self.state_file = state_file
         self.use_hardcoded = use_hardcoded
         
@@ -150,6 +152,7 @@ class StrategyProcessor:
             strat_id,
             strategy_candles,
             open_positions,
+            self.account_number,  # ← NECESITA PASAR account_number
             self.state_file
         )
         
@@ -173,7 +176,7 @@ class StrategyProcessor:
             resp_order = place_order(
                 symbol=sig['symbol'],
                 direction=strat['direction'],
-                usdt_amount=order_amount,  # ← USING ADJUSTED AMOUNT
+                usdt_amount=order_amount,  
                 send_request_func=self.send_request
             )
             
@@ -218,13 +221,14 @@ class StrategyProcessor:
                     order_id=order_id,
                     open_positions=open_positions,
                     strategy_candles=strategy_candles,
+                    account_number=self.account_number,  # ← NECESITA PASAR account_number
                     state_file=self.state_file,
                     hour_zone=self.hour_zone,
                     usdt_amount=order_amount,
-                    regime_family=regime_family,        # ← AÑADIR
-                    regime_multiplier=regime_multiplier ,
-                    market_direction=direction,                      # ← NUEVO
-                    direction_multiplier=direction_multiplier# ← AÑADIR# ← USING ADJUSTED AMOUNT
+                    regime_family=regime_family,
+                    regime_multiplier=regime_multiplier,
+                    market_direction=direction,
+                    direction_multiplier=direction_multiplier
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:

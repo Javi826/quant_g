@@ -24,8 +24,7 @@ from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
 from market_regime import get_current_regime, get_current_direction, PositionSizer
 
-
-from validation import validate_strategy_configuration,validate_settings
+from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
 
 from analytics import BotState
 from api.backend import DashboardServer, create_dashboard_template
@@ -186,7 +185,7 @@ class BotOrchestrator:
         Saves state and closes all connections.
         """
         self._running = False
-        save_state_local(self.open_positions, self.strategy_candles, self.state_file)
+        save_state_local(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
         self.logger.info("⛔ BOT Stopped")
     
     def get_status(self) -> Dict[str, Any]:
@@ -247,7 +246,8 @@ class BotOrchestrator:
     def _load_bot_state(self) -> None:
         """Load bot state from disk and initialize BotState."""
         self.open_positions, self.strategy_candles = load_state(
-            self.state_file,
+            self.account_number,
+            self.state_file
         )
         
         self.bot_state = BotState()
@@ -270,6 +270,8 @@ class BotOrchestrator:
         # Validate
         self.logger.info(f"Validating configuration...")
         self.logger.info(f"{'-' * 48}")
+        
+        validate_postgresql_connection()
         
         all_errors = []
         all_warnings = []
@@ -342,6 +344,7 @@ class BotOrchestrator:
             send_request_func=self._send_request_wrapper,
             get_balance_func=get_usdt_balance_ws,
             hour_zone=HOUR_ZONE,
+            account_number=self.account_number,
             state_file=self.state_file,
             use_hardcoded=USE_HARDCODED_SIGNALS
         )
@@ -453,7 +456,7 @@ class BotOrchestrator:
         self.logger.info(f"Timeframes: {', '.join(closed_timeframes)}")
         
         # Sync with broker
-        sync_broker(self.open_positions, self.strategy_candles, self.state_file)
+        sync_broker(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
         
         # ========================================================================
         # NEW: Update regime for closed timeframes
@@ -503,6 +506,7 @@ class BotOrchestrator:
                     strat_id,
                     self.strategy_candles,
                     self.open_positions,
+                    self.account_number,
                     self.state_file
                 )
                 candles       = self.strategy_candles.get(strat_id, 0)
@@ -518,6 +522,7 @@ class BotOrchestrator:
                     strat['sell_after_ncandles'],
                     self.open_positions,
                     self.strategy_candles,
+                    self.account_number,
                     self.state_file,
                     self._send_request_wrapper,
                     bot_state=self.bot_state
@@ -618,6 +623,7 @@ class BotOrchestrator:
                 self.strategies,
                 self.open_positions,
                 self.strategy_candles,
+                self.account_number,  # ← AÑADIR
                 self.state_file,
                 self._send_request_wrapper,
                 check_tp_sl_for_strategy,

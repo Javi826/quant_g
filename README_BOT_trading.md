@@ -1,1306 +1,807 @@
-# 🤖 BOT TRADING - DOCUMENTACIÓN TÉCNICA v2.5
+BOT TRADING - DOCUMENTACIÓN TÉCNICA v2.7
+Sistema de Trading Automatizado con PostgreSQL y Regime-Based Position Sizing
 
-**Sistema de Trading Automatizado con Regime-Based Position Sizing**
+Versión: 2.7
+Fecha: 2026-01-25
+Python: 3.12
+Framework: Flask + ccxt + Bitget API + PostgreSQL
 
----
+📋 TABLA DE CONTENIDOS
+PARTE 1: VISIÓN GENERAL
 
-**Versión:** 2.5  
-**Fecha:** 2026-01-20  
-**Python:** 3.12  
-**Framework:** Flask + ccxt + Bitget API
+Introducción
+Arquitectura
+Stack Tecnológico
 
----
+PARTE 2: POSTGRESQL INTEGRATION
 
-## 📋 TABLA DE CONTENIDOS
+Arquitectura de Datos
+Estado del Bot
+Trades y Analytics
 
-### PARTE 1: VISIÓN GENERAL
-1. [Introducción](#1-introducción)
-2. [Arquitectura](#2-arquitectura)
-3. [Stack Tecnológico](#3-stack-tecnológico)
+PARTE 3: MARKET REGIME SYSTEM
 
-### PARTE 2: MARKET REGIME SYSTEM
-4. [Clasificación de Mercado](#4-clasificación-de-mercado)
-5. [Matriz de Régimen Custom](#5-matriz-de-régimen-custom)
-6. [Configuración de Régimen](#6-configuración-de-régimen)
+Clasificación de Mercado
+Matriz de Régimen Custom
+Position Sizing Adaptativo
 
-### PARTE 3: COMPONENTES CORE
-7. [BotOrchestrator](#7-botaniquestrator)
-8. [Sistema de Estrategias](#8-sistema-de-estrategias)
-9. [Dashboard Web](#9-dashboard-web)
+PARTE 4: COMPONENTES CORE
 
-### PARTE 4: CONFIGURACIÓN
-10. [Settings.py](#10-settingspy)
-11. [Strategies.yaml](#11-strategiesyaml)
-12. [Alta de Estrategias](#12-alta-de-estrategias)
+BotOrchestrator
+Sistema de Estrategias
+Dashboard Web
 
-### PARTE 5: FLUJOS Y OPERACIÓN
-13. [Ciclo de Vida](#13-ciclo-de-vida)
-14. [Position Sizing Adaptativo](#14-position-sizing-adaptativo)
-15. [Troubleshooting](#15-troubleshooting)
+PARTE 5: CONFIGURACIÓN Y OPERACIÓN
 
-### PARTE 6: REFERENCIA RÁPIDA
-16. [Estructuras de Datos](#16-estructuras-de-datos)
-17. [Comandos y Endpoints](#17-comandos-y-endpoints)
+Settings.py
+Strategies Configuration
+Ciclo de Vida
 
----
+PARTE 6: REFERENCIA RÁPIDA
 
-# PARTE 1: VISIÓN GENERAL
+Troubleshooting
+Comandos y Endpoints
+Estructuras de Datos
 
-## 1. Introducción
 
-### 1.1 ¿Qué es BOT_trading?
+PARTE 1: VISIÓN GENERAL
+1. Introducción
+1.1 ¿Qué es BOT_trading?
+Sistema automatizado de trading en futuros de criptomonedas que opera 24/7. Gestiona múltiples estrategias en diferentes timeframes con position sizing adaptativo según condiciones de mercado.
+Características principales:
 
-BOT_trading es un sistema automatizado de trading en futuros de criptomonedas que opera 24/7 sin intervención humana. Gestiona múltiples estrategias simultáneamente en diferentes timeframes (4H, 1H, 6Hutc, 2m, 5m) con **position sizing adaptativo personalizado por estrategia** según las condiciones del mercado.
+18+ estrategias multi-timeframe (4H, 1H, 6Hutc)
+Position sizing personalizado por estrategia
+PostgreSQL como fuente de verdad
+Estado persistente con alta disponibilidad
+Dashboard web en tiempo real
+Tracking completo de condiciones de mercado
+Dual-write para redundancia (PostgreSQL + JSON/Excel)
 
-**Características principales:**
-- 14+ estrategias multi-timeframe
-- **Custom multipliers: cada estrategia define su comportamiento según régimen de mercado**
-- Gestión automática de TP/SL/Timeout
-- Multi-cuenta (00, E1, 01)
-- Dashboard web en tiempo real
-- Estado persistente (recuperación tras crash)
-- Tracking completo de condiciones de mercado en cada trade
+1.2 Novedades v2.7
+PostgreSQL Integration Completa:
 
-### 1.2 Flujo Simplificado
-```
-VELA CIERRA → DETECTAR RÉGIMEN Y DIRECCIÓN MERCADO
-    ↓
-PARA CADA ESTRATEGIA:
-├─ Leer regime_trending/ranging/volatile (del YAML)
-├─ Leer direction_mode (del YAML)
-├─ PositionSizer calcula multipliers
-├─ Calcular: adjusted_amount = base × regime_mult × direction_mult
-├─ Guardar market_direction en posición
-└─ Si multiplier != 0 → Buscar señales con adjusted_amount
-```
+Estado del bot (posiciones activas) en base de datos
+Lectura primaria desde PostgreSQL con fallback a JSON
+Dashboard consume directamente de PostgreSQL
+Trades históricos en base de datos
 
----
+Arquitectura Independiente:
 
-## 2. Arquitectura
+PostgreSQL no depende de convenciones de nombres de archivos
+Parámetro account_number explícito en toda la cadena
+Sistema escalable para replicación/failover
 
-### 2.1 Estructura de Directorios
-```
+
+2. Arquitectura
+2.1 Estructura de Directorios
 bitget/
-├── BOT_trading/                    # 🤖 Producción
+├── BOT_trading/
 │   ├── config/
-│   │   └── settings.py             # DIRECTION_MATRIX, REGIME_GENERAL
+│   │   ├── settings.py             # POSTGRES_CONFIG, DIRECTION_MATRIX
+│   │   ├── strategies_00.py        # Estrategias Python cuenta 00
+│   │   ├── strategies_E1.py        # Estrategias Python cuenta E1
+│   │   └── strategies_01.py        # Estrategias Python cuenta 01
 │   ├── core/
-│   │   └── orchestrator.py         # Orquestación
-│   ├── strategies/
-│   │   ├── strategies.yaml         # regime_trending/ranging/volatile + direction_mode
-│   │   └── strategy_registry.py
-│   ├── market_regime/
-│   │   ├── regime_classifier.py    # Detecta régimen y dirección
-│   │   ├── regime_metrics.py       # Calcula métricas técnicas
-│   │   └── position_sizer.py       # Cálculo multipliers
-│   ├── execution/
-│   │   ├── position_tracker.py     # Guarda market_direction
-│   │   ├── order_manager.py        # Extrae market_direction
-│   │   └── trade_logger.py         # Escribe MARKET_DIRECTION a Excel
+│   │   └── orchestrator.py         # Main loop + regime cache
 │   ├── state/
-│   │   └── state_manager.py        # Persiste market_direction en JSON
+│   │   ├── state_manager.py        # PostgreSQL primary + JSON fallback
+│   │   └── candle_tracker.py       # Candle timeouts
+│   ├── execution/
+│   │   ├── position_tracker.py     # Add/remove positions
+│   │   ├── order_manager.py        # TP/SL execution
+│   │   └── trade_logger.py         # Dual-write trades
+│   ├── market_regime/
+│   │   ├── regime_classifier.py    # Detecta régimen/dirección
+│   │   └── position_sizer.py       # Calcula multipliers
 │   ├── api/
-│   │   ├── backend.py
-│   │   └── templates/
-│   │       └── dashboard.html
-│   └── signals/                    # ← Symlink a ../signals/
-│
-├── signals/                        # 🔄 Compartido
-│   ├── add_signals_double_top.py
-│   ├── add_signals_reversal.py
-│   └── ...
-│
-└── development/                    # 🛠️ Desarrollo
-    └── backtesters/
-```
-
-### 2.2 Flujo de Datos
-```
-Market Data (Bitget API)
+│   │   └── backend.py              # Dashboard Flask + PostgreSQL
+│   └── validation/
+│       └── validation_module.py    # Config + PostgreSQL validation
+2.2 Flujo de Datos
+Market Data → Regime Classifier
     ↓
-Market Regime Classifier
-├─ Calcular Hurst, ER, ATR, PE
-├─ Clasificar régimen: trending/ranging/volatile
-├─ Detectar dirección: uptrend/dwtrend (price vs MA50)
-└─ Cachear en orchestrator
+Position Sizer (calcula multipliers)
     ↓
-PositionSizer
-├─ Lookup regime_trending/ranging/volatile (del YAML)
-├─ Lookup DIRECTION_MATRIX[direction_mode][market_direction]
-├─ Calcular: final_mult = regime_mult × direction_mult
-└─ Retornar adjusted_order_amount + metadata (incluye market_direction)
+Strategy Processor (abre posiciones)
     ↓
-Strategy Processor
-├─ Detectar señales
-├─ Abrir posición con adjusted_order_amount
-└─ Pasar market_direction a position_tracker
-    ↓
-Position Tracker
-├─ Guardar market_direction en diccionario de posición
-└─ Persistir en state_manager
+Position Tracker (guarda market_direction)
     ↓
 State Manager
-└─ Guardar market_direction en bot_state.json
+├─ PostgreSQL (PRIMARY - source of truth)
+└─ JSON (BACKUP - safety net)
     ↓
 (Al cerrar posición)
-Order Manager
-├─ Extraer market_direction de posición
-└─ Pasar a trade_logger
-    ↓
 Trade Logger
-└─ Escribir columna MARKET_DIRECTION en Excel
-```
+├─ PostgreSQL (analytics/dashboard)
+└─ Excel (visualización rápida)
+    ↓
+Dashboard Backend (lee PostgreSQL)
 
-### 2.3 Separación de Responsabilidades
+3. Stack Tecnológico
+3.1 Core
 
-| Módulo | Responsabilidad |
-|--------|-----------------|
-| **config/** | DIRECTION_MATRIX, REGIME_GENERAL, configuración |
-| **core/** | Orquestación, cache de régimen/dirección |
-| **market_regime/** | Clasificación mercado + cálculo sizing |
-| **strategies/** | Definición regime_trending/ranging/volatile + direction_mode |
-| **execution/** | API Bitget + tracking de market_direction |
-| **state/** | Persistencia de market_direction |
-| **api/** | Dashboard + endpoints |
-| **signals/** | Funciones de señales (compartido) |
+Python 3.12
+PostgreSQL 14+ (persistencia primary)
+Flask 3.x (dashboard)
+ccxt (OHLCV data)
+psycopg2 (PostgreSQL driver)
 
----
+3.2 Librerías Analytics
+LibreríaUsopandasProcesamiento datosnumpyArrays numéricosnoldsHurst exponentta (pandas_ta)ATRneurokit2Permutation Entropy
+3.3 APIs
+Bitget REST API:
 
-## 3. Stack Tecnológico
+Base: https://api.bitget.com
+Auth: HMAC SHA256
+Product: USDT-FUTURES
 
-### 3.1 Lenguajes y Frameworks
+Endpoints:
 
-- **Python 3.12**
-- **Flask 3.x** (Dashboard)
-- **ccxt** (OHLCV data)
-- **requests** (Bitget API)
+POST /api/v2/mix/order/place
+GET /api/v2/mix/position/all-position
+GET /api/v2/mix/account/account
 
-### 3.2 Librerías Clave
 
-| Librería | Uso |
-|----------|-----|
-| pandas | Procesamiento datos |
-| numpy | Arrays numéricos |
-| yaml | Parsing estrategias |
-| nolds | Hurst exponent |
-| ta | ATR (pandas_ta) |
-| neurokit2 | Permutation Entropy |
+PARTE 2: POSTGRESQL INTEGRATION
+4. Arquitectura de Datos
+4.1 Filosofía
+PostgreSQL = Source of Truth
 
-### 3.3 APIs
+Bot lee estado primero de PostgreSQL
+Dashboard consume únicamente PostgreSQL
+JSON/Excel como backup automático redundante
 
-**Bitget API:**
-- Base URL: `https://api.bitget.com`
-- Auth: HMAC SHA256
-- Product: USDT-FUTURES
+¿Por qué dual-write permanente?
 
-**Endpoints:**
-- `POST /api/v2/mix/order/place`
-- `GET /api/v2/mix/position/all-position`
-- `GET /api/v2/mix/account/account`
-- `GET /api/v2/mix/market/candles`
+Costo marginal: 50KB disco, <1ms latencia
+Beneficios enormes: Disaster recovery, debugging, portabilidad
+Arquitectura profesional: Zero single points of failure
 
----
+4.2 Esquema de Tablas
+Tabla bot_state:
 
-# PARTE 2: MARKET REGIME SYSTEM
+account (TEXT, PRIMARY KEY)
+state_data (JSONB)
+updated_at (TIMESTAMP)
 
-## 4. Clasificación de Mercado
+Tabla trades:
 
-### 4.1 Métricas Calculadas
+Histórico completo de trades
+Incluye: market_direction, regime_family, multipliers
+Índices en: strategy_id, opened_at, closed_at
 
-El sistema calcula 4 métricas en los últimos N períodos de BTCUSDT:
-
-**1. Hurst Exponent**
-```python
-H = hurst_rs(log_returns, window=100)
-```
-- **Rango:** 0.0 - 1.0
-- **Uso:** Detectar persistencia tendencial
-- H > 0.5 = trending (tendencia persistente)
-- H < 0.5 = mean-reverting (reversión a la media)
-
-**2. Efficiency Ratio (ER)**
-```python
-ER = abs(close[-1] - close[-window]) / sum(abs(price_changes))
-```
-- **Rango:** 0.0 - 1.0
-- **Uso:** Medir calidad direccional
-- 0 = completamente lateral
-- 1 = tendencia perfecta
-
-**3. ATR Normalizado**
-```python
-ATR_normalized = (ATR_14 / close[-1]) * 100
-```
-- **Rango:** 0-15%
-- **Uso:** Detectar volatilidad extrema
-
-**4. Permutation Entropy (PE)**
-```python
-PE = entropy(permutations(log_returns, order=3))
-```
-- **Rango:** 0.0 - 1.0
-- **Uso:** Detectar aleatoriedad
-- 0 = predecible
-- 1 = aleatorio
-
-### 4.2 Reglas de Clasificación
-```python
-# config/settings.py
-REGIME_FAMILIES = {
-    'trending': {
-        'hurst': ('>', 0.55),
-        'efficiency_ratio': ('>', 0.4)
-    },
-    'volatile': {
-        'atr_pct': ('>', 2.0),
-        'permutation_entropy': ('>', 0.2)
-    },
-    'ranging': {}  # Default
+4.3 Configuración
+settings.py:
+POSTGRES_CONFIG = {
+    'dbname': 'bot_trading',
+    'user': 'javi',
+    'password': 'xxxx',
+    'host': 'localhost',
+    'port': 5432,
+    'connect_timeout': 5
 }
-```
+Validación automática en startup:
 
-**Orden de evaluación (first-match-wins):**
-1. TRENDING: if Hurst > 0.55 AND ER > 0.4
-2. VOLATILE: elif ATR > 2.0% AND PE > 0.2
-3. RANGING: else (fallback)
+Conexión PostgreSQL disponible
+Tablas existen
+Columna state_data es tipo JSONB
+Permisos correctos
 
-### 4.3 Detección de Dirección
 
-**Basada en precio vs MA50:**
-```python
-if BTC_price > MA50:
-    market_direction = 'uptrend'
-else:
-    market_direction = 'dwtrend'
-```
+5. Estado del Bot
+5.1 Lectura: PostgreSQL Primary + JSON Fallback
+Proceso en state_manager.load_state(account_number, state_file):
 
-**Logs incluyen contexto completo:**
-```
-[REGIME] 1H: REGIME=TRENDING, DIRECTION=UPTREND (BTC=$94356.80, MA50=$92145.23, hurst=0.67, er=0.58)
-```
+Intenta PostgreSQL primero:
 
-### 4.4 Símbolo de Referencia
+Query: SELECT state_data FROM bot_state WHERE account = %s
+Si existe: Reconstruye posiciones con tipos Decimal/datetime
+Log: ✓ State loaded from PostgreSQL: N positions
 
-**`REGIME_REFERENCE_SYMBOL = 'BTCUSDT'`**
 
-Todas las estrategias usan BTCUSDT como referencia, independientemente del símbolo que tradeen.
+Fallback a JSON si falla:
 
-**Razones:**
-- Mayor liquidez y volumen
-- Representa sentimiento general del mercado crypto
-- Evita ruido de símbolos de baja liquidez
-- Eficiencia: 1 solo fetch por timeframe
+Lee bot_state_XX.json
+Mismo procesamiento que PostgreSQL
+Log: ✓ State loaded from JSON: N positions
 
----
 
-## 5. Matriz de Régimen Custom
+Si ambos fallan:
 
-### 5.1 Concepto
+Retorna estado vacío (posiciones = {}, candles = {})
+Bot arranca limpio
 
-Sistema bidimensional que ajusta position sizing basado en:
-- **Régimen de mercado:** trending/ranging/volatile (calculado del mercado)
-- **Dirección de mercado:** uptrend/dwtrend (calculado del mercado)
-- **Multipliers de estrategia:** regime_trending/ranging/volatile (definidos en YAML)
-- **Modo dirección de estrategia:** long_only/short_only/general (definido en YAML)
 
-**Fórmula:**
-```python
-final_multiplier = regime_multiplier × direction_multiplier
-adjusted_amount = base_amount × final_multiplier
-```
 
-**El `market_direction` se guarda en cada posición** para tracking histórico.
+Punto crítico: Bot SIEMPRE puede arrancar (con o sin PostgreSQL).
+5.2 Escritura: Dual-Write (PostgreSQL + JSON)
+Proceso en state_manager.save_state_local():
+Siempre escribe a ambos:
 
-### 5.2 Definición de Matrices
-```python
-# config/settings.py
+JSON: Archivo local bot_state_XX.json
+PostgreSQL: UPSERT en tabla bot_state
 
-# Matriz de Dirección
-DIRECTION_MATRIX = {
-    'long_only': {
-        'uptrend': 1.0,    # Long en uptrend = Favorable
-        'dwtrend': 0.0     # Long en downtrend = BLOQUEAR
-    },
-    'short_only': {
-        'uptrend': 0.0,    # Short en uptrend = BLOQUEAR
-        'dwtrend': 1.0     # Short en downtrend = Favorable
-    }
-}
+Comportamiento robusto:
 
-# Fallbacks globales
-REGIME_GENERAL = {
-    'trending': 1.0,
-    'ranging': 1.0,
-    'volatile': 1.0,
-}
+Si JSON falla → Log error, continúa
+Si PostgreSQL falla → Log error, continúa
+Estado nunca se pierde (al menos uno escribe)
 
-DIRECTION_GENERAL = {
-    'uptrend': 1.0,
-    'dwtrend': 1.0
-}
-```
+Logs (debug level):
+[PG✓ JSON✓] State saved: 3 positions
+5.3 Independencia de Archivos
+CRÍTICO - Cambio arquitectónico v2.7:
+ANTES (v2.6):
 
-### 5.3 Lógica de Aplicación (PositionSizer)
-```python
-# En market_regime/position_sizer.py
+account_number extraído del nombre de archivo bot_state_01.json
+PostgreSQL dependía de convención de nombres
 
-class PositionSizer:
-    def calculate_adjusted_amount(
-        self,
-        base_amount: float,
-        regime_trending: float,        # Del YAML
-        regime_ranging: float,         # Del YAML
-        regime_volatile: float,        # Del YAML
-        direction_mode: str,           # Del YAML: 'long_only'/'short_only'/'general'
-        market_regime: str,            # Del clasificador: 'trending'/'ranging'/'volatile'
-        market_direction: str          # Del clasificador: 'uptrend'/'dwtrend'
-    ):
-        # 1. Regime multiplier (usa valores del YAML según market_regime)
-        if market_regime == 'trending':
-            regime_mult = regime_trending
-        elif market_regime == 'ranging':
-            regime_mult = regime_ranging
-        elif market_regime == 'volatile':
-            regime_mult = regime_volatile
-        
-        # Si no tiene valores definidos, usa REGIME_GENERAL
-        if not (regime_trending or regime_ranging or regime_volatile):
-            regime_mult = REGIME_GENERAL[market_regime]
-        
-        # 2. Direction multiplier
-        if direction_mode == 'general':
-            direction_mult = DIRECTION_GENERAL[market_direction]
-        elif direction_mode:
-            direction_mult = DIRECTION_MATRIX[direction_mode][market_direction]
-        else:
-            direction_mult = 1.0
-        
-        # 3. Combined
-        final_mult = regime_mult * direction_mult
-        adjusted_amount = base_amount * final_mult
-        
-        # 4. Build metadata (incluye market_direction para tracking)
-        metadata = {
-            'market_direction': market_direction,
-            'direction_multiplier': direction_mult,
-            'regime_multiplier': regime_mult,
-            'final_multiplier': final_mult,
-            'adjusted_amount': adjusted_amount,
-            'blocked': (final_mult == 0)
-        }
-        
-        return adjusted_amount, metadata
-```
+DESPUÉS (v2.7):
 
-### 5.4 Ejemplos Prácticos
+account_number parámetro explícito en todas las funciones
+PostgreSQL 100% independiente de archivos JSON
+Escalabilidad mejorada (múltiples servidores, naming flexible)
 
-**Ejemplo 1: Estrategia Long en Mercado Trending Downtrend**
-```
-Estrategia: 06_reversal_long_1H
-- regime_trending: 1.8
-- direction_mode: 'long_only'
-- order_amount: 80 USDT
+Funciones modificadas:
 
+load_state(account_number, state_file)
+save_state_local(open_positions, strategy_candles, account_number, state_file)
+sync_broker(..., account_number, state_file)
+add_position(..., account_number, ...)
+Todas las funciones de state/execution/strategies
+
+
+6. Trades y Analytics
+6.1 Dual-Write Trades
+Excel (visualización rápida):
+
+Archivo local TRADES_XX.xlsx
+Útil para debugging rápido
+Columna MARKET_DIRECTION incluida
+
+PostgreSQL (analytics):
+
+Tabla trades con todos los campos
+Dashboard consulta directamente
+Sin dependencia de archivos
+
+6.2 Dashboard Integration
+Backend lee únicamente PostgreSQL:
+
+GET /api/trades → Query directo a tabla trades
+GET /api/positions → Query a tabla bot_state
+Sin lectura de Excel/JSON
+Queries optimizadas con índices
+
+
+PARTE 3: MARKET REGIME SYSTEM
+7. Clasificación de Mercado
+7.1 Métricas Calculadas
+Sobre BTCUSDT en ventanas configurables:
+
+Hurst Exponent (trending persistence)
+
+H > 0.5 = trending
+H < 0.5 = mean-reverting
+
+
+Efficiency Ratio (quality direccional)
+
+0 = lateral, 1 = tendencia perfecta
+
+
+ATR Normalizado (volatilidad)
+
+% sobre precio actual
+
+
+Permutation Entropy (aleatoriedad)
+
+0 = predecible, 1 = aleatorio
+
+
+
+7.2 Reglas de Clasificación
+Definidas en settings.py → REGIME_FAMILIES:
+Orden first-match-wins:
+
+TRENDING: if Hurst > 0.55 AND ER > 0.4
+VOLATILE: elif ATR > 2.0% AND PE > 0.2
+RANGING: else
+
+7.3 Detección de Dirección
+Basada en precio vs MA50:
+
+BTC price > MA50 → market_direction = 'uptrend'
+BTC price < MA50 → market_direction = 'dwtrend'
+
+Se calcula 1 vez por vela cerrada y se cachea.
+Logs incluyen contexto:
+[REGIME] 1H: REGIME=TRENDING, DIRECTION=DWTREND 
+(BTC=$91086.10, MA50=$93446.76, hurst=0.81, er=0.66)
+
+8. Matriz de Régimen Custom
+8.1 Sistema Bidimensional
+Ajusta position sizing según:
+
+Régimen de mercado: trending/ranging/volatile (detectado)
+Dirección de mercado: uptrend/dwtrend (detectado)
+Multipliers de estrategia: regime_trending/ranging/volatile (config)
+Modo dirección: long_only/short_only/general (config)
+
+Fórmula:
+final_mult = regime_mult × direction_mult
+adjusted_amount = base_amount × final_mult
+8.2 Configuración Matrices
+DIRECTION_MATRIX (settings.py):
+long_only:  uptrend=1.0, dwtrend=0.0  # Bloquea longs en downtrend
+short_only: uptrend=0.0, dwtrend=1.0  # Bloquea shorts en uptrend
+general:    uptrend=1.0, dwtrend=1.0  # Sin filtro direccional
+REGIME_GENERAL (fallbacks):
+trending: 1.0
+ranging: 1.0
+volatile: 1.0
+DIRECTION_GENERAL (fallbacks):
+uptrend: 1.0
+dwtrend: 1.0
+8.3 Ejemplo Práctico
+Estrategia Long en Downtrend:
+
+Config: regime_trending=1.8, direction_mode='long_only', base=80 USDT
+Mercado: TRENDING + DWTREND (BTC < MA50)
+Cálculo:
+
+regime_mult = 1.8
+direction_mult = 0.0 (DIRECTION_MATRIX['long_only']['dwtrend'])
+final_mult = 1.8 × 0.0 = 0.0
+adjusted = 0 USDT
+
+
+Resultado: Estrategia BLOQUEADA, no busca señales
+
+Estrategia Short en Downtrend:
+
+Config: regime_trending=1.0, direction_mode='short_only', base=80 USDT
 Mercado: TRENDING + DWTREND
-- BTC: $91,086, MA50: $93,446 (BTC < MA50 → dwtrend)
-
 Cálculo:
-- regime_mult = regime_trending = 1.8
-- direction_mult = DIRECTION_MATRIX['long_only']['dwtrend'] = 0.0
-- final_mult = 1.8 × 0.0 = 0.0
-- adjusted = 80 × 0.0 = 0 USDT
 
-→ Estrategia BLOQUEADA (no se buscan señales)
-→ Log: "[SIZING] Skip 06_...: regime=trending(1.8x), dir=dwtrend(0x), final=0x → BLOCKED"
-→ market_direction = 'dwtrend' (se guardaría si se abriera)
-```
+regime_mult = 1.0
+direction_mult = 1.0 (DIRECTION_MATRIX['short_only']['dwtrend'])
+final_mult = 1.0
+adjusted = 80 USDT
 
-**Ejemplo 2: Estrategia Short en Mercado Trending Downtrend**
-```
-Estrategia: 07_reversal_short_1H
-- regime_trending: 1.0
-- direction_mode: 'short_only'
-- order_amount: 80 USDT
 
-Mercado: TRENDING + DWTREND
+Resultado: Posición abierta, market_direction='dwtrend' guardado
 
-Cálculo:
-- regime_mult = regime_trending = 1.0
-- direction_mult = DIRECTION_MATRIX['short_only']['dwtrend'] = 1.0
-- final_mult = 1.0 × 1.0 = 1.0
-- adjusted = 80 × 1.0 = 80 USDT
 
-→ Posición abierta con 80 USDT
-→ Log: "[SIZING] 07_...: Market=[trending, dwtrend] | Base=$80 × regime(1.0x) × dir(1.0x) = $80"
-→ market_direction = 'dwtrend' (se guarda en posición)
-```
-
-**Ejemplo 3: Sin Valores Específicos = Fallback Global**
-```
-Estrategia: 12_legacy_strategy_4H
-- regime_trending: null
-- regime_ranging: null
-- regime_volatile: null
-- direction_mode: null
-- order_amount: 50 USDT
-
-Mercado: TRENDING + UPTREND
-
-Cálculo:
-- regime_mult = REGIME_GENERAL['trending'] = 1.0
-- direction_mult = DIRECTION_GENERAL['uptrend'] = 1.0
-- final_mult = 1.0 × 1.0 = 1.0
-- adjusted = 50 × 1.0 = 50 USDT
-
-→ Usa multiplicadores globales (backward compatible)
-→ market_direction = 'uptrend' (se guarda en posición)
-```
-
-### 5.5 Tracking de Market Direction
-
-**Flujo completo:**
-```
-orchestrator → calcula market_direction ('uptrend'/'dwtrend')
-    ↓
-position_sizer → incluye en metadata['market_direction']
-    ↓
-strategy_processor → pasa market_direction a position_tracker
-    ↓
-position_tracker → guarda en posición: {'market_direction': 'dwtrend'}
-    ↓
-state_manager → persiste en JSON: "market_direction": "dwtrend"
-    ↓
-(al cerrar posición)
-order_manager → extrae position_data.get('market_direction')
-    ↓
-trade_logger → escribe Excel: columna 'MARKET_DIRECTION'
-```
-
-**Resultado:** Cada trade en el Excel tiene registrado el `market_direction` que había cuando se abrió la posición.
-
----
-
-## 6. Configuración de Régimen
-
-### 6.1 Archivo settings.py
-
-**Ubicación:** `config/settings.py`
-```python
-# ===== MARKET REGIME CONFIGURATION =====
-
-# Símbolo de referencia
-REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
-
-# Windows para métricas
-REGIME_HURST_WINDOW = 100
-REGIME_ER_WINDOW = 14
-REGIME_ATR_WINDOW = 14
-REGIME_PE_WINDOW = 50
-REGIME_PE_ORDER = 3
-
-# Thresholds para clasificación
-REGIME_FAMILIES = {
-    'trending': {
-        'hurst': ('>', 0.55),
-        'efficiency_ratio': ('>', 0.4)
-    },
-    'volatile': {
-        'atr_pct': ('>', 2.0),
-        'permutation_entropy': ('>', 0.2)
-    },
-    'ranging': {}
-}
-
-# Multiplicadores globales (fallback)
-REGIME_GENERAL = {
-    'trending': 1.0,
-    'ranging': 1.0,
-    'volatile': 1.0,
-}
-
-DIRECTION_GENERAL = {
-    'uptrend': 1.0,
-    'dwtrend': 1.0
-}
-
-# Matriz de Dirección
-DIRECTION_MATRIX = {
-    'long_only': {
-        'uptrend': 1.0,
-        'dwtrend': 0.0
-    },
-    'short_only': {
-        'uptrend': 0.0,
-        'dwtrend': 1.0
-    }
-}
-```
-
-### 6.2 Modificar Configuración
-
-**Para ajustar thresholds:**
-```python
-# Más restrictivo en trending
-'trending': {
-    'hurst': ('>', 0.60),
-    'efficiency_ratio': ('>', 0.50)
-}
-```
-
-**Para ajustar multiplicadores de dirección:**
-```python
-# Más agresivo en dirección favorable
-'long_only': {
-    'uptrend': 1.5,  # Antes 1.0
-    'dwtrend': 0.0
-}
-```
-
-### 6.3 Validación
-
-El sistema valida automáticamente en startup:
-- `direction_mode` existe en DIRECTION_MATRIX
-- `regime_trending/ranging/volatile` son números válidos (>= 0)
-- Coherencia entre `direction` y `direction_mode`
-- Todos los campos requeridos presentes
-
-Si validación falla → Error crítico + shutdown
-
----
-
-# PARTE 3: COMPONENTES CORE
-
-## 7. BotOrchestrator
-
-### 7.1 Responsabilidades
-
-**core/orchestrator.py** es el cerebro del sistema:
-
-1. Inicialización y configuración
-2. Main loop infinito
-3. Coordinación de estrategias
-4. **Cache de régimen y dirección por timeframe**
-5. **Delegación de sizing a PositionSizer**
-6. **Paso de market_direction a strategy_processor**
-7. Sincronización con broker
-
-### 7.2 Variables de Estado
-```python
-class BotOrchestrator:
-    def __init__(self, ...):
-        self.open_positions = {}           # {strategy_id: [positions]}
-        self.strategy_candles = {}         # {strategy_id: counter}
-        self.strategies = []               # Cargadas desde YAML
-        self.regime_cache = {}             # {timeframe: regime_str}
-        self.direction_cache = {}          # {timeframe: 'uptrend'/'dwtrend'}
-        self.position_sizer = None         # PositionSizer instance
-```
-
-**Caches:** Dict en memoria (NO persisten)
-- Se recalculan cada vela cerrada
-- Compartidos entre estrategias del mismo timeframe
-- `direction_cache` almacena 'uptrend' o 'dwtrend'
-
-### 7.3 Método `_update_regime_for_timeframes()`
-
-Calcula y cachea régimen + dirección tras cerrar vela:
-```python
-def _update_regime_for_timeframes(self, timeframes):
-    for tf in timeframes:
-        try:
-            # 1. Calculate REGIME
-            family, metrics = get_current_regime(tf)
-            self.regime_cache[tf] = family
-            
-            # 2. Calculate DIRECTION (returns price + MA50)
-            direction, btc_price, btc_ma50 = get_current_direction(tf)
-            self.direction_cache[tf] = direction  # 'uptrend' o 'dwtrend'
-            
-            # Format for logging
-            price_str = f"${btc_price:.2f}" if btc_price else "N/A"
-            ma50_str = f"${btc_ma50:.2f}" if btc_ma50 else "N/A"
-            
-            self.logger.info(
-                f"[REGIME] {tf}: REGIME={family.upper()}, "
-                f"DIRECTION={direction.upper()} "
-                f"(BTC={price_str}, MA50={ma50_str}, "
-                f"hurst={metrics.get('hurst', 0):.2f}, "
-                f"er={metrics.get('efficiency_ratio', 0):.2f})"
-            )
-        except Exception as e:
-            self.regime_cache[tf] = 'ranging'
-            self.direction_cache[tf] = 'uptrend'
-```
-
-### 7.4 Método `_search_signals()`
-
-Delegación a PositionSizer y paso de market_direction:
-```python
-def _search_signals(self, strategies_to_process):
-    for strat in strategies_to_process:
-        # Skip checks...
-        
-        # Get market state from cache
-        timeframe = strat['timeframe']
-        market_regime = self.regime_cache.get(timeframe, 'ranging')
-        market_direction = self.direction_cache.get(timeframe, 'uptrend')
-        
-        # Calculate adjusted amount using PositionSizer
-        adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
-            base_amount=strat['order_amount'],
-            regime_trending=strat.get('regime_trending', 1.0),
-            regime_ranging=strat.get('regime_ranging', 1.0),
-            regime_volatile=strat.get('regime_volatile', 1.0),
-            direction_mode=strat.get('direction_mode', 'general'),
-            market_regime=market_regime,
-            market_direction=market_direction
-        )
-        
-        # Check if blocked
-        if metadata['blocked']:
-            log_msg = self.position_sizer.format_log_message(strat['id'], metadata)
-            self.logger.info(log_msg)
-            continue
-        
-        # Log sizing decision
-        log_msg = self.position_sizer.format_log_message(strat['id'], metadata)
-        self.logger.info(log_msg)
-        
-        # Process strategy (pasa market_direction)
-        self.strategy_processor.process(
-            strat=strat,
-            adjusted_order_amount=adjusted_amount,
-            regime_family=metadata['market_regime'],
-            regime_multiplier=metadata['regime_multiplier'],
-            direction=metadata['market_direction'],           # ← PASA market_direction
-            direction_multiplier=metadata['direction_multiplier'],
-            ...
-        )
-```
-
-### 7.5 Timing Crítico
-
-**¿CUÁNDO se calcula régimen y dirección?**
-- DESPUÉS del sync con broker
-- ANTES de buscar señales
-- SOLO cuando cierra vela
-- UNA VEZ por timeframe por vela
-
-**Flujo temporal:**
-```
-15:59:58 - Esperando vela 1H...
-16:00:00 - ¡Vela cerrada!
-16:00:01 - Sync con broker
-16:00:02 - Calcular regime + direction
-16:00:03 - Cachear en orchestrator (direction_cache['1H'] = 'dwtrend')
-16:00:04 - Para cada estrategia 1H:
-           ├─ PositionSizer.calculate_adjusted_amount()
-           ├─ metadata incluye market_direction='dwtrend'
-           ├─ Check if blocked
-           ├─ Buscar señales
-           └─ Si abre posición → guardar market_direction='dwtrend'
-```
-
----
-
-## 8. Sistema de Estrategias
-
-### 8.1 Definición en YAML
-
-**strategies/strategies.yaml**
-```yaml
-strategies:
-  # ===== TRENDING STRATEGIES =====
-  - id: "06_reversal_long_1H"
-    name: "reversal_long_1H"
-    function_name: "add_signals_reversal_long"
-    timeframe: "1H"
-    direction: "long"
-    order_amount: 80
-    tp_pct: 2.0
-    sl_pct: 10.0
-    sell_after_ncandles: 50
-    symbols: "multi"
-    active: true
-    regime_trending: 1.8     # Multiplier cuando market_regime='trending'
-    regime_ranging: 0        # Multiplier cuando market_regime='ranging' (BLOQUEA)
-    regime_volatile: 1.0     # Multiplier cuando market_regime='volatile'
-    direction_mode: "long_only"  # Usa DIRECTION_MATRIX['long_only']
-    
-  # ===== RANGING STRATEGIES =====
-  - id: "07_reversal_short_1H"
-    name: "reversal_short_1H"
-    function_name: "add_signals_reversal_short"
-    timeframe: "1H"
-    direction: "short"
-    order_amount: 80
-    tp_pct: 1.9
-    sl_pct: 5.0
-    sell_after_ncandles: 50
-    symbols: "multi"
-    active: true
-    regime_trending: 0       # BLOQUEA en trending
-    regime_ranging: 1.5      # Favorece ranging
-    regime_volatile: 1.0
-    direction_mode: "short_only"  # Usa DIRECTION_MATRIX['short_only']
-    
-  # ===== LEGACY (sin custom multipliers - usa fallback) =====
-  - id: "01_double_top_long_4H"
-    name: "double_top_long_4H"
-    function_name: "add_signals_double_top_long"
-    timeframe: "4H"
-    direction: "long"
-    order_amount: 40
-    tp_pct: 4.0
-    sl_pct: 10.0
-    sell_after_ncandles: 50
-    symbols: "multi"
-    active: true
-    # regime_trending: null    # Sin definir → usa REGIME_GENERAL
-    # regime_ranging: null
-    # regime_volatile: null
-    # direction_mode: null     # Sin definir → usa DIRECTION_GENERAL
-```
-
-### 8.2 Campos Disponibles
-
-| Campo | Tipo | Requerido | Descripción |
-|-------|------|-----------|-------------|
-| `id` | String | Sí | Identificador único (NN_name) |
-| `name` | String | Sí | Nombre estrategia |
-| `function_name` | String | Sí | Nombre en strategy_registry |
-| `timeframe` | String | Sí | 4H, 1H, 6Hutc, etc. |
-| `direction` | String | Sí | long o short |
-| `order_amount` | Float | Sí | Monto base en USDT |
-| `tp_pct` | Float | Sí | Take Profit % |
-| `sl_pct` | Float | Sí | Stop Loss % |
-| `sell_after_ncandles` | Int | Sí | Velas hasta timeout |
-| `symbols` | String | Sí | "multi" o lista |
-| `active` | Bool | Sí | true o false |
-| `regime_trending` | Float | No | Multiplier para mercado trending |
-| `regime_ranging` | Float | No | Multiplier para mercado ranging |
-| `regime_volatile` | Float | No | Multiplier para mercado volatile |
-| `direction_mode` | String | No | long_only/short_only/general |
-
-### 8.3 Validación
-
-El sistema valida en startup:
-- `direction_mode` existe en DIRECTION_MATRIX (si está definido)
-- `regime_trending/ranging/volatile` son números >= 0 (si están definidos)
-- `direction` coherente con `direction_mode` y nombre
-- `function_name` existe en IMPLEMENTED_STRATEGIES
-- Todos los campos requeridos presentes
-
-Si falla → Error crítico + shutdown
-
----
-
-## 9. Dashboard Web
-
-### 9.1 Endpoints de Régimen
-
-**api/backend.py**
-```python
-@app.route('/api/regime/matrix', methods=['GET'])
-def get_regime_matrix():
-    return jsonify({
-        'direction_matrix': DIRECTION_MATRIX,
-        'regime_general': REGIME_GENERAL,
-        'direction_general': DIRECTION_GENERAL
-    })
-
-@app.route('/api/regime/current', methods=['GET'])
-def get_current_regime():
-    tf = request.args.get('timeframe', '1H')
-    info = get_regime_info(tf)
-    
-    return jsonify({
-        'timeframe': tf,
-        'regime': info['family'],
-        'direction': info['btc_trend'],  # 'uptrend' o 'downtrend'
-        'btc_price': info['btc_price'],
-        'btc_ma50': info['btc_ma50'],
-        'metrics': info['metrics'],
-        'timestamp': datetime.now().isoformat()
-    })
-```
-
-### 9.2 Visualización
-
-Dashboard muestra en tiempo real:
-- Régimen actual por timeframe
-- Dirección de mercado (uptrend/dwtrend)
-- BTC price vs MA50
-- Matriz de multiplicadores
-- Estrategias con multipliers aplicados
-- Posiciones abiertas con su market_direction
-
----
-
-# PARTE 4: CONFIGURACIÓN
-
-## 10. Settings.py
-
-**Ubicación:** `config/settings.py`
-
-### 10.1 Configuración de Cuentas
-```python
-ACCOUNTS = {
-    '00': {
-        'initial_capital': 3671,
-        'dashboard_port': 5000,
-        'description': 'Main Account'
-    },
-    'E1': {
-        'initial_capital': 1761,
-        'dashboard_port': 5001,
-        'description': 'Elite Account'
-    },
-    '01': {
-        'initial_capital': 117,
-        'dashboard_port': 5099,
-        'description': 'Testing Account'
-    }
-}
-```
-
-### 10.2 Validación Settings
-```python
-MIN_ORDER_AMOUNT = 40
-MAX_ORDER_AMOUNT = 100
-MIN_TP_PCT = 1.5
-MAX_TP_PCT = 10
-MIN_SL_PCT = 1.5
-MAX_SL_PCT = 15
-MIN_CANDLES = 49
-MAX_CANDLES = 51
-VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
-```
-
----
-
-## 11. Strategies.yaml
-
-Ver sección 8.1 para estructura completa.
-
----
-
-## 12. Alta de Estrategias
-
-### 12.1 Proceso Completo
-
-**Paso 1: Crear función de señal**
-```python
-# bitget/signals/add_signals_mi_estrategia.py
-import numpy as np
-
-def add_signals_mi_estrategia_long(data):
-    close = data['close']
-    signals = np.zeros(len(close))
-    
-    # Lógica de señal
-    for i in range(50, len(close)):
-        if condition_long:
-            signals[i] = 1
-    
-    return signals
-```
-
-**Paso 2: Registrar en strategy_registry.py**
-```python
-IMPLEMENTED_STRATEGIES = {
-    'add_signals_mi_estrategia_long': add_signals_mi_estrategia_long,
-}
-```
-
-**Paso 3: Añadir a strategies.yaml**
-```yaml
-- id: "18_mi_estrategia_long_1H"
-  function_name: "add_signals_mi_estrategia_long"
-  timeframe: "1H"
-  order_amount: 80
-  regime_trending: 1.5
-  regime_ranging: 0.5
-  regime_volatile: 1.0
-  direction_mode: "long_only"
-  # ... otros campos
-```
-
-**Paso 4: Crear fichero de símbolos**
-```
-symbols_live/symbols_live_18_mi_estrategia_long_1H_1H.xlsx
-```
-
-**Paso 5: Validar**
-```bash
-python3 main.py --account 01
-# Verificar logs de validación
-```
-
-### 12.2 Checklist
-
-- [ ] Función creada en `signals/`
-- [ ] Registrada en `strategy_registry.py`
-- [ ] Añadida a `strategies.yaml`
-- [ ] `regime_trending/ranging/volatile` definidos
-- [ ] `direction_mode` definido
-- [ ] Fichero símbolos creado
-- [ ] Validación pasa en startup
-- [ ] Probada en cuenta 01
-
----
-
-# PARTE 5: FLUJOS Y OPERACIÓN
-
-## 13. Ciclo de Vida
-
-### 13.1 Inicialización
-```
-STARTUP
-├─ Parse args
-├─ Cargar configuración
-├─ Validar estrategias (incluye direction_mode)
-├─ Validar símbolos por estrategia
-├─ Inicializar PositionSizer
-├─ Conectar a API
-├─ Inicializar dashboard
-├─ Cargar estado previo (incluye market_direction de posiciones)
-└─ Calcular próximas velas
-
-RUNNING
-└─ Main loop infinito
-
-SHUTDOWN
-├─ Guardar estado (incluye market_direction)
-└─ Exit graceful
-```
-
-### 13.2 Main Loop
-```python
-while True:
-    now = datetime.now(tz=UTC)
-    
-    closed_timeframes = check_closed_candles()
-    
-    if closed_timeframes:
-        sync_broker()
-        update_regime_for_timeframes(closed_timeframes)  # Calcula direction_cache
-        process_strategies(closed_timeframes)            # Usa direction_cache
-    else:
-        check_tp_sl_periodic()
-    
-    time.sleep(0.05)
-```
-
----
-
-## 14. Position Sizing Adaptativo
-
-### 14.1 Flujo Completo con Market Direction
-```
+9. Position Sizing Adaptativo
+9.1 Flujo Completo
 VELA CIERRA
     ↓
 1. SYNC BROKER
     ↓
 2. UPDATE REGIME + DIRECTION
-├─ Fetch BTCUSDT OHLCV
-├─ Calcular métricas
-├─ Clasificar régimen
-├─ Calcular dirección (BTC vs MA50)
-├─ Cachear regime_cache['1H'] = 'trending'
-└─ Cachear direction_cache['1H'] = 'dwtrend'
+   - Calcular métricas en BTCUSDT
+   - Clasificar: trending/ranging/volatile
+   - Detectar: uptrend/dwtrend (BTC vs MA50)
+   - Cachear: regime_cache['1H'], direction_cache['1H']
     ↓
 3. PARA CADA ESTRATEGIA:
-├─ Obtener market_regime del cache
-├─ Obtener market_direction del cache
-├─ PositionSizer.calculate_adjusted_amount()
-│   ├─ regime_mult = regime_trending (del YAML)
-│   ├─ direction_mult = DIRECTION_MATRIX[direction_mode][market_direction]
-│   └─ metadata['market_direction'] = 'dwtrend'
-├─ Si blocked (mult=0) → Skip
-└─ Buscar señales con adjusted_amount
+   - PositionSizer.calculate_adjusted_amount()
+     * regime_mult del config
+     * direction_mult de DIRECTION_MATRIX
+     * metadata incluye market_direction
+   - Si blocked → Skip
+   - Buscar señales con adjusted_amount
     ↓
-4. SI SE ABRE POSICIÓN:
-├─ position_tracker.add_position()
-│   └─ Guarda: {'market_direction': 'dwtrend', ...}
-├─ state_manager.save_state()
-│   └─ Persiste en JSON: "market_direction": "dwtrend"
+4. SI ABRE POSICIÓN:
+   - position_tracker.add_position()
+     * Guarda market_direction en dict
+   - state_manager.save_state()
+     * PostgreSQL: UPSERT en bot_state
+     * JSON: Escribe bot_state_XX.json
     ↓
-5. AL CERRAR POSICIÓN:
-├─ order_manager.close_position()
-│   └─ Extrae: position_data.get('market_direction')
-└─ trade_logger.log_closed_position()
-    └─ Escribe Excel: columna 'MARKET_DIRECTION' = 'dwtrend'
-```
+5. AL CERRAR:
+   - order_manager.close_position()
+     * Extrae market_direction
+   - trade_logger.log_closed_position()
+     * PostgreSQL: INSERT en trades
+     * Excel: Append a TRADES_XX.xlsx
+9.2 Tracking Market Direction
+Se guarda en TODA la cadena:
 
-### 14.2 Logs de Régimen y Dirección
+Cache en orchestrator (por timeframe)
+Metadata de PositionSizer
+Dict de posición en position_tracker
+JSON en state_manager
+PostgreSQL tabla bot_state
+Excel columna MARKET_DIRECTION
+PostgreSQL tabla trades
 
-**Formato de logs:**
-```
-[REGIME] Updating regime & direction for: ['1H']
-[REGIME] 1H: REGIME=TRENDING, DIRECTION=DWTREND (BTC=$91086.10, MA50=$93446.76, hurst=0.81, er=0.66)
-[SIZING] 06_reversal_long_1H: Market=[trending, dwtrend] | Base=$80 × regime(1.8x) × dir(0.0x) = $0
-[SIZING] Skip 06_reversal_long_1H: regime=trending(1.8x), dir=dwtrend(0x), final=0x → BLOCKED
-[SIZING] Skip 07_reversal_short_1H: regime=trending(0x), dir=dwtrend(1.0x), final=0x → BLOCKED
-```
+Resultado: Análisis histórico completo de condiciones de mercado.
 
-**Explicación:**
-- `REGIME=TRENDING`: Mercado clasificado como trending
-- `DIRECTION=DWTREND`: BTC por debajo de MA50
-- `BTC=$91086.10, MA50=$93446.76`: Precio y media móvil
-- `regime(1.8x)`: Multiplier del YAML (regime_trending)
-- `dir(0x)`: Multiplier de DIRECTION_MATRIX (long_only + dwtrend = 0)
-- `final=0x → BLOCKED`: Estrategia bloqueada
+PARTE 4: COMPONENTES CORE
+10. BotOrchestrator
+core/orchestrator.py - Cerebro del sistema
+10.1 Responsabilidades
 
----
+Main loop infinito
+Cache de régimen/dirección por timeframe
+Coordinación de estrategias
+Delegación de sizing a PositionSizer
+Sincronización con broker
 
-## 15. Troubleshooting
+10.2 Variables Clave
+Estado operacional:
 
-### 15.1 Market Direction No Se Guarda
+open_positions: Dict de posiciones abiertas
+strategy_candles: Contadores de velas
+strategies: Lista de estrategias (cargadas de Python config)
 
-**Síntoma:** Posiciones en Excel sin columna `MARKET_DIRECTION` o con valor `unknown`
+Caches (NO persisten):
 
-**Diagnóstico:**
-```bash
-# Verificar que se pasa correctamente
-grep "market_direction" persistence/bot_files_XX/BOT_orchestator_XX.log
+regime_cache: {timeframe: régimen}
+direction_cache: {timeframe: dirección}
+position_sizer: Instancia de PositionSizer
 
-# Verificar JSON de estado
-cat persistence/bot_state_XX.json | python3 -m json.tool | grep market_direction
-```
+10.3 Timing Crítico
+¿CUÁNDO se calcula régimen/dirección?
 
-**Solución:** Verificar que toda la cadena está actualizada (ver sección 5.5)
+Solo al cerrar vela
+Una vez por timeframe
+Antes de buscar señales
+Después de sync broker
 
-### 15.2 Direction Cache Vacío
+Secuencia temporal:
+16:00:00 - Vela 1H cerró
+16:00:01 - Sync broker
+16:00:02 - Calcular regime + direction → cachear
+16:00:03 - Para cada estrategia 1H:
+           ├─ PositionSizer → metadata con market_direction
+           ├─ Check si bloqueada
+           └─ Buscar señales
 
-**Síntoma:** Logs "direction_cache.get() returned None"
+11. Sistema de Estrategias
+11.1 Configuración Python
+Ubicación: config/strategies_XX.py
+Ventajas vs YAML:
 
-**Diagnóstico:**
-```bash
-grep "direction_cache\|DIRECTION=" persistence/bot_files_XX/BOT_orchestator_XX.log
-```
+Type safety
+IDE autocomplete
+Syntax errors detectados inmediatamente
+Sin problemas de indentación
+Backward compatible
 
-**Solución:** Verificar que `get_current_direction()` se ejecuta correctamente
+11.2 Estructura
+Lista STRATEGIES con dicts, cada dict es una estrategia.
+Campos clave:
 
-### 15.3 Estrategia Bloqueada por Dirección
+Identificación: id, name
+Ejecución: timeframe, direction, order_amount
+Risk: tp_pct, sl_pct, sell_after_ncandles
+Regime sizing: regime_trending/ranging/volatile
+Direction filtering: direction_mode
+Estado: active (True/False)
+Específicos: lookback, tolerance, etc.
 
-**Síntoma:** Logs "dir=dwtrend(0x) → BLOCKED"
+11.3 Validación Automática
+En startup (validation/validation_module.py):
 
-**Diagnóstico:** Verificar DIRECTION_MATRIX
+PostgreSQL connection disponible
+Tablas existen
+direction_mode válido
+regime_trending/ranging/volatile >= 0
+Coherencia direction/direction_mode
+Parámetros requeridos presentes
 
-**Solución:** Esto es correcto si quieres bloquear long en downtrend. Para cambiar:
-```python
-# En config/settings.py
-'long_only': {
-    'uptrend': 1.0,
-    'dwtrend': 0.5  # Permitir con penalización
-}
-```
+Si falla → Shutdown con error claro
 
-### 15.4 Excel Sin Columna MARKET_DIRECTION
+12. Dashboard Web
+12.1 Endpoints
+Backend Flask en api/backend.py
+GET /api/regime/current?timeframe=1H
 
-**Síntoma:** Archivo Excel no tiene columna `MARKET_DIRECTION`
+Retorna: regime, direction, BTC price, BTC MA50, métricas
 
-**Solución:** Verificar en `trade_logger.py` línea ~168:
-```python
-'MARKET_DIRECTION': market_direction if market_direction else 'unknown',
-```
+GET /api/regime/matrix
 
-### 15.5 Validación Falla
+Retorna: DIRECTION_MATRIX, REGIME_GENERAL, DIRECTION_GENERAL
 
-**Síntoma:** Bot no arranca, error de validación
+GET /api/positions
 
-**Solución:**
-1. Verificar `direction_mode` es válido (long_only/short_only/general)
-2. Verificar `regime_trending/ranging/volatile` son números >= 0
-3. Verificar coherencia direction/direction_mode
-4. Corregir YAML y reiniciar
+Lee PostgreSQL tabla bot_state
+Retorna: Posiciones con market_direction
 
----
+GET /api/trades?limit=100
 
-# PARTE 6: REFERENCIA RÁPIDA
+Lee PostgreSQL tabla trades
+Retorna: Histórico con market_direction, regime_family
 
-## 16. Estructuras de Datos
+GET /api/status
 
-### 16.1 Strategy Dict
-```python
-{
-    'id': '06_reversal_long_1H',
-    'name': 'reversal_long_1H',
-    'function_name': 'add_signals_reversal_long',
-    'timeframe': '1H',
-    'direction': 'long',
-    'order_amount': 80.0,
-    'tp_pct': 2.0,
-    'sl_pct': 10.0,
-    'sell_after_ncandles': 50,
-    'symbols': 'multi',
-    'active': True,
-    'regime_trending': 1.8,
-    'regime_ranging': 0.0,
-    'regime_volatile': 1.0,
-    'direction_mode': 'long_only'
-}
-```
+Retorna: Estado general del bot
 
-### 16.2 PositionSizer Metadata
-```python
-{
-    'base_amount': 80.0,
-    'market_regime': 'trending',
-    'market_direction': 'dwtrend',           # ← TRACKING
-    'regime_multiplier': 1.8,
-    'regime_source': 'strategy YAML',
-    'direction_multiplier': 0.0,
-    'direction_source': 'MATRIX[long_only][dwtrend]',
-    'final_multiplier': 0.0,
-    'adjusted_amount': 0.0,
-    'blocked': True
-}
-```
+12.2 PostgreSQL Integration
+Dashboard consume únicamente PostgreSQL:
 
-### 16.3 Position Dict
-```python
-{
-    'strategy_id': '06_reversal_long_1H',
-    'symbol': 'BTCUSDT',
-    'size': 0.05,
-    'entry_price': 91086.10,
-    'direction': 'long',
-    'opened_at': '2026-01-20 09:00:45',
-    'usdt_amount': 80.0,
-    'market_direction': 'dwtrend',           # ← GUARDADO
-    'direction_multiplier': 0.0,
-    'regime_family': 'trending',
-    'regime_multiplier': 1.8,
-    # ... otros campos
-}
-```
+Sin lectura de archivos JSON/Excel
+Queries optimizadas con índices
+Tiempo real (JSONB queries rápidas)
 
-### 16.4 Caches
-```python
-# Orchestrator
-self.regime_cache = {
-    '4H': 'ranging',
-    '1H': 'trending',
-    '6Hutc': 'volatile'
-}
 
-self.direction_cache = {
-    '4H': 'dwtrend',
-    '1H': 'uptrend',
-    '6Hutc': 'uptrend'
-}
-```
+PARTE 5: CONFIGURACIÓN Y OPERACIÓN
+13. Settings.py
+config/settings.py - Configuración centralizada
+13.1 PostgreSQL
+POSTGRES_CONFIG: Dict con parámetros de conexión
+13.2 Matrices
+DIRECTION_MATRIX: Multipliers por direction_mode
+REGIME_GENERAL: Fallbacks por régimen
+DIRECTION_GENERAL: Fallbacks por dirección
+13.3 Validación
+STRATEGY_TYPE_REQUIRED_PARAMS: Parámetros por tipo
+COMMON_REQUIRED_PARAMS: Parámetros obligatorios todas
+Límites:
 
-### 16.5 Excel Output
-```
-| MARKET_DIRECTION | DIRECTION_MULTIPLIER | REGIME_FAMILY | REGIME_MULTIPLIER |
-|------------------|---------------------|---------------|-------------------|
-| dwtrend          | 0.0                 | trending      | 1.8               |
-| uptrend          | 1.5                 | ranging       | 1.0               |
-```
+Order amount: 40-100 USDT
+TP: 1.5-10%
+SL: 1.5-15%
+Candles: 49-51
 
----
 
-## 17. Comandos y Endpoints
+14. Strategies Configuration
+14.1 Archivos
+Por cuenta:
 
-### 17.1 Comandos CLI
-```bash
-# Iniciar bot
-python3 main.py --account 00
+strategies_00.py (18 estrategias)
+strategies_E1.py (16 estrategias)
+strategies_01.py (2 estrategias)
 
-# Ver logs completos
+14.2 Carga Dinámica
+strategies/strategy_loader.py:
+
+load_strategies(account_number) → import dinámico
+Sin recompilación Docker
+Cambios instantáneos (restart bot)
+
+14.3 Alta Nueva Estrategia
+Checklist:
+
+Crear función señal en signals/
+Registrar en strategy_registry.py
+Añadir dict a strategies_XX.py
+Definir regime_trending/ranging/volatile
+Definir direction_mode
+Crear fichero símbolos
+Validar en cuenta 01
+Verificar logs
+
+
+15. Ciclo de Vida
+15.1 Startup
+STARTUP
+├─ Cargar config (settings + strategies Python)
+├─ Validar PostgreSQL connection
+├─ Validar estrategias
+├─ Inicializar PositionSizer
+├─ Conectar Bitget API
+├─ Inicializar dashboard Flask
+├─ load_state()
+│  ├─ Try PostgreSQL first
+│  └─ Fallback JSON if fails
+└─ Calcular próximas velas
+15.2 Main Loop
+LOOP INFINITO:
+1. Check vela cerrada
+2. Si cerró:
+   - Sync broker
+   - Update regime + direction → cachear
+   - Process estrategias
+     * PositionSizer
+     * Buscar señales
+     * Si abre → save_state() dual-write
+3. Si no:
+   - Check TP/SL periódico
+4. Sleep 50ms
+15.3 Shutdown
+SHUTDOWN
+├─ save_state_local()
+│  ├─ PostgreSQL: UPSERT bot_state
+│  └─ JSON: Write bot_state_XX.json
+├─ Cerrar conexiones
+└─ Exit graceful
+
+PARTE 6: REFERENCIA RÁPIDA
+16. Troubleshooting
+16.1 PostgreSQL Connection Failed
+Síntoma: Bot no arranca, error validación PostgreSQL
+Solución:
+bash# Verificar servicio
+sudo systemctl status postgresql
+
+# Iniciar si parado
+sudo systemctl start postgresql
+
+# Verificar conexión
+psql -U javi -d bot_trading
+
+# Verificar tablas
+\dt
+16.2 Market Direction No Se Guarda
+Síntoma: Posiciones sin market_direction o con 'unknown'
+Diagnóstico:
+bash# Logs
+grep "market_direction\|DIRECTION" BOT_orchestator_XX.log
+
+# PostgreSQL
+psql -U javi -d bot_trading -c \
+"SELECT market_direction FROM trades ORDER BY id DESC LIMIT 10;"
+Solución: Verificar cadena completa (orchestrator → position_sizer → position_tracker → state_manager → trade_logger)
+16.3 Estado No Carga de PostgreSQL
+Síntoma: Logs muestran "Loading from JSON fallback"
+Diagnóstico:
+bash# Verificar dato existe
+psql -U javi -d bot_trading -c \
+"SELECT account FROM bot_state;"
+Solución:
+
+Verificar account_number correcto
+Verificar tabla bot_state tiene dato
+Revisar logs de error PostgreSQL
+
+16.4 Estrategia Bloqueada
+Síntoma: Logs "dir=dwtrend(0x) → BLOCKED"
+Solución:
+
+Esto es correcto si direction_mode='long_only' y market='dwtrend'
+Para permitir con penalización: cambiar 0.0 a 0.5 en DIRECTION_MATRIX
+
+
+17. Comandos y Endpoints
+17.1 CLI
+Iniciar:
+bashpython3 main.py --account 00
+python3 main.py --account E1
+python3 main.py --account 01
+Logs:
+bash# Completos
 tail -f persistence/bot_files_00/BOT_orchestator_00.log
 
-# Filtrar logs de sizing y dirección
-grep "SIZING\|DIRECTION" persistence/bot_files_00/BOT_orchestator_00.log
+# Filtrados
+grep "PostgreSQL\|DIRECTION\|SIZING" BOT_orchestator_00.log
+grep "REGIME" BOT_orchestator_00.log
+grep "ERROR" BOT_orchestator_00.log
+Verificar estado:
+bash# PostgreSQL state
+psql -U javi -d bot_trading -c \
+"SELECT account, updated_at FROM bot_state;"
 
-# Verificar market_direction en estado
-cat persistence/bot_state_00.json | python3 -m json.tool | grep market_direction
+# PostgreSQL trades
+psql -U javi -d bot_trading -c \
+"SELECT symbol, market_direction, regime_family 
+FROM trades ORDER BY id DESC LIMIT 10;"
+
+# JSON backup
+cat persistence/bot_state_00.json | python3 -m json.tool
 ```
 
 ### 17.2 API Endpoints
-```
-GET http://localhost:5000/api/regime/current?timeframe=1H
-  → Retorna: regime, direction ('uptrend'/'downtrend'), btc_price, btc_ma50
 
-GET http://localhost:5000/api/regime/matrix
-  → Retorna: DIRECTION_MATRIX, REGIME_GENERAL, DIRECTION_GENERAL
+**Base:** `http://localhost:PUERTO`
+- Cuenta 00: Puerto 5000
+- Cuenta E1: Puerto 5001
+- Cuenta 01: Puerto 5099
 
-GET http://localhost:5000/api/positions
-  → Incluye market_direction por posición
-
-GET http://localhost:5000/api/status
-```
-
-### 17.3 Testing Rápido
-```python
-# Test position sizer con market_direction
-from market_regime import PositionSizer
-import logging
-
-logger = logging.getLogger('test')
-sizer = PositionSizer(logger)
-
-amount, meta = sizer.calculate_adjusted_amount(
-    base_amount=80.0,
-    regime_trending=1.8,
-    regime_ranging=0.0,
-    regime_volatile=1.0,
-    direction_mode='long_only',
-    market_regime='trending',
-    market_direction='dwtrend'
-)
-
-print(f"Adjusted: ${amount:.2f}")
-print(f"Market direction: {meta['market_direction']}")
-print(f"Direction mult: {meta['direction_multiplier']:.1f}x")
-print(f"Final mult: {meta['final_multiplier']:.1f}x")
-print(f"Blocked: {meta['blocked']}")
-```
+**Principales:**
+- `GET /api/regime/current?timeframe=1H`
+- `GET /api/regime/matrix`
+- `GET /api/positions`
+- `GET /api/trades?limit=100`
+- `GET /api/status`
 
 ---
 
-# 🎉 FIN DE DOCUMENTACIÓN
+## 18. Estructuras de Datos
 
-**BOT_trading v2.5 - Sistema de Trading Automatizado**
+### 18.1 PositionSizer Metadata
 
----
+**Retorna dict con:**
+- base_amount
+- market_regime (trending/ranging/volatile)
+- market_direction (uptrend/dwtrend)
+- regime_multiplier
+- direction_multiplier
+- final_multiplier
+- adjusted_amount
+- blocked (True/False)
+- regime_source, direction_source
 
-**Última actualización:** 2026-01-20  
-**Autor:** Trading Bot Team  
-**Nueva Feature:** Market Direction Tracking (uptrend/dwtrend)
+### 18.2 Position Dict
 
----
+**Guardado en state:**
+- strategy_id, symbol, size
+- entry_price, direction
+- opened_at, usdt_amount
+- market_direction (uptrend/dwtrend)
+- regime_family, regime_multiplier
+- direction_multiplier
+- TP/SL levels, order_id
 
-## 📝 RESUMEN EJECUTIVO
+### 18.3 Caches Orchestrator
 
-### Cambios Principales v2.5
+**NO persisten, recalculan cada vela:**
 
-1. **Market Direction Tracking:** Sistema unificado de `market_direction` en toda la cadena
-2. **Persistencia completa:** market_direction se guarda en JSON y Excel
-3. **Logs mejorados:** Incluyen BTC price, MA50 y dirección en cada ciclo
-4. **Cadena de datos verificada:** 7 pasos desde orchestrator hasta Excel
+**regime_cache:**
+```
+{'4H': 'ranging', '1H': 'trending', '6Hutc': 'volatile'}
+```
 
-### Quick Start
-```bash
-# 1. Actualizar strategies.yaml
-regime_trending: 1.8
-regime_ranging: 0
-regime_volatile: 1.0
-direction_mode: "long_only"
+**direction_cache:**
+```
+{'4H': 'dwtrend', '1H': 'uptrend', '6Hutc': 'uptrend'}
+18.4 PostgreSQL Schemas
+Tabla bot_state:
 
-# 2. Reiniciar bot
+account (TEXT, PK)
+state_data (JSONB)
+updated_at (TIMESTAMP)
+
+Tabla trades:
+
+id, strategy_id, symbol
+direction, entry_price, exit_price
+opened_at, closed_at
+market_direction (TEXT)
+regime_family (TEXT)
+regime_multiplier, direction_multiplier
+profit_pct, usdt_amount
+
+
+🎉 FIN DE DOCUMENTACIÓN
+BOT_trading v2.7 - PostgreSQL Integration Complete
+
+📝 RESUMEN EJECUTIVO v2.7
+Cambios Principales
+PostgreSQL Integration:
+
+Estado del bot: PostgreSQL primary + JSON fallback
+Trades: PostgreSQL + Excel dual-write
+Dashboard: Consume únicamente PostgreSQL
+Independencia total de nombres de archivos
+
+Arquitectura:
+
+account_number parámetro explícito en toda la cadena
+Escalabilidad mejorada (multi-servidor ready)
+Failover automático (fallback a JSON)
+Zero single points of failure
+
+Quick Start
+bash# 1. PostgreSQL
+sudo systemctl status postgresql
+
+# 2. Config
+# - settings.py: POSTGRES_CONFIG
+# - strategies_XX.py: STRATEGIES lista
+
+# 3. Start
 python3 main.py --account 00
 
-# 3. Verificar logs
-grep "DIRECTION\|SIZING" persistence/bot_files_00/BOT_orchestator_00.log
+# 4. Verify
+grep "PostgreSQL" BOT_orchestator_00.log
+# Debe mostrar: "✓ State loaded from PostgreSQL"
 
-# 4. Verificar Excel
-# Columna MARKET_DIRECTION debe tener 'uptrend' o 'dwtrend'
+# 5. Check data
+psql -U javi -d bot_trading -c "SELECT * FROM bot_state;"
 ```
 
----
+### Arquitectura Final
+```
+PostgreSQL (source of truth)
+    ↓
+├─ Bot: PostgreSQL primary + JSON fallback
+├─ Dashboard: PostgreSQL direct
+└─ Trades: PostgreSQL + Excel dual-write
 
-**¿Preguntas? Consulta [Troubleshooting](#15-troubleshooting) o [Position Sizing Adaptativo](#14-position-sizing-adaptativo).**
+

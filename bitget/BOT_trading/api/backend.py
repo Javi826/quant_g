@@ -16,21 +16,11 @@ import logging
 from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 
+import psycopg2
 from analytics.metrics import MetricsCalculator
-
-# ===========================================================================
-# MARKET REGIME IMPORT
-# ===========================================================================
-try:
-    from market_regime.regime_classifier import get_regime_info
-    from config.settings import REGIME_FAMILIES, REGIME_GENERAL
-    REGIME_MODULE_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"WAR-Market regime module not available: {e}")
-    REGIME_MODULE_AVAILABLE = False
-    REGIME_FAMILIES = {}
-    REGIME_GENERAL = {}
-
+from market_regime.regime_classifier import get_regime_info
+from config.settings import REGIME_FAMILIES, REGIME_GENERAL
+from config.settings import POSTGRES_CONFIG
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -68,6 +58,8 @@ class DashboardServer:
         
         self.app = Flask(__name__, template_folder=self.templates_dir)
         self.app.last_log_position = 0
+        # PostgreSQL configuration
+        self.postgres_config = POSTGRES_CONFIG
         
         self._register_routes()
         
@@ -96,20 +88,44 @@ class DashboardServer:
             return 5
     
     def _load_trades_dataframe(self):
-        """
-        Carga y valida el DataFrame de trades desde el archivo Excel.
-        """
-        if not os.path.exists(self.trades_file):
-            return None
-        
-        try:
-            df = pd.read_excel(self.trades_file, engine='openpyxl')
-            if df.empty:
+            """
+            Load and validate trades DataFrame from PostgreSQL.
+            """
+            try:
+                conn = psycopg2.connect(**self.postgres_config)
+                query = f"SELECT * FROM trades WHERE account = '{self.account_number}'"
+                df = pd.read_sql(query, conn)
+                conn.close()
+                
+                if df.empty:
+                    return None
+                
+                # Rename columns to match Excel format (for compatibility)
+                df.rename(columns={
+                    'open_at': 'OPEN_AT',
+                    'close_at': 'CLOSE_AT',
+                    'duration_days': 'DURATION_DAYS',
+                    'strategy': 'STRATEGY',
+                    'symbol': 'SYMBOL',
+                    'direction': 'DIRECTION',
+                    'usdt_amount': 'USDT_AMOUNT',
+                    'size': 'SIZE',
+                    'price_entry': 'PRICE_ENTRY',
+                    'price_close': 'PRICE_CLOSE',
+                    'profit': 'PROFIT',
+                    'fee': 'FEE',
+                    'profit_pct': 'PROFIT_PCT',
+                    'reason_out': 'REASON_OUT',
+                    'regime_family': 'REGIME_FAMILY',
+                    'regime_multiplier': 'REGIME_MULTIPLIER',
+                    'market_direction': 'MARKET_DIRECTION',
+                    'direction_multiplier': 'DIRECTION_MULTIPLIER'
+                }, inplace=True)
+                
+                return df
+            except Exception as e:
+                logger.error(f"Error loading trades from PostgreSQL: {e}")
                 return None
-            return df
-        except Exception as e:
-            logger.error(f"Error-loading trades file: {e}")
-            return None
     
     def _prepare_trades_dataframe(self, df):
         """
@@ -157,6 +173,36 @@ class DashboardServer:
                 pass
         
         return df
+    
+    
+    def _load_state(self):
+            """
+            Load bot state from PostgreSQL.
+            
+            Returns:
+                Dictionary with 'positions' and 'strategy_candles'
+            """
+            try:
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    "SELECT state_data FROM bot_state WHERE account = %s",
+                    (self.account_number,)
+                )
+                
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                
+                if result:
+                    return result[0]  # JSONB data
+                else:
+                    return {'positions': {}, 'strategy_candles': {}}
+                    
+            except Exception as e:
+                logger.error(f"Error loading state from PostgreSQL: {e}")
+                return {'positions': {}, 'strategy_candles': {}}
     
     @staticmethod
     def _extract_number_from_id(strategy_id):
@@ -358,11 +404,7 @@ class DashboardServer:
         @self.app.route('/api/status')
         def get_status():
             try:
-                if not os.path.exists(self.state_file):
-                    return jsonify({'error': 'Error-State file not found'}), 404
-                
-                with open(self.state_file, 'r') as f:
-                    state = json.load(f)
+                state = self._load_state()
                 
                 total_positions = sum(len(positions) 
                                     for positions in state.get('positions', {}).values())
@@ -437,11 +479,7 @@ class DashboardServer:
         @self.app.route('/api/positions')
         def get_positions():
             try:
-                if not os.path.exists(self.state_file):
-                    return jsonify([])
-                
-                with open(self.state_file, 'r') as f:
-                    state = json.load(f)
+                state = self._load_state()
                 
                 positions_data = []
                 for strategy_id, positions in state.get('positions', {}).items():
@@ -1336,18 +1374,6 @@ class DashboardServer:
             Returns:
                 JSON con family, multiplier, metrics, thresholds, all_families, all_thresholds
             """
-            if not REGIME_MODULE_AVAILABLE:
-                return jsonify({
-                    'success': False,
-                    'error': 'Market regime module not available',
-                    'family': 'ranging',
-                    'multiplier': 1.0,
-                    'metrics': {},
-                    'timeframe': request.args.get('timeframe', '4H'),
-                    'all_families': {},
-                    'all_thresholds': {}
-                }), 200
-            
             try:
                 timeframe = request.args.get('timeframe', '4H')
                 
@@ -1398,44 +1424,37 @@ class DashboardServer:
         
         @self.app.route('/api/regime/history')
         def get_regime_history():
-            """
-            Obtiene el historial de régimen de mercado (PLACEHOLDER).
-            
-            Query params:
-                timeframe: Timeframe a analizar (ej: '4H', '1H')
-                bars: Número de barras históricas (default: 24)
-            
-            Returns:
-                JSON con historial de regímenes
-            """
-            if not REGIME_MODULE_AVAILABLE:
-                return jsonify({
-                    'success': False,
-                    'error': 'Market regime module not available',
-                    'history': []
-                }), 200
-            
-            try:
-                timeframe = request.args.get('timeframe', '4H')
-                bars = int(request.args.get('bars', 24))
-                
-                # PLACEHOLDER: Por ahora retornar estructura vacía
-                # TODO: Implementar tracking histórico de regímenes
-                return jsonify({
-                    'success': True,
-                    'timeframe': timeframe,
-                    'bars': bars,
-                    'history': [],
-                    'message': 'Historical tracking not yet implemented'
-                })
-                
-            except Exception as e:
-                logger.error(f"Error getting regime history: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'history': []
-                }), 500
+                    """
+                    Obtiene el historial de régimen de mercado (PLACEHOLDER).
+                    
+                    Query params:
+                        timeframe: Timeframe a analizar (ej: '4H', '1H')
+                        bars: Número de barras históricas (default: 24)
+                    
+                    Returns:
+                        JSON con historial de regímenes
+                    """
+                    try:
+                        timeframe = request.args.get('timeframe', '4H')
+                        bars = int(request.args.get('bars', 24))
+                        
+                        # PLACEHOLDER: Por ahora retornar estructura vacía
+                        # TODO: Implementar tracking histórico de regímenes
+                        return jsonify({
+                            'success': True,
+                            'timeframe': timeframe,
+                            'bars': bars,
+                            'history': [],
+                            'message': 'Historical tracking not yet implemented'
+                        })
+                        
+                    except Exception as e:
+                        logger.error(f"Error getting regime history: {e}")
+                        return jsonify({
+                            'success': False,
+                            'error': str(e),
+                            'history': []
+                        }), 500
     
     def start(self, host='0.0.0.0', port=5000):
         """Inicia el servidor del dashboard"""

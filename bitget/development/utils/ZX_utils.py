@@ -154,13 +154,12 @@ def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: i
     return int(base_seed) + (int(h, 16) % mod) + int(path_idx)
 
 
-def save_filtered_symbols(filtered_symbols, strategy="_",timeframe="10H",save_symbols=False, folder="live_trading/symbols_live"):
-
+def save_filtered_symbols(filtered_symbols, strategy="_", timeframe="10H", save_symbols=False, folder="live_trading/symbols_live"):
     if save_symbols:
         os.makedirs(folder, exist_ok=True)  
-        df_symbols   = pd.DataFrame({"Filtered_symbols": filtered_symbols})
-        path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.xlsx")
-        df_symbols.to_excel(path_symbols, index=False)   
+        df_symbols = pd.DataFrame({"Filtered_symbols": filtered_symbols})
+        path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.csv")
+        df_symbols.to_csv(path_symbols, index=False, header=False)  # Sin index, sin header
         print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
 
 def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_name,save_file=False):

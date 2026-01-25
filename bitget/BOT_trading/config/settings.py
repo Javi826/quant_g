@@ -77,9 +77,30 @@ DIRECTION_GENERAL = {
 }
 
 # ==========================================================================
-# VALIDATION SETTINGS
+# STRATEGY VALIDATION CONFIGURATION
 # ==========================================================================
 
+# Common parameters required for ALL strategies
+COMMON_REQUIRED_PARAMS = [
+    'id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 
+    'order_amount', 'tp_pct', 'sl_pct', 'direction', 
+    'regime_trending', 'regime_ranging', 'regime_volatile', 'direction_mode'
+]
+
+# Strategy-specific required parameters by strategy type
+STRATEGY_TYPE_REQUIRED_PARAMS = {
+    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
+    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
+    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
+    'parity_long': ['lookback', 'tolerance', 'ma_period'],
+    'parity_short': ['lookback', 'tolerance', 'ma_period'],
+    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
+    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
+    'ranging_long': ['lookback', 'tolerance', 'range'],
+    'ranging_short': ['lookback', 'tolerance', 'range'],
+    'flag_long': ['lookback', 'impulse', 'flag', 'ma_period'],
+    'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
+}
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 40
 MAX_ORDER_AMOUNT = 100
@@ -92,10 +113,22 @@ MAX_SL_PCT = 15
 
 # Candles timeout limits
 MIN_CANDLES = 49
-MAX_CANDLES = 51
+MAX_CANDLES = 101
 
 # Valid timeframes
 VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
+
+# ==========================================================================
+# POSTGRESQL CONFIGURATION
+# ==========================================================================
+POSTGRES_CONFIG = {
+    'dbname': 'bot_trading',
+    'user': 'javi',
+    'password': 'Laplaciano86-',
+    'host': 'localhost',
+    'port': 5432,
+    'connect_timeout': 3
+}
 
 # ==========================================================================
 # EXCHANGE SETTINGS

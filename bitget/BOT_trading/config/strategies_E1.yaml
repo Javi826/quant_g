@@ -85,7 +85,7 @@ strategies:
     regime_ranging: 1.0
     regime_volatile: 1.0
     direction_mode: 'general'
-    sell_after_ncandles: 50
+    sell_after_ncandles: 100
     order_amount: 40
     lookback: 7
     tolerance: 40
@@ -106,7 +106,7 @@ strategies:
     regime_ranging: 1.0
     regime_volatile: 1.0
     direction_mode: 'general'
-    sell_after_ncandles: 50
+    sell_after_ncandles: 100
     order_amount: 40
     lookback: 5
     tolerance: 30
@@ -167,7 +167,7 @@ strategies:
     regime_ranging: 1.0
     regime_volatile: 1.0
     direction_mode: 'general'
-    sell_after_ncandles: 50
+    sell_after_ncandles: 75
     order_amount: 40
     lookback: 150
     tolerance: 15

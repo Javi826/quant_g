@@ -10,29 +10,63 @@ from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
 from config.settings import VALID_TIMEFRAMES
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_REFERENCE_SYMBOL
+from config.settings import STRATEGY_TYPE_REQUIRED_PARAMS, COMMON_REQUIRED_PARAMS
 from config.settings import ACCOUNTS, BASE_URL
+from config.settings import POSTGRES_CONFIG
+import psycopg2
+from psycopg2 import OperationalError
 
 # ==========================================================================
-# STRATEGY CONFIGURATION & VALIDATION
+# POSTGRESQL VALIDATION
 # ==========================================================================
 
-# When adding a new strategy function, add its required params here
-STRATEGY_TYPE_REQUIRED_PARAMS = {
-    'double_top_long': ['lookback', 'tolerance', 'trend_th'],
-    'reversal_long': ['lookback', 'tolerance', 'ma_period'],
-    'reversal_short': ['lookback', 'tolerance', 'ma_period'],
-    'parity_long': ['lookback', 'tolerance', 'ma_period'],
-    'parity_short': ['lookback', 'tolerance', 'ma_period'],
-    'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
-    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'ranging_long': ['lookback', 'tolerance', 'range'],
-    'ranging_short': ['lookback', 'tolerance', 'range'],
-    'flag_long': ['lookback', 'impulse', 'flag', 'ma_period'],
-    'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
-}
-
-# Common parameters required for ALL strategies
-COMMON_REQUIRED_PARAMS = ['id', 'name', 'timeframe', 'active', 'sell_after_ncandles', 'order_amount', 'tp_pct', 'sl_pct', 'direction', 'regime_trending', 'regime_ranging', 'regime_volatile', 'direction_mode']
+def validate_postgresql_connection():
+    """
+    Validates PostgreSQL connection is available before bot starts.
+    
+    Raises:
+        SystemExit: If PostgreSQL is not accessible
+    
+    Returns:
+        bool: True if connection successful
+    """
+    try:
+        
+        logger.info("Validating PostgreSQL connection...")
+        
+        # Try to connect
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        
+        # Verify table exists
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'symbols_live'
+            )
+        """)
+        table_exists = cursor.fetchone()[0]
+        
+        if not table_exists:
+            logger.warning("Table 'symbols_live' not found in database")
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info("✓ PostgreSQL connection validated successfully")
+        return True
+        
+    except OperationalError as e:
+        logger.error("✗ FATAL: PostgreSQL connection failed")
+        logger.error(f"Error: {e}")
+        logger.error("Ensure PostgreSQL is running: sudo systemctl status postgresql")
+        raise SystemExit(1)
+        
+    except Exception as e:
+        logger.error(f"✗ FATAL: Unexpected error validating PostgreSQL: {e}")
+        raise SystemExit(1)
+        
 # ==========================================================================
 # SETTINGS VALIDATION
 # ==========================================================================

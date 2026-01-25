@@ -62,22 +62,7 @@ def calculate_pnl(direction: str,
                  entry_price: Decimal, 
                  current_price: Decimal, 
                  size: Decimal) -> float:
-    """
-    Calculate unrealized PnL in USDT for a position.
-    
-    Args:
-        direction: Position direction ('long' or 'short')
-        entry_price: Entry price
-        current_price: Current market price
-        size: Position size
-    
-    Returns:
-        Unrealized PnL in USDT
-    
-    Example:
-        >>> calculate_pnl('long', Decimal('100'), Decimal('105'), Decimal('10'))
-        50.0  # (105 - 100) * 10
-    """
+
     entry_float   = float(entry_price)
     current_float = float(current_price)
     size_float    = float(size)
@@ -102,14 +87,15 @@ def add_position(strat_id: str,
                 sl_pct: float, 
                 order_id: str,
                 open_positions: Dict, 
-                strategy_candles: Dict, 
+                strategy_candles: Dict,
+                account_number: str,  
                 state_file: str,
                 hour_zone, 
                 usdt_amount: float = 0,
                 regime_family: Optional[str] = None,
                 regime_multiplier: Optional[float] = None,
                 market_direction: Optional[str] = None,            
-                direction_multiplier: Optional[float] = None) -> None: 
+                direction_multiplier: Optional[float] = None) -> None:
     """
     Add a new position to tracking system.
     
@@ -159,7 +145,7 @@ def add_position(strat_id: str,
     }
     
     open_positions[strat_id].append(position)
-    save_state_local(open_positions, strategy_candles, state_file)
+    save_state_local(open_positions, strategy_candles, account_number, state_file)
 
 
 # ==========================================================================
@@ -169,7 +155,8 @@ def check_tp_sl_for_strategy(strat_id: str,
                              strat_config: Dict,
                              open_positions: Dict, 
                              strategy_candles: Dict,
-                            state_file: str, 
+                             account_number: str,  # ← AÑADIR AQUÍ
+                             state_file: str, 
                              send_request_func,
                              pnl_accumulator: Optional[Dict] = None,
                              bot_state=None) -> None:
@@ -268,16 +255,19 @@ def check_tp_sl_for_strategy(strat_id: str,
             if i < len(open_positions[strat_id]):
                 open_positions[strat_id].pop(i)
         
-        save_state_local(open_positions, strategy_candles, state_file)
+        save_state_local(open_positions, strategy_candles, account_number, state_file)
 
 
-def check_all_tp_sl(strategies: List[Dict], 
-                   open_positions: Dict,
-                   strategy_candles: Dict, 
-                   state_file: str,
-                   send_request_func, 
-                   check_tp_sl_for_strategy_func,
-                   bot_state=None) -> Dict:
+def check_all_tp_sl(
+    strategies: List[Dict], 
+    open_positions: Dict,
+    strategy_candles: Dict,
+    account_number: str,  # ← AÑADIR
+    state_file: str,
+    send_request_func, 
+    check_tp_sl_for_strategy_func,
+    bot_state=None
+) -> Dict:
     """
     Check TP/SL for all strategies (simplified for dashboard).
     
@@ -309,8 +299,15 @@ def check_all_tp_sl(strategies: List[Dict],
         if positions:
             strat_pnl_acc = {'total': 0.0}
             check_tp_sl_for_strategy_func(
-                strat_id, strat, open_positions, strategy_candles,
-                state_file, send_request_func, strat_pnl_acc, bot_state
+                strat_id, 
+                strat, 
+                open_positions, 
+                strategy_candles,
+                account_number,
+                state_file, 
+                send_request_func, 
+                strat_pnl_acc, 
+                bot_state
             )
             pnl_accumulator['total'] += strat_pnl_acc['total']
     

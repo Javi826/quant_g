@@ -17,14 +17,24 @@ import traceback
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-
+from config.settings import POSTGRES_CONFIG
 import logging
 logger = logging.getLogger('BOT_trading.execution.trade_logger')
 
 
-# Global configuration
+# =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+
+# Excel configuration
 TRADES_LOG_PATH = None
 
+# PostgreSQL configuration (dual-write)
+POSTGRES_ENABLED = True
+
+# =============================================================================
+# CONFIGURATION FUNCTIONS
+# =============================================================================
 
 def configure_log_path(trades_log_path: str) -> None:
     """
@@ -36,6 +46,87 @@ def configure_log_path(trades_log_path: str) -> None:
     global TRADES_LOG_PATH
     TRADES_LOG_PATH = trades_log_path
 
+
+# =============================================================================
+# POSTGRESQL HOOK (NEW - NON-BLOCKING)
+# =============================================================================
+
+def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbol, 
+                        direction, usdt_amount, size_val, entry_price, close_price,
+                        profit, fee, profit_pct, reason, regime_family, regime_multiplier,
+                        market_direction, direction_multiplier):
+    """
+    Write trade to PostgreSQL (dual-write hook).
+    
+    This function is called after all calculations are done.
+    Errors are logged but don't affect Excel writing.
+    """
+    if not POSTGRES_ENABLED:
+        return
+    
+    try:
+        import psycopg2
+        from psycopg2 import sql
+        
+        # Extract account from TRADES_LOG_PATH
+        account = 'unknown'
+        if TRADES_LOG_PATH:
+            filename = os.path.basename(TRADES_LOG_PATH)
+            if filename.startswith('bot_trades_') and filename.endswith('.xlsx'):
+                account = filename.replace('bot_trades_', '').replace('.xlsx', '')
+        
+        # Connect and insert
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+        
+        insert_query = sql.SQL("""
+            INSERT INTO trades (
+                account, open_at, close_at, duration_days, strategy, symbol, direction,
+                usdt_amount, size, price_entry, price_close, profit, fee,
+                profit_pct, reason_out, regime_family, regime_multiplier,
+                market_direction, direction_multiplier
+            ) VALUES (
+                %(account)s, %(open_at)s, %(close_at)s, %(duration_days)s, %(strategy)s,
+                %(symbol)s, %(direction)s, %(usdt_amount)s, %(size)s,
+                %(price_entry)s, %(price_close)s, %(profit)s, %(fee)s,
+                %(profit_pct)s, %(reason_out)s, %(regime_family)s,
+                %(regime_multiplier)s, %(market_direction)s, %(direction_multiplier)s
+            )
+        """)
+        
+        cursor.execute(insert_query, {
+            'account': account,
+            'open_at': opened_at_dt,
+            'close_at': closed_at,
+            'duration_days': round(delta_days, 4),
+            'strategy': strategy_id,
+            'symbol': symbol,
+            'direction': direction.upper(),
+            'usdt_amount': round(usdt_amount, 2),
+            'size': round(size_val, 6) if size_val else None,
+            'price_entry': round(entry_price, 6),
+            'price_close': round(close_price, 6),
+            'profit': round(profit, 2),
+            'fee': round(fee, 4),
+            'profit_pct': round(profit_pct, 1),
+            'reason_out': reason,
+            'regime_family': regime_family,
+            'regime_multiplier': round(regime_multiplier, 1),
+            'market_direction': market_direction,
+            'direction_multiplier': round(direction_multiplier, 1)
+        })
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.debug(f"PostgreSQL write failed (non-critical): {e}")
+
+
+# =============================================================================
+# ORIGINAL CODE - UNCHANGED
+# =============================================================================
 
 def log_closed_position(opened_at,
                        strategy_id: str,
@@ -128,6 +219,8 @@ def log_closed_position(opened_at,
                 else:
                     profit     = (entry_price - close_price) * (usdt_amount / entry_price)
                     profit_pct = ((entry_price - close_price) / entry_price) * 100
+            
+            fee = 0
 
         closed_at = datetime.now()
 
@@ -181,6 +274,19 @@ def log_closed_position(opened_at,
         # Update bot state
         if bot_state is not None:
             bot_state.closed_total_profit += profit
+
+        # =====================================================================
+        # POSTGRESQL HOOK (NEW - added before logging)
+        # =====================================================================
+        _write_to_postgresql(
+            opened_at_dt, closed_at, delta_days, strategy_id, symbol,
+            direction, usdt_amount, size_val, entry_price, close_price,
+            profit, fee, profit_pct, reason,
+            regime_family if regime_family else 'unknown',
+            regime_multiplier if regime_multiplier is not None else 1.0,
+            market_direction if market_direction else 'unknown',
+            direction_multiplier if direction_multiplier is not None else 1.0
+        )
 
         # Enhanced logging with regime info
         regime_info = ""
