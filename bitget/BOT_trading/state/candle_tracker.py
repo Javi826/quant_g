@@ -31,7 +31,13 @@ def increment_strategy_candles(strat_id: str,
         strategy_candles[strat_id] = 0
     
     strategy_candles[strat_id] += 1
-    save_state_local(open_positions, strategy_candles, account_number, state_file)
+    try:
+        save_state_local(open_positions, strategy_candles, account_number, state_file)
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR saving state after incrementing candles")
+        logger.error(f"Strategy: {strat_id}, Candles: {strategy_candles[strat_id]}")
+        logger.error(f"Error: {e}")
+        raise
 
 
 def reset_strategy_candles(strat_id: str,
@@ -41,7 +47,13 @@ def reset_strategy_candles(strat_id: str,
                            state_file: str) -> None:
 
     strategy_candles[strat_id] = 0
-    save_state_local(open_positions, strategy_candles, account_number, state_file)
+    try:
+        save_state_local(open_positions, strategy_candles, account_number, state_file)
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR saving state after resetting candles")
+        logger.error(f"Strategy: {strat_id}")
+        logger.error(f"Error: {e}")
+        raise
 
 
 # ==========================================================================
@@ -100,4 +112,10 @@ def check_candles_timeout_for_strategy(strat_id: str,
     if all_closed:
         open_positions[strat_id] = []
         strategy_candles[strat_id] = 0
-        save_state_local(open_positions, strategy_candles, account_number, state_file)
+        try:
+            save_state_local(open_positions, strategy_candles, account_number, state_file)
+        except Exception as e:
+            logger.error(f"CRITICAL ERROR saving state after timeout close")
+            logger.error(f"Strategy: {strat_id}, Positions closed: {len(positions)}")
+            logger.error(f"Error: {e}")
+            raise

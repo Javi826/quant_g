@@ -160,34 +160,57 @@
     
     <div class="main-panel">
         <div class="stats-grid">
+            <!-- Card 1: CLOSED PnL -->
             <div class="stat-card">
                 <div class="stat-label" style="text-transform: none;">CLOSED PnL</div>
                 <div class="stat-value positive" id="total-profit">$-</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Profit %</div>
-                <div class="stat-value positive" id="profit-pct">-%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Trades</div>
-                <div class="stat-value neutral" id="trades-num">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Win Rate</div>
-                <div class="stat-value neutral" id="trades-pct">-%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Positions</div>
-                <div class="stat-value neutral" id="total-positions">-</div>
-            </div>
+            
+            <!-- Card 2: OPEN PnL -->
             <div class="stat-card">
                 <div class="stat-label" style="text-transform: none;">OPEN PnL</div>
                 <div class="stat-value positive" id="open-pnl">$-</div>
             </div>
+            
+            <!-- Card 3: Profit % -->
+            <div class="stat-card">
+                <div class="stat-label">Profit %</div>
+                <div class="stat-value positive" id="profit-pct">-%</div>
+            </div>
+            
+            <!-- Card 4: Trades & Positions -->
+            <!-- Card 4: Trades & Positions -->
+            <div class="stat-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div class="stat-label" style="font-size: 14px; margin-bottom: 8px;">Trades</div>
+                        <div class="stat-value neutral" id="trades-num" style="color: #58a6ff; font-size: 36px;">-</div>
+                    </div>
+                    <div style="flex: 1;">
+                        <div class="stat-label" style="font-size: 14px; margin-bottom: 8px;">Positions</div>
+                        <div class="stat-value neutral" id="total-positions" style="color: #58a6ff; font-size: 36px;">-</div>
+                    </div>
+                </div>
+            </div>            
+            <!-- Card 7: BTC Price -->
             <div class="stat-card">
                 <div class="stat-label">BTC Price</div>
                 <div class="stat-value warning" id="btc-price">$-</div>
             </div>
+            
+            <!-- Card 8: Gross Exposure -->
+            <!-- Card 8: Gross Exposure -->
+            <div class="stat-card">
+                <div class="stat-label">Gross Exp.</div>
+                <div class="stat-value neutral" id="exposure-gross">-%</div>
+            </div>
+            
+            <!-- Card 9: Net Exposure -->
+            <div class="stat-card">
+                <div class="stat-label">Net Exp.</div>
+                <div class="stat-value neutral" id="exposure-net">-%</div>
+            </div>         
+            <!-- Card 10: Market Regime -->
             <div class="stat-card">
                 <div class="stat-label">Market Regime</div>
                 <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
@@ -204,6 +227,7 @@
             <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
             <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
             <button class="tab-btn" onclick="switchTab('regime')">Market Regime</button>
+            <button class="tab-btn" onclick="switchTab('risk')">Risk Control</button>
             <button class="tab-btn" onclick="switchTab('config')">Configuration</button>
             <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
         </div>
@@ -486,7 +510,7 @@
             </div>
         </div>
         
-        <div id="tab-regime" class="tab-content">
+<div id="tab-regime" class="tab-content">
             <div class="content-section">
                 <h2>
                     <span>Market Regime Analysis</span>
@@ -655,11 +679,54 @@
                             </div>
                         </div>
                     </div>
+                </div>               
+            </div>
+        </div>
+        
+        <div id="tab-risk" class="tab-content">
+            <div class="content-section">
+                <h2>Risk Control</h2>
+                
+                <!-- Sección A: Cards de métricas -->
+                <div class="stats-grid" style="margin-bottom: 30px;">
+                    <div class="stat-card">
+                        <div class="stat-label">Gross Exposure</div>
+                        <div class="stat-value neutral" id="risk-gross-exp">-%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Net Exposure</div>
+                        <div class="stat-value neutral" id="risk-net-exp">-%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Long Exposure</div>
+                        <div class="stat-value neutral" id="risk-long-exp" style="color: #3fb950;">-%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Short Exposure</div>
+                        <div class="stat-value neutral" id="risk-short-exp" style="color: #f85149;">-%</div>
+                    </div>
+                </div>
+                
+                <!-- Sección B: Tabla de exposure por estrategia -->
+                <div class="config-card" style="margin-bottom: 30px;">
+                    <h3>Exposure by Strategy</h3>
+                    <div id="risk-strategy-table">
+                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
+                    </div>
+                </div>
+                
+                <!-- Sección C: Gráfico histórico -->
+                <div class="config-card">
+                    <h3>Exposure History (Last 30 Days)</h3>
+                    <div style="height: 400px; margin-top: 20px;">
+                        <canvas id="riskExposureChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
         
         <div id="tab-config" class="tab-content">
+        
             <div class="content-section">
                 <h2>Bot Configuration & Status</h2>
                 

@@ -28,7 +28,7 @@ def _http_get(url, params=None, timeout=API_TIMEOUT, max_retries=API_MAX_RETRIES
         except requests.RequestException:
             attempt += 1
             time.sleep(0.5 * attempt)
-    raise Exception("Reintentos agotados")
+    raise Exception("No more tryies.")
 
 
 def _call_history_candles(symbol, granularity, limit=200, startTime=None, endTime=None):

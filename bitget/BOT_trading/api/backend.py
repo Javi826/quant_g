@@ -1424,37 +1424,375 @@ class DashboardServer:
         
         @self.app.route('/api/regime/history')
         def get_regime_history():
-                    """
-                    Obtiene el historial de régimen de mercado (PLACEHOLDER).
+            """
+            Get historical BTC price and regime data from PostgreSQL.
+            
+            Query params:
+                timeframe: Timeframe (1Dutc, 4H, 1H, 6Hutc)
+                days: Number of days to fetch (default: 30)
+            
+            Returns:
+                JSON with dates, prices, ma50, regime_family arrays
+            """
+            try:
+                timeframe = request.args.get('timeframe', '4H')
+                days = int(request.args.get('days', 30))
+                
+                # Query PostgreSQL
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT 
+                        timestamp,
+                        price,
+                        ma50,
+                        regime_family
+                    FROM btc_history
+                    WHERE timeframe = %s
+                    ORDER BY timestamp ASC
+                    LIMIT %s
+                """, (timeframe, days * 24))  # Rough limit based on hourly data
+                
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if not rows:
+                    return jsonify({
+                        'success': False,
+                        'error': f'No data available for {timeframe}',
+                        'dates': [],
+                        'prices': [],
+                        'ma50': [],
+                        'regimes': []
+                    })
+                
+                # Format data
+                dates = [row[0].isoformat() for row in rows]
+                prices = [float(row[1]) for row in rows]
+                ma50 = [float(row[2]) for row in rows]
+                regimes = [row[3] for row in rows]
+                
+                return jsonify({
+                    'success': True,
+                    'timeframe': timeframe,
+                    'dates': dates,
+                    'prices': prices,
+                    'ma50': ma50,
+                    'regimes': regimes,
+                    'count': len(dates)
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting regime history: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'dates': [],
+                    'prices': [],
+                    'ma50': [],
+                    'regimes': []
+                }), 500
+        # ==============================================================================
+        # BTC DATA ENDPOINTS
+        # ==============================================================================
+        
+        @self.app.route('/api/btc/history')
+        def get_btc_history():
+            """
+            Get BTC price history for chart overlay.
+            
+            Query params:
+                timeframe: '1H', '4H', '6Hutc', '1Dutc' (required)
+                date_from: YYYY-MM-DD (optional)
+                date_to: YYYY-MM-DD (optional)
+            
+            Returns:
+                JSON with dates, prices, and ma50 arrays
+            """
+            try:
+                timeframe = request.args.get('timeframe')
+                date_from = request.args.get('date_from')
+                date_to = request.args.get('date_to')
+                
+                if not timeframe:
+                    return jsonify({'success': False, 'error': 'timeframe required'}), 400
+                
+                # Check if data needs updating
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT timestamp, price 
+                    FROM btc_history 
+                    WHERE timeframe = %s
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                """, [timeframe])
+                result = cursor.fetchone()
+                last_ts, last_price = result if result[0] else (None, None)
+                cursor.close()
+                conn.close()
+                
+                if last_ts:
+                    from datetime import datetime, timezone
+                    gap_hours = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
+                    tf_hours = {'1H': 1, '4H': 4, '6Hutc': 6, '1Dutc': 24}
+                    estimated_gap = gap_hours / tf_hours.get(timeframe, 1)
                     
-                    Query params:
-                        timeframe: Timeframe a analizar (ej: '4H', '1H')
-                        bars: Número de barras históricas (default: 24)
-                    
-                    Returns:
-                        JSON con historial de regímenes
-                    """
-                    try:
-                        timeframe = request.args.get('timeframe', '4H')
-                        bars = int(request.args.get('bars', 24))
+                    if estimated_gap > 200:
+                        # Fill gap with last known price (flat line)
+                        from market_data.btc_tracker import fill_btc_gap
+                        fill_btc_gap(timeframe, last_ts, last_price)
+                    elif estimated_gap > 1:
+                        # Normal capture
+                        from market_data.btc_tracker import capture_btc_snapshot
+                        capture_btc_snapshot(timeframe)
+                           
+                # Build query
+                query = """
+                    SELECT timestamp, price, ma50
+                    FROM btc_history
+                    WHERE timeframe = %s
+                """
+                params = [timeframe]
+                
+                if date_from:
+                    query += " AND timestamp >= %s"
+                    params.append(date_from)
+                
+                if date_to:
+                    query += " AND timestamp <= %s"
+                    params.append(date_to + ' 23:59:59')
+                
+                query += " ORDER BY timestamp"
+                
+                # Execute query
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if not rows:
+                    return jsonify({
+                        'success': True,
+                        'timeframe': timeframe,
+                        'dates': [],
+                        'prices': [],
+                        'ma50': []
+                    })
+                
+                # Format response
+                dates = [row[0].strftime('%Y-%m-%d %H:%M:%S') for row in rows]
+                prices = [float(row[1]) if row[1] else None for row in rows]
+                ma50 = [float(row[2]) if row[2] else None for row in rows]
+                
+                return jsonify({
+                    'success': True,
+                    'timeframe': timeframe,
+                    'dates': dates,
+                    'prices': prices,
+                    'ma50': ma50
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting BTC history: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+            
+        @self.app.route('/api/risk/exposure')
+        def get_risk_exposure():
+            """
+            Get current risk exposure snapshot.
+            
+            Returns:
+                JSON with gross/net exposure metrics and per-strategy breakdown
+            """
+            try:
+                state = self._load_state()
+                
+                # Calculate available capital (initial + closed P&L)
+                df = self._load_trades_dataframe()
+                closed_pnl = df['PROFIT'].sum() if df is not None and not df.empty else 0
+                available_capital = self.initial_capital + closed_pnl
+                
+                # Calculate exposure from open positions
+                total_long_usdt = 0
+                total_short_usdt = 0
+                positions_by_strategy = []
+                
+                for strategy_id, positions in state.get('positions', {}).items():
+                    for pos in positions:
+                        usdt_amount = float(pos.get('usdt_amount', 0))
+                        direction = pos['direction'].lower()
                         
-                        # PLACEHOLDER: Por ahora retornar estructura vacía
-                        # TODO: Implementar tracking histórico de regímenes
-                        return jsonify({
-                            'success': True,
-                            'timeframe': timeframe,
-                            'bars': bars,
-                            'history': [],
-                            'message': 'Historical tracking not yet implemented'
+                        if direction == 'long':
+                            total_long_usdt += usdt_amount
+                        else:
+                            total_short_usdt += usdt_amount
+                        
+                        positions_by_strategy.append({
+                            'strategy': strategy_id,
+                            'symbol': pos['symbol'],
+                            'side': direction.upper(),
+                            'usdt': usdt_amount
                         })
-                        
-                    except Exception as e:
-                        logger.error(f"Error getting regime history: {e}")
-                        return jsonify({
-                            'success': False,
-                            'error': str(e),
-                            'history': []
-                        }), 500
+                
+                # Calculate exposure percentages
+                gross_exposure_pct = ((total_long_usdt + total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
+                net_exposure_pct = ((total_long_usdt - total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
+                long_exposure_pct = (total_long_usdt / available_capital * 100) if available_capital > 0 else 0
+                short_exposure_pct = (total_short_usdt / available_capital * 100) if available_capital > 0 else 0
+                
+                # Aggregate by strategy
+                strategy_exposure = {}
+                for pos in positions_by_strategy:
+                    strat = pos['strategy']
+                    if strat not in strategy_exposure:
+                        strategy_exposure[strat] = {
+                            'side': pos['side'],
+                            'usdt': 0,
+                            'pct': 0
+                        }
+                    strategy_exposure[strat]['usdt'] += pos['usdt']
+                
+                # Calculate percentages
+                for strat, data in strategy_exposure.items():
+                    data['pct'] = (data['usdt'] / available_capital * 100) if available_capital > 0 else 0
+                
+                # Sort by exposure DESC
+                strategy_list = [
+                    {'strategy': k, **v} 
+                    for k, v in sorted(strategy_exposure.items(), key=lambda x: x[1]['usdt'], reverse=True)
+                ]
+                
+                return jsonify({
+                    'success': True,
+                    'metrics': {
+                        'gross_exposure_pct': round(gross_exposure_pct, 2),
+                        'net_exposure_pct': round(net_exposure_pct, 2),
+                        'long_exposure_pct': round(long_exposure_pct, 2),
+                        'short_exposure_pct': round(short_exposure_pct, 2),
+                        'num_positions': sum(len(positions) for positions in state.get('positions', {}).values()),
+                        'available_capital': round(available_capital, 2)
+                    },
+                    'strategies': strategy_list
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting risk exposure: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+            
+        @self.app.route('/api/risk/exposure-history')
+        def get_risk_exposure_history():
+            """
+            Get historical risk exposure data.
+            
+            Query params:
+                days: Number of days to retrieve (default: 30)
+            
+            Returns:
+                JSON with historical exposure data
+            """
+            try:
+                days = int(request.args.get('days', 30))
+                
+                # Check if we need to capture today's snapshot
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                
+                from datetime import date
+                today = date.today()
+                
+                cursor.execute("""
+                    SELECT date FROM exposure_history 
+                    WHERE account = %s AND date = %s
+                """, [self.account_number, today])
+                
+                exists = cursor.fetchone()
+                
+                if not exists:
+                    # Capture today's snapshot by calling exposure endpoint internally
+                    state = self._load_state()
+                    df = self._load_trades_dataframe()
+                    closed_pnl = df['PROFIT'].sum() if df is not None and not df.empty else 0
+                    available_capital = self.initial_capital + closed_pnl
+                    
+                    total_long_usdt = 0
+                    total_short_usdt = 0
+                    num_positions = 0
+                    
+                    for strategy_id, positions in state.get('positions', {}).items():
+                        num_positions += len(positions)
+                        for pos in positions:
+                            usdt_amount = float(pos.get('usdt_amount', 0))
+                            if pos['direction'].lower() == 'long':
+                                total_long_usdt += usdt_amount
+                            else:
+                                total_short_usdt += usdt_amount
+                    
+                    gross_pct = ((total_long_usdt + total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
+                    net_pct = ((total_long_usdt - total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
+                    long_pct = (total_long_usdt / available_capital * 100) if available_capital > 0 else 0
+                    short_pct = (total_short_usdt / available_capital * 100) if available_capital > 0 else 0
+                    
+                    cursor.execute("""
+                        INSERT INTO exposure_history 
+                        (date, account, gross_exposure_pct, net_exposure_pct, long_exposure_pct, short_exposure_pct, num_positions)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (date, account) DO NOTHING
+                    """, [today, self.account_number, 
+                          float(gross_pct), float(net_pct), float(long_pct), float(short_pct), int(num_positions)])
+                    
+                    conn.commit()
+                
+                # Query historical data
+                cursor.execute("""
+                    SELECT date, gross_exposure_pct, net_exposure_pct, 
+                           long_exposure_pct, short_exposure_pct, num_positions
+                    FROM exposure_history
+                    WHERE account = %s AND date >= CURRENT_DATE - INTERVAL '%s days'
+                    ORDER BY date ASC
+                """, [self.account_number, days])
+                
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if not rows:
+                    return jsonify({
+                        'success': True,
+                        'dates': [],
+                        'gross': [],
+                        'net': [],
+                        'long': [],
+                        'short': [],
+                        'positions': []
+                    })
+                
+                dates = [row[0].strftime('%Y-%m-%d') for row in rows]
+                gross = [float(row[1]) if row[1] else 0 for row in rows]
+                net = [float(row[2]) if row[2] else 0 for row in rows]
+                long_exp = [float(row[3]) if row[3] else 0 for row in rows]
+                short_exp = [float(row[4]) if row[4] else 0 for row in rows]
+                positions = [int(row[5]) if row[5] else 0 for row in rows]
+                
+                return jsonify({
+                    'success': True,
+                    'dates': dates,
+                    'gross': gross,
+                    'net': net,
+                    'long': long_exp,
+                    'short': short_exp,
+                    'positions': positions
+                })
+                
+            except Exception as e:
+                logger.error(f"Error getting exposure history: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
     
     def start(self, host='0.0.0.0', port=5000):
         """Inicia el servidor del dashboard"""

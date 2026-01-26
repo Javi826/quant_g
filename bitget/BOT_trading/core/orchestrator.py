@@ -185,7 +185,12 @@ class BotOrchestrator:
         Saves state and closes all connections.
         """
         self._running = False
-        save_state_local(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
+        try:
+           save_state_local(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
+        except Exception as e:
+            self.logger.error(f"CRITICAL ERROR saving state during shutdown")
+            self.logger.error(f"Account: {self.account_number}, Positions: {sum(len(p) for p in self.open_positions.values())}")
+            self.logger.error(f"Error: {e}")
         self.logger.info("⛔ BOT Stopped")
     
     def get_status(self) -> Dict[str, Any]:

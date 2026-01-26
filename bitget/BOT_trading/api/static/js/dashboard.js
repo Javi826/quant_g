@@ -305,6 +305,7 @@ function setRegimeTimeframe(timeframe) {
     
     // Load regime data
     loadRegimeData();
+
 }
 
 async function loadRegimeData() {
@@ -2211,6 +2212,10 @@ async function updateEquityChart() {
             return;
         }
         
+        // Fetch BTC history with same date filters
+        const btcRes = await fetch('/api/btc/history?timeframe=1Dutc' + dateParams);
+        const btcData = await btcRes.json();
+        
         document.getElementById('equity-metrics').style.display = 'block';
         document.getElementById('metric-num-trades').textContent = data.num_trades || 0;
         
@@ -2246,22 +2251,121 @@ async function updateEquityChart() {
         const finalEquity = data.equity_pct[data.equity_pct.length - 1] || 0;
         const equityColor = finalEquity >= 0 ? COLORS.equityPositive : COLORS.equityNegative;
         
+        // Prepare datasets
+        const datasets = [{
+            label: 'Equity (%)',
+            data: data.equity_pct,
+            borderColor: equityColor,
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1,
+            yAxisID: 'y'
+        }];
+        
+        // Add BTC dataset if data available
+        // Add BTC dataset if data available (WITH DATE ALIGNMENT)
+        if (btcData.success && btcData.dates && btcData.dates.length > 0) {
+            // Normalize BTC dates: "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DD"
+            const btcDatesMap = {};
+            btcData.dates.forEach((dateStr, idx) => {
+                const normalizedDate = dateStr.split(' ')[0]; // Extract YYYY-MM-DD
+                btcDatesMap[normalizedDate] = btcData.prices[idx];
+            });
+            
+            // Align BTC prices with equity dates
+            const alignedBtcPrices = data.dates.map(equityDate => {
+                return btcDatesMap[equityDate] || null; // null if no match
+            });
+            
+            // Only add if we have at least some overlap
+            const validPrices = alignedBtcPrices.filter(p => p !== null);
+            if (validPrices.length > 0) {
+                datasets.push({
+                    label: 'BTC Price',
+                    data: alignedBtcPrices,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.1,
+                    yAxisID: 'y2',
+                    spanGaps: true  // Draw line across null values
+                });
+            }
+        }
         const ctxEquity = document.getElementById('equityChart').getContext('2d');
         equityChart = new Chart(ctxEquity, {
             type: 'line',
             data: {
                 labels: data.dates,
-                datasets: [{
-                    label: 'Equity (%)',
-                    data: data.equity_pct,
-                    borderColor: equityColor,
-                    backgroundColor: 'transparent',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.1
-                }]
+                datasets: datasets
             },
-            options: getBaseChartConfig('Equity Curve - ' + selectedStrategies.length + ' strategies selected', false)
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { 
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: COLORS.white,
+                            font: { size: 14 }
+                        }
+                    },
+                    title: { 
+                        display: true, 
+                        text: 'Equity Curve - ' + selectedStrategies.length + ' strategies selected',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: { 
+                        ticks: { color: CHART_DEFAULTS.textColor, font: { size: CHART_DEFAULTS.fontSize.axis } }, 
+                        grid: { 
+                            color: CHART_DEFAULTS.gridColor,
+                            drawBorder: true,
+                            borderColor: CHART_DEFAULTS.borderColor,
+                            borderWidth: CHART_DEFAULTS.borderWidth
+                        } 
+                    },
+                    y: { 
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        ticks: { 
+                            color: CHART_DEFAULTS.textColor,
+                            font: { size: CHART_DEFAULTS.fontSize.axis },
+                            callback: function(value) { return value.toFixed(1) + '%'; }
+                        }, 
+                        grid: { 
+                            color: CHART_DEFAULTS.gridColor,
+                            drawBorder: true,
+                            borderColor: CHART_DEFAULTS.borderColor,
+                            borderWidth: CHART_DEFAULTS.borderWidth
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: datasets.length > 1,
+                        position: 'right',
+                        ticks: {
+                            color: '#f59e0b',
+                            font: { size: CHART_DEFAULTS.fontSize.axis },
+                            callback: function(value) { return '$' + value.toLocaleString(); }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
         });
         
         const ctxDD = document.getElementById('drawdownChart').getContext('2d');
@@ -2321,6 +2425,55 @@ async function loadData() {
             const btcPrice = status.btc_price || 0;
             document.getElementById('btc-price').textContent = '$' + btcPrice.toLocaleString();
         });
+        
+        // Load exposure data
+        try {
+            const exposureRes = await fetch('/api/risk/exposure');
+            if (exposureRes.ok) {
+                const exposureData = await exposureRes.json();
+                if (exposureData.success) {
+                    const grossPct = exposureData.metrics.gross_exposure_pct;
+                    const netPct = exposureData.metrics.net_exposure_pct;
+                    
+                    // Max limit from settings
+                    const MAX_GROSS = 30.0;
+                    
+                    // Calculate color for gross exposure
+                    const grossUsage = (grossPct / MAX_GROSS) * 100;
+                    let grossColor = '#3fb950'; // Green
+                    if (grossUsage >= 80) {
+                        grossColor = '#f85149'; // Red
+                    } else if (grossUsage >= 60) {
+                        grossColor = '#d29922'; // Yellow
+                    }
+                    
+                    // Update header card
+                    const grossEl = document.getElementById('exposure-gross');
+                    const netEl = document.getElementById('exposure-net');
+                    
+                    if (grossEl) {
+                        grossEl.textContent = grossPct.toFixed(1) + '%';
+                        grossEl.style.color = grossColor;
+                    }
+                    
+                    if (netEl) {
+                        // Same color logic as gross
+                        const netUsage = (Math.abs(netPct) / MAX_GROSS) * 100;
+                        let netColor = '#3fb950'; // Green
+                        if (netUsage >= 80) {
+                            netColor = '#f85149'; // Red
+                        } else if (netUsage >= 60) {
+                            netColor = '#d29922'; // Yellow
+                        }
+                        
+                        netEl.textContent = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '%';
+                        netEl.style.color = netColor;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading exposure:', error);
+        }
         
         const posRes = await fetch('/api/positions');
         if (!posRes.ok) throw new Error('HTTP ' + posRes.status);

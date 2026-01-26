@@ -967,3 +967,19 @@ input[type="datetime-local"],
     font-weight: 600;
     font-size: 14px;
 }
+
+/* Dual value cards */
+.stat-value-dual {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 16px;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.8px;
+}
+
+.stat-separator {
+    color: #30363d;
+    font-weight: 400;
+}

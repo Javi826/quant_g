@@ -31,6 +31,13 @@ ACCOUNTS = {
 }
 
 # ==========================================================================
+# RISK CONTROL SETTINGS
+# ==========================================================================
+RISK_LIMITS = {
+    'max_gross_exposure_pct': 30.0,  # Maximum gross exposure (% of available capital)
+    'max_net_exposure_pct': 20.0     # Maximum net exposure (% of available capital) - future
+}
+# ==========================================================================
 # MARKET REGIME SETTINGS
 # ==========================================================================
 

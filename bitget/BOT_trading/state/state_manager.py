@@ -363,8 +363,15 @@ def sync_broker(open_positions: Dict,
                 strategy_candles[strat_id] = 0
     
     # Save state if changes were made
+    # Save state if changes were made
     if total_removed > 0:
-        save_state_local(open_positions, strategy_candles, account_number, state_file)
-        logger.info(f"Sync with broker completed: {total_removed} position(s) removed")
+        try:
+            save_state_local(open_positions, strategy_candles, account_number, state_file)
+            logger.info(f"Sync with broker completed: {total_removed} position(s) removed")
+        except Exception as e:
+            logger.error(f"CRITICAL ERROR saving state after sync_broker")
+            logger.error(f"Account: {account_number}, Positions removed: {total_removed}")
+            logger.error(f"Error: {e}")
+            raise
     else:
         logger.info(f"Sync with broker completed.")

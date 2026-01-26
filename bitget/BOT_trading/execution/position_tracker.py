@@ -145,7 +145,14 @@ def add_position(strat_id: str,
     }
     
     open_positions[strat_id].append(position)
-    save_state_local(open_positions, strategy_candles, account_number, state_file)
+    try:
+        save_state_local(open_positions, strategy_candles, account_number, state_file)
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR saving state after opening position")
+        logger.error(f"Strategy: {strat_id}, Symbol: {symbol}, Direction: {direction}")
+        logger.error(f"Position was opened in broker but NOT saved to state!")
+        logger.error(f"Error: {e}")
+        raise
 
 
 # ==========================================================================
@@ -191,71 +198,84 @@ def check_tp_sl_for_strategy(strat_id: str,
     sell_after_ncandles = strat_config.get('sell_after_ncandles') if strat_config else None
     
     for i, pos in enumerate(positions):
-        symbol = pos['symbol']
-        
-        # Get current price via WebSocket
         try:
-            current_price = get_current_price(symbol, max_cache_age=0.5)
-        except (TimeoutError, RuntimeError) as e:
-            logger.info(f"No price for {symbol}: {e}")
-            continue
-        
-        if current_price is None:
-            continue
-        
-        direction   = pos['direction']
-        tp_price    = pos['tp']
-        sl_price    = pos['sl']
-        entry_price = pos['entry_price']
-        
-        current_price = Decimal(str(current_price))
-        
-        # Calculate PnL if accumulator provided
-        if pnl_accumulator is not None:
-            pnl = calculate_pnl(direction, entry_price, current_price, pos['size'])
-            pnl_accumulator['total'] += pnl
-               
-        # Check TP/SL hits
-        hit_tp = current_price >= tp_price if direction.lower() == 'long' else current_price <= tp_price
-        hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
-        
-        if hit_tp:
-            position_data = {
-                'opened_at': pos['opened_at'],
-                'strategy_id': strat_id,
-                'usdt_amount': pos.get('usdt_amount', 0),
-                'entry_price': pos['entry_price'],
-                'regime_family': pos.get('regime_family', 'unknown'),
-                'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                'market_direction': pos.get('market_direction', 'unknown'),           # ← NUEVO
-                'direction_multiplier': pos.get('direction_multiplier', 1.0)
-            }
-            if close_position(symbol, pos['size'], direction, send_request_func, 
-                            reason="TP", position_data=position_data, bot_state=bot_state):
-                positions_to_remove.append(i)
-                
-        elif hit_sl:
-            position_data = {
-                'opened_at': pos['opened_at'],
-                'strategy_id': strat_id,
-                'usdt_amount': pos.get('usdt_amount', 0),
-                'entry_price': pos['entry_price'],
-                'regime_family': pos.get('regime_family', 'unknown'),
-                'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                'market_direction': pos.get('market_direction', 'unknown'),             # ← NUEVO
-                'direction_multiplier': pos.get('direction_multiplier', 1.0)  
-            }
-            if close_position(symbol, pos['size'], direction, send_request_func, 
-                            reason="SL", position_data=position_data, bot_state=bot_state):
-                positions_to_remove.append(i)
+            symbol = pos['symbol']
+            
+            # Get current price via WebSocket
+            try:
+                current_price = get_current_price(symbol, max_cache_age=0.5)
+            except (TimeoutError, RuntimeError) as e:
+                logger.info(f"No price for {symbol}: {e}")
+                continue
+            
+            if current_price is None:
+                continue
+            
+            direction   = pos['direction']
+            tp_price    = pos['tp']
+            sl_price    = pos['sl']
+            entry_price = pos['entry_price']
+            
+            current_price = Decimal(str(current_price))
+            
+            # Calculate PnL if accumulator provided
+            if pnl_accumulator is not None:
+                pnl = calculate_pnl(direction, entry_price, current_price, pos['size'])
+                pnl_accumulator['total'] += pnl
+                   
+            # Check TP/SL hits
+            hit_tp = current_price >= tp_price if direction.lower() == 'long' else current_price <= tp_price
+            hit_sl = current_price <= sl_price if direction.lower() == 'long' else current_price >= sl_price
+            
+            if hit_tp:
+                position_data = {
+                    'opened_at': pos['opened_at'],
+                    'strategy_id': strat_id,
+                    'usdt_amount': pos.get('usdt_amount', 0),
+                    'entry_price': pos['entry_price'],
+                    'regime_family': pos.get('regime_family', 'unknown'),
+                    'regime_multiplier': pos.get('regime_multiplier', 1.0),
+                    'market_direction': pos.get('market_direction', 'unknown'),           # ← NUEVO
+                    'direction_multiplier': pos.get('direction_multiplier', 1.0)
+                }
+                if close_position(symbol, pos['size'], direction, send_request_func, 
+                                reason="TP", position_data=position_data, bot_state=bot_state):
+                    positions_to_remove.append(i)
+                    
+            elif hit_sl:
+                position_data = {
+                    'opened_at': pos['opened_at'],
+                    'strategy_id': strat_id,
+                    'usdt_amount': pos.get('usdt_amount', 0),
+                    'entry_price': pos['entry_price'],
+                    'regime_family': pos.get('regime_family', 'unknown'),
+                    'regime_multiplier': pos.get('regime_multiplier', 1.0),
+                    'market_direction': pos.get('market_direction', 'unknown'),             # ← NUEVO
+                    'direction_multiplier': pos.get('direction_multiplier', 1.0)  
+                }
+                if close_position(symbol, pos['size'], direction, send_request_func, 
+                                reason="SL", position_data=position_data, bot_state=bot_state):
+                    positions_to_remove.append(i)
+                    
+        except Exception as e:
+            logger.error(f"CRITICAL ERROR processing position {symbol} in strategy {strat_id}")
+            logger.error(f"Position index: {i}, Direction: {pos.get('direction')}")
+            logger.error(f"Error: {e}")
+            raise  # Bot stops with full context
+    
     
     # Remove closed positions
     if positions_to_remove:
         for i in reversed(positions_to_remove):
             if i < len(open_positions[strat_id]):
                 open_positions[strat_id].pop(i)
-        
-        save_state_local(open_positions, strategy_candles, account_number, state_file)
+        try:
+            save_state_local(open_positions, strategy_candles, account_number, state_file)
+        except Exception as e:
+            logger.error(f"CRITICAL ERROR saving state after closing positions")
+            logger.error(f"Strategy: {strat_id}, Positions removed: {len(positions_to_remove)}")
+            logger.error(f"Error: {e}")
+            raise
 
 
 def check_all_tp_sl(
@@ -297,18 +317,24 @@ def check_all_tp_sl(
         positions = open_positions.get(strat_id, [])
         
         if positions:
-            strat_pnl_acc = {'total': 0.0}
-            check_tp_sl_for_strategy_func(
-                strat_id, 
-                strat, 
-                open_positions, 
-                strategy_candles,
-                account_number,
-                state_file, 
-                send_request_func, 
-                strat_pnl_acc, 
-                bot_state
-            )
-            pnl_accumulator['total'] += strat_pnl_acc['total']
+            try:
+                strat_pnl_acc = {'total': 0.0}
+                check_tp_sl_for_strategy_func(
+                    strat_id, 
+                    strat, 
+                    open_positions, 
+                    strategy_candles,
+                    account_number,
+                    state_file, 
+                    send_request_func, 
+                    strat_pnl_acc, 
+                    bot_state
+                )
+                pnl_accumulator['total'] += strat_pnl_acc['total']
+            except Exception as e:
+               logger.error(f"CRITICAL ERROR checking TP/SL for strategy {strat_id}")
+               logger.error(f"Account: {account_number}, Positions: {len(positions)}")
+               logger.error(f"Error: {e}")
+               raise  # Bot stops but with full context logged
     
     return pnl_accumulator
