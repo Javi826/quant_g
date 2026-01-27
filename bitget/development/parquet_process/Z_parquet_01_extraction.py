@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 BASE_URL               = "https://api.bitget.com"
 PRODUCT_TYPE           = "usdt-futures"
 
-TIMEFRAME              = "1H"          
+TIMEFRAME              = "1Dutc"          
 LIMIT                  = 200           
 DATA_FOLDER            = "crypto_2026_BTC"
 START_DATE             = "2025-01-01"  

@@ -157,6 +157,20 @@ function getComposeDateParams() {
     return params;
 }
 
+function clearRiskDates() {
+    document.getElementById('risk-date-from').value = '';
+    document.getElementById('risk-date-to').value = '';
+}
+
+function getRiskDateParams() {
+    const dateFrom = document.getElementById('risk-date-from').value;
+    const dateTo = document.getElementById('risk-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
 async function waitForBackend() {
     const maxAttempts = 30;
     let attempts = 0;
@@ -222,6 +236,9 @@ let drawdownChart = null;
 let allStrategiesList = [];
 let isStoppingBot = false;
 let currentRegimeAnalyticsMode = 'regime';
+let riskExposureChart = null;
+let MAX_GROSS_EXPOSURE = 30.0;  // Default, overwritten by backend
+let MAX_NET_EXPOSURE = 20.0;     // Default, overwritten by backend
 // ═══════════════════════════════════════════════════════════════════════════
 // POSITION SORT FEATURE (NEW)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -799,6 +816,7 @@ function switchTab(tabName) {
     if (tabName === 'config') loadBotConfig();
     if (tabName === 'equity') loadEquityTab();
     if (tabName === 'regime') loadRegimeData();
+    if (tabName === 'risk') loadRiskTab();
 }
 
 function switchEquitySubTab(subTabName) {
@@ -2402,44 +2420,59 @@ async function loadData() {
         const status = await statusRes.json();
         
         requestAnimationFrame(() => {
-            document.getElementById('total-positions').textContent = status.total_positions || 0;
+            const totalPosEl = document.getElementById('total-positions');
+            if (totalPosEl) totalPosEl.textContent = status.total_positions || 0;
             
             const totalProfit = status.total_profit || 0;
             const profitEl = document.getElementById('total-profit');
-            profitEl.textContent = '$' + totalProfit.toFixed(2);
-            profitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'positive' : 'negative');
+            if (profitEl) {
+                profitEl.textContent = '$' + totalProfit.toFixed(2);
+                profitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'positive' : 'negative');
+            }
             
             const openPnl = status.open_pnl || 0;
             const openPnlEl = document.getElementById('open-pnl');
-            openPnlEl.textContent = '$' + openPnl.toFixed(2);
-            openPnlEl.className = 'stat-value ' + (openPnl >= 0 ? 'positive' : 'negative');
+            if (openPnlEl) {
+                openPnlEl.textContent = '$' + openPnl.toFixed(2);
+                openPnlEl.className = 'stat-value ' + (openPnl >= 0 ? 'positive' : 'negative');
+            }
             
             const profitPct = status.profit_pct || 0;
             const profitPctEl = document.getElementById('profit-pct');
-            profitPctEl.textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
-            profitPctEl.className = 'stat-value ' + (profitPct >= 0 ? 'positive' : 'negative');
+            if (profitPctEl) {
+                profitPctEl.textContent = (profitPct >= 0 ? '+' : '') + profitPct.toFixed(2) + '%';
+                profitPctEl.className = 'stat-value ' + (profitPct >= 0 ? 'positive' : 'negative');
+            }
             
-            document.getElementById('trades-num').textContent = status.num_trades || 0;
+            const tradesNumEl = document.getElementById('trades-num');
+            if (tradesNumEl) tradesNumEl.textContent = status.num_trades || 0;
+            
             const tradesPct = status.trades_pct || 0;
-            document.getElementById('trades-pct').textContent = tradesPct.toFixed(1) + '%';
+            const tradesPctEl = document.getElementById('trades-pct');
+            if (tradesPctEl) tradesPctEl.textContent = tradesPct.toFixed(1) + '%';
+            
             const btcPrice = status.btc_price || 0;
-            document.getElementById('btc-price').textContent = '$' + btcPrice.toLocaleString();
+            const btcPriceEl = document.getElementById('btc-price');
+            if (btcPriceEl) btcPriceEl.textContent = '$' + btcPrice.toLocaleString();
         });
         
-        // Load exposure data
+        // Load exposure data with dynamic limits from backend
         try {
             const exposureRes = await fetch('/api/risk/exposure');
             if (exposureRes.ok) {
                 const exposureData = await exposureRes.json();
                 if (exposureData.success) {
+                    // Update global limits from backend
+                    if (exposureData.limits) {
+                        MAX_GROSS_EXPOSURE = exposureData.limits.max_gross;
+                        MAX_NET_EXPOSURE = exposureData.limits.max_net;
+                    }
+                    
                     const grossPct = exposureData.metrics.gross_exposure_pct;
                     const netPct = exposureData.metrics.net_exposure_pct;
                     
-                    // Max limit from settings
-                    const MAX_GROSS = 30.0;
-                    
-                    // Calculate color for gross exposure
-                    const grossUsage = (grossPct / MAX_GROSS) * 100;
+                    // Calculate color for gross exposure (usage percentage)
+                    const grossUsage = (grossPct / MAX_GROSS_EXPOSURE) * 100;
                     let grossColor = '#3fb950'; // Green
                     if (grossUsage >= 80) {
                         grossColor = '#f85149'; // Red
@@ -2447,7 +2480,16 @@ async function loadData() {
                         grossColor = '#d29922'; // Yellow
                     }
                     
-                    // Update header card
+                    // Calculate color for net exposure (usage percentage)
+                    const netUsage = (Math.abs(netPct) / MAX_NET_EXPOSURE) * 100;
+                    let netColor = '#3fb950'; // Green
+                    if (netUsage >= 80) {
+                        netColor = '#f85149'; // Red
+                    } else if (netUsage >= 60) {
+                        netColor = '#d29922'; // Yellow
+                    }
+                    
+                    // Update header cards
                     const grossEl = document.getElementById('exposure-gross');
                     const netEl = document.getElementById('exposure-net');
                     
@@ -2457,15 +2499,6 @@ async function loadData() {
                     }
                     
                     if (netEl) {
-                        // Same color logic as gross
-                        const netUsage = (Math.abs(netPct) / MAX_GROSS) * 100;
-                        let netColor = '#3fb950'; // Green
-                        if (netUsage >= 80) {
-                            netColor = '#f85149'; // Red
-                        } else if (netUsage >= 60) {
-                            netColor = '#d29922'; // Yellow
-                        }
-                        
                         netEl.textContent = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '%';
                         netEl.style.color = netColor;
                     }
@@ -2741,6 +2774,325 @@ function renderHighCorrelationPairs(pairs) {
 // =============================================================================
 // END CORRELATION ANALYSIS
 // =============================================================================
+
+// =============================================================================
+// RISK CONTROL TAB
+// =============================================================================
+
+async function loadRiskTab() {
+    try {
+        // Fetch current exposure
+        const exposureRes = await fetch('/api/risk/exposure');
+        const exposureData = await exposureRes.json();
+        
+        if (!exposureData.success) {
+            console.error('Failed to load risk exposure:', exposureData.error);
+            return;
+        }
+        
+        // Update global limits
+        if (exposureData.limits) {
+            MAX_GROSS_EXPOSURE = exposureData.limits.max_gross;
+            MAX_NET_EXPOSURE = exposureData.limits.max_net;
+        }
+        
+        const metrics = exposureData.metrics;
+        const strategies = exposureData.strategies;
+        
+        // Update cards with dynamic colors
+        updateRiskCards(metrics);
+        
+        // Render strategy table
+        renderRiskStrategyTable(strategies, metrics.available_capital);
+        
+        // Load and render history chart
+        await loadRiskHistoryChart();
+        
+    } catch (error) {
+        console.error('Error loading risk tab:', error);
+    }
+}
+
+function updateRiskCards(metrics) {
+    const grossPct = metrics.gross_exposure_pct;
+    const netPct = metrics.net_exposure_pct;
+    const longPct = metrics.long_exposure_pct;
+    const shortPct = metrics.short_exposure_pct;
+    
+    // Calculate usage percentages for color
+    const grossUsage = (grossPct / MAX_GROSS_EXPOSURE) * 100;
+    const netUsage = (Math.abs(netPct) / MAX_NET_EXPOSURE) * 100;
+    
+    // Determine colors
+    function getUsageColor(usage) {
+        if (usage < 60) return '#3fb950';      // Green
+        if (usage < 80) return '#d29922';      // Yellow
+        return '#f85149';                       // Red
+    }
+    
+    const grossColor = getUsageColor(grossUsage);
+    const netColor = getUsageColor(netUsage);
+    
+    // Update Gross Exposure card
+    const grossEl = document.getElementById('risk-gross-exp');
+    if (grossEl) {
+        grossEl.textContent = grossPct.toFixed(1) + '%';
+        grossEl.style.color = grossColor;
+    }
+    
+    // Update Net Exposure card
+    const netEl = document.getElementById('risk-net-exp');
+    if (netEl) {
+        const netSign = netPct >= 0 ? '+' : '';
+        netEl.textContent = netSign + netPct.toFixed(1) + '%';
+        netEl.style.color = netColor;
+    }
+    
+    // Update Long Exposure card (always green)
+    const longEl = document.getElementById('risk-long-exp');
+    if (longEl) {
+        longEl.textContent = longPct.toFixed(1) + '%';
+    }
+    
+    // Update Short Exposure card (always red)
+    const shortEl = document.getElementById('risk-short-exp');
+    if (shortEl) {
+        shortEl.textContent = shortPct.toFixed(1) + '%';
+    }
+    
+    // Update config card  ← AÑADIR DESDE AQUÍ
+    const configGrossEl = document.getElementById('risk-config-max-gross');
+    const configNetEl = document.getElementById('risk-config-max-net');
+    
+    if (configGrossEl) {
+        configGrossEl.textContent = MAX_GROSS_EXPOSURE.toFixed(1) + '%';
+    }
+    
+    if (configNetEl) {
+        configNetEl.textContent = MAX_NET_EXPOSURE.toFixed(1) + '%';
+    }
+}
+
+function renderRiskStrategyTable(strategies, availableCapital) {
+    const container = document.getElementById('risk-strategy-table');
+    
+    if (!strategies || strategies.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No open positions</div>';
+        return;
+    }
+    
+    const html = '<table><thead><tr>' +
+        '<th>#</th>' +
+        '<th>Strategy</th>' +
+        '<th>Side</th>' +
+        '<th>USDT</th>' +
+        '<th>% Exposure</th>' +
+        '</tr></thead><tbody>' +
+        strategies.map((strat, idx) => {
+            const num = String(idx + 1).padStart(2, '0');
+            const sideClass = strat.side === 'LONG' ? 'direction-long' : 'direction-short';
+            
+            return '<tr>' +
+                '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+                '<td>' + strat.strategy + '</td>' +
+                '<td class="' + sideClass + '">' + strat.side + '</td>' +
+                '<td>$' + strat.usdt.toFixed(2) + '</td>' +
+                '<td>' + strat.pct.toFixed(2) + '%</td>' +
+                '</tr>';
+        }).join('') +
+        '</tbody></table>';
+    
+    container.innerHTML = html;
+}
+
+async function loadRiskHistoryChart() {
+    try {
+        const dateParams = getRiskDateParams();
+        const res = await fetch('/api/risk/exposure-history?days=30' + dateParams);
+        const data = await res.json();
+        
+        if (!data.success || !data.history || data.history.dates.length === 0) {
+            console.log('No risk history data available yet');
+            return;
+        }
+        
+        const history = data.history;
+        
+        // Destroy existing chart
+        if (riskExposureChart) {
+            riskExposureChart.destroy();
+            riskExposureChart = null;
+        }
+        
+        // Fetch BTC data for overlay
+        let btcPrices = [];
+        try {
+            const btcRes = await fetch('/api/btc/history?timeframe=1Dutc&bars=30');
+            const btcData = await btcRes.json();
+            
+            if (btcData.success && btcData.data.length > 0) {
+                // Create map: date -> price
+                const btcMap = {};
+                btcData.data.forEach(item => {
+                    const date = item.timestamp.split('T')[0];
+                    btcMap[date] = item.price;
+                });
+                
+                // Align with exposure dates
+                btcPrices = history.dates.map(date => btcMap[date] || null);
+            }
+        } catch (error) {
+            console.error('Error loading BTC data for risk chart:', error);
+        }
+        
+        // Calculate Y2 axis range for BTC (min/max with 5% padding)
+        let btcMin = Math.min(...btcPrices.filter(p => p !== null));
+        let btcMax = Math.max(...btcPrices.filter(p => p !== null));
+        const btcPadding = (btcMax - btcMin) * 0.05;
+        btcMin -= btcPadding;
+        btcMax += btcPadding;
+        
+        // Determine Gross line color based on max value
+        const maxGross = Math.max(...history.gross);
+        const grossUsage = (maxGross / MAX_GROSS_EXPOSURE) * 100;
+        let grossColor = '#3fb950';  // Green
+        if (grossUsage >= 80) {
+            grossColor = '#f85149';  // Red
+        } else if (grossUsage >= 60) {
+            grossColor = '#d29922';  // Yellow
+        }
+        
+        const ctx = document.getElementById('riskExposureChart').getContext('2d');
+        riskExposureChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: history.dates,
+                datasets: [
+                    {
+                        label: 'Gross Exposure (%)',
+                        data: history.gross,
+                        borderColor: grossColor,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: grossColor,
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Net Exposure (%)',
+                        data: history.net,
+                        borderColor: '#a8556f',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#a8556f',
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'BTC Price',
+                        data: btcPrices,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        tension: 0.1,
+                        yAxisID: 'y2'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#ffffff',
+                            font: { size: 14 },
+                            usePointStyle: true
+                        }
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#ffffff',
+                            font: { size: 14 }
+                        },
+                        grid: {
+                            color: '#21262d',
+                            drawBorder: true,
+                            borderColor: '#facc15',
+                            borderWidth: 1
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Exposure (%)',
+                            color: '#ffffff',
+                            font: { size: 14 }
+                        },
+                        ticks: {
+                            color: '#ffffff',
+                            font: { size: 14 },
+                            callback: function(value) {
+                                return value.toFixed(1) + '%';
+                            }
+                        },
+                        grid: {
+                            color: '#21262d',
+                            drawBorder: true,
+                            borderColor: '#facc15',
+                            borderWidth: 1
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        position: 'right',
+                        min: btcMin,
+                        max: btcMax,
+                        title: {
+                            display: true,
+                            text: 'BTC Price ($)',
+                            color: '#f59e0b',
+                            font: { size: 14 }
+                        },
+                        ticks: {
+                            color: '#f59e0b',
+                            font: { size: 14 },
+                            callback: function(value) {
+                                return '$' + value.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                });
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error loading risk history chart:', error);
+    }
+}
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDashboard);

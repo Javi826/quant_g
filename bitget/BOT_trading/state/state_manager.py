@@ -98,7 +98,7 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
                 
                 total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
                 
-                logger.info(f"✓ State loaded from PostgreSQL: {total_positions} positions")
+                logger.info(f"State loaded from PostgreSQL: {total_positions} positions")
                 logger.info(f"{'-' * 48}")
                 
                 # Display summary
@@ -113,7 +113,7 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
                 # Fall through to JSON fallback
                 
         except Exception as e:
-            logger.error(f"✗ PostgreSQL load failed: {e}")
+            logger.error(f"Error-PostgreSQL load failed: {e}")
             logger.info("Falling back to JSON...")
             # Fall through to JSON fallback
     
@@ -258,7 +258,7 @@ def save_state_local(
                 
                 postgres_success = True
             except Exception as e:
-                logger.error(f"✗ PostgreSQL state save failed: {e}")
+                logger.error(f"Error-PostgreSQL state save failed: {e}")
         
         # Log dual-write status (only if verbose)
         status_indicators = []

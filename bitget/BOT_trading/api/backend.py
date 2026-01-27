@@ -13,6 +13,9 @@ import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
 import logging
+import schedule
+import time as time_module
+import requests
 from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 
@@ -20,7 +23,8 @@ import psycopg2
 from analytics.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL
-from config.settings import POSTGRES_CONFIG
+from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
+
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -65,6 +69,10 @@ class DashboardServer:
         
         self.server_thread = None
         self.running = False
+        
+        self.snapshot_thread = None
+        self.snapshot_running = False
+        self.dashboard_port = None
         
     def get_precision_for_price(self, price):
         """
@@ -1422,80 +1430,6 @@ class DashboardServer:
                     'all_thresholds': {}
                 }), 500
         
-        @self.app.route('/api/regime/history')
-        def get_regime_history():
-            """
-            Get historical BTC price and regime data from PostgreSQL.
-            
-            Query params:
-                timeframe: Timeframe (1Dutc, 4H, 1H, 6Hutc)
-                days: Number of days to fetch (default: 30)
-            
-            Returns:
-                JSON with dates, prices, ma50, regime_family arrays
-            """
-            try:
-                timeframe = request.args.get('timeframe', '4H')
-                days = int(request.args.get('days', 30))
-                
-                # Query PostgreSQL
-                conn = psycopg2.connect(**self.postgres_config)
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    SELECT 
-                        timestamp,
-                        price,
-                        ma50,
-                        regime_family
-                    FROM btc_history
-                    WHERE timeframe = %s
-                    ORDER BY timestamp ASC
-                    LIMIT %s
-                """, (timeframe, days * 24))  # Rough limit based on hourly data
-                
-                rows = cursor.fetchall()
-                cursor.close()
-                conn.close()
-                
-                if not rows:
-                    return jsonify({
-                        'success': False,
-                        'error': f'No data available for {timeframe}',
-                        'dates': [],
-                        'prices': [],
-                        'ma50': [],
-                        'regimes': []
-                    })
-                
-                # Format data
-                dates = [row[0].isoformat() for row in rows]
-                prices = [float(row[1]) for row in rows]
-                ma50 = [float(row[2]) for row in rows]
-                regimes = [row[3] for row in rows]
-                
-                return jsonify({
-                    'success': True,
-                    'timeframe': timeframe,
-                    'dates': dates,
-                    'prices': prices,
-                    'ma50': ma50,
-                    'regimes': regimes,
-                    'count': len(dates)
-                })
-                
-            except Exception as e:
-                logger.error(f"Error getting regime history: {e}")
-                import traceback
-                traceback.print_exc()
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'dates': [],
-                    'prices': [],
-                    'ma50': [],
-                    'regimes': []
-                }), 500
         # ==============================================================================
         # BTC DATA ENDPOINTS
         # ==============================================================================
@@ -1506,68 +1440,33 @@ class DashboardServer:
             Get BTC price history for chart overlay.
             
             Query params:
-                timeframe: '1H', '4H', '6Hutc', '1Dutc' (required)
                 date_from: YYYY-MM-DD (optional)
                 date_to: YYYY-MM-DD (optional)
             
             Returns:
-                JSON with dates, prices, and ma50 arrays
+                JSON with dates and prices arrays
             """
             try:
-                timeframe = request.args.get('timeframe')
                 date_from = request.args.get('date_from')
                 date_to = request.args.get('date_to')
                 
-                if not timeframe:
-                    return jsonify({'success': False, 'error': 'timeframe required'}), 400
-                
-                # Check if data needs updating
-                conn = psycopg2.connect(**self.postgres_config)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT timestamp, price 
-                    FROM btc_history 
-                    WHERE timeframe = %s
-                    ORDER BY timestamp DESC
-                    LIMIT 1
-                """, [timeframe])
-                result = cursor.fetchone()
-                last_ts, last_price = result if result[0] else (None, None)
-                cursor.close()
-                conn.close()
-                
-                if last_ts:
-                    from datetime import datetime, timezone
-                    gap_hours = (datetime.now(timezone.utc) - last_ts).total_seconds() / 3600
-                    tf_hours = {'1H': 1, '4H': 4, '6Hutc': 6, '1Dutc': 24}
-                    estimated_gap = gap_hours / tf_hours.get(timeframe, 1)
-                    
-                    if estimated_gap > 200:
-                        # Fill gap with last known price (flat line)
-                        from market_data.btc_tracker import fill_btc_gap
-                        fill_btc_gap(timeframe, last_ts, last_price)
-                    elif estimated_gap > 1:
-                        # Normal capture
-                        from market_data.btc_tracker import capture_btc_snapshot
-                        capture_btc_snapshot(timeframe)
-                           
                 # Build query
                 query = """
-                    SELECT timestamp, price, ma50
+                    SELECT date, price
                     FROM btc_history
-                    WHERE timeframe = %s
+                    WHERE 1=1
                 """
-                params = [timeframe]
+                params = []
                 
                 if date_from:
-                    query += " AND timestamp >= %s"
+                    query += " AND date >= %s"
                     params.append(date_from)
                 
                 if date_to:
-                    query += " AND timestamp <= %s"
-                    params.append(date_to + ' 23:59:59')
+                    query += " AND date <= %s"
+                    params.append(date_to)
                 
-                query += " ORDER BY timestamp"
+                query += " ORDER BY date"
                 
                 # Execute query
                 conn = psycopg2.connect(**self.postgres_config)
@@ -1580,23 +1479,18 @@ class DashboardServer:
                 if not rows:
                     return jsonify({
                         'success': True,
-                        'timeframe': timeframe,
                         'dates': [],
-                        'prices': [],
-                        'ma50': []
+                        'prices': []
                     })
                 
                 # Format response
-                dates = [row[0].strftime('%Y-%m-%d %H:%M:%S') for row in rows]
+                dates = [row[0].strftime('%Y-%m-%d') for row in rows]
                 prices = [float(row[1]) if row[1] else None for row in rows]
-                ma50 = [float(row[2]) if row[2] else None for row in rows]
                 
                 return jsonify({
                     'success': True,
-                    'timeframe': timeframe,
                     'dates': dates,
-                    'prices': prices,
-                    'ma50': ma50
+                    'prices': prices
                 })
                 
             except Exception as e:
@@ -1627,18 +1521,19 @@ class DashboardServer:
                 for strategy_id, positions in state.get('positions', {}).items():
                     for pos in positions:
                         usdt_amount = float(pos.get('usdt_amount', 0))
+                        real_exposure = usdt_amount / LEVERAGE  # Divide by leverage
                         direction = pos['direction'].lower()
                         
                         if direction == 'long':
-                            total_long_usdt += usdt_amount
+                            total_long_usdt += real_exposure
                         else:
-                            total_short_usdt += usdt_amount
+                            total_short_usdt += real_exposure
                         
                         positions_by_strategy.append({
                             'strategy': strategy_id,
                             'symbol': pos['symbol'],
                             'side': direction.upper(),
-                            'usdt': usdt_amount
+                            'usdt': real_exposure 
                         })
                 
                 # Calculate exposure percentages
@@ -1679,7 +1574,11 @@ class DashboardServer:
                         'num_positions': sum(len(positions) for positions in state.get('positions', {}).values()),
                         'available_capital': round(available_capital, 2)
                     },
-                    'strategies': strategy_list
+                    'strategies': strategy_list,
+                    'limits': {
+                        'max_gross': RISK_LIMITS['max_gross_exposure_pct'],
+                        'max_net': RISK_LIMITS['max_net_exposure_pct']
+                    }
                 })
                 
             except Exception as e:
@@ -1693,18 +1592,24 @@ class DashboardServer:
             
             Query params:
                 days: Number of days to retrieve (default: 30)
+                date_from: Start date (YYYY-MM-DD, optional)
+                date_to: End date (YYYY-MM-DD, optional)
             
             Returns:
                 JSON with historical exposure data
             """
             try:
+                from datetime import date, datetime, timedelta
+                
+                # Get filter parameters
                 days = int(request.args.get('days', 30))
+                date_from_str = request.args.get('date_from')
+                date_to_str = request.args.get('date_to')
                 
                 # Check if we need to capture today's snapshot
                 conn = psycopg2.connect(**self.postgres_config)
                 cursor = conn.cursor()
                 
-                from datetime import date
                 today = date.today()
                 
                 cursor.execute("""
@@ -1715,7 +1620,7 @@ class DashboardServer:
                 exists = cursor.fetchone()
                 
                 if not exists:
-                    # Capture today's snapshot by calling exposure endpoint internally
+                    # Capture today's snapshot
                     state = self._load_state()
                     df = self._load_trades_dataframe()
                     closed_pnl = df['PROFIT'].sum() if df is not None and not df.empty else 0
@@ -1729,10 +1634,11 @@ class DashboardServer:
                         num_positions += len(positions)
                         for pos in positions:
                             usdt_amount = float(pos.get('usdt_amount', 0))
+                            real_exposure = usdt_amount / LEVERAGE  # Divide by leverage
                             if pos['direction'].lower() == 'long':
-                                total_long_usdt += usdt_amount
+                                total_long_usdt += real_exposure
                             else:
-                                total_short_usdt += usdt_amount
+                                total_short_usdt += real_exposure
                     
                     gross_pct = ((total_long_usdt + total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
                     net_pct = ((total_long_usdt - total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
@@ -1749,15 +1655,51 @@ class DashboardServer:
                     
                     conn.commit()
                 
-                # Query historical data
-                cursor.execute("""
-                    SELECT date, gross_exposure_pct, net_exposure_pct, 
-                           long_exposure_pct, short_exposure_pct, num_positions
-                    FROM exposure_history
-                    WHERE account = %s AND date >= CURRENT_DATE - INTERVAL '%s days'
-                    ORDER BY date ASC
-                """, [self.account_number, days])
+                # Build query based on filters
+                if date_from_str and date_to_str:
+                    # Use explicit date range
+                    query = """
+                        SELECT date, gross_exposure_pct, net_exposure_pct, 
+                               long_exposure_pct, short_exposure_pct, num_positions
+                        FROM exposure_history
+                        WHERE account = %s AND date >= %s AND date <= %s
+                        ORDER BY date ASC
+                    """
+                    params = [self.account_number, date_from_str, date_to_str]
+                elif date_from_str:
+                    # From date to today
+                    query = """
+                        SELECT date, gross_exposure_pct, net_exposure_pct, 
+                               long_exposure_pct, short_exposure_pct, num_positions
+                        FROM exposure_history
+                        WHERE account = %s AND date >= %s
+                        ORDER BY date ASC
+                    """
+                    params = [self.account_number, date_from_str]
+                elif date_to_str:
+                    # From 30 days ago to date_to
+                    query = """
+                        SELECT date, gross_exposure_pct, net_exposure_pct, 
+                               long_exposure_pct, short_exposure_pct, num_positions
+                        FROM exposure_history
+                        WHERE account = %s AND date <= %s AND date >= %s
+                        ORDER BY date ASC
+                    """
+                    date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+                    date_from = date_to - timedelta(days=days)
+                    params = [self.account_number, date_to_str, date_from]
+                else:
+                    # Default: last N days
+                    query = """
+                        SELECT date, gross_exposure_pct, net_exposure_pct, 
+                               long_exposure_pct, short_exposure_pct, num_positions
+                        FROM exposure_history
+                        WHERE account = %s AND date >= CURRENT_DATE - INTERVAL '%s days'
+                        ORDER BY date ASC
+                    """
+                    params = [self.account_number, days]
                 
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
                 cursor.close()
                 conn.close()
@@ -1765,12 +1707,14 @@ class DashboardServer:
                 if not rows:
                     return jsonify({
                         'success': True,
-                        'dates': [],
-                        'gross': [],
-                        'net': [],
-                        'long': [],
-                        'short': [],
-                        'positions': []
+                        'history': {
+                            'dates': [],
+                            'gross': [],
+                            'net': [],
+                            'long': [],
+                            'short': [],
+                            'positions': []
+                        }
                     })
                 
                 dates = [row[0].strftime('%Y-%m-%d') for row in rows]
@@ -1782,23 +1726,203 @@ class DashboardServer:
                 
                 return jsonify({
                     'success': True,
-                    'dates': dates,
-                    'gross': gross,
-                    'net': net,
-                    'long': long_exp,
-                    'short': short_exp,
-                    'positions': positions
+                    'history': {
+                        'dates': dates,
+                        'gross': gross,
+                        'net': net,
+                        'long': long_exp,
+                        'short': short_exp,
+                        'positions': positions
+                    }
                 })
                 
             except Exception as e:
                 logger.error(f"Error getting exposure history: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
+            
+        @self.app.route('/api/btc/snapshot')
+        def capture_btc_snapshot():
+            """
+            Capture today's BTC price snapshot.
+            Auto-called by scheduler at 23:55 UTC daily.
+            
+            Returns:
+                JSON with success status and captured price
+            """
+            try:
+                from datetime import date
+                
+                today = date.today()
+                
+                # Check if today's snapshot already exists
+                conn = psycopg2.connect(**self.postgres_config)
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT price FROM btc_history 
+                    WHERE date = %s
+                """, [today])
+                
+                existing = cursor.fetchone()
+                
+                if existing:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({
+                        'success': True,
+                        'message': 'Snapshot already exists for today',
+                        'price': float(existing[0]),
+                        'date': today.isoformat()
+                    })
+                
+                # Get current BTC price
+                try:
+                    btc_price = float(self.get_current_price('BTCUSDT'))
+                except Exception as e:
+                    cursor.close()
+                    conn.close()
+                    logger.error(f"[BTC SNAPSHOT] Error getting BTC price: {e}")
+                    return jsonify({
+                        'success': False,
+                        'error': f'Failed to get BTC price: {str(e)}'
+                    }), 500
+                
+                # Insert today's snapshot
+                cursor.execute("""
+                    INSERT INTO btc_history (date, price)
+                    VALUES (%s, %s)
+                    ON CONFLICT (date) DO NOTHING
+                """, [today, btc_price])
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                logger.info(f"[BTC SNAPSHOT] ✓ Captured: {today} -> ${btc_price:.2f}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'BTC snapshot captured successfully',
+                    'price': btc_price,
+                    'date': today.isoformat()
+                })
+                
+            except Exception as e:
+                logger.error(f"[BTC SNAPSHOT] Error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 500
+            
+    # ==========================================================================
+    # DAILY SNAPSHOT SCHEDULER
+    # ==========================================================================
+    
+    def _capture_snapshot(self):
+        """
+        Capture daily exposure snapshot by calling internal endpoint.
+        Triggered by scheduler at 23:55 UTC daily.
+        """
+        try:
+            if not self.dashboard_port:
+                logger.warning("[SNAPSHOT] Port not set, skipping")
+                return
+            
+            url = f'http://localhost:{self.dashboard_port}/api/risk/exposure-history?days=1'
+            response = requests.get(url, timeout=10)
+            
+            if response.ok:
+                data = response.json()
+                if data.get('success'):
+                    logger.info(f"[SNAPSHOT] ✓ Daily exposure captured for {self.account_number}")
+                else:
+                    logger.warning(f"[SNAPSHOT] Endpoint returned error: {data.get('error')}")
+            else:
+                logger.warning(f"[SNAPSHOT] HTTP {response.status_code}: {response.text[:100]}")
+                
+        except requests.exceptions.Timeout:
+            logger.error("[SNAPSHOT] Request timeout (>10s)")
+        except Exception as e:
+            logger.error(f"[SNAPSHOT] Error capturing snapshot: {e}")
+            
+    def _capture_btc_snapshot(self):
+        """
+        Capture daily BTC price snapshot by calling internal endpoint.
+        Triggered by scheduler at 23:55 UTC daily.
+        """
+        try:
+            if not self.dashboard_port:
+                logger.warning("[BTC SNAPSHOT] Port not set, skipping")
+                return
+            
+            url = f'http://localhost:{self.dashboard_port}/api/btc/snapshot'
+            response = requests.get(url, timeout=10)
+            
+            if response.ok:
+                data = response.json()
+                if data.get('success'):
+                    logger.info(f"[BTC SNAPSHOT] ✓ Daily BTC price captured: ${data.get('price')}")
+                else:
+                    logger.warning(f"[BTC SNAPSHOT] Endpoint returned error: {data.get('error')}")
+            else:
+                logger.warning(f"[BTC SNAPSHOT] HTTP {response.status_code}: {response.text[:100]}")
+                
+        except requests.exceptions.Timeout:
+            logger.error("[BTC SNAPSHOT] Request timeout (>10s)")
+        except Exception as e:
+            logger.error(f"[BTC SNAPSHOT] Error capturing snapshot: {e}")
+    
+    def _schedule_daily_snapshot(self):
+        """
+        Scheduler loop that runs in separate thread.
+        Captures exposure snapshot daily at 23:55 UTC.
+        Only account 00 captures BTC price (shared resource).
+        """
+        schedule.every().day.at("23:55").do(self._capture_snapshot)
+        
+        # Only account 00 captures BTC (shared across all accounts)
+        if self.account_number == '00':
+            schedule.every().day.at("23:55").do(self._capture_btc_snapshot)
+            logger.info("[SNAPSHOT] Scheduler started - captures exposure + BTC daily at 23:55 UTC")
+        else:
+            logger.info("[SNAPSHOT] Scheduler started - captures exposure daily at 23:55 UTC")
+        
+        while self.snapshot_running:
+            schedule.run_pending()
+            time_module.sleep(60)  # Check every minute
+        
+        logger.info("[SNAPSHOT] Scheduler stopped")
+    
+    def _start_snapshot_scheduler(self):
+        """Start snapshot scheduler thread"""
+        if self.snapshot_thread and self.snapshot_thread.is_alive():
+            logger.warning("[SNAPSHOT] Scheduler already running")
+            return
+        
+        self.snapshot_running = True
+        self.snapshot_thread = threading.Thread(
+            target=self._schedule_daily_snapshot,
+            daemon=True,
+            name=f'SnapshotScheduler-{self.account_number}'
+        )
+        self.snapshot_thread.start()
+    
+    def _stop_snapshot_scheduler(self):
+        """Stop snapshot scheduler thread"""
+        if self.snapshot_running:
+            self.snapshot_running = False
+            if self.snapshot_thread:
+                self.snapshot_thread.join(timeout=2)
+
     
     def start(self, host='0.0.0.0', port=5000):
         """Inicia el servidor del dashboard"""
         if self.running:
             print("⚠️  Dashboard already running")
             return
+        
+        # Store port for snapshot scheduler
+        self.dashboard_port = port
         
         def run_server():
             import logging
@@ -1829,9 +1953,17 @@ class DashboardServer:
         logger.info(f"Network: http://127.0.0.1:{port}")
         logger.info(f"LAN:     http://<your-ip>:{port}")
         logger.info(f"{'─' * 45}\n")
+        
+        # Start snapshot scheduler AFTER Flask is running
+        self._start_snapshot_scheduler()
     
+# ==============================================================================
+# STEP 5: MODIFY stop() METHOD (replace entire method, lines 1495-1498)
+# ==============================================================================
+
     def stop(self):
         """Detiene el servidor"""
+        self._stop_snapshot_scheduler()  # Stop scheduler first
         self.running = False
         logger.info("Dashboard server stopped")
 

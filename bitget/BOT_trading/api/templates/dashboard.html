@@ -179,37 +179,32 @@
             </div>
             
             <!-- Card 4: Trades & Positions -->
-            <!-- Card 4: Trades & Positions -->
+            <!-- Card 4: Trades -->
             <div class="stat-card">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="flex: 1;">
-                        <div class="stat-label" style="font-size: 14px; margin-bottom: 8px;">Trades</div>
-                        <div class="stat-value neutral" id="trades-num" style="color: #58a6ff; font-size: 36px;">-</div>
-                    </div>
-                    <div style="flex: 1;">
-                        <div class="stat-label" style="font-size: 14px; margin-bottom: 8px;">Positions</div>
-                        <div class="stat-value neutral" id="total-positions" style="color: #58a6ff; font-size: 36px;">-</div>
-                    </div>
-                </div>
-            </div>            
-            <!-- Card 7: BTC Price -->
-            <div class="stat-card">
-                <div class="stat-label">BTC Price</div>
-                <div class="stat-value warning" id="btc-price">$-</div>
+                <div class="stat-label">Trades</div>
+                <div class="stat-value neutral" id="trades-num" style="color: #58a6ff;">-</div>
             </div>
             
-            <!-- Card 8: Gross Exposure -->
+            <!-- Card 5: Positions -->
+            <div class="stat-card">
+                <div class="stat-label">Positions</div>
+                <div class="stat-value neutral" id="total-positions" style="color: #58a6ff;">-</div>
+            </div>  
+            <!-- Card: Win Rate -->
+            <div class="stat-card">
+                <div class="stat-label">Win Rate</div>
+                <div class="stat-value neutral" id="trades-pct" style="color: #58a6ff;">-%</div>
+            </div>         
             <!-- Card 8: Gross Exposure -->
             <div class="stat-card">
                 <div class="stat-label">Gross Exp.</div>
                 <div class="stat-value neutral" id="exposure-gross">-%</div>
-            </div>
-            
-            <!-- Card 9: Net Exposure -->
+            </div> 
+            <!-- Card 7: BTC Price -->
             <div class="stat-card">
-                <div class="stat-label">Net Exp.</div>
-                <div class="stat-value neutral" id="exposure-net">-%</div>
-            </div>         
+                <div class="stat-label">BTC Price</div>
+                <div class="stat-value warning" id="btc-price">$-</div>
+            </div>       
             <!-- Card 10: Market Regime -->
             <div class="stat-card">
                 <div class="stat-label">Market Regime</div>
@@ -713,13 +708,48 @@
                     <div id="risk-strategy-table">
                         <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
                     </div>
-                </div>
-                
+                </div>              
+                <!-- Sección C: Gráfico histórico -->
                 <!-- Sección C: Gráfico histórico -->
                 <div class="config-card">
-                    <h3>Exposure History (Last 30 Days)</h3>
+                    <h3>Exposure History</h3>
+                    
+                    <!-- Date Filter -->
+                    <div class="date-filter-container">
+                        <div class="date-filter-group">
+                            <label>From:</label>
+                            <input type="date" id="risk-date-from">
+                        </div>
+                        <div class="date-filter-group">
+                            <label>To:</label>
+                            <input type="date" id="risk-date-to">
+                        </div>
+                        <button class="btn-clear-dates" onclick="clearRiskDates()">Clear</button>
+                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadRiskHistoryChart()">🔄 Update</button>
+                    </div>
+                    
                     <div style="height: 400px; margin-top: 20px;">
                         <canvas id="riskExposureChart"></canvas>
+                    </div>
+                </div>
+                <!-- Sección D: Risk Limits Configuration -->
+                <div class="config-card" style="margin-top: 20px;">
+                    <h3>Risk Limits Configuration</h3>
+                    <div class="config-row">
+                        <span class="config-label">Max Gross Exposure:</span>
+                        <span class="config-value" id="risk-config-max-gross">-%</span>
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Max Net Exposure:</span>
+                        <span class="config-value" id="risk-config-max-net">-%</span>
+                    </div>
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">ℹ️ COLOR THRESHOLDS</div>
+                        <div style="font-size: 13px; color: #c9d1d9; line-height: 1.6;">
+                            <span style="color: #3fb950;">●</span> Green: &lt;60% of limit<br>
+                            <span style="color: #d29922;">●</span> Yellow: 60-80% of limit<br>
+                            <span style="color: #f85149;">●</span> Red: ≥80% of limit
+                        </div>
                     </div>
                 </div>
             </div>

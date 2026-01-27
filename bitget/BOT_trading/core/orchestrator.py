@@ -23,6 +23,7 @@ if parent_dir not in sys.path:
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
 from market_regime import get_current_regime, get_current_direction, PositionSizer
+from risk_control import RiskLimiter, ExposureCalculator
 
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
 
@@ -43,6 +44,7 @@ from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 from config.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
 from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
+from config.settings import LEVERAGE
 
 class BotOrchestrator:
     """
@@ -127,6 +129,9 @@ class BotOrchestrator:
         self.regime_cache: Dict[str, str] = {}
         self.direction_cache: Dict[str, str] = {}
         self.position_sizer: Optional[PositionSizer] = None
+        #Risk
+        self.risk_limiter: Optional[RiskLimiter] = None
+        self.exposure_calculator: Optional[ExposureCalculator] = None
         
     # ======================================================================
     # PUBLIC API
@@ -169,6 +174,8 @@ class BotOrchestrator:
         self._setup_directories()
         self._load_bot_state()
         self._load_and_validate_strategies()
+        self._initialize_position_sizing()     # ← Régimen
+        self._initialize_risk_management() 
         self._load_market_symbols()
         self._initialize_connections()
         self._start_dashboard()
@@ -311,8 +318,6 @@ class BotOrchestrator:
             self.logger.warning(f"CONFIGURATION WARNINGS:")
             for warn in all_warnings:
                 self.logger.warning(f"{warn}")
-                
-        self.position_sizer = PositionSizer(self.logger)
     
     def _load_market_symbols(self) -> None:
         """Load market symbols for each strategy."""
@@ -411,7 +416,23 @@ class BotOrchestrator:
             )
         
         self.last_tpsl_check = time.time()
-    
+    def _initialize_position_sizing(self) -> None:
+        """Initialize position sizing based on market regime."""
+        from market_regime import PositionSizer
+        
+        self.position_sizer = PositionSizer(self.logger)
+        self.logger.info("Position sizing initialized")
+
+    def _initialize_risk_management(self) -> None:
+        """Initialize risk management components."""
+        from risk_control import ExposureCalculator, RiskLimiter
+        
+        self.exposure_calculator = ExposureCalculator(logger=self.logger)
+        self.risk_limiter = RiskLimiter(
+            initial_capital=self.initial_capital,
+            logger=self.logger
+        )
+        self.logger.info("Risk management initialized")
     # ======================================================================
     # MAIN LOOP (Private)
     # ======================================================================
@@ -460,11 +481,13 @@ class BotOrchestrator:
         self.logger.info(f"New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
         self.logger.info(f"Timeframes: {', '.join(closed_timeframes)}")
         
-        # Sync with broker
+        # ========================================================================
+        # BROKER SYNC: Load latest positions from exchange
+        # ========================================================================
         sync_broker(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
         
         # ========================================================================
-        # NEW: Update regime for closed timeframes
+        # REGIME UPDATE: Calculate market regime & direction for closed timeframes
         # ========================================================================
         self._update_regime_for_timeframes(closed_timeframes)
         
@@ -477,10 +500,14 @@ class BotOrchestrator:
         for tf in closed_timeframes:
             strategies_to_process.extend(self.strategies_by_tf[tf])
                 
-        # Process candle timeouts
+        # ========================================================================
+        # TIMEOUT CHECK: Increment candles and close expired positions
+        # ========================================================================
         self._process_candle_timeouts(strategies_to_process)
         
-        # Search for new signals (will use regime cache)
+        # ========================================================================
+        # SIGNAL SEARCH: Look for new entries in strategies without positions
+        # ========================================================================
         self._search_signals(strategies_to_process)
         
         self.logger.info("Signal cycle completed")
@@ -543,7 +570,9 @@ class BotOrchestrator:
             for strat in strategies_to_process:
                 strat_id = strat['id']
                 
-                # Skip deprecated strategies
+                # ========================================================================
+                # STRATEGY PRE-CHECKS: Skip if deprecated or has positions
+                # ========================================================================
                 if not strat.get('active', True):
                     continue
                 
@@ -552,12 +581,37 @@ class BotOrchestrator:
                 if num_positions > 0:
                     continue
                 
-                # Get market state from cache
+                # ========================================================================
+                # RISK CHECK: Skip if already at/above exposure limit
+                # ========================================================================
+                current_exposure = self.exposure_calculator.calculate_current_exposure(
+                    open_positions=self.open_positions,
+                    closed_pnl=self.bot_state.closed_total_profit if self.bot_state else 0,
+                    initial_capital=self.initial_capital,
+                    leverage=LEVERAGE
+                )
+                
+                blocked, reason, risk_metadata = self.risk_limiter.is_at_limit(
+                    current_gross_pct=current_exposure['gross_exposure_pct']
+                )
+                
+                # Check if blocked
+                if blocked:
+                    log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
+                    self.logger.info(log_msg)
+                    continue
+                
+                # Log risk decision (not blocked)
+                log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
+                self.logger.info(log_msg)
+                
+                # ========================================================================
+                # REGIME SIZING: Calculate adjusted order amount
+                # ========================================================================
                 timeframe = strat['timeframe']
                 market_regime = self.regime_cache.get(timeframe, 'ranging')
                 market_direction = self.direction_cache.get(timeframe, 'uptrend')
                 
-                # Calculate adjusted amount using PositionSizer
                 # Calculate adjusted amount using PositionSizer
                 adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
                     base_amount=strat['order_amount'],
@@ -574,12 +628,14 @@ class BotOrchestrator:
                     log_msg = self.position_sizer.format_log_message(strat_id, metadata)
                     self.logger.info(log_msg)
                     continue
-                
-                # Log sizing decision
+                               
+                # Log sizing decision (not blocked)
                 log_msg = self.position_sizer.format_log_message(strat_id, metadata)
                 self.logger.info(log_msg)
                 
-                # Process strategy with retry logic
+                # ========================================================================
+                # SIGNAL PROCESSING: Execute strategy with retry logic
+                # ========================================================================
                 try:
                     self.strategy_processor.process(
                         strat=strat,
@@ -653,10 +709,7 @@ class BotOrchestrator:
     # ======================================================================
     # HELPER METHODS (Private)
     # ======================================================================
-    
-    # ----------------------------------------------------------------------------
-    # CHANGE 3: Add new method (after _calculate_next_candles, around line 350)
-    # ----------------------------------------------------------------------------
+
     
     def _update_regime_for_timeframes(self, closed_timeframes: List[str]) -> None:
             """

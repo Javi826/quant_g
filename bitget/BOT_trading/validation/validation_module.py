@@ -138,21 +138,6 @@ def validate_settings():
     if validation_s5_errors == 0:
         logger.info("Val S5: BASE_URL uses HTTPS")
     
-    # ========================================================================
-    # Val S6: Account strategies YAML files exist
-    # ========================================================================
-    validation_s6_errors = 0
-    import os
-    config_dir = os.path.dirname(os.path.abspath(__file__)).replace('/validation', '/config')
-    
-    for account_num in ACCOUNTS.keys():
-        yaml_file = os.path.join(config_dir, f'strategies_{account_num}.yaml')
-        if not os.path.exists(yaml_file):
-            errors.append(f"Account {account_num} missing YAML: strategies_{account_num}.yaml")
-            validation_s6_errors += 1
-    
-    if validation_s6_errors == 0:
-        logger.info("Val S6: All accounts have strategy YAML files")
     
     # ========================================================================
     # Val S7: SL percentage limits
