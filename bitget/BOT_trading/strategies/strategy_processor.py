@@ -173,15 +173,29 @@ class StrategyProcessor:
             
             # Place order - USE ADJUSTED AMOUNT
             logger.debug(f"Placing order for {sig['symbol']} with ${order_amount:.2f}")
-            resp_order = place_order(
+            order_result = place_order(
                 symbol=sig['symbol'],
                 direction=strat['direction'],
                 usdt_amount=order_amount,  
                 send_request_func=self.send_request
             )
             
-            if resp_order is None:
+            # =========================================================================
+            # BLOQUE 2: NUEVO - EXTRAER DATOS DEL DICT RETORNADO
+            # =========================================================================
+            if order_result is None:
                 logger.error(f"Error-Failed to place order for {sig['symbol']}")
+                continue
+            
+            # Extraer datos de ejecución
+            resp_order = order_result.get('resp_order')  # Dict original del broker
+            order_price_open = order_result.get('order_price')
+            order_ts_open = order_result.get('order_ts')
+            exec_ts_open = order_result.get('exec_ts')
+            
+            # Validar que resp_order existe
+            if resp_order is None:
+                logger.error(f"Error-Invalid order result for {sig['symbol']}")
                 continue
             
             # Extract order data - CLONED LOGIC
@@ -228,7 +242,10 @@ class StrategyProcessor:
                     regime_family=regime_family,
                     regime_multiplier=regime_multiplier,
                     market_direction=direction,
-                    direction_multiplier=direction_multiplier
+                    direction_multiplier=direction_multiplier,
+                    order_price_open=order_price_open,      # NUEVO
+                    order_ts_open=order_ts_open,            # NUEVO
+                    exec_ts_open=exec_ts_open               # NUEVO
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:

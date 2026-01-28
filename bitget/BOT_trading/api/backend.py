@@ -20,7 +20,7 @@ from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 
 import psycopg2
-from analytics.metrics import MetricsCalculator
+from api.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
@@ -229,62 +229,7 @@ class DashboardServer:
             return match.group(1).zfill(2)
         
         return '??'
-    
-    @staticmethod
-    def _calculate_r_squared(equity_values):
-        """
-        Calcula R² de la equity curve vs línea recta.
-        Mide consistencia del crecimiento.
         
-        R² = 1.0 → Línea recta perfecta (ideal)
-        R² > 0.9 → Muy consistente
-        R² = 0.7-0.9 → Buena consistencia
-        R² < 0.7 → Equity errática
-        
-        Args:
-            equity_values: Lista o array de valores de equity
-        
-        Returns:
-            float: R² entre 0 y 1
-        """
-        if len(equity_values) < 2:
-            return 0.0
-        
-        try:
-            y = np.array(equity_values).reshape(-1, 1)
-            X = np.arange(len(y)).reshape(-1, 1)
-            
-            # Calcular R² manualmente (sin sklearn para evitar dependencia)
-            y_mean = np.mean(y)
-            
-            # Regresión lineal simple: y = mx + b
-            X_mean = np.mean(X)
-            numerator = np.sum((X - X_mean) * (y - y_mean))
-            denominator = np.sum((X - X_mean) ** 2)
-            
-            if denominator == 0:
-                return 0.0
-            
-            slope = numerator / denominator
-            intercept = y_mean - slope * X_mean
-            
-            # Predicciones
-            y_pred = slope * X + intercept
-            
-            # R²
-            ss_res = np.sum((y - y_pred) ** 2)
-            ss_tot = np.sum((y - y_mean) ** 2)
-            
-            if ss_tot == 0:
-                return 1.0 if ss_res == 0 else 0.0
-            
-            r_squared = 1 - (ss_res / ss_tot)
-            
-            return round(float(max(0, min(1, r_squared))), 3)
-        except Exception as e:
-            logger.error(f"Error calculating R²: {e}")
-            return 0.0
-    
     def _calculate_capital_allocation(self, num_strategies=None):
         """
         Calcula el capital asignado por estrategia.
@@ -870,13 +815,7 @@ class DashboardServer:
                             capital_assigned=combo_capital,
                             include_profit_pct=True
                         )
-                        
-                        # Calcular R² de la equity curve
-                        daily_profit = metrics.get('daily_profit')
-                        r_squared = 0.0
-                        if daily_profit is not None and not daily_profit.empty and 'equity_usd' in daily_profit.columns:
-                            r_squared = self._calculate_r_squared(daily_profit['equity_usd'].values)
-                        
+                                              
                         combo_numbers = [self._extract_number_from_id(s) for s in combo]
                         combo_str = '+'.join(combo_numbers)
                         
@@ -889,7 +828,7 @@ class DashboardServer:
                             'weekly_win_pct': metrics['weekly_win_pct'],
                             'win_rate': metrics['win_rate'],
                             'max_dd': metrics['max_dd'],
-                            'r_squared': r_squared,
+                            'r_squared': metrics['r_squared'],
                             'sharpe_ratio': metrics['sharpe_ratio']
                         })
                 
@@ -970,31 +909,70 @@ class DashboardServer:
         
         @self.app.route('/api/symbols-analysis')
         def get_symbols_analysis():
-            try:
-                df = self._load_trades_dataframe()
+            import traceback
+            try:              
+                df = self._load_trades_dataframe()      
                 if df is None:
+                    print("ERROR: DataFrame is None")
                     return jsonify([])
+                
+                # Check if slippage columns exist
+                has_slippage_data = 'ORDER_PRICE_OPEN' in df.columns and 'PRICE_ENTRY' in df.columns
                 
                 results = []
                 
                 for symbol in sorted(df['SYMBOL'].unique()):
+                    print(f"Processing symbol: {symbol}")
                     df_symbol = df[df['SYMBOL'] == symbol]
                     
+                    # Existing metrics
                     total_trades = len(df_symbol)
                     positive_trades = len(df_symbol[df_symbol['PROFIT'] > 0])
                     win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
                     total_profit = df_symbol['PROFIT'].sum()
                     avg_profit = total_profit / total_trades if total_trades > 0 else 0
                     
+                    # NEW: Calculate slippage metrics (only if columns exist)
+                    slippage_total = None
+                    slippage_l30 = None
+                    
+                    if has_slippage_data:
+                        df_with_slippage = df_symbol[
+                            df_symbol['ORDER_PRICE_OPEN'].notna() & 
+                            df_symbol['PRICE_ENTRY'].notna()
+                        ].copy()
+                        
+                        # Total slippage
+                        if len(df_with_slippage) > 0:
+                            df_with_slippage['slippage_pct'] = (
+                                (df_with_slippage['PRICE_ENTRY'] - df_with_slippage['ORDER_PRICE_OPEN']) 
+                                / df_with_slippage['ORDER_PRICE_OPEN'] 
+                                * 100
+                            )
+                            slippage_total = df_with_slippage['slippage_pct'].mean()
+                        
+                        # Last 30 trades slippage
+                        if len(df_with_slippage) > 0:
+                            df_last30 = df_with_slippage.tail(30)
+                            if len(df_last30) > 0:
+                                df_last30['slippage_pct'] = (
+                                    (df_last30['PRICE_ENTRY'] - df_last30['ORDER_PRICE_OPEN']) 
+                                    / df_last30['ORDER_PRICE_OPEN'] 
+                                    * 100
+                                )
+                                slippage_l30 = df_last30['slippage_pct'].mean()
+                    
                     results.append({
                         'Symbol': symbol,
                         'Total_Trades': total_trades,
                         'Win_Pct': round(win_pct, 2),
                         'Total_Profit': round(total_profit, 2),
-                        'Avg_Profit': round(avg_profit, 2)
+                        'Avg_Profit': round(avg_profit, 2),
+                        'Slippage_Total': round(slippage_total, 4) if slippage_total is not None else None,
+                        'Slippage_L30': round(slippage_l30, 4) if slippage_l30 is not None else None
                     })
-                
                 return jsonify(results)
+                
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
         
@@ -1088,6 +1066,7 @@ class DashboardServer:
                 capital_per_strategy = self._calculate_capital_allocation(num_strategies_with_trades)
                 capital_assigned = capital_per_strategy * num_selected
                 
+                # DESPUÉS:
                 metrics_data = MetricsCalculator.calculate_all_metrics(
                     df=df,
                     capital_assigned=capital_assigned,
@@ -1095,8 +1074,6 @@ class DashboardServer:
                 )
                 
                 daily_profit = metrics_data['daily_profit']
-                
-                r_squared = 0.0
                 
                 if not daily_profit.empty:
                     daily_profit['date_str'] = daily_profit['date'].astype(str)
@@ -1109,10 +1086,8 @@ class DashboardServer:
                     daily_profit['peak_usd'] = daily_profit['equity_usd'].cummax()
                     daily_profit['drawdown_pct'] = ((daily_profit['peak_usd'] - daily_profit['equity_usd']) / daily_profit['peak_usd']) * 100
                     
-                    # Calcular R²
-                    r_squared = self._calculate_r_squared(daily_profit['equity_usd'].values)
-                    
                     dates = daily_profit['date_str'].tolist()
+
                     equity_pct = [round(val, 2) for val in daily_profit['equity_pct'].tolist()]
                     drawdown_pct = [round(val, 2) for val in daily_profit['drawdown_pct'].tolist()]
                 else:
@@ -1133,7 +1108,7 @@ class DashboardServer:
                     'weekly_win_pct': metrics_data['weekly_win_pct'],
                     'win_rate': metrics_data['win_rate'],
                     'max_dd': metrics_data['max_dd'],
-                    'r_squared': r_squared,
+                    'r_squared': metrics_data['r_squared'],
                     'sharpe_ratio': metrics_data['sharpe_ratio']
                 })
                 
@@ -1740,6 +1715,100 @@ class DashboardServer:
                 logger.error(f"Error getting exposure history: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
             
+        @self.app.route('/api/quality/drift')
+        def get_quality_drift():
+            """
+            Get drift analysis for all strategies.
+            
+            Returns:
+                JSON with drift status per strategy
+            """
+            try:
+                from quality_control.analyzer import analyze_drift_status
+                
+                # Load trades from PostgreSQL
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No trades data available',
+                        'data': {}
+                    })
+                
+                # Get strategies config
+                strategies_list = self._get_full_strategies_list_with_numbers()
+                
+                # Filter only ACTIVE and DEPRECATING strategies
+                active_strategies = [
+                    s for s in strategies_list 
+                    if s['status'] in ('ACTIVE', 'DEPRECATING')
+                ]
+                
+                # Analyze drift
+                drift_results = analyze_drift_status(df, active_strategies)
+                
+                return jsonify({
+                    'success': True,
+                    'data': drift_results
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in drift analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'data': {}
+                }), 500
+        
+        @self.app.route('/api/quality/execution')
+        def get_quality_execution():
+            """
+            Get execution quality analysis for all strategies.
+            
+            Returns:
+                JSON with slippage and latency metrics per strategy
+            """
+            try:
+                from quality_control.analyzer import analyze_execution_quality
+                
+                # Load trades from PostgreSQL
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No trades data available',
+                        'data': {}
+                    })
+                
+                # Get strategies config
+                strategies_list = self._get_full_strategies_list_with_numbers()
+                
+                # Filter only ACTIVE and DEPRECATING strategies
+                active_strategies = [
+                    s for s in strategies_list 
+                    if s['status'] in ('ACTIVE', 'DEPRECATING')
+                ]
+                
+                # Analyze execution quality
+                execution_results = analyze_execution_quality(df, active_strategies)
+                
+                return jsonify({
+                    'success': True,
+                    'data': execution_results
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in execution quality analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'data': {}
+                }), 500
+            
         @self.app.route('/api/btc/snapshot')
         def capture_btc_snapshot():
             """
@@ -1813,6 +1882,7 @@ class DashboardServer:
                     'success': False,
                     'error': str(e)
                 }), 500
+            
             
     # ==========================================================================
     # DAILY SNAPSHOT SCHEDULER

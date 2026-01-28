@@ -137,27 +137,59 @@ class MetricsCalculator:
         return 0.0
     
     @staticmethod
-    def ulcer_index(equity_series: pd.Series) -> float:
+    def calculate_r_squared(equity_values):
         """
-        Calcula el Ulcer Index.
+        Calcula R² de la equity curve vs línea recta.
+        Mide consistencia del crecimiento.
         
-        Ulcer Index = sqrt(mean(drawdown_pct^2))
+        R² = 1.0 → Línea recta perfecta (ideal)
+        R² > 0.9 → Muy consistente
+        R² = 0.7-0.9 → Buena consistencia
+        R² < 0.7 → Equity errática
         
         Args:
-            equity_series: Serie de pandas con valores de equity
+            equity_values: Lista o array de valores de equity
         
         Returns:
-            Ulcer Index redondeado a 2 decimales
-            Retorna 0 si no hay datos
+            float: R² entre 0 y 1
         """
-        if len(equity_series) == 0:
+        if len(equity_values) < 2:
             return 0.0
         
-        peaks = equity_series.cummax()
-        drawdown_pct = ((equity_series - peaks) / peaks) * 100
-        ulcer = np.sqrt((drawdown_pct ** 2).mean())
-        
-        return round(ulcer, 2)
+        try:
+            y = np.array(equity_values).reshape(-1, 1)
+            X = np.arange(len(y)).reshape(-1, 1)
+            
+            # Calcular R² manualmente (sin sklearn para evitar dependencia)
+            y_mean = np.mean(y)
+            
+            # Regresión lineal simple: y = mx + b
+            X_mean = np.mean(X)
+            numerator = np.sum((X - X_mean) * (y - y_mean))
+            denominator = np.sum((X - X_mean) ** 2)
+            
+            if denominator == 0:
+                return 0.0
+            
+            slope = numerator / denominator
+            intercept = y_mean - slope * X_mean
+            
+            # Predicciones
+            y_pred = slope * X + intercept
+            
+            # R²
+            ss_res = np.sum((y - y_pred) ** 2)
+            ss_tot = np.sum((y - y_mean) ** 2)
+            
+            if ss_tot == 0:
+                return 1.0 if ss_res == 0 else 0.0
+            
+            r_squared = 1 - (ss_res / ss_tot)
+            
+            return round(float(max(0, min(1, r_squared))), 3)
+        except Exception as e:
+            logger.error(f"Error calculating R²: {e}")
+            return 0.0
     
     @staticmethod
     def total_profit_usd(df: pd.DataFrame) -> float:
@@ -212,7 +244,7 @@ class MetricsCalculator:
                 'weekly_win_pct': 0.0,
                 'win_rate': 0.0,
                 'max_dd': 0.0,
-                'ulcer_index': 0.0,
+                'r_squared': 0.0,
                 'sharpe_ratio': 0.0,
                 'daily_profit': pd.DataFrame()
             }
@@ -223,7 +255,7 @@ class MetricsCalculator:
         # 1. Ordenar por fecha de cierre
         df_sorted = df.sort_values('CLOSE_AT').copy()
         
-        # 2. Equity trade-by-trade (para Max DD preciso y Ulcer Index)
+        # 2. Equity trade-by-trade (para Max DD y R² precisos)
         cumulative_profit = df_sorted['PROFIT'].cumsum()
         equity_trades = capital_assigned + cumulative_profit
         
@@ -242,8 +274,8 @@ class MetricsCalculator:
         # 6. Max DD (desde equity trade-by-trade para máxima precisión)
         max_dd = cls.max_drawdown_from_equity(equity_trades)
         
-        # 7. Ulcer Index (desde equity trade-by-trade)
-        ulcer = cls.ulcer_index(equity_trades)
+        # 7. R²
+        r_squared = cls.calculate_r_squared(equity_trades.values)
         
         # 8. Número de trades
         num_trades = len(df)
@@ -260,9 +292,9 @@ class MetricsCalculator:
             'weekly_win_pct': cls.weekly_win_percentage(df),
             'win_rate': win_rate,
             'max_dd': max_dd,
-            'ulcer_index': ulcer,
+            'r_squared': r_squared,
             'sharpe_ratio': cls.sharpe_ratio(daily_returns),
-            'daily_profit': daily_profit  # ← Para Curves (gráficas)
+            'daily_profit': daily_profit
         }
         
         if include_profit_pct:

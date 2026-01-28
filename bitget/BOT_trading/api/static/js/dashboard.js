@@ -817,6 +817,7 @@ function switchTab(tabName) {
     if (tabName === 'equity') loadEquityTab();
     if (tabName === 'regime') loadRegimeData();
     if (tabName === 'risk') loadRiskTab();
+    if (tabName === 'quality') loadQualityTab();
 }
 
 function switchEquitySubTab(subTabName) {
@@ -1959,11 +1960,40 @@ async function loadSymbolsAnalysis() {
         
         const sortedData = data.sort((a, b) => b.Win_Pct - a.Win_Pct);
         
-        const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
+        function formatSlippage(value) {
+            if (value === null || value === undefined) {
+                return '<span style="color: #6b7280;">N/A</span>';
+            }
+            
+            const absValue = Math.abs(value);
+            let color;
+            
+            if (absValue < 0.05) {
+                color = '#3fb950';
+            } else if (absValue < 0.1) {
+                color = '#d29922';
+            } else {
+                color = '#f85149';
+            }
+            
+            const prefix = value >= 0 ? '+' : '';
+            return `<span style="color: ${color}; font-weight: 600;">${prefix}${value.toFixed(4)}%</span>`;
+        }
+        
+        const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th><th>Slippage Total</th><th>Slippage L30</th></tr></thead><tbody>' +
             sortedData.map(s => {
                 const profitClass = s.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
                 const avgProfitClass = s.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + s.Symbol + '</td><td>' + s.Total_Trades + '</td><td>' + s.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_Profit >= 0 ? '+' : '') + '$' + s.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (s.Avg_Profit >= 0 ? '+' : '') + '$' + s.Avg_Profit.toFixed(2) + '</td></tr>';
+                
+                return '<tr>' +
+                    '<td>' + s.Symbol + '</td>' +
+                    '<td>' + s.Total_Trades + '</td>' +
+                    '<td>' + s.Win_Pct.toFixed(1) + '%</td>' +
+                    '<td class="' + profitClass + '">' + (s.Total_Profit >= 0 ? '+' : '') + '$' + s.Total_Profit.toFixed(2) + '</td>' +
+                    '<td class="' + avgProfitClass + '">' + (s.Avg_Profit >= 0 ? '+' : '') + '$' + s.Avg_Profit.toFixed(2) + '</td>' +
+                    '<td>' + formatSlippage(s.Slippage_Total) + '</td>' +
+                    '<td>' + formatSlippage(s.Slippage_L30) + '</td>' +
+                    '</tr>';
             }).join('') +
             '</tbody></table>';
         container.innerHTML = html;
@@ -2812,6 +2842,187 @@ async function loadRiskTab() {
         console.error('Error loading risk tab:', error);
     }
 }
+
+// =============================================================================
+// QUALITY CONTROL TAB
+// =============================================================================
+
+async function loadQualityTab() {
+    try {
+        // Load drift analysis
+        const driftRes = await fetch('/api/quality/drift');
+        const driftData = await driftRes.json();
+        
+        if (driftData.success) {
+            renderDriftTable(driftData.data);
+        } else {
+            document.getElementById('drift-table-container').innerHTML = 
+                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
+                (driftData.error || 'Error loading drift data') + 
+                '</div>';
+        }
+        
+        // Load execution quality
+        const execRes = await fetch('/api/quality/execution');
+        const execData = await execRes.json();
+        
+        if (execData.success) {
+            renderExecutionTable(execData.data);
+        } else {
+            document.getElementById('execution-table-container').innerHTML = 
+                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
+                (execData.error || 'Error loading execution data') + 
+                '</div>';
+        }
+        
+    } catch (error) {
+        console.error('Error loading quality tab:', error);
+        document.getElementById('drift-table-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+        document.getElementById('execution-table-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+function renderDriftTable(data) {
+    const container = document.getElementById('drift-table-container');
+    
+    if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+        return;
+    }
+    
+    // Sort by strategy ID
+    const sortedStrategies = Object.keys(data).sort();
+    
+    let html = '<table><thead><tr>' +
+            '<th>#</th>' +
+            '<th>Strategy</th>' +
+            '<th>Status</th>' +
+            '<th>WinRate_100_L20</th>' +
+            '<th>WinRate_100</th>' +
+            '<th>P5_Ref</th>' +
+            '<th>P50_Ref</th>' +
+            '<th>Avg_Profit_100</th>' +
+            '<th>Counter</th>' +
+            '<th>Total Trades</th>' +
+            '</tr></thead><tbody>';
+    
+    sortedStrategies.forEach((strategyId, index) => {
+        const strat = data[strategyId];
+        const num = String(index + 1).padStart(2, '0');
+        
+        // Status color
+        let statusColor = '#8b949e';
+        let statusText = strat.status;
+        
+        if (strat.status === 'HEALTHY') {
+            statusColor = '#3fb950';
+        } else if (strat.status === 'WARNING') {
+            statusColor = '#d29922';
+        } else if (strat.status === 'DANGER') {
+            statusColor = '#f85149';
+        }
+        
+        // Avg profit color
+        const avgProfitColor = strat.avg_profit_100 >= 0 ? '#3fb950' : '#f85149';
+        const avgProfitPrefix = strat.avg_profit_100 >= 0 ? '+$' : '$';
+        
+        // Counter color (red if > 0)
+        const counterColor = strat.counter > 0 ? '#f85149' : '#c9d1d9';
+        
+        html += '<tr>' +
+            '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+            '<td>' + strategyId + '</td>' +
+            '<td style="color: ' + statusColor + '; font-weight: 700; text-transform: uppercase;">' + statusText + '</td>' +
+            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.winrate_100 !== null ? strat.winrate_100.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.p5_reference !== null ? strat.p5_reference.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.p50_reference !== null ? strat.p50_reference.toFixed(1) + '%' : '-') + '</td>' +
+            '<td style="color: ' + avgProfitColor + ';">' + 
+                (strat.avg_profit_100 !== null ? avgProfitPrefix + strat.avg_profit_100.toFixed(2) : '-') + 
+            '</td>' +
+            '<td style="color: ' + counterColor + '; font-weight: 600;">' + strat.counter + '</td>' +
+            '<td>' + strat.total_trades + '</td>' +
+            '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function renderExecutionTable(data) {
+    const container = document.getElementById('execution-table-container');
+    
+    if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+        return;
+    }
+    
+    // Sort by strategy ID
+    const sortedStrategies = Object.keys(data).sort();
+    
+    let html = '<table><thead><tr>' +
+        '<th>#</th>' +
+        '<th>Strategy</th>' +
+        '<th>Total Trades</th>' +
+        '<th>Avg Slippage</th>' +
+        '<th>Status</th>' +
+        '<th>Avg Latency</th>' +
+        '<th>Status</th>' +
+        '</tr></thead><tbody>';
+    
+    sortedStrategies.forEach((strategyId, index) => {
+        const strat = data[strategyId];
+        const num = String(index + 1).padStart(2, '0');
+        
+        // Slippage status color
+        let slippageColor = '#3fb950'; // OK
+        if (strat.slippage_status === 'WARNING') {
+            slippageColor = '#d29922';
+        } else if (strat.slippage_status === 'CRITICAL') {
+            slippageColor = '#f85149';
+        } else if (strat.slippage_status === 'NO_DATA') {
+            slippageColor = '#8b949e';
+        }
+        
+        // Latency status color
+        let latencyColor = '#3fb950'; // OK
+        if (strat.latency_status === 'WARNING') {
+            latencyColor = '#d29922';
+        } else if (strat.latency_status === 'CRITICAL') {
+            latencyColor = '#f85149';
+        } else if (strat.latency_status === 'NO_DATA') {
+            latencyColor = '#8b949e';
+        }
+        
+        // Format values
+        const slippageText = strat.avg_slippage_pct !== null ? 
+            (strat.avg_slippage_pct >= 0 ? '+' : '') + strat.avg_slippage_pct.toFixed(4) + '%' : 
+            '-';
+        
+        const latencyText = strat.avg_latency_sec !== null ? 
+            strat.avg_latency_sec.toFixed(3) + 's' : 
+            '-';
+        
+        html += '<tr>' +
+            '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+            '<td>' + strategyId + '</td>' +
+            '<td>' + strat.total_trades + '</td>' +
+            '<td>' + slippageText + '</td>' +
+            '<td style="color: ' + slippageColor + '; font-weight: 700; text-transform: uppercase;">' + strat.slippage_status + '</td>' +
+            '<td>' + latencyText + '</td>' +
+            '<td style="color: ' + latencyColor + '; font-weight: 700; text-transform: uppercase;">' + strat.latency_status + '</td>' +
+            '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// =============================================================================
+// END QUALITY CONTROL TAB
+// =============================================================================
 
 function updateRiskCards(metrics) {
     const grossPct = metrics.gross_exposure_pct;

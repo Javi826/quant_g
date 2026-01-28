@@ -54,7 +54,9 @@ def configure_log_path(trades_log_path: str) -> None:
 def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbol, 
                         direction, usdt_amount, size_val, entry_price, close_price,
                         profit, fee, profit_pct, reason, regime_family, regime_multiplier,
-                        market_direction, direction_multiplier):
+                        market_direction, direction_multiplier,
+                        order_price_open, order_ts_open, exec_ts_open,      # ← AÑADIR
+                        order_price_close, order_ts_close, exec_ts_close):
     """
     Write trade to PostgreSQL (dual-write hook).
     
@@ -84,13 +86,16 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
                 account, open_at, close_at, duration_days, strategy, symbol, direction,
                 usdt_amount, size, price_entry, price_close, profit, fee,
                 profit_pct, reason_out, regime_family, regime_multiplier,
-                market_direction, direction_multiplier
+                market_direction, direction_multiplier,order_price_open, order_ts_open, exec_ts_open,
+                order_price_close, order_ts_close, exec_ts_close
             ) VALUES (
                 %(account)s, %(open_at)s, %(close_at)s, %(duration_days)s, %(strategy)s,
                 %(symbol)s, %(direction)s, %(usdt_amount)s, %(size)s,
                 %(price_entry)s, %(price_close)s, %(profit)s, %(fee)s,
                 %(profit_pct)s, %(reason_out)s, %(regime_family)s,
-                %(regime_multiplier)s, %(market_direction)s, %(direction_multiplier)s
+                %(regime_multiplier)s, %(market_direction)s, %(direction_multiplier)s,
+                %(order_price_open)s, %(order_ts_open)s, %(exec_ts_open)s,      # ← AÑADIR
+                %(order_price_close)s, %(order_ts_close)s, %(exec_ts_close)s  
             )
         """)
         
@@ -113,7 +118,14 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
             'regime_family': regime_family,
             'regime_multiplier': round(regime_multiplier, 1),
             'market_direction': market_direction,
-            'direction_multiplier': round(direction_multiplier, 1)
+            'direction_multiplier': round(direction_multiplier, 1),
+            # ← AÑADIR ESTOS 6:
+            'order_price_open': order_price_open,
+            'order_ts_open': order_ts_open,
+            'exec_ts_open': exec_ts_open,
+            'order_price_close': order_price_close,
+            'order_ts_close': order_ts_close,
+            'exec_ts_close': exec_ts_close
         })
         
         conn.commit()
@@ -143,7 +155,14 @@ def log_closed_position(opened_at,
                        regime_family: Optional[str] = None,
                        regime_multiplier: Optional[float] = None,
                        market_direction: Optional[str] = None,            
-                       direction_multiplier: Optional[float] = None) -> None:  
+                       direction_multiplier: Optional[float] = None,
+                       order_price_open: Optional[float] = None,
+                        order_ts_open: Optional[float] = None,
+                        exec_ts_open: Optional[float] = None,
+                        order_price_close: Optional[float] = None,
+                        order_ts_close: Optional[float] = None,
+                        exec_ts_close: Optional[float] = None
+                       ) -> None:  
     """
     Log a closed position to Excel file.
     
@@ -259,7 +278,13 @@ def log_closed_position(opened_at,
             'REGIME_FAMILY': regime_family if regime_family else 'unknown',
             'REGIME_MULTIPLIER': round(regime_multiplier, 1) if regime_multiplier is not None else 1.0,
             'MARKET_DIRECTION': market_direction if market_direction else 'unknown',
-            'DIRECTION_MULTIPLIER': round(direction_multiplier, 1) if direction_multiplier is not None else 1.0  
+            'DIRECTION_MULTIPLIER': round(direction_multiplier, 1) if direction_multiplier is not None else 1.0,
+            'ORDER_PRICE_OPEN': order_price_open,
+            'ORDER_TS_OPEN': order_ts_open,
+            'EXEC_TS_OPEN': exec_ts_open,
+            'ORDER_PRICE_CLOSE': order_price_close,
+            'ORDER_TS_CLOSE': order_ts_close,
+            'EXEC_TS_CLOSE': exec_ts_close
         }
 
         # Append to Excel
@@ -285,7 +310,9 @@ def log_closed_position(opened_at,
             regime_family if regime_family else 'unknown',
             regime_multiplier if regime_multiplier is not None else 1.0,
             market_direction if market_direction else 'unknown',
-            direction_multiplier if direction_multiplier is not None else 1.0
+            direction_multiplier if direction_multiplier is not None else 1.0,
+            order_price_open, order_ts_open, exec_ts_open,              # ← AÑADIR
+            order_price_close, order_ts_close, exec_ts_close  
         )
 
         # Enhanced logging with regime info

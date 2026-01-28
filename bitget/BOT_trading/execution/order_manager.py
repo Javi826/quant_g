@@ -321,23 +321,6 @@ def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[in
     logger.info("INF-Order placed successfully on retry")
     return code_order, resp_order
 
-# =============================================================================
-# def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[int], Optional[Dict]]:
-#     """Place market order via REST API."""
-#     code_order, resp_order = send_request_func(
-#         "POST", 
-#         "/api/v2/mix/order/place-order", 
-#         body=body_order
-#     )
-#     
-#     if code_order != 200 or resp_order.get("code") != "00000":
-#         logger.error("Error-order:", resp_order)
-#         return None, None
-#     
-#     return code_order, resp_order
-# =============================================================================
-
-
 def extract_filled_amount(resp_order: Dict, size_q: Decimal) -> Decimal:
     """Extract filled amount from order response."""
     filled_amount = Decimal("0")
@@ -389,6 +372,11 @@ def place_order(symbol: str,
     """
     if send_request_func is None:
         raise ValueError("Error-Send request error.")
+        
+    # =========================================================================
+    # BLOQUE 1: CÓDIGO ORIGINAL (NO SE TOCA)
+    # =========================================================================
+    # Get current price via WebSocket
 
     # Get current price via WebSocket
     last_price, _ = fetch_ticker_ws(symbol)
@@ -413,7 +401,20 @@ def place_order(symbol: str,
     # Place order via REST API
     body_order = build_order_body(symbol, product_type, margin_mode, margin_coin, 
                                    size_q, side, client_oid)
+    # =========================================================================
+    # BLOQUE 2: NUEVO - CAPTURA TIMESTAMP PRE-ORDEN
+    # =========================================================================
+    order_ts = time.time()  # Timestamp justo antes de enviar
+    # =========================================================================
+    # BLOQUE 3: ENVÍO DE ORDEN
+    # =========================================================================
+
     code_order, resp_order = place_market_order(send_request_func, body_order)
+    
+    # =========================================================================
+    # BLOQUE 4: NUEVO - CAPTURA TIMESTAMP POST-EJECUCIÓN
+    # =========================================================================
+    exec_ts = time.time()  # Timestamp justo después de ejecución
     
     if code_order is None:
         logger.warning(f"WAR-:last_price={last_price}, price_tick={price_tick}, "
@@ -433,7 +434,14 @@ def place_order(symbol: str,
            f"Price: {exec_price}")
        
 
-    return resp_order
+    return {
+        'success': True,
+        'resp_order': resp_order,           # Original (backward compatibility)
+        'order_price': float(last_price),   # Precio PRE-orden
+        'order_ts': order_ts,                # Timestamp PRE-orden
+        'exec_ts': exec_ts,                  # Timestamp ejecución
+        'filled_amount': float(filled_amount) # Amount ejecutado
+    }
 
 
 # ==========================================================================
@@ -563,8 +571,24 @@ def close_position(symbol: str,
         elif reason == "TIMEOUT":
             logger.info(f"TIMEOUT for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) "
                   f"at {datetime.now().strftime('%H:%M')}")
-
+       
+        # =========================================================================
+        # BLOQUE 2: NUEVO - CAPTURA PRECIO Y TIMESTAMP PRE-ORDEN
+        # =========================================================================
+        order_price_close = None
+        order_ts_close = None
+        
+        try:
+            # Get current market price via WebSocket
+            current_price = get_current_price(symbol, max_cache_age=0.5)
+            order_price_close = float(current_price)
+        except Exception as e:
+            logger.warning(f"WAR-Could not capture order_price_close for {symbol}: {e}")
+        
+        order_ts_close = time.time()  # Timestamp just before sending order       
         code, resp = send_request_func("POST", "/api/v2/mix/order/place-order", body=body)
+        exec_ts_close = time.time()
+        
         time.sleep(0.05)
         
         if code == 200 and resp.get("code") == "00000":
@@ -599,8 +623,15 @@ def close_position(symbol: str,
                             bot_state=bot_state,
                             regime_family=position_data.get('regime_family', 'unknown'),
                             regime_multiplier=position_data.get('regime_multiplier', 1.0),
-                            market_direction=position_data.get('market_direction', 'unknown'),              # ← NUEVO
-                            direction_multiplier=position_data.get('direction_multiplier', 1.0)  
+                            market_direction=position_data.get('market_direction', 'unknown'),              
+                            direction_multiplier=position_data.get('direction_multiplier', 1.0),
+                            order_price_open=position_data.get('order_price_open'),
+                            order_ts_open=position_data.get('order_ts_open'),
+                            exec_ts_open=position_data.get('exec_ts_open'),
+                            # ← NUEVOS: Datos de cierre (capturados aquí)
+                            order_price_close=order_price_close,
+                            order_ts_close=order_ts_close,
+                            exec_ts_close=exec_ts_close
                         )
             
             return True
@@ -627,7 +658,15 @@ def close_position(symbol: str,
                             regime_family=position_data.get('regime_family', 'unknown'),
                             regime_multiplier=position_data.get('regime_multiplier', 1.0),
                             market_direction=position_data.get('market_direction', 'unknown'),              # ← NUEVO
-                            direction_multiplier=position_data.get('direction_multiplier', 1.0)
+                            direction_multiplier=position_data.get('direction_multiplier', 1.0),
+                            # ← NUEVOS: Datos de apertura (vienen de position_data)
+                            order_price_open=position_data.get('order_price_open'),
+                            order_ts_open=position_data.get('order_ts_open'),
+                            exec_ts_open=position_data.get('exec_ts_open'),
+                            # ← NUEVOS: Datos de cierre (capturados aquí)
+                            order_price_close=order_price_close,
+                            order_ts_close=order_ts_close,
+                            exec_ts_close=exec_ts_close
                         )
                 return True  # Remove from open_positions
             return False

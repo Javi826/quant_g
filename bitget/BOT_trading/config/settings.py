@@ -30,14 +30,6 @@ ACCOUNTS = {
     }
 }
 
-LEVERAGE = 10
-# ==========================================================================
-# RISK CONTROL SETTINGS
-# ==========================================================================
-RISK_LIMITS = {
-    'max_gross_exposure_pct': 60.0,  # Maximum gross exposure (% of available capital)
-    'max_net_exposure_pct': 20.0     # Maximum net exposure (% of available capital) - future
-}
 # ==========================================================================
 # MARKET REGIME SETTINGS
 # ==========================================================================
@@ -84,6 +76,28 @@ DIRECTION_GENERAL = {
     'dwtrend': 1.0
 }
 
+# ==========================================================================
+# RISK CONTROL SETTINGS
+# ==========================================================================
+RISK_LIMITS = {
+    'max_gross_exposure_pct': 60.0,  # Maximum gross exposure (% of available capital)
+    'max_net_exposure_pct': 20.0     # Maximum net exposure (% of available capital) - future
+}
+LEVERAGE = 10
+# =============================================================================
+# QUALITY CONTROL PARAMETERS
+# =============================================================================
+
+# Drift detection
+DRIFT_WINDOW_SIZE = 100
+DRIFT_CHECK_INTERVAL = 20
+
+# Execution quality
+EXECUTION_WINDOW_SIZE = 20
+SLIPPAGE_WARNING_PCT = 0.05
+SLIPPAGE_CRITICAL_PCT = 0.10
+LATENCY_WARNING_SEC = 2.0
+LATENCY_CRITICAL_SEC = 3.0
 # ==========================================================================
 # STRATEGY VALIDATION CONFIGURATION
 # ==========================================================================

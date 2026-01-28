@@ -223,6 +223,7 @@
             <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
             <button class="tab-btn" onclick="switchTab('regime')">Market Regime</button>
             <button class="tab-btn" onclick="switchTab('risk')">Risk Control</button>
+            <button class="tab-btn" onclick="switchTab('quality')">Quality Control</button>
             <button class="tab-btn" onclick="switchTab('config')">Configuration</button>
             <div id="live-clock" style="margin-left: auto; color: #58a6ff; font-size: 20px; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 1px;">--:--:--</div>
         </div>
@@ -755,8 +756,54 @@
             </div>
         </div>
         
-        <div id="tab-config" class="tab-content">
+        <div id="tab-quality" class="tab-content">
+            <div class="content-section">
+                <h2>Quality Control</h2>
+                
+                <!-- Tabla 1: Strategy Drift Analysis -->
+                <div class="config-card">
+                    <h3>Strategy Drift Analysis</h3>
+                    <div id="drift-table-container">
+                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
+                        <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
+                            <strong>STATUS:</strong><br>
+                            - HEALTHY: WinRate >= P50 (median performance expected)<br>
+                            - WARNING: WinRate < P50 (below median, informational only)<br>
+                            - DANGER: (WinRate < P5 AND Avg Profit < 0) confirmed in 2 consecutive checks<br><br>
+                            <strong>COUNTER:</strong> Tracks consecutive checks where DANGER condition is met. Resets to 0 if condition improves.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tabla 2: Execution Quality by Strategy -->
+                <div class="config-card" style="margin-top: 20px;">
+                    <h3>Execution Quality by Strategy</h3>
+                    <div id="execution-table-container">
+                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
+                        <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
+                            <strong>SLIPPAGE:</strong> Average difference between order price and execution price (last 20 trades)<br>
+                            - OK: < 0.05% | WARNING: 0.05% - 0.1% | CRITICAL: > 0.1%<br><br>
+                            <strong>LATENCY:</strong> Average time between order submission and execution confirmation (last 20 trades)<br>
+                            - OK: < 2 seconds | WARNING: 2-3 seconds | CRITICAL: > 3 seconds
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
+        
+        
+        <div id="tab-config" class="tab-content">        
             <div class="content-section">
                 <h2>Bot Configuration & Status</h2>
                 

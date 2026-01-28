@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_flag ===
+# === FILE: M_montecarlo_dbott ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -16,21 +16,20 @@ from utils.ZX_utils import filter_symbols, final_prints
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results, get_n_obs
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from signals.add_signals_flag import flag_long
-from signals.add_signals_flag import flag_short
+from signals.add_signals_dbott import dbott_long
 
 
 DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
-STRATEGY            = "flag_pattern"
+STRATEGY            = "dbott_pattern"
 MY_SYMBOLS          = False
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 
@@ -38,90 +37,20 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST           = [0]  
-LOOKBACK_LIST             = [5,10,15,20]
-IMPULSE_LIST              = [3,5,7,10]
-FLAG_LIST                 = [30,40,50,60,70]
-MA_PERIOD_LIST            = [50]
+SELL_AFTER_LIST    = [0]  
+LOOKBACK_LIST      = [30,40,50,60]
+TOLERANCE_LIST     = [3,5,7,10]
+MIN_DISTANCE_LIST  = [3,5,7]
+MA_PERIOD_LIST     = [50]
 
-TP_PCT_LIST               = [2,3,4,5]
-SL_PCT_LIST               = [7,8,9,10]
-
-# =============================================================================
-# #4HLONG-9(2025) 
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [15]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [40]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [4]
-# SL_PCT_LIST               = [10]
-# =============================================================================
-
-# =============================================================================
-# #4HSHORT-23(2025) 
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [10]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [50]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [3]
-# SL_PCT_LIST               = [9]
-# =============================================================================
-
-# =============================================================================
-# #1HLONG-3(2025) 
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [20]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [40]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [2]
-# SL_PCT_LIST               = [10]
-# =============================================================================
-
-#1HSHORT-9 
-# =============================================================================
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [20]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [60]
-# MA_PERIOD_LIST            = [25]
-# 
-# TP_PCT_LIST               = [2]
-# SL_PCT_LIST               = [8]
-# =============================================================================
-
-# =============================================================================
-# #6Hutclong 9  
-# SELL_AFTER_LIST    = [0]  
-# LOOKBACK_LIST      = [20]
-# IMPULSE_LIST       = [3]
-# FLAG_MAX_LIST      = [40]
-# MA_PERIOD_LIST     = [50]
-# 
-# TP_PCT_LIST        = [4]
-# SL_PCT_LIST        = [10]
-# 
-# #6Hutcshort 9  
-# SELL_AFTER_LIST    = [0]  
-# LOOKBACK_LIST      = [10]
-# IMPULSE_LIST       = [3]
-# FLAG_MAX_LIST      = [30]
-# MA_PERIOD_LIST     = [50]
-# 
-# TP_PCT_LIST        = [4]
-# SL_PCT_LIST        = [10]
-# =============================================================================
+TP_PCT_LIST        = [2,3,4,5]
+SL_PCT_LIST        = [7,8,9,10]
 
 param_names = [
     'SELL_AFTER',
     'LOOKBACK',
-    'IMPULSE',
-    'FLAG',
+    'TOLERANCE',
+    'MIN_DISTANCE',
     'MA_PERIOD',
     'TP_PCT',
     'SL_PCT'
@@ -153,11 +82,11 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = flag_short(
+            signals = dbott_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
-                impulse=param_dict.get('IMPULSE'),
-                flag=param_dict.get('FLAG'),
+                tolerance=param_dict.get('TOLERANCE'),
+                min_distance=param_dict.get('MIN_DISTANCE'),
                 ma_period=param_dict.get('MA_PERIOD'),
                 live_trading=False
             )
