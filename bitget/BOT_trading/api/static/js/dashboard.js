@@ -1154,7 +1154,7 @@ function renderSymbolsView(container, positions) {
                 '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
                 '<td style="color: #58a6ff; font-weight: 600;">' + data.symbol + '</td>' +
                 '<td class="' + sideClass + '">' + data.side + '</td>' +
-                '<td>' + data.totalSize.toFixed(4) + '</td>' +
+                '<td>' + data.totalSize.toFixed(2) + '</td>' +
                 '<td style="color: #c9d1d9;">' + stratDisplay + '</td>' +
                 '<td class="' + pnlClass + '">' + (data.totalPnl >= 0 ? '+' : '') + '$' + data.totalPnl.toFixed(2) + '</td>' +
                 '</tr>';
@@ -1178,10 +1178,11 @@ async function loadStrategyAnalysis() {
         
         const sortedData = data.sort((a, b) => a.Strategy.localeCompare(b.Strategy));
         
-        const html = '<table><thead><tr><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>Total %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
-            sortedData.map(s => {
+        const html = '<table><thead><tr><th>#</th><th>Strategy</th><th>First</th><th>Trades</th><th>Win %</th><th>Profit</th><th>Profit %</th><th>Total %</th><th>TP %</th><th>SL %</th><th>TIMEOUT %</th><th>OOM %</th><th>Avg Days</th></tr></thead><tbody>' +
+            sortedData.map((s, index) => {
+                const num = String(index + 1).padStart(2, '0');
                 const profitClass = s.Total_profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + (s.Total_pct >= 0 ? '+' : '') + s.Total_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
+                return '<tr><td style="color: #8b949e; font-weight: 600;">' + num + '</td><td>' + s.Strategy + '</td><td>' + s.date_fo + '</td><td>' + s.Trades_num + '</td><td>' + s.Trades_pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (s.Total_profit >= 0 ? '+' : '') + '$' + s.Total_profit.toFixed(2) + '</td><td class="' + profitClass + '">' + (s.Profit_pct >= 0 ? '+' : '') + s.Profit_pct.toFixed(1) + '%</td><td>' + (s.Total_pct >= 0 ? '+' : '') + s.Total_pct.toFixed(1) + '%</td><td>' + s.TP_pct.toFixed(1) + '%</td><td>' + s.SL_pct.toFixed(1) + '%</td><td>' + s.TIMEOUT_pct.toFixed(1) + '%</td><td>' + s.OOM_pct.toFixed(1) + '%</td><td>' + s.Avg_days.toFixed(2) + '</td></tr>';
             }).join('') +
             '</tbody></table>';
         container.innerHTML = html;
@@ -1968,16 +1969,16 @@ async function loadSymbolsAnalysis() {
             const absValue = Math.abs(value);
             let color;
             
-            if (absValue < 0.05) {
+            if (absValue < 0.2) {
                 color = '#3fb950';
-            } else if (absValue < 0.1) {
+            } else if (absValue < 0.3) {
                 color = '#d29922';
             } else {
                 color = '#f85149';
             }
             
             const prefix = value >= 0 ? '+' : '';
-            return `<span style="color: ${color}; font-weight: 600;">${prefix}${value.toFixed(4)}%</span>`;
+            return `<span style="color: ${color}; font-weight: 600;">${prefix}${value.toFixed(2)}%</span>`;
         }
         
         const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th><th>Slippage Total</th><th>Slippage L30</th></tr></thead><tbody>' +
@@ -2867,7 +2868,7 @@ async function loadQualityTab() {
         const execData = await execRes.json();
         
         if (execData.success) {
-            renderExecutionTable(execData.data);
+            renderExecutionTable(execData.data);  // ← Sin segundo parámetro
         } else {
             document.getElementById('execution-table-container').innerHTML = 
                 '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
@@ -2951,7 +2952,7 @@ function renderDriftTable(data) {
     container.innerHTML = html;
 }
 
-function renderExecutionTable(data) {
+function renderExecutionTable(data) {  // ← Quita parámetro thresholds
     const container = document.getElementById('execution-table-container');
     
     if (!data || Object.keys(data).length === 0) {
@@ -2977,28 +2978,28 @@ function renderExecutionTable(data) {
         const num = String(index + 1).padStart(2, '0');
         
         // Slippage status color
-        let slippageColor = '#3fb950'; // OK
-        if (strat.slippage_status === 'WARNING') {
+        let slippageColor = '#8b949e';
+        if (strat.slippage_status === 'HEALTHY') {
+            slippageColor = '#3fb950';
+        } else if (strat.slippage_status === 'WARNING') {
             slippageColor = '#d29922';
-        } else if (strat.slippage_status === 'CRITICAL') {
+        } else if (strat.slippage_status === 'DANGER') {
             slippageColor = '#f85149';
-        } else if (strat.slippage_status === 'NO_DATA') {
-            slippageColor = '#8b949e';
         }
         
         // Latency status color
-        let latencyColor = '#3fb950'; // OK
-        if (strat.latency_status === 'WARNING') {
+        let latencyColor = '#8b949e';
+        if (strat.latency_status === 'HEALTHY') {
+            latencyColor = '#3fb950';
+        } else if (strat.latency_status === 'WARNING') {
             latencyColor = '#d29922';
-        } else if (strat.latency_status === 'CRITICAL') {
+        } else if (strat.latency_status === 'DANGER') {
             latencyColor = '#f85149';
-        } else if (strat.latency_status === 'NO_DATA') {
-            latencyColor = '#8b949e';
         }
         
         // Format values
         const slippageText = strat.avg_slippage_pct !== null ? 
-            (strat.avg_slippage_pct >= 0 ? '+' : '') + strat.avg_slippage_pct.toFixed(4) + '%' : 
+            (strat.avg_slippage_pct >= 0 ? '+' : '') + strat.avg_slippage_pct.toFixed(2) + '%' : 
             '-';
         
         const latencyText = strat.avg_latency_sec !== null ? 
@@ -3138,15 +3139,14 @@ async function loadRiskHistoryChart() {
         // Fetch BTC data for overlay
         let btcPrices = [];
         try {
-            const btcRes = await fetch('/api/btc/history?timeframe=1Dutc&bars=30');
+            const btcRes = await fetch('/api/btc/history' + dateParams);
             const btcData = await btcRes.json();
             
-            if (btcData.success && btcData.data.length > 0) {
+            if (btcData.success && btcData.dates && btcData.dates.length > 0) {
                 // Create map: date -> price
                 const btcMap = {};
-                btcData.data.forEach(item => {
-                    const date = item.timestamp.split('T')[0];
-                    btcMap[date] = item.price;
+                btcData.dates.forEach((date, idx) => {
+                    btcMap[date] = btcData.prices[idx];
                 });
                 
                 // Align with exposure dates

@@ -909,20 +909,18 @@ class DashboardServer:
         
         @self.app.route('/api/symbols-analysis')
         def get_symbols_analysis():
-            import traceback
             try:              
                 df = self._load_trades_dataframe()      
                 if df is None:
-                    print("ERROR: DataFrame is None")
+                    logger.error("ERROR: DataFrame is None")
                     return jsonify([])
                 
-                # Check if slippage columns exist
-                has_slippage_data = 'ORDER_PRICE_OPEN' in df.columns and 'PRICE_ENTRY' in df.columns
+                # Check if slippage columns exist (CLOSE execution data) - LOWERCASE
+                has_slippage_data = 'order_price_close' in df.columns and 'PRICE_CLOSE' in df.columns
                 
                 results = []
                 
                 for symbol in sorted(df['SYMBOL'].unique()):
-                    print(f"Processing symbol: {symbol}")
                     df_symbol = df[df['SYMBOL'] == symbol]
                     
                     # Existing metrics
@@ -932,21 +930,21 @@ class DashboardServer:
                     total_profit = df_symbol['PROFIT'].sum()
                     avg_profit = total_profit / total_trades if total_trades > 0 else 0
                     
-                    # NEW: Calculate slippage metrics (only if columns exist)
+                    # Calculate slippage metrics from CLOSE execution data
                     slippage_total = None
                     slippage_l30 = None
                     
                     if has_slippage_data:
                         df_with_slippage = df_symbol[
-                            df_symbol['ORDER_PRICE_OPEN'].notna() & 
-                            df_symbol['PRICE_ENTRY'].notna()
+                            df_symbol['order_price_close'].notna() & 
+                            df_symbol['PRICE_CLOSE'].notna()
                         ].copy()
                         
                         # Total slippage
                         if len(df_with_slippage) > 0:
                             df_with_slippage['slippage_pct'] = (
-                                (df_with_slippage['PRICE_ENTRY'] - df_with_slippage['ORDER_PRICE_OPEN']) 
-                                / df_with_slippage['ORDER_PRICE_OPEN'] 
+                                (df_with_slippage['PRICE_CLOSE'] - df_with_slippage['order_price_close']) 
+                                / df_with_slippage['order_price_close'] 
                                 * 100
                             )
                             slippage_total = df_with_slippage['slippage_pct'].mean()
@@ -956,8 +954,8 @@ class DashboardServer:
                             df_last30 = df_with_slippage.tail(30)
                             if len(df_last30) > 0:
                                 df_last30['slippage_pct'] = (
-                                    (df_last30['PRICE_ENTRY'] - df_last30['ORDER_PRICE_OPEN']) 
-                                    / df_last30['ORDER_PRICE_OPEN'] 
+                                    (df_last30['PRICE_CLOSE'] - df_last30['order_price_close']) 
+                                    / df_last30['order_price_close'] 
                                     * 100
                                 )
                                 slippage_l30 = df_last30['slippage_pct'].mean()
@@ -968,8 +966,8 @@ class DashboardServer:
                         'Win_Pct': round(win_pct, 2),
                         'Total_Profit': round(total_profit, 2),
                         'Avg_Profit': round(avg_profit, 2),
-                        'Slippage_Total': round(slippage_total, 4) if slippage_total is not None else None,
-                        'Slippage_L30': round(slippage_l30, 4) if slippage_l30 is not None else None
+                        'Slippage_Total': round(slippage_total, 2) if slippage_total is not None else None,
+                        'Slippage_L30': round(slippage_l30, 2) if slippage_l30 is not None else None
                     })
                 return jsonify(results)
                 
@@ -1761,19 +1759,12 @@ class DashboardServer:
                     'error': str(e),
                     'data': {}
                 }), 500
-        
+
         @self.app.route('/api/quality/execution')
         def get_quality_execution():
-            """
-            Get execution quality analysis for all strategies.
-            
-            Returns:
-                JSON with slippage and latency metrics per strategy
-            """
             try:
                 from quality_control.analyzer import analyze_execution_quality
                 
-                # Load trades from PostgreSQL
                 df = self._load_trades_dataframe()
                 if df is None or df.empty:
                     return jsonify({
@@ -1782,16 +1773,12 @@ class DashboardServer:
                         'data': {}
                     })
                 
-                # Get strategies config
                 strategies_list = self._get_full_strategies_list_with_numbers()
-                
-                # Filter only ACTIVE and DEPRECATING strategies
                 active_strategies = [
                     s for s in strategies_list 
                     if s['status'] in ('ACTIVE', 'DEPRECATING')
                 ]
                 
-                # Analyze execution quality
                 execution_results = analyze_execution_quality(df, active_strategies)
                 
                 return jsonify({

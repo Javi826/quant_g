@@ -189,9 +189,7 @@ class StrategyProcessor:
             
             # Extraer datos de ejecución
             resp_order = order_result.get('resp_order')  # Dict original del broker
-            order_price_open = order_result.get('order_price')
-            order_ts_open = order_result.get('order_ts')
-            exec_ts_open = order_result.get('exec_ts')
+
             
             # Validar que resp_order existe
             if resp_order is None:
@@ -242,10 +240,7 @@ class StrategyProcessor:
                     regime_family=regime_family,
                     regime_multiplier=regime_multiplier,
                     market_direction=direction,
-                    direction_multiplier=direction_multiplier,
-                    order_price_open=order_price_open,      # NUEVO
-                    order_ts_open=order_ts_open,            # NUEVO
-                    exec_ts_open=exec_ts_open               # NUEVO
+                    direction_multiplier=direction_multiplier
                 )
                 logger.debug(f"Position added to tracking: {sig['symbol']}")
             else:

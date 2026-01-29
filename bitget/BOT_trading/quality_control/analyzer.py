@@ -1,6 +1,9 @@
 """
 Quality Control Analyzer - Drift detection and execution quality metrics.
 
+FIXED: Changed to use CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
+       in lowercase to match PostgreSQL column names.
+
 Calculates:
 1. Drift status per strategy (HEALTHY, WARNING, DANGER)
 2. Execution quality per strategy (slippage, latency)
@@ -169,9 +172,12 @@ def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[D
     """
     Analyze execution quality (slippage, latency) for all strategies.
     
+    FIXED: Now uses CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
+           instead of OPEN data (which is lost on bot crashes).
+    
     Args:
-        df_trades: DataFrame with trades (columns: STRATEGY, ORDER_PRICE_OPEN, PRICE_ENTRY, 
-                   ORDER_TS_OPEN, EXEC_TS_OPEN)
+        df_trades: DataFrame with trades (columns: STRATEGY, order_price_close, PRICE_CLOSE, 
+                   order_ts_close, exec_ts_close)
         strategies_config: List of strategy configurations
     
     Returns:
@@ -209,20 +215,20 @@ def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[D
         # Get last EXECUTION_WINDOW_SIZE trades
         df_last = df_strat.tail(EXECUTION_WINDOW_SIZE)
         
-        # Calculate slippage (if columns exist)
+        # Calculate slippage from CLOSE data (lowercase columns)
         avg_slippage_pct = None
         slippage_status = 'NO_DATA'
         
-        if 'ORDER_PRICE_OPEN' in df_last.columns and 'PRICE_ENTRY' in df_last.columns:
+        if 'order_price_close' in df_last.columns and 'PRICE_CLOSE' in df_last.columns:
             df_with_slippage = df_last[
-                df_last['ORDER_PRICE_OPEN'].notna() & 
-                df_last['PRICE_ENTRY'].notna()
+                df_last['order_price_close'].notna() & 
+                df_last['PRICE_CLOSE'].notna()
             ].copy()
             
             if len(df_with_slippage) > 0:
                 df_with_slippage['slippage_pct'] = (
-                    (df_with_slippage['PRICE_ENTRY'] - df_with_slippage['ORDER_PRICE_OPEN']) 
-                    / df_with_slippage['ORDER_PRICE_OPEN'] 
+                    (df_with_slippage['PRICE_CLOSE'] - df_with_slippage['order_price_close']) 
+                    / df_with_slippage['order_price_close'] 
                     * 100
                 )
                 avg_slippage_pct = df_with_slippage['slippage_pct'].mean()
@@ -230,40 +236,40 @@ def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[D
                 # Determine status
                 abs_slippage = abs(avg_slippage_pct)
                 if abs_slippage < SLIPPAGE_WARNING_PCT:
-                    slippage_status = 'OK'
+                    slippage_status = 'HEALTHY'
                 elif abs_slippage < SLIPPAGE_CRITICAL_PCT:
                     slippage_status = 'WARNING'
                 else:
-                    slippage_status = 'CRITICAL'
+                    slippage_status = 'DANGER'
         
-        # Calculate latency (timestamps in seconds with decimals)
+        # Calculate latency from CLOSE data (lowercase columns, timestamps in seconds with decimals)
         avg_latency_sec = None
         latency_status = 'NO_DATA'
         
-        if 'EXEC_TS_OPEN' in df_last.columns and 'ORDER_TS_OPEN' in df_last.columns:
+        if 'exec_ts_close' in df_last.columns and 'order_ts_close' in df_last.columns:
             df_with_latency = df_last[
-                df_last['EXEC_TS_OPEN'].notna() & 
-                df_last['ORDER_TS_OPEN'].notna()
+                df_last['exec_ts_close'].notna() & 
+                df_last['order_ts_close'].notna()
             ].copy()
             
             if len(df_with_latency) > 0:
                 # Latency in seconds (timestamps already in seconds with decimals)
                 df_with_latency['latency_sec'] = (
-                    df_with_latency['EXEC_TS_OPEN'] - df_with_latency['ORDER_TS_OPEN']
+                    df_with_latency['exec_ts_close'] - df_with_latency['order_ts_close']
                 )
                 avg_latency_sec = df_with_latency['latency_sec'].mean()
                 
                 # Determine status
                 if avg_latency_sec < LATENCY_WARNING_SEC:
-                    latency_status = 'OK'
+                    latency_status = 'HEALTHY'
                 elif avg_latency_sec < LATENCY_CRITICAL_SEC:
                     latency_status = 'WARNING'
                 else:
-                    latency_status = 'CRITICAL'
+                    latency_status = 'DANGER'
         
         results[strategy_id] = {
             'total_trades': int(total_trades),
-            'avg_slippage_pct': round(avg_slippage_pct, 4) if avg_slippage_pct is not None else None,
+            'avg_slippage_pct': round(avg_slippage_pct, 2) if avg_slippage_pct is not None else None,
             'slippage_status': slippage_status,
             'avg_latency_sec': round(avg_latency_sec, 3) if avg_latency_sec is not None else None,
             'latency_status': latency_status

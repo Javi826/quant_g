@@ -745,7 +745,7 @@
                         <span class="config-value" id="risk-config-max-net">-%</span>
                     </div>
                     <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
-                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">ℹ️ COLOR THRESHOLDS</div>
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">COLOR THRESHOLDS</div>
                         <div style="font-size: 13px; color: #c9d1d9; line-height: 1.6;">
                             <span style="color: #3fb950;">●</span> Green: &lt;60% of limit<br>
                             <span style="color: #d29922;">●</span> Yellow: 60-80% of limit<br>
@@ -781,6 +781,7 @@
                 </div>
                 
                 <!-- Tabla 2: Execution Quality by Strategy -->
+                <!-- Tabla 2: Execution Quality by Strategy -->
                 <div class="config-card" style="margin-top: 20px;">
                     <h3>Execution Quality by Strategy</h3>
                     <div id="execution-table-container">
@@ -791,10 +792,11 @@
                     <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
                         <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
-                            <strong>SLIPPAGE:</strong> Average difference between order price and execution price (last 20 trades)<br>
-                            - OK: < 0.05% | WARNING: 0.05% - 0.1% | CRITICAL: > 0.1%<br><br>
-                            <strong>LATENCY:</strong> Average time between order submission and execution confirmation (last 20 trades)<br>
-                            - OK: < 2 seconds | WARNING: 2-3 seconds | CRITICAL: > 3 seconds
+                            <strong>SLIPPAGE:</strong> Average difference between order price and execution price<br>
+                            - HEALTHY: Low slippage | WARNING: Moderate slippage | DANGER: High slippage<br><br>
+                            <strong>LATENCY:</strong> Average time between order submission and execution confirmation<br>
+                            - HEALTHY: Fast execution | WARNING: Moderate delay | DANGER: Slow execution<br><br>
+                            Check <code style="color: #58a6ff;">config/settings.py</code> for exact thresholds and window size.
                         </div>
                     </div>
                 </div>

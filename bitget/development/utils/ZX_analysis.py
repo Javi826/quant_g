@@ -606,7 +606,8 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     # -----------------------------
     path_grouped = df_portfolio.groupby('path_index').agg({
         'Portfolio_Final_Balance': 'mean',
-        'DD': 'mean'
+        'DD': 'mean',
+        'Win_Ratio': 'mean'
     }).reset_index()
    
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
@@ -683,5 +684,13 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     print(f"Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
     print(f"Probability of Negative Path : {prob_negative:.2f}%")
+    
+    # Luego calcular P5 y P50 del Win Rate
+    win_rates = path_grouped['Win_Ratio'].dropna()
+    p5_winrate = np.percentile(win_rates, 5)
+    p50_winrate = np.percentile(win_rates, 50)
+    
+    print(f"\nP5  Win Rate per Path: {p5_winrate:.2f}%")
+    print(f"P50 Win Rate per Path: {p50_winrate:.2f}%")
 
     return df_summary

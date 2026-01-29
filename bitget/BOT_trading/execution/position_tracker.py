@@ -97,9 +97,6 @@ def add_position(
     regime_multiplier: Optional[float] = None,
     market_direction: Optional[str] = None,            
     direction_multiplier: Optional[float] = None,
-    order_price_open: Optional[float] = None,       # ✅
-    order_ts_open: Optional[float] = None,          # ✅
-    exec_ts_open: Optional[float] = None            # ✅ 
 ) -> None:
     """
     Add a new position to tracking system.
@@ -146,11 +143,7 @@ def add_position(
         'regime_family': regime_family if regime_family else 'unknown',
         'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0,
         'market_direction': market_direction if market_direction else 'unknown',
-        'direction_multiplier': direction_multiplier if direction_multiplier is not None else 1.0,
-        # ← AÑADIR ESTOS 4:
-        'order_price_open': order_price_open,
-        'order_ts_open': order_ts_open,
-        'exec_ts_open': exec_ts_open
+        'direction_multiplier': direction_multiplier if direction_multiplier is not None else 1.0
     }
     
     open_positions[strat_id].append(position)
@@ -245,11 +238,7 @@ def check_tp_sl_for_strategy(strat_id: str,
                     'regime_family': pos.get('regime_family', 'unknown'),
                     'regime_multiplier': pos.get('regime_multiplier', 1.0),
                     'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': pos.get('direction_multiplier', 1.0),
-                    # ← AÑADIR ESTOS 3:
-                    'order_price_open': pos.get('order_price_open'),
-                    'order_ts_open': pos.get('order_ts_open'),
-                    'exec_ts_open': pos.get('exec_ts_open')
+                    'direction_multiplier': pos.get('direction_multiplier', 1.0)
                 }
                 if close_position(symbol, pos['size'], direction, send_request_func, 
                                 reason="TP", position_data=position_data, bot_state=bot_state):
@@ -264,11 +253,7 @@ def check_tp_sl_for_strategy(strat_id: str,
                     'regime_family': pos.get('regime_family', 'unknown'),
                     'regime_multiplier': pos.get('regime_multiplier', 1.0),
                     'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': pos.get('direction_multiplier', 1.0),
-                    # ← AÑADIR ESTOS 3:
-                    'order_price_open': pos.get('order_price_open'),
-                    'order_ts_open': pos.get('order_ts_open'),
-                    'exec_ts_open': pos.get('exec_ts_open')
+                    'direction_multiplier': pos.get('direction_multiplier', 1.0)
                 }
                 if close_position(symbol, pos['size'], direction, send_request_func, 
                                 reason="SL", position_data=position_data, bot_state=bot_state):

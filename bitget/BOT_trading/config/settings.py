@@ -94,10 +94,10 @@ DRIFT_CHECK_INTERVAL = 20
 
 # Execution quality
 EXECUTION_WINDOW_SIZE = 20
-SLIPPAGE_WARNING_PCT = 0.05
-SLIPPAGE_CRITICAL_PCT = 0.10
-LATENCY_WARNING_SEC = 2.0
-LATENCY_CRITICAL_SEC = 3.0
+SLIPPAGE_WARNING_PCT = 0.2
+SLIPPAGE_CRITICAL_PCT = 0.3
+LATENCY_WARNING_SEC = 0.5
+LATENCY_CRITICAL_SEC = 1.0
 # ==========================================================================
 # STRATEGY VALIDATION CONFIGURATION
 # ==========================================================================

@@ -27,7 +27,7 @@ from risk_control import RiskLimiter, ExposureCalculator
 
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
 
-from analytics import BotState
+from state.state_manager import BotState
 from api.backend import DashboardServer, create_dashboard_template
 
 from execution import configure_paths, get_current_price, check_tp_sl_for_strategy

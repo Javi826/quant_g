@@ -33,6 +33,10 @@ POSTGRES_ENABLED = True
 # ==========================================================================
 # STATE PERSISTENCE
 # ==========================================================================
+class BotState:
+    def __init__(self):
+        self.closed_total_profit = 0.0
+        
 def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
     """
     Load bot state from PostgreSQL (primary) with JSON fallback.
