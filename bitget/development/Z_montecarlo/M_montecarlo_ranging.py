@@ -27,7 +27,7 @@ MY_SYMBOLS        = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------.
-DATA_FOLDER         = "../data/crypto_OOS"
+DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER       = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR   = '6Hutc'
 ORDER_AMOUNT      = 80
@@ -80,7 +80,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = ranging_long(
+            signals = ranging_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

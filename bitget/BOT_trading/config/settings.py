@@ -84,6 +84,7 @@ RISK_LIMITS = {
     'max_net_exposure_pct': 20.0     # Maximum net exposure (% of available capital) - future
 }
 LEVERAGE = 10
+
 # =============================================================================
 # QUALITY CONTROL PARAMETERS
 # =============================================================================
@@ -166,7 +167,7 @@ API_LIMIT_DATA  = 180  # Limit for live trading candle fetch
 # GENERAL BOT SETTINGS
 # ==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
-CHECK_INTERVAL        = 10  
+CHECK_INTERVAL        = 5  
 USE_HARDCODED_SIGNALS = False  
 PERSISTENCE_DIR       = "persistence"
 
@@ -176,7 +177,7 @@ PERSISTENCE_DIR       = "persistence"
 
 WS_PUBLIC_URL   = "wss://ws.bitget.com/v2/ws/public"
 WS_PRIVATE_URL  = "wss://ws.bitget.com/v2/ws/private"
-API_TIMEOUT     = 10  #seconds
+API_TIMEOUT     = 10  
 API_MAX_RETRIES = 3
 
 # ==========================================================================

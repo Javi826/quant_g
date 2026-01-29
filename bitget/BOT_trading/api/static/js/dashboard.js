@@ -2900,10 +2900,10 @@ function renderDriftTable(data) {
             '<th>#</th>' +
             '<th>Strategy</th>' +
             '<th>Status</th>' +
-            '<th>WinRate_100_L20</th>' +
-            '<th>WinRate_100</th>' +
             '<th>P5_Ref</th>' +
             '<th>P50_Ref</th>' +
+            '<th>WinRate_100_L20</th>' +
+            '<th>WinRate_100</th>' +
             '<th>Avg_Profit_100</th>' +
             '<th>Counter</th>' +
             '<th>Total Trades</th>' +
@@ -2936,10 +2936,10 @@ function renderDriftTable(data) {
             '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
             '<td>' + strategyId + '</td>' +
             '<td style="color: ' + statusColor + '; font-weight: 700; text-transform: uppercase;">' + statusText + '</td>' +
-            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
-            '<td>' + (strat.winrate_100 !== null ? strat.winrate_100.toFixed(1) + '%' : '-') + '</td>' +
             '<td>' + (strat.p5_reference !== null ? strat.p5_reference.toFixed(1) + '%' : '-') + '</td>' +
             '<td>' + (strat.p50_reference !== null ? strat.p50_reference.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.winrate_100 !== null ? strat.winrate_100.toFixed(1) + '%' : '-') + '</td>' +
             '<td style="color: ' + avgProfitColor + ';">' + 
                 (strat.avg_profit_100 !== null ? avgProfitPrefix + strat.avg_profit_100.toFixed(2) : '-') + 
             '</td>' +
@@ -2952,7 +2952,7 @@ function renderDriftTable(data) {
     container.innerHTML = html;
 }
 
-function renderExecutionTable(data) {  // ← Quita parámetro thresholds
+function renderExecutionTable(data) {
     const container = document.getElementById('execution-table-container');
     
     if (!data || Object.keys(data).length === 0) {
@@ -2966,11 +2966,11 @@ function renderExecutionTable(data) {  // ← Quita parámetro thresholds
     let html = '<table><thead><tr>' +
         '<th>#</th>' +
         '<th>Strategy</th>' +
-        '<th>Total Trades</th>' +
         '<th>Avg Slippage</th>' +
         '<th>Status</th>' +
         '<th>Avg Latency</th>' +
         '<th>Status</th>' +
+        '<th>Total Trades</th>' +
         '</tr></thead><tbody>';
     
     sortedStrategies.forEach((strategyId, index) => {
@@ -3009,11 +3009,11 @@ function renderExecutionTable(data) {  // ← Quita parámetro thresholds
         html += '<tr>' +
             '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
             '<td>' + strategyId + '</td>' +
-            '<td>' + strat.total_trades + '</td>' +
             '<td>' + slippageText + '</td>' +
             '<td style="color: ' + slippageColor + '; font-weight: 700; text-transform: uppercase;">' + strat.slippage_status + '</td>' +
             '<td>' + latencyText + '</td>' +
             '<td style="color: ' + latencyColor + '; font-weight: 700; text-transform: uppercase;">' + strat.latency_status + '</td>' +
+            '<td>' + strat.total_trades + '</td>' +
             '</tr>';
     });
     

@@ -22,12 +22,11 @@ from signals.add_signals_double_top import double_top_long
 DTYPE             = np.float32
 start_time        = time.time()
 N_JOBS            = -1
-STRATEGY          = "double_top"
+STRATEGY          = "double_top_long_4H"
 MY_SYMBOLS        = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS"
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER       = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR   = '4H'

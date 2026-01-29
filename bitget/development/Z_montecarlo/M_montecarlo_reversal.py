@@ -23,16 +23,15 @@ DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
 STRATEGY            = "reversal"
-MY_SYMBOLS          = False
+MY_SYMBOLS          = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
-#DATA_FOLDER         = "../data/crypto_OOS_2025"
 #DATA_FOLDER         = "data/crypto_2024_short_IS"
 TIMEFRAME_MINOR     = '6Hutc'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_500_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -47,12 +46,12 @@ TP_PCT_LIST          = [3,4,5,6]
 SL_PCT_LIST          = [8,9,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [7] 
+LOOKBACK_LIST        = [6] 
 MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [40]
+TOLERANCE_LIST       = [30]
 
 TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [10]
+SL_PCT_LIST          = [7.5]
 
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
@@ -83,7 +82,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_long(
+            signals = reversal_short(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

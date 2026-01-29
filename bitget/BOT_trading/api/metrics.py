@@ -6,15 +6,10 @@ Todas las métricas financieras del bot están aquí para evitar duplicación.
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict
+from typing import  Dict
 import logging
 
-logger = logging.getLogger('BOT_trading.analytics.metrics')
-
-class BotState:
-    def __init__(self):
-        self.closed_total_profit = 0.0
-
+logger = logging.getLogger('BOT_trading.api.metrics')
 
 class MetricsCalculator:
     """

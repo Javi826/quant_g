@@ -29,10 +29,10 @@ MY_SYMBOLS          = False
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
-DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+#DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -59,8 +59,8 @@ SL_PCT_LIST               = [7,8,9,10]
 # SL_PCT_LIST               = [10]
 # =============================================================================
 
+#4HSHORT-23(2025) 
 # =============================================================================
-# #4HSHORT-23(2025) 
 # SELL_AFTER_LIST           = [0]  
 # LOOKBACK_LIST             = [10]
 # IMPULSE_MIN_PCT_LIST      = [3]
@@ -71,8 +71,8 @@ SL_PCT_LIST               = [7,8,9,10]
 # SL_PCT_LIST               = [9]
 # =============================================================================
 
+#1HLONG-3(2025) 
 # =============================================================================
-# #1HLONG-3(2025) 
 # SELL_AFTER_LIST           = [0]  
 # LOOKBACK_LIST             = [20]
 # IMPULSE_MIN_PCT_LIST      = [3]
@@ -84,38 +84,15 @@ SL_PCT_LIST               = [7,8,9,10]
 # =============================================================================
 
 #1HSHORT-9 
-# =============================================================================
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [20]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [60]
-# MA_PERIOD_LIST            = [25]
-# 
-# TP_PCT_LIST               = [2]
-# SL_PCT_LIST               = [8]
-# =============================================================================
+SELL_AFTER_LIST           = [0]  
+LOOKBACK_LIST             = [20]
+IMPULSE_MIN_PCT_LIST      = [3]
+FLAG_MAX_RANGE_PCT_LIST   = [60]
+MA_PERIOD_LIST            = [25]
 
-# =============================================================================
-# #6Hutclong 9  
-# SELL_AFTER_LIST    = [0]  
-# LOOKBACK_LIST      = [20]
-# IMPULSE_LIST       = [3]
-# FLAG_MAX_LIST      = [40]
-# MA_PERIOD_LIST     = [50]
-# 
-# TP_PCT_LIST        = [4]
-# SL_PCT_LIST        = [10]
-# 
-# #6Hutcshort 9  
-# SELL_AFTER_LIST    = [0]  
-# LOOKBACK_LIST      = [10]
-# IMPULSE_LIST       = [3]
-# FLAG_MAX_LIST      = [30]
-# MA_PERIOD_LIST     = [50]
-# 
-# TP_PCT_LIST        = [4]
-# SL_PCT_LIST        = [10]
-# =============================================================================
+TP_PCT_LIST               = [2]
+SL_PCT_LIST               = [8]
+
 
 param_names = [
     'SELL_AFTER',
@@ -131,7 +108,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 100
+FINAL_N_PATHS        = 2000
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 

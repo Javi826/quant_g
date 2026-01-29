@@ -4,6 +4,8 @@ Quality Control Analyzer - Drift detection and execution quality metrics.
 FIXED: Changed to use CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
        in lowercase to match PostgreSQL column names.
 
+UPDATED: Adaptive window size - calculates with available trades (no minimum required).
+
 Calculates:
 1. Drift status per strategy (HEALTHY, WARNING, DANGER)
 2. Execution quality per strategy (slippage, latency)
@@ -14,15 +16,10 @@ import numpy as np
 from typing import Dict, List, Any
 import logging
 
-from config.settings import (
-    DRIFT_WINDOW_SIZE,
-    DRIFT_CHECK_INTERVAL,
-    EXECUTION_WINDOW_SIZE,
-    SLIPPAGE_WARNING_PCT,
-    SLIPPAGE_CRITICAL_PCT,
-    LATENCY_WARNING_SEC,
-    LATENCY_CRITICAL_SEC
-)
+from config.settings import DRIFT_WINDOW_SIZE, DRIFT_CHECK_INTERVAL
+from config.settings import EXECUTION_WINDOW_SIZE
+from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT, LATENCY_WARNING_SEC, LATENCY_CRITICAL_SEC
+
 from .drift_montecarlo import DRIFT_REFERENCE
 
 logger = logging.getLogger('BOT_trading.quality_control.analyzer')
@@ -32,6 +29,8 @@ def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict])
     """
     Analyze drift status for all strategies.
     
+    UPDATED: Now uses adaptive window size - calculates with available trades (no minimum).
+    
     Args:
         df_trades: DataFrame with all closed trades (columns: STRATEGY, PROFIT, CLOSE_AT, etc.)
         strategies_config: List of strategy configurations
@@ -40,7 +39,7 @@ def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict])
         Dict with drift analysis per strategy:
         {
             'strategy_id': {
-                'status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA' | 'INSUFFICIENT_DATA' | 'NO_REFERENCE',
+                'status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA' | 'NO_REFERENCE',
                 'winrate_100': 62.5,
                 'winrate_100_l20': 58.3,
                 'p5_reference': 52.0,
@@ -74,20 +73,6 @@ def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict])
         
         total_trades = len(df_strat)
         
-        # Need at least DRIFT_WINDOW_SIZE trades to evaluate
-        if total_trades < DRIFT_WINDOW_SIZE:
-            results[strategy_id] = {
-                'status': 'INSUFFICIENT_DATA',
-                'winrate_100': None,
-                'winrate_100_l20': None,
-                'p5_reference': None,
-                'p50_reference': None,
-                'avg_profit_100': None,
-                'total_trades': total_trades,
-                'counter': 0
-            }
-            continue
-        
         # Get reference values
         reference = DRIFT_REFERENCE.get(strategy_id, {})
         p5_wr = reference.get('p5_winrate')
@@ -107,26 +92,27 @@ def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict])
             }
             continue
         
-        # Calculate metrics for last DRIFT_WINDOW_SIZE trades (current window)
-        df_last_100 = df_strat.tail(DRIFT_WINDOW_SIZE)
+        # UPDATED: Use adaptive window size (max DRIFT_WINDOW_SIZE, or all available if less)
+        window_size = min(total_trades, DRIFT_WINDOW_SIZE)
+        df_last_N = df_strat.tail(window_size)
         
-        # WinRate_100 (current window)
-        winning_trades = len(df_last_100[df_last_100['PROFIT'] > 0])
-        winrate_100 = (winning_trades / len(df_last_100)) * 100
+        # WinRate_100 (current window - using available trades)
+        winning_trades = len(df_last_N[df_last_N['PROFIT'] > 0])
+        winrate_100 = (winning_trades / window_size) * 100
         
         # WinRate_100_L20 (previous window - 20 trades ago)
         winrate_100_l20 = None
-        if total_trades >= DRIFT_WINDOW_SIZE + DRIFT_CHECK_INTERVAL:
-            start_idx = total_trades - DRIFT_WINDOW_SIZE - DRIFT_CHECK_INTERVAL
+        if total_trades >= window_size + DRIFT_CHECK_INTERVAL:
+            start_idx = total_trades - window_size - DRIFT_CHECK_INTERVAL
             end_idx = total_trades - DRIFT_CHECK_INTERVAL
-            df_prev_100 = df_strat.iloc[start_idx:end_idx]
+            df_prev_N = df_strat.iloc[start_idx:end_idx]
             
-            if len(df_prev_100) == DRIFT_WINDOW_SIZE:
-                prev_winning = len(df_prev_100[df_prev_100['PROFIT'] > 0])
-                winrate_100_l20 = (prev_winning / DRIFT_WINDOW_SIZE) * 100
+            if len(df_prev_N) == window_size:
+                prev_winning = len(df_prev_N[df_prev_N['PROFIT'] > 0])
+                winrate_100_l20 = (prev_winning / window_size) * 100
         
         # Avg Profit per trade (simpler than Avg_R)
-        avg_profit_100 = df_last_100['PROFIT'].mean()
+        avg_profit_100 = df_last_N['PROFIT'].mean()
         
         # Determine status
         status = 'HEALTHY'
@@ -139,15 +125,15 @@ def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict])
             counter = 1
             
             # Check if this is 2nd consecutive failure (on-the-fly calculation)
-            if total_trades >= DRIFT_WINDOW_SIZE + DRIFT_CHECK_INTERVAL:
+            if total_trades >= window_size + DRIFT_CHECK_INTERVAL:
                 # Get previous window
-                start_idx = total_trades - DRIFT_WINDOW_SIZE - DRIFT_CHECK_INTERVAL
+                start_idx = total_trades - window_size - DRIFT_CHECK_INTERVAL
                 end_idx = total_trades - DRIFT_CHECK_INTERVAL
                 df_prev = df_strat.iloc[start_idx:end_idx]
                 
-                if len(df_prev) == DRIFT_WINDOW_SIZE:
+                if len(df_prev) == window_size:
                     prev_winning = len(df_prev[df_prev['PROFIT'] > 0])
-                    prev_winrate = (prev_winning / DRIFT_WINDOW_SIZE) * 100
+                    prev_winrate = (prev_winning / window_size) * 100
                     prev_avg_profit = df_prev['PROFIT'].mean()
                     
                     if prev_winrate < p5_wr and prev_avg_profit < 0:
