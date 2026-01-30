@@ -595,7 +595,10 @@ def close_position(symbol: str,
                         close_price_from_fills = Decimal(str(data.get('price', 0)))
                         if close_price_from_fills == 0:
                             close_price_from_fills = get_current_price(symbol)
-                    
+                            
+                    tp_target = position_data.get('tp')
+                    sl_target = position_data.get('sl')
+                    logger.info(f"[DEBUG] Closing position - tp_target={tp_target}, sl_target={sl_target}")
                     if close_price_from_fills:
                         log_closed_position(
                             opened_at=position_data.get('opened_at'),
@@ -617,7 +620,9 @@ def close_position(symbol: str,
                             # ← NUEVOS: Datos de cierre (capturados aquí)
                             order_price_close=order_price_close,
                             order_ts_close=order_ts_close,
-                            exec_ts_close=exec_ts_close
+                            exec_ts_close=exec_ts_close,
+                            tp_target=tp_target,  # ← AÑADIR
+                            sl_target=sl_target  
                         )
             
             return True
@@ -627,6 +632,10 @@ def close_position(symbol: str,
             if resp.get("code") == "22002":
                 logger.warning(f"WAR-Removing from local record (nonexistent position)")
                 if position_data:
+                    tp_target = position_data.get('tp')
+                    sl_target = position_data.get('sl')
+                    logger.info(f"[DEBUG OUT_OF_MARGIN] tp_target={tp_target}, sl_target={sl_target}")
+
                     current_price = get_current_price(symbol)
                     if current_price:
                         log_closed_position(
@@ -648,7 +657,9 @@ def close_position(symbol: str,
                             # ← NUEVOS: Datos de cierre (capturados aquí)
                             order_price_close=order_price_close,
                             order_ts_close=order_ts_close,
-                            exec_ts_close=exec_ts_close
+                            exec_ts_close=exec_ts_close,
+                            tp_target=tp_target,  
+                            sl_target=sl_target 
                         )
                 return True  # Remove from open_positions
             return False

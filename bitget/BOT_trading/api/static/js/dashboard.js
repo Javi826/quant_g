@@ -2868,11 +2868,24 @@ async function loadQualityTab() {
         const execData = await execRes.json();
         
         if (execData.success) {
-            renderExecutionTable(execData.data);  // ← Sin segundo parámetro
+            renderExecutionTable(execData.data);
         } else {
             document.getElementById('execution-table-container').innerHTML = 
                 '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
                 (execData.error || 'Error loading execution data') + 
+                '</div>';
+        }
+        
+        // Load target deviation
+        const deviationRes = await fetch('/api/quality/target-deviation');
+        const deviationData = await deviationRes.json();
+        
+        if (deviationData.success) {
+            renderTargetDeviationTable(deviationData.data);
+        } else {
+            document.getElementById('deviation-table-container').innerHTML = 
+                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
+                (deviationData.error || 'Error loading deviation data') + 
                 '</div>';
         }
         
@@ -2881,6 +2894,8 @@ async function loadQualityTab() {
         document.getElementById('drift-table-container').innerHTML = 
             '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
         document.getElementById('execution-table-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+        document.getElementById('deviation-table-container').innerHTML = 
             '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
@@ -2966,7 +2981,11 @@ function renderExecutionTable(data) {
     let html = '<table><thead><tr>' +
         '<th>#</th>' +
         '<th>Strategy</th>' +
-        '<th>Avg Slippage</th>' +
+        '<th>Close Slip</th>' +
+        '<th>Status</th>' +
+        '<th>TP Slip</th>' +
+        '<th>Status</th>' +
+        '<th>SL Slip</th>' +
         '<th>Status</th>' +
         '<th>Avg Latency</th>' +
         '<th>Status</th>' +
@@ -2977,42 +2996,38 @@ function renderExecutionTable(data) {
         const strat = data[strategyId];
         const num = String(index + 1).padStart(2, '0');
         
-        // Slippage status color
-        let slippageColor = '#8b949e';
-        if (strat.slippage_status === 'HEALTHY') {
-            slippageColor = '#3fb950';
-        } else if (strat.slippage_status === 'WARNING') {
-            slippageColor = '#d29922';
-        } else if (strat.slippage_status === 'DANGER') {
-            slippageColor = '#f85149';
+        // Helper function for status color
+        function getStatusColor(status) {
+            if (status === 'HEALTHY') return '#3fb950';
+            if (status === 'WARNING') return '#d29922';
+            if (status === 'DANGER') return '#f85149';
+            return '#8b949e';
         }
         
-        // Latency status color
-        let latencyColor = '#8b949e';
-        if (strat.latency_status === 'HEALTHY') {
-            latencyColor = '#3fb950';
-        } else if (strat.latency_status === 'WARNING') {
-            latencyColor = '#d29922';
-        } else if (strat.latency_status === 'DANGER') {
-            latencyColor = '#f85149';
+        // Format slippage values
+        function formatSlippage(value) {
+            if (value === null || value === undefined) return '-';
+            return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
         }
         
-        // Format values
-        const slippageText = strat.avg_slippage_pct !== null ? 
-            (strat.avg_slippage_pct >= 0 ? '+' : '') + strat.avg_slippage_pct.toFixed(2) + '%' : 
-            '-';
+        const closeSlippageText = formatSlippage(strat.avg_close_slippage_pct);
+        const tpSlippageText = formatSlippage(strat.avg_tp_slippage_pct);
+        const slSlippageText = formatSlippage(strat.avg_sl_slippage_pct);
         
         const latencyText = strat.avg_latency_sec !== null ? 
-            strat.avg_latency_sec.toFixed(3) + 's' : 
-            '-';
+            strat.avg_latency_sec.toFixed(3) + 's' : '-';
         
         html += '<tr>' +
             '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
             '<td>' + strategyId + '</td>' +
-            '<td>' + slippageText + '</td>' +
-            '<td style="color: ' + slippageColor + '; font-weight: 700; text-transform: uppercase;">' + strat.slippage_status + '</td>' +
+            '<td>' + closeSlippageText + '</td>' +
+            '<td style="color: ' + getStatusColor(strat.close_slippage_status) + '; font-weight: 700; text-transform: uppercase;">' + strat.close_slippage_status + '</td>' +
+            '<td>' + tpSlippageText + '</td>' +
+            '<td style="color: ' + getStatusColor(strat.tp_slippage_status) + '; font-weight: 700; text-transform: uppercase;">' + strat.tp_slippage_status + '</td>' +
+            '<td>' + slSlippageText + '</td>' +
+            '<td style="color: ' + getStatusColor(strat.sl_slippage_status) + '; font-weight: 700; text-transform: uppercase;">' + strat.sl_slippage_status + '</td>' +
             '<td>' + latencyText + '</td>' +
-            '<td style="color: ' + latencyColor + '; font-weight: 700; text-transform: uppercase;">' + strat.latency_status + '</td>' +
+            '<td style="color: ' + getStatusColor(strat.latency_status) + '; font-weight: 700; text-transform: uppercase;">' + strat.latency_status + '</td>' +
             '<td>' + strat.total_trades + '</td>' +
             '</tr>';
     });
@@ -3020,7 +3035,84 @@ function renderExecutionTable(data) {
     html += '</tbody></table>';
     container.innerHTML = html;
 }
-
+function renderTargetDeviationTable(data) {
+    const container = document.getElementById('deviation-table-container');
+    
+    if (!data || Object.keys(data).length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
+        return;
+    }
+    
+    // Sort by strategy ID
+    const sortedStrategies = Object.keys(data).sort();
+    
+    let html = '<table><thead><tr>' +
+        '<th>#</th>' +
+        '<th>Strategy</th>' +
+        '<th>TP Real%</th>' +
+        '<th>TP Target%</th>' +
+        '<th>TP Dev</th>' +
+        '<th>SL Real%</th>' +
+        '<th>SL Target%</th>' +
+        '<th>SL Dev</th>' +
+        '<th>Total Trades</th>' +
+        '</tr></thead><tbody>';
+    
+    sortedStrategies.forEach((strategyId, index) => {
+        const strat = data[strategyId];
+        const num = String(index + 1).padStart(2, '0');
+        
+        // Helper function for deviation color
+        // Helper function for deviation color
+        function getDeviationColor(deviation) {
+            if (deviation === null || deviation === undefined) return '#8b949e';
+            
+            // Positive deviation is ALWAYS good (we got more profit than expected)
+            if (deviation > 0) return '#3fb950';  // 🟢 Green
+            
+            // Negative deviation: apply thresholds
+            const absDev = Math.abs(deviation);
+            if (absDev < 0.2) return '#3fb950';  
+            if (absDev < 0.5) return '#d29922';  
+            return '#f85149';                   
+        }
+        
+        // Format percentage values
+        function formatPct(value) {
+            if (value === null || value === undefined) return '-';
+            return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+        }
+        
+        const tpRealText = formatPct(strat.tp_real_pct);
+        const tpTargetText = formatPct(strat.tp_target_pct);
+        const tpDevText = formatPct(strat.tp_deviation);
+        
+        const slRealText = formatPct(strat.sl_real_pct);
+        const slTargetText = formatPct(strat.sl_target_pct);
+        const slDevText = formatPct(strat.sl_deviation);
+        
+        const tpDevColor = getDeviationColor(strat.tp_deviation);
+        const slDevColor = getDeviationColor(strat.sl_deviation);
+        
+        // Total trades = TP trades + SL trades
+        const totalTrades = strat.tp_trades + strat.sl_trades;
+        
+        html += '<tr>' +
+            '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+            '<td>' + strategyId + '</td>' +
+            '<td>' + tpRealText + '</td>' +
+            '<td>' + tpTargetText + '</td>' +
+            '<td style="color: ' + tpDevColor + '; font-weight: 600;">' + tpDevText + '</td>' +
+            '<td>' + slRealText + '</td>' +
+            '<td>' + slTargetText + '</td>' +
+            '<td style="color: ' + slDevColor + '; font-weight: 600;">' + slDevText + '</td>' +
+            '<td>' + totalTrades + '</td>' +
+            '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
 // =============================================================================
 // END QUALITY CONTROL TAB
 // =============================================================================

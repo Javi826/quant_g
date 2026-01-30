@@ -329,6 +329,8 @@ def sync_broker(open_positions: Dict,
                         'usdt_amount': pos.get('usdt_amount', 0),
                         'entry_price': pos['entry_price']
                     }
+                    tp_target = pos.get('tp')
+                    sl_target = pos.get('sl')
                     
                     log_closed_position(
                         opened_at=position_data['opened_at'],
@@ -345,7 +347,12 @@ def sync_broker(open_positions: Dict,
                         regime_family=pos.get('regime_family', 'unknown'),
                         regime_multiplier=pos.get('regime_multiplier', 1.0),
                         market_direction=pos.get('market_direction', 'unknown'),
-                        direction_multiplier=pos.get('direction_multiplier', 1.0)  
+                        direction_multiplier=pos.get('direction_multiplier', 1.0),
+                        order_price_close=None,  
+                        order_ts_close=None,    
+                        exec_ts_close=None,    
+                        tp_target=tp_target,
+                        sl_target=sl_target
                     )
                     
                     positions_to_remove.append(i)

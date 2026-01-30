@@ -55,7 +55,8 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
                         direction, usdt_amount, size_val, entry_price, close_price,
                         profit, fee, profit_pct, reason, regime_family, regime_multiplier,
                         market_direction, direction_multiplier,
-                        order_price_close, order_ts_close, exec_ts_close):
+                        order_price_close, order_ts_close, exec_ts_close,
+                        tp_target, sl_target):  # ← AÑADIR AQUÍ
     """
     Write trade to PostgreSQL (dual-write hook).
     
@@ -64,6 +65,7 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
     """
     if not POSTGRES_ENABLED:
         return
+    logger.info(f"[DEBUG POSTGRES] tp_target={tp_target}, sl_target={sl_target}, strategy={strategy_id}")
     
     try:
         import psycopg2
@@ -86,14 +88,16 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
                 usdt_amount, size, price_entry, price_close, profit, fee,
                 profit_pct, reason_out, regime_family, regime_multiplier,
                 market_direction, direction_multiplier,
-                order_price_close, order_ts_close, exec_ts_close
+                order_price_close, order_ts_close, exec_ts_close,
+                tp_target, sl_target  -- ← AÑADIR AQUÍ
             ) VALUES (
                 %(account)s, %(open_at)s, %(close_at)s, %(duration_days)s, %(strategy)s,
                 %(symbol)s, %(direction)s, %(usdt_amount)s, %(size)s,
                 %(price_entry)s, %(price_close)s, %(profit)s, %(fee)s,
                 %(profit_pct)s, %(reason_out)s, %(regime_family)s,
                 %(regime_multiplier)s, %(market_direction)s, %(direction_multiplier)s,
-                %(order_price_close)s, %(order_ts_close)s, %(exec_ts_close)s  
+                %(order_price_close)s, %(order_ts_close)s, %(exec_ts_close)s,
+                %(tp_target)s, %(sl_target)s  -- ← AÑADIR AQUÍ
             )
         """)
         
@@ -119,10 +123,14 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
             'direction_multiplier': round(direction_multiplier, 1),
             'order_price_close': order_price_close,
             'order_ts_close': order_ts_close,
-            'exec_ts_close': exec_ts_close
+            'exec_ts_close': exec_ts_close,
+            'tp_target': tp_target,  # ← AÑADIR AQUÍ
+            'sl_target': sl_target
         })
         
         conn.commit()
+        logger.info(f"[DEBUG POSTGRES] ✓ Trade inserted - tp_target={tp_target}, sl_target={sl_target}")
+        
         cursor.close()
         conn.close()
         
@@ -153,10 +161,12 @@ def log_closed_position(opened_at,
                        regime_multiplier: Optional[float] = None,
                        market_direction: Optional[str] = None,            
                        direction_multiplier: Optional[float] = None,
-                        order_price_close: Optional[float] = None,
-                        order_ts_close: Optional[float] = None,
-                        exec_ts_close: Optional[float] = None
-                       ) -> None:  
+                       order_price_close: Optional[float] = None,
+                       order_ts_close: Optional[float] = None,
+                       exec_ts_close: Optional[float] = None,
+                       tp_target: Optional[float] = None,
+                       sl_target: Optional[float] = None
+                       ) -> None: 
     """
     Log a closed position to Excel file.
     
@@ -275,7 +285,9 @@ def log_closed_position(opened_at,
             'DIRECTION_MULTIPLIER': round(direction_multiplier, 1) if direction_multiplier is not None else 1.0,
             'ORDER_PRICE_CLOSE': order_price_close,
             'ORDER_TS_CLOSE': order_ts_close,
-            'EXEC_TS_CLOSE': exec_ts_close
+            'EXEC_TS_CLOSE': exec_ts_close,
+            'TP_TARGET': tp_target,  # ← AÑADIR
+            'SL_TARGET': sl_target   # ← AÑADIR
         }
 
         # Append to Excel
@@ -302,7 +314,8 @@ def log_closed_position(opened_at,
             regime_multiplier if regime_multiplier is not None else 1.0,
             market_direction if market_direction else 'unknown',
             direction_multiplier if direction_multiplier is not None else 1.0,
-            order_price_close, order_ts_close, exec_ts_close  
+            order_price_close, order_ts_close, exec_ts_close,
+            tp_target, sl_target
         )
 
         # Enhanced logging with regime info

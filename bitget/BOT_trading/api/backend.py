@@ -1796,6 +1796,50 @@ class DashboardServer:
                     'data': {}
                 }), 500
             
+        @self.app.route('/api/quality/target-deviation')
+        def get_quality_target_deviation():
+            """
+            Get target deviation analysis (TP/SL real vs configured).
+            """
+            try:
+                from quality_control.analyzer import analyze_target_deviation
+                
+                # Load trades from PostgreSQL
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No trades data available',
+                        'data': {}
+                    })
+                
+                # Get strategies config
+                strategies_list = self._get_full_strategies_list_with_numbers()
+                
+                # Filter only ACTIVE and DEPRECATING strategies
+                active_strategies = [
+                    s for s in strategies_list 
+                    if s['status'] in ('ACTIVE', 'DEPRECATING')
+                ]
+                
+                # Analyze target deviation
+                deviation_results = analyze_target_deviation(df, active_strategies)
+                
+                return jsonify({
+                    'success': True,
+                    'data': deviation_results
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in target deviation analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'data': {}
+                }), 500
+        
         @self.app.route('/api/btc/snapshot')
         def capture_btc_snapshot():
             """
@@ -1869,10 +1913,9 @@ class DashboardServer:
                     'success': False,
                     'error': str(e)
                 }), 500
-            
-            
+    
     # ==========================================================================
-    # DAILY SNAPSHOT SCHEDULER
+    # DAILY SNAPSHOT SCHEDULER METHODS (CLASS LEVEL)
     # ==========================================================================
     
     def _capture_snapshot(self):
@@ -1901,7 +1944,7 @@ class DashboardServer:
             logger.error("[SNAPSHOT] Request timeout (>10s)")
         except Exception as e:
             logger.error(f"[SNAPSHOT] Error capturing snapshot: {e}")
-            
+    
     def _capture_btc_snapshot(self):
         """
         Capture daily BTC price snapshot by calling internal endpoint.
@@ -1970,7 +2013,6 @@ class DashboardServer:
             self.snapshot_running = False
             if self.snapshot_thread:
                 self.snapshot_thread.join(timeout=2)
-
     
     def start(self, host='0.0.0.0', port=5000):
         """Inicia el servidor del dashboard"""
@@ -2014,10 +2056,6 @@ class DashboardServer:
         # Start snapshot scheduler AFTER Flask is running
         self._start_snapshot_scheduler()
     
-# ==============================================================================
-# STEP 5: MODIFY stop() METHOD (replace entire method, lines 1495-1498)
-# ==============================================================================
-
     def stop(self):
         """Detiene el servidor"""
         self._stop_snapshot_scheduler()  # Stop scheduler first
