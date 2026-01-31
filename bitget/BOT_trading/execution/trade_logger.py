@@ -65,7 +65,7 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
     """
     if not POSTGRES_ENABLED:
         return
-    logger.info(f"[DEBUG POSTGRES] tp_target={tp_target}, sl_target={sl_target}, strategy={strategy_id}")
+    logger.debug(f"[POSTGRES] tp_target={tp_target}, sl_target={sl_target}, strategy={strategy_id}")
     
     try:
         import psycopg2
@@ -129,7 +129,7 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
         })
         
         conn.commit()
-        logger.info(f"[DEBUG POSTGRES] ✓ Trade inserted - tp_target={tp_target}, sl_target={sl_target}")
+        logger.debug(f"[DEBUG POSTGRES] ✓ Trade inserted - tp_target={tp_target}, sl_target={sl_target}")
         
         cursor.close()
         conn.close()

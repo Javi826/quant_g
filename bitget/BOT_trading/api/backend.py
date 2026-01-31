@@ -127,7 +127,9 @@ class DashboardServer:
                     'regime_family': 'REGIME_FAMILY',
                     'regime_multiplier': 'REGIME_MULTIPLIER',
                     'market_direction': 'MARKET_DIRECTION',
-                    'direction_multiplier': 'DIRECTION_MULTIPLIER'
+                    'direction_multiplier': 'DIRECTION_MULTIPLIER',
+                    'tp_target': 'TP_TARGET',      # ← AÑADIR
+                    'sl_target': 'SL_TARGET'
                 }, inplace=True)
                 
                 return df
@@ -565,8 +567,10 @@ class DashboardServer:
                 if df is None:
                     return jsonify([])
                 
-                # ✅ SOLUCIÓN: Reemplazar NaN con None antes de serializar
-                recent = df.tail(15).replace({np.nan: None}).to_dict('records')
+                df_sorted = df.sort_values('CLOSE_AT', ascending=False)
+                
+                # Take first 15 (most recent)
+                recent = df_sorted.head(15).replace({np.nan: None}).to_dict('records')
                 return jsonify(recent)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500

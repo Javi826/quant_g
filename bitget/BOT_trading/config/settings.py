@@ -6,7 +6,6 @@ validation limits, paths, and account-specific settings.
 """
 
 from zoneinfo import ZoneInfo
-import os
 
 # ==========================================================================
 # ACCOUNT-SPECIFIC SETTINGS
@@ -80,8 +79,8 @@ DIRECTION_GENERAL = {
 # RISK CONTROL SETTINGS
 # ==========================================================================
 RISK_LIMITS = {
-    'max_gross_exposure_pct': 60.0,  # Maximum gross exposure (% of available capital)
-    'max_net_exposure_pct': 20.0     # Maximum net exposure (% of available capital) - future
+    'max_gross_exposure_pct': 60.0,  
+    'max_net_exposure_pct': 20.0     
 }
 LEVERAGE = 10
 
@@ -125,7 +124,7 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 40
+MIN_ORDER_AMOUNT = 20
 MAX_ORDER_AMOUNT = 100
 
 # TP/SL limits (%)

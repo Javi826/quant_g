@@ -2554,9 +2554,9 @@ async function loadData() {
         requestAnimationFrame(() => {
             const tradesBody = document.getElementById('trades-body');
             if (!trades || trades.length === 0) {
-                tradesBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No trades</td></tr>';
+                tradesBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No trades</td></tr>';
             } else {
-                tradesBody.innerHTML = trades.reverse().map(trade => {
+                tradesBody.innerHTML = trades.map(trade => {
                     const profitClass = trade.PROFIT >= 0 ? 'direction-long' : 'direction-short';
                     let reasonBadge = '';
                     if (trade.REASON_OUT === 'TP') {
@@ -2917,8 +2917,8 @@ function renderDriftTable(data) {
             '<th>Status</th>' +
             '<th>P5_Ref</th>' +
             '<th>P50_Ref</th>' +
-            '<th>WinRate_100_L20</th>' +
             '<th>WinRate_100</th>' +
+            '<th>WinRate_100_L20</th>' +
             '<th>Avg_Profit_100</th>' +
             '<th>Counter</th>' +
             '<th>Total Trades</th>' +
@@ -2953,8 +2953,8 @@ function renderDriftTable(data) {
             '<td style="color: ' + statusColor + '; font-weight: 700; text-transform: uppercase;">' + statusText + '</td>' +
             '<td>' + (strat.p5_reference !== null ? strat.p5_reference.toFixed(1) + '%' : '-') + '</td>' +
             '<td>' + (strat.p50_reference !== null ? strat.p50_reference.toFixed(1) + '%' : '-') + '</td>' +
-            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
             '<td>' + (strat.winrate_100 !== null ? strat.winrate_100.toFixed(1) + '%' : '-') + '</td>' +
+            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
             '<td style="color: ' + avgProfitColor + ';">' + 
                 (strat.avg_profit_100 !== null ? avgProfitPrefix + strat.avg_profit_100.toFixed(2) : '-') + 
             '</td>' +
