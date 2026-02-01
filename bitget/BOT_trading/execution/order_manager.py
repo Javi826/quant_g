@@ -196,7 +196,7 @@ def get_current_price(symbol: str, max_cache_age: float = 0.5) -> Decimal:
             return price_data['price']
         time.sleep(0.01)
     
-    raise TimeoutError(f"No fresh-{symbol}")
+    raise TimeoutError(f"No fresh - {symbol}")
 
 
 # ==========================================================================
@@ -308,14 +308,10 @@ def place_market_order(send_request_func, body_order: Dict) -> Tuple[Optional[in
     logger.warning(f"WAR-Order failed, retrying in 0.5s... {resp_order}")
     time.sleep(0.5) 
     
-    code_order, resp_order = send_request_func(
-        "POST", 
-        "/api/v2/mix/order/place-order", 
-        body=body_order
-    )
+    code_order, resp_order = send_request_func("POST", "/api/v2/mix/order/place-order", body=body_order)
     
     if code_order != 200 or resp_order.get("code") != "00000":
-        logger.error(f"ERR-Order failed after retry: {resp_order}")
+        logger.error(f"Error-Order failed after retry: {resp_order}")
         return None, None
     
     logger.info("INF-Order placed successfully on retry")
@@ -565,7 +561,7 @@ def close_position(symbol: str,
         # BLOQUE 2: NUEVO - CAPTURA PRECIO Y TIMESTAMP PRE-ORDEN
         # =========================================================================
         order_price_close = None
-        order_ts_close = None
+        order_ts_close    = None
         
         try:
             # Get current market price via WebSocket
@@ -654,9 +650,8 @@ def close_position(symbol: str,
                             fee_from_api=None,
                             regime_family=position_data.get('regime_family', 'unknown'),
                             regime_multiplier=position_data.get('regime_multiplier', 1.0),
-                            market_direction=position_data.get('market_direction', 'unknown'),              # ← NUEVO
+                            market_direction=position_data.get('market_direction', 'unknown'),              
                             direction_multiplier=position_data.get('direction_multiplier', 1.0),
-                            # ← NUEVOS: Datos de cierre (capturados aquí)
                             order_price_close=order_price_close,
                             order_ts_close=order_ts_close,
                             exec_ts_close=exec_ts_close,

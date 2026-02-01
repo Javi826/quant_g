@@ -90,7 +90,7 @@ LEVERAGE = 10
 
 # Drift detection
 DRIFT_WINDOW_SIZE = 100
-DRIFT_CHECK_INTERVAL = 20
+DRIFT_CHECK_INTERVAL = 30
 
 # Execution quality
 EXECUTION_WINDOW_SIZE = 20
@@ -98,6 +98,8 @@ SLIPPAGE_WARNING_PCT = 0.2
 SLIPPAGE_CRITICAL_PCT = 0.3
 LATENCY_WARNING_SEC = 0.5
 LATENCY_CRITICAL_SEC = 1.0
+
+
 # ==========================================================================
 # STRATEGY VALIDATION CONFIGURATION
 # ==========================================================================

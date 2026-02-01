@@ -18,6 +18,7 @@ import time as time_module
 import requests
 from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
+from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
 
 import psycopg2
 from api.metrics import MetricsCalculator
@@ -322,6 +323,15 @@ class DashboardServer:
                 'timestamp': datetime.now().isoformat()
             })
         
+        @self.app.route('/api/quality/thresholds')
+        def get_quality_thresholds():
+            return jsonify({
+                'success': True,
+                'thresholds': {
+                    'slippage_warning_pct': SLIPPAGE_WARNING_PCT,
+                    'slippage_critical_pct': SLIPPAGE_CRITICAL_PCT
+                }
+            })
 
         @self.app.route('/api/logs/stream')
         def stream_logs():
@@ -574,7 +584,7 @@ class DashboardServer:
                 return jsonify(recent)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
-        
+    
         @self.app.route('/api/strategy-analysis')
         def get_strategy_analysis():
             try:
@@ -595,7 +605,16 @@ class DashboardServer:
                 
                 num_strategies = df['STRATEGY'].nunique()
                 capital_per_strategy = self._calculate_capital_allocation(num_strategies)
-                total_profit_all = df['PROFIT'].sum()
+                
+                # Calculate profit per strategy first
+                strategy_profits = {}
+                for strategy in df['STRATEGY'].unique():
+                    df_strategy = df[df['STRATEGY'] == strategy]
+                    strategy_profits[strategy] = df_strategy['PROFIT'].sum()
+                
+                # Separate positive and negative STRATEGY profits
+                total_profit_positive = sum(p for p in strategy_profits.values() if p > 0)
+                total_profit_negative = sum(p for p in strategy_profits.values() if p < 0)
                 
                 for strategy in sorted(df['STRATEGY'].unique()):
                     df_strategy = df[df['STRATEGY'] == strategy]
@@ -603,7 +622,7 @@ class DashboardServer:
                     num_trades = len(df_strategy)
                     positive_trades = len(df_strategy[df_strategy['PROFIT'] > 0])
                     pct_positive = (positive_trades / num_trades * 100) if num_trades > 0 else 0
-                    total_profit = df_strategy['PROFIT'].sum()
+                    total_profit = strategy_profits[strategy]
                     profit_pct = (total_profit / capital_per_strategy * 100) if capital_per_strategy > 0 else 0
                     avg_duration = round(df_strategy['DURATION'].mean(), 2)
                     date_fo = df_strategy['OPEN_AT'].min()
@@ -619,9 +638,16 @@ class DashboardServer:
                     pct_oom = (oom_count / total_reasons * 100) if total_reasons > 0 else 0
                     pct_timeout = (timeout_count / total_reasons * 100) if total_reasons > 0 else 0
                     
-                    # Calculate Total % (contribution to total profit)
-                    # Calculate Total % (contribution to total profit)
-                    total_pct = (total_profit / abs(total_profit_all) * 100) if total_profit_all != 0 else 0
+                    # Calculate Total % (contribution to respective group)
+                    if total_profit > 0:
+                        # Winning strategy: % of total positive strategies profit
+                        total_pct = (total_profit / total_profit_positive * 100) if total_profit_positive > 0 else 0
+                    elif total_profit < 0:
+                        # Losing strategy: % of total negative strategies profit
+                        total_pct = (total_profit / abs(total_profit_negative) * 100) if total_profit_negative < 0 else 0
+                    else:
+                        # Break-even strategy
+                        total_pct = 0.0
                     
                     results.append({
                         'Strategy': strategy,
@@ -630,7 +656,7 @@ class DashboardServer:
                         'Trades_pct': round(pct_positive, 2),
                         'Total_profit': round(total_profit, 2),
                         'Profit_pct': round(profit_pct, 2),
-                        'Total_pct': round(total_pct, 2),  # <-- NUEVA COLUMNA
+                        'Total_pct': round(total_pct, 2),
                         'TP_pct': round(pct_tp, 2),
                         'SL_pct': round(pct_sl, 2),
                         'OOM_pct': round(pct_oom, 2),
@@ -1842,6 +1868,97 @@ class DashboardServer:
                     'success': False,
                     'error': str(e),
                     'data': {}
+                }), 500
+            
+        @self.app.route('/api/quality/winrate-evolution')
+        def get_winrate_evolution():
+            """
+            Get cumulative win rate evolution over time for selected strategies.
+            
+            Query params:
+                strategies: Comma-separated strategy IDs
+                date_from: Start date (YYYY-MM-DD, optional)
+                date_to: End date (YYYY-MM-DD, optional)
+            
+            Returns:
+                JSON with dates and cumulative win rate percentages
+            """
+            try:
+                # Get parameters
+                strategies_param = request.args.get('strategies', '')
+                selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
+                date_from = request.args.get('date_from', None)
+                date_to = request.args.get('date_to', None)
+                
+                if not selected_strategies:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No strategies selected'
+                    }), 400
+                
+                # Load trades
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': True,
+                        'dates': [],
+                        'winrate': []
+                    })
+                
+                # Filter by strategies
+                df = df[df['STRATEGY'].isin(selected_strategies)].copy()
+                
+                if df.empty:
+                    return jsonify({
+                        'success': True,
+                        'dates': [],
+                        'winrate': []
+                    })
+                
+                # Prepare and filter by dates
+                df = self._prepare_trades_dataframe(df)
+                df = self._filter_df_by_dates(df, date_from, date_to)
+                
+                if df.empty:
+                    return jsonify({
+                        'success': True,
+                        'dates': [],
+                        'winrate': []
+                    })
+                
+                # Sort by close date
+                df = df.sort_values('CLOSE_AT')
+                
+                # Group by date and calculate cumulative win rate
+                df['date'] = df['CLOSE_AT'].dt.date
+                df['is_winner'] = (df['PROFIT'] > 0).astype(int)
+                
+                # Calculate cumulative stats
+                df['cumulative_wins'] = df['is_winner'].cumsum()
+                df['cumulative_trades'] = range(1, len(df) + 1)
+                df['cumulative_winrate'] = (df['cumulative_wins'] / df['cumulative_trades']) * 100
+                
+                # Get one value per day (last trade of the day)
+                daily = df.groupby('date').last().reset_index()
+                
+                # Format output
+                dates = [d.strftime('%Y-%m-%d') for d in daily['date']]
+                winrate = [round(wr, 2) for wr in daily['cumulative_winrate']]
+                
+                return jsonify({
+                    'success': True,
+                    'dates': dates,
+                    'winrate': winrate,
+                    'total_trades': int(len(df))
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in winrate evolution: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
                 }), 500
         
         @self.app.route('/api/btc/snapshot')

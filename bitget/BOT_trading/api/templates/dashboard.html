@@ -449,6 +449,16 @@
                 <div id="equity-subtab-symbols" class="tab-content">
                     <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
                     <div id="symbols-container">Loading...</div>
+                    
+                    <!-- Leyenda para Analytics → Symbols -->
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">SLIPPAGE COLOR LEGEND</div>
+                        <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
+                            <span style="color: #3fb950;">●</span> Green: Positive slippage or low magnitude<br>
+                            <span style="color: #d29922;">●</span> Yellow: Moderate negative slippage.<br>
+                            <span style="color: #f85149;">●</span> Red: High negative slippage.
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="equity-subtab-weekday" class="tab-content">
@@ -683,23 +693,33 @@
             <div class="content-section">
                 <h2>Risk Control</h2>
                 
-                <!-- Sección A: Cards de métricas -->
-                <div class="stats-grid" style="margin-bottom: 30px;">
-                    <div class="stat-card">
-                        <div class="stat-label">Gross Exposure</div>
-                        <div class="stat-value neutral" id="risk-gross-exp">-%</div>
+                <!-- Section A: Total Exposure Cards -->
+                <div style="margin-bottom: 15px;">
+                    <h3 style="font-size: 14px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Total Exposure</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Gross Exposure</div>
+                            <div class="stat-value neutral" id="risk-gross-exp">-%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Net Exposure</div>
+                            <div class="stat-value neutral" id="risk-net-exp">-%</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Net Exposure</div>
-                        <div class="stat-value neutral" id="risk-net-exp">-%</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Long Exposure</div>
-                        <div class="stat-value neutral" id="risk-long-exp" style="color: #3fb950;">-%</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Short Exposure</div>
-                        <div class="stat-value neutral" id="risk-short-exp" style="color: #f85149;">-%</div>
+                </div>
+                
+                <!-- Section B: Directional Breakdown Cards -->
+                <div style="margin-bottom: 30px;">
+                    <h3 style="font-size: 14px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Directional Breakdown</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">Long Exposure</div>
+                            <div class="stat-value neutral" id="risk-long-exp" style="color: #3fb950;">-%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Short Exposure</div>
+                            <div class="stat-value neutral" id="risk-short-exp" style="color: #f85149;">-%</div>
+                        </div>
                     </div>
                 </div>
                 
@@ -766,7 +786,6 @@
                     <div id="drift-table-container">
                         <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
                     </div>
-                    
                     <!-- Legend -->
                     <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
@@ -774,9 +793,40 @@
                             <strong>STATUS:</strong><br>
                             - HEALTHY: WinRate >= P50 (median performance expected)<br>
                             - WARNING: WinRate < P50 (below median, informational only)<br>
-                            - DANGER: (WinRate < P5 AND Avg Profit < 0) confirmed in 2 consecutive checks<br><br>
+                            - DANGER: (WinRate < P5 AND Avg Profit < 0) confirmed in 2 consecutive checks<br>
                             <strong>COUNTER:</strong> Tracks consecutive checks where DANGER condition is met. Resets to 0 if condition improves.
                         </div>
+                    </div>
+                </div>
+                <!-- Win Rate Evolution Chart -->
+                <div class="config-card" style="margin-top: 20px;">
+                    <h3>Win Rate Evolution</h3>
+                    
+                    <!-- Date Filter -->
+                    <div class="date-filter-container">
+                        <div class="date-filter-group">
+                            <label>From:</label>
+                            <input type="date" id="winrate-date-from">
+                        </div>
+                        <div class="date-filter-group">
+                            <label>To:</label>
+                            <input type="date" id="winrate-date-to">
+                        </div>
+                        <button class="btn-clear-dates" onclick="clearWinRateDates()">Clear</button>
+                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="updateWinRateChart()">📊 Update Chart</button>
+                    </div>
+                    
+                    <!-- Strategy Checkboxes -->
+                    <div class="strategy-checkboxes" id="winrate-strategy-checkboxes">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="winrate-strat-all" value="ALL" checked>
+                            <label for="winrate-strat-all">ALL STRATEGIES</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Chart Canvas -->
+                    <div class="chart-container">
+                        <canvas id="winRateChart"></canvas>
                     </div>
                 </div>
                 <!-- Tabla 2: Execution Quality by Strategy -->
@@ -785,13 +835,12 @@
                     <div id="execution-table-container">
                         <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
                     </div>
-                    
                     <!-- Legend -->
                     <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
                         <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
                             <strong>SLIPPAGE:</strong> Average difference between order price and execution price<br>
-                            - HEALTHY: Low slippage | WARNING: Moderate slippage | DANGER: High slippage<br><br>
+                            - HEALTHY: Low slippage | WARNING: Moderate slippage | DANGER: High slippage<br>
                             <strong>LATENCY:</strong> Average time between order submission and execution confirmation<br>
                             - HEALTHY: Fast execution | WARNING: Moderate delay | DANGER: Slow execution
                         </div>
@@ -804,14 +853,14 @@
                         <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
                     </div>
                     
-                    <!-- Legend -->
+                    <!-- Leyenda para Analytics → Symbols -->
                     <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
-                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
+                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">SLIPPAGE COLOR LEGEND</div>
                         <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
-                            <strong>DEVIATION:</strong> Difference between realized profit% and configured TP/SL%<br>
-                            - 🟢 GREEN: Deviation < 0.2% (excellent accuracy)<br>
-                            - 🟡 YELLOW: Deviation 0.2% - 0.5% (acceptable drift)<br>
-                            - 🔴 RED: Deviation > 0.5% (significant drift - review strategy logic)
+                            <strong>SLIPPAGE:</strong> Difference between order price and execution price<br>
+                            - <span style="color: #3fb950;">●</span> GREEN: Positive slippage or low magnitude (excellent execution)<br>
+                            - <span style="color: #d29922;">●</span> YELLOW: Moderate negative slippage (acceptable execution)<br>
+                            - <span style="color: #f85149;">●</span> RED: High negative slippage (poor execution quality)
                         </div>
                     </div>
                 </div>

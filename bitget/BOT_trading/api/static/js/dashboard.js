@@ -34,6 +34,22 @@ const CHART_DEFAULTS = {
     titleColor: COLORS.textPrimary
 };
 
+let SLIPPAGE_THRESHOLDS = {
+    warning: 0.2,   // Fallback si falla el fetch
+    critical: 0.3
+};
+async function loadQualityThresholds() {
+    try {
+        const res = await fetch('/api/quality/thresholds');
+        const data = await res.json();
+        if (data.success) {
+            SLIPPAGE_THRESHOLDS.warning = data.thresholds.slippage_warning_pct;
+            SLIPPAGE_THRESHOLDS.critical = data.thresholds.slippage_critical_pct;
+        }
+    } catch (error) {
+        console.error('Error loading quality thresholds:', error);
+    }
+}
 function getMetricColor(value, withGlow = false) {
     const thresholds = METRIC_THRESHOLDS.profitFactor;
     if (value >= thresholds.excellent) {
@@ -1551,6 +1567,11 @@ async function loadComposeAnalysis() {
     try {
         document.querySelectorAll('.compose-checkbox').forEach(cb => cb.checked = false);
         
+        // Show loading indicator
+        const container = document.getElementById('compose-container');
+        container.innerHTML = '<div style="text-align: center; color: #58a6ff; padding: 40px;"><div class="loading-spinner"></div><p style="margin-top: 15px;">Calculating combinations...</p></div>';
+        document.getElementById('compose-plot-btn').style.display = 'none';
+        
         const metric = document.getElementById('compose-metric').value;
         const dateParams = getComposeDateParams();
         const res = await fetch('/api/compose-analysis?metric=' + metric + dateParams);
@@ -1558,7 +1579,6 @@ async function loadComposeAnalysis() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         
         const data = await res.json();
-        const container = document.getElementById('compose-container');
         
         if (!data || data.length === 0) {
             container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
@@ -1966,15 +1986,20 @@ async function loadSymbolsAnalysis() {
                 return '<span style="color: #6b7280;">N/A</span>';
             }
             
-            const absValue = Math.abs(value);
             let color;
             
-            if (absValue < 0.2) {
+            // Positive slippage = better execution (always green)
+            if (value > 0) {
                 color = '#3fb950';
-            } else if (absValue < 0.3) {
-                color = '#d29922';
             } else {
-                color = '#f85149';
+                const absValue = Math.abs(value);
+                if (absValue < SLIPPAGE_THRESHOLDS.warning) {
+                    color = '#3fb950';
+                } else if (absValue < SLIPPAGE_THRESHOLDS.critical) {
+                    color = '#d29922';
+                } else {
+                    color = '#f85149';
+                }
             }
             
             const prefix = value >= 0 ? '+' : '';
@@ -2003,7 +2028,6 @@ async function loadSymbolsAnalysis() {
         document.getElementById('symbols-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
-
 async function loadWeekDayAnalysis() {
     try {
         const res = await fetch('/api/weekday-analysis');
@@ -2663,6 +2687,7 @@ async function initializeDashboard() {
     });
     
     const backendReady = await waitForBackend();
+    await loadQualityThresholds();
     await loadBotConfig();
     startPolling();
 }
@@ -2888,6 +2913,12 @@ async function loadQualityTab() {
                 (deviationData.error || 'Error loading deviation data') + 
                 '</div>';
         }
+        // Initialize win rate evolution checkboxes
+        await initStrategyCheckboxes(
+            'winrate-strategy-checkboxes',
+            'winrate-strat-',
+            'winrate-strat-all'
+        );
         
     } catch (error) {
         console.error('Error loading quality tab:', error);
@@ -2918,7 +2949,7 @@ function renderDriftTable(data) {
             '<th>P5_Ref</th>' +
             '<th>P50_Ref</th>' +
             '<th>WinRate_100</th>' +
-            '<th>WinRate_100_L20</th>' +
+            '<th>WinRate_100_L30</th>' +
             '<th>Avg_Profit_100</th>' +
             '<th>Counter</th>' +
             '<th>Total Trades</th>' +
@@ -3185,16 +3216,25 @@ function renderRiskStrategyTable(strategies, availableCapital) {
         return;
     }
     
+    // Calculate total gross exposure (sum of all strategy exposures)
+    const totalGrossExposure = strategies.reduce((sum, strat) => sum + strat.pct, 0);
+    
     const html = '<table><thead><tr>' +
         '<th>#</th>' +
         '<th>Strategy</th>' +
         '<th>Side</th>' +
         '<th>USDT</th>' +
         '<th>% Exposure</th>' +
+        '<th>% of Total</th>' +
         '</tr></thead><tbody>' +
         strategies.map((strat, idx) => {
             const num = String(idx + 1).padStart(2, '0');
             const sideClass = strat.side === 'LONG' ? 'direction-long' : 'direction-short';
+            
+            // Calculate % of total gross exposure
+            const pctOfTotal = totalGrossExposure > 0 
+                ? (strat.pct / totalGrossExposure * 100) 
+                : 0;
             
             return '<tr>' +
                 '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
@@ -3202,6 +3242,7 @@ function renderRiskStrategyTable(strategies, availableCapital) {
                 '<td class="' + sideClass + '">' + strat.side + '</td>' +
                 '<td>$' + strat.usdt.toFixed(2) + '</td>' +
                 '<td>' + strat.pct.toFixed(2) + '%</td>' +
+                '<td>' + pctOfTotal.toFixed(1) + '%</td>' +
                 '</tr>';
         }).join('') +
         '</tbody></table>';
@@ -3319,8 +3360,7 @@ async function loadRiskHistoryChart() {
                         position: 'top',
                         labels: {
                             color: '#ffffff',
-                            font: { size: 14 },
-                            usePointStyle: true
+                            font: { size: 14 }
                         }
                     },
                     title: {
@@ -3396,7 +3436,130 @@ async function loadRiskHistoryChart() {
         console.error('Error loading risk history chart:', error);
     }
 }
+// =============================================================================
+// WIN RATE EVOLUTION CHART (Quality Control)
+// =============================================================================
 
+let winRateChart = null;
+
+function clearWinRateDates() {
+    document.getElementById('winrate-date-from').value = '';
+    document.getElementById('winrate-date-to').value = '';
+}
+
+function getWinRateDateParams() {
+    const dateFrom = document.getElementById('winrate-date-from').value;
+    const dateTo = document.getElementById('winrate-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+async function updateWinRateChart() {
+    try {
+        const selectedStrategies = getSelectedStrategies('winrate-strategy-checkboxes');
+        
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+        
+        const dateParams = getWinRateDateParams();
+        const res = await fetch('/api/quality/winrate-evolution?strategies=' + selectedStrategies.join(',') + dateParams);
+        const data = await res.json();
+        
+        if (!data.success) {
+            alert('Error loading win rate data: ' + (data.error || 'Unknown error'));
+            return;
+        }
+        
+        if (!data.dates || data.dates.length === 0) {
+            alert('No trades found for selected strategies in this date range');
+            return;
+        }
+        
+        // Destroy existing chart
+        if (winRateChart) {
+            winRateChart.destroy();
+            winRateChart = null;
+        }
+        
+        // Create chart
+        const ctx = document.getElementById('winRateChart').getContext('2d');
+        winRateChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'Cumulative Win Rate (%)',
+                    data: data.winrate,
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointBackgroundColor: '#58a6ff',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#ffffff',
+                            font: { size: 14 }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Win Rate Evolution - ' + selectedStrategies.length + ' strategies (' + data.total_trades + ' trades)',
+                        color: CHART_DEFAULTS.titleColor,
+                        font: { size: CHART_DEFAULTS.fontSize.title, weight: 'bold' }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: CHART_DEFAULTS.textColor,
+                            font: { size: CHART_DEFAULTS.fontSize.axis }
+                        },
+                        grid: {
+                            color: CHART_DEFAULTS.gridColor,
+                            drawBorder: true,
+                            borderColor: CHART_DEFAULTS.borderColor,
+                            borderWidth: CHART_DEFAULTS.borderWidth
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: CHART_DEFAULTS.textColor,
+                            font: { size: CHART_DEFAULTS.fontSize.axis },
+                            callback: function(value) { return value.toFixed(1) + '%'; }
+                        },
+                        grid: {
+                            color: CHART_DEFAULTS.gridColor,
+                            drawBorder: true,
+                            borderColor: CHART_DEFAULTS.borderColor,
+                            borderWidth: CHART_DEFAULTS.borderWidth
+                        }
+                    }
+                }
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error updating win rate chart:', error);
+        alert('Error loading win rate chart: ' + error.message);
+    }
+}
+
+// =============================================================================
+// END WIN RATE EVOLUTION CHART
+// =============================================================================
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeDashboard);
 } else {
