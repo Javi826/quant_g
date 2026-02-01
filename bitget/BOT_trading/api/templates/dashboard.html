@@ -465,7 +465,7 @@
                     <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
                     <div id="weekday-container">Loading...</div>
                 </div>
-                
+               
                 <div id="equity-subtab-regime" class="tab-content">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="margin: 0; color: #c9d1d9;">Performance by Market Regime</h3>
@@ -474,6 +474,34 @@
                             <button class="view-btn" onclick="setRegimeAnalyticsMode('direction')">Market Direction</button>
                         </div>
                     </div>
+                    
+                    <!-- NEW: Strategy Breakdown Table -->
+                    <div class="config-card" style="margin-bottom: 30px;">
+                        <h3>Performance by Strategy</h3>
+                        
+                        <!-- Date Filter -->
+                        <div class="date-filter-container">
+                            <div class="date-filter-group">
+                                <label>From:</label>
+                                <input type="date" id="regime-breakdown-date-from">
+                            </div>
+                            <div class="date-filter-group">
+                                <label>To:</label>
+                                <input type="date" id="regime-breakdown-date-to">
+                            </div>
+                            <button class="btn-clear-dates" onclick="clearRegimeBreakdownDates()">Clear</button>
+                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadRegimeStrategyBreakdown()">🔄 Update</button>
+                        </div>
+                        
+                        <!-- Table Container -->
+                        <div id="regime-breakdown-container" style="margin-top: 20px;">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Click "🔄 Update" to load strategy breakdown
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- EXISTING: Aggregated stats cards -->
                     <div id="regime-analytics-container">
                         <div style="text-align: center; color: #8b949e; padding: 40px;">
                             Loading regime analytics...

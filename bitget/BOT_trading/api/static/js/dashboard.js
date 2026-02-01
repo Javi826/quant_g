@@ -2265,7 +2265,109 @@ async function loadMarketDirectionAnalytics() {
 // =============================================================================
 // END REGIME ANALYTICS
 // =============================================================================
+// =============================================================================
+// REGIME STRATEGY BREAKDOWN
+// =============================================================================
 
+function clearRegimeBreakdownDates() {
+    document.getElementById('regime-breakdown-date-from').value = '';
+    document.getElementById('regime-breakdown-date-to').value = '';
+}
+
+function getRegimeBreakdownDateParams() {
+    const dateFrom = document.getElementById('regime-breakdown-date-from').value;
+    const dateTo = document.getElementById('regime-breakdown-date-to').value;
+    let params = '';
+    if (dateFrom) params += '&date_from=' + dateFrom;
+    if (dateTo) params += '&date_to=' + dateTo;
+    return params;
+}
+
+async function loadRegimeStrategyBreakdown() {
+    try {
+        const dateParams = getRegimeBreakdownDateParams();
+        const res = await fetch('/api/regime/strategy-breakdown?' + dateParams);
+        
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+        }
+        
+        const response = await res.json();
+        const container = document.getElementById('regime-breakdown-container');
+        
+        if (!response.success || !response.data || response.data.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
+                (response.error || 'No data available for selected date range') +
+                '</div>';
+            return;
+        }
+        
+        const data = response.data;
+        
+        // Build table
+        let html = '<table><thead><tr>' +
+            '<th>#</th>' +
+            '<th>Strategy</th>' +
+            '<th>Total Trades</th>' +
+            '<th>Win %</th>' +
+            '<th>Profit</th>' +
+            '<th>TRENDING</th>' +
+            '<th>RANGING</th>' +
+            '<th>VOLATILE</th>' +
+            '<th>UPTREND</th>' +
+            '<th>DOWNTREND</th>' +
+            '</tr></thead><tbody>';
+        
+        data.forEach(row => {
+            const num = String(row.number).padStart(2, '0');
+            const profitClass = row.profit >= 0 ? 'direction-long' : 'direction-short';
+            const profitPrefix = row.profit >= 0 ? '+$' : '$';
+            
+            // Helper to format regime/direction cells
+            function formatCell(stats, globalWinRate) {
+                if (stats.trades === 0) {
+                    return '<span style="color: #6b7280;">-</span>';
+                }
+                
+                let arrow = '';
+                if (stats.win_pct > globalWinRate) {
+                    arrow = ' <span style="color: #ffffff;">↑</span>';
+                } else if (stats.win_pct < globalWinRate) {
+                    arrow = ' <span style="color: #ffffff;">↓</span>';
+                } else {
+                    arrow = ' <span style="color: #ffffff;">=</span>';
+                }
+                
+                return stats.trades + ' / ' + stats.win_pct.toFixed(1) + '%' + arrow;
+            }
+            
+            html += '<tr>' +
+                '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
+                '<td>' + row.strategy + '</td>' +
+                '<td style="text-align: center;">' + row.total_trades + '</td>' +
+                '<td style="text-align: center;">' + row.win_rate.toFixed(1) + '%</td>' +
+                '<td class="' + profitClass + '">' + profitPrefix + row.profit.toFixed(2) + '</td>' +
+                '<td style="text-align: center; color: #58a6ff;">' + formatCell(row.trending, row.win_rate) + '</td>' +
+                '<td style="text-align: center; color: #9ca3af;">' + formatCell(row.ranging, row.win_rate) + '</td>' +
+                '<td style="text-align: center; color: #f85149;">' + formatCell(row.volatile, row.win_rate) + '</td>' +
+                '<td style="text-align: center; color: #3fb950;">' + formatCell(row.uptrend, row.win_rate) + '</td>' +
+                '<td style="text-align: center; color: #f85149;">' + formatCell(row.downtrend, row.win_rate) + '</td>' +
+                '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading regime strategy breakdown:', error);
+        document.getElementById('regime-breakdown-container').innerHTML = 
+            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+    }
+}
+
+// =============================================================================
+// END REGIME STRATEGY BREAKDOWN
+// =============================================================================
 async function updateEquityChart() {
     try {
         const selectedStrategies = getSelectedStrategies('strategy-checkboxes');

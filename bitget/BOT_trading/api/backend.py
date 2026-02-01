@@ -1320,6 +1320,118 @@ class DashboardServer:
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
             
+        @self.app.route('/api/regime/strategy-breakdown')
+        def get_regime_strategy_breakdown():
+            """
+            Performance breakdown by strategy across market regimes and directions.
+            
+            Query params:
+                date_from: YYYY-MM-DD (optional)
+                date_to: YYYY-MM-DD (optional)
+            
+            Returns:
+                JSON with per-strategy stats across regimes and directions
+            """
+            try:
+                date_from = request.args.get('date_from', None)
+                date_to = request.args.get('date_to', None)
+                
+                # Load trades
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No trades data available',
+                        'data': []
+                    })
+                
+                # Check if regime columns exist
+                if 'REGIME_FAMILY' not in df.columns or 'MARKET_DIRECTION' not in df.columns:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No regime/direction data in trades file',
+                        'data': []
+                    })
+                
+                # Prepare and filter by dates
+                df = self._prepare_trades_dataframe(df)
+                df = self._filter_df_by_dates(df, date_from, date_to)
+                
+                if df.empty:
+                    return jsonify({
+                        'success': True,
+                        'data': []
+                    })
+                
+                # Fill NaN values
+                df['REGIME_FAMILY'] = df['REGIME_FAMILY'].fillna('unknown')
+                df['MARKET_DIRECTION'] = df['MARKET_DIRECTION'].fillna('unknown')
+                
+                # Get unique strategies
+                strategies = sorted(df['STRATEGY'].unique())
+                
+                results = []
+                
+                for idx, strategy in enumerate(strategies, 1):
+                    df_strat = df[df['STRATEGY'] == strategy]
+                    
+                    # Global stats
+                    total_trades = len(df_strat)
+                    positive_trades = len(df_strat[df_strat['PROFIT'] > 0])
+                    win_rate = (positive_trades / total_trades * 100) if total_trades > 0 else 0
+                    total_profit = df_strat['PROFIT'].sum()
+                    
+                    # Helper function to calculate regime/direction stats
+                    def get_stats(filtered_df):
+                        if len(filtered_df) == 0:
+                            return {'trades': 0, 'win_pct': 0}
+                        
+                        trades = len(filtered_df)
+                        wins = len(filtered_df[filtered_df['PROFIT'] > 0])
+                        win_pct = (wins / trades * 100) if trades > 0 else 0
+                        
+                        return {
+                            'trades': int(trades),
+                            'win_pct': round(float(win_pct), 1)
+                        }
+                    
+                    # Calculate stats for each regime
+                    trending_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'trending'])
+                    ranging_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'ranging'])
+                    volatile_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'volatile'])
+                    
+                    # Calculate stats for each direction
+                    uptrend_stats = get_stats(df_strat[df_strat['MARKET_DIRECTION'] == 'uptrend'])
+                    downtrend_stats = get_stats(df_strat[df_strat['MARKET_DIRECTION'] == 'dwtrend'])
+                    
+                    results.append({
+                        'number': idx,
+                        'strategy': strategy,
+                        'total_trades': int(total_trades),
+                        'win_rate': round(float(win_rate), 1),
+                        'profit': round(float(total_profit), 2),
+                        'trending': trending_stats,
+                        'ranging': ranging_stats,
+                        'volatile': volatile_stats,
+                        'uptrend': uptrend_stats,
+                        'downtrend': downtrend_stats
+                    })
+                
+                return jsonify({
+                    'success': True,
+                    'data': results
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in regime strategy breakdown: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'data': []
+                }), 500
+            
         @self.app.route('/api/analytics/market-direction')
         def get_market_direction_analytics():
             """
