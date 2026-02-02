@@ -2862,6 +2862,20 @@ function getSelectedCorrelationStrategies() {
     return getSelectedStrategies('correlation-strategy-checkboxes');
 }
 
+
+function setCorrelationMetric(metric) {
+    currentCorrelationMetric = metric;
+    
+    // Update button states
+    const buttons = document.querySelectorAll('#equity-subtab-correlation .view-selector .view-btn');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        if ((metric === 'profit' && btn.textContent === 'Profit') ||
+            (metric === 'drawdown' && btn.textContent === 'Drawdown')) {
+            btn.classList.add('active');
+        }
+    });
+}
 async function updateCorrelationAnalysis() {
     const selected = getSelectedCorrelationStrategies();
     
@@ -2878,7 +2892,10 @@ async function updateCorrelationAnalysis() {
         const res = await fetch('/api/correlation-matrix', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ strategies: selected })
+            body: JSON.stringify({ 
+                strategies: selected,
+                metric: currentCorrelationMetric
+            })
         });
         
         const data = await res.json();

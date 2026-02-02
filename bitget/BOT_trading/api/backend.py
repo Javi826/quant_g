@@ -1149,21 +1149,19 @@ class DashboardServer:
             try:
                 import pandas as pd
                 
-                # Get selected strategies from request
+                # Get selected strategies and metric from request
                 data = request.get_json()
                 selected_strategies = data.get('strategies', [])
+                metric = data.get('metric', 'profit')  # 'profit' or 'drawdown'
                 
                 if not selected_strategies:
                     return jsonify({'error': 'No strategies selected'}), 400
                 
-                # Load trades from Excel
-                if not os.path.exists(self.trades_file):
+                # Load trades from PostgreSQL
+                df = self._load_trades_dataframe()
+                
+                if df is None or df.empty:
                     return jsonify({'error': 'No trades data available'}), 404
-                
-                df = pd.read_excel(self.trades_file)
-                
-                if df.empty:
-                    return jsonify({'error': 'Trades file is empty'}), 404
                 
                 # Filter by selected strategies
                 df = df[df['STRATEGY'].isin(selected_strategies)]
@@ -1171,7 +1169,7 @@ class DashboardServer:
                 if df.empty:
                     return jsonify({'error': 'No trades found for selected strategies'}), 404
                 
-                # Group by strategy and date, calculate daily returns
+                # Group by strategy and date
                 returns_by_strategy = {}
                 for strat_id in selected_strategies:
                     strat_df = df[df['STRATEGY'] == strat_id].copy()
@@ -1182,8 +1180,17 @@ class DashboardServer:
                     # Convert to datetime and get date
                     strat_df['date'] = pd.to_datetime(strat_df['CLOSE_AT']).dt.date
                     
-                    # Sum daily profits
-                    daily_returns = strat_df.groupby('date')['PROFIT'].sum()
+                    if metric == 'profit':
+                        # Sum daily profits
+                        daily_returns = strat_df.groupby('date')['PROFIT'].sum()
+                    else:  # drawdown
+                        # Calculate daily drawdown
+                        daily_returns = strat_df.groupby('date')['PROFIT'].sum()
+                        cumulative = daily_returns.cumsum()
+                        running_max = cumulative.cummax()
+                        daily_drawdown = cumulative - running_max
+                        daily_returns = daily_drawdown
+                    
                     returns_by_strategy[strat_id] = daily_returns
                 
                 if len(returns_by_strategy) < 2:
@@ -1191,8 +1198,6 @@ class DashboardServer:
                 
                 # Create DataFrame and calculate correlation
                 returns_df = pd.DataFrame(returns_by_strategy)
-                
-                # Fill NaN with 0 (days with no trades)
                 returns_df = returns_df.fillna(0)
                 
                 # Calculate correlation matrix
@@ -1216,7 +1221,7 @@ class DashboardServer:
                 # Sort by correlation (highest first)
                 high_corr_pairs.sort(key=lambda x: x['correlation'], reverse=True)
                 
-                # Convert matrix to dict (handle NaN values)
+                # Convert matrix to dict
                 matrix_dict = {}
                 for col in corr_matrix.columns:
                     matrix_dict[col] = {}
@@ -1228,7 +1233,8 @@ class DashboardServer:
                     'success': True,
                     'matrix': matrix_dict,
                     'strategies': strategies_list,
-                    'high_corr_pairs': high_corr_pairs
+                    'high_corr_pairs': high_corr_pairs,
+                    'metric': metric
                 })
                 
             except Exception as e:

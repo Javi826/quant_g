@@ -507,10 +507,17 @@
                             Loading regime analytics...
                         </div>
                     </div>
-                </div>
-                
+                </div>              
                 <div id="equity-subtab-correlation" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Correlation Analysis</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #c9d1d9;">Strategy Correlation Analysis</h3>
+                        
+                        <!-- Metric selector -->
+                        <div class="view-selector">
+                            <button class="view-btn active" onclick="setCorrelationMetric('profit')">Profit</button>
+                            <button class="view-btn" onclick="setCorrelationMetric('drawdown')">Drawdown</button>
+                        </div>
+                    </div>
                     
                     <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd; margin-bottom: 20px;" onclick="updateCorrelationAnalysis()">🔄 Update Correlation</button>
                     
