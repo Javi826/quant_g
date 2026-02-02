@@ -377,6 +377,10 @@ function updateRegimeUI(data) {
     const multiplier = data.multiplier || 1.0;
     const metrics = data.metrics || {};
     const timeframe = data.timeframe || currentRegimeTimeframe;
+    
+    // GLOBAL CONSTANTS
+    const TOTAL_BLOCKS = 72;
+    
     // CRITICAL: all_families must come from backend (settings.py)
     // If backend fails, show error instead of using outdated hardcoded values
     const allFamilies = data.all_families;
@@ -463,10 +467,9 @@ function updateRegimeUI(data) {
         }
     }
     
-        // Get badge style
+    // Get badge style
     const badgeStyle = getRegimeBadgeStyle(family);
     
-    // Update header stat card
     // Update header stat card
     const regimeText = document.getElementById('regime-text');
     const regimeDirection = document.getElementById('regime-direction');
@@ -568,7 +571,7 @@ function updateRegimeUI(data) {
     
     // Helper function to create colored block bar
     function createColoredBar(value, reverse = false) {
-        const totalBlocks = 20;
+        const totalBlocks = TOTAL_BLOCKS;
         const filledBlocks = Math.round(value * totalBlocks);
         
         // Determine single color based on value (not position)
@@ -608,6 +611,16 @@ function updateRegimeUI(data) {
         return html;
     }
     
+    // Helper to create empty bar
+    function createEmptyBar() {
+        const totalBlocks = TOTAL_BLOCKS;
+        let html = '';
+        for (let i = 0; i < totalBlocks; i++) {
+            html += '<span style="color: #2d333b;">█</span>';
+        }
+        return html;
+    }
+    
     // Update metrics with colored block bars
     const hurst = metrics.hurst;
     const er = metrics.efficiency_ratio;
@@ -633,13 +646,15 @@ function updateRegimeUI(data) {
         const hurstBar = document.getElementById('regime-bar-hurst');
         if (hurstBar) {
             hurstBar.innerHTML = createColoredBar(hurst, false);
+            hurstBar.style.width = '100%';
         }
     } else {
         document.getElementById('regime-metric-hurst').textContent = '-';
         document.getElementById('regime-metric-hurst').style.color = '#58a6ff';
         const hurstBar = document.getElementById('regime-bar-hurst');
         if (hurstBar) {
-            hurstBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+            hurstBar.innerHTML = createEmptyBar();
+            hurstBar.style.width = '100%';
         }
     }
     
@@ -662,43 +677,70 @@ function updateRegimeUI(data) {
         const erBar = document.getElementById('regime-bar-er');
         if (erBar) {
             erBar.innerHTML = createColoredBar(er, false);
+            erBar.style.width = '100%';
         }
     } else {
         document.getElementById('regime-metric-er').textContent = '-';
         document.getElementById('regime-metric-er').style.color = '#22d3ee';
         const erBar = document.getElementById('regime-bar-er');
         if (erBar) {
-            erBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+            erBar.innerHTML = createEmptyBar();
+            erBar.style.width = '100%';
         }
     }
     
-    // ATR Percentage (scale 0-5% to 0-1, lower is better)
+    // ATR Percentage (scale 0-4% to 0-1, lower is better)
     if (atr !== undefined && atr !== null && !isNaN(atr)) {
         const atrElement = document.getElementById('regime-metric-atr');
         atrElement.textContent = atr.toFixed(2) + '%';
         
-        // Set color to match bar color (reverse - lower is better)
-        const atrScaled = Math.min(atr / 5, 1.0);
+        // Color for text based on absolute ATR value
         let atrColor;
-        if (atrScaled < 0.33) {
-            atrColor = '#3fb950'; // Green (low value is good)
-        } else if (atrScaled < 0.66) {
-            atrColor = '#f59e0b'; // Yellow (medium value)
+        if (atr > 2.0) {
+            atrColor = '#f85149'; // Red if > 2%
+        } else if (atr > 1.0) {
+            atrColor = '#f59e0b'; // Yellow if 1-2%
         } else {
-            atrColor = '#f85149'; // Red (high value is bad)
+            atrColor = '#3fb950'; // Green if < 1%
         }
         atrElement.style.color = atrColor;
         
+        // Bar uses SAME color logic (not reverse gradient)
+        const atrScaled = Math.min(atr / 4, 1.0);
+        const totalBlocks = TOTAL_BLOCKS;
+        const filledBlocks = Math.round(atrScaled * totalBlocks);
+        
+        // Determine bar color based on actual ATR value
+        let barFillColor;
+        if (atr > 2.0) {
+            barFillColor = '#f85149'; // Red
+        } else if (atr > 1.0) {
+            barFillColor = '#f59e0b'; // Yellow
+        } else {
+            barFillColor = '#3fb950'; // Green
+        }
+        
+        let barHtml = '';
+        for (let i = 0; i < totalBlocks; i++) {
+            if (i < filledBlocks) {
+                barHtml += '<span style="color: ' + barFillColor + ';">█</span>';
+            } else {
+                barHtml += '<span style="color: #2d333b;">█</span>';
+            }
+        }
+        
         const atrBar = document.getElementById('regime-bar-atr');
         if (atrBar) {
-            atrBar.innerHTML = createColoredBar(atrScaled, true);
+            atrBar.innerHTML = barHtml;
+            atrBar.style.width = '100%';
         }
     } else {
         document.getElementById('regime-metric-atr').textContent = '-';
         document.getElementById('regime-metric-atr').style.color = '#f59e0b';
         const atrBar = document.getElementById('regime-bar-atr');
         if (atrBar) {
-            atrBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+            atrBar.innerHTML = createEmptyBar();
+            atrBar.style.width = '100%';
         }
     }
     
@@ -721,17 +763,18 @@ function updateRegimeUI(data) {
         const peBar = document.getElementById('regime-bar-pe');
         if (peBar) {
             peBar.innerHTML = createColoredBar(pe, true);
+            peBar.style.width = '100%';
         }
     } else {
         document.getElementById('regime-metric-pe').textContent = '-';
         document.getElementById('regime-metric-pe').style.color = '#a78bfa';
         const peBar = document.getElementById('regime-bar-pe');
         if (peBar) {
-            peBar.innerHTML = '<span style="color: #2d333b;">████████████████████</span>';
+            peBar.innerHTML = createEmptyBar();
+            peBar.style.width = '100%';
         }
     }
 }
-
 // ═══════════════════════════════════════════════════════════════════════════
 // END MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2324,21 +2367,25 @@ async function loadRegimeStrategyBreakdown() {
             const profitPrefix = row.profit >= 0 ? '+$' : '$';
             
             // Helper to format regime/direction cells
+            // Helper to format regime/direction cells
             function formatCell(stats, globalWinRate) {
                 if (stats.trades === 0) {
                     return '<span style="color: #6b7280;">-</span>';
                 }
                 
-                let arrow = '';
+                let arrowColor = '#6b7280'; // Default grey
+                let arrow = '=';
+                
                 if (stats.win_pct > globalWinRate) {
-                    arrow = ' <span style="color: #ffffff;">↑</span>';
+                    arrowColor = '#3fb950'; // Green
+                    arrow = '↑';
                 } else if (stats.win_pct < globalWinRate) {
-                    arrow = ' <span style="color: #ffffff;">↓</span>';
-                } else {
-                    arrow = ' <span style="color: #ffffff;">=</span>';
+                    arrowColor = '#f85149'; // Red
+                    arrow = '↓';
                 }
                 
-                return stats.trades + ' / ' + stats.win_pct.toFixed(1) + '%' + arrow;
+            return '<span style="color: #58a6ff;">' + stats.trades + ' / ' + stats.win_pct.toFixed(1) + '%</span>' +
+                   ' <span style="color: ' + arrowColor + '; font-weight: 700; font-size: 24px;">' + arrow + '</span>';
             }
             
             html += '<tr>' +
@@ -2347,11 +2394,11 @@ async function loadRegimeStrategyBreakdown() {
                 '<td style="text-align: center;">' + row.total_trades + '</td>' +
                 '<td style="text-align: center;">' + row.win_rate.toFixed(1) + '%</td>' +
                 '<td class="' + profitClass + '">' + profitPrefix + row.profit.toFixed(2) + '</td>' +
-                '<td style="text-align: center; color: #58a6ff;">' + formatCell(row.trending, row.win_rate) + '</td>' +
-                '<td style="text-align: center; color: #9ca3af;">' + formatCell(row.ranging, row.win_rate) + '</td>' +
-                '<td style="text-align: center; color: #f85149;">' + formatCell(row.volatile, row.win_rate) + '</td>' +
-                '<td style="text-align: center; color: #3fb950;">' + formatCell(row.uptrend, row.win_rate) + '</td>' +
-                '<td style="text-align: center; color: #f85149;">' + formatCell(row.downtrend, row.win_rate) + '</td>' +
+                '<td style="text-align: center;">' + formatCell(row.trending, row.win_rate) + '</td>' +
+                '<td style="text-align: center;">' + formatCell(row.ranging, row.win_rate) + '</td>' +
+                '<td style="text-align: center;">' + formatCell(row.volatile, row.win_rate) + '</td>' +
+                '<td style="text-align: center;">' + formatCell(row.uptrend, row.win_rate) + '</td>' +
+                '<td style="text-align: center;">' + formatCell(row.downtrend, row.win_rate) + '</td>' +
                 '</tr>';
         });
         

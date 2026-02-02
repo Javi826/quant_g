@@ -983,3 +983,21 @@ input[type="datetime-local"],
     color: #30363d;
     font-weight: 400;
 }
+/* ═══════════════════════════════════════════════════════════════
+   REGIME METRIC BARS - FULL WIDTH
+   ═══════════════════════════════════════════════════════════════ */
+
+#regime-bar-hurst,
+#regime-bar-er,
+#regime-bar-atr,
+#regime-bar-pe {
+    display: block !important;
+    width: 100% !important;
+    font-family: monospace !important;
+    font-size: 16px !important;
+    margin-bottom: 8px !important;
+    letter-spacing: 1px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
