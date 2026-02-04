@@ -169,7 +169,7 @@ API_LIMIT_DATA  = 180  # Limit for live trading candle fetch
 # ==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
 CHECK_INTERVAL        = 5  
-USE_HARDCODED_SIGNALS = True  
+USE_HARDCODED_SIGNALS = False  
 PERSISTENCE_DIR       = "persistence"
 
 # ==========================================================================

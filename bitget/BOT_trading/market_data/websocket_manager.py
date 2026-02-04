@@ -348,17 +348,22 @@ class BitgetWSManager:
                             self.on_fill_callback(fill)
     
             elif channel == "positions":
-                if action == "snapshot":
-                    self.positions.clear()
-    
-                for pos in data_list:
-                    symbol = pos.get("instId")
-                    total = float(pos.get("total", 0))
-                    if symbol:
-                        if total > 0:
-                            self.positions[symbol] = pos
-                        else:
-                            self.positions.pop(symbol, None)
+               if action == "snapshot":
+                   self.positions.clear()
+           
+               for pos in data_list:
+                   symbol = pos.get("instId")
+                   hold_side = pos.get("holdSide", "").lower()
+                   total = float(pos.get("total", 0))
+                   
+                   if symbol and hold_side:
+                       # Use composite key for hedge mode support
+                       key = f"{symbol}_{hold_side}"
+                       
+                       if total > 0:
+                           self.positions[key] = pos
+                       else:
+                           self.positions.pop(key, None)
     
             elif channel == "account":
                 for acc in data_list:
@@ -452,8 +457,45 @@ class BitgetWSManager:
         return self.orders.get(order_id)
     
     def get_position(self, symbol):
-        """Obtiene información de una posición"""
-        return self.positions.get(symbol)
+        """
+        DEPRECATED: Use get_positions_by_symbol() instead.
+        
+        This method is incompatible with hedge mode (same symbol can have 
+        both LONG and SHORT positions). Returns None to prevent silent data loss.
+        
+        Args:
+            symbol: Trading pair (e.g. 'BTCUSDT')
+            
+        Returns:
+            None (always)
+        """
+        logger.warning(
+            f"[WS] get_position() is DEPRECATED - use get_positions_by_symbol(). "
+            f"Called with: {symbol}"
+        )
+        return None
+    
+    def get_positions_by_symbol(self, symbol):
+        """
+        Get all positions for a symbol (hedge mode support).
+        
+        Args:
+            symbol: Trading pair (e.g., 'BTCUSDT')
+        
+        Returns:
+            dict: {'long': pos_data or None, 'short': pos_data or None}
+        """
+        result = {'long': None, 'short': None}
+        
+        for pos_data in self.positions.values():
+            if pos_data.get('instId') == symbol:
+                hold_side = pos_data.get('holdSide', '').lower()
+                if hold_side == 'long':
+                    result['long'] = pos_data
+                elif hold_side == 'short':
+                    result['short'] = pos_data
+        
+        return result
     
     def get_usdt_balance(self):
         """Obtiene el balance USDT disponible desde el canal equity"""

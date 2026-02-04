@@ -281,7 +281,6 @@ def save_state_local(
         logger.error(f"Error-saving state: {e}")
         traceback.print_exc()
 
-
 # ==========================================================================
 # BROKER SYNCHRONIZATION (READ-ONLY MONITORING)
 # ==========================================================================
@@ -294,6 +293,8 @@ def sync_broker(open_positions: Dict,
     READ-ONLY: Does not modify state or log trades.
     
     Aggregates positions by symbol+direction and compares with broker.
+    Uses contract precision (volumePlace) for size comparison to avoid float errors.
+    Logs discrepancies to PostgreSQL for historical tracking.
     
     Args:
         open_positions: Current open positions dict
@@ -360,7 +361,7 @@ def sync_broker(open_positions: Dict,
                 local_by_symbol[symbol]['short_strategies'].append(strat_id)
     
     # ==========================================================================
-    # STEP 2: Compare each symbol with broker
+    # STEP 2: Compare each symbol with broker (HEDGE MODE SAFE + PRECISION)
     # ==========================================================================
     total_issues = 0
     
@@ -369,19 +370,33 @@ def sync_broker(open_positions: Dict,
             local_long = local_data['long_size']
             local_short = local_data['short_size']
             
-            # Aggregate broker positions for this symbol (iterate all WS positions)
+            # Get broker positions for this symbol (hedge mode safe)
+            broker_positions = ws.get_positions_by_symbol(symbol)
+            
             broker_long = 0.0
             broker_short = 0.0
             
-            for pos_key, pos_data in ws.positions.items():
-                if pos_data.get('instId') == symbol:
-                    hold_side = pos_data.get('holdSide', '').lower()
-                    total = float(pos_data.get('total', 0))
-                    
-                    if hold_side == 'long':
-                        broker_long += total
-                    elif hold_side == 'short':
-                        broker_short += total
+            if broker_positions['long']:
+                broker_long = float(broker_positions['long'].get('total', 0))
+            
+            if broker_positions['short']:
+                broker_short = float(broker_positions['short'].get('total', 0))
+            
+            # ======================================================================
+            # GET CONTRACT PRECISION (volumePlace from WebSocket cache)
+            # ======================================================================
+            tolerance = 0.0001  # Default fallback
+            
+            try:
+                contract = ws.get_contract(symbol)
+                if contract and 'volumePlace' in contract:
+                    volume_place = int(contract['volumePlace'])
+                    # Tolerance = 1 unit at the precision level
+                    # Example: volumePlace=2 → tolerance=0.01
+                    #          volumePlace=4 → tolerance=0.0001
+                    tolerance = 10 ** (-volume_place)
+            except Exception as e:
+                logger.debug(f"[SYNC] Could not get contract precision for {symbol}: {e}")
             
             # ======================================================================
             # CHECK LONG POSITIONS
@@ -395,6 +410,7 @@ def sync_broker(open_positions: Dict,
                         f"| Strategies: {', '.join(local_data['long_strategies'])}"
                     )
                     
+                    # Telegram alert
                     send_sync_alert(
                         account=account_number,
                         symbol=symbol,
@@ -404,20 +420,42 @@ def sync_broker(open_positions: Dict,
                         strategies=local_data['long_strategies']
                     )
                     
+                    # PostgreSQL log
+                    log_sync_discrepancy(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="not_in_broker_long",
+                        local_size=local_long,
+                        broker_size=0.0,
+                        strategies=local_data['long_strategies']
+                    )
+                    
                     total_issues += 1
                     
-                elif broker_long != local_long:
+                elif abs(broker_long - local_long) > tolerance:
                     # SIZE_MISMATCH: Both have LONG but different sizes
                     logger.warning(
                         f"[SYNC] SIZE MISMATCH: {symbol} LONG "
                         f"| Local: {local_long} | Broker: {broker_long} "
+                        f"| Diff: {abs(broker_long - local_long):.8f} (tolerance: {tolerance}) "
                         f"| Strategies: {', '.join(local_data['long_strategies'])}"
                     )
                     
+                    # Telegram alert
                     send_sync_alert(
                         account=account_number,
                         symbol=symbol,
                         issue_type="SIZE_MISMATCH_LONG",
+                        local_size=local_long,
+                        broker_size=broker_long,
+                        strategies=local_data['long_strategies']
+                    )
+                    
+                    # PostgreSQL log
+                    log_sync_discrepancy(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="size_mismatch_long",
                         local_size=local_long,
                         broker_size=broker_long,
                         strategies=local_data['long_strategies']
@@ -437,6 +475,7 @@ def sync_broker(open_positions: Dict,
                         f"| Strategies: {', '.join(local_data['short_strategies'])}"
                     )
                     
+                    # Telegram alert
                     send_sync_alert(
                         account=account_number,
                         symbol=symbol,
@@ -446,20 +485,42 @@ def sync_broker(open_positions: Dict,
                         strategies=local_data['short_strategies']
                     )
                     
+                    # PostgreSQL log
+                    log_sync_discrepancy(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="not_in_broker_short",
+                        local_size=local_short,
+                        broker_size=0.0,
+                        strategies=local_data['short_strategies']
+                    )
+                    
                     total_issues += 1
                     
-                elif broker_short != local_short:
+                elif abs(broker_short - local_short) > tolerance:
                     # SIZE_MISMATCH: Both have SHORT but different sizes
                     logger.warning(
                         f"[SYNC] SIZE MISMATCH: {symbol} SHORT "
                         f"| Local: {local_short} | Broker: {broker_short} "
+                        f"| Diff: {abs(broker_short - local_short):.8f} (tolerance: {tolerance}) "
                         f"| Strategies: {', '.join(local_data['short_strategies'])}"
                     )
                     
+                    # Telegram alert
                     send_sync_alert(
                         account=account_number,
                         symbol=symbol,
                         issue_type="SIZE_MISMATCH_SHORT",
+                        local_size=local_short,
+                        broker_size=broker_short,
+                        strategies=local_data['short_strategies']
+                    )
+                    
+                    # PostgreSQL log
+                    log_sync_discrepancy(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="size_mismatch_short",
                         local_size=local_short,
                         broker_size=broker_short,
                         strategies=local_data['short_strategies']
