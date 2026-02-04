@@ -136,11 +136,11 @@ MIN_SL_PCT = 1.5
 MAX_SL_PCT = 15
 
 # Candles timeout limits
-MIN_CANDLES = 49
+MIN_CANDLES = 2
 MAX_CANDLES = 101
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
+VALID_TIMEFRAMES = ['2m','1H', '4H', '6Hutc']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION
@@ -169,7 +169,7 @@ API_LIMIT_DATA  = 180  # Limit for live trading candle fetch
 # ==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
 CHECK_INTERVAL        = 5  
-USE_HARDCODED_SIGNALS = False  
+USE_HARDCODED_SIGNALS = True  
 PERSISTENCE_DIR       = "persistence"
 
 # ==========================================================================

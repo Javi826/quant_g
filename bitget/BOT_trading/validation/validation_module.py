@@ -31,27 +31,10 @@ def validate_postgresql_connection():
         bool: True if connection successful
     """
     try:
-        
         logger.info("Validating PostgreSQL connection...")
         
         # Try to connect
         conn = psycopg2.connect(**POSTGRES_CONFIG)
-        
-        # Verify table exists
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                AND table_name = 'symbols_live'
-            )
-        """)
-        table_exists = cursor.fetchone()[0]
-        
-        if not table_exists:
-            logger.warning("Table 'symbols_live' not found in database")
-        
-        cursor.close()
         conn.close()
         
         logger.info("✓ PostgreSQL connection validated successfully")

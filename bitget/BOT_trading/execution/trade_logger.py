@@ -1,5 +1,5 @@
 """
-Trade Logger - Handles trade logging to Excel.
+execution.trade_logger.py - Handles trade logging to Excel.
 
 This module is responsible for:
 - Logging closed positions to Excel file
@@ -327,4 +327,62 @@ def log_closed_position(opened_at,
 
     except Exception as e:
         logger.error(f"Error-logging to Excel: {e}")
+        traceback.print_exc()
+
+# =============================================================================
+# SYNC DISCREPANCY LOGGING (NEW)
+# =============================================================================
+
+def log_sync_discrepancy(account: str,
+                        symbol: str,
+                        issue_type: str,
+                        local_size: float,
+                        broker_size: float,
+                        strategies: list) -> None:
+    """
+    Log a broker synchronization discrepancy to PostgreSQL.
+    
+    Args:
+        account: Account identifier ('00', 'E1', '01')
+        symbol: Trading symbol (e.g., 'BTCUSDT')
+        issue_type: Type of issue ('not_in_broker', 'size_mismatch', 'not_in_local')
+        local_size: Size in local state
+        broker_size: Size in broker
+        strategies: List of strategy IDs involved
+    """
+    if not POSTGRES_ENABLED:
+        return
+    
+    try:
+        import psycopg2
+        from psycopg2 import sql
+        
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+        
+        insert_query = sql.SQL("""
+            INSERT INTO sync_discrepancies 
+            (timestamp, account, symbol, issue_type, local_size, broker_size, strategies)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """)
+        
+        cursor.execute(insert_query, [
+            datetime.now(),
+            account,
+            symbol,
+            issue_type,
+            local_size,
+            broker_size,
+            strategies
+        ])
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.debug(f"[POSTGRES] ✓ Sync discrepancy logged: {symbol} - {issue_type}")
+        
+    except Exception as e:
+        logger.error(f"Error-PostgreSQL sync discrepancy write FAILED: {e}")
+        import traceback
         traceback.print_exc()

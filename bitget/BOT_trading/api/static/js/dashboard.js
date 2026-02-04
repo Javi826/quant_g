@@ -706,7 +706,7 @@ function updateRegimeUI(data) {
         atrElement.style.color = atrColor;
         
         // Bar uses SAME color logic (not reverse gradient)
-        const atrScaled = Math.min(atr / 4, 1.0);
+        const atrScaled = Math.min(atr / 2.5, 1.0);
         const totalBlocks = TOTAL_BLOCKS;
         const filledBlocks = Math.round(atrScaled * totalBlocks);
         

@@ -21,6 +21,8 @@ from typing import Dict, Tuple
 from market_data import get_ws_manager
 from execution.trade_logger import log_closed_position
 from config.settings import POSTGRES_CONFIG
+from alerts.telegram_notifier import send_sync_alert
+from execution.trade_logger import log_sync_discrepancy
 
 import logging
 logger = logging.getLogger('BOT_trading.execution.state_manager')
@@ -281,14 +283,25 @@ def save_state_local(
 
 
 # ==========================================================================
-# BROKER SYNCHRONIZATION
+# BROKER SYNCHRONIZATION (READ-ONLY MONITORING)
 # ==========================================================================
 def sync_broker(open_positions: Dict, 
                 strategy_candles: Dict,
                 account_number: str,
                 state_file: str) -> None:
-
-    total_removed = 0
+    """
+    Monitor and alert on discrepancies between local state and broker.
+    READ-ONLY: Does not modify state or log trades.
+    
+    Args:
+        open_positions: Current open positions dict
+        strategy_candles: Candle counters dict
+        account_number: Account identifier
+        state_file: State file path (unused, kept for signature compatibility)
+    """
+    from alerts.telegram_notifier import send_sync_alert
+    
+    total_issues = 0
     
     if not get_ws_manager():
         raise RuntimeError("WebSocket manager not init.")
@@ -297,92 +310,72 @@ def sync_broker(open_positions: Dict,
     get_ws_manager().refresh_positions()
     
     # Check each strategy's positions
-    for strat_id, positions in list(open_positions.items()):
-        positions_to_remove = []
-        
-        for i, pos in enumerate(positions):
+    for strat_id, positions in open_positions.items():
+        for pos in positions:
             try:
                 symbol = pos['symbol']
+                direction = pos['direction']
+                local_size = pos['size']
                 
                 # Get position from WebSocket
                 ws_position = get_ws_manager().get_position(symbol)
                 
                 # Check if position exists
                 position_exists = False
+                broker_size = 0.0
+                
                 if ws_position:
                     total_size = float(ws_position.get('total', 0))
+                    broker_size = total_size
                     position_exists = (total_size > 0)
                     
                     # Debug info if position is closed
                     if not position_exists:
                         logger.info(f"{symbol}: total={total_size} (position closed)")
                 
-                # If position doesn't exist, mark for removal
+                # Alert if position doesn't exist in broker
                 if not position_exists:
-                    logger.info(f"Position {symbol} doesn't exist in broker - treating as SL")
-                    
-                    sl_price = pos['sl']
-                    
-                    position_data = {
-                        'opened_at': pos['opened_at'],
-                        'strategy_id': strat_id,
-                        'usdt_amount': pos.get('usdt_amount', 0),
-                        'entry_price': pos['entry_price']
-                    }
-                    tp_target = pos.get('tp')
-                    sl_target = pos.get('sl')
-                    
-                    log_closed_position(
-                        opened_at=position_data['opened_at'],
-                        strategy_id=position_data['strategy_id'],
-                        symbol=symbol,
-                        direction=pos['direction'],
-                        usdt_amount=position_data['usdt_amount'],
-                        entry_price=position_data['entry_price'],
-                        close_price=sl_price,
-                        reason="NOT_FOUND",
-                        size=pos['size'],
-                        profit_from_api=None,
-                        fee_from_api=None,
-                        regime_family=pos.get('regime_family', 'unknown'),
-                        regime_multiplier=pos.get('regime_multiplier', 1.0),
-                        market_direction=pos.get('market_direction', 'unknown'),
-                        direction_multiplier=pos.get('direction_multiplier', 1.0),
-                        order_price_close=None,  
-                        order_ts_close=None,    
-                        exec_ts_close=None,    
-                        tp_target=tp_target,
-                        sl_target=sl_target
+                    logger.warning(
+                        f"[SYNC] Position NOT FOUND in broker: {symbol} {direction} "
+                        f"| Strategy: {strat_id} | Local size: {local_size}"
                     )
                     
-                    positions_to_remove.append(i)
-                    total_removed += 1
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="NOT_IN_BROKER",
+                        local_size=local_size,
+                        broker_size=0.0,
+                        strategies=[strat_id]
+                    )
+                    
+                    total_issues += 1
+                
+                # Alert if sizes don't match (position exists but different size)
+                elif abs(broker_size - local_size) > 0.0001:
+                    logger.warning(
+                        f"[SYNC] SIZE MISMATCH: {symbol} {direction} "
+                        f"| Strategy: {strat_id} | Local: {local_size} | Broker: {broker_size}"
+                    )
+                    
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="SIZE_MISMATCH",
+                        local_size=local_size,
+                        broker_size=broker_size,
+                        strategies=[strat_id]
+                    )
+                    
+                    total_issues += 1
                 
             except Exception as e:
-                logger.error(f"Error checking {pos['symbol']}: {e}")
+                logger.error(f"[SYNC] Error checking {pos['symbol']}: {e}")
                 import traceback
                 traceback.print_exc()
-        
-        # Remove positions that don't exist
-        for i in reversed(positions_to_remove):
-            if i < len(open_positions[strat_id]):
-                open_positions[strat_id].pop(i)
-        
-        # Reset candle counter if no positions left
-        if not open_positions[strat_id]:
-            if strategy_candles.get(strat_id, 0) > 0:
-                strategy_candles[strat_id] = 0
     
-    # Save state if changes were made
-    # Save state if changes were made
-    if total_removed > 0:
-        try:
-            save_state_local(open_positions, strategy_candles, account_number, state_file)
-            logger.info(f"Sync with broker completed: {total_removed} position(s) removed")
-        except Exception as e:
-            logger.error(f"CRITICAL ERROR saving state after sync_broker")
-            logger.error(f"Account: {account_number}, Positions removed: {total_removed}")
-            logger.error(f"Error: {e}")
-            raise
+    # Summary log
+    if total_issues > 0:
+        logger.warning(f"[SYNC] Broker sync completed: {total_issues} issue(s) detected - MANUAL REVIEW REQUIRED")
     else:
-        logger.info(f"Sync with broker completed.")
+        logger.info(f"[SYNC] Broker sync completed: All positions match")
