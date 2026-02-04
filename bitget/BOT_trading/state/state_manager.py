@@ -293,89 +293,192 @@ def sync_broker(open_positions: Dict,
     Monitor and alert on discrepancies between local state and broker.
     READ-ONLY: Does not modify state or log trades.
     
+    Aggregates positions by symbol+direction and compares with broker.
+    
     Args:
         open_positions: Current open positions dict
         strategy_candles: Candle counters dict
         account_number: Account identifier
         state_file: State file path (unused, kept for signature compatibility)
     """
+    import time
     from alerts.telegram_notifier import send_sync_alert
-    
-    total_issues = 0
     
     if not get_ws_manager():
         raise RuntimeError("WebSocket manager not init.")
     
-    # Refresh WebSocket position data
-    get_ws_manager().refresh_positions()
+    ws = get_ws_manager()
     
-    # Check each strategy's positions
+    # Refresh WebSocket position data
+    ws.refresh_positions()
+    
+    # Give extra time for snapshot to arrive (thread synchronization)
+    time.sleep(1.5)
+    
+    # Count total local positions
+    total_local = sum(len(positions) for positions in open_positions.values())
+    
+    # CASE 1: Both empty → Nothing to sync
+    if total_local == 0 and len(ws.positions) == 0:
+        logger.info("[SYNC] No positions to sync")
+        return
+    
+    # CASE 2: Local has positions but WS empty → Timing issue, skip
+    if total_local > 0 and len(ws.positions) == 0:
+        logger.error(
+            f"[SYNC] Local has {total_local} position(s) but WebSocket empty "
+            f"- SKIPPING (snapshot timing issue)"
+        )
+        return
+    
+    # CASE 3: WS has data → Proceed with aggregation and comparison
+    
+    # ==========================================================================
+    # STEP 1: Aggregate local positions by symbol + direction
+    # ==========================================================================
+    local_by_symbol = {}
+    
     for strat_id, positions in open_positions.items():
         for pos in positions:
-            try:
-                symbol = pos['symbol']
-                direction = pos['direction']
-                local_size = pos['size']
-                
-                # Get position from WebSocket
-                ws_position = get_ws_manager().get_position(symbol)
-                
-                # Check if position exists
-                position_exists = False
-                broker_size = 0.0
-                
-                if ws_position:
-                    total_size = float(ws_position.get('total', 0))
-                    broker_size = total_size
-                    position_exists = (total_size > 0)
-                    
-                    # Debug info if position is closed
-                    if not position_exists:
-                        logger.info(f"{symbol}: total={total_size} (position closed)")
-                
-                # Alert if position doesn't exist in broker
-                if not position_exists:
-                    logger.warning(
-                        f"[SYNC] Position NOT FOUND in broker: {symbol} {direction} "
-                        f"| Strategy: {strat_id} | Local size: {local_size}"
-                    )
-                    
-                    send_sync_alert(
-                        account=account_number,
-                        symbol=symbol,
-                        issue_type="NOT_IN_BROKER",
-                        local_size=local_size,
-                        broker_size=0.0,
-                        strategies=[strat_id]
-                    )
-                    
-                    total_issues += 1
-                
-                # Alert if sizes don't match (position exists but different size)
-                elif abs(broker_size - local_size) > 0.0001:
-                    logger.warning(
-                        f"[SYNC] SIZE MISMATCH: {symbol} {direction} "
-                        f"| Strategy: {strat_id} | Local: {local_size} | Broker: {broker_size}"
-                    )
-                    
-                    send_sync_alert(
-                        account=account_number,
-                        symbol=symbol,
-                        issue_type="SIZE_MISMATCH",
-                        local_size=local_size,
-                        broker_size=broker_size,
-                        strategies=[strat_id]
-                    )
-                    
-                    total_issues += 1
-                
-            except Exception as e:
-                logger.error(f"[SYNC] Error checking {pos['symbol']}: {e}")
-                import traceback
-                traceback.print_exc()
+            symbol = pos['symbol']
+            direction = pos['direction'].lower()
+            size = float(pos['size'])
+            
+            if symbol not in local_by_symbol:
+                local_by_symbol[symbol] = {
+                    'long_size': 0.0,
+                    'long_strategies': [],
+                    'short_size': 0.0,
+                    'short_strategies': []
+                }
+            
+            if direction == 'long':
+                local_by_symbol[symbol]['long_size'] += size
+                local_by_symbol[symbol]['long_strategies'].append(strat_id)
+            else:  # short
+                local_by_symbol[symbol]['short_size'] += size
+                local_by_symbol[symbol]['short_strategies'].append(strat_id)
     
-    # Summary log
+    # ==========================================================================
+    # STEP 2: Compare each symbol with broker
+    # ==========================================================================
+    total_issues = 0
+    
+    for symbol, local_data in local_by_symbol.items():
+        try:
+            local_long = local_data['long_size']
+            local_short = local_data['short_size']
+            
+            # Aggregate broker positions for this symbol (iterate all WS positions)
+            broker_long = 0.0
+            broker_short = 0.0
+            
+            for pos_key, pos_data in ws.positions.items():
+                if pos_data.get('instId') == symbol:
+                    hold_side = pos_data.get('holdSide', '').lower()
+                    total = float(pos_data.get('total', 0))
+                    
+                    if hold_side == 'long':
+                        broker_long += total
+                    elif hold_side == 'short':
+                        broker_short += total
+            
+            # ======================================================================
+            # CHECK LONG POSITIONS
+            # ======================================================================
+            if local_long > 0:
+                if broker_long == 0:
+                    # NOT_IN_BROKER: Local has LONG but broker doesn't
+                    logger.warning(
+                        f"[SYNC] Position NOT FOUND in broker: {symbol} LONG "
+                        f"| Local: {local_long} | Broker: 0.0 "
+                        f"| Strategies: {', '.join(local_data['long_strategies'])}"
+                    )
+                    
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="NOT_IN_BROKER_LONG",
+                        local_size=local_long,
+                        broker_size=0.0,
+                        strategies=local_data['long_strategies']
+                    )
+                    
+                    total_issues += 1
+                    
+                elif broker_long != local_long:
+                    # SIZE_MISMATCH: Both have LONG but different sizes
+                    logger.warning(
+                        f"[SYNC] SIZE MISMATCH: {symbol} LONG "
+                        f"| Local: {local_long} | Broker: {broker_long} "
+                        f"| Strategies: {', '.join(local_data['long_strategies'])}"
+                    )
+                    
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="SIZE_MISMATCH_LONG",
+                        local_size=local_long,
+                        broker_size=broker_long,
+                        strategies=local_data['long_strategies']
+                    )
+                    
+                    total_issues += 1
+            
+            # ======================================================================
+            # CHECK SHORT POSITIONS
+            # ======================================================================
+            if local_short > 0:
+                if broker_short == 0:
+                    # NOT_IN_BROKER: Local has SHORT but broker doesn't
+                    logger.warning(
+                        f"[SYNC] Position NOT FOUND in broker: {symbol} SHORT "
+                        f"| Local: {local_short} | Broker: 0.0 "
+                        f"| Strategies: {', '.join(local_data['short_strategies'])}"
+                    )
+                    
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="NOT_IN_BROKER_SHORT",
+                        local_size=local_short,
+                        broker_size=0.0,
+                        strategies=local_data['short_strategies']
+                    )
+                    
+                    total_issues += 1
+                    
+                elif broker_short != local_short:
+                    # SIZE_MISMATCH: Both have SHORT but different sizes
+                    logger.warning(
+                        f"[SYNC] SIZE MISMATCH: {symbol} SHORT "
+                        f"| Local: {local_short} | Broker: {broker_short} "
+                        f"| Strategies: {', '.join(local_data['short_strategies'])}"
+                    )
+                    
+                    send_sync_alert(
+                        account=account_number,
+                        symbol=symbol,
+                        issue_type="SIZE_MISMATCH_SHORT",
+                        local_size=local_short,
+                        broker_size=broker_short,
+                        strategies=local_data['short_strategies']
+                    )
+                    
+                    total_issues += 1
+            
+        except Exception as e:
+            logger.error(f"[SYNC] Error checking {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # ==========================================================================
+    # SUMMARY
+    # ==========================================================================
     if total_issues > 0:
-        logger.warning(f"[SYNC] Broker sync completed: {total_issues} issue(s) detected - MANUAL REVIEW REQUIRED")
+        logger.warning(
+            f"[SYNC] Broker sync completed: {total_issues} issue(s) detected "
+            f"- MANUAL REVIEW REQUIRED"
+        )
     else:
         logger.info(f"[SYNC] Broker sync completed: All positions match")
