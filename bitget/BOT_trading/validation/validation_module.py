@@ -41,13 +41,13 @@ def validate_postgresql_connection():
         return True
         
     except OperationalError as e:
-        logger.error("✗ FATAL: PostgreSQL connection failed")
+        logger.error("Error: PostgreSQL connection failed")
         logger.error(f"Error: {e}")
         logger.error("Ensure PostgreSQL is running: sudo systemctl status postgresql")
         raise SystemExit(1)
         
     except Exception as e:
-        logger.error(f"✗ FATAL: Unexpected error validating PostgreSQL: {e}")
+        logger.error(f"Error: Unexpected error validating PostgreSQL: {e}")
         raise SystemExit(1)
         
 # ==========================================================================
@@ -380,11 +380,11 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     """
     
     # Use IDs instead of names for validation
-    declared_strategies = {s['id'] for s in strategies}
+    declared_strategies    = {s['id'] for s in strategies}
     missing_implementation = declared_strategies - implemented_strategies
-    unused_implementation = implemented_strategies - declared_strategies
+    unused_implementation  = implemented_strategies - declared_strategies
     
-    errors = []
+    errors   = []
     warnings = []
     
     # ========================================================================

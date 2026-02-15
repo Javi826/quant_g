@@ -1861,6 +1861,55 @@ class DashboardServer:
                 logger.error(f"Error getting exposure history: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
             
+        @self.app.route('/api/quality/drift-binomial')
+        def get_quality_drift_binomial():
+            """
+            Get binomial drift analysis for all strategies.
+            Uses statistical thresholds (P_target ± σ) with double confirmation.
+            
+            Returns:
+                JSON with drift status per strategy using binomial distribution
+            """
+            try:
+                from quality_control.analyzer import analyze_drift_binomial
+                
+                # Load trades from PostgreSQL
+                df = self._load_trades_dataframe()
+                if df is None or df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'No trades data available',
+                        'data': {}
+                    })
+                
+                # Get strategies config
+                strategies_list = self._get_full_strategies_list_with_numbers()
+                
+                # Filter only ACTIVE and DEPRECATING strategies
+                active_strategies = [
+                    s for s in strategies_list 
+                    if s['status'] in ('ACTIVE', 'DEPRECATING')
+                ]
+                
+                # Analyze drift with binomial method
+                drift_results = analyze_drift_binomial(df, active_strategies)
+                
+                return jsonify({
+                    'success': True,
+                    'data': drift_results,
+                    'window_size': 100
+                })
+                
+            except Exception as e:
+                logger.error(f"Error in binomial drift analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'data': {}
+                }), 500
+                    
         @self.app.route('/api/quality/drift')
         def get_quality_drift():
             """

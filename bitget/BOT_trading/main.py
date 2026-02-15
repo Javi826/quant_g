@@ -17,6 +17,7 @@ from execution import BitgetClient
 from bot_utils.logger import setup_logger
 from core import BotOrchestrator
 from config.utils import get_account_config
+
 # Credentials
 from config.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
 from config.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
@@ -81,8 +82,7 @@ def main():
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
         active_strategy_ids=active_strategy_ids
     )
-    
-    # =======================================================================
+
     bot.run()
 
 if __name__ == '__main__':

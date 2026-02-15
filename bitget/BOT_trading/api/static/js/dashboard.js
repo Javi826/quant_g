@@ -5,6 +5,9 @@
 const COLORS = {
     purple: '#6d28d9',
     green: '#3fb950',
+    healthy: '#58a6ff',
+    warning: '#f0883e',   // ← AÑADIR
+    danger: '#f85149',    // ← AÑADIR
     yellow: '#d29922',
     red: '#f85149',
     textPrimary: '#c9d1d9',
@@ -3035,11 +3038,126 @@ async function loadRiskTab() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// QUALITY CONTROL - BINOMIAL DRIFT DETECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function loadBinomialDrift() {
+    try {
+        const response = await fetch('/api/quality/drift-binomial');
+        const result = await response.json();
+        
+        if (!result.success) {
+            console.error('Error loading binomial drift:', result.error);
+            return;
+        }
+        
+        renderBinomialDriftTable(result.data, result.window_size);
+        
+    } catch (error) {
+        console.error('Error fetching binomial drift:', error);
+    }
+}
+
+function renderBinomialDriftTable(data, windowSize) {
+    const container = document.getElementById('binomial-drift-table-container');
+    if (!container) {
+        console.error('Binomial drift table container not found');
+        return;
+    }
+    
+    const strategies = Object.keys(data).sort();
+    
+    if (strategies.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #8b949e;">No data available</p>';
+        return;
+    }
+    
+    let html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Strategy</th>
+                    <th>Status</th>
+                    <th>Trades</th>
+                    <th>WR 100</th>
+                    <th>WR 100L30</th>
+                    <th>P Target</th>
+                    <th>Warning Limit</th>
+                    <th>Danger Limit</th>
+                    <th>σ</th>
+                    <th>Z-Score</th>
+                    <th>Z-ScoreL30</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    strategies.forEach(strategyId => {
+        const item = data[strategyId];
+        
+        // Status badge color
+        let statusColor = COLORS.healthy; // Blue for HEALTHY
+        if (item.status === 'WARNING') statusColor = '#f0883e';
+        if (item.status === 'DANGER') statusColor = '#f85149';
+        if (item.status === 'INSUFFICIENT_DATA') statusColor = '#6e7681';
+        
+        // Z-score colors
+        function getZScoreColor(zScore) {
+            if (zScore === null || zScore === undefined) return '#8b949e';
+            if (zScore < -3) return '#f85149';
+            if (zScore < -2) return '#f0883e';
+            if (zScore >= 0) return '#3fb950';
+            return '#8b949e';
+        }
+        
+        const zScoreColor = getZScoreColor(item.z_score);
+        const zScoreL30Color = getZScoreColor(item.z_score_l30);
+        
+        html += `
+            <tr>
+                <td style="text-align: left; font-weight: 500;">${strategyId}</td>
+                <td><span style="color: ${statusColor}; font-weight: 600;">${item.status}</span></td>
+                <td>${item.trades_count}</td>
+                <td>${item.winrate_current !== null && item.winrate_current !== undefined ? item.winrate_current.toFixed(2) + '%' : '-'}</td>
+                <td>${item.winrate_l30 !== null && item.winrate_l30 !== undefined ? item.winrate_l30.toFixed(2) + '%' : '-'}</td>
+                <td>${item.p_target !== null && item.p_target !== undefined ? item.p_target.toFixed(2) + '%' : '-'}</td>
+                <td>${item.limit_warning !== null && item.limit_warning !== undefined ? item.limit_warning.toFixed(2) + '%' : '-'}</td>
+                <td>${item.limit_danger !== null && item.limit_danger !== undefined ? item.limit_danger.toFixed(2) + '%' : '-'}</td>
+                <td>${item.sigma !== null && item.sigma !== undefined ? item.sigma.toFixed(2) + '%' : '-'}</td>
+                <td style="color: ${zScoreColor}; font-weight: 500;">${item.z_score !== null && item.z_score !== undefined ? item.z_score.toFixed(2) : '-'}</td>
+                <td style="color: ${zScoreL30Color}; font-weight: 500;">${item.z_score_l30 !== null && item.z_score_l30 !== undefined ? item.z_score_l30.toFixed(2) : '-'}</td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+        
+        <!-- Legend -->
+        <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
+            <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
+                <strong>WR L30:</strong> WinRate from lagged window (shifted 30 trades back) for double confirmation<br>
+                <strong>STATUS:</strong><br>
+                - HEALTHY: WR Current >= Warning Limit (-2σ)<br>
+                - WARNING: WR Current < Warning Limit but not confirmed<br>
+                - DANGER: Both WR Current AND WR L30 < Danger Limit (-3σ, 0.13% probability each)<br>
+                <strong>Z-SCORE:</strong> Standard deviations from P_target. Negative values indicate underperformance.
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
 // =============================================================================
 // QUALITY CONTROL TAB
 // =============================================================================
-
 async function loadQualityTab() {
+    // Load binomial drift first
+    await loadBinomialDrift();
+    
     try {
         // Load drift analysis
         const driftRes = await fetch('/api/quality/drift');
@@ -3097,6 +3215,7 @@ async function loadQualityTab() {
     }
 }
 
+
 function renderDriftTable(data) {
     const container = document.getElementById('drift-table-container');
     
@@ -3130,19 +3249,19 @@ function renderDriftTable(data) {
         let statusText = strat.status;
         
         if (strat.status === 'HEALTHY') {
-            statusColor = '#3fb950';
+            statusColor = COLORS.healthy;
         } else if (strat.status === 'WARNING') {
-            statusColor = '#d29922';
+            statusColor = COLORS.warning;
         } else if (strat.status === 'DANGER') {
-            statusColor = '#f85149';
+            statusColor = COLORS.danger;
         }
         
         // Avg profit color
-        const avgProfitColor = strat.avg_profit_100 >= 0 ? '#3fb950' : '#f85149';
+        const avgProfitColor = strat.avg_profit_100 >= 0 ? '#3fb950' : COLORS.danger;
         const avgProfitPrefix = strat.avg_profit_100 >= 0 ? '+$' : '$';
         
         // Counter color (red if > 0)
-        const counterColor = strat.counter > 0 ? '#f85149' : '#c9d1d9';
+        const counterColor = strat.counter > 0 ? COLORS.danger : '#c9d1d9';
         
         html += '<tr>' +
             '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
@@ -3163,7 +3282,6 @@ function renderDriftTable(data) {
     html += '</tbody></table>';
     container.innerHTML = html;
 }
-
 function renderExecutionTable(data) {
     const container = document.getElementById('execution-table-container');
     
@@ -3195,9 +3313,9 @@ function renderExecutionTable(data) {
         
         // Helper function for status color
         function getStatusColor(status) {
-            if (status === 'HEALTHY') return '#3fb950';
-            if (status === 'WARNING') return '#d29922';
-            if (status === 'DANGER') return '#f85149';
+            if (status === 'HEALTHY') return COLORS.healthy;
+            if (status === 'WARNING') return COLORS.warning;
+            if (status === 'DANGER') return COLORS.danger;
             return '#8b949e';
         }
         
@@ -3260,7 +3378,6 @@ function renderTargetDeviationTable(data) {
         const num = String(index + 1).padStart(2, '0');
         
         // Helper function for deviation color
-        // Helper function for deviation color
         function getDeviationColor(deviation) {
             if (deviation === null || deviation === undefined) return '#8b949e';
             
@@ -3270,8 +3387,8 @@ function renderTargetDeviationTable(data) {
             // Negative deviation: apply thresholds
             const absDev = Math.abs(deviation);
             if (absDev < 0.2) return '#3fb950';  
-            if (absDev < 0.5) return '#d29922';  
-            return '#f85149';                   
+            if (absDev < 0.5) return COLORS.warning;  
+            return COLORS.danger;                   
         }
         
         // Format percentage values

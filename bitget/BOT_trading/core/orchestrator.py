@@ -45,7 +45,7 @@ from config.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
 from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
 from config.settings import LEVERAGE
-
+from core.split_brain_checker import check_split_brain
 class BotOrchestrator:
     """
     Main orchestrator for the trading bot.
@@ -445,7 +445,9 @@ class BotOrchestrator:
         - New closed candles → process signals
         - TP/SL hits → close positions
         """
+        # Split-brain protection (only checks on LOCAL)
         while self._running:
+            check_split_brain(self)
             current_time      = time.time()
             now_datetime      = datetime.now(HOUR_ZONE)
             closed_timeframes = self._get_closed_timeframes(now_datetime)

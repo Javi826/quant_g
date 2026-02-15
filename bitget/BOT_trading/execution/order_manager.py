@@ -196,7 +196,7 @@ def get_current_price(symbol: str, max_cache_age: float = 0.5) -> Decimal:
             return price_data['price']
         time.sleep(0.01)
     
-    raise TimeoutError(f"No fresh - {symbol}")
+    raise TimeoutError(f"No fresh-{symbol}")
 
 
 # ==========================================================================
@@ -627,7 +627,7 @@ def close_position(symbol: str,
         else:
             logger.warning(f"WAR-No closing position available {symbol}: {resp}")
             if resp.get("code") == "22002":
-                logger.warning(f"WAR-Removing from local record (nonexistent position)")
+                logger.warning(f"WAR-Removing from local record (non-existent position)")
                 if position_data:
                     logger.debug(f"[DEBUG POSITION_DATA OUT_OF_MARGIN] {position_data}")
                     tp_target = position_data.get('tp')
@@ -644,7 +644,7 @@ def close_position(symbol: str,
                             usdt_amount=position_data.get('usdt_amount', 0),
                             entry_price=position_data.get('entry_price'),
                             close_price=current_price,
-                            reason="OUT_OF_MARGIN",
+                            reason="GHOST_POSITION",
                             size=size,
                             profit_from_api=None,
                             fee_from_api=None,

@@ -1,5 +1,5 @@
 """
-Bot Configuration Settings
+config/settings.pyBot Configuration Settings
 
 Centralizes all bot configuration including exchange settings,
 validation limits, paths, and account-specific settings.
@@ -13,12 +13,12 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "00": {
-        "initial_capital": 3431,
+        "initial_capital": 26000,
         "dashboard_port": 5000,
         "description": "Main Account"
     },
     "E1": {
-        "initial_capital": 1660,
+        "initial_capital": 26000,
         "dashboard_port": 5001,
         "description": "Elite Account"
     },
@@ -79,7 +79,7 @@ DIRECTION_GENERAL = {
 # RISK CONTROL SETTINGS
 # ==========================================================================
 RISK_LIMITS = {
-    'max_gross_exposure_pct': 60.0,  
+    'max_gross_exposure_pct': 50.0,  
     'max_net_exposure_pct': 20.0     
 }
 LEVERAGE = 10
@@ -89,15 +89,18 @@ LEVERAGE = 10
 # =============================================================================
 
 # Drift detection
-DRIFT_WINDOW_SIZE = 100
+DRIFT_WINDOW_SIZE    = 100
 DRIFT_CHECK_INTERVAL = 30
 
 # Execution quality
 EXECUTION_WINDOW_SIZE = 20
-SLIPPAGE_WARNING_PCT = 0.2
+SLIPPAGE_WARNING_PCT  = 0.2
 SLIPPAGE_CRITICAL_PCT = 0.3
-LATENCY_WARNING_SEC = 0.5
-LATENCY_CRITICAL_SEC = 1.0
+LATENCY_WARNING_SEC   = 0.5
+LATENCY_CRITICAL_SEC  = 1.0
+
+DRIFT_BINOMIAL_WINDOW      = 100
+DRIFT_BINOMIAL_DEFAULT_P50 = 0.55 
 
 
 # ==========================================================================
@@ -126,25 +129,32 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 20
-MAX_ORDER_AMOUNT = 100
+MIN_ORDER_AMOUNT = 580
+MAX_ORDER_AMOUNT = 620
 
 # TP/SL limits (%)
 MIN_TP_PCT = 1.5
 MAX_TP_PCT = 10
-MIN_SL_PCT = 1.5
+MIN_SL_PCT = 5
 MAX_SL_PCT = 15
 
 # Candles timeout limits
-MIN_CANDLES = 2
-MAX_CANDLES = 101
+MIN_CANDLES = 50
+MAX_CANDLES = 100
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['2m','1H', '4H', '6Hutc']
+VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION
 # ==========================================================================
+import socket
+
+# Environment detection
+HOSTNAME      = socket.gethostname()
+VPS_HOSTNAMES = ['srv1326826', 'hstgr.cloud']
+IS_VPS        = any(h in HOSTNAME for h in VPS_HOSTNAMES)
+
 POSTGRES_CONFIG = {
     'dbname': 'bot_trading',
     'user': 'javi',
@@ -152,6 +162,15 @@ POSTGRES_CONFIG = {
     'host': 'localhost',
     'port': 5432,
     'connect_timeout': 3
+}
+
+# VPS PostgreSQL connection (for split-brain check from LOCAL)
+VPS_CHECK_CONFIG = {
+    'host': '100.123.10.95',        # Tailscale IP
+    'user': 'javi',
+    'password': 'Laplaciano86-',
+    'dbname': 'bot_trading',
+    'timeout': 5                     # seconds
 }
 
 # ==========================================================================

@@ -360,6 +360,11 @@ def sync_broker(open_positions: Dict,
                 local_by_symbol[symbol]['short_size'] += size
                 local_by_symbol[symbol]['short_strategies'].append(strat_id)
     
+    # DEBUG: Show aggregated local positions
+    logger.debug(f"[SYNC DEBUG] Local aggregation: {len(local_by_symbol)} symbols")
+    for sym, data in local_by_symbol.items():
+        logger.debug(f"[SYNC DEBUG]   {sym}: LONG={data['long_size']:.6f}, SHORT={data['short_size']:.6f}")
+    
     # ==========================================================================
     # STEP 2: Compare each symbol with broker (HEDGE MODE SAFE + PRECISION)
     # ==========================================================================
@@ -382,6 +387,9 @@ def sync_broker(open_positions: Dict,
             if broker_positions['short']:
                 broker_short = float(broker_positions['short'].get('total', 0))
             
+            # DEBUG: Show broker positions
+            logger.debug(f"[SYNC DEBUG] Broker {symbol}: LONG={broker_long:.6f}, SHORT={broker_short:.6f}")
+            
             # ======================================================================
             # GET CONTRACT PRECISION (volumePlace from WebSocket cache)
             # ======================================================================
@@ -398,10 +406,15 @@ def sync_broker(open_positions: Dict,
             except Exception as e:
                 logger.debug(f"[SYNC] Could not get contract precision for {symbol}: {e}")
             
+            logger.debug(f"[SYNC DEBUG] {symbol} tolerance: {tolerance}")
+            
             # ======================================================================
             # CHECK LONG POSITIONS
             # ======================================================================
             if local_long > 0:
+                diff_long = abs(broker_long - local_long)
+                logger.debug(f"[SYNC DEBUG] {symbol} LONG diff: {diff_long:.8f} (tolerance: {tolerance})")
+                
                 if broker_long == 0:
                     # NOT_IN_BROKER: Local has LONG but broker doesn't
                     logger.warning(
@@ -432,12 +445,12 @@ def sync_broker(open_positions: Dict,
                     
                     total_issues += 1
                     
-                elif abs(broker_long - local_long) > tolerance:
+                elif diff_long >= tolerance:
                     # SIZE_MISMATCH: Both have LONG but different sizes
                     logger.warning(
                         f"[SYNC] SIZE MISMATCH: {symbol} LONG "
                         f"| Local: {local_long} | Broker: {broker_long} "
-                        f"| Diff: {abs(broker_long - local_long):.8f} (tolerance: {tolerance}) "
+                        f"| Diff: {diff_long:.8f} (tolerance: {tolerance}) "
                         f"| Strategies: {', '.join(local_data['long_strategies'])}"
                     )
                     
@@ -467,6 +480,9 @@ def sync_broker(open_positions: Dict,
             # CHECK SHORT POSITIONS
             # ======================================================================
             if local_short > 0:
+                diff_short = abs(broker_short - local_short)
+                logger.debug(f"[SYNC DEBUG] {symbol} SHORT diff: {diff_short:.8f} (tolerance: {tolerance})")
+                
                 if broker_short == 0:
                     # NOT_IN_BROKER: Local has SHORT but broker doesn't
                     logger.warning(
@@ -497,12 +513,12 @@ def sync_broker(open_positions: Dict,
                     
                     total_issues += 1
                     
-                elif abs(broker_short - local_short) > tolerance:
+                elif diff_short >= tolerance:
                     # SIZE_MISMATCH: Both have SHORT but different sizes
                     logger.warning(
                         f"[SYNC] SIZE MISMATCH: {symbol} SHORT "
                         f"| Local: {local_short} | Broker: {broker_short} "
-                        f"| Diff: {abs(broker_short - local_short):.8f} (tolerance: {tolerance}) "
+                        f"| Diff: {diff_short:.8f} (tolerance: {tolerance}) "
                         f"| Strategies: {', '.join(local_data['short_strategies'])}"
                     )
                     

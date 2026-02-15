@@ -27,8 +27,6 @@ import nolds
 from ta.volatility import AverageTrueRange
 import neurokit2 as nk
 
-print("✅ All required libraries loaded successfully!")
-
 
 def calc_hurst(close: np.ndarray, window: int = 100) -> float:
     """

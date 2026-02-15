@@ -1,4 +1,5 @@
 """
+quality_control/analyzer.py
 Quality Control Analyzer - Drift detection and execution quality metrics.
 
 FIXED: Changed to use CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
@@ -424,6 +425,131 @@ def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Di
             'sl_real_pct': round(sl_real_pct, 2) if sl_real_pct is not None else None,
             'sl_target_pct': round(sl_target_pct, 2) if sl_target_pct is not None else None,
             'sl_deviation': round(sl_deviation, 2) if sl_deviation is not None else None
+        }
+    
+    return results
+
+def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
+    """
+    Analyze drift status using binomial distribution with double confirmation.
+    
+    Uses statistical thresholds (P_target ± σ) instead of fixed Montecarlo percentiles.
+    Requires both current and lagged windows to be in DANGER zone for confirmation.
+    
+    Args:
+        df_trades: DataFrame with all closed trades (columns: STRATEGY, PROFIT, etc.)
+        strategies_config: List of strategy configurations
+    
+    Returns:
+        Dict with binomial drift analysis per strategy:
+        {
+            'strategy_id': {
+                'status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'INSUFFICIENT_DATA',
+                'trades_count': 203,
+                'winrate_current': 69.0,
+                'winrate_l30': 65.0,
+                'p_target': 82.0,
+                'limit_warning': 73.6,
+                'limit_danger': 69.1,
+                'sigma': 3.84,
+                'z_score': -3.39,
+                'z_score_l30': -4.43
+            }
+        }
+    """
+    from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT_P50, DRIFT_CHECK_INTERVAL
+    from .drift_montecarlo import DRIFT_REFERENCE
+    import math
+    
+    results = {}
+    
+    for strategy in strategies_config:
+        strategy_id = strategy['id']
+        
+        # Get P_target from DRIFT_REFERENCE
+        if strategy_id in DRIFT_REFERENCE:
+            p_target = DRIFT_REFERENCE[strategy_id]['p50_winrate'] / 100
+        else:
+            p_target = DRIFT_BINOMIAL_DEFAULT_P50
+        
+        # Filter trades for this strategy
+        strategy_trades = df_trades[df_trades['STRATEGY'] == strategy_id].copy()
+        total_trades = len(strategy_trades)
+        
+        if total_trades < DRIFT_BINOMIAL_WINDOW:
+            results[strategy_id] = {
+                'status': 'INSUFFICIENT_DATA',
+                'trades_count': total_trades,
+                'required': DRIFT_BINOMIAL_WINDOW,
+                'winrate_current': None,
+                'winrate_l30': None,
+                'p_target': round(p_target * 100, 2),
+                'limit_warning': None,
+                'limit_danger': None,
+                'sigma': None,
+                'z_score': None,
+                'z_score_l30': None
+            }
+            continue
+        
+        # Calculate binomial standard deviation
+        sigma = math.sqrt(p_target * (1 - p_target) / DRIFT_BINOMIAL_WINDOW)
+        
+        # Calculate thresholds
+        limit_warning = p_target - 2 * sigma  # -2σ
+        limit_danger = p_target - 3 * sigma   # -3σ (0.13% probability)
+        
+        # =====================================================================
+        # CURRENT WINDOW (last N trades)
+        # =====================================================================
+        last_trades = strategy_trades.tail(DRIFT_BINOMIAL_WINDOW)
+        wins_current = (last_trades['PROFIT'] > 0).sum()
+        winrate_current = wins_current / DRIFT_BINOMIAL_WINDOW
+        z_score = (winrate_current - p_target) / sigma if sigma > 0 else 0
+        
+        # =====================================================================
+        # LAGGED WINDOW (L30 - shifted 30 trades back)
+        # =====================================================================
+        winrate_l30 = None
+        z_score_l30 = None
+        
+        if total_trades >= DRIFT_BINOMIAL_WINDOW + DRIFT_CHECK_INTERVAL:
+            start_idx = total_trades - DRIFT_BINOMIAL_WINDOW - DRIFT_CHECK_INTERVAL
+            end_idx = total_trades - DRIFT_CHECK_INTERVAL
+            lagged_trades = strategy_trades.iloc[start_idx:end_idx]
+            
+            if len(lagged_trades) == DRIFT_BINOMIAL_WINDOW:
+                wins_l30 = (lagged_trades['PROFIT'] > 0).sum()
+                winrate_l30 = wins_l30 / DRIFT_BINOMIAL_WINDOW
+                z_score_l30 = (winrate_l30 - p_target) / sigma if sigma > 0 else 0
+        
+        # =====================================================================
+        # DETERMINE STATUS (with double confirmation)
+        # =====================================================================
+        status = 'HEALTHY'
+        
+        # Check current window
+        if winrate_current < limit_warning:
+            status = 'WARNING'
+        
+        # DANGER requires BOTH windows to be below danger limit
+        if winrate_current < limit_danger:
+            if winrate_l30 is not None and winrate_l30 < limit_danger:
+                status = 'DANGER'  # Double confirmation
+            elif winrate_l30 is None:
+                status = 'WARNING'  # Can't confirm, keep as WARNING
+        
+        results[strategy_id] = {
+            'status': status,
+            'trades_count': total_trades,
+            'winrate_current': round(winrate_current * 100, 2),
+            'winrate_l30': round(winrate_l30 * 100, 2) if winrate_l30 is not None else None,
+            'p_target': round(p_target * 100, 2),
+            'limit_warning': round(limit_warning * 100, 2),
+            'limit_danger': round(limit_danger * 100, 2),
+            'sigma': round(sigma * 100, 2),
+            'z_score': round(z_score, 2),
+            'z_score_l30': round(z_score_l30, 2) if z_score_l30 is not None else None
         }
     
     return results

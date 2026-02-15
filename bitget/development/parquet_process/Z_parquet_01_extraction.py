@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 BASE_URL               = "https://api.bitget.com"
 PRODUCT_TYPE           = "usdt-futures"
 
-TIMEFRAME              = "1Dutc"          
+TIMEFRAME              = "15m"          
 LIMIT                  = 200           
 DATA_FOLDER            = "crypto_2026_BTC"
 START_DATE             = "2025-01-01"  
@@ -20,8 +20,11 @@ SLEEP_BETWEEN_REQUESTS = 0.06
 MAX_ITER_PER_SYMBOL    = 2000     
 MAX_RETRIES            = 3      
 
-SELECTED_SYMBOLS = ["BTCUSDT"]
-#SELECTED_SYMBOLS = None        
+SELECTED_SYMBOLS =  ["BCHUSDT","HUSDT","ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ETHUSDT","PENGUUSDT","AAVEUSDT",
+                      "ENAUSDT","ONDOUSDT","XRPUSDT","LTCUSDT","ARBUSDT","AVAXUSDT","TAOUSDT","HBARUSDT",
+                      "DOTUSDT","DOGEUSDT","SOLUSDT","FARTCOINUSDT","WIFUSDT","WLDUSDT","NEARUSDT","LINKUSDT",
+                      "BGBUSDT","SNXUSDT","BTCUSDT","SUIUSDT","APTUSDT","FORMUSDT","HYPEUSDT","ADAUSDT"]
+SELECTED_SYMBOLS =  ["ANIMEUSDT","SOPHUSDT"]       
 # ----------------------------------------
 
 MS_90_DAYS = 90 * 24 * 60 * 60 * 1000
