@@ -18,20 +18,21 @@ from signals.add_signals_flag import flag_long
 from signals.add_signals_flag import flag_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
+SAVE_SYMBOLS = True
 MY_SYMBOLS   = False
-STRATEGY     = "flag_short_6Hutc_OOS"
+STRATEGY     = "flag_short_1H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
+DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '1H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 5_000_000
+MIN_VOL_USDT        = 1_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -45,35 +46,30 @@ MA_PERIOD_LIST   = [50]
 TP_PCT_LIST      = [1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
 SL_PCT_LIST      = [9,5,9.6,9.7,9.8,9.9,10,10.1,10.2,10.3,10.4,10.5]
 
-#4HLONG-9(2025) 
-SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [15]
-IMPULSE_LIST       = [3]
-FLAG_LIST          = [40]
-MA_PERIOD_LIST     = [50]
+# =============================================================================
+# #4HLONG-9(2025) 
+# SELL_AFTER_LIST    = [0]  
+# LOOKBACK_LIST      = [15]
+# IMPULSE_LIST       = [5]
+# FLAG_LIST          = [40]
+# MA_PERIOD_LIST     = [50]
+# 
+# TP_PCT_LIST        = [4]
+# SL_PCT_LIST        = [10]
+# =============================================================================
 
-TP_PCT_LIST        = [4]
-SL_PCT_LIST        = [10]
+# =============================================================================
+# #4HSHORT-23(2025) 
+# SELL_AFTER_LIST    = [0]  
+# LOOKBACK_LIST      = [10]
+# IMPULSE_LIST       = [3]
+# FLAG_LIST          = [50]
+# MA_PERIOD_LIST     = [50]
+# 
+# TP_PCT_LIST        = [3]
+# SL_PCT_LIST        = [9]
+# =============================================================================
 
-#4HSHORT-23(2025) 
-SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [10]
-IMPULSE_LIST       = [3]
-FLAG_LIST          = [50]
-MA_PERIOD_LIST     = [50]
-
-TP_PCT_LIST        = [3]
-SL_PCT_LIST        = [9]
-
-#1HLONG-3(2025) 
-SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [20]
-IMPULSE_LIST       = [3]
-FLAG_MAX_LIST      = [40]
-MA_PERIOD_LIST     = [50]
-
-TP_PCT_LIST        = [2]
-SL_PCT_LIST        = [10]
 
 #1HSHORT-9 
 SELL_AFTER_LIST    = [0]  
@@ -84,29 +80,6 @@ MA_PERIOD_LIST     = [25]
 
 TP_PCT_LIST        = [2]
 SL_PCT_LIST        = [8]
-
-
-#6Hutclong 9  
-SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [15]
-IMPULSE_LIST       = [3]
-FLAG_MAX_LIST      = [30]
-MA_PERIOD_LIST     = [50]
-
-TP_PCT_LIST        = [5]
-SL_PCT_LIST        = [10]
-
-#6Hutcshort 9  
-
-SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [10]
-IMPULSE_LIST       = [3]
-FLAG_MAX_LIST      = [50]
-MA_PERIOD_LIST     = [50]
-
-TP_PCT_LIST        = [5]
-SL_PCT_LIST        = [7]
-
 
 
 param_names = ['SELL_AFTER','LOOKBACK','IMPULSE','FLAG','MA_PERIOD','TP_PCT','SL_PCT']

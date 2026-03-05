@@ -4,9 +4,9 @@ from pathlib import Path
 from tqdm import tqdm
 
 # 📁 Folders with the files
-BASE_DIR = Path(__file__).resolve().parent.parent
-input_folder = BASE_DIR / "data" / "crypto_2022_2"
-output_folder = BASE_DIR / "data" / "crypto_2022_2_clean"
+BASE_DIR      = Path(__file__).resolve().parent.parent
+input_folder  = BASE_DIR / "data" / "crypto_2026_BTC"
+output_folder = BASE_DIR / "data" / "crypto_2026_BTC_clean"
 
 output_folder.mkdir(exist_ok=True)  # Create output folder if it doesn't exist
 

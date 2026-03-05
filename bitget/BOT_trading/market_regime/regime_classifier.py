@@ -15,7 +15,7 @@ from market_regime.regime_metrics import calc_all_metrics
 from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
-
+from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
@@ -346,3 +346,44 @@ def get_current_direction(timeframe: str) -> Tuple[str, Optional[float], Optiona
     except Exception as e:
         logger.error(f"Error calculating direction: {e}")
         return 'uptrend', None, None  # Fallback
+    
+def get_btc_1d_filter(direction: str) -> bool:
+    """
+    Check if trade allowed based on BTC 1D price vs MA5.
+    
+    LONG: BTC > MA5 * GLOBAL_SYSTEM_REGIME_TH2
+    SHORT: BTC < MA5 * GLOBAL_SYSTEM_REGIME_TH1
+    """
+    try:
+        df = fetch_btc_ohlcv('1Dutc')
+        
+        if df is None or df.empty or len(df) < 5:  # ← Restaurado df.empty
+            logger.warning("[REGIME 0 - 1D] Insufficient BTC 1D data, allowing trade")
+            return True
+        
+        # Safe conversion (como el original)
+        btc_close = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
+        ma5 = float(pd.to_numeric(df['close'], errors='coerce').tail(5).mean())
+        
+        if direction == 'long':
+            allowed = btc_close > ma5 * GLOBAL_SYSTEM_REGIME_TH2
+            threshold = GLOBAL_SYSTEM_REGIME_TH2
+        elif direction == 'short':
+            allowed = btc_close < ma5 * GLOBAL_SYSTEM_REGIME_TH1
+            threshold = GLOBAL_SYSTEM_REGIME_TH1
+        else:
+            allowed = True
+            threshold = 1.00
+        
+        # Log decision
+        status = 'ALLOW' if allowed else 'BLOCK'
+        logger.info(
+            f"[REGIME 0 - 1D] {direction.upper()}S: "
+            f"BTC=${btc_close:.2f} vs MA5*{threshold:.2f}=${ma5*threshold:.2f} → {status}"
+        )
+        
+        return allowed
+        
+    except Exception as e:
+        logger.error(f"[REGIME 0 - 1D] Error in filter: {e}")
+        return False  # On error, not allow trade

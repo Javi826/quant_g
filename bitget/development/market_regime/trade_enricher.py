@@ -23,11 +23,9 @@ from glob import glob
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from market_regime.config import (
-    TRADES_FOLDER, TRADES_PATTERN, OHLC_FOLDER, OUTPUT_FOLDER,
-    BTC_SYMBOL, LOOKBACK_BARS,
-    HURST_WINDOW, ER_WINDOW, ATR_WINDOW, PE_WINDOW, PE_ORDER
-)
+from market_regime.config import TRADES_FOLDER, TRADES_PATTERN, OHLC_FOLDER, OUTPUT_FOLDER
+from market_regime.config import BTC_SYMBOL, LOOKBACK_BARS
+from market_regime.config import HURST_WINDOW, ER_WINDOW, ATR_WINDOW, PE_WINDOW, PE_ORDER
 from market_regime.regime_metrics import calc_all_metrics
 
 

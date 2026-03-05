@@ -1,12 +1,9 @@
 import os
 import random
 import hashlib
-import smtplib
 import numpy as np
 import pandas as pd
 from typing import Union
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 np.random.seed(42)
 random.seed(42)
@@ -72,25 +69,27 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-            if df is not None:
-                n_rows = len(df)
-                if timeframe == "1H":
-                    min_bars = 4320
-                elif timeframe == "30m":
-                    min_bars = 7800
-                elif timeframe == "4H":
-                    min_bars = 1080
-                elif timeframe == "6Hutc":
-                    min_bars = 720
-                elif timeframe == "12Hutc":
-                    min_bars = 360
-                elif timeframe == "1Dutc":
-                    min_bars = 180
-                else:
-                    min_bars = 999999999
-                    
-                if n_rows < min_bars:
-                    reasons.append("Not enough bars")
+# =============================================================================
+#             if df is not None:
+#                 n_rows = len(df)
+#                 if timeframe == "1H":
+#                     min_bars = 4320
+#                 elif timeframe == "30m":
+#                     min_bars = 7800
+#                 elif timeframe == "4H":
+#                     min_bars = 1080
+#                 elif timeframe == "6Hutc":
+#                     min_bars = 720
+#                 elif timeframe == "12Hutc":
+#                     min_bars = 360
+#                 elif timeframe == "1Dutc":
+#                     min_bars = 180
+#                 else:
+#                     min_bars = 999999999
+#                     
+#                 if n_rows < min_bars:
+#                     reasons.append("Not enough bars")
+# =============================================================================
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:

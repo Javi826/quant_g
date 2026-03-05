@@ -1,240 +1,216 @@
 #!/usr/bin/env python3
 """
-Script autocontenido para análisis mensual de trades
-Lee automáticamente el archivo más reciente de brief_trades/
+Weekly Win Rate Analysis - Lab Trades
+Shows WR week by week to identify if Feb 15-28 was particularly bad.
 """
 
-import os
 import pandas as pd
 import numpy as np
+from pathlib import Path
+from glob import glob
 import matplotlib.pyplot as plt
-from datetime import datetime
-import warnings
-
-warnings.filterwarnings("ignore")
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
 
 
-def find_latest_file(folder_path):
-    """Encuentra el archivo más reciente en la carpeta"""
-    if not os.path.exists(folder_path):
-        raise FileNotFoundError(f"La carpeta {folder_path} no existe")
+def load_all_lab_trades():
+    """Load and combine all lab trades"""
     
-    files = [f for f in os.listdir(folder_path) if f.endswith(('.xlsx', '.xls'))]
+    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades')
+    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
     
-    if not files:
-        raise FileNotFoundError(f"No se encontraron archivos Excel en {folder_path}")
+    all_trades = []
     
-    files_with_time = [(f, os.path.getmtime(os.path.join(folder_path, f))) for f in files]
-    latest_file = max(files_with_time, key=lambda x: x[1])[0]
+    for filepath in files:
+        df = pd.read_excel(filepath)
+        df['sell_time'] = pd.to_datetime(df['sell_time'])
+        all_trades.append(df)
     
-    return os.path.join(folder_path, latest_file)
+    combined = pd.concat(all_trades, ignore_index=True)
+    return combined.sort_values('sell_time').reset_index(drop=True)
 
 
-def load_trades(file_path):
-    """Carga el archivo de trades"""
-    print(f"📂 Cargando archivo: {os.path.basename(file_path)}")
+def calculate_weekly_wr(df):
+    """Calculate WR week by week"""
     
-    # Intentar leer la primera hoja
-    df = pd.read_excel(file_path, sheet_name=0)
+    # Create week column
+    df['week'] = df['sell_time'].dt.to_period('W')
     
-    print(f"✅ Cargadas {len(df)} trades")
-    return df
-
-
-def calculate_monthly_metrics(df):
-    """Calcula métricas mensuales de profit y win ratio"""
+    weekly_stats = []
     
-    # Convertir sell_time a datetime si no lo está
-    if 'sell_time' not in df.columns:
-        raise ValueError("El archivo debe tener una columna 'sell_time'")
-    
-    df['sell_time'] = pd.to_datetime(df['sell_time'], errors='coerce')
-    
-    # Filtrar trades válidas (con sell_time y profit)
-    df_valid = df[df['sell_time'].notna() & df['profit'].notna()].copy()
-    
-    if len(df_valid) == 0:
-        raise ValueError("No hay trades válidas para analizar")
-    
-    # Crear columna de mes
-    df_valid['month'] = df_valid['sell_time'].dt.to_period('M')
-    
-    # Agrupar por mes
-    monthly_stats = []
-    
-    for month, group in df_valid.groupby('month'):
-        total_trades = len(group)
-        winning_trades = (group['profit'] > 0).sum()
-        losing_trades = (group['profit'] < 0).sum()
+    for week, group in df.groupby('week'):
+        week_start = group['sell_time'].min()
+        week_end = group['sell_time'].max()
         
-        win_ratio = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        total = len(group)
+        winners = (group['profit'] > 0).sum()
+        wr = (winners / total * 100) if total > 0 else 0
         
         total_profit = group['profit'].sum()
         avg_profit = group['profit'].mean()
         
-        avg_win = group[group['profit'] > 0]['profit'].mean() if winning_trades > 0 else 0
-        avg_loss = group[group['profit'] < 0]['profit'].mean() if losing_trades > 0 else 0
-        
-        monthly_stats.append({
-            'Month': str(month),
-            'Total_Trades': total_trades,
-            'Winning_Trades': winning_trades,
-            'Losing_Trades': losing_trades,
-            'Win_Ratio_%': win_ratio,
-            'Total_Profit': total_profit,
-            'Avg_Profit': avg_profit,
-            'Avg_Win': avg_win,
-            'Avg_Loss': avg_loss
+        weekly_stats.append({
+            'week': str(week),
+            'start_date': week_start.date(),
+            'end_date': week_end.date(),
+            'trades': total,
+            'wr': wr,
+            'total_profit': total_profit,
+            'avg_profit': avg_profit
         })
     
-    return pd.DataFrame(monthly_stats)
+    return pd.DataFrame(weekly_stats)
 
 
-def plot_monthly_metrics(df_monthly):
-    """Genera gráficos de las métricas mensuales"""
+def calculate_daily_wr(df, start_date, end_date):
+    """Calculate WR day by day for specific period"""
     
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-    fig.suptitle('📊 Monthly Trading Metrics', fontsize=16, fontweight='bold')
+    start = pd.to_datetime(start_date)
+    end = pd.to_datetime(end_date)
     
-    months = df_monthly['Month'].values
-    x_pos = np.arange(len(months))
+    df_period = df[(df['sell_time'] >= start) & (df['sell_time'] <= end)].copy()
+    df_period['date'] = df_period['sell_time'].dt.date
     
-    # 1. Profit Mensual (barras verdes/rojas)
-    profits = df_monthly['Total_Profit'].values
-    colors = ['green' if p > 0 else 'red' for p in profits]
+    daily_stats = []
     
-    axes[0, 0].bar(x_pos, profits, color=colors, alpha=0.7, edgecolor='black')
-    axes[0, 0].set_title('Total Profit por Mes')
-    axes[0, 0].set_xlabel('Month')
-    axes[0, 0].set_ylabel('Profit')
-    axes[0, 0].set_xticks(x_pos)
-    axes[0, 0].set_xticklabels(months, rotation=45, ha='right')
-    axes[0, 0].axhline(y=0, color='black', linestyle='--', linewidth=0.8)
-    axes[0, 0].grid(True, alpha=0.3)
+    for date, group in df_period.groupby('date'):
+        total = len(group)
+        winners = (group['profit'] > 0).sum()
+        wr = (winners / total * 100) if total > 0 else 0
+        
+        total_profit = group['profit'].sum()
+        
+        daily_stats.append({
+            'date': date,
+            'trades': total,
+            'wr': wr,
+            'total_profit': total_profit
+        })
     
-    # 2. Win Ratio Mensual (línea)
-    axes[0, 1].plot(x_pos, df_monthly['Win_Ratio_%'], marker='o', 
-                    color='blue', linewidth=2, markersize=8)
-    axes[0, 1].fill_between(x_pos, df_monthly['Win_Ratio_%'], alpha=0.3, color='blue')
-    axes[0, 1].set_title('Win Ratio % por Mes')
-    axes[0, 1].set_xlabel('Month')
-    axes[0, 1].set_ylabel('Win Ratio %')
-    axes[0, 1].set_xticks(x_pos)
-    axes[0, 1].set_xticklabels(months, rotation=45, ha='right')
-    axes[0, 1].axhline(y=50, color='gray', linestyle='--', linewidth=0.8, alpha=0.5)
-    axes[0, 1].grid(True, alpha=0.3)
-    axes[0, 1].set_ylim([0, 100])
+    return pd.DataFrame(daily_stats)
+
+
+def plot_weekly_wr(df_weekly):
+    """Plot weekly WR with Feb 15-28 highlighted"""
     
-    # 3. Número de Trades por Mes
-    axes[1, 0].bar(x_pos, df_monthly['Total_Trades'], color='steelblue', 
-                   alpha=0.7, edgecolor='black')
-    axes[1, 0].set_title('Número de Trades por Mes')
-    axes[1, 0].set_xlabel('Month')
-    axes[1, 0].set_ylabel('Trades')
-    axes[1, 0].set_xticks(x_pos)
-    axes[1, 0].set_xticklabels(months, rotation=45, ha='right')
-    axes[1, 0].grid(True, alpha=0.3)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 10))
     
-    # 4. Avg Win vs Avg Loss
-    x_categories = np.arange(len(months))
-    width = 0.35
+    weeks = df_weekly['week'].values
+    x_pos = np.arange(len(weeks))
     
-    axes[1, 1].bar(x_categories - width/2, df_monthly['Avg_Win'], width, 
-                   label='Avg Win', color='green', alpha=0.7, edgecolor='black')
-    axes[1, 1].bar(x_categories + width/2, df_monthly['Avg_Loss'], width, 
-                   label='Avg Loss', color='red', alpha=0.7, edgecolor='black')
-    axes[1, 1].set_title('Avg Win vs Avg Loss por Mes')
-    axes[1, 1].set_xlabel('Month')
-    axes[1, 1].set_ylabel('Profit')
-    axes[1, 1].set_xticks(x_categories)
-    axes[1, 1].set_xticklabels(months, rotation=45, ha='right')
-    axes[1, 1].legend()
-    axes[1, 1].grid(True, alpha=0.3)
-    axes[1, 1].axhline(y=0, color='black', linestyle='--', linewidth=0.8)
+    # Identify Feb weeks
+    feb_15_28_mask = df_weekly['start_date'].apply(
+        lambda x: pd.to_datetime(x) >= pd.to_datetime('2026-02-15')
+    ) & df_weekly['end_date'].apply(
+        lambda x: pd.to_datetime(x) <= pd.to_datetime('2026-02-28')
+    )
+    
+    colors = ['red' if m else 'steelblue' for m in feb_15_28_mask]
+    
+    # Plot 1: Win Rate
+    ax1.bar(x_pos, df_weekly['wr'], color=colors, alpha=0.7, edgecolor='black')
+    ax1.axhline(y=73, color='green', linestyle='--', linewidth=2, label='Lab Average (73%)')
+    ax1.axhline(y=52, color='red', linestyle='--', linewidth=2, label='Live Feb 15-28 (52%)')
+    ax1.set_title('Weekly Win Rate - Lab Trades (Red = Feb 15-28 period)', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Week')
+    ax1.set_ylabel('Win Rate %')
+    ax1.set_xticks(x_pos)
+    ax1.set_xticklabels([f"{w}\n{s}" for w, s in zip(weeks, df_weekly['start_date'])], 
+                        rotation=45, ha='right', fontsize=8)
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim([0, 100])
+    
+    # Plot 2: Total Profit
+    profit_colors = ['green' if p > 0 else 'red' for p in df_weekly['total_profit']]
+    
+    ax2.bar(x_pos, df_weekly['total_profit'], color=profit_colors, alpha=0.7, edgecolor='black')
+    ax2.set_title('Weekly Total Profit', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('Week')
+    ax2.set_ylabel('Profit $')
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels([f"{w}\n{s}" for w, s in zip(weeks, df_weekly['start_date'])], 
+                        rotation=45, ha='right', fontsize=8)
+    ax2.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+    ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.show()
 
 
-def print_summary(df_monthly):
-    """Imprime resumen de métricas mensuales"""
-    
-    print("\n" + "="*80)
-    print("📈 MONTHLY TRADING METRICS")
-    print("="*80)
-    
-    # Formatear DataFrame para mejor visualización
-    df_display = df_monthly.copy()
-    df_display['Win_Ratio_%'] = df_display['Win_Ratio_%'].apply(lambda x: f"{x:.2f}")
-    df_display['Total_Profit'] = df_display['Total_Profit'].apply(lambda x: f"{x:,.2f}")
-    df_display['Avg_Profit'] = df_display['Avg_Profit'].apply(lambda x: f"{x:.2f}")
-    df_display['Avg_Win'] = df_display['Avg_Win'].apply(lambda x: f"{x:.2f}")
-    df_display['Avg_Loss'] = df_display['Avg_Loss'].apply(lambda x: f"{x:.2f}")
-    
-    print(df_display.to_string(index=False))
-    
-    print("\n" + "-"*80)
-    print("📊 OVERALL STATISTICS")
-    print("-"*80)
-    
-    total_trades = df_monthly['Total_Trades'].sum()
-    total_winning = df_monthly['Winning_Trades'].sum()
-    total_losing = df_monthly['Losing_Trades'].sum()
-    overall_win_ratio = (total_winning / total_trades * 100) if total_trades > 0 else 0
-    
-    total_profit = df_monthly['Total_Profit'].sum()
-    avg_monthly_profit = df_monthly['Total_Profit'].mean()
-    
-    winning_months = (df_monthly['Total_Profit'] > 0).sum()
-    losing_months = (df_monthly['Total_Profit'] < 0).sum()
-    monthly_win_ratio = (winning_months / len(df_monthly) * 100)
-    
-    print(f"Total Trades          : {total_trades:,}")
-    print(f"Winning Trades        : {total_winning:,}")
-    print(f"Losing Trades         : {total_losing:,}")
-    print(f"Overall Win Ratio     : {overall_win_ratio:.2f}%")
-    print(f"\nTotal Profit          : {total_profit:,.2f}")
-    print(f"Avg Monthly Profit    : {avg_monthly_profit:,.2f}")
-    print(f"\nWinning Months        : {winning_months} / {len(df_monthly)}")
-    print(f"Losing Months         : {losing_months} / {len(df_monthly)}")
-    print(f"Monthly Win Ratio     : {monthly_win_ratio:.2f}%")
-    
-    best_month = df_monthly.loc[df_monthly['Total_Profit'].idxmax()]
-    worst_month = df_monthly.loc[df_monthly['Total_Profit'].idxmin()]
-    
-    print(f"\nBest Month            : {best_month['Month']} ({best_month['Total_Profit']:,.2f})")
-    print(f"Worst Month           : {worst_month['Month']} ({worst_month['Total_Profit']:,.2f})")
-    print("="*80 + "\n")
-
-
 def main():
-    """Función principal"""
+    print("="*100)
+    print("WEEKLY WIN RATE ANALYSIS - LAB TRADES")
+    print("="*100)
     
-    # Definir ruta de la carpeta (relativa al script)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    trades_folder = os.path.join(script_dir, '..', 'brief_trades')
+    # Load all trades
+    print("\n📂 Loading all lab trades...")
+    df = load_all_lab_trades()
+    print(f"✅ Loaded {len(df)} total trades")
+    print(f"   Date range: {df['sell_time'].min().date()} → {df['sell_time'].max().date()}")
     
-    try:
-        # Encontrar y cargar archivo más reciente
-        latest_file = find_latest_file(trades_folder)
-        df_trades = load_trades(latest_file)
+    # Weekly analysis
+    print("\n" + "="*100)
+    print("WEEKLY STATISTICS")
+    print("="*100)
+    
+    df_weekly = calculate_weekly_wr(df)
+    
+    print(f"\n{'Week':<12} {'Start':<12} {'End':<12} {'Trades':>8} {'WR%':>8} {'Profit':>12} {'Avg':>10}")
+    print("-"*90)
+    
+    for _, row in df_weekly.iterrows():
+        print(f"{row['week']:<12} {str(row['start_date']):<12} {str(row['end_date']):<12} "
+              f"{row['trades']:>8} {row['wr']:>7.1f}% ${row['total_profit']:>11.2f} ${row['avg_profit']:>9.2f}")
+    
+    # Highlight Feb 15-28
+    feb_weeks = df_weekly[
+        (pd.to_datetime(df_weekly['start_date']) >= pd.to_datetime('2026-02-15')) &
+        (pd.to_datetime(df_weekly['end_date']) <= pd.to_datetime('2026-02-28'))
+    ]
+    
+    if len(feb_weeks) > 0:
+        print("\n" + "="*100)
+        print("FEB 15-28 WEEKS (Your live trading period)")
+        print("="*100)
         
-        # Calcular métricas mensuales
-        df_monthly = calculate_monthly_metrics(df_trades)
+        avg_wr_feb = feb_weeks['wr'].mean()
+        avg_profit_feb = feb_weeks['total_profit'].mean()
         
-        # Mostrar resumen
-        print_summary(df_monthly)
+        print(f"\nAverage WR (Feb 15-28 weeks): {avg_wr_feb:.1f}%")
+        print(f"Average Profit per week: ${avg_profit_feb:.2f}")
         
-        # Mostrar gráficos
-        plot_monthly_metrics(df_monthly)
+        # Compare with overall
+        overall_wr = (df['profit'] > 0).mean() * 100
         
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"\nOverall lab WR: {overall_wr:.1f}%")
+        print(f"Feb 15-28 WR: {avg_wr_feb:.1f}%")
+        print(f"Difference: {avg_wr_feb - overall_wr:+.1f}pp")
+        
+        if avg_wr_feb < overall_wr - 5:
+            print("\n⚠️  Feb 15-28 had WORSE than average WR")
+            print("   You entered during a bad period")
+        elif avg_wr_feb > overall_wr + 5:
+            print("\n✅ Feb 15-28 had BETTER than average WR")
+        else:
+            print("\n➡️  Feb 15-28 was AVERAGE")
+    
+    # Daily analysis for Feb
+    print("\n" + "="*100)
+    print("DAILY BREAKDOWN: Feb 15-28")
+    print("="*100)
+    
+    df_daily = calculate_daily_wr(df, '2026-02-15', '2026-02-28')
+    
+    print(f"\n{'Date':<12} {'Trades':>8} {'WR%':>8} {'Profit':>12}")
+    print("-"*50)
+    
+    for _, row in df_daily.iterrows():
+        print(f"{str(row['date']):<12} {row['trades']:>8} {row['wr']:>7.1f}% ${row['total_profit']:>11.2f}")
+    
+    # Plot
+    print("\n📊 Generating plots...")
+    plot_weekly_wr(df_weekly)
+    
+    print("\n" + "="*100)
 
 
 if __name__ == "__main__":

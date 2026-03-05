@@ -22,7 +22,7 @@ if parent_dir not in sys.path:
 # Now do imports
 from market_data.api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime import get_current_regime, get_current_direction, PositionSizer
+from market_regime import get_current_regime, get_current_direction, PositionSizer, get_btc_1d_filter
 from risk_control import RiskLimiter, ExposureCalculator
 
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
@@ -46,6 +46,7 @@ from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,
 from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
 from config.settings import LEVERAGE
 from core.split_brain_checker import check_split_brain
+
 class BotOrchestrator:
     """
     Main orchestrator for the trading bot.
@@ -128,6 +129,7 @@ class BotOrchestrator:
         #Marke regime
         self.regime_cache: Dict[str, str] = {}
         self.direction_cache: Dict[str, str] = {}
+        self.btc_1d_cache: Dict[str, bool] = {}
         self.position_sizer: Optional[PositionSizer] = None
         #Risk
         self.risk_limiter: Optional[RiskLimiter] = None
@@ -433,6 +435,20 @@ class BotOrchestrator:
             logger=self.logger
         )
         self.logger.info("Risk management initialized")
+        
+    def _update_btc_1d_filter(self) -> None:
+        """
+        Update BTC 1D filter for both LONG and SHORT.
+        Called once per candle cycle (before regime update).
+        """
+        
+        self.logger.info("[REGIME0] Calculating BTC 1D filter...")
+        
+        # Calculate for LONG
+        self.btc_1d_cache['long'] = get_btc_1d_filter('long')
+        
+        # Calculate for SHORT
+        self.btc_1d_cache['short'] = get_btc_1d_filter('short')
     # ======================================================================
     # MAIN LOOP (Private)
     # ======================================================================
@@ -487,6 +503,9 @@ class BotOrchestrator:
         # BROKER SYNC: Load latest positions from exchange
         # ========================================================================
         sync_broker(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
+        
+        # LAYER 0: BTC 1D filter (once per cycle)
+        self._update_btc_1d_filter()  # ← NUEVO
         
         # ========================================================================
         # REGIME UPDATE: Calculate market regime & direction for closed timeframes
@@ -606,6 +625,13 @@ class BotOrchestrator:
                 # Log risk decision (not blocked)
                 log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
                 self.logger.info(log_msg)
+                # ========================================================================
+                # REGIME LAYER 0: Calculate adjusted order amount
+                # ========================================================================
+                direction = strat['direction']
+                if not self.btc_1d_cache.get(direction, True):
+                    # Log already printed by get_btc_1d_filter()
+                    continue
                 
                 # ========================================================================
                 # REGIME SIZING: Calculate adjusted order amount
@@ -654,25 +680,62 @@ class BotOrchestrator:
                 except Exception as e:
                     self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
                     
-                    # Retry once
-                    self.logger.info(f"Retrying {strat_id} after 3 seconds...")
-                    time.sleep(3)
-                    try:
-                        self.strategy_processor.process(
-                            strat=strat,
-                            final_symbols=self.final_by_strat.get(strat['id'], []),
-                            exchange=self.exchange,
-                            open_positions=self.open_positions,
-                            strategy_candles=self.strategy_candles,
-                            adjusted_order_amount=adjusted_amount,
-                            regime_family=metadata['market_regime'],
-                            regime_multiplier=metadata['regime_multiplier'],
-                            direction=metadata['market_direction'],
-                            direction_multiplier=metadata['direction_multiplier']
+                    # Check if any positions were opened before error
+                    opened_symbols = [pos['symbol'] for pos in self.open_positions.get(strat_id, [])]
+                    
+                    if opened_symbols:
+                        # Some positions opened, retry only remaining symbols
+                        self.logger.info(
+                            f"Retrying {strat_id} after 3 seconds... "
+                            f"({len(opened_symbols)} positions already opened, will skip those symbols)"
                         )
-                        self.logger.info(f"Retry successful for {strat_id}")
-                    except Exception as e2:
-                        self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
+                        time.sleep(3)
+                        
+                        # Filter out symbols that already have positions
+                        remaining_symbols = [
+                            s for s in self.final_by_strat.get(strat['id'], []) 
+                            if s not in opened_symbols
+                        ]
+                        
+                        if remaining_symbols:
+                            try:
+                                self.strategy_processor.process(
+                                    strat=strat,
+                                    final_symbols=remaining_symbols,
+                                    exchange=self.exchange,
+                                    open_positions=self.open_positions,
+                                    strategy_candles=self.strategy_candles,
+                                    adjusted_order_amount=adjusted_amount,
+                                    regime_family=metadata['market_regime'],
+                                    regime_multiplier=metadata['regime_multiplier'],
+                                    direction=metadata['market_direction'],
+                                    direction_multiplier=metadata['direction_multiplier']
+                                )
+                                self.logger.info(f"Retry successful for {strat_id} ({len(remaining_symbols)} remaining symbols processed)")
+                            except Exception as e2:
+                                self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
+                        else:
+                            self.logger.info(f"No remaining symbols to retry for {strat_id}")
+                    else:
+                        # No positions opened yet, safe to retry all
+                        self.logger.info(f"Retrying {strat_id} after 3 seconds... (no positions opened yet)")
+                        time.sleep(3)
+                        try:
+                            self.strategy_processor.process(
+                                strat=strat,
+                                final_symbols=self.final_by_strat.get(strat['id'], []),
+                                exchange=self.exchange,
+                                open_positions=self.open_positions,
+                                strategy_candles=self.strategy_candles,
+                                adjusted_order_amount=adjusted_amount,
+                                regime_family=metadata['market_regime'],
+                                regime_multiplier=metadata['regime_multiplier'],
+                                direction=metadata['market_direction'],
+                                direction_multiplier=metadata['direction_multiplier']
+                            )
+                            self.logger.info(f"Retry successful for {strat_id}")
+                        except Exception as e2:
+                            self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
     
     def _periodic_tpsl_check(self, current_time: float) -> None:
         """

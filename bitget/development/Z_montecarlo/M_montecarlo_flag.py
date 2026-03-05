@@ -29,10 +29,10 @@ MY_SYMBOLS          = False
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2025"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 8_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -44,8 +44,8 @@ IMPULSE_LIST              = [3,5,7,10]
 FLAG_LIST                 = [30,40,50,60,70]
 MA_PERIOD_LIST            = [50]
 
-TP_PCT_LIST               = [2,3,4,5]
-SL_PCT_LIST               = [7,8,9,10]
+TP_PCT_LIST               = [2,3,4]
+SL_PCT_LIST               = [2,3]
 
 # =============================================================================
 # #4HLONG-9(2025) 
@@ -83,15 +83,17 @@ SL_PCT_LIST               = [7,8,9,10]
 # SL_PCT_LIST               = [10]
 # =============================================================================
 
-#1HSHORT-9 
-SELL_AFTER_LIST           = [0]  
-LOOKBACK_LIST             = [20]
-IMPULSE_MIN_PCT_LIST      = [3]
-FLAG_MAX_RANGE_PCT_LIST   = [60]
-MA_PERIOD_LIST            = [25]
-
-TP_PCT_LIST               = [2]
-SL_PCT_LIST               = [8]
+# =============================================================================
+# #1HSHORT-9 
+# SELL_AFTER_LIST           = [0]  
+# LOOKBACK_LIST             = [20]
+# IMPULSE_MIN_PCT_LIST      = [3]
+# FLAG_MAX_RANGE_PCT_LIST   = [60]
+# MA_PERIOD_LIST            = [25]
+# 
+# TP_PCT_LIST               = [2]
+# SL_PCT_LIST               = [8]
+# =============================================================================
 
 
 param_names = [
@@ -108,7 +110,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 2000
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -130,7 +132,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = flag_short(
+            signals = flag_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 impulse=param_dict.get('IMPULSE'),

@@ -1,5 +1,5 @@
 """
-market_regime/optimize_thresholds.py
+market_regime/th_optimization.py
 
 Optimizes volatile family thresholds to improve portfolio drawdown or profit.
 Tests multiple configurations and shows detailed comparison.

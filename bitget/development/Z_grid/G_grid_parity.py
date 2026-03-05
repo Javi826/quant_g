@@ -18,18 +18,18 @@ from signals.add_signals_parity import parity_short
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
-STRATEGY     = "parity_short_1H_OOS"
+STRATEGY     = "parity_long_6Hutc_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
+DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '6Hutc'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_200_000
+MIN_VOL_USDT        = 3_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -42,20 +42,22 @@ TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
 #LONG
-LOOKBACK_LIST        = [90,100,110,120,130,140,150,160]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [10,15,20,25,30,35,40,45] 
-
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [9]
-
-#SHORT
-LOOKBACK_LIST        = [150]
+LOOKBACK_LIST        = [50]
 MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [20] 
+TOLERANCE_LIST       = [40] 
 
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [7.5]
+TP_PCT_LIST          = [3.5]
+SL_PCT_LIST          = [10]
+
+# =============================================================================
+# #SHORT
+# LOOKBACK_LIST        = [150]
+# MA_PERIOD_LIST       = [50]
+# TOLERANCE_LIST       = [20] 
+# 
+# TP_PCT_LIST          = [2]
+# SL_PCT_LIST          = [7.5]
+# =============================================================================
 # -----------------------------------------------------------------------------
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -81,7 +83,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = parity_short(
+        signals = parity_long(
             arr=arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],

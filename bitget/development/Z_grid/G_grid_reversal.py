@@ -19,19 +19,19 @@ from signals.add_signals_reversal import reversal_short
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "reversal_long100_1H_OOS"
+MY_SYMBOLS   = True
+STRATEGY     = "reversal_short_6Hutc_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
+DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '6Hutc'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 6_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -42,15 +42,15 @@ MA_PERIOD_LIST       = [5,10,25,50]
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+SL_PCT_LIST          = [3,4,5,6,7,9,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [5] 
-MA_PERIOD_LIST       = [50]
+LOOKBACK_LIST        = [6] 
+MA_PERIOD_LIST       = [25]
 TOLERANCE_LIST       = [30]
 
-TP_PCT_LIST          = [1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.4,2.5,2.6]
-SL_PCT_LIST          = [4.5,4.6,4.7,4.8,4.9,5,5.1,5.2,5.3,5.4,5.5,5.6,5.7]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [7.5]
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -105,7 +105,7 @@ with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinat
     )
 
 # -----------------------------------------------------------------------------
-# COMPILE RESULTS INTO DATAFRAME
+# COMPILE RESULTS INTO DATAFRAMEFalse
 # -----------------------------------------------------------------------------
 grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)

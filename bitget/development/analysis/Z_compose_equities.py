@@ -1,3 +1,5 @@
+#analysis/compose_equities.py
+
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -11,7 +13,8 @@ from sklearn.linear_model import LinearRegression
 FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '4h'
-DATA_FOLDER         = "../data/crypto_OOS_2025"
+BARS_PER_DAY        = 6          # 24h / 4h = 6 barras por día (siempre correcto tras resamplear)
+DATA_FOLDER         = "../data/crypto_OOS_2026"
 
 # -------------------------------------------------
 # --- Metrics Functions
@@ -25,13 +28,16 @@ def profit_factor(df):
     returns = df['balance'].pct_change().dropna()
     gains   = returns[returns > 0].sum()
     losses  = -returns[returns < 0].sum()
-    
+
     if losses == 0:
         return np.inf
     return gains / losses
 
 def average_recovery_time(df):
-    """Calculate average recovery time from drawdowns"""
+    """
+    Calculate average and max recovery time from drawdowns.
+    Returns (avg_bars, max_bars) — convert to days dividing by BARS_PER_DAY.
+    """
     bal        = df['balance'].values
     peaks      = np.maximum.accumulate(bal)
     underwater = bal < peaks
@@ -46,14 +52,14 @@ def average_recovery_time(df):
             last_peak_index = i
 
     if len(recovery_times) == 0:
-        return 0
-    return np.mean(recovery_times)
+        return 0, 0
+    return np.mean(recovery_times), np.max(recovery_times)
 
 def equity_r_squared(df):
     """
     R² de la equity curve vs línea recta.
     Mide consistencia del crecimiento.
-    
+
     R² = 1.0 → Línea recta perfecta (ideal)
     R² = 0.9 → Muy consistente
     R² = 0.7 → Algo de ruido
@@ -61,40 +67,69 @@ def equity_r_squared(df):
     """
     y = df['balance'].values.reshape(-1, 1)
     X = np.arange(len(y)).reshape(-1, 1)
-    
+
     model = LinearRegression()
     model.fit(X, y)
-    
+
     return model.score(X, y)
+
+# -------------------------------------------------
+# Helper: resample a balance series to RESAMPLE_FREQ
+# -------------------------------------------------
+def resample_equity(df_indexed):
+    """
+    Receives a DataFrame with DatetimeIndex and 'balance' column.
+    Returns a new DataFrame resampled to RESAMPLE_FREQ with the index reset.
+    All curves go through this so every metric is computed on the same bar frequency.
+    """
+    common_index = pd.date_range(
+        start=df_indexed.index.min(),
+        end=df_indexed.index.max(),
+        freq=RESAMPLE_FREQ
+    )
+    df_r = df_indexed[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    df_r.index.name = 'timestamp'
+    return df_r
 
 # -------------------------------------------------
 # Function to compute metrics
 # -------------------------------------------------
 def compute_metrics(equity_df, capital, name="Equity"):
-    """Compute all metrics for a given equity curve"""
+    """
+    Compute all metrics for a given equity curve.
+    equity_df must have 'timestamp' and 'balance' columns.
+    Assumes all rows are spaced RESAMPLE_FREQ apart (guaranteed by resample_equity).
+    """
     df = equity_df.copy()
     df = df.sort_values('timestamp')
 
-    returns = df['balance'].pct_change().dropna()
+    returns    = df['balance'].pct_change().dropna()
     volatility = returns.std() * 100
 
     df['month'] = df['timestamp'].dt.to_period('M')
     monthly_returns = df.groupby('month')['balance'].last().pct_change()
     consistency = (monthly_returns > 0).mean() * 100
 
-    net_gain = total_return(df, capital)
-    pf = profit_factor(df)
-    rt = average_recovery_time(df) / 6
-    r2 = equity_r_squared(df)
+    net_gain        = total_return(df, capital)
+    pf              = profit_factor(df)
+    rt_avg, rt_max  = average_recovery_time(df)
+    r2              = equity_r_squared(df)
+
+    bal            = df['balance'].values
+    cumulative_max = np.maximum.accumulate(bal)
+    max_dd         = ((bal - cumulative_max) / cumulative_max * 100).min()
 
     return {
-        "Curve": name,
+        "Curve":         name,
         "Volatility_pct": round(volatility, 2),
-        "Monthly_pct": round(consistency, 2),
-        "Net_Gain_pct": round(net_gain, 2),
-        "Profit_Factor": round(pf, 3) if pf != np.inf else np.inf,
-        "Rec_Time": round(rt, 2),
-        "R_Squared": round(r2, 3)
+        "Monthly_pct":    round(consistency, 2),
+        "Net_Gain_pct":   round(net_gain, 2),
+        "Max_DD_pct":     round(max_dd, 2),
+        "Profit_Factor":  round(pf, 3) if pf != np.inf else np.inf,
+        "Rec_Time":       round(rt_avg / BARS_PER_DAY, 2),
+        "Rec_Max":        round(rt_max / BARS_PER_DAY, 2),
+        "R_Squared":      round(r2, 3)
     }
 
 # -------------------------------------------------
@@ -104,20 +139,20 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
     """Plot net gain % and drawdown with BTC comparison"""
     initial_capital = capital
     timestamps = pd.to_datetime(equity_hist['timestamp'])
-    balances = np.array(equity_hist['balance'])
-    
+    balances   = np.array(equity_hist['balance'])
+
     # Net Gain %
-    net_gain_pct = (balances - initial_capital) / initial_capital * 100
-    
+    net_gain_pct   = (balances - initial_capital) / initial_capital * 100
+
     # Drawdown %
     cumulative_max = np.maximum.accumulate(balances)
-    dd_pct = (balances - cumulative_max) / cumulative_max * 100
-    
-    fig, ax1 = plt.subplots(figsize=(12,6))
-    
+    dd_pct         = (balances - cumulative_max) / cumulative_max * 100
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
     # --- Bitcoin line for comparison ---
     btc_file = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
-    btc_df = pd.read_parquet(btc_file)
+    btc_df   = pd.read_parquet(btc_file)
 
     if 'timestamp' not in btc_df.columns:
         if isinstance(btc_df.index, pd.DatetimeIndex):
@@ -126,7 +161,7 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
             raise ValueError("BTC parquet missing 'timestamp' column or datetime index")
 
     btc_df = btc_df[['timestamp', 'close']]
-    btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
+    btc_df['timestamp']       = pd.to_datetime(btc_df['timestamp'])
     btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
 
     # --- Compare with BTC for dynamic coloring ---
@@ -136,60 +171,49 @@ def plot_netgain_dd(equity_hist, capital, title="Net Gain % y DD"):
         btc_df['btc_net_gain_pct']
     )
 
-    # Create masks for when we beat BTC or not
     above_btc = net_gain_pct >= btc_aligned
     below_btc = net_gain_pct < btc_aligned
 
-    # Green area where we beat BTC
     ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.2, color='green', interpolate=True)
-
-    # Red area where we don't beat BTC
-    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red', interpolate=True)
-
-    # Blue line (always on top)
+    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red',   interpolate=True)
     ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
 
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Net_Gain_pct", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
-    # Plot BTC with orange dashed line
-    ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'], 
+    ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'],
              color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
 
-    # Drawdown %
     ax2 = ax1.twinx()
     ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
     ax2.set_ylabel("Drawdown", color='red')
     ax2.tick_params(axis='y', labelcolor='red')
-    
-    # Calculate values for labels
+
     final_net_gain = net_gain_pct[-1]
-    max_dd = dd_pct.min()
-    final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
-    
-    # Add labels to plot
+    max_dd         = dd_pct.min()
+    final_btc      = btc_df['btc_net_gain_pct'].iloc[-1]
+
     textstr = f'Final Net Gain: {final_net_gain:.2f}%\nMax DD: {max_dd:.2f}%\nBTC Final: {final_btc:.2f}%'
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    
+
     fig.suptitle(title)
     fig.autofmt_xdate()
     ax1.grid(True, linestyle='--', alpha=0.6)
-    
-    # Combined legend
-    lines, labels = ax1.get_legend_handles_labels()
+
+    lines,  labels  = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc='best')
-    
+
     plt.show()
 
 # -------------------------------------------------
 # Read all files
 # -------------------------------------------------
-dfs = []
-file_names = []
-metrics_table = []
+dfs             = []
+file_names      = []
+metrics_table   = []
 correlation_data = {}
 
 for file_name in os.listdir(FOLDER):
@@ -210,11 +234,16 @@ for file_name in os.listdir(FOLDER):
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values('timestamp')
     df.set_index('timestamp', inplace=True)
+
+    # ✅ Resamplear a RESAMPLE_FREQ — todas las curvas en la misma frecuencia
+    df = resample_equity(df)
+
     dfs.append(df)
 
     short_name = os.path.splitext(file_name)[0]
     file_names.append(short_name)
 
+    # ✅ correlation_data con returns ya normalizados a RESAMPLE_FREQ
     correlation_data[short_name] = df['balance'].pct_change()
 
     plot_netgain_dd(df.reset_index(), capital=INITIAL_CAPITAL,
@@ -239,7 +268,7 @@ if dfs:
         resampled_balances.append(df_r['balance'])
 
     combined_balance = pd.concat(resampled_balances, axis=1).sum(axis=1)
-    combined_df = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+    combined_df      = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
 
     combined_capital = INITIAL_CAPITAL * len(dfs)
     plot_netgain_dd(combined_df, capital=combined_capital,
@@ -249,29 +278,30 @@ if dfs:
         compute_metrics(combined_df, capital=combined_capital, name="Combined Portfolio")
     )
 
-    correlation_data["Combined Portfolio"] = combined_df['balance'].pct_change()
+    correlation_data["Combined Portfolio"] = combined_df.set_index('timestamp')['balance'].pct_change()
 
 # -------------------------------------------------
-# BTC metrics
+# BTC metrics — también resampleado a RESAMPLE_FREQ
 # -------------------------------------------------
 try:
     btc_path = os.path.join(DATA_FOLDER, "BTCUSDT_4H.parquet")
-    btc_df = pd.read_parquet(btc_path)
+    btc_df   = pd.read_parquet(btc_path)
 
     if 'timestamp' not in btc_df.columns:
         if isinstance(btc_df.index, pd.DatetimeIndex):
             btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
 
     btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
-    btc_df_metrics = btc_df[['timestamp','close']].copy()
-    btc_df_metrics['balance'] = btc_df_metrics['close']
+    btc_df = btc_df.set_index('timestamp')[['close']].rename(columns={'close': 'balance'})
+
+    # ✅ Resamplear BTC igual que el resto
+    btc_df = resample_equity(btc_df)
 
     metrics_table.append(
-        compute_metrics(btc_df_metrics, capital=btc_df_metrics['balance'].iloc[0],
-                        name="BTCUSDT")
+        compute_metrics(btc_df.reset_index(), capital=btc_df['balance'].iloc[0], name="BTCUSDT")
     )
 
-    correlation_data["BTCUSDT"] = btc_df_metrics['balance'].pct_change()
+    correlation_data["BTCUSDT"] = btc_df['balance'].pct_change()
 
 except Exception as e:
     print(f"⚠️ Error computing BTC metrics: {e}")
@@ -295,7 +325,7 @@ print(metrics_df_display.to_string(index=False))
 from itertools import combinations
 
 combo_results = []
-named_dfs = dict(zip(file_names, dfs))
+named_dfs     = dict(zip(file_names, dfs))
 
 for r in range(1, len(named_dfs) + 1):
     for combo in combinations(named_dfs.keys(), r):
@@ -313,9 +343,9 @@ for r in range(1, len(named_dfs) + 1):
             resampled.append(df_r['balance'])
 
         combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-        combined_df = pd.DataFrame({
+        combined_df      = pd.DataFrame({
             'timestamp': common_index,
-            'balance': combined_balance
+            'balance':   combined_balance
         })
 
         capital = INITIAL_CAPITAL * len(combo_dfs)
@@ -340,9 +370,9 @@ combo_df = pd.DataFrame(combo_results)
 # -------------------------------------------------
 # TOP 10 BY NET GAIN (Descending)
 # -------------------------------------------------
-combo_netgain = combo_df.sort_values("Net_Gain_pct", ascending=False).head(10).copy()
+combo_netgain         = combo_df.sort_values("Net_Gain_pct", ascending=False).head(10).copy()
 combo_netgain_display = combo_netgain.copy()
-max_len_netgain = combo_netgain_display['Curve'].str.len().max()
+max_len_netgain       = combo_netgain_display['Curve'].str.len().max()
 combo_netgain_display['Curve'] = combo_netgain_display['Curve'].apply(lambda x: x.ljust(max_len_netgain))
 
 print("\n📈 TOP 10 COMBINATIONS BY NET GAIN (Highest):\n")
@@ -351,9 +381,9 @@ print(combo_netgain_display.to_string(index=False))
 # -------------------------------------------------
 # TOP 10 BY R² (Descending - higher is better)
 # -------------------------------------------------
-combo_r2 = combo_df.sort_values("R_Squared", ascending=False).head(10).copy()
+combo_r2         = combo_df.sort_values("R_Squared", ascending=False).head(10).copy()
 combo_r2_display = combo_r2.copy()
-max_len_r2 = combo_r2_display['Curve'].str.len().max()
+max_len_r2       = combo_r2_display['Curve'].str.len().max()
 combo_r2_display['Curve'] = combo_r2_display['Curve'].apply(lambda x: x.ljust(max_len_r2))
 
 print("\n📐 TOP 10 COMBINATIONS BY R² (Most Consistent):\n")
@@ -362,26 +392,49 @@ print(combo_r2_display.to_string(index=False))
 # -------------------------------------------------
 # TOP 10 BY PROFIT FACTOR (Descending)
 # -------------------------------------------------
-combo_pf = combo_df[combo_df['Profit_Factor'] != np.inf].sort_values("Profit_Factor", ascending=False).head(10).copy()
+combo_pf         = combo_df[combo_df['Profit_Factor'] != np.inf].sort_values("Profit_Factor", ascending=False).head(10).copy()
 combo_pf_display = combo_pf.copy()
-max_len_pf = combo_pf_display['Curve'].str.len().max()
+max_len_pf       = combo_pf_display['Curve'].str.len().max()
 combo_pf_display['Curve'] = combo_pf_display['Curve'].apply(lambda x: x.ljust(max_len_pf))
 
 print("\n💰 TOP 10 COMBINATIONS BY PROFIT FACTOR (Highest):\n")
 print(combo_pf_display.to_string(index=False))
+
+# -------------------------------------------------
+# TOP 10 BY RECOVERY TIME (Ascending - lower is better)
+# -------------------------------------------------
+combo_rec         = combo_df.sort_values("Rec_Time", ascending=True).head(10).copy()
+combo_rec_display = combo_rec.copy()
+max_len_rec       = combo_rec_display['Curve'].str.len().max()
+combo_rec_display['Curve'] = combo_rec_display['Curve'].apply(lambda x: x.ljust(max_len_rec))
+
+print("\n⏱️  TOP 10 COMBINATIONS BY RECOVERY TIME (Lowest):\n")
+print(combo_rec_display.to_string(index=False))
+
+# -------------------------------------------------
+# TOP 10 BY MAX DD (Ascending - less negative is better)
+# -------------------------------------------------
+combo_dd         = combo_df.sort_values("Max_DD_pct", ascending=False).head(10).copy()
+combo_dd_display = combo_dd.copy()
+max_len_dd       = combo_dd_display['Curve'].str.len().max()
+combo_dd_display['Curve'] = combo_dd_display['Curve'].apply(lambda x: x.ljust(max_len_dd))
+
+print("\n📉 TOP 10 COMBINATIONS BY MAX DD (Lowest Drawdown):\n")
+print(combo_dd_display.to_string(index=False))
+
+print("\n" + "="*80)
 
 print("\n" + "="*80)
 
 # -------------------------------------------------
 # Best combination by Net Gain
 # -------------------------------------------------
-best_name_netgain = combo_netgain.iloc[0]["Curve"]
+best_name_netgain  = combo_netgain.iloc[0]["Curve"].strip()
 best_combo_netgain = best_name_netgain.split("+")
+best_dfs_netgain   = [named_dfs[name] for name in best_combo_netgain]
 
-best_dfs_netgain = [named_dfs[name] for name in best_combo_netgain]
-
-start = min(df.index.min() for df in best_dfs_netgain)
-end   = max(df.index.max() for df in best_dfs_netgain)
+start        = min(df.index.min() for df in best_dfs_netgain)
+end          = max(df.index.max() for df in best_dfs_netgain)
 common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 
 resampled = []
@@ -390,10 +443,9 @@ for df in best_dfs_netgain:
     df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
     resampled.append(df_r['balance'])
 
-combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_netgain = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-
-best_capital = INITIAL_CAPITAL * len(best_dfs_netgain)
+combined_balance  = pd.concat(resampled, axis=1).sum(axis=1)
+best_df_netgain   = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital      = INITIAL_CAPITAL * len(best_dfs_netgain)
 
 plot_netgain_dd(best_df_netgain, capital=best_capital,
                 title=f"Best Combination by Net Gain: {best_name_netgain}")
@@ -401,13 +453,12 @@ plot_netgain_dd(best_df_netgain, capital=best_capital,
 # -------------------------------------------------
 # Best combination by R²
 # -------------------------------------------------
-best_name_r2 = combo_r2.iloc[0]["Curve"]
+best_name_r2  = combo_r2.iloc[0]["Curve"].strip()
 best_combo_r2 = best_name_r2.split("+")
+best_dfs_r2   = [named_dfs[name] for name in best_combo_r2]
 
-best_dfs_r2 = [named_dfs[name] for name in best_combo_r2]
-
-start = min(df.index.min() for df in best_dfs_r2)
-end   = max(df.index.max() for df in best_dfs_r2)
+start        = min(df.index.min() for df in best_dfs_r2)
+end          = max(df.index.max() for df in best_dfs_r2)
 common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 
 resampled = []
@@ -417,8 +468,8 @@ for df in best_dfs_r2:
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_r2 = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-best_capital = INITIAL_CAPITAL * len(best_dfs_r2)
+best_df_r2       = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital     = INITIAL_CAPITAL * len(best_dfs_r2)
 
 plot_netgain_dd(best_df_r2, capital=best_capital,
                 title=f"Best Combination by R² (Consistency): {best_name_r2}")
@@ -426,13 +477,12 @@ plot_netgain_dd(best_df_r2, capital=best_capital,
 # -------------------------------------------------
 # Best combination by Profit Factor
 # -------------------------------------------------
-best_name_pf = combo_pf.iloc[0]["Curve"]
+best_name_pf  = combo_pf.iloc[0]["Curve"].strip()
 best_combo_pf = best_name_pf.split("+")
+best_dfs_pf   = [named_dfs[name] for name in best_combo_pf]
 
-best_dfs_pf = [named_dfs[name] for name in best_combo_pf]
-
-start = min(df.index.min() for df in best_dfs_pf)
-end   = max(df.index.max() for df in best_dfs_pf)
+start        = min(df.index.min() for df in best_dfs_pf)
+end          = max(df.index.max() for df in best_dfs_pf)
 common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 
 resampled = []
@@ -442,8 +492,8 @@ for df in best_dfs_pf:
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
-best_df_pf = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
-best_capital = INITIAL_CAPITAL * len(best_dfs_pf)
+best_df_pf       = pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
+best_capital     = INITIAL_CAPITAL * len(best_dfs_pf)
 
 plot_netgain_dd(best_df_pf, capital=best_capital,
                 title=f"Best Combination by Profit Factor: {best_name_pf}")
@@ -461,14 +511,13 @@ print("="*80)
 # -------------------------------------------------
 print("\n[1/2] Generating correlation heatmap...")
 
-# Create DataFrame with returns from each strategy
+# ✅ Todos los returns son de series normalizadas a RESAMPLE_FREQ
 returns_df = pd.DataFrame()
 
 for name in file_names:
     if name in correlation_data:
         returns_df[name] = correlation_data[name]
 
-# Calculate correlation
 correlation_matrix = returns_df.corr()
 
 import seaborn as sns
@@ -498,7 +547,7 @@ high_corr_pairs = []
 for i in range(len(correlation_matrix.columns)):
     for j in range(i + 1, len(correlation_matrix.columns)):
         corr_value = correlation_matrix.iloc[i, j]
-        
+
         if corr_value > 0.7:
             high_corr_pairs.append((correlation_matrix.columns[i], correlation_matrix.columns[j], corr_value))
 
@@ -508,8 +557,6 @@ if high_corr_pairs:
         print(f"   {strat1} + {strat2}: {corr:.3f}")
 else:
     print("   ✅ No pairs with high positive correlation")
-
-
 
 print("\n" + "="*80)
 print("✅ ANALYSIS COMPLETED")

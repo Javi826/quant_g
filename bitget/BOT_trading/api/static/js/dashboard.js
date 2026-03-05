@@ -341,6 +341,7 @@ function setRegimeTimeframe(timeframe) {
     
     // Load regime data
     loadRegimeData();
+    loadRegime0Data();
 
 }
 
@@ -778,6 +779,94 @@ function updateRegimeUI(data) {
         }
     }
 }
+
+// REGIME 0 (BTC 1D FILTER) FUNCTIONS
+async function loadRegime0Data() {
+    try {
+        const res = await fetch('/api/regime0/current');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        
+        const data = await res.json();
+        
+        if (!data.success) {
+            console.error('Regime 0 API error:', data.error);
+            return;
+        }
+        
+        updateRegime0UI(data);
+        
+    } catch (error) {
+        console.error('Error loading REGIME 0 data:', error);
+    }
+}
+
+function updateRegime0UI(data) {
+    const btcClose = data.btc_close;
+    const ma5 = data.ma5;
+    const longData = data.long;
+    const shortData = data.short;
+    
+    const longAllowed = longData.allowed;
+    const shortAllowed = shortData.allowed;
+    const noneActive = !longAllowed && !shortAllowed;
+    
+    // Update SHORT card (LEFT) - No numbers
+    const shortCard = document.getElementById('regime0-card-short');
+    const shortStatus = document.getElementById('regime0-short-status');
+    
+    if (shortAllowed) {
+        shortCard.style.border = '2px solid #f85149';
+        shortCard.style.background = 'rgba(248, 81, 73, 0.1)';
+        shortStatus.textContent = 'ALLOW';
+        shortStatus.style.color = '#f85149';
+    } else {
+        shortCard.style.border = '2px solid #21262d';
+        shortCard.style.background = '#1c2128';
+        shortStatus.textContent = 'BLOCK';
+        shortStatus.style.color = '#6b7280';
+    }
+    
+    // Update INACTIVE card (CENTER) - 3 values only
+    const noneCard = document.getElementById('regime0-card-none');
+    const noneShortTh = document.getElementById('regime0-none-short-th');
+    const noneBtc = document.getElementById('regime0-none-btc');
+    const noneLongTh = document.getElementById('regime0-none-long-th');
+    
+    if (noneActive) {
+        noneCard.style.border = '2px solid #d29922';
+        noneCard.style.background = 'rgba(210, 153, 34, 0.1)';
+    } else {
+        noneCard.style.border = '2px solid #21262d';
+        noneCard.style.background = '#1c2128';
+    }
+    
+    // Update 3 values in INACTIVE card
+    if (noneShortTh && shortData.threshold) {
+        noneShortTh.textContent = '$' + shortData.threshold.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    if (noneBtc && btcClose) {
+        noneBtc.textContent = '$' + btcClose.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    if (noneLongTh && longData.threshold) {
+        noneLongTh.textContent = '$' + longData.threshold.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+    
+    // Update LONG card (RIGHT) - No numbers
+    const longCard = document.getElementById('regime0-card-long');
+    const longStatus = document.getElementById('regime0-long-status');
+    
+    if (longAllowed) {
+        longCard.style.border = '2px solid #3fb950';
+        longCard.style.background = 'rgba(63, 185, 80, 0.1)';
+        longStatus.textContent = 'ALLOW';
+        longStatus.style.color = '#3fb950';
+    } else {
+        longCard.style.border = '2px solid #21262d';
+        longCard.style.background = '#1c2128';
+        longStatus.textContent = 'BLOCK';
+        longStatus.style.color = '#6b7280';
+    }
+}
 // ═══════════════════════════════════════════════════════════════════════════
 // END MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -877,7 +966,10 @@ function switchTab(tabName) {
     if (tabName === 'analysis') loadStrategyAnalysis();
     if (tabName === 'config') loadBotConfig();
     if (tabName === 'equity') loadEquityTab();
-    if (tabName === 'regime') loadRegimeData();
+    if (tabName === 'regime') {
+    loadRegimeData();
+    loadRegime0Data();
+}
     if (tabName === 'risk') loadRiskTab();
     if (tabName === 'quality') loadQualityTab();
 }
@@ -907,7 +999,10 @@ function switchEquitySubTab(subTabName) {
 function getLogClass(line) {
     if (line.includes('TP for')) return 'tp-hit';
     if (line.includes('SL for')) return 'sl-hit';
-    if (line.includes('SHORT') || line.includes('LONG')) return 'info';
+    // Check que NO sea SHORTS/LONGS (evitar false positives)
+    if (!line.includes('SHORTS') && !line.includes('LONGS')) {
+        if (line.includes('SHORT') || line.includes('LONG')) return 'info';
+    }
     if (line.includes('Error')) return 'error';
     if (line.includes('WAR')) return 'warning';
     return 'default';
@@ -2678,36 +2773,18 @@ async function loadData() {
                     const grossPct = exposureData.metrics.gross_exposure_pct;
                     const netPct = exposureData.metrics.net_exposure_pct;
                     
-                    // Calculate color for gross exposure (usage percentage)
-                    const grossUsage = (grossPct / MAX_GROSS_EXPOSURE) * 100;
-                    let grossColor = '#3fb950'; // Green
-                    if (grossUsage >= 80) {
-                        grossColor = '#f85149'; // Red
-                    } else if (grossUsage >= 60) {
-                        grossColor = '#d29922'; // Yellow
-                    }
-                    
-                    // Calculate color for net exposure (usage percentage)
-                    const netUsage = (Math.abs(netPct) / MAX_NET_EXPOSURE) * 100;
-                    let netColor = '#3fb950'; // Green
-                    if (netUsage >= 80) {
-                        netColor = '#f85149'; // Red
-                    } else if (netUsage >= 60) {
-                        netColor = '#d29922'; // Yellow
-                    }
-                    
-                    // Update header cards
+                    // Update header cards (always blue)
                     const grossEl = document.getElementById('exposure-gross');
                     const netEl = document.getElementById('exposure-net');
                     
                     if (grossEl) {
                         grossEl.textContent = grossPct.toFixed(1) + '%';
-                        grossEl.style.color = grossColor;
+                        grossEl.style.color = '#58a6ff';  // Blue
                     }
                     
                     if (netEl) {
                         netEl.textContent = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '%';
-                        netEl.style.color = netColor;
+                        netEl.style.color = '#58a6ff';  // Blue
                     }
                 }
             }
@@ -3437,33 +3514,19 @@ function updateRiskCards(metrics) {
     const longPct = metrics.long_exposure_pct;
     const shortPct = metrics.short_exposure_pct;
     
-    // Calculate usage percentages for color
-    const grossUsage = (grossPct / MAX_GROSS_EXPOSURE) * 100;
-    const netUsage = (Math.abs(netPct) / MAX_NET_EXPOSURE) * 100;
-    
-    // Determine colors
-    function getUsageColor(usage) {
-        if (usage < 60) return '#3fb950';      // Green
-        if (usage < 80) return '#d29922';      // Yellow
-        return '#f85149';                       // Red
-    }
-    
-    const grossColor = getUsageColor(grossUsage);
-    const netColor = getUsageColor(netUsage);
-    
-    // Update Gross Exposure card
+    // Update Gross Exposure card (always blue)
     const grossEl = document.getElementById('risk-gross-exp');
     if (grossEl) {
         grossEl.textContent = grossPct.toFixed(1) + '%';
-        grossEl.style.color = grossColor;
+        grossEl.style.color = '#58a6ff';  // Blue
     }
     
-    // Update Net Exposure card
+    // Update Net Exposure card (always blue)
     const netEl = document.getElementById('risk-net-exp');
     if (netEl) {
         const netSign = netPct >= 0 ? '+' : '';
         netEl.textContent = netSign + netPct.toFixed(1) + '%';
-        netEl.style.color = netColor;
+        netEl.style.color = '#58a6ff';  // Blue
     }
     
     // Update Long Exposure card (always green)
@@ -3478,7 +3541,7 @@ function updateRiskCards(metrics) {
         shortEl.textContent = shortPct.toFixed(1) + '%';
     }
     
-    // Update config card  ← AÑADIR DESDE AQUÍ
+    // Update config card
     const configGrossEl = document.getElementById('risk-config-max-gross');
     const configNetEl = document.getElementById('risk-config-max-net');
     
@@ -3579,15 +3642,8 @@ async function loadRiskHistoryChart() {
         btcMin -= btcPadding;
         btcMax += btcPadding;
         
-        // Determine Gross line color based on max value
-        const maxGross = Math.max(...history.gross);
-        const grossUsage = (maxGross / MAX_GROSS_EXPOSURE) * 100;
-        let grossColor = '#3fb950';  // Green
-        if (grossUsage >= 80) {
-            grossColor = '#f85149';  // Red
-        } else if (grossUsage >= 60) {
-            grossColor = '#d29922';  // Yellow
-        }
+        // Gross Exposure always blue
+        const grossColor = '#58a6ff';  // Blue
         
         const ctx = document.getElementById('riskExposureChart').getContext('2d');
         riskExposureChart = new Chart(ctx, {
@@ -3609,11 +3665,11 @@ async function loadRiskHistoryChart() {
                     {
                         label: 'Net Exposure (%)',
                         data: history.net,
-                        borderColor: '#a8556f',
+                        borderColor: '#22d3ee',
                         backgroundColor: 'transparent',
                         borderWidth: 1.5,
                         pointRadius: 2,
-                        pointBackgroundColor: '#a8556f',
+                        pointBackgroundColor: '#22d3ee',
                         tension: 0.1,
                         yAxisID: 'y'
                     },
@@ -3719,6 +3775,7 @@ async function loadRiskHistoryChart() {
         console.error('Error loading risk history chart:', error);
     }
 }
+
 // =============================================================================
 // WIN RATE EVOLUTION CHART (Quality Control)
 // =============================================================================

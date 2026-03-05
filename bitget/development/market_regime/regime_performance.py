@@ -1,5 +1,5 @@
 """
-market_regime/regime_analyzer.py
+market_regime/regime_performance.py
 
 Analyzes strategy performance across 3 dimensions:
 1. By FAMILY (trending/volatile/ranging) - ignoring BTC direction
@@ -251,9 +251,9 @@ def format_significance(p_value: float) -> str:
 
 def print_single_strategy_all_dimensions(r: dict):
     """Prints all 3 dimension tables for a single strategy."""
-    print(f"\n\033[93m{'='*200}\033[0m")
+    print(f"\n\033[93m{'='*145}\033[0m")
     print(f"\033[93mSTRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)\033[0m")
-    print(f"\033[93m{'='*200}\033[0m")
+    print(f"\033[93m{'='*145}\033[0m")
     
     # TABLE 1: BY FAMILY
     print(f"\n{'─'*120}")
@@ -371,11 +371,11 @@ def print_single_strategy_all_dimensions(r: dict):
 
 def print_summary_tables(results: list):
     """Prints final summary tables across all strategies."""
-    print(f"\n{'='*200}")
-    print(f"{'='*200}")
+    print(f"\n{'='*145}")
+    print(f"{'='*145}")
     print(f"SUMMARY - ALL STRATEGIES")
-    print(f"{'='*200}")
-    print(f"{'='*200}")
+    print(f"{'='*145}")
+    print(f"{'='*145}")
     
     # Summary 1: Best Family
     print(f"\n{'─'*145}")
@@ -510,7 +510,7 @@ def analyze_all_strategies(output_folder: str = None, families: dict = None,
     print_summary_tables(results)
     
     # Interpretation guide
-    print(f"\n{'='*200}")
+    print(f"\n{'='*145}")
     print("INTERPRETATION GUIDE:")
     print("\n  CONF (Confidence):")
     print("    ✓ = Reliable sample (≥50 trades) - trust these results")
@@ -524,7 +524,7 @@ def analyze_all_strategies(output_folder: str = None, families: dict = None,
     print("    - If DIRECTION is ✓✅: filter by direction only")
     print("    - If REGIME is ✓✅: filter by specific regime")
     print("    - Otherwise: don't filter, operate in all conditions")
-    print(f"{'='*200}")
+    print(f"{'='*145}")
     
     return results
 

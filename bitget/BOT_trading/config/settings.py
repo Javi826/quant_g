@@ -13,12 +13,12 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "00": {
-        "initial_capital": 26000,
+        "initial_capital": 1752,
         "dashboard_port": 5000,
         "description": "Main Account"
     },
     "E1": {
-        "initial_capital": 26000,
+        "initial_capital": 1752,
         "dashboard_port": 5001,
         "description": "Elite Account"
     },
@@ -55,6 +55,9 @@ REGIME_GENERAL = {
     'volatile': 1.0,    
 }
 
+GLOBAL_SYSTEM_REGIME_TH1 = 1.00  # SHORT threshold (BTC < MA5 * TH1)
+GLOBAL_SYSTEM_REGIME_TH2 = 1.02  # LONG threshold (BTC > MA5 * TH2)
+
 # ==========================================================================
 # DIRECTION SIZING (BTC TREND FILTER)
 # ==========================================================================
@@ -79,7 +82,7 @@ DIRECTION_GENERAL = {
 # RISK CONTROL SETTINGS
 # ==========================================================================
 RISK_LIMITS = {
-    'max_gross_exposure_pct': 50.0,  
+    'max_gross_exposure_pct': 25.0,  
     'max_net_exposure_pct': 20.0     
 }
 LEVERAGE = 10
@@ -129,8 +132,8 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 580
-MAX_ORDER_AMOUNT = 620
+MIN_ORDER_AMOUNT = 38
+MAX_ORDER_AMOUNT = 42
 
 # TP/SL limits (%)
 MIN_TP_PCT = 1.5
