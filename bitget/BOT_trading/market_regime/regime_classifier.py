@@ -378,7 +378,7 @@ def get_btc_1d_filter(direction: str) -> bool:
         # Log decision
         status = 'ALLOW' if allowed else 'BLOCK'
         logger.info(
-            f"[REGIME 0 - 1D] {direction.upper()}S: "
+            f"[REGIME0] {direction.upper()}S: "
             f"BTC=${btc_close:.2f} vs MA5*{threshold:.2f}=${ma5*threshold:.2f} → {status}"
         )
         
