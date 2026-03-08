@@ -8,7 +8,9 @@ import time
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
+# %%
 from tqdm_joblib import tqdm_joblib
+
 from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
@@ -28,7 +30,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 6_000_000
@@ -45,12 +47,14 @@ TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,9,10]
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [6] 
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [30]
+LOOKBACK_LIST        = [3] 
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [20]
 
 TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [7.5]
+# %%
+SL_PCT_LIST          = [3]
+
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}

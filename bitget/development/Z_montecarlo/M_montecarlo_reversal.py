@@ -31,7 +31,7 @@ DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 120_000_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -42,8 +42,8 @@ LOOKBACK_LIST        = [3,4,5,6,7,8]
 MA_PERIOD_LIST       = [50]
 TOLERANCE_LIST       = [20,30,40]
 
-TP_PCT_LIST          = [2,3,4,5,6,7,8,9]
-SL_PCT_LIST          = [2,3,4,5,6,7,8,9]
+TP_PCT_LIST          = [1,2,3,4]
+SL_PCT_LIST          = [1,2,3]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -53,7 +53,6 @@ SL_PCT_LIST          = [2,3,4,5,6,7,8,9]
 # 
 # TP_PCT_LIST          = [4]
 # SL_PCT_LIST          = [7.5]
-# 
 # =============================================================================
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

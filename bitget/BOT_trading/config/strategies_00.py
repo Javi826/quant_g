@@ -12,24 +12,6 @@ IMPORTANT:
 
 STRATEGIES = [
     {
-        'id': '01_double_top_long_4H',
-        'name': 'double_top_long_4H',
-        'timeframe': '4H',
-        'active': True,
-        'direction': 'long',
-        'regime_trending': 1.0,
-        'regime_ranging': 1.0,
-        'regime_volatile': 1.0,
-        'direction_mode': 'general',
-        'sell_after_ncandles': 50,
-        'order_amount': 40,
-        'lookback': 2,
-        'tolerance': 15,
-        'trend_th': 5,
-        'tp_pct': 4,
-        'sl_pct': 10
-    },
-    {
         'id': '02_reversal_long_4H',
         'name': 'reversal_long_4H',
         'timeframe': '4H',

@@ -339,7 +339,7 @@ def get_implemented_strategies() -> set:
     strategies = {
         #'99_reversal_long_2m',
         #'98_reversal_short_5m',
-        '01_double_top_long_4H',
+        #'01_double_top_long_4H',
         '02_reversal_long_4H',
         '03_parity_long_4H',
         '04_reversal_short_4H',

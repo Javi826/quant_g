@@ -13,12 +13,12 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "00": {
-        "initial_capital": 1752,
+        "initial_capital": 1649,
         "dashboard_port": 5000,
         "description": "Main Account"
     },
     "E1": {
-        "initial_capital": 1752,
+        "initial_capital": 6000,
         "dashboard_port": 5001,
         "description": "Elite Account"
     },
@@ -82,7 +82,7 @@ DIRECTION_GENERAL = {
 # RISK CONTROL SETTINGS
 # ==========================================================================
 RISK_LIMITS = {
-    'max_gross_exposure_pct': 25.0,  
+    'max_gross_exposure_pct': 50.0,  
     'max_net_exposure_pct': 20.0     
 }
 LEVERAGE = 10
@@ -132,8 +132,8 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 38
-MAX_ORDER_AMOUNT = 42
+MIN_ORDER_AMOUNT = 35
+MAX_ORDER_AMOUNT = 180
 
 # TP/SL limits (%)
 MIN_TP_PCT = 1.5
