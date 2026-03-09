@@ -13,12 +13,12 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "00": {
-        "initial_capital": 1649,
+        "initial_capital": 6000,
         "dashboard_port": 5000,
         "description": "Main Account"
     },
     "E1": {
-        "initial_capital": 6000,
+        "initial_capital": 24000,
         "dashboard_port": 5001,
         "description": "Elite Account"
     },
