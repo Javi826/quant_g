@@ -29,10 +29,10 @@ N_JOBS       = -1
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 1_000_000
+MIN_VOL_USDT        = 2_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -73,10 +73,10 @@ SL_PCT_LIST      = [9,5,9.6,9.7,9.8,9.9,10,10.1,10.2,10.3,10.4,10.5]
 
 #1HSHORT-9 
 SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [20]
-IMPULSE_LIST       = [3]
-FLAG_MAX_LIST      = [60]
-MA_PERIOD_LIST     = [25]
+LOOKBACK_LIST      = [5]
+IMPULSE_LIST       = [10]
+FLAG_MAX_LIST      = [70]
+MA_PERIOD_LIST     = [50]
 
 TP_PCT_LIST        = [2]
 SL_PCT_LIST        = [8]

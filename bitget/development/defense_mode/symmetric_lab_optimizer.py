@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+defense_mode/symmetric_lab_optimizer.py
+
 Optimize BTC 1D Filter Rules on LAB, Validate on LIVE
 Tests multiple MA thresholds to find best profit configuration
 """

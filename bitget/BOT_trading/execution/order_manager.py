@@ -23,6 +23,7 @@ from market_data import get_ws_manager
 from execution.trade_logger import log_closed_position, configure_log_path
 import logging
 logger = logging.getLogger('BOT_trading.execution.order_manager')
+from config.settings import HOUR_ZONE
 
 # ==========================================================================
 # CONSTANTS
@@ -549,13 +550,13 @@ def close_position(symbol: str,
         # Print closing message
         if reason == "TP":
             logger.info(f"TP for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) "
-                  f"at {datetime.now().strftime('%H:%M')}")
+                  f"at {datetime.now(HOUR_ZONE).strftime('%H:%M')}")
         elif reason == "SL":
             logger.info(f"SL for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) "
-                  f"at {datetime.now().strftime('%H:%M')}")           
+                  f"at {datetime.now(HOUR_ZONE).strftime('%H:%M')}")            
         elif reason == "TIMEOUT":
             logger.info(f"TIMEOUT for {symbol} ({position_data.get('strategy_id', 'N/A') if position_data else 'N/A'}) "
-                  f"at {datetime.now().strftime('%H:%M')}")
+                  f"at {datetime.now(HOUR_ZONE).strftime('%H:%M')}") 
        
         # =========================================================================
         # BLOQUE 2: NUEVO - CAPTURA PRECIO Y TIMESTAMP PRE-ORDEN

@@ -16,7 +16,7 @@ from pathlib import Path
 from glob import glob
 
 # Configuration
-TRADES_FOLDER = "../market_regime/brief_trades_2025"
+TRADES_FOLDER = "../market_regime/brief_trades_2026"
 EQUITIES_FOLDER = "../brief_equities"
 INITIAL_CAPITAL = 800
 
@@ -24,7 +24,7 @@ print("=" * 80)
 print("PROFIT CONSISTENCY VERIFICATION")
 print("=" * 80)
 
-# =============================================================================
+# ================================================ex=============================
 # STEP 1: Calculate total profit from TRADES
 # =============================================================================
 print("\n[1] ANALYZING TRADES...")

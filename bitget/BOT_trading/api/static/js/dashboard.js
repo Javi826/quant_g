@@ -2820,7 +2820,7 @@ async function loadData() {
                         reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
                     }
                     return '<tr>' +
-                        '<td>' + new Date(trade.CLOSE_AT).toLocaleString() + '</td>' +
+                        '<td>' + new Date(trade.CLOSE_AT).toISOString().replace('T', ' ').substring(0, 19) + '</td>' +
                         '<td>' + trade.STRATEGY + '</td>' +
                         '<td>' + trade.SYMBOL + '</td>' +
                         '<td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td>' +

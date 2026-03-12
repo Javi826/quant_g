@@ -1,5 +1,5 @@
 """
-market_regime/regime_performance.py
+market_regime/regime1_performance.py
 
 Analyzes strategy performance across 3 dimensions:
 1. By FAMILY (trending/volatile/ranging) - ignoring BTC direction
@@ -19,12 +19,9 @@ from glob import glob
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from market_regime.config import (
-    OUTPUT_FOLDER, FAMILIES, 
-    DIRECTION_METHOD, DIRECTION_MA_PERIOD,
-    DIRECTION_MA_FAST, DIRECTION_MA_SLOW,
-    INITIAL_CAPITAL, DATE_RANGE_FILTER
-)
+from market_regime.config import OUTPUT_FOLDER, FAMILIES, DIRECTION_METHOD
+from market_regime.config import DIRECTION_MA_PERIOD, DIRECTION_MA_FAST, DIRECTION_MA_SLOW
+from market_regime.config import INITIAL_CAPITAL, DATE_RANGE_FILTER
 
 
 # Minimum trades for confidence

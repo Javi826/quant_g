@@ -442,7 +442,7 @@ class BotOrchestrator:
         Called once per candle cycle (before regime update).
         """
         
-        self.logger.info("[REGIME0] Calculating BTC 1D filter...")
+        self.logger.info("[REGIME0] Calculating BTC 1Dutc filter...")
         
         # Calculate for LONG
         self.btc_1d_cache['long'] = get_btc_1d_filter('long')
@@ -783,7 +783,7 @@ class BotOrchestrator:
             Args:
                 closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
             """
-            self.logger.info(f"[REGIME] Updating regime & direction for: {closed_timeframes}")
+            self.logger.info(f"[REGIME1] Updating regime & direction for: {closed_timeframes}")
             
             for tf in closed_timeframes:
                 try:
@@ -802,14 +802,14 @@ class BotOrchestrator:
                     ma50_str = f"${btc_ma50:.2f}" if btc_ma50 else "N/A"
                     
                     self.logger.info(
-                        f"[REGIME] {tf}: REGIME={family.upper()}, DIRECTION={direction.upper()} "
+                        f"[REGIME1] {tf}: REGIME={family.upper()}, DIRECTION={direction.upper()} "
                         f"(BTC={price_str}, MA50={ma50_str}, "
                         f"hurst={metrics.get('hurst', 0):.2f}, "
                         f"er={metrics.get('efficiency_ratio', 0):.2f})"
                     )
                     
                 except Exception as e:
-                    self.logger.error(f"[REGIME] Error for {tf}: {e}")
+                    self.logger.error(f"[REGIME1] Error for {tf}: {e}")
                     self.regime_cache[tf] = 'ranging'
                     self.direction_cache[tf] = 'uptrend'
     

@@ -358,7 +358,7 @@ def get_btc_1d_filter(direction: str) -> bool:
         df = fetch_btc_ohlcv('1Dutc')
         
         if df is None or df.empty or len(df) < 5:  # ← Restaurado df.empty
-            logger.warning("[REGIME 0 - 1D] Insufficient BTC 1D data, allowing trade")
+            logger.warning("[REGIME0] Insufficient BTC 1D data, allowing trade")
             return True
         
         # Safe conversion (como el original)
@@ -385,5 +385,5 @@ def get_btc_1d_filter(direction: str) -> bool:
         return allowed
         
     except Exception as e:
-        logger.error(f"[REGIME 0 - 1D] Error in filter: {e}")
+        logger.error(f"[REGIME0]Error-in filter: {e}")
         return False  # On error, not allow trade

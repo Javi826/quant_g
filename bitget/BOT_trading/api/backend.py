@@ -26,6 +26,7 @@ from market_regime.regime_classifier import get_regime_info
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
+from config.settings import HOUR_ZONE
 
 
 class DashboardServer:
@@ -321,7 +322,7 @@ class DashboardServer:
             return jsonify({
                 'status': 'ready',
                 'account': self.account_number,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now(HOUR_ZONE).isoformat()
             })
         
         @self.app.route('/api/quality/thresholds')
@@ -362,7 +363,7 @@ class DashboardServer:
                 
                 return jsonify({
                     'logs': clean_lines,
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now(HOUR_ZONE).isoformat()
                 })
             except Exception as e:
                 return jsonify({'error': str(e), 'logs': []}), 500
@@ -437,7 +438,7 @@ class DashboardServer:
                     'num_trades': num_trades,
                     'trades_pct': float(trades_pct),
                     'btc_price': float(btc_price),
-                    'timestamp': datetime.now().isoformat()
+                    'timestamp': datetime.now(HOUR_ZONE).isoformat()
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500

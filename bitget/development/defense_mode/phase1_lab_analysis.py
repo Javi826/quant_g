@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+defense_mode/phase1_lab_analysis.py
 PHASE 1: COMPREHENSIVE LAB ANALYSIS
 Exhaustive daily analysis to identify patterns in bad trading days.
 """

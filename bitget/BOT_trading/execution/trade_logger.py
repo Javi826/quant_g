@@ -20,6 +20,7 @@ from typing import Optional
 from config.settings import POSTGRES_CONFIG
 import logging
 logger = logging.getLogger('BOT_trading.execution.trade_logger')
+from config.settings import HOUR_ZONE
 
 
 # =============================================================================
@@ -245,7 +246,7 @@ def log_closed_position(opened_at,
             
             fee = 0
 
-        closed_at = datetime.now()
+        closed_at = datetime.now(HOUR_ZONE)
 
         # Convert opened_at to datetime if string
         if isinstance(opened_at, str):
@@ -253,12 +254,12 @@ def log_closed_position(opened_at,
         else:
             opened_at_dt = opened_at
 
-        # Remove timezone info
-        if opened_at_dt.tzinfo is not None:
-            opened_at_dt = opened_at_dt.replace(tzinfo=None)
-            
-        if closed_at.tzinfo is not None:
-            closed_at = closed_at.replace(tzinfo=None)
+        # Ensure both are timezone-aware in UTC
+        if opened_at_dt.tzinfo is None:
+            opened_at_dt = opened_at_dt.replace(tzinfo=HOUR_ZONE)
+        
+        if closed_at.tzinfo is None:
+            closed_at = closed_at.replace(tzinfo=HOUR_ZONE)
 
         # Calculate duration
         delta_days = (closed_at - opened_at_dt).total_seconds() / (3600 * 24)
@@ -367,7 +368,7 @@ def log_sync_discrepancy(account: str,
         """)
         
         cursor.execute(insert_query, [
-            datetime.now(),
+            datetime.now(HOUR_ZONE),
             account,
             symbol,
             issue_type,
