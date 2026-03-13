@@ -448,7 +448,7 @@ function updateRegimeUI(data) {
             // LONG card inactiva
             btcCardLong.style.border = '2px solid #21262d';
             btcCardLong.style.background = '#1c2128';
-            btcCardLong.style.opacity = '0.5';
+            btcCardLong.style.opacity = '0.4';
         } else if (btcTrend === 'uptrend') {
             // LONG card activa
             btcCardLong.style.border = '2px solid #3fb950';
@@ -458,16 +458,16 @@ function updateRegimeUI(data) {
             // SHORT card inactiva
             btcCardShort.style.border = '2px solid #21262d';
             btcCardShort.style.background = '#1c2128';
-            btcCardShort.style.opacity = '0.5';
+            btcCardShort.style.opacity = '0.4';
         } else {
             // Ambas inactivas
             btcCardShort.style.border = '2px solid #21262d';
             btcCardShort.style.background = '#1c2128';
-            btcCardShort.style.opacity = '0.5';
+            btcCardShort.style.opacity = '0.4';
             
             btcCardLong.style.border = '2px solid #21262d';
             btcCardLong.style.background = '#1c2128';
-            btcCardLong.style.opacity = '0.5';
+            btcCardLong.style.opacity = '0.4';
         }
     }
     
@@ -568,7 +568,7 @@ function updateRegimeUI(data) {
                 // Inactive card
                 card.style.border = '2px solid #21262d';
                 card.style.background = '#1c2128'; // Normal background
-                card.style.opacity = '0.5';
+                card.style.opacity = '0.4';
             }
         }
     });
@@ -865,6 +865,28 @@ function updateRegime0UI(data) {
         longCard.style.background = '#1c2128';
         longStatus.textContent = 'BLOCK';
         longStatus.style.color = '#6b7280';
+    }
+    
+    // Update opacity for REGIME 0 cards
+    if (shortAllowed) {
+        // SHORT activa
+        shortCard.style.opacity = '1';
+        longCard.style.opacity = '0.4';
+    } else if (longAllowed) {
+        // LONG activa
+        longCard.style.opacity = '1';
+        shortCard.style.opacity = '0.4';
+    } else {
+        // Ambas inactivas
+        shortCard.style.opacity = '0.4';
+        longCard.style.opacity = '0.4';
+    }
+    
+    // Update opacity for INACTIVE card (CENTER)
+    if (noneActive) {
+        noneCard.style.opacity = '1';
+    } else {
+        noneCard.style.opacity = '0.4';
     }
 }
 // ═══════════════════════════════════════════════════════════════════════════

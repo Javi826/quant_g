@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_flag ===
+# === FILE: main_grid_flag ===
 # -----------------------------------------------------------
 import os
 import sys

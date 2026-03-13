@@ -569,7 +569,7 @@
                     </h3>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                         <!-- SHORT Card - LEFT -->
-                        <div id="regime0-card-short" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div id="regime0-card-short" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                             <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M12 5v14M19 12l-7 7-7-7"/>
@@ -583,7 +583,6 @@
                         </div>
                         
                         <!-- INACTIVE Card - CENTER -->
-<!-- INACTIVE Card - CENTER -->
                         <div id="regime0-card-none" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                             <div style="font-size: 32px; font-weight: 700; color: #d29922; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -593,17 +592,14 @@
                             </div>
                             <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
                                 <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px;">
-                                    <!-- SHORT Threshold -->
                                     <div style="flex: 1;">
                                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Short TH</div>
                                         <div id="regime0-none-short-th" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
                                     </div>
-                                    <!-- BTC Price -->
                                     <div style="flex: 1;">
                                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">BTC</div>
                                         <div id="regime0-none-btc" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
                                     </div>
-                                    <!-- LONG Threshold -->
                                     <div style="flex: 1;">
                                         <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Long TH</div>
                                         <div id="regime0-none-long-th" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
@@ -613,7 +609,7 @@
                         </div>
                         
                         <!-- LONG Card - RIGHT -->
-                        <div id="regime0-card-long" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                        <div id="regime0-card-long" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                             <div style="font-size: 32px; font-weight: 700; color: #3fb950; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M12 19V5M5 12l7-7 7 7"/>
@@ -631,7 +627,7 @@
                 <!-- ✅ PRIMERA FILA: BTC TREND CARDS -->
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
                     <!-- Card LEFT: DOWNTREND -->
-                    <div id="btc-card-short" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                    <div id="btc-card-short" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
                             DOWNTREND
@@ -644,7 +640,7 @@
                     </div>
                     
                     <!-- Card CENTER: BTC INFO -->
-                    <div id="btc-card-info" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                    <div id="btc-card-info" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 32px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">BTC TREND</div>
                         <div style="display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #21262d; padding-top: 12px; margin-top: 8px; gap: 20px;">
                             <div style="flex: 1;">
@@ -659,7 +655,7 @@
                     </div>
                     
                     <!-- Card RIGHT: UPTREND -->
-                    <div id="btc-card-long" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                    <div id="btc-card-long" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 32px; font-weight: 700; color: #3fb950; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                             UPTREND
@@ -688,7 +684,7 @@
                     </div>
                     
                     <!-- RANGING Card -->
-                    <div id="regime-card-ranging" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                    <div id="regime-card-ranging" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 32px; font-weight: 700; color: #9ca3af; margin-bottom: 8px;">RANGING</div>
                         <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
                             <div id="regime-card-ranging-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
@@ -701,7 +697,7 @@
                     </div>
                     
                     <!-- TRENDING Card -->
-                    <div id="regime-card-trending" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
+                    <div id="regime-card-trending" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
                         <div style="font-size: 32px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">TRENDING</div>
                         <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
                             <div id="regime-card-trending-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">

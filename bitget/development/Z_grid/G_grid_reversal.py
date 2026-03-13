@@ -8,13 +8,13 @@ import time
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
-# %%
 from tqdm_joblib import tqdm_joblib
 
 from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
+
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from signals.add_signals_reversal import reversal_long
 from signals.add_signals_reversal import reversal_short
@@ -38,21 +38,20 @@ MIN_VOL_USDT        = 6_000_000
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10] 
+SELL_AFTER_LIST      = [0]
+LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10]
 MA_PERIOD_LIST       = [5,10,25,50]
 TOLERANCE_LIST       = [5,10,15,20,25,30]
 
 TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,9,10]
 
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [3] 
+SELL_AFTER_LIST      = [0]
+LOOKBACK_LIST        = [3]
 MA_PERIOD_LIST       = [50]
 TOLERANCE_LIST       = [20]
 
 TP_PCT_LIST          = [4]
-# %%
 SL_PCT_LIST          = [3]
 
 
