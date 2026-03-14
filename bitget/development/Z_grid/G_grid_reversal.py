@@ -29,7 +29,7 @@ N_JOBS       = -1
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2026"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
+DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
@@ -49,10 +49,10 @@ SL_PCT_LIST          = [3,4,5,6,7,9,10]
 SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [3]
 MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [20]
+TOLERANCE_LIST       = [25]
 
 TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [3]
+SL_PCT_LIST          = [2]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

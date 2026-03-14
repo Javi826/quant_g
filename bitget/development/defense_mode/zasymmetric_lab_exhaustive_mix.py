@@ -182,8 +182,8 @@ def evaluate_ma_combination(df_trades, btc_df, long_ma, long_th, short_ma, short
 # PHASE 2: HURST RULES
 # =============================================================================
 
-def get_btc_hurst_regime(btc_df, trade_time, hurst_th, slope_th):
-    """Get BTC regime using Hurst method"""
+def get_btc_hurst_regime(btc_df, trade_time, hurst_th):
+    """Get BTC regime using Hurst method (without slope)"""
     closed_candles = btc_df[btc_df['ts'] < trade_time]
     
     if len(closed_candles) < 10:
@@ -195,17 +195,17 @@ def get_btc_hurst_regime(btc_df, trade_time, hurst_th, slope_th):
     # Calculate Hurst
     hurst = calculate_hurst(recent_closes, window=10)
     
-    # Calculate slope (5-day change)
+    # Calculate 5-day price change for direction
     if len(recent_closes) >= 5:
-        slope = (recent_closes[-1] - recent_closes[-5]) / recent_closes[-5]
+        price_change = (recent_closes[-1] - recent_closes[-5]) / recent_closes[-5]
     else:
-        slope = 0
+        return None
     
-    # Classify
+    # Classify based on Hurst only (direction from price change)
     if hurst > hurst_th:
-        if slope > slope_th:
+        if price_change > 0:
             return 'LONGS'
-        elif slope < -slope_th:
+        elif price_change < 0:
             return 'SHORTS'
         else:
             return 'INACTIVE'
@@ -213,8 +213,8 @@ def get_btc_hurst_regime(btc_df, trade_time, hurst_th, slope_th):
         return 'INACTIVE'
 
 
-def evaluate_hurst_combination(df_trades, btc_df, long_hurst_th, long_slope_th, short_hurst_th, short_slope_th):
-    """Evaluate Hurst combination"""
+def evaluate_hurst_combination(df_trades, btc_df, long_hurst_th, short_hurst_th):
+    """Evaluate Hurst combination (simplified without slope)"""
     results = {}
     
     for direction in ['LONG', 'SHORT']:
@@ -226,11 +226,11 @@ def evaluate_hurst_combination(df_trades, btc_df, long_hurst_th, long_slope_th, 
             profit = trade['profit']
             
             if direction == 'LONG':
-                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th, long_slope_th)
+                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th)
                 if regime == 'LONGS':
                     filtered_profits.append(profit)
             else:  # SHORT
-                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th, short_slope_th)
+                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th)
                 if regime == 'SHORTS':
                     filtered_profits.append(profit)
         
@@ -257,8 +257,8 @@ def evaluate_hybrid_combination(df_trades, btc_df, best_ma_config, best_hurst_co
     
     long_ma, long_ma_th = best_ma_config['long']
     short_ma, short_ma_th = best_ma_config['short']
-    long_hurst_th, long_slope_th = best_hurst_config['long']
-    short_hurst_th, short_slope_th = best_hurst_config['short']
+    long_hurst_th = best_hurst_config['long']
+    short_hurst_th = best_hurst_config['short']
     
     for direction in ['LONG', 'SHORT']:
         df_dir = df_trades[df_trades['position_type'] == direction].copy()
@@ -270,13 +270,13 @@ def evaluate_hybrid_combination(df_trades, btc_df, best_ma_config, best_hurst_co
             
             if direction == 'LONG':
                 ma_regime = get_btc_ma_regime(btc_df, trade['buy_time'], long_ma, long_ma_th)
-                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th, long_slope_th)
+                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th)
                 
                 if ma_regime == 'LONGS' and hurst_regime == 'LONGS':
                     filtered_profits.append(profit)
             else:  # SHORT
                 ma_regime = get_btc_ma_regime(btc_df, trade['buy_time'], short_ma, short_ma_th)
-                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th, short_slope_th)
+                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th)
                 
                 if ma_regime == 'SHORTS' and hurst_regime == 'SHORTS':
                     filtered_profits.append(profit)
@@ -390,32 +390,29 @@ def main():
     print("PHASE 2: TESTING HURST RULES")
     print("="*110)
     
-    hurst_rules = []
-    for hurst_th in [0.48, 0.50, 0.52, 0.55, 0.58]:
-        for slope_th in [0.01, 0.02, 0.03, 0.04]:
-            hurst_rules.append((hurst_th, slope_th))
+    hurst_thresholds = [0.45, 0.48, 0.50, 0.52, 0.55, 0.58, 0.60]
     
-    print(f"\n🔍 Testing {len(hurst_rules)} LONG rules × {len(hurst_rules)} SHORT rules = {len(hurst_rules)**2} combinations...")
+    print(f"\n🔍 Testing {len(hurst_thresholds)} LONG rules × {len(hurst_thresholds)} SHORT rules = {len(hurst_thresholds)**2} combinations...")
     
     best_hurst_combo = None
     best_hurst_profit = -float('inf')
-    total_combos = len(hurst_rules) ** 2
+    total_combos = len(hurst_thresholds) ** 2
     current = 0
     
-    for long_hurst_th, long_slope_th in hurst_rules:
-        for short_hurst_th, short_slope_th in hurst_rules:
+    for long_hurst_th in hurst_thresholds:
+        for short_hurst_th in hurst_thresholds:
             current += 1
             print(f"   Progress: {current}/{total_combos} ({current/total_combos*100:.1f}%)...", end='\r')
             
             results, combined_profit, combined_trades = evaluate_hurst_combination(
-                df_lab, btc_df, long_hurst_th, long_slope_th, short_hurst_th, short_slope_th
+                df_lab, btc_df, long_hurst_th, short_hurst_th
             )
             
             if combined_profit > best_hurst_profit:
                 best_hurst_profit = combined_profit
                 best_hurst_combo = {
-                    'long': (long_hurst_th, long_slope_th),
-                    'short': (short_hurst_th, short_slope_th),
+                    'long': long_hurst_th,
+                    'short': short_hurst_th,
                     'results': results,
                     'profit': combined_profit,
                     'trades': combined_trades
@@ -423,12 +420,12 @@ def main():
     
     print()
     
-    long_hurst_th, long_slope_th = best_hurst_combo['long']
-    short_hurst_th, short_slope_th = best_hurst_combo['short']
+    long_hurst_th = best_hurst_combo['long']
+    short_hurst_th = best_hurst_combo['short']
     
     print(f"\n✅ Best Hurst combination:")
-    print(f"   LONG:  Hurst>{long_hurst_th:.2f} + slope>{long_slope_th:.2f}")
-    print(f"   SHORT: Hurst>{short_hurst_th:.2f} + slope<-{short_slope_th:.2f}")
+    print(f"   LONG:  Hurst>{long_hurst_th:.2f} + price_change>0")
+    print(f"   SHORT: Hurst>{short_hurst_th:.2f} + price_change<0")
     print(f"   Profit: ${best_hurst_combo['profit']:,.2f}")
     print(f"   Trades: {best_hurst_combo['trades']}")
     
@@ -461,8 +458,8 @@ def main():
     hybrid_dd = -hybrid_dd
     
     print(f"\n✅ Hybrid combination:")
-    print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f} + slope>{long_slope_th:.2f})")
-    print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f} + slope<-{short_slope_th:.2f})")
+    print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f})")
+    print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f})")
     print(f"   Profit: ${hybrid_profit:,.2f}")
     print(f"   Trades: {hybrid_trades}")
     print(f"   WR: {hybrid_wr:.1f}%")
@@ -531,12 +528,12 @@ def main():
         print(f"   SHORT: BTC < {short_ma.upper()}*{short_ma_th:.2f}")
     elif winner_name == 'Best Hurst':
         print(f"\n📋 Production Config:")
-        print(f"   LONG:  Hurst>{long_hurst_th:.2f} + slope>{long_slope_th:.2f}")
-        print(f"   SHORT: Hurst>{short_hurst_th:.2f} + slope<-{short_slope_th:.2f}")
+        print(f"   LONG:  Hurst>{long_hurst_th:.2f} (price_change>0)")
+        print(f"   SHORT: Hurst>{short_hurst_th:.2f} (price_change<0)")
     else:  # Hybrid
         print(f"\n📋 Production Config:")
-        print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f} + slope>{long_slope_th:.2f})")
-        print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f} + slope<-{short_slope_th:.2f})")
+        print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f})")
+        print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f})")
     
     print("\n" + "="*110)
 

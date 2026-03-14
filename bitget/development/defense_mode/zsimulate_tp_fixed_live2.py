@@ -1,230 +1,541 @@
 #!/usr/bin/env python3
 """
-Compare Two Rules on LIVE Data (00 and E1)
-Rule A: Symmetric  MA5*1.00 / MA5*1.00
-Rule B: Asymmetric MA5*1.02 / MA5*1.00
+3-Phase BTC Filter Optimization:
+Phase 1: Find best MA combination (400 combos)
+Phase 2: Find best Hurst combination (400 combos)
+Phase 3: Compare winners + hybrid
 """
 
 import pandas as pd
+import numpy as np
 from pathlib import Path
+from glob import glob
 
 
 def load_btc_1d():
     """Load BTC 1D data"""
     btc_file = Path('/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet')
+    
+    if not btc_file.exists():
+        raise FileNotFoundError(f"BTC 1D file not found: {btc_file}")
+    
     df = pd.read_parquet(btc_file)
     df.columns = df.columns.str.lower()
-    df['ts'] = pd.to_datetime(df.get('timestamp', df.index))
+    
+    if 'timestamp' in df.columns:
+        df['ts'] = pd.to_datetime(df['timestamp'])
+    else:
+        df['ts'] = pd.to_datetime(df.index)
+    
     df = df.sort_values('ts').reset_index(drop=True)
+    
+    # Calculate all MAs
     df['ma5'] = df['close'].rolling(window=5).mean()
+    df['ma10'] = df['close'].rolling(window=10).mean()
+    df['ma20'] = df['close'].rolling(window=20).mean()
+    df['ma50'] = df['close'].rolling(window=50).mean()
+    
     return df
 
 
-def get_btc_values(btc_df, trade_time):
-    """Get BTC close and MA5 at trade time"""
-    closed = btc_df[btc_df['ts'] < trade_time]
-    if len(closed) == 0:
-        return None, None
-    last = closed.iloc[-1]
-    if pd.isna(last['ma5']):
-        return None, None
-    return last['close'], last['ma5']
+def calculate_hurst(prices, window=10):
+    """Calculate Hurst exponent using R/S analysis"""
+    if len(prices) < window:
+        return 0.5
+    
+    prices = np.array(prices[-window:])
+    
+    # Calculate log returns
+    log_returns = np.diff(np.log(prices))
+    
+    if len(log_returns) == 0:
+        return 0.5
+    
+    # Mean and std
+    mean_return = np.mean(log_returns)
+    std_return = np.std(log_returns)
+    
+    if std_return == 0:
+        return 0.5
+    
+    # Cumulative deviations
+    cumsum = np.cumsum(log_returns - mean_return)
+    
+    # Range
+    R = np.max(cumsum) - np.min(cumsum)
+    
+    # Rescaled range
+    RS = R / std_return if std_return > 0 else 0
+    
+    # Hurst exponent approximation
+    if RS > 0:
+        hurst = np.log(RS) / np.log(len(log_returns))
+    else:
+        hurst = 0.5
+    
+    # Clamp between 0 and 1
+    hurst = max(0.0, min(1.0, hurst))
+    
+    return hurst
 
 
-def load_trades(filepath):
-    """Load trades file"""
-    df = pd.read_excel(filepath)
-    df.columns = df.columns.str.upper()
+def load_all_lab_trades():
+    """Load all lab trades"""
+    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades')
+    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
     
-    ts_col = next((c for c in ['OPEN_AT', 'BUY_TIME', 'ENTRY_TIME'] if c in df.columns), None)
-    if not ts_col:
-        raise ValueError(f"No timestamp column in {filepath}")
+    all_trades = []
+    for filepath in files:
+        df = pd.read_excel(filepath)
+        df['sell_time'] = pd.to_datetime(df['sell_time'])
+        df['buy_time'] = pd.to_datetime(df['buy_time'])
+        all_trades.append(df)
     
-    df[ts_col] = pd.to_datetime(df[ts_col])
-    df.rename(columns={ts_col: 'open_time'}, inplace=True)
-    return df.sort_values('open_time').reset_index(drop=True)
+    combined = pd.concat(all_trades, ignore_index=True)
+    return combined.sort_values('buy_time').reset_index(drop=True)
 
 
-def evaluate_file_with_rule(filepath, btc_df, rule_name, long_th, short_th):
-    """
-    Evaluate file with specific rule
-    """
-    df = load_trades(filepath)
+def calculate_max_dd(profits):
+    """Calculate max drawdown %"""
+    if len(profits) == 0:
+        return 0
     
-    all_profits = []
-    filtered_profits = []
+    cumulative = 0
+    peak = 0
+    max_dd = 0
     
-    for _, trade in df.iterrows():
-        direction = trade['DIRECTION']
-        profit = trade['PROFIT']
-        
-        all_profits.append(profit)
-        
-        btc_close, ma5 = get_btc_values(btc_df, trade['open_time'])
-        
-        if btc_close is None or ma5 is None:
-            filtered_profits.append(profit)
-            continue
-        
-        # Apply rule
-        if direction == 'LONG':
-            if btc_close > ma5 * long_th:
-                filtered_profits.append(profit)
-        else:  # SHORT
-            if btc_close < ma5 * short_th:
-                filtered_profits.append(profit)
+    for profit in profits:
+        cumulative += profit
+        if cumulative > peak:
+            peak = cumulative
+        dd = peak - cumulative
+        if dd > max_dd:
+            max_dd = dd
     
-    total_profit = sum(all_profits)
-    filtered_profit = sum(filtered_profits)
+    dd_pct = (max_dd / peak * 100) if peak > 0 else 0
+    return -dd_pct if dd_pct > 0 else 0
+
+
+# =============================================================================
+# PHASE 1: MA RULES
+# =============================================================================
+
+def get_btc_ma_regime(btc_df, trade_time, ma_type, threshold):
+    """Get BTC regime using MA method"""
+    closed_candles = btc_df[btc_df['ts'] < trade_time]
     
-    return {
-        'file': Path(filepath).stem,
-        'rule': rule_name,
-        'before_profit': total_profit,
-        'after_profit': filtered_profit,
-        'change': filtered_profit - total_profit,
-        'before_trades': len(all_profits),
-        'after_trades': len(filtered_profits)
-    }
+    if len(closed_candles) == 0:
+        return None
+    
+    last_candle = closed_candles.iloc[-1]
+    
+    if pd.isna(last_candle[ma_type]):
+        return None
+    
+    btc_close = last_candle['close']
+    ma_value = last_candle[ma_type]
+    ma_threshold = ma_value * threshold
+    
+    if btc_close > ma_threshold:
+        return 'LONGS'
+    elif btc_close < ma_threshold:
+        return 'SHORTS'
+    else:
+        return 'INACTIVE'
+
+
+def evaluate_ma_combination(df_trades, btc_df, long_ma, long_th, short_ma, short_th):
+    """Evaluate MA combination"""
+    results = {}
+    
+    for direction in ['LONG', 'SHORT']:
+        df_dir = df_trades[df_trades['position_type'] == direction].copy()
+        
+        filtered_profits = []
+        
+        for idx, trade in df_dir.iterrows():
+            profit = trade['profit']
+            
+            if direction == 'LONG':
+                regime = get_btc_ma_regime(btc_df, trade['buy_time'], long_ma, long_th)
+                if regime == 'LONGS':
+                    filtered_profits.append(profit)
+            else:  # SHORT
+                regime = get_btc_ma_regime(btc_df, trade['buy_time'], short_ma, short_th)
+                if regime == 'SHORTS':
+                    filtered_profits.append(profit)
+        
+        results[direction] = {
+            'trades': len(filtered_profits),
+            'profit': sum(filtered_profits),
+            'wr': sum(1 for p in filtered_profits if p > 0) / len(filtered_profits) * 100 if len(filtered_profits) > 0 else 0,
+            'dd': calculate_max_dd(filtered_profits)
+        }
+    
+    combined_profit = results['LONG']['profit'] + results['SHORT']['profit']
+    combined_trades = results['LONG']['trades'] + results['SHORT']['trades']
+    
+    return results, combined_profit, combined_trades
+
+
+# =============================================================================
+# PHASE 2: HURST RULES
+# =============================================================================
+
+def get_btc_hurst_regime(btc_df, trade_time, hurst_th):
+    """Get BTC regime using Hurst method (without slope)"""
+    closed_candles = btc_df[btc_df['ts'] < trade_time]
+    
+    if len(closed_candles) < 10:
+        return None
+    
+    # Get last 10 closes
+    recent_closes = closed_candles['close'].values[-10:]
+    
+    # Calculate Hurst
+    hurst = calculate_hurst(recent_closes, window=10)
+    
+    # Calculate 5-day price change for direction
+    if len(recent_closes) >= 5:
+        price_change = (recent_closes[-1] - recent_closes[-5]) / recent_closes[-5]
+    else:
+        return None
+    
+    # Classify based on Hurst only (direction from price change)
+    if hurst > hurst_th:
+        if price_change > 0:
+            return 'LONGS'
+        elif price_change < 0:
+            return 'SHORTS'
+        else:
+            return 'INACTIVE'
+    else:
+        return 'INACTIVE'
+
+
+def evaluate_hurst_combination(df_trades, btc_df, long_hurst_th, short_hurst_th):
+    """Evaluate Hurst combination (simplified without slope)"""
+    results = {}
+    
+    for direction in ['LONG', 'SHORT']:
+        df_dir = df_trades[df_trades['position_type'] == direction].copy()
+        
+        filtered_profits = []
+        
+        for idx, trade in df_dir.iterrows():
+            profit = trade['profit']
+            
+            if direction == 'LONG':
+                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th)
+                if regime == 'LONGS':
+                    filtered_profits.append(profit)
+            else:  # SHORT
+                regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th)
+                if regime == 'SHORTS':
+                    filtered_profits.append(profit)
+        
+        results[direction] = {
+            'trades': len(filtered_profits),
+            'profit': sum(filtered_profits),
+            'wr': sum(1 for p in filtered_profits if p > 0) / len(filtered_profits) * 100 if len(filtered_profits) > 0 else 0,
+            'dd': calculate_max_dd(filtered_profits)
+        }
+    
+    combined_profit = results['LONG']['profit'] + results['SHORT']['profit']
+    combined_trades = results['LONG']['trades'] + results['SHORT']['trades']
+    
+    return results, combined_profit, combined_trades
+
+
+# =============================================================================
+# PHASE 3: HYBRID (BEST MA + BEST HURST)
+# =============================================================================
+
+def evaluate_hybrid_combination(df_trades, btc_df, best_ma_config, best_hurst_config):
+    """Evaluate hybrid: MA AND Hurst must both agree"""
+    results = {}
+    
+    long_ma, long_ma_th = best_ma_config['long']
+    short_ma, short_ma_th = best_ma_config['short']
+    long_hurst_th = best_hurst_config['long']
+    short_hurst_th = best_hurst_config['short']
+    
+    for direction in ['LONG', 'SHORT']:
+        df_dir = df_trades[df_trades['position_type'] == direction].copy()
+        
+        filtered_profits = []
+        
+        for idx, trade in df_dir.iterrows():
+            profit = trade['profit']
+            
+            if direction == 'LONG':
+                ma_regime = get_btc_ma_regime(btc_df, trade['buy_time'], long_ma, long_ma_th)
+                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], long_hurst_th)
+                
+                if ma_regime == 'LONGS' and hurst_regime == 'LONGS':
+                    filtered_profits.append(profit)
+            else:  # SHORT
+                ma_regime = get_btc_ma_regime(btc_df, trade['buy_time'], short_ma, short_ma_th)
+                hurst_regime = get_btc_hurst_regime(btc_df, trade['buy_time'], short_hurst_th)
+                
+                if ma_regime == 'SHORTS' and hurst_regime == 'SHORTS':
+                    filtered_profits.append(profit)
+        
+        results[direction] = {
+            'trades': len(filtered_profits),
+            'profit': sum(filtered_profits),
+            'wr': sum(1 for p in filtered_profits if p > 0) / len(filtered_profits) * 100 if len(filtered_profits) > 0 else 0,
+            'dd': calculate_max_dd(filtered_profits)
+        }
+    
+    combined_profit = results['LONG']['profit'] + results['SHORT']['profit']
+    combined_trades = results['LONG']['trades'] + results['SHORT']['trades']
+    
+    return results, combined_profit, combined_trades
 
 
 def main():
-    print("="*100)
-    print("COMPARE TWO RULES ON LIVE DATA")
-    print("="*100)
-    print("\nRule A (Symmetric):  LONG: BTC > MA5*1.00  |  SHORT: BTC < MA5*1.00")
-    print("Rule B (Asymmetric): LONG: BTC > MA5*1.02  |  SHORT: BTC < MA5*1.00")
-    print("="*100)
+    print("="*110)
+    print("3-PHASE BTC FILTER OPTIMIZATION")
+    print("="*110)
     
-    # Load BTC
+    # Load data
+    print("\n📂 Loading BTC 1D data...")
     btc_df = load_btc_1d()
+    print(f"✅ Loaded {len(btc_df)} daily bars")
     
-    # Find files
-    folder = Path('/home/javi/projects/quant/quant_g/bitget/development/defense_mode')
-    files_00 = sorted(folder.glob('bot_trades_00_*.xlsx'))
-    files_e1 = sorted(folder.glob('bot_trades_E1_*.xlsx'))
+    print("\n📂 Loading LAB trades...")
+    df_lab = load_all_lab_trades()
+    print(f"✅ Loaded {len(df_lab)} LAB trades")
     
-    # Store all results
-    all_results = []
+    long_count = len(df_lab[df_lab['position_type'] == 'LONG'])
+    short_count = len(df_lab[df_lab['position_type'] == 'SHORT'])
+    print(f"   LONG:  {long_count} trades")
+    print(f"   SHORT: {short_count} trades")
     
-    # Evaluate 00 files
-    print("\n" + "="*100)
-    print("00 FILES (RAW - NO LAYER 1)")
-    print("="*100)
+    # Calculate baseline
+    baseline_long_profit = df_lab[df_lab['position_type'] == 'LONG']['profit'].sum()
+    baseline_short_profit = df_lab[df_lab['position_type'] == 'SHORT']['profit'].sum()
+    baseline_total_profit = baseline_long_profit + baseline_short_profit
+    baseline_total_wr = (df_lab['profit'] > 0).mean() * 100
+    baseline_dd = calculate_max_dd(df_lab['profit'].tolist())
     
-    for f in files_00:
-        result_a = evaluate_file_with_rule(f, btc_df, 'A', 1.00, 1.00)
-        result_b = evaluate_file_with_rule(f, btc_df, 'B', 1.02, 1.00)
-        all_results.extend([result_a, result_b])
+    print(f"\n📊 Baseline (no filter):")
+    print(f"   Profit: ${baseline_total_profit:,.2f}")
+    print(f"   WR: {baseline_total_wr:.1f}%")
+    print(f"   DD: {baseline_dd:.1f}%")
     
-    # Print 00 results
-    print(f"\n{'FILE':<25} {'RULE':<6} {'TRADES':<15} {'BEFORE':<15} {'AFTER':<15} {'CHANGE':<15}")
-    print("-"*100)
+    # =============================================================================
+    # PHASE 1: FIND BEST MA COMBINATION
+    # =============================================================================
+    print("\n" + "="*110)
+    print("PHASE 1: TESTING MA RULES")
+    print("="*110)
     
-    results_00_a = [r for r in all_results if '00' in r['file'] and r['rule'] == 'A']
-    results_00_b = [r for r in all_results if '00' in r['file'] and r['rule'] == 'B']
+    ma_rules = []
+    for ma_type in ['ma5', 'ma10', 'ma20', 'ma50']:
+        for threshold in [0.95, 0.98, 1.00, 1.02, 1.05]:
+            ma_rules.append((ma_type, threshold))
     
-    for i in range(len(results_00_a)):
-        ra = results_00_a[i]
-        rb = results_00_b[i]
-        
-        print(f"{ra['file']:<25} {ra['rule']:<6} {ra['before_trades']:>5}→{ra['after_trades']:<6} "
-              f"${ra['before_profit']:>12.2f} ${ra['after_profit']:>12.2f} ${ra['change']:>+12.2f}")
-        print(f"{'':<25} {rb['rule']:<6} {rb['before_trades']:>5}→{rb['after_trades']:<6} "
-              f"${rb['before_profit']:>12.2f} ${rb['after_profit']:>12.2f} ${rb['change']:>+12.2f}")
-        print()
+    print(f"\n🔍 Testing {len(ma_rules)} LONG rules × {len(ma_rules)} SHORT rules = {len(ma_rules)**2} combinations...")
     
-    # Totals 00
-    total_00_a = sum(r['after_profit'] for r in results_00_a)
-    total_00_b = sum(r['after_profit'] for r in results_00_b)
-    change_00_a = sum(r['change'] for r in results_00_a)
-    change_00_b = sum(r['change'] for r in results_00_b)
+    best_ma_combo = None
+    best_ma_profit = -float('inf')
+    total_combos = len(ma_rules) ** 2
+    current = 0
     
-    print("-"*100)
-    print(f"{'TOTAL 00 - Rule A':<25} {'A':<6} {'':<15} {'':<15} ${total_00_a:>12.2f} ${change_00_a:>+12.2f}")
-    print(f"{'TOTAL 00 - Rule B':<25} {'B':<6} {'':<15} {'':<15} ${total_00_b:>12.2f} ${change_00_b:>+12.2f}")
+    for long_ma, long_th in ma_rules:
+        for short_ma, short_th in ma_rules:
+            current += 1
+            print(f"   Progress: {current}/{total_combos} ({current/total_combos*100:.1f}%)...", end='\r')
+            
+            results, combined_profit, combined_trades = evaluate_ma_combination(
+                df_lab, btc_df, long_ma, long_th, short_ma, short_th
+            )
+            
+            if combined_profit > best_ma_profit:
+                best_ma_profit = combined_profit
+                best_ma_combo = {
+                    'long': (long_ma, long_th),
+                    'short': (short_ma, short_th),
+                    'results': results,
+                    'profit': combined_profit,
+                    'trades': combined_trades
+                }
     
-    # Evaluate E1 files
-    print("\n" + "="*100)
-    print("E1 FILES (WITH LAYER 1)")
-    print("="*100)
+    print()
     
-    results_e1 = []
-    for f in files_e1:
-        result_a = evaluate_file_with_rule(f, btc_df, 'A', 1.00, 1.00)
-        result_b = evaluate_file_with_rule(f, btc_df, 'B', 1.02, 1.00)
-        results_e1.extend([result_a, result_b])
+    long_ma, long_ma_th = best_ma_combo['long']
+    short_ma, short_ma_th = best_ma_combo['short']
     
-    # Print E1 results
-    print(f"\n{'FILE':<25} {'RULE':<6} {'TRADES':<15} {'BEFORE':<15} {'AFTER':<15} {'CHANGE':<15}")
-    print("-"*100)
+    print(f"\n✅ Best MA combination:")
+    print(f"   LONG:  BTC > {long_ma.upper()}*{long_ma_th:.2f}")
+    print(f"   SHORT: BTC < {short_ma.upper()}*{short_ma_th:.2f}")
+    print(f"   Profit: ${best_ma_combo['profit']:,.2f}")
+    print(f"   Trades: {best_ma_combo['trades']}")
     
-    results_e1_a = [r for r in results_e1 if r['rule'] == 'A']
-    results_e1_b = [r for r in results_e1 if r['rule'] == 'B']
+    long_r = best_ma_combo['results']['LONG']
+    short_r = best_ma_combo['results']['SHORT']
+    combined_wr = (long_r['wr'] * long_r['trades'] + short_r['wr'] * short_r['trades']) / best_ma_combo['trades'] if best_ma_combo['trades'] > 0 else 0
+    combined_dd = (abs(long_r['dd']) * abs(long_r['profit']) + abs(short_r['dd']) * abs(short_r['profit'])) / (abs(long_r['profit']) + abs(short_r['profit'])) if (abs(long_r['profit']) + abs(short_r['profit'])) > 0 else 0
+    combined_dd = -combined_dd
     
-    for i in range(len(results_e1_a)):
-        ra = results_e1_a[i]
-        rb = results_e1_b[i]
-        
-        print(f"{ra['file']:<25} {ra['rule']:<6} {ra['before_trades']:>5}→{ra['after_trades']:<6} "
-              f"${ra['before_profit']:>12.2f} ${ra['after_profit']:>12.2f} ${ra['change']:>+12.2f}")
-        print(f"{'':<25} {rb['rule']:<6} {rb['before_trades']:>5}→{rb['after_trades']:<6} "
-              f"${rb['before_profit']:>12.2f} ${rb['after_profit']:>12.2f} ${rb['change']:>+12.2f}")
-        print()
+    print(f"   WR: {combined_wr:.1f}%")
+    print(f"   DD: {combined_dd:.1f}%")
     
-    # Totals E1
-    total_e1_a = sum(r['after_profit'] for r in results_e1_a)
-    total_e1_b = sum(r['after_profit'] for r in results_e1_b)
-    change_e1_a = sum(r['change'] for r in results_e1_a)
-    change_e1_b = sum(r['change'] for r in results_e1_b)
+    # =============================================================================
+    # PHASE 2: FIND BEST HURST COMBINATION
+    # =============================================================================
+    print("\n" + "="*110)
+    print("PHASE 2: TESTING HURST RULES")
+    print("="*110)
     
-    print("-"*100)
-    print(f"{'TOTAL E1 - Rule A':<25} {'A':<6} {'':<15} {'':<15} ${total_e1_a:>12.2f} ${change_e1_a:>+12.2f}")
-    print(f"{'TOTAL E1 - Rule B':<25} {'B':<6} {'':<15} {'':<15} ${total_e1_b:>12.2f} ${change_e1_b:>+12.2f}")
+    hurst_thresholds = [0.45, 0.48, 0.50, 0.52, 0.55, 0.58, 0.60]
     
-    # Final summary
-    print("\n" + "="*100)
+    print(f"\n🔍 Testing {len(hurst_thresholds)} LONG rules × {len(hurst_thresholds)} SHORT rules = {len(hurst_thresholds)**2} combinations...")
+    
+    best_hurst_combo = None
+    best_hurst_profit = -float('inf')
+    total_combos = len(hurst_thresholds) ** 2
+    current = 0
+    
+    for long_hurst_th in hurst_thresholds:
+        for short_hurst_th in hurst_thresholds:
+            current += 1
+            print(f"   Progress: {current}/{total_combos} ({current/total_combos*100:.1f}%)...", end='\r')
+            
+            results, combined_profit, combined_trades = evaluate_hurst_combination(
+                df_lab, btc_df, long_hurst_th, short_hurst_th
+            )
+            
+            if combined_profit > best_hurst_profit:
+                best_hurst_profit = combined_profit
+                best_hurst_combo = {
+                    'long': long_hurst_th,
+                    'short': short_hurst_th,
+                    'results': results,
+                    'profit': combined_profit,
+                    'trades': combined_trades
+                }
+    
+    print()
+    
+    long_hurst_th = best_hurst_combo['long']
+    short_hurst_th = best_hurst_combo['short']
+    
+    print(f"\n✅ Best Hurst combination:")
+    print(f"   LONG:  Hurst>{long_hurst_th:.2f} + price_change>0")
+    print(f"   SHORT: Hurst>{short_hurst_th:.2f} + price_change<0")
+    print(f"   Profit: ${best_hurst_combo['profit']:,.2f}")
+    print(f"   Trades: {best_hurst_combo['trades']}")
+    
+    long_r = best_hurst_combo['results']['LONG']
+    short_r = best_hurst_combo['results']['SHORT']
+    combined_wr = (long_r['wr'] * long_r['trades'] + short_r['wr'] * short_r['trades']) / best_hurst_combo['trades'] if best_hurst_combo['trades'] > 0 else 0
+    combined_dd = (abs(long_r['dd']) * abs(long_r['profit']) + abs(short_r['dd']) * abs(short_r['profit'])) / (abs(long_r['profit']) + abs(short_r['profit'])) if (abs(long_r['profit']) + abs(short_r['profit'])) > 0 else 0
+    combined_dd = -combined_dd
+    
+    print(f"   WR: {combined_wr:.1f}%")
+    print(f"   DD: {combined_dd:.1f}%")
+    
+    # =============================================================================
+    # PHASE 3: TEST HYBRID (BEST MA + BEST HURST)
+    # =============================================================================
+    print("\n" + "="*110)
+    print("PHASE 3: TESTING HYBRID (BEST MA + BEST HURST)")
+    print("="*110)
+    
+    print(f"\n🔍 Testing: Best MA AND Best Hurst combined...")
+    
+    hybrid_results, hybrid_profit, hybrid_trades = evaluate_hybrid_combination(
+        df_lab, btc_df, best_ma_combo, best_hurst_combo
+    )
+    
+    long_r = hybrid_results['LONG']
+    short_r = hybrid_results['SHORT']
+    hybrid_wr = (long_r['wr'] * long_r['trades'] + short_r['wr'] * short_r['trades']) / hybrid_trades if hybrid_trades > 0 else 0
+    hybrid_dd = (abs(long_r['dd']) * abs(long_r['profit']) + abs(short_r['dd']) * abs(short_r['profit'])) / (abs(long_r['profit']) + abs(short_r['profit'])) if (abs(long_r['profit']) + abs(short_r['profit'])) > 0 else 0
+    hybrid_dd = -hybrid_dd
+    
+    print(f"\n✅ Hybrid combination:")
+    print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f})")
+    print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f})")
+    print(f"   Profit: ${hybrid_profit:,.2f}")
+    print(f"   Trades: {hybrid_trades}")
+    print(f"   WR: {hybrid_wr:.1f}%")
+    print(f"   DD: {hybrid_dd:.1f}%")
+    
+    # =============================================================================
+    # FINAL COMPARISON TABLE
+    # =============================================================================
+    print("\n" + "="*110)
     print("FINAL COMPARISON")
-    print("="*100)
+    print("="*110)
     
-    print(f"\n{'DATASET':<20} {'RULE A (Symmetric)':<30} {'RULE B (Asymmetric)':<30} {'WINNER':<10}")
-    print("-"*100)
-    print(f"{'00 (raw)':<20} ${total_00_a:>12.2f} ({change_00_a:>+10.2f})    "
-          f"${total_00_b:>12.2f} ({change_00_b:>+10.2f})    "
-          f"{'A' if total_00_a > total_00_b else 'B' if total_00_b > total_00_a else 'TIE':<10}")
-    print(f"{'E1 (+ LAYER 1)':<20} ${total_e1_a:>12.2f} ({change_e1_a:>+10.2f})    "
-          f"${total_e1_b:>12.2f} ({change_e1_b:>+10.2f})    "
-          f"{'A' if total_e1_a > total_e1_b else 'B' if total_e1_b > total_e1_a else 'TIE':<10}")
+    print(f"\n{'Method':<30} {'Trades':>10} {'Profit':>15} {'WR%':>10} {'DD%':>10} {'Improvement':>15}")
+    print("-"*110)
     
-    # Overall winner
-    total_a = total_00_a + total_e1_a
-    total_b = total_00_b + total_e1_b
+    # Baseline
+    print(f"{'Baseline (no filter)':<30} {len(df_lab):>10} ${baseline_total_profit:>13.2f} {baseline_total_wr:>9.1f}% {baseline_dd:>9.1f}% {'—':>15}")
     
-    print("\n" + "="*100)
-    print("VERDICT")
-    print("="*100)
+    # Best MA
+    ma_improvement = (best_ma_combo['profit'] - baseline_total_profit) / abs(baseline_total_profit) * 100
+    ma_emoji = "🚀" if ma_improvement > 10 else "📈" if ma_improvement > 0 else "📉"
+    ma_wr = (best_ma_combo['results']['LONG']['wr'] * best_ma_combo['results']['LONG']['trades'] + 
+             best_ma_combo['results']['SHORT']['wr'] * best_ma_combo['results']['SHORT']['trades']) / best_ma_combo['trades']
+    ma_dd = -(abs(best_ma_combo['results']['LONG']['dd']) * abs(best_ma_combo['results']['LONG']['profit']) + 
+             abs(best_ma_combo['results']['SHORT']['dd']) * abs(best_ma_combo['results']['SHORT']['profit'])) / (
+             abs(best_ma_combo['results']['LONG']['profit']) + abs(best_ma_combo['results']['SHORT']['profit']))
     
-    print(f"\nRule A (Symmetric):  ${total_a:,.2f}")
-    print(f"Rule B (Asymmetric): ${total_b:,.2f}")
+    print(f"{'Best MA':<30} {best_ma_combo['trades']:>10} ${best_ma_combo['profit']:>13.2f} {ma_wr:>9.1f}% {ma_dd:>9.1f}% {ma_improvement:>+13.1f}% {ma_emoji}")
     
-    if total_a > total_b:
-        diff = total_a - total_b
-        print(f"\n🏆 WINNER: Rule A (Symmetric MA5*1.00)")
-        print(f"   Beats Rule B by ${diff:,.2f}")
-        print(f"\n💡 RECOMMENDATION: Switch to symmetric rule")
-        print(f"   LONG:  BTC > MA5*1.00")
-        print(f"   SHORT: BTC < MA5*1.00")
-    elif total_b > total_a:
-        diff = total_b - total_a
-        print(f"\n🏆 WINNER: Rule B (Asymmetric MA5*1.02/1.00)")
-        print(f"   Beats Rule A by ${diff:,.2f}")
-        print(f"\n💡 RECOMMENDATION: Keep current asymmetric rule")
-        print(f"   LONG:  BTC > MA5*1.02")
-        print(f"   SHORT: BTC < MA5*1.00")
-    else:
-        print(f"\n⚖️  TIE: Both rules perform equally")
+    # Best Hurst
+    hurst_improvement = (best_hurst_combo['profit'] - baseline_total_profit) / abs(baseline_total_profit) * 100
+    hurst_emoji = "🚀" if hurst_improvement > 10 else "📈" if hurst_improvement > 0 else "📉"
+    hurst_wr = (best_hurst_combo['results']['LONG']['wr'] * best_hurst_combo['results']['LONG']['trades'] + 
+                best_hurst_combo['results']['SHORT']['wr'] * best_hurst_combo['results']['SHORT']['trades']) / best_hurst_combo['trades']
+    hurst_dd = -(abs(best_hurst_combo['results']['LONG']['dd']) * abs(best_hurst_combo['results']['LONG']['profit']) + 
+                abs(best_hurst_combo['results']['SHORT']['dd']) * abs(best_hurst_combo['results']['SHORT']['profit'])) / (
+                abs(best_hurst_combo['results']['LONG']['profit']) + abs(best_hurst_combo['results']['SHORT']['profit']))
     
-    print("\n" + "="*100)
+    print(f"{'Best Hurst':<30} {best_hurst_combo['trades']:>10} ${best_hurst_combo['profit']:>13.2f} {hurst_wr:>9.1f}% {hurst_dd:>9.1f}% {hurst_improvement:>+13.1f}% {hurst_emoji}")
+    
+    # Hybrid
+    hybrid_improvement = (hybrid_profit - baseline_total_profit) / abs(baseline_total_profit) * 100
+    hybrid_emoji = "🔥" if hybrid_improvement > 20 else "🚀" if hybrid_improvement > 10 else "📈" if hybrid_improvement > 0 else "📉"
+    
+    print(f"{'Best MA + Best Hurst':<30} {hybrid_trades:>10} ${hybrid_profit:>13.2f} {hybrid_wr:>9.1f}% {hybrid_dd:>9.1f}% {hybrid_improvement:>+13.1f}% {hybrid_emoji}")
+    
+    print("-"*110)
+    
+    # Winner
+    winner_data = [
+        ('Best MA', best_ma_combo['profit']),
+        ('Best Hurst', best_hurst_combo['profit']),
+        ('Hybrid', hybrid_profit)
+    ]
+    
+    winner_name, winner_profit = max(winner_data, key=lambda x: x[1])
+    winner_improvement = (winner_profit - baseline_total_profit) / abs(baseline_total_profit) * 100
+    
+    print(f"\n💡 WINNER: {winner_name}")
+    print(f"   Profit: ${winner_profit:,.2f}")
+    print(f"   Improvement: {winner_improvement:+.1f}%")
+    
+    if winner_name == 'Best MA':
+        print(f"\n📋 Production Config:")
+        print(f"   LONG:  BTC > {long_ma.upper()}*{long_ma_th:.2f}")
+        print(f"   SHORT: BTC < {short_ma.upper()}*{short_ma_th:.2f}")
+    elif winner_name == 'Best Hurst':
+        print(f"\n📋 Production Config:")
+        print(f"   LONG:  Hurst>{long_hurst_th:.2f} (price_change>0)")
+        print(f"   SHORT: Hurst>{short_hurst_th:.2f} (price_change<0)")
+    else:  # Hybrid
+        print(f"\n📋 Production Config:")
+        print(f"   LONG:  (BTC > {long_ma.upper()}*{long_ma_th:.2f}) AND (Hurst>{long_hurst_th:.2f})")
+        print(f"   SHORT: (BTC < {short_ma.upper()}*{short_ma_th:.2f}) AND (Hurst>{short_hurst_th:.2f})")
+    
+    print("\n" + "="*110)
 
 
 if __name__ == "__main__":

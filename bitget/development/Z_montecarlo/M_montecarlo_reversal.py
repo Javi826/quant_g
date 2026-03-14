@@ -38,12 +38,12 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [3,4,5,6,7,8] 
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [20,30,40]
+LOOKBACK_LIST        = [3,4,5,6,7,8,9] 
+MA_PERIOD_LIST       = [25,50]
+TOLERANCE_LIST       = [10,15,20,25,30,35,40,45]
 
-TP_PCT_LIST          = [1,2,3,4]
-SL_PCT_LIST          = [1,2,3]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [2]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -83,7 +83,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
             arr_minor = ohlcv_arrays_minor[sym]
  
-            signals = reversal_short(
+            signals = reversal_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),
