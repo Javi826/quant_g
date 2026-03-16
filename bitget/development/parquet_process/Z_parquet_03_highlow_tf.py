@@ -6,11 +6,11 @@ from tqdm import tqdm
 # CONFIGURATION PARAMETERS
 # -----------------------------
 BASE_DIR      = Path(__file__).resolve().parent.parent  # go up one level
-input_folder  = BASE_DIR / "data" / "crypto_2026_BTC_clean"
-output_folder = BASE_DIR / "data" / "crypto_2026_BTC_hl"
+input_folder  = BASE_DIR / "data" / "crypto_2026_short_clean"
+output_folder = BASE_DIR / "data" / "crypto_2026_short_hl"
 
 # Pair of timeframes to process: [higher_timeframe, intrabar_timeframe]
-timeframes_to_consider = ["6Hutc", "1H"]
+timeframes_to_consider = ["15m", "5m"]
 
 output_folder.mkdir(exist_ok=True, parents=True)
 

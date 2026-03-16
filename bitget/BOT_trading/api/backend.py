@@ -341,19 +341,11 @@ class DashboardServer:
                 if not os.path.exists(self.log_file):
                     return jsonify({'logs': [], 'timestamp': None})
                 
-                # Inicializar posición si no existe
-                if not hasattr(self.app, 'last_log_position'):
-                    self.app.last_log_position = 0
-                
+                # Leer las últimas 100 líneas SIEMPRE
                 with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                    # Si la posición guardada es mayor que el tamaño del archivo → resetear
-                    file_size = os.path.getsize(self.log_file)
-                    if self.app.last_log_position > file_size:
-                        self.app.last_log_position = max(0, file_size - 50000)  # Últimos ~50KB
-                    
-                    f.seek(self.app.last_log_position)
-                    new_lines = f.readlines()
-                    self.app.last_log_position = f.tell()
+                    all_lines = f.readlines()
+                    # Tomar últimas 100 líneas
+                    new_lines = all_lines[-100:] if len(all_lines) > 100 else all_lines
                 
                 import re
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')

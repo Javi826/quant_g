@@ -111,7 +111,8 @@ def compile_grid_results(grid_results_list, param_names, initial_balance):
             "DD_pct": dd_pct,
             "Sharpe": sharpe_ratio,
             "sim_balance_history": port.get("sim_balance_history", {}),
-            "duration_m": duration_days  # En días, no minutos (nombre legacy)
+            #"trade_log": port.get("trade_log", pd.DataFrame()),
+            "duration_m": duration_days 
         })
         records.append(row)
     

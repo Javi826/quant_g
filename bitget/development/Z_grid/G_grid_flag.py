@@ -18,7 +18,7 @@ from signals.add_signals_flag import flag_long
 from signals.add_signals_flag import flag_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = True
+SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
 STRATEGY     = "flag_short_1H_OOS"
 N_JOBS       = -1
@@ -32,7 +32,7 @@ DATA_FOLDER         = "../data/crypto_OOS_2026"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 2_000_000
+MIN_VOL_USDT        = 80_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID

@@ -24,7 +24,7 @@ SHOW_PLOTS = False
 ANALYZE_MI_PEARSON = False
 
 # Parameter Surface Analysis
-ANALYZE_SURFACE = True
+ANALYZE_SURFACE = False
 SURFACE_PARAM_X = 'TP_PCT'
 SURFACE_PARAM_Y = 'SL_PCT'
 SURFACE_METRIC  = 'Net_Gain_pct'  # Options: 'Net_Gain_pct', 'Sharpe', 'Win_Ratio', 'DD_pct'
@@ -484,6 +484,23 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
             print("-"*60)
             print(f"Winning Months:       {winning_months} / {total_months} ({winning_pct:.2f}%)")
             print()
+            
+    # -------------------------------------------------------------------------
+    # Symbol distribution analysis
+    # -------------------------------------------------------------------------
+    trade_log = best_row.get("trade_log", None)
+    
+    if trade_log is not None and not trade_log.empty:
+        total_trades = len(trade_log)
+        
+        symbol_stats = trade_log.groupby('symbol').size().to_frame('Num_Trades')
+        symbol_stats['Trades_pct'] = (symbol_stats['Num_Trades'] / total_trades * 100).round(1)
+        symbol_stats = symbol_stats.sort_values('Trades_pct', ascending=False).reset_index()
+        
+        print("\n" + "-"*60)
+        print("SYMBOL DISTRIBUTION (Best Net Gain Combination)")
+        print("-"*60)
+        print(symbol_stats.to_string(index=False))
  
     # -------------------------------------------------------------------------
     # Optional: Parameter vs Metrics plots
@@ -503,7 +520,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     # -------------------------------------------------------------------------
     if ANALYZE_SURFACE:
         analyze_parameter_surface(df, parameters, SURFACE_PARAM_X, SURFACE_PARAM_Y, SURFACE_METRIC)
-         
+                 
     return df_portfolio, mi_series
 
 def report_montecarlo(df_portfolio, param_names, initial_balance):

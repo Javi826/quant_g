@@ -416,11 +416,11 @@ function updateRegimeUI(data) {
         const statusEl = document.getElementById('btc-trend-status');
         
         if (priceEl && btcPrice !== undefined && btcPrice !== null) {
-            priceEl.textContent = '$' + btcPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            priceEl.textContent = '$' + btcPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
         }
         
         if (ma50El && btcMa50 !== undefined && btcMa50 !== null) {
-            ma50El.textContent = '$' + btcMa50.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            ma50El.textContent = '$' + btcMa50.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
         }
         
         if (statusEl && btcTrend) {
@@ -842,13 +842,13 @@ function updateRegime0UI(data) {
     
     // Update 3 values in INACTIVE card
     if (noneShortTh && shortData.threshold) {
-        noneShortTh.textContent = '$' + shortData.threshold.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        noneShortTh.textContent = '$' + shortData.threshold.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
     }
     if (noneBtc && btcClose) {
-        noneBtc.textContent = '$' + btcClose.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        noneBtc.textContent = '$' + btcClose.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
     }
     if (noneLongTh && longData.threshold) {
-        noneLongTh.textContent = '$' + longData.threshold.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        noneLongTh.textContent = '$' + longData.threshold.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
     }
     
     // Update LONG card (RIGHT) - No numbers

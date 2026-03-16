@@ -1,5 +1,3 @@
-# === FILE: main_MONTECARLO_ ===
-# -----------------------------------------------------------
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -9,53 +7,42 @@ import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
-
 from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
-
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
-from signals.add_signals_reversal import reversal_long
-from signals.add_signals_reversal import reversal_short
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints, save_equity_to_excel
+from signals.add_signals_rsi_bounce import rsi_bounce_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
-STRATEGY     = "reversal_short_6Hutc_OOS"
+STRATEGY     = "rsi_bounce_long_1H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_OOS_2026"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 2_000_000
+MIN_VOL_USDT        = 100_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10]
-MA_PERIOD_LIST       = [5,10,25,50]
-TOLERANCE_LIST       = [5,10,15,20,25,30]
+SELL_AFTER_LIST   = [0]
+RSI_PERIOD_LIST   = [14]
+RSI_EXTREME_LIST  = [30,35,40]
+LOOKBACK_LOW_LIST = [10, 15, 20]
+MA_PERIOD_LIST    = [50, 100]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,9,10]
+TP_PCT_LIST = [3, 4, 5]      # Más margen para TP
+SL_PCT_LIST = [1.5, 2, 2.5]  # Más holgura para SL
 
-SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [7]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [30]
-
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [5]
-
-
-param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names = ['SELL_AFTER', 'RSI_PERIOD', 'RSI_EXTREME', 'LOOKBACK_LOW', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -63,8 +50,7 @@ lists_for_grid = [param_ranges[name] for name in param_names]
 # LOAD AND FILTER DATA
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50,my_symbols=MY_SYMBOLS)
-
+ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS)
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
@@ -79,10 +65,11 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_short(
+        signals = rsi_bounce_long(
             arr_minor,
-            lookback=params['LOOKBACK'],
-            tolerance=params['TOLERANCE'],
+            rsi_period=params['RSI_PERIOD'],
+            rsi_extreme=params['RSI_EXTREME'],
+            lookback_low=params['LOOKBACK_LOW'],
             ma_period=params['MA_PERIOD'],
             live_trading=False
         )
@@ -108,7 +95,7 @@ with tqdm_joblib(tqdm(desc="🔄 Backtesting Grid... \n", total=len(all_combinat
     )
 
 # -----------------------------------------------------------------------------
-# COMPILE RESULTS INTO DATAFRAMEFalse
+# COMPILE RESULTS INTO DATAFRAME
 # -----------------------------------------------------------------------------
 grid_records    = compile_grid_results(grid_results_list, param_names, INITIAL_BALANCE)
 grid_results_df = pd.DataFrame(grid_records)
@@ -118,7 +105,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
 save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
+save_equity_to_excel(grid_results_list, "../brief_equities", INITIAL_BALANCE, STRATEGY, save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 
