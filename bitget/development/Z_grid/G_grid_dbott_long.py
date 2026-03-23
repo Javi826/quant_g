@@ -1,4 +1,4 @@
-# === FILE: G_grid_dbott ===
+# === FILE: G_grid_regime_ma ===
 # -----------------------------------------------------------
 import os
 import sys
@@ -14,46 +14,35 @@ from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALA
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
 from utils.ZX_analysis import report_backtesting
 from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints, save_equity_to_excel
-from signals.add_signals_dbott import dbott_long
+from signals.add_signals_regime_ma import regime_ma_long
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
-STRATEGY     = "dbott_long_4H"
+MY_SYMBOLS   = True
+STRATEGY     = "regime_ma_long_4H"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '4H'
+DATA_FOLDER         = "../data/crypto_OOS_2026"
+DATA_FOLDER         = "../data/crypto_2022_IS"
+TIMEFRAME_MINOR     = '1Dutc'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 10000_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST   = [0]  
-LOOKBACK_LIST     = [30, 40, 50, 60]
-TOLERANCE_LIST    = [3, 5, 7, 10]
-MIN_DISTANCE_LIST = [3, 5, 7]
-MA_PERIOD_LIST    = [50]
+SELL_AFTER_LIST      = [0]  
+MA_PERIOD_LIST       = [5]
+PRICE_THRESHOLD_LIST = [2]
 
-TP_PCT_LIST      = [2, 3, 4, 5]
-SL_PCT_LIST      = [7, 8, 9, 10]
+TP_PCT_LIST = [2]
+SL_PCT_LIST = [2]
 
-SELL_AFTER_LIST   = [0]  
-LOOKBACK_LIST     = [50]
-TOLERANCE_LIST    = [10]
-MIN_DISTANCE_LIST = [3]
-MA_PERIOD_LIST    = [25]
-
-TP_PCT_LIST      = [3]
-SL_PCT_LIST      = [10]
-
-param_names = ['SELL_AFTER','LOOKBACK','TOLERANCE','MIN_DISTANCE','MA_PERIOD','TP_PCT','SL_PCT']
+param_names = ['SELL_AFTER', 'MA_PERIOD', 'PRICE_THRESHOLD', 'TP_PCT', 'SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 lists_for_grid = [param_ranges[name] for name in param_names]
 
@@ -76,14 +65,12 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = dbott_long(
-                arr_minor,
-                lookback=params['LOOKBACK'],
-                tolerance=params['TOLERANCE'],
-                min_distance=params['MIN_DISTANCE'],
-                ma_period=params['MA_PERIOD'],
-                live_trading=False
-            )
+        signals = regime_ma_long(
+            arr_minor,
+            ma_period=params['MA_PERIOD'],
+            price_threshold=params['PRICE_THRESHOLD'],
+            live_trading=False
+        )
 
         ohlcv_arrays[sym] = {**arr_minor, 'signal': signals}
 
@@ -123,4 +110,4 @@ final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", M
 df_portfolio, mi_series = report_backtesting(df=grid_results_df, parameters=param_names, data_folder=DATA_FOLDER, initial_capital=INITIAL_BALANCE)
 
 elapsed = int(time.time() - start_time)
-print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s") 
+print(f"\n🏁 Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

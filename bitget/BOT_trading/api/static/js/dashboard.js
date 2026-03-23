@@ -888,7 +888,20 @@ function updateRegime0UI(data) {
     } else {
         noneCard.style.opacity = '0.4';
     }
+    
+    // Update Market Regime card border based on REGIME 0
+    const regimeCard = document.getElementById('regime-card');
+    if (regimeCard) {
+        if (longAllowed) {
+            regimeCard.style.border = '2px solid #3fb950';  // Verde (LONG ALLOW)
+        } else if (shortAllowed) {
+            regimeCard.style.border = '2px solid #f85149';  // Rojo (SHORT ALLOW)
+        } else {
+            regimeCard.style.border = '2px solid #d29922';  // Naranja (INACTIVE)
+        }
+    }
 }
+
 // ═══════════════════════════════════════════════════════════════════════════
 // END MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1039,12 +1052,13 @@ async function loadLogs() {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         
+        const logsContent = document.getElementById('logs-content');
+        if (!logsContent) return;
+        
+        // REEMPLAZAR TODO el contenido
+        logsContent.innerHTML = '';
+        
         if (data.logs && data.logs.length > 0) {
-            const logsContent = document.getElementById('logs-content');
-            if (logsContent.children.length === 1 && logsContent.children[0].textContent.includes('Waiting')) {
-                logsContent.innerHTML = '';
-            }
-            
             const fragment = document.createDocumentFragment();
             data.logs.forEach(log => {
                 const logLine = document.createElement('div');
@@ -1054,14 +1068,9 @@ async function loadLogs() {
             });
             logsContent.appendChild(fragment);
             
-            while (logsContent.children.length > 500) {
-                logsContent.removeChild(logsContent.firstChild);
-            }
-            
+            // Auto-scroll al final
             if (autoScroll) {
-                requestAnimationFrame(() => {
-                    logsContent.scrollTop = logsContent.scrollHeight;
-                });
+                logsContent.scrollTop = logsContent.scrollHeight;
             }
         }
     } catch (error) {
@@ -1246,7 +1255,7 @@ function renderDetailedView(container, positions) {
                 '<td>' + pos.symbol + '</td>' +
                 '<td class="direction-' + pos.direction.toLowerCase() + '">' + pos.direction.toUpperCase() + '</td>' +
                 '<td>$' + entryPrice.toFixed(precision) + '</td>' +
-                '<td>$' + currentPrice.toFixed(precision) + '</td>' +
+                '<td style="color: #f0883e;">$' + currentPrice.toFixed(precision) + '</td>' +
                 '<td>$' + parseFloat(pos.usdt_amount).toFixed(2) + '</td>' +
                 '<td>$' + tp.toFixed(precision) + ' <span class="' + deltaTpClass + '">(Δ' + (deltaTp >= 0 ? '+' : '') + deltaTp.toFixed(2) + '%)</span></td>' +
                 '<td>$' + sl.toFixed(precision) + ' <span class="' + deltaSlClass + '">(Δ' + (deltaSl >= 0 ? '+' : '') + deltaSl.toFixed(2) + '%)</span></td>' +
@@ -2567,7 +2576,7 @@ async function updateEquityChart() {
         document.getElementById('metric-profit-usd').textContent = '$' + (data.total_profit_usd || 0);
         document.getElementById('metric-profit-factor').textContent = data.profit_factor || '-';
         document.getElementById('metric-weekly-win').textContent = (data.weekly_win_pct || 0) + '%';
-        document.getElementById('metric-win-rate').textContent = (data.win_rate || 0) + '%';
+        document.getElementById('metric-win-rate').textContent = Math.round(data.win_rate || 0) + '%';
         document.getElementById('metric-max-dd').textContent = (data.max_dd || 0) + '%';
         document.getElementById('metric-r-squared').textContent = data.r_squared || 0;
         document.getElementById('metric-sharpe').textContent = (data.sharpe_ratio || 0);
@@ -2750,14 +2759,14 @@ async function loadData() {
             const totalProfit = status.total_profit || 0;
             const profitEl = document.getElementById('total-profit');
             if (profitEl) {
-                profitEl.textContent = '$' + totalProfit.toFixed(2);
+                profitEl.textContent = '$' + totalProfit.toFixed(0);
                 profitEl.className = 'stat-value ' + (totalProfit >= 0 ? 'positive' : 'negative');
             }
             
             const openPnl = status.open_pnl || 0;
             const openPnlEl = document.getElementById('open-pnl');
             if (openPnlEl) {
-                openPnlEl.textContent = '$' + openPnl.toFixed(2);
+                openPnlEl.textContent = '$' + openPnl.toFixed(0);
                 openPnlEl.className = 'stat-value ' + (openPnl >= 0 ? 'positive' : 'negative');
             }
             
@@ -2777,7 +2786,7 @@ async function loadData() {
             
             const btcPrice = status.btc_price || 0;
             const btcPriceEl = document.getElementById('btc-price');
-            if (btcPriceEl) btcPriceEl.textContent = '$' + btcPrice.toLocaleString();
+            if (btcPriceEl) btcPriceEl.textContent = '$' + btcPrice.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
         });
         
         // Load exposure data with dynamic limits from backend
@@ -2859,6 +2868,7 @@ async function loadData() {
         
         // Load regime data (non-blocking)
         loadRegimeData().catch(console.error);
+        loadRegime0Data().catch(console.error); 
         
     } catch (error) {
         console.error('Error:', error);

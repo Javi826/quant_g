@@ -20,7 +20,7 @@ from signals.add_signals_double_top import double_top_long
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = True
-STRATEGY     = "double_top_4H_OOS"
+STRATEGY     = "double_top_4ssH_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -120,7 +120,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=True)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=True)
 save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

@@ -195,18 +195,26 @@
                 <div class="stat-label">Win Rate</div>
                 <div class="stat-value neutral" id="trades-pct" style="color: #58a6ff;">-%</div>
             </div>         
-            <!-- Card 8: Gross Exposure -->
+            <!-- Card 8: Gross & Net Exposure -->
             <div class="stat-card">
-                <div class="stat-label">Gross Exp.</div>
-                <div class="stat-value neutral" id="exposure-gross">-%</div>
-            </div> 
+                <div style="display: flex; justify-content: space-around; gap: 20px; width: 100%;">
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="stat-label">Gross Exp</span>
+                        <span class="stat-value neutral" id="exposure-gross">-%</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <span class="stat-label">Net Exp</span>
+                        <span class="stat-value neutral" id="exposure-net">-%</span>
+                    </div>
+                </div>
+            </div>
             <!-- Card 7: BTC Price -->
             <div class="stat-card">
                 <div class="stat-label">BTC Price</div>
                 <div class="stat-value warning" id="btc-price">$-</div>
             </div>       
             <!-- Card 10: Market Regime -->
-            <div class="stat-card">
+            <div class="stat-card" id="regime-card">
                 <div class="stat-label">Market Regime</div>
                 <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
                     <span id="regime-text">-</span>

@@ -339,33 +339,26 @@ class DashboardServer:
         def stream_logs():
             try:
                 if not os.path.exists(self.log_file):
-                    return jsonify({'logs': [], 'timestamp': None})
+                    return jsonify({'logs': []})
                 
-                # Leer las últimas 100 líneas SIEMPRE
                 with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
                     all_lines = f.readlines()
-                    # Tomar últimas 100 líneas
-                    new_lines = all_lines[-100:] if len(all_lines) > 100 else all_lines
                 
                 import re
                 ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
                 
-                clean_lines = []
-                for line in new_lines:
-                    line = ansi_escape.sub('', line)
-                    line = line.strip()
-                    
-                    if line:
-                        if ' - ' in line:
-                            message = line.split(' - ')[-1]
-                            clean_lines.append(message)
-                        else:
-                            clean_lines.append(line)
+                # Tomar últimas 200 líneas
+                recent_lines = all_lines[-500:] if len(all_lines) > 500 else all_lines
                 
-                return jsonify({
-                    'logs': clean_lines,
-                    'timestamp': datetime.now(HOUR_ZONE).isoformat()
-                })
+                clean_logs = []
+                for line in recent_lines:
+                    line = ansi_escape.sub('', line).strip()
+                    if line and ' - ' in line:
+                        # Extraer solo el mensaje (después del último " - ")
+                        message = line.split(' - ')[-1]
+                        clean_logs.append(message)
+                
+                return jsonify({'logs': clean_logs})
             except Exception as e:
                 return jsonify({'error': str(e), 'logs': []}), 500
             

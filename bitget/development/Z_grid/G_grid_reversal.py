@@ -20,9 +20,9 @@ from signals.add_signals_reversal import reversal_long
 from signals.add_signals_reversal import reversal_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
+SAVE_SYMBOLS = True
 MY_SYMBOLS   = False
-STRATEGY     = "reversal_short_6Hutc_OOS"
+STRATEGY     = "reversal_long_1H_OOS"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -48,11 +48,11 @@ SL_PCT_LIST          = [3,4,5,6,7,9,10]
 
 SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [7]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [30]
+MA_PERIOD_LIST       = [25]
+TOLERANCE_LIST       = [40]
 
 TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [5]
+SL_PCT_LIST          = [10]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
@@ -79,7 +79,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_short(
+        signals = reversal_long(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -117,8 +117,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=True)
+save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

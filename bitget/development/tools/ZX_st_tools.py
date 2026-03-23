@@ -144,7 +144,7 @@ def _calculate_duration_optimized(trade_log):
         return np.nan
 
 
-def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True):
+def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_name=None, save=True):
 
     if not save:
         return
@@ -180,6 +180,11 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, save=True
         for param_name, param_value in zip(param_names, comb):
             tl_df[param_name] = param_value
         
+        
+        # ✅ AÑADIR COLUMNA STRATEGY
+        if strategy_name is not None:
+            tl_df['strategy'] = strategy_name
+                
         all_trades_records.append(tl_df)
     
     if all_trades_records:

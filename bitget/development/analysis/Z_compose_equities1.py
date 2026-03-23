@@ -12,8 +12,8 @@ from sklearn.linear_model import LinearRegression
 
 FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
-RESAMPLE_FREQ       = '4h'
-BARS_PER_DAY        = 6          # 24h / 4h = 6 barras por día (siempre correcto tras resamplear)
+RESAMPLE_FREQ       = '1D'
+BARS_PER_DAY        = 1
 DATA_FOLDER         = "../data/crypto_OOS_2026"
 
 # -------------------------------------------------
@@ -80,6 +80,8 @@ def resample_equity(df_indexed):
     """
     Receives a DataFrame with DatetimeIndex and 'balance' column.
     Returns a new DataFrame resampled to RESAMPLE_FREQ with the index reset.
+    
+    Uses ffill for aggregation to avoid interpolating/inventing data.
     All curves go through this so every metric is computed on the same bar frequency.
     """
     common_index = pd.date_range(
@@ -88,7 +90,7 @@ def resample_equity(df_indexed):
         freq=RESAMPLE_FREQ
     )
     df_r = df_indexed[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    df_r['balance'] = df_r['balance'].ffill().bfill()
     df_r.index.name = 'timestamp'
     return df_r
 
@@ -264,7 +266,7 @@ if dfs:
     resampled_balances = []
     for df in dfs:
         df_r = df[['balance']].reindex(common_index)
-        df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+        df_r['balance'] = df_r['balance'].ffill().bfill()
         resampled_balances.append(df_r['balance'])
 
     combined_balance = pd.concat(resampled_balances, axis=1).sum(axis=1)
@@ -339,7 +341,7 @@ for r in range(1, len(named_dfs) + 1):
         resampled = []
         for df in combo_dfs:
             df_r = df[['balance']].reindex(common_index)
-            df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+            df_r['balance'] = df_r['balance'].ffill().bfill()
             resampled.append(df_r['balance'])
 
         combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
@@ -440,7 +442,7 @@ common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 resampled = []
 for df in best_dfs_netgain:
     df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    df_r['balance'] = df_r['balance'].ffill().bfill()
     resampled.append(df_r['balance'])
 
 combined_balance  = pd.concat(resampled, axis=1).sum(axis=1)
@@ -464,7 +466,7 @@ common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 resampled = []
 for df in best_dfs_r2:
     df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    df_r['balance'] = df_r['balance'].ffill().bfill()
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
@@ -488,7 +490,7 @@ common_index = pd.date_range(start=start, end=end, freq=RESAMPLE_FREQ)
 resampled = []
 for df in best_dfs_pf:
     df_r = df[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].interpolate(method='time').ffill().bfill()
+    df_r['balance'] = df_r['balance'].ffill().bfill()
     resampled.append(df_r['balance'])
 
 combined_balance = pd.concat(resampled, axis=1).sum(axis=1)
@@ -557,6 +559,68 @@ if high_corr_pairs:
         print(f"   {strat1} + {strat2}: {corr:.3f}")
 else:
     print("   ✅ No pairs with high positive correlation")
+    
+# =============================================================================
+# DRAWDOWN CORRELATION ANALYSIS
+# =============================================================================
+
+print("\n" + "="*80)
+print("📉 DRAWDOWN CORRELATION ANALYSIS")
+print("="*80)
+
+# -------------------------------------------------
+# 1. DRAWDOWN CORRELATION HEATMAP
+# -------------------------------------------------
+print("\n[1/2] Generating drawdown correlation heatmap...")
+
+# Calculate drawdown series for each strategy
+dd_df = pd.DataFrame()
+
+for name, df in zip(file_names, dfs):
+    bal = df['balance'].values
+    cummax = np.maximum.accumulate(bal)
+    dd_pct = np.where(cummax > 0, ((cummax - bal) / cummax) * 100, 0.0)
+    dd_df[name] = dd_pct
+
+dd_correlation_matrix = dd_df.corr()
+
+plt.figure(figsize=(14, 12))
+sns.heatmap(
+    dd_correlation_matrix,
+    annot=True,
+    fmt='.2f',
+    cmap='RdYlGn_r',
+    center=0,
+    square=True,
+    linewidths=0.5,
+    cbar_kws={"shrink": 0.8}
+)
+plt.title('Drawdown Correlation Matrix Between Strategies', fontsize=16, pad=20)
+plt.tight_layout()
+plt.show()
+
+# -------------------------------------------------
+# 2. HIGH DRAWDOWN CORRELATION PAIRS (WARNING)
+# -------------------------------------------------
+print("\n[2/2] Identifying highly correlated drawdown pairs...")
+
+high_dd_corr_pairs = []
+
+for i in range(len(dd_correlation_matrix.columns)):
+    for j in range(i + 1, len(dd_correlation_matrix.columns)):
+        corr_value = dd_correlation_matrix.iloc[i, j]
+        
+        if corr_value > 0.7:
+            high_dd_corr_pairs.append((dd_correlation_matrix.columns[i], dd_correlation_matrix.columns[j], corr_value))
+
+print("\n⚠️  PAIRS WITH HIGH DRAWDOWN CORRELATION (>0.7) - Drawdowns happen together:\n")
+if high_dd_corr_pairs:
+    for strat1, strat2, corr in sorted(high_dd_corr_pairs, key=lambda x: x[2], reverse=True):
+        print(f"   {strat1} + {strat2}: {corr:.3f}")
+else:
+    print("   ✅ No pairs with high drawdown correlation")
+
+print("\n" + "="*80)
 
 print("\n" + "="*80)
 print("✅ ANALYSIS COMPLETED")
