@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Trading Bot - Main Entry Point
+main.py Trading Bot - Main Entry Point
 
 Clean entry point that instantiates and runs the BotOrchestrator.
 """
@@ -24,6 +24,8 @@ from config.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_
 from config.connect_pass import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
 from config.connect_pass import connect_bitget_00, connect_bitget_01, connect_bitget_E1
 
+from core.demo_operative import DemoOperative
+from config.settings import DEMO_MODE_ACCOUNTS
 
 def main():
     """Main entry point."""
@@ -82,6 +84,15 @@ def main():
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
         active_strategy_ids=active_strategy_ids
     )
+    # Inject demo_operative if demo mode
+    if account_number in DEMO_MODE_ACCOUNTS:
+        account_config = get_account_config(account_number)
+        bot.demo_operative = DemoOperative(
+            account_number=account_number,
+            ws_manager=None,
+            excel_path=account_config['paths']['trades_file'],
+            strategy_configs=[]
+        )
 
     bot.run()
 

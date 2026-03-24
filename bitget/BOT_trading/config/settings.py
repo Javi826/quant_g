@@ -6,7 +6,7 @@ validation limits, paths, and account-specific settings.
 """
 
 from zoneinfo import ZoneInfo
-
+DEMO_MODE_ACCOUNTS = ['01']
 # ==========================================================================
 # ACCOUNT-SPECIFIC SETTINGS
 # ==========================================================================

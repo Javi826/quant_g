@@ -52,6 +52,7 @@ class StrategyProcessor:
         account_number: str, 
         state_file: str,
         use_hardcoded: bool = False
+        
     ):
         """
         Initialize the StrategyProcessor.
@@ -69,6 +70,7 @@ class StrategyProcessor:
         self.account_number = account_number
         self.state_file = state_file
         self.use_hardcoded = use_hardcoded
+        self.demo_operative = None
         
         # Store references to signal detection functions
         self._detect_real_signals = detect_signals_for_strategy
@@ -168,6 +170,18 @@ class StrategyProcessor:
                 logger.warning(
                     f"WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']} "
                     f"(needs {order_amount:.2f} USDT)"
+                )
+                continue
+            
+            # Demo mode intercept
+            if hasattr(self, 'demo_operative') and self.demo_operative:
+                self.demo_operative.place_simulated_order(
+                    symbol=sig['symbol'],
+                    direction=strat['direction'],
+                    usdt_amount=order_amount,
+                    tp_pct=strat['tp_pct'],
+                    sl_pct=strat['sl_pct'],
+                    strategy_id=strat_id
                 )
                 continue
             

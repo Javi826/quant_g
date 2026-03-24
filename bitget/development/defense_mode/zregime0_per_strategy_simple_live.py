@@ -1,94 +1,93 @@
 #!/usr/bin/env python3
 """
-Analyze REGIME 0 Impact Per Strategy - Simple Version
-Shows profit before/after applying asymmetric rule (LONG: MA5*1.02, SHORT: MA5*1.00)
+Compare Asymmetric Rules on 00 (raw) vs E1 (with LAYER 1)
+Configurable LONG_TH and SHORT_TH parameters
 """
 
 import pandas as pd
 from pathlib import Path
-from glob import glob
+
+# =============================================================================
+# CONFIGURATION - EDIT THESE PARAMETERS
+# =============================================================================
+
+LONG_TH  = 1.02  # Threshold for LONG: BTC > MA5 * LONG_TH
+SHORT_TH = 1.00  # Threshold for SHORT: BTC < MA5 * SHORT_TH
+
+# =============================================================================
 
 
 def load_btc_1d():
     """Load BTC 1D data"""
     btc_file = Path('/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet')
-    
-    if not btc_file.exists():
-        raise FileNotFoundError(f"BTC 1D file not found: {btc_file}")
-    
     df = pd.read_parquet(btc_file)
     df.columns = df.columns.str.lower()
-    
-    if 'timestamp' in df.columns:
-        df['ts'] = pd.to_datetime(df['timestamp'])
-    else:
-        df['ts'] = pd.to_datetime(df.index)
-    
+    df['ts'] = pd.to_datetime(df.get('timestamp', df.index))
     df = df.sort_values('ts').reset_index(drop=True)
     df['ma5'] = df['close'].rolling(window=5).mean()
-    
     return df
 
 
 def get_btc_values(btc_df, trade_time):
     """Get BTC close and MA5 at trade time"""
     closed = btc_df[btc_df['ts'] < trade_time]
-    
     if len(closed) == 0:
         return None, None
-    
     last = closed.iloc[-1]
-    
     if pd.isna(last['ma5']):
         return None, None
-    
     return last['close'], last['ma5']
 
 
-def extract_strategy_name(filepath):
-    """Extract strategy name from filename"""
-    filename = Path(filepath).stem
-    if filename.startswith('all_trades_'):
-        return filename.replace('all_trades_', '')
-    return filename
-
-
-def load_all_lab_trades():
-    """Load all lab trades with strategy column from filename"""
-    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades')
-    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
+def load_trades(filepath):
+    """Load trades file"""
+    df = pd.read_excel(filepath)
+    df.columns = df.columns.str.upper()
     
-    all_trades = []
-    for filepath in files:
-        df = pd.read_excel(filepath)
-        df['sell_time'] = pd.to_datetime(df['sell_time'])
-        df['buy_time'] = pd.to_datetime(df['buy_time'])
-        
-        strategy_name = extract_strategy_name(filepath)
-        df['strategy'] = strategy_name
-        
-        all_trades.append(df)
+    ts_col = next((c for c in ['OPEN_AT', 'BUY_TIME', 'ENTRY_TIME'] if c in df.columns), None)
+    if not ts_col:
+        raise ValueError(f"No timestamp column in {filepath}")
     
-    combined = pd.concat(all_trades, ignore_index=True)
-    return combined.sort_values('buy_time').reset_index(drop=True)
+    df[ts_col] = pd.to_datetime(df[ts_col])
+    df.rename(columns={ts_col: 'open_time'}, inplace=True)
+    return df.sort_values('open_time').reset_index(drop=True)
 
 
-def evaluate_strategy(df_strategy, btc_df, long_th, short_th):
+def calculate_dd(profits):
+    """Calculate max drawdown %"""
+    if len(profits) == 0:
+        return 0
+    cumulative = 0
+    peak = 0
+    max_dd = 0
+    for p in profits:
+        cumulative += p
+        if cumulative > peak:
+            peak = cumulative
+        dd = peak - cumulative
+        if dd > max_dd:
+            max_dd = dd
+    return -(max_dd / peak * 100) if peak > 0 else 0
+
+
+def evaluate_file(filepath, btc_df, long_th, short_th):
     """
-    Evaluate strategy with asymmetric rules
-    LONG:  BTC > MA5*long_th
-    SHORT: BTC < MA5*short_th
+    Evaluate single file with asymmetric rules
+    LONG:  BTC > MA5 * long_th → allow
+    SHORT: BTC < MA5 * short_th → allow
     """
+    df = load_trades(filepath)
+    
     all_profits = []
     filtered_profits = []
     
-    for _, trade in df_strategy.iterrows():
-        direction = trade['position_type']
-        profit = trade['profit']
+    for _, trade in df.iterrows():
+        direction = trade['DIRECTION']
+        profit = trade['PROFIT']
         
         all_profits.append(profit)
         
-        btc_close, ma5 = get_btc_values(btc_df, trade['buy_time'])
+        btc_close, ma5 = get_btc_values(btc_df, trade['open_time'])
         
         if btc_close is None or ma5 is None:
             filtered_profits.append(profit)
@@ -96,78 +95,162 @@ def evaluate_strategy(df_strategy, btc_df, long_th, short_th):
         
         # Apply asymmetric rules
         if direction == 'LONG':
+            # LONG: allow if BTC > MA5 * long_th
             if btc_close > ma5 * long_th:
                 filtered_profits.append(profit)
-        else:  # SHORT
+        else:
+            # SHORT: allow if BTC < MA5 * short_th
             if btc_close < ma5 * short_th:
                 filtered_profits.append(profit)
     
+    total_trades = len(all_profits)
     total_profit = sum(all_profits)
+    total_wr = sum(1 for p in all_profits if p > 0) / total_trades * 100 if total_trades > 0 else 0
+    total_dd = calculate_dd(all_profits)
+    
+    filtered_trades = len(filtered_profits)
     filtered_profit = sum(filtered_profits)
+    filtered_wr = sum(1 for p in filtered_profits if p > 0) / filtered_trades * 100 if filtered_trades > 0 else 0
+    filtered_dd = calculate_dd(filtered_profits)
     
     return {
-        'before': total_profit,
-        'after': filtered_profit,
-        'change': filtered_profit - total_profit
+        'file': Path(filepath).stem,
+        'before_trades': total_trades,
+        'before_profit': total_profit,
+        'before_wr': total_wr,
+        'before_dd': total_dd,
+        'after_trades': filtered_trades,
+        'after_profit': filtered_profit,
+        'after_wr': filtered_wr,
+        'after_dd': filtered_dd
     }
 
 
 def main():
-    print("="*100)
-    print("REGIME 0 IMPACT ANALYSIS - SIMPLE VIEW")
-    print("Rule: LONG: BTC > MA5*1.02  |  SHORT: BTC < MA5*1.00")
-    print("="*100)
+    print("="*120)
+    print(f"ASYMMETRIC RULES: 00 (raw) vs E1 (with LAYER 1)")
+    print(f"LONG: BTC > MA5×{LONG_TH} → allow  |  SHORT: BTC < MA5×{SHORT_TH} → allow")
+    print("="*120)
     
-    # Load BTC 1D
+    # Load BTC
     print("\n📂 Loading BTC 1D data...")
     btc_df = load_btc_1d()
     print(f"✅ Loaded {len(btc_df)} daily bars")
     
-    # Load LAB trades
-    print("\n📂 Loading LAB trades...")
-    df_lab = load_all_lab_trades()
-    print(f"✅ Loaded {len(df_lab)} LAB trades")
+    # Find files
+    folder = Path('/home/javi/projects/quant/quant_g/bitget/development/defense_mode')
+    files_00 = sorted(folder.glob('bot_trades_00_*.xlsx'))
+    files_e1 = sorted(folder.glob('bot_trades_E1_*.xlsx'))
     
-    # Get unique strategies
-    strategies = sorted(df_lab['strategy'].unique())
-    print(f"📊 Found {len(strategies)} unique strategies\n")
+    if not files_00:
+        print("\n❌ No 00 files found")
+        return
     
-    # Store results
-    results = []
+    if not files_e1:
+        print("\n❌ No E1 files found")
+        return
     
-    # Analyze each strategy
-    for strategy in strategies:
-        df_strategy = df_lab[df_lab['strategy'] == strategy]
-        result = evaluate_strategy(df_strategy, btc_df, 1.02, 1.00)
+    print(f"📂 Found {len(files_00)} files for 00 (raw)")
+    print(f"📂 Found {len(files_e1)} files for E1 (+ LAYER 1)")
+    
+    # Evaluate 00 files
+    print("\n" + "="*120)
+    print("00 FILES (RAW - NO LAYER 1)")
+    print("="*120)
+    
+    print(f"\n{'FILE':<20} {'BEFORE T':>10} {'WR%':>8} {'PROFIT':>12} {'DD%':>8} "
+          f"{'AFTER T':>10} {'WR%':>8} {'PROFIT':>12} {'DD%':>8} {'Δ PROFIT':>12}")
+    print("-"*120)
+    
+    results_00 = []
+    for f in files_00:
+        r = evaluate_file(f, btc_df, LONG_TH, SHORT_TH)
+        results_00.append(r)
         
-        results.append({
-            'strategy': strategy,
-            'before': result['before'],
-            'after': result['after'],
-            'change': result['change']
-        })
-    
-    # Print results
-    print("="*100)
-    print(f"{'Strategy':<35} {'BEFORE':<15} {'AFTER':<15} {'Δ':<15} {'%Δ':<10}")
-    print("-"*100)
-    
-    for r in sorted(results, key=lambda x: x['change'], reverse=True):
-        pct_change = (r['change'] / abs(r['before']) * 100) if r['before'] != 0 else 0
+        profit_change = r['after_profit'] - r['before_profit']
         
-        print(f"{r['strategy']:<35} ${r['before']:>12.2f} ${r['after']:>12.2f} ${r['change']:>+12.2f} {pct_change:>+8.1f}%")
+        print(f"{r['file']:<20} {r['before_trades']:>10} {r['before_wr']:>7.1f}% {r['before_profit']:>12.2f} {r['before_dd']:>7.1f}% "
+              f"{r['after_trades']:>10} {r['after_wr']:>7.1f}% {r['after_profit']:>12.2f} {r['after_dd']:>7.1f}% "
+              f"{profit_change:>+12.2f}")
     
-    # Total
-    print("-"*100)
+    # Totals 00
+    total_00_before_profit = sum(r['before_profit'] for r in results_00)
+    total_00_after_profit = sum(r['after_profit'] for r in results_00)
+    total_00_change = total_00_after_profit - total_00_before_profit
     
-    total_before = sum(r['before'] for r in results)
-    total_after = sum(r['after'] for r in results)
-    total_change = total_after - total_before
-    total_pct = (total_change / abs(total_before) * 100) if total_before != 0 else 0
+    print("-"*120)
+    print(f"{'TOTAL 00':<20} {sum(r['before_trades'] for r in results_00):>10} {'':>8} {total_00_before_profit:>12.2f} {'':>8} "
+          f"{sum(r['after_trades'] for r in results_00):>10} {'':>8} {total_00_after_profit:>12.2f} {'':>8} "
+          f"{total_00_change:>+12.2f}")
     
-    print(f"{'TOTAL SYSTEM':<35} ${total_before:>12.2f} ${total_after:>12.2f} ${total_change:>+12.2f} {total_pct:>+8.1f}%")
+    # Evaluate E1 files
+    print("\n" + "="*120)
+    print("E1 FILES (WITH LAYER 1)")
+    print("="*120)
     
-    print("\n" + "="*100)
+    print(f"\n{'FILE':<20} {'BEFORE T':>10} {'WR%':>8} {'PROFIT':>12} {'DD%':>8} "
+          f"{'AFTER T':>10} {'WR%':>8} {'PROFIT':>12} {'DD%':>8} {'Δ PROFIT':>12}")
+    print("-"*120)
+    
+    results_e1 = []
+    for f in files_e1:
+        r = evaluate_file(f, btc_df, LONG_TH, SHORT_TH)
+        results_e1.append(r)
+        
+        profit_change = r['after_profit'] - r['before_profit']
+        
+        print(f"{r['file']:<20} {r['before_trades']:>10} {r['before_wr']:>7.1f}% {r['before_profit']:>12.2f} {r['before_dd']:>7.1f}% "
+              f"{r['after_trades']:>10} {r['after_wr']:>7.1f}% {r['after_profit']:>12.2f} {r['after_dd']:>7.1f}% "
+              f"{profit_change:>+12.2f}")
+    
+    # Totals E1
+    total_e1_before_profit = sum(r['before_profit'] for r in results_e1)
+    total_e1_after_profit = sum(r['after_profit'] for r in results_e1)
+    total_e1_change = total_e1_after_profit - total_e1_before_profit
+    
+    print("-"*120)
+    print(f"{'TOTAL E1':<20} {sum(r['before_trades'] for r in results_e1):>10} {'':>8} {total_e1_before_profit:>12.2f} {'':>8} "
+          f"{sum(r['after_trades'] for r in results_e1):>10} {'':>8} {total_e1_after_profit:>12.2f} {'':>8} "
+          f"{total_e1_change:>+12.2f}")
+    
+    # Summary comparison
+    print("\n" + "="*120)
+    print("SUMMARY")
+    print("="*120)
+    
+    print(f"\n{'GROUP':<20} {'BEFORE PROFIT':>20} {'AFTER PROFIT':>20} {'CHANGE':>20} {'% CHANGE':>15}")
+    print("-"*80)
+    print(f"{'00 (raw)':<20} {total_00_before_profit:>20.2f} {total_00_after_profit:>20.2f} {total_00_change:>+20.2f} "
+          f"{total_00_change/abs(total_00_before_profit)*100:>+14.1f}%")
+    print(f"{'E1 (+ LAYER 1)':<20} {total_e1_before_profit:>20.2f} {total_e1_after_profit:>20.2f} {total_e1_change:>+20.2f} "
+          f"{total_e1_change/abs(total_e1_before_profit)*100 if total_e1_before_profit != 0 else 0:>+14.1f}%")
+    
+    # Verdict
+    print("\n" + "="*120)
+    print("VERDICT")
+    print("="*120)
+    
+    print(f"\nConfiguration tested:")
+    print(f"  LONG:  BTC > MA5×{LONG_TH}")
+    print(f"  SHORT: BTC < MA5×{SHORT_TH}")
+    
+    if total_00_change > 0:
+        print(f"\n00 (raw):        ✅ Rules improve by ${total_00_change:.2f}")
+    else:
+        print(f"\n00 (raw):        ❌ Rules worsen by ${total_00_change:.2f}")
+    
+    if total_e1_change > 0:
+        print(f"E1 (+ LAYER 1):  ✅ Rules add value: +${total_e1_change:.2f}")
+        print(f"\n💡 RECOMMENDATION: Use BOTH layers")
+        print(f"   - LAYER 1: Regime per strategy (4H)")
+        print(f"   - LAYER 0: BTC filter (1D)")
+        print(f"     • LONG:  allow if BTC > MA5×{LONG_TH}")
+        print(f"     • SHORT: allow if BTC < MA5×{SHORT_TH}")
+    else:
+        print(f"E1 (+ LAYER 1):  ❌ Rules do NOT add value: ${total_e1_change:.2f}")
+        print(f"\n💡 RECOMMENDATION: Use LAYER 1 only")
+    
+    print("\n" + "="*120)
 
 
 if __name__ == "__main__":

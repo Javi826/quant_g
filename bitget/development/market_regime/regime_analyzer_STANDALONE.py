@@ -1,59 +1,89 @@
+#!/usr/bin/env python3
 """
-market_regime/regime_analyzer.py
+market_regime/regime_analyzer_STANDALONE.py
 
-Compares system performance in two scenarios:
-1. WITHOUT TREND FILTER: All strategies operate on all trades
-2. WITH TREND FILTER   : LONG strategies only in uptrend, SHORT strategies only in downtrend
+Autonomous script that compares system performance with/without trend filtering.
+Calculates BTC MAs on-the-fly - no pre-enrichment needed.
 
-Shows strategy-by-strategy and global portfolio comparison.
-
+Usage:
+    python regime_analyzer_STANDALONE.py
+    
+Parameters (edit at top of script):
+    TRADES_FOLDER: Folder with all_trades_*.xlsx files
+    BTC_FILE: Path to BTC 1D parquet
+    MA_PERIOD: Moving average period for trend detection (5, 10, 20, 50, 200)
+    INITIAL_CAPITAL: Capital per strategy (default 800)
 """
 
-import os
-import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from glob import glob
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# =============================================================================
+# CONFIGURATION - EDIT THESE PARAMETERS
+# =============================================================================
 
-from market_regime.config import OUTPUT_FOLDER, INITIAL_CAPITAL
-from market_regime.config import DIRECTION_METHOD, DIRECTION_MA_PERIOD
+TRADES_FOLDER = '/home/javi/projects/quant/quant_g/bitget/development/brief_trades'
+BTC_FILE = '/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet'
+MA_PERIOD = 5  # Options: 5, 10, 20, 50, 200
+INITIAL_CAPITAL = 800
 
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
 
-def detect_strategy_type(strategy_name: str) -> str:
-    """
-    Detects if strategy is LONG or SHORT based on name.
+def load_btc_1d(btc_file: str) -> pd.DataFrame:
+    """Load BTC 1D data and calculate MA"""
+    if not Path(btc_file).exists():
+        raise FileNotFoundError(f"BTC file not found: {btc_file}")
     
-    Returns: 'LONG' or 'SHORT'
-    """
+    df = pd.read_parquet(btc_file)
+    df.columns = df.columns.str.lower()
+    
+    if 'timestamp' in df.columns:
+        df['ts'] = pd.to_datetime(df['timestamp'])
+    else:
+        df['ts'] = pd.to_datetime(df.index)
+    
+    df = df.sort_values('ts').reset_index(drop=True)
+    
+    # Calculate MA
+    df[f'ma{MA_PERIOD}'] = df['close'].rolling(window=MA_PERIOD).mean()
+    
+    return df
+
+
+def get_btc_value_at_trade(btc_df: pd.DataFrame, trade_time: pd.Timestamp) -> tuple:
+    """Get BTC close and MA at trade time (only closed candles)"""
+    closed_candles = btc_df[btc_df['ts'] < trade_time]
+    
+    if len(closed_candles) < MA_PERIOD:
+        return None, None
+    
+    last_candle = closed_candles.iloc[-1]
+    
+    if pd.isna(last_candle[f'ma{MA_PERIOD}']):
+        return None, None
+    
+    return last_candle['close'], last_candle[f'ma{MA_PERIOD}']
+
+
+def detect_strategy_type(strategy_name: str) -> str:
+    """Detect if strategy is LONG or SHORT based on name"""
     name_lower = strategy_name.lower()
     
-    # Explicit markers
     if '_long_' in name_lower or name_lower.endswith('_long'):
         return 'LONG'
     elif '_short_' in name_lower or name_lower.endswith('_short'):
         return 'SHORT'
     
-    # Special cases
-    if 'double_top' in name_lower:
-        return 'LONG'  # double_top is a long strategy
-    
-    # Default fallback (shouldn't happen with proper naming)
-    print(f"⚠️  WARNING: Cannot detect type for '{strategy_name}', assuming LONG")
+    print(f"⚠️  Cannot detect type for '{strategy_name}', assuming LONG")
     return 'LONG'
 
 
 def calculate_strategy_metrics(df: pd.DataFrame, initial_capital: float) -> dict:
-    """
-    Calculates key metrics for a strategy.
-    
-    Returns dict with: num_trades, total_profit, net_gain_pct, max_dd_pct
-    """
+    """Calculate key metrics for a strategy"""
     if len(df) == 0:
         return {
             'num_trades': 0,
@@ -83,51 +113,42 @@ def calculate_strategy_metrics(df: pd.DataFrame, initial_capital: float) -> dict
     }
 
 
-def load_enriched_trades(filepath: str) -> pd.DataFrame:
-    """Loads enriched trades from Excel file."""
+def load_trades(filepath: str) -> pd.DataFrame:
+    """Load trades from Excel file"""
     df = pd.read_excel(filepath)
     df.columns = df.columns.str.lower().str.strip()
+    
     if 'buy_time' in df.columns:
         df['buy_time'] = pd.to_datetime(df['buy_time'])
+    else:
+        raise ValueError(f"File {filepath} missing 'buy_time' column")
+    
     return df
 
 
-def classify_trend(row: pd.Series, direction_method: str = 'price_vs_ma') -> str:
-    """Classifies trade trend based on direction method."""
-    if direction_method == 'price_vs_ma':
-        price_vs_ma_col = f'price_vs_ma_{DIRECTION_MA_PERIOD}'
-        if price_vs_ma_col in row and not pd.isna(row[price_vs_ma_col]):
-            return 'uptrend' if row[price_vs_ma_col] > 1.0 else 'downtrend'
+def classify_trades_by_trend(df: pd.DataFrame, btc_df: pd.DataFrame) -> pd.DataFrame:
+    """Add trend classification to each trade based on BTC MA"""
+    df['trend'] = 'unknown'
     
-    elif direction_method == 'ma_cross':
-        # Import MA periods from config
-        from market_regime.config import DIRECTION_MA_FAST, DIRECTION_MA_SLOW
-        ma_cross_col = f'ma_{DIRECTION_MA_FAST}_vs_ma_{DIRECTION_MA_SLOW}'
+    for idx, trade in df.iterrows():
+        btc_close, ma_value = get_btc_value_at_trade(btc_df, trade['buy_time'])
         
-        if ma_cross_col in row and not pd.isna(row[ma_cross_col]):
-            return 'uptrend' if row[ma_cross_col] > 1.0 else 'downtrend'
+        if btc_close is not None and ma_value is not None:
+            df.at[idx, 'trend'] = 'uptrend' if btc_close > ma_value else 'downtrend'
     
-    return 'unknown'
+    return df
 
 
-# =============================================================================
-# MAIN COMPARISON LOGIC
-# =============================================================================
-
-def analyze_strategy_both_scenarios(filepath: str, initial_capital: float) -> dict:
-    """
-    Analyzes a single strategy in both scenarios (with and without trend filter).
-    
-    Returns dict with metrics for both scenarios.
-    """
-    strategy = Path(filepath).stem.replace('trades_enriched_', '')
-    df = load_enriched_trades(filepath)
+def analyze_strategy(filepath: str, btc_df: pd.DataFrame, initial_capital: float) -> dict:
+    """Analyze single strategy with and without trend filter"""
+    strategy = Path(filepath).stem.replace('all_trades_', '')
+    df = load_trades(filepath)
     
     # Detect strategy type
     strategy_type = detect_strategy_type(strategy)
     
     # Classify trades by trend
-    df['trend'] = df.apply(lambda r: classify_trend(r, DIRECTION_METHOD), axis=1)
+    df = classify_trades_by_trend(df, btc_df)
     
     # SCENARIO A: WITHOUT FILTER (all trades)
     metrics_without = calculate_strategy_metrics(df, initial_capital)
@@ -143,58 +164,36 @@ def analyze_strategy_both_scenarios(filepath: str, initial_capital: float) -> di
     return {
         'strategy': strategy,
         'type': strategy_type,
+        'filepath': filepath,
         'without_filter': metrics_without,
         'with_filter': metrics_with
     }
 
 
-def calculate_global_portfolio(results: list, initial_capital: float, use_filter: bool = False) -> dict:
-    """
-    Calculates global portfolio metrics.
-    
-    Args:
-        results: List of strategy results
-        initial_capital: Capital per strategy
-        use_filter: If True, uses filtered trades; if False, uses all trades
-    """
+def calculate_global_portfolio(results: list, btc_df: pd.DataFrame, initial_capital: float, use_filter: bool = False) -> dict:
+    """Calculate global portfolio metrics"""
     all_trades = []
     
     for r in results:
-        filepath = r['filepath']
-        strategy_type = r['type']
-        
-        df = load_enriched_trades(filepath)
-        df['trend'] = df.apply(lambda row: classify_trend(row, DIRECTION_METHOD), axis=1)
+        df = load_trades(r['filepath'])
+        df = classify_trades_by_trend(df, btc_df)
         
         if use_filter:
-            # Apply trend filter
-            if strategy_type == 'LONG':
+            if r['type'] == 'LONG':
                 df = df[df['trend'] == 'uptrend'].copy()
             else:  # SHORT
                 df = df[df['trend'] == 'downtrend'].copy()
         
         all_trades.append(df[['buy_time', 'profit']].copy())
     
-    # Combine all trades
     if not all_trades:
-        return {
-            'num_trades': 0,
-            'total_profit': 0.0,
-            'net_gain_pct': 0.0,
-            'max_dd_pct': 0.0
-        }
+        return {'num_trades': 0, 'total_profit': 0.0, 'net_gain_pct': 0.0, 'max_dd_pct': 0.0}
     
     combined_trades = pd.concat(all_trades, ignore_index=True)
     combined_trades = combined_trades.sort_values('buy_time').reset_index(drop=True)
     
-    # Check if we have any trades after filtering
     if len(combined_trades) == 0:
-        return {
-            'num_trades': 0,
-            'total_profit': 0.0,
-            'net_gain_pct': 0.0,
-            'max_dd_pct': 0.0
-        }
+        return {'num_trades': 0, 'total_profit': 0.0, 'net_gain_pct': 0.0, 'max_dd_pct': 0.0}
     
     total_capital = initial_capital * len(results)
     
@@ -225,33 +224,40 @@ def calculate_global_portfolio(results: list, initial_capital: float, use_filter
 
 def main():
     print("=" * 100)
-    print("TREND FILTERING COMPARISON")
+    print("TREND FILTERING COMPARISON (STANDALONE)")
     print("=" * 100)
-    print(f"\nDirection detection: {DIRECTION_METHOD}")
-    if DIRECTION_METHOD == 'price_vs_ma':
-        print(f"Using: Price vs MA{DIRECTION_MA_PERIOD}")
-    print(f"Initial capital per strategy: ${INITIAL_CAPITAL}")
+    print(f"\nConfiguration:")
+    print(f"  Trades folder: {TRADES_FOLDER}")
+    print(f"  BTC file:      {BTC_FILE}")
+    print(f"  MA period:     MA{MA_PERIOD}")
+    print(f"  Capital:       ${INITIAL_CAPITAL}")
     
-    # Find all enriched trade files
-    pattern = os.path.join(OUTPUT_FOLDER, "trades_enriched_*.xlsx")
+    # Load BTC 1D
+    print("\n📂 Loading BTC 1D data...")
+    btc_df = load_btc_1d(BTC_FILE)
+    print(f"✅ Loaded {len(btc_df)} daily bars ({btc_df['ts'].min().date()} → {btc_df['ts'].max().date()})")
+    
+    # Find all trades files
+    pattern = str(Path(TRADES_FOLDER) / 'all_trades_*.xlsx')
     files = sorted(glob(pattern))
     
     if not files:
-        print(f"\n❌ No enriched files found in {OUTPUT_FOLDER}")
+        print(f"\n❌ No trades files found in {TRADES_FOLDER}")
         return
     
-    print(f"\nAnalyzing {len(files)} strategies...\n")
+    print(f"\n📂 Found {len(files)} strategy files")
     
     # Analyze each strategy
+    print("\n🔍 Analyzing strategies...")
     results = []
     for filepath in files:
-        result = analyze_strategy_both_scenarios(filepath, INITIAL_CAPITAL)
-        result['filepath'] = filepath
+        result = analyze_strategy(filepath, btc_df, INITIAL_CAPITAL)
         results.append(result)
+        print(f"   ✅ {result['strategy']}")
     
     # Calculate global portfolios
-    global_without = calculate_global_portfolio(results, INITIAL_CAPITAL, use_filter=False)
-    global_with = calculate_global_portfolio(results, INITIAL_CAPITAL, use_filter=True)
+    global_without = calculate_global_portfolio(results, btc_df, INITIAL_CAPITAL, use_filter=False)
+    global_with = calculate_global_portfolio(results, btc_df, INITIAL_CAPITAL, use_filter=True)
     
     # ==========================================================================
     # PRINT COMPARISON TABLE
@@ -260,7 +266,6 @@ def main():
     print("STRATEGY-BY-STRATEGY COMPARISON")
     print("=" * 80)
     
-    # Create ultra-simplified comparison table
     comparison_rows = []
     
     for r in results:
@@ -273,7 +278,7 @@ def main():
         else:
             profit_change_pct = 0.0
         
-        # Calculate % change in DD (improvement = less negative)
+        # Calculate % change in DD
         if w['max_dd_pct'] != 0:
             dd_change_pct = ((f['max_dd_pct'] - w['max_dd_pct']) / abs(w['max_dd_pct'])) * 100
         else:
@@ -281,7 +286,7 @@ def main():
         
         # Indicators
         profit_indicator = "✅" if profit_change_pct > 5 else ("❌" if profit_change_pct < -5 else "=")
-        dd_indicator = "✅" if dd_change_pct > 5 else ("❌" if dd_change_pct < -5 else "=")  # DD improvement = less negative = positive %
+        dd_indicator = "✅" if dd_change_pct > 5 else ("❌" if dd_change_pct < -5 else "=")
         
         comparison_rows.append({
             'Strategy': r['strategy'],
@@ -298,10 +303,9 @@ def main():
     df_comp['ΔProfit%'] = df_comp['ΔProfit%'].apply(lambda x: f"{x:+.1f}%")
     df_comp['ΔDD%'] = df_comp['ΔDD%'].apply(lambda x: f"{x:+.1f}%")
     
-    # Print table
     print(df_comp.to_string(index=False))
     
-    # Add global portfolio row
+    # Global portfolio comparison
     if global_without['total_profit'] != 0:
         global_profit_change = ((global_with['total_profit'] - global_without['total_profit']) / abs(global_without['total_profit'])) * 100
     else:
@@ -312,32 +316,24 @@ def main():
     else:
         global_dd_change = 0.0
     
-    global_profit_ind = "✅" if global_profit_change > 5 else ("❌" if global_profit_change < -5 else "=")
-    global_dd_ind = "✅" if global_dd_change > 5 else ("❌" if global_dd_change < -5 else "=")
-    
     print("\n" + "-" * 80)
-    
-    # Show detailed global metrics for verification
     print(f"\n{'DETAILED GLOBAL METRICS':^80}")
     print("-" * 80)
     print(f"WITHOUT FILTER:")
     print(f"  Total Profit: ${global_without['total_profit']:,.2f}")
+    print(f"  Net Gain:     {global_without['net_gain_pct']:.2f}%")
     print(f"  Max DD:       {global_without['max_dd_pct']:.2f}%")
     print(f"  Num Trades:   {global_without['num_trades']:,}")
-    print(f"\nWITH TREND FILTER:")
+    print(f"\nWITH TREND FILTER (BTC > MA{MA_PERIOD} for LONG, BTC < MA{MA_PERIOD} for SHORT):")
     print(f"  Total Profit: ${global_with['total_profit']:,.2f}")
+    print(f"  Net Gain:     {global_with['net_gain_pct']:.2f}%")
     print(f"  Max DD:       {global_with['max_dd_pct']:.2f}%")
     print(f"  Num Trades:   {global_with['num_trades']:,}")
     print(f"\nCHANGE:")
     print(f"  Profit:       ${global_with['total_profit'] - global_without['total_profit']:,.2f} ({global_profit_change:+.1f}%)")
+    print(f"  Net Gain:     {global_with['net_gain_pct'] - global_without['net_gain_pct']:+.2f}% pts")
     print(f"  DD:           {global_with['max_dd_pct'] - global_without['max_dd_pct']:.2f} pts ({global_dd_change:+.1f}%)")
     print(f"  Trades:       {global_with['num_trades'] - global_without['num_trades']:,} ({(global_with['num_trades']/global_without['num_trades']-1)*100:+.1f}%)")
-    print("-" * 80)
-    
-    print(f"{'GLOBAL PORTFOLIO':<30} {'BOTH':<6} "
-          f"{global_profit_change:>+7.1f}% {global_profit_ind:>6} "
-          f"{global_dd_change:>+7.1f}% {global_dd_ind:>6}")
-    
     print("=" * 80)
     
     # ==========================================================================
@@ -347,7 +343,6 @@ def main():
     print("SUMMARY STATISTICS")
     print("=" * 100)
     
-    # Count improvements
     improvements = sum(1 for r in results if r['with_filter']['net_gain_pct'] > r['without_filter']['net_gain_pct'])
     degradations = sum(1 for r in results if r['with_filter']['net_gain_pct'] < r['without_filter']['net_gain_pct'])
     unchanged = len(results) - improvements - degradations
@@ -356,14 +351,12 @@ def main():
     print(f"Strategies degraded with filter:    {degradations}/{len(results)} ({degradations/len(results)*100:.1f}%)")
     print(f"Strategies unchanged:                {unchanged}/{len(results)} ({unchanged/len(results)*100:.1f}%)")
     
-    # Average improvements
     avg_gain_improvement = np.mean([r['with_filter']['net_gain_pct'] - r['without_filter']['net_gain_pct'] for r in results])
     avg_dd_improvement = np.mean([r['with_filter']['max_dd_pct'] - r['without_filter']['max_dd_pct'] for r in results])
     
     print(f"\nAverage Net Gain improvement:        {avg_gain_improvement:+.2f}%")
     print(f"Average Max DD change:                {avg_dd_improvement:+.2f}%")
     
-    # Global impact
     delta_global_gain = global_with['net_gain_pct'] - global_without['net_gain_pct']
     delta_global_dd = global_with['max_dd_pct'] - global_without['max_dd_pct']
     
@@ -373,11 +366,8 @@ def main():
     print(f"With filter:     {global_with['net_gain_pct']:>6.2f}% gain, {global_with['max_dd_pct']:>6.2f}% DD")
     print(f"Delta:           {delta_global_gain:>+6.2f}% gain, {delta_global_dd:>+6.2f}% DD")
     
-    # Trades reduction
-    trades_reduction_pct = (1 - global_with['num_trades'] / global_without['num_trades']) * 100
+    trades_reduction_pct = (1 - global_with['num_trades'] / global_without['num_trades']) * 100 if global_without['num_trades'] > 0 else 0
     print(f"\nTrades reduction:    {global_without['num_trades']:,} → {global_with['num_trades']:,} ({trades_reduction_pct:.1f}% less)")
-    
-    print("\n" + "=" * 100)
     
     # ==========================================================================
     # RECOMMENDATION

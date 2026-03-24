@@ -176,7 +176,7 @@ class BotOrchestrator:
         self._setup_directories()
         self._load_bot_state()
         self._load_and_validate_strategies()
-        self._initialize_position_sizing()     # ← Régimen
+        self._initialize_position_sizing()     
         self._initialize_risk_management() 
         self._load_market_symbols()
         self._initialize_connections()
@@ -186,6 +186,11 @@ class BotOrchestrator:
         
         self._initialized = True
         self.logger.info("BOT Initialization completed\n")
+        
+        # Link demo_operative
+        if hasattr(self, 'demo_operative') and self.demo_operative:
+            self.demo_operative.ws_manager = self.ws_manager
+            self.demo_operative.strategy_configs = {s['id']: s for s in self.strategies}
         
     def shutdown(self) -> None:
         """
@@ -360,6 +365,9 @@ class BotOrchestrator:
             state_file=self.state_file,
             use_hardcoded=USE_HARDCODED_SIGNALS
         )
+        # Pass demo_operative  ← AQUÍ
+        if hasattr(self, 'demo_operative'):
+            self.strategy_processor.demo_operative = self.demo_operative
     
     def _start_dashboard(self) -> None:
         """Start the web dashboard."""
@@ -562,8 +570,12 @@ class BotOrchestrator:
                     self.account_number,
                     self.state_file
                 )
+                # Demo candles
+                if hasattr(self, 'demo_operative') and self.demo_operative:
+                    self.demo_operative.increment_candles(strat_id)
                 candles       = self.strategy_candles.get(strat_id, 0)
                 num_positions = len(self.open_positions.get(strat_id, []))
+
                 
                 self.logger.info(
                     f"Skip {strat_id:<23} {candles:>2}/"
@@ -625,6 +637,27 @@ class BotOrchestrator:
                 # Log risk decision (not blocked)
                 log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
                 self.logger.info(log_msg)
+                
+                # ========================================================================
+                # DEMO MODE: Skip regime layers for demo accounts
+                # ========================================================================
+                if hasattr(self, 'demo_operative') and self.demo_operative:
+                    try:
+                        self.strategy_processor.process(
+                            strat=strat,
+                            final_symbols=self.final_by_strat.get(strat['id'], []),
+                            exchange=self.exchange,
+                            open_positions=self.open_positions,
+                            strategy_candles=self.strategy_candles,
+                            adjusted_order_amount=strat['order_amount'],
+                            regime_family='no_regime',
+                            regime_multiplier=1.0,
+                            direction='no_direction',
+                            direction_multiplier=1.0
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Error processing demo strategy {strat_id}: {e}")
+                    continue  # Skip to next strategy
                 # ========================================================================
                 # REGIME LAYER 0: Calculate adjusted order amount
                 # ========================================================================
@@ -734,8 +767,11 @@ class BotOrchestrator:
                                 direction_multiplier=metadata['direction_multiplier']
                             )
                             self.logger.info(f"Retry successful for {strat_id}")
+                            
+                            
                         except Exception as e2:
                             self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
+
     
     def _periodic_tpsl_check(self, current_time: float) -> None:
         """
@@ -756,6 +792,9 @@ class BotOrchestrator:
                 bot_state=self.bot_state
             )
             self.last_tpsl_check = current_time
+            # Demo exits
+            if hasattr(self, 'demo_operative') and self.demo_operative:
+                self.demo_operative.monitor_exits(self.strategy_candles)
     
     def _update_next_candle_times(self, closed_timeframes: List[str]) -> None:
         """

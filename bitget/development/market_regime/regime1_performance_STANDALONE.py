@@ -1,13 +1,11 @@
+#!/usr/bin/env python3
 """
-market_regime/regime1_performance.py
+regime1_performance_STANDALONE.py - MATCHES ENRICHER EXACTLY
 
-Analyzes strategy performance across 3 dimensions:
-1. By FAMILY (trending/volatile/ranging) - ignoring BTC direction
-2. By DIRECTION (uptrend/downtrend) - ignoring family
-3. By REGIME (6 combined) - full granularity
-
-Usage:
-    python regime_analyzer.py
+Replicates enricher.py behavior:
+- Drops NaN rows in critical metrics
+- Calculates MA50 and price_vs_ma_50
+- Uses closed candles only (no lookahead)
 """
 
 import os
@@ -17,31 +15,120 @@ import pandas as pd
 from pathlib import Path
 from glob import glob
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from regime_metrics import calc_all_metrics
 
-from market_regime.config import OUTPUT_FOLDER, FAMILIES, DIRECTION_METHOD
-from market_regime.config import DIRECTION_MA_PERIOD, DIRECTION_MA_FAST, DIRECTION_MA_SLOW
-from market_regime.config import INITIAL_CAPITAL, DATE_RANGE_FILTER
-
-
-# Minimum trades for confidence
+BASE_DIR              = '/home/javi/projects/quant/quant_g/bitget/development'
+TRADES_FOLDER         = f'{BASE_DIR}/market_regime/brief_trades_2026'
+OHLC_FOLDER           = f'{BASE_DIR}/data/crypto_OOS_2025'  
+MA_PERIOD             = 50
+INITIAL_CAPITAL       = 800
 MIN_TRADES_CONFIDENCE = 50
 
+_btc_cache = {}  # Cache for BTC dataframes by timeframe
 
-def classify_trade(row: pd.Series, families: dict) -> str:
-    """Classifies a trade into a family based on its metrics."""
+FAMILIES = {
+    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
+    'ranging': {}
+}
+
+HURST_WINDOW  = 100
+ER_WINDOW     = 14
+ATR_WINDOW    = 14
+PE_WINDOW     = 50
+PE_ORDER      = 3
+LOOKBACK_BARS = 100
+
+_btc_cache = {}  # Cache for BTC dataframes by timeframe
+
+def extract_timeframe(filename):
+    """Extract timeframe from filename - matches enricher.py"""
+    name = Path(filename).stem.replace('all_trades_', '')
+    parts = name.split('_')
+    if parts[-1].upper() in ['IS', 'OOS']:
+        parts = parts[:-1]
+    if parts:
+        timeframe = parts[-1]
+        if any(c.isdigit() for c in timeframe.upper()) and 'H' in timeframe.upper():
+            return timeframe
+    print(f"    ⚠️  Could not extract timeframe from '{filename}', defaulting to 4H")
+    return '4H'
+
+def load_btc_for_timeframe(ohlc_folder, timeframe):
+    """Load BTC OHLC for specific timeframe - matches enricher.py"""
+    cache_key = f"BTCUSDT_{timeframe}"
+    if cache_key in _btc_cache:
+        return _btc_cache[cache_key]
+    
+    filepath = Path(ohlc_folder) / f"BTCUSDT_{timeframe}.parquet"
+    if not filepath.exists():
+        raise FileNotFoundError(f"BTC OHLC not found: {filepath}")
+    
+    df = pd.read_parquet(filepath)
+    df.columns = df.columns.str.lower()
+    if 'timestamp' in df.columns:
+        df['ts'] = pd.to_datetime(df['timestamp'])
+    else:
+        df['ts'] = pd.to_datetime(df.index)
+    df = df.sort_values('ts').reset_index(drop=True)
+    
+    _btc_cache[cache_key] = df
+    return df
+
+def calc_all_metrics_at_time(btc_df, buy_time, lookback):
+    """Calculate metrics - MATCHES enricher.py exactly"""
+    closed_candles = btc_df[btc_df['ts'] < buy_time]
+    if len(closed_candles) < lookback:
+        return None
+    idx = closed_candles.index[-1]
+    start_idx = max(0, idx - lookback + 1)
+    if idx - start_idx < 20:
+        return None
+    subset = btc_df.iloc[start_idx:idx + 1]
+    ohlc = {
+        'open': subset['open'].values.astype(np.float64),
+        'high': subset['high'].values.astype(np.float64),
+        'low': subset['low'].values.astype(np.float64),
+        'close': subset['close'].values.astype(np.float64)
+    }
+    metrics = calc_all_metrics(ohlc, hurst_window=HURST_WINDOW, er_window=ER_WINDOW, 
+                                atr_window=ATR_WINDOW, pe_window=PE_WINDOW, pe_order=PE_ORDER)
+    current_close = float(btc_df.iloc[idx]['close'])
+    if idx >= (MA_PERIOD - 1):
+        ma_data = btc_df.iloc[idx - (MA_PERIOD - 1):idx + 1]['close'].values
+        metrics['ma_50'] = float(np.mean(ma_data))
+        metrics['price_vs_ma_50'] = current_close / metrics['ma_50']
+    else:
+        metrics['ma_50'] = np.nan
+        metrics['price_vs_ma_50'] = np.nan
+    return metrics
+
+def load_btc_1d(btc_file):
+    """Load BTC data"""
+    df = pd.read_parquet(btc_file)
+    df.columns = df.columns.str.lower()
+    if 'timestamp' in df.columns:
+        df['ts'] = pd.to_datetime(df['timestamp'])
+    else:
+        df['ts'] = pd.to_datetime(df.index)
+    df = df.sort_values('ts').reset_index(drop=True)
+    return df
+
+def classify_trade_by_family(metrics, families):
+    """Classify trade into family"""
     for family_name, rules in families.items():
         if not rules:
             continue
         match = True
         for metric, (op, val) in rules.items():
-            if metric not in row or pd.isna(row[metric]):
+            if metrics.get(metric) is None or pd.isna(metrics[metric]):
                 match = False
                 break
-            if op == '>' and not (row[metric] > val):
+            if op == '>' and not (metrics[metric] > val):
                 match = False
                 break
-            elif op == '<' and not (row[metric] < val):
+            elif op == '<' and not (metrics[metric] < val):
                 match = False
                 break
         if match:
@@ -51,181 +138,119 @@ def classify_trade(row: pd.Series, families: dict) -> str:
             return family_name
     return 'unknown'
 
+def load_trades(filepath):
+    """Load trades"""
+    df = pd.read_excel(filepath)
+    df.columns = df.columns.str.lower().str.strip()
+    if 'buy_time' in df.columns:
+        df['buy_time'] = pd.to_datetime(df['buy_time'])
+    else:
+        raise ValueError("File missing buy_time column")
+    return df
 
-def calculate_max_dd_pct(equity_curve: pd.Series) -> float:
-    """Calculates Maximum Drawdown % correctly."""
+def calculate_max_dd_pct(equity_curve):
+    """Calculate Maximum Drawdown"""
     if len(equity_curve) == 0:
         return 0.0
-    
     cummax = equity_curve.cummax()
-    drawdown_pct = np.where(
-        cummax > 0,
-        ((cummax - equity_curve) / cummax) * 100,
-        0.0
-    )
+    drawdown_pct = np.where(cummax > 0, ((cummax - equity_curve) / cummax) * 100, 0.0)
     return float(np.max(drawdown_pct))
 
-
-def bootstrap_confidence_interval(profits: list, n_bootstrap: int = 1000, confidence: float = 0.95) -> tuple:
-    """
-    Simple bootstrap to estimate confidence interval for mean profit per trade.
-    Returns (lower_bound, upper_bound)
-    """
-    if len(profits) < 10:
-        return (np.nan, np.nan)
-    
-    means = []
-    for _ in range(n_bootstrap):
-        sample = np.random.choice(profits, size=len(profits), replace=True)
-        means.append(np.mean(sample))
-    
-    alpha = (1 - confidence) / 2
-    lower = np.percentile(means, alpha * 100)
-    upper = np.percentile(means, (1 - alpha) * 100)
-    
-    return (lower, upper)
-
-
-def permutation_test(profits1: list, profits2: list, n_permutations: int = 1000) -> float:
-    """
-    Permutation test to check if two profit distributions are significantly different.
-    Returns p-value.
-    """
+def permutation_test(profits1, profits2, n_permutations=1000):
+    """Permutation test"""
     if len(profits1) < 10 or len(profits2) < 10:
-        return 1.0  # Not enough data
-    
+        return 1.0
     observed_diff = np.mean(profits1) - np.mean(profits2)
     combined = profits1 + profits2
     n1 = len(profits1)
-    
     count_extreme = 0
     for _ in range(n_permutations):
         np.random.shuffle(combined)
         perm_diff = np.mean(combined[:n1]) - np.mean(combined[n1:])
         if abs(perm_diff) >= abs(observed_diff):
             count_extreme += 1
-    
-    p_value = count_extreme / n_permutations
-    return p_value
+    return count_extreme / n_permutations
 
+def format_significance(p_value):
+    """Format significance"""
+    if p_value < 0.1:
+        return f"✅ (p={p_value:.3f})"
+    else:
+        return f"❌ (p={p_value:.2f})"
 
-def load_enriched_trades(filepath: str) -> pd.DataFrame:
-    """Loads enriched trades from Excel file."""
-    df = pd.read_excel(filepath)
-    df.columns = df.columns.str.lower().str.strip()
-    if 'buy_time' in df.columns:
-        df['buy_time'] = pd.to_datetime(df['buy_time'])
-    return df
-
-
-def analyze_by_dimension(df: pd.DataFrame, dimension: str, initial_capital: float) -> dict:
-    """
-    Analyzes performance by a single dimension.
-    
-    dimension: 'family', 'trend', or 'regime'
-    """
+def analyze_by_dimension(df, dimension, initial_capital):
+    """Analyze performance by dimension"""
     stats = {}
-    
     for category in df[dimension].unique():
         cat_df = df[df[dimension] == category].copy()
         cat_df = cat_df.sort_values('buy_time').reset_index(drop=True)
         cat_df['equity'] = initial_capital + cat_df['profit'].cumsum()
-        
         num_trades = len(cat_df)
         profit = cat_df['profit'].sum()
         profits_list = cat_df['profit'].tolist()
-        
-        # Confidence indicator: tick if >=50, X otherwise
-        if num_trades >= MIN_TRADES_CONFIDENCE:
-            confidence = "✓"  # Normal tick
-        else:
-            confidence = "✗"  # Normal X
-        
-        # Bootstrap CI
-        ci_lower, ci_upper = bootstrap_confidence_interval(profits_list)
-        
+        confidence = "✓" if num_trades >= MIN_TRADES_CONFIDENCE else "✗"
         stats[category] = {
             'num_trades': num_trades,
             'profit': profit,
             'dd_pct': calculate_max_dd_pct(cat_df['equity']),
             'win_rate': (cat_df['profit'] > 0).mean() * 100 if num_trades > 0 else 0.0,
             'profits_list': profits_list,
-            'confidence': confidence,
-            'ci_lower': ci_lower,
-            'ci_upper': ci_upper
+            'confidence': confidence
         }
-    
     return stats
 
-
-def analyze_strategy_all_dimensions(filepath: str, families: dict, initial_capital: float, 
-                                     direction_method: str = None, date_range: tuple = None) -> dict:
-    """Analyzes a single strategy across all 3 dimensions."""
-    strategy = Path(filepath).stem.replace('trades_enriched_', '')
-    df = load_enriched_trades(filepath)
+def analyze_strategy(filepath, families, initial_capital):
+    """Analyze single strategy - MATCHES enricher.py"""
+    strategy = Path(filepath).stem.replace('all_trades_', '')
     
-    # Apply date range filter if specified
-    if date_range is not None:
-        start_date, end_date = date_range
-        start_date = pd.to_datetime(start_date)
-        end_date = pd.to_datetime(end_date)
-        df = df[(df['buy_time'] >= start_date) & (df['buy_time'] <= end_date)].copy()
+    # Extract timeframe and load correct BTC file
+    timeframe = extract_timeframe(Path(filepath).name)
+    btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe)
     
-    # Classify family
-    df['family'] = df.apply(lambda row: classify_trade(row, families), axis=1)
+    print(f"   Processing {strategy} [{timeframe}]...")
     
-    # ==========================================
-    # NEW: Determine trend based on configured method
-    # ==========================================
-    direction_method = direction_method or DIRECTION_METHOD
+    df = load_trades(filepath)
     
-    if direction_method == 'price_vs_ma':
-        # Method 1: Price vs single MA
-        price_vs_ma_col = f'price_vs_ma_{DIRECTION_MA_PERIOD}'
-        df['trend'] = df.apply(
-            lambda r: 'uptrend' if (not pd.isna(r.get(price_vs_ma_col)) and r[price_vs_ma_col] > 1.0) else 
-                      'downtrend' if (not pd.isna(r.get(price_vs_ma_col))) else 
-                      'unknown',
-            axis=1
-        )
+    df['family'] = 'unknown'
+    df['trend'] = 'unknown'
+    df['hurst'] = np.nan
+    df['efficiency_ratio'] = np.nan
+    df['atr_pct'] = np.nan
+    df['permutation_entropy'] = np.nan
+    df['ma_50'] = np.nan
+    df['price_vs_ma_50'] = np.nan
     
-    elif direction_method == 'ma_cross':
-        # Method 2: MA cross (e.g., MA50 vs MA200)
-        ma_cross_col = f'ma_{DIRECTION_MA_FAST}_vs_ma_{DIRECTION_MA_SLOW}'
-        df['trend'] = df.apply(
-            lambda r: 'uptrend' if (not pd.isna(r.get(ma_cross_col)) and r[ma_cross_col] > 1.0) else 
-                      'downtrend' if (not pd.isna(r.get(ma_cross_col))) else 
-                      'unknown',
-            axis=1
-        )
+    for idx, trade in df.iterrows():
+        metrics = calc_all_metrics_at_time(btc_df, trade['buy_time'], LOOKBACK_BARS)
+        if metrics:
+            df.at[idx, 'hurst'] = metrics['hurst']
+            df.at[idx, 'efficiency_ratio'] = metrics['efficiency_ratio']
+            df.at[idx, 'atr_pct'] = metrics['atr_pct']
+            df.at[idx, 'permutation_entropy'] = metrics['permutation_entropy']
+            df.at[idx, 'ma_50'] = metrics['ma_50']
+            df.at[idx, 'price_vs_ma_50'] = metrics['price_vs_ma_50']
+            family = classify_trade_by_family(metrics, families)
+            df.at[idx, 'family'] = family
+            if not pd.isna(metrics['price_vs_ma_50']):
+                df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'downtrend'
     
-    else:
-        # Fallback: default to price_vs_ma_50
-        print(f"    ⚠️  Unknown DIRECTION_METHOD '{direction_method}', defaulting to price_vs_ma_50")
-        df['trend'] = df.apply(
-            lambda r: 'uptrend' if (not pd.isna(r.get('price_vs_ma_50')) and r['price_vs_ma_50'] > 1.0) else 
-                      'downtrend' if (not pd.isna(r.get('price_vs_ma_50'))) else 
-                      'unknown',
-            axis=1
-        )
+    # CRITICAL: Drop NaN rows (matches enricher.py lines 244-256)
+    critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
+    trades_before = len(df)
+    df = df.dropna(subset=critical_cols).reset_index(drop=True)
+    trades_after = len(df)
+    if trades_before != trades_after:
+        print(f"      Dropped {trades_before - trades_after} trades with NaN metrics")
     
-    # Create regime column (family_trend)
     df['regime'] = df['family'] + '_' + df['trend']
-    
-    # Sort by time
     df = df.sort_values('buy_time').reset_index(drop=True)
-    
-    # Analyze by each dimension
     family_stats = analyze_by_dimension(df, 'family', initial_capital)
     trend_stats = analyze_by_dimension(df, 'trend', initial_capital)
     regime_stats = analyze_by_dimension(df, 'regime', initial_capital)
-    
-    # Calculate total equity and DD for entire strategy
     df_sorted = df.sort_values('buy_time').reset_index(drop=True)
     df_sorted['equity_total'] = initial_capital + df_sorted['profit'].cumsum()
     total_dd_pct = calculate_max_dd_pct(df_sorted['equity_total'])
     total_win_rate = (df_sorted['profit'] > 0).mean() * 100 if len(df_sorted) > 0 else 0.0
-    
     return {
         'strategy': strategy,
         'total_trades': len(df),
@@ -237,24 +262,14 @@ def analyze_strategy_all_dimensions(filepath: str, families: dict, initial_capit
         'regime_stats': regime_stats
     }
 
-
-def format_significance(p_value: float) -> str:
-    """Formats significance with green tick or red X."""
-    if p_value < 0.1:
-        return f"✅ (p={p_value:.3f})"
-    else:
-        return f"❌ (p={p_value:.2f})"
-
-
-def print_single_strategy_all_dimensions(r: dict):
-    """Prints all 3 dimension tables for a single strategy."""
+def print_single_strategy_all_dimensions(r):
+    """Print tables"""
     print(f"\n\033[93m{'='*145}\033[0m")
     print(f"\033[93mSTRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)\033[0m")
     print(f"\033[93m{'='*145}\033[0m")
     
-    # TABLE 1: BY FAMILY
     print(f"\n{'─'*120}")
-    print(f"BY FAMILY (trending/volatile/ranging)")
+    print("BY FAMILY (trending/volatile/ranging)")
     print(f"{'─'*120}")
     print(f"{'FAMILY':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
     print("-" * 120)
@@ -264,25 +279,19 @@ def print_single_strategy_all_dimensions(r: dict):
     
     for idx, (category, stats) in enumerate(sorted_family):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
-        
-        # Calculate p-value
         if len(sorted_family) < 2:
             p_str = "N/A"
         elif idx == 0:
-            # Best vs 2nd best
             p_value = permutation_test(sorted_family[0][1]['profits_list'], sorted_family[1][1]['profits_list'])
             p_str = format_significance(p_value)
         else:
-            # Others vs best
             p_value = permutation_test(stats['profits_list'], sorted_family[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        
         print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
     
     print("-" * 120)
     print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
     
-    # Best family comparison
     if len(sorted_family) >= 2:
         best_fam, best_stats = sorted_family[0]
         second_fam, second_stats = sorted_family[1]
@@ -290,9 +299,8 @@ def print_single_strategy_all_dimensions(r: dict):
         sig_str = format_significance(p_value)
         print(f"\n→ BEST: {best_fam} (${best_stats['profit']:.2f}) vs 2ND: {second_fam} (${second_stats['profit']:.2f}) | {sig_str}")
     
-    # TABLE 2: BY DIRECTION
     print(f"\n{'─'*120}")
-    print(f"BY DIRECTION (uptrend/downtrend)")
+    print("BY DIRECTION (uptrend/downtrend)")
     print(f"{'─'*120}")
     print(f"{'DIRECTION':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
     print("-" * 120)
@@ -302,25 +310,19 @@ def print_single_strategy_all_dimensions(r: dict):
     
     for idx, (category, stats) in enumerate(sorted_trend):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
-        
-        # Calculate p-value
         if len(sorted_trend) < 2:
             p_str = "N/A"
         elif idx == 0:
-            # Best vs 2nd best
             p_value = permutation_test(sorted_trend[0][1]['profits_list'], sorted_trend[1][1]['profits_list'])
             p_str = format_significance(p_value)
         else:
-            # Others vs best
             p_value = permutation_test(stats['profits_list'], sorted_trend[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        
         print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
     
     print("-" * 120)
     print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
     
-    # Best direction comparison
     if len(sorted_trend) >= 2:
         best_dir, best_stats = sorted_trend[0]
         second_dir, second_stats = sorted_trend[1]
@@ -328,9 +330,8 @@ def print_single_strategy_all_dimensions(r: dict):
         sig_str = format_significance(p_value)
         print(f"\n→ BEST: {best_dir} (${best_stats['profit']:.2f}) vs 2ND: {second_dir} (${second_stats['profit']:.2f}) | {sig_str}")
     
-    # TABLE 3: BY REGIME
     print(f"\n{'─'*120}")
-    print(f"BY REGIME (6 combined categories)")
+    print("BY REGIME (6 combined categories)")
     print(f"{'─'*120}")
     print(f"{'REGIME':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
     print("-" * 120)
@@ -340,25 +341,19 @@ def print_single_strategy_all_dimensions(r: dict):
     
     for idx, (category, stats) in enumerate(sorted_regime):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
-        
-        # Calculate p-value
         if len(sorted_regime) < 2:
             p_str = "N/A"
         elif idx == 0:
-            # Best vs 2nd best
             p_value = permutation_test(sorted_regime[0][1]['profits_list'], sorted_regime[1][1]['profits_list'])
             p_str = format_significance(p_value)
         else:
-            # Others vs best
             p_value = permutation_test(stats['profits_list'], sorted_regime[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        
         print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
     
     print("-" * 120)
     print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
     
-    # Best regime comparison
     if len(sorted_regime) >= 2:
         best_reg, best_stats = sorted_regime[0]
         second_reg, second_stats = sorted_regime[1]
@@ -366,15 +361,14 @@ def print_single_strategy_all_dimensions(r: dict):
         sig_str = format_significance(p_value)
         print(f"\n→ BEST: {best_reg} (${best_stats['profit']:.2f}) vs 2ND: {second_reg} (${second_stats['profit']:.2f}) | {sig_str}")
 
-def print_summary_tables(results: list):
-    """Prints final summary tables across all strategies."""
+def print_summary_tables(results):
+    """Print summaries"""
     print(f"\n{'='*145}")
     print(f"{'='*145}")
-    print(f"SUMMARY - ALL STRATEGIES")
+    print("SUMMARY - ALL STRATEGIES")
     print(f"{'='*145}")
     print(f"{'='*145}")
     
-    # Summary 1: Best Family
     print(f"\n{'─'*145}")
     print("BEST FAMILY PER STRATEGY")
     print(f"{'─'*145}")
@@ -388,9 +382,7 @@ def print_summary_tables(results: list):
             best_fam, best_stats = sorted_fam[0]
             second_fam, second_stats = sorted_fam[1]
             p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
-            
             sig_str = format_significance(p_value)
-            
             print(f"{r['strategy']:<30} {best_fam:<20} {best_stats['confidence']:>5} {best_stats['num_trades']:>8} {best_stats['profit']:>10.2f} {second_fam:<20} {second_stats['num_trades']:>8} {second_stats['profit']:>10.2f} {sig_str:>15}")
         elif family_stats and len(family_stats) == 1:
             best_fam, best_stats = list(family_stats.items())[0]
@@ -398,7 +390,6 @@ def print_summary_tables(results: list):
     
     print("-" * 145)
     
-    # Summary 2: Best Direction
     print(f"\n{'─'*145}")
     print("BEST DIRECTION PER STRATEGY")
     print(f"{'─'*145}")
@@ -412,9 +403,7 @@ def print_summary_tables(results: list):
             best_dir, best_stats = sorted_trend[0]
             second_dir, second_stats = sorted_trend[1]
             p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
-            
             sig_str = format_significance(p_value)
-            
             print(f"{r['strategy']:<30} {best_dir:<20} {best_stats['confidence']:>5} {best_stats['num_trades']:>8} {best_stats['profit']:>10.2f} {second_dir:<20} {second_stats['num_trades']:>8} {second_stats['profit']:>10.2f} {sig_str:>15}")
         elif trend_stats and len(trend_stats) == 1:
             best_dir, best_stats = list(trend_stats.items())[0]
@@ -422,7 +411,6 @@ def print_summary_tables(results: list):
     
     print("-" * 145)
     
-    # Summary 3: Best Regime
     print(f"\n{'─'*145}")
     print("BEST REGIME PER STRATEGY")
     print(f"{'─'*145}")
@@ -436,9 +424,7 @@ def print_summary_tables(results: list):
             best_reg, best_stats = sorted_reg[0]
             second_reg, second_stats = sorted_reg[1]
             p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
-            
             sig_str = format_significance(p_value)
-            
             print(f"{r['strategy']:<30} {best_reg:<20} {best_stats['confidence']:>5} {best_stats['num_trades']:>8} {best_stats['profit']:>10.2f} {second_reg:<20} {second_stats['num_trades']:>8} {second_stats['profit']:>10.2f} {sig_str:>15}")
         elif regime_stats and len(regime_stats) == 1:
             best_reg, best_stats = list(regime_stats.items())[0]
@@ -446,75 +432,58 @@ def print_summary_tables(results: list):
     
     print("-" * 145)
 
-
-def analyze_all_strategies(output_folder: str = None, families: dict = None, 
-                           initial_capital: float = None, direction_method: str = None,
-                           date_range: tuple = None) -> list:
-    """Analyzes all strategies across all 3 dimensions."""
-    output_folder = output_folder or OUTPUT_FOLDER
-    families = families or FAMILIES
-    initial_capital = initial_capital or INITIAL_CAPITAL
-    direction_method = direction_method or DIRECTION_METHOD
-    
+def main():
     print("=" * 70)
-    print("REGIME ANALYZER - Performance across 3 dimensions")
+    print("REGIME ANALYZER - Performance across 3 dimensions (STANDALONE)")
     print("=" * 70)
     
-    if date_range:
-        print(f"\n⚠️  DATE RANGE FILTER ACTIVE: {date_range[0]} → {date_range[1]}")
-    
-    # Display direction detection method
-    print(f"\nDirection detection method: {direction_method}")
-    if direction_method == 'price_vs_ma':
-        print(f"  Using: Price vs MA{DIRECTION_MA_PERIOD}")
-    elif direction_method == 'ma_cross':
-        print(f"  Using: MA{DIRECTION_MA_FAST} vs MA{DIRECTION_MA_SLOW}")
-    
-    print(f"Initial capital: ${initial_capital}")
+    print(f"\nConfiguration:")
+    print(f"  Trades folder: {TRADES_FOLDER}")
+    print(f"  OHLC folder:   {OHLC_FOLDER}")
+    print(f"  MA period:     MA{MA_PERIOD}")
+    print(f"  Capital:       ${INITIAL_CAPITAL}")
     
     print("\nDimensions analyzed:")
     print("  1. FAMILY: trending/volatile/ranging (ignoring BTC direction)")
     print("  2. DIRECTION: uptrend/downtrend (ignoring family)")
     print("  3. REGIME: 6 combined categories (full granularity)")
     
-    print("\nConfidence indicator (CONF):")
-    print(f"  ✓ = ≥{MIN_TRADES_CONFIDENCE} trades (reliable)")
+    print(f"\nConfidence indicator (CONF):")
+    print(f"  ✓ = >={MIN_TRADES_CONFIDENCE} trades (reliable)")
     print(f"  ✗ = <{MIN_TRADES_CONFIDENCE} trades (unreliable)")
     
     print("\nSignificance indicator (SIGNIFICANT?):")
-    print(f"  ✅ = p<0.10 (statistically significant difference)")
-    print(f"  ❌ = p≥0.10 (no significant difference)")
+    print("  ✅ = p<0.10 (statistically significant difference)")
+    print("  ❌ = p>=0.10 (no significant difference)")
     
-    pattern = os.path.join(output_folder, "trades_enriched_*.xlsx")
+    pattern = str(Path(TRADES_FOLDER) / 'all_trades_*.xlsx')
     files = sorted(glob(pattern))
     
     if not files:
-        print(f"\n❌ No enriched files found in {output_folder}")
-        return []
+        print(f"\n❌ No trades files found in {TRADES_FOLDER}")
+        return
     
-    print(f"\nFiles found: {len(files)}\n")
+    print(f"\n📂 Found {len(files)} strategy files")
+    print("\n🔍 Analyzing strategies...")
     
     results = []
-    for f in files:
-        r = analyze_strategy_all_dimensions(f, families, initial_capital, direction_method, date_range=date_range)
-        results.append(r)
+    for filepath in files:
+        result = analyze_strategy(filepath, FAMILIES, INITIAL_CAPITAL)
+        results.append(result)
     
-    # Print each strategy with all 3 dimensions
     for r in results:
         print_single_strategy_all_dimensions(r)
     
-    # Print final summary tables
     print_summary_tables(results)
     
-    # Interpretation guide
     print(f"\n{'='*145}")
     print("INTERPRETATION GUIDE:")
     print("\n  CONF (Confidence):")
-    print("    ✓ = Reliable sample (≥50 trades) - trust these results")
+    print("    ✓ = Reliable sample (>=50 trades) - trust these results")
     print("    ✗ = Unreliable sample (<50 trades) - don't trust these results")
     print("\n  SIGNIFICANT? (Statistical test):")
     print("    ✅ (p<0.10) = Difference is real, not random")
-    print("    ❌ (p≥0.10) = Difference could be random chance")
+    print("    ❌ (p>=0.10) = Difference could be random chance")
     print("\n  FILTERING DECISION:")
     print("    - Only filter if BOTH: ✓ (reliable) AND ✅ (significant)")
     print("    - If FAMILY is ✓✅: filter by family only")
@@ -522,9 +491,6 @@ def analyze_all_strategies(output_folder: str = None, families: dict = None,
     print("    - If REGIME is ✓✅: filter by specific regime")
     print("    - Otherwise: don't filter, operate in all conditions")
     print(f"{'='*145}")
-    
-    return results
-
 
 if __name__ == "__main__":
-    analyze_all_strategies(date_range=DATE_RANGE_FILTER)
+    main()

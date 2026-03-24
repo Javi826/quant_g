@@ -44,13 +44,15 @@ IMPULSE_LIST         = [0.005,0.01,0.015]
 TP_PCT_LIST          = [2,3,4]
 SL_PCT_LIST          = [9,10,11]
 
-SELL_AFTER_LIST      = [0]  
-IMPULSE_LIST         = [0.01] 
-LOOKBACK_LIST        = [50]
-TOLERANCE_LIST       = [35] 
-
-TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [11]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# IMPULSE_LIST         = [0.01] 
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [35] 
+# 
+# TP_PCT_LIST          = [4]
+# SL_PCT_LIST          = [11]
+# =============================================================================
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]
@@ -58,7 +60,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 2000
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
