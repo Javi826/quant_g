@@ -191,6 +191,11 @@ class BotOrchestrator:
         if hasattr(self, 'demo_operative') and self.demo_operative:
             self.demo_operative.ws_manager = self.ws_manager
             self.demo_operative.strategy_configs = {s['id']: s for s in self.strategies}
+            
+            # NEW: Inject state references
+            self.demo_operative.open_positions = self.open_positions
+            self.demo_operative.strategy_candles = self.strategy_candles
+            self.demo_operative.state_file = self.state_file
         
     def shutdown(self) -> None:
         """
@@ -253,6 +258,45 @@ class BotOrchestrator:
     # ======================================================================
     # INITIALIZATION METHODS (Private)
     # ======================================================================
+    #demo
+    def _load_demo_state(self) -> tuple:
+        """Load state from demo JSON file."""
+        import json
+        from datetime import datetime
+        
+        json_path = os.path.join(
+            self.base_dir, 
+            f'demo_state_{self.account_number}.json'
+        )
+        
+        self.logger.info(f"[DEMO DEBUG] Attempting to load: {json_path}")
+        self.logger.info(f"[DEMO DEBUG] File exists: {os.path.exists(json_path)}")
+        
+        if not os.path.exists(json_path):
+            self.logger.warning(f"[DEMO DEBUG] File does not exist! Returning empty state")
+            return {}, {}
+        
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        self.logger.info(f"[DEMO DEBUG] JSON loaded - strategies in data: {list(data.get('open_positions', {}).keys())}")  # ← CAMBIAR
+        
+        # Deserialize datetime strings
+        positions = {}
+        for strategy_id, pos_list in data.get('open_positions', {}).items():  # ← CAMBIAR AQUÍ
+            positions[strategy_id] = []
+            for pos in pos_list:
+                pos_copy = pos.copy()
+                if isinstance(pos_copy.get('opened_at'), str):
+                    pos_copy['opened_at'] = datetime.fromisoformat(pos_copy['opened_at'])
+                positions[strategy_id].append(pos_copy)
+            
+            self.logger.info(f"[DEMO DEBUG] Loaded {strategy_id}: {len(positions[strategy_id])} positions")
+        
+        total = sum(len(p) for p in positions.values())
+        self.logger.info(f"[DEMO DEBUG] Total positions to return: {total}")
+        
+        return positions, data.get('strategy_candles', {})
     
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
@@ -264,10 +308,22 @@ class BotOrchestrator:
     
     def _load_bot_state(self) -> None:
         """Load bot state from disk and initialize BotState."""
-        self.open_positions, self.strategy_candles = load_state(
-            self.account_number,
-            self.state_file
-        )
+        
+        from config.settings import DEMO_MODE_ACCOUNTS  # ← AÑADIR
+        
+        # Check if demo mode by account number
+        is_demo = self.account_number in DEMO_MODE_ACCOUNTS  # ← CAMBIAR
+        
+        if is_demo:  # ← CAMBIAR
+            # Load from demo JSON instead of PostgreSQL/bot_state
+            self.open_positions, self.strategy_candles = self._load_demo_state()
+            self.logger.info(f"[DEMO] Loaded {sum(len(p) for p in self.open_positions.values())} positions from demo_state_{self.account_number}.json")
+        else:
+            # Normal load (PostgreSQL + bot_state JSON)
+            self.open_positions, self.strategy_candles = load_state(
+                self.account_number,
+                self.state_file
+            )
         
         self.bot_state = BotState()
         if os.path.exists(self.trades_log_path):
@@ -292,7 +348,7 @@ class BotOrchestrator:
         
         validate_postgresql_connection()
         
-        all_errors = []
+        all_errors   = []
         all_warnings = []
               
         # 1. Strategies
@@ -365,7 +421,7 @@ class BotOrchestrator:
             state_file=self.state_file,
             use_hardcoded=USE_HARDCODED_SIGNALS
         )
-        # Pass demo_operative  ← AQUÍ
+        # Pass demo_operative 
         if hasattr(self, 'demo_operative'):
             self.strategy_processor.demo_operative = self.demo_operative
     
@@ -570,9 +626,7 @@ class BotOrchestrator:
                     self.account_number,
                     self.state_file
                 )
-                # Demo candles
-                if hasattr(self, 'demo_operative') and self.demo_operative:
-                    self.demo_operative.increment_candles(strat_id)
+                    
                 candles       = self.strategy_candles.get(strat_id, 0)
                 num_positions = len(self.open_positions.get(strat_id, []))
 
@@ -592,6 +646,9 @@ class BotOrchestrator:
                     self._send_request_wrapper,
                     bot_state=self.bot_state
                 )
+            # Demo candles (OUTSIDE the if block - same indentation as 'if has_positions:')
+            if hasattr(self, 'demo_operative') and self.demo_operative:
+                self.demo_operative.increment_candles(strat_id)
     
     def _search_signals(self, strategies_to_process: List[Dict]) -> None:
             """
@@ -781,20 +838,27 @@ class BotOrchestrator:
             current_time: Current timestamp
         """
         if current_time - self.last_tpsl_check >= CHECK_INTERVAL:
-            check_all_tp_sl(
-                self.strategies,
-                self.open_positions,
-                self.strategy_candles,
-                self.account_number,  # ← AÑADIR
-                self.state_file,
-                self._send_request_wrapper,
-                check_tp_sl_for_strategy,
-                bot_state=self.bot_state
-            )
-            self.last_tpsl_check = current_time
-            # Demo exits
+            # ============================================================
+            # DEMO MODE: Use demo_operative for monitoring (exclusive)
+            # LIVE MODE: Use production check_all_tp_sl (exclusive)
+            # ============================================================
             if hasattr(self, 'demo_operative') and self.demo_operative:
+                # DEMO: Monitor via demo_operative (no broker calls)
                 self.demo_operative.monitor_exits(self.strategy_candles)
+            else:
+                # LIVE: Monitor via production system (broker calls)
+                check_all_tp_sl(
+                    self.strategies,
+                    self.open_positions,
+                    self.strategy_candles,
+                    self.account_number,
+                    self.state_file,
+                    self._send_request_wrapper,
+                    check_tp_sl_for_strategy,
+                    bot_state=self.bot_state
+                )
+            
+            self.last_tpsl_check = current_time
     
     def _update_next_candle_times(self, closed_timeframes: List[str]) -> None:
         """

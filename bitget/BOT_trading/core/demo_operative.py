@@ -1,21 +1,26 @@
 """
-Demo Operative Module - Simulation Trading Mode
+core/demo_operative.py Module - Simulation Trading Mode
 
-Handles simulated trading for LAB validation:
-- Intercepts order placement (NO real broker orders)
-- Tracks simulated positions in memory
-- Monitors TP/SL/TIMEOUT using WebSocket prices
-- Logs ONLY to Excel (bypasses PostgreSQL)
-- Operates WITHOUT REGIME 0 + REGIME 1 layers
+PERSISTENCE MODEL:
+- ✅ JSON for state (open positions)
+- ✅ Excel for closed trades
+- ❌ NO PostgreSQL
+- ❌ NO broker API calls
 
-This module runs in parallel with live accounts for validation purposes.
+REGIME BYPASS:
+- Skips REGIME 0 (BTC 1D filter)
+- Skips REGIME 1 (market regime sizing)
+- Uses base order_amount from config
+
+For LAB validation without touching PostgreSQL or broker.
 """
 
 import os
+import json
+import time
 import pandas as pd
 from datetime import datetime
-from decimal import Decimal
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 import logging
 
 from config.settings import HOUR_ZONE
@@ -26,181 +31,219 @@ logger = logging.getLogger('BOT_trading.demo_operative')
 
 class DemoOperative:
     """
-    Simulated trading handler for validation against LAB results.
+    Simulated trading with JSON + Excel persistence.
     
     Attributes:
-        account_number: Account identifier (typically '01' for demo)
-        ws_manager: WebSocket manager for real-time prices
-        excel_path: Path to Excel file for trade logging
-        simulated_positions: In-memory list of open simulated positions
-        strategy_configs: Strategy configurations for timeout tracking
+        account_number: Account identifier
+        ws_manager: WebSocket manager for prices
+        excel_path: Path to Excel file for trades
+        json_path: Path to JSON file for state
+        open_positions: Simulated positions (shared with orchestrator)
+        strategy_candles: Candle counters (shared with orchestrator)
+        strategy_configs: Strategy configurations
     """
     
     def __init__(self, account_number: str, ws_manager, excel_path: str, 
                  strategy_configs: List[Dict]):
         """
-        Initialize demo operative module.
+        Initialize demo operative.
         
         Args:
-            account_number: Account number (e.g., '01')
-            ws_manager: WebSocket manager instance
-            excel_path: Path to Excel file for logging
-            strategy_configs: List of strategy configurations
+            account_number: Account number
+            ws_manager: WebSocket manager
+            excel_path: Path to Excel file
+            strategy_configs: Strategy configurations
         """
         self.account_number = account_number
         self.ws_manager = ws_manager
         self.excel_path = excel_path
         self.strategy_configs = {s['id']: s for s in strategy_configs}
         
-        # Simulated positions (in-memory only)
-        self.simulated_positions: List[Dict] = []
+        # JSON state file path
+        state_dir = os.path.dirname(excel_path)
+        self.json_path = os.path.join(state_dir, f'demo_state_{account_number}.json')
         
-        logger.info(f"[DEMO] Demo operative initialized for account {account_number}")
-        logger.info(f"[DEMO] Excel logging path: {excel_path}")
-        logger.info(f"[DEMO] NO real orders will be placed")
-        logger.info(f"[DEMO] REGIME 0 + REGIME 1 layers DISABLED")
+        # References (injected by orchestrator)
+        self.open_positions: Optional[Dict] = None
+        self.strategy_candles: Optional[Dict] = None
+        self.state_file: Optional[str] = None  # Ignored in demo mode
+        
+        logger.info(f"[DEMO] Demo mode initialized for account {account_number}")
+        logger.info(f"[DEMO] Persistence: JSON (state) + Excel (trades)")
+        logger.info(f"[DEMO] JSON path: {self.json_path}")
+        logger.info(f"[DEMO] Excel path: {excel_path}")
+        logger.info(f"[DEMO] NO PostgreSQL writes")
+        logger.info(f"[DEMO] NO broker API calls")
+        logger.info(f"[DEMO] REGIME layers DISABLED")
     
     
     def place_simulated_order(self, symbol: str, direction: str, 
                              usdt_amount: float, tp_pct: float, 
                              sl_pct: float, strategy_id: str) -> Optional[Dict]:
         """
-        Simulate order placement without sending to broker.
-        
-        Uses current WebSocket price as entry price.
+        Simulate order placement and save to JSON.
         
         Args:
-            symbol: Trading symbol (e.g., 'BTCUSDT')
+            symbol: Trading symbol
             direction: 'long' or 'short'
-            usdt_amount: USDT amount to invest
-            tp_pct: Take profit percentage
-            sl_pct: Stop loss percentage
-            strategy_id: Strategy identifier
+            usdt_amount: USDT amount
+            tp_pct: TP percentage
+            sl_pct: SL percentage
+            strategy_id: Strategy ID
         
         Returns:
-            Simulated position dict or None if failed
+            Position dict or None
         """
         try:
-            # Get current market price from WebSocket
+            # Get current price from WebSocket
             current_price = get_current_price(symbol, max_cache_age=0.5)
-            
             if not current_price:
-                logger.warning(f"[DEMO] No price available for {symbol}, skipping entry")
+                logger.warning(f"[DEMO] No price for {symbol}")
                 return None
             
-            current_price_float = float(current_price)
+            entry_price = float(current_price)
             
             # Calculate TP/SL prices
             if direction.lower() == 'long':
-                tp_price = current_price_float * (1 + tp_pct / 100)
-                sl_price = current_price_float * (1 - sl_pct / 100)
-            else:  # short
-                tp_price = current_price_float * (1 - tp_pct / 100)
-                sl_price = current_price_float * (1 + sl_pct / 100)
+                tp_price = entry_price * (1 + tp_pct / 100)
+                sl_price = entry_price * (1 - sl_pct / 100)
+            else:
+                tp_price = entry_price * (1 - tp_pct / 100)
+                sl_price = entry_price * (1 + sl_pct / 100)
             
-            # Create simulated position
+            size = usdt_amount / entry_price
+            
+            # Create position dict
             position = {
-                'strategy': strategy_id,
                 'symbol': symbol,
+                'size': size,
+                'entry_price': entry_price,
                 'direction': direction.lower(),
-                'entry_price': current_price_float,
-                'usdt_amount': usdt_amount,
                 'tp': tp_price,
                 'sl': sl_price,
+                'order_id': f"demo_{int(time.time() * 1000000)}",
+                'opened_at': datetime.now(HOUR_ZONE),
+                'usdt_amount': usdt_amount,
+                'regime_family': 'no_regime',
+                'regime_multiplier': 1.0,
+                'market_direction': 'no_direction',
+                'direction_multiplier': 1.0,
                 'tp_pct': tp_pct,
                 'sl_pct': sl_pct,
-                'entry_time': datetime.now(HOUR_ZONE),
-                'candles': 0,
                 'simulated': True
             }
             
-            self.simulated_positions.append(position)
+            # Add to open_positions (shared reference)
+            if strategy_id not in self.open_positions:
+                self.open_positions[strategy_id] = []
             
-            logger.info(f"[DEMO] ENTRY {direction.upper()} {symbol} @ ${current_price_float:.4f} | "
-                       f"Amount: ${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f}")
+            self.open_positions[strategy_id].append(position)
+            
+            # Save to JSON only
+            self._save_state_json()
+            
+            logger.info(
+                f"[DEMO] ENTRY {direction.upper()} {symbol} @ ${entry_price:.4f} | "
+                f"${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f}"
+            )
             
             return position
             
         except Exception as e:
-            logger.error(f"[DEMO] Error placing simulated order for {symbol}: {e}")
+            logger.error(f"[DEMO] Error placing simulated order {symbol}: {e}")
             import traceback
             traceback.print_exc()
             return None
     
+    
     def increment_candles(self, strategy_id: str) -> None:
-        """
-        Increment candle counter for all positions of a strategy.
-        
-        Called when a new candle closes for the strategy's timeframe.
-        
-        Args:
-            strategy_id: Strategy identifier
-        """
-        for position in self.simulated_positions:
-            if position['strategy'] == strategy_id:
-                position['candles'] += 1
+        """No-op - orchestrator manages candles."""
+        pass
+    
     
     def monitor_exits(self, strategy_candles: Dict[str, int]) -> None:
         """
         Monitor simulated positions for TP/SL/TIMEOUT exits.
         
-        Should be called periodically (every few seconds) to check exit conditions.
+        Args:
+            strategy_candles: Candle counters from orchestrator
         """
-        if not self.simulated_positions:
+        if not self.open_positions:
             return
         
         positions_to_close = []
         
-        for position in self.simulated_positions:
-            symbol = position['symbol']
-            strategy_id = position['strategy']
+        for strategy_id, positions in self.open_positions.items():
+            if not positions:
+                continue
             
-            try:
-                # Get current price from WebSocket
-                current_price = get_current_price(symbol, max_cache_age=0.5)
-                
-                if not current_price:
+            for position in positions:
+                # Skip non-simulated positions
+                if not position.get('simulated', False):
                     continue
                 
-                current_price_float = float(current_price)
-                direction = position['direction']
+                symbol = position['symbol']
                 
-                # Check TP hit
-                tp_hit = (direction == 'long' and current_price_float >= position['tp']) or \
-                         (direction == 'short' and current_price_float <= position['tp'])
-                
-                if tp_hit:
-                    positions_to_close.append((position, 'TP', current_price_float))
+                try:
+                    # Get current price
+                    current_price = get_current_price(symbol, max_cache_age=0.5)
+                except (TimeoutError, RuntimeError):
+                    continue
+                except Exception as e:
+                    logger.error(f"[DEMO] Error getting price {symbol}: {e}")
                     continue
                 
-                # Check SL hit
-                sl_hit = (direction == 'long' and current_price_float <= position['sl']) or \
-                         (direction == 'short' and current_price_float >= position['sl'])
+                try:
+                    current_price_float = float(current_price)
+                    direction = position['direction']
+                    
+                    # Check TP hit
+                    tp_hit = (direction == 'long' and current_price_float >= position['tp']) or \
+                             (direction == 'short' and current_price_float <= position['tp'])
+                    
+                    if tp_hit:
+                        positions_to_close.append((strategy_id, position, 'TP', current_price_float))
+                        continue
+                    
+                    # Check SL hit
+                    sl_hit = (direction == 'long' and current_price_float <= position['sl']) or \
+                             (direction == 'short' and current_price_float >= position['sl'])
+                    
+                    if sl_hit:
+                        positions_to_close.append((strategy_id, position, 'SL', current_price_float))
+                        continue
+                    
+                    # Check TIMEOUT
+                    if strategy_id in self.strategy_configs:
+                        max_candles = self.strategy_configs[strategy_id].get('sell_after_ncandles', 50)
+                        if strategy_candles.get(strategy_id, 0) >= max_candles:
+                            positions_to_close.append((strategy_id, position, 'TIMEOUT', current_price_float))
                 
-                if sl_hit:
-                    positions_to_close.append((position, 'SL', current_price_float))
-                    continue
-                
-                # Check TIMEOUT
-                if strategy_id in self.strategy_configs:
-                    max_candles = self.strategy_configs[strategy_id].get('sell_after_ncandles', 50)
-                    if strategy_candles.get(strategy_id, 0) >= max_candles:
-                        positions_to_close.append((position, 'TIMEOUT', current_price_float))
-            
-            except Exception as e:
-                logger.error(f"[DEMO] Error monitoring {symbol}: {e}")
+                except Exception as e:
+                    logger.error(f"[DEMO] Error processing {symbol}: {e}")
         
-        # Close positions that hit exit conditions
-        for position, reason, close_price in positions_to_close:
-            self._close_simulated_position(position, reason, close_price)
+        # ============================================================
+        # CLOSE POSITIONS WITH PRODUCTION-STYLE LOGS
+        # ============================================================
+        for strategy_id, position, reason, close_price in positions_to_close:
+            # Production-style log (for consistency with live mode)
+            symbol = position['symbol']
+            now_time = datetime.now(HOUR_ZONE).strftime('%H:%M')
+            logger.info(f"{reason} for {symbol} ({strategy_id}) at {now_time}")
+            
+            self._close_simulated_position(strategy_id, position, reason, close_price)
     
-    def _close_simulated_position(self, position: Dict, reason: str, 
-                                  close_price: float) -> None:
+    
+    def _close_simulated_position(self, strategy_id: str, position: Dict, 
+                                  reason: str, close_price: float) -> None:
         """
-        Close simulated position and log to Excel ONLY.
+        Close simulated position: Excel logging + JSON state update.
+        
+        NO PostgreSQL writes, NO broker calls.
         
         Args:
-            position: Position dictionary
+            strategy_id: Strategy ID
+            position: Position dict
             reason: Exit reason ('TP', 'SL', 'TIMEOUT')
             close_price: Close price
         """
@@ -208,19 +251,24 @@ class DemoOperative:
             entry_price = position['entry_price']
             direction = position['direction']
             usdt_amount = position['usdt_amount']
-            symbol = position['symbol']
-            strategy_id = position['strategy']
+            symbol = position['symbol']  # ← EXTRACT FIRST
             
             # Calculate profit
             if direction == 'long':
                 profit_pct = ((close_price - entry_price) / entry_price) * 100
-            else:  # short
+            else:
                 profit_pct = ((entry_price - close_price) / entry_price) * 100
             
             profit_usd = usdt_amount * (profit_pct / 100)
+            size = position.get('size', usdt_amount / entry_price)
             
-            # Calculate size (for compatibility with Excel format)
-            size = usdt_amount / entry_price
+            # Parse entry time
+            entry_time = position['opened_at']
+            if isinstance(entry_time, str):
+                entry_time = datetime.strptime(entry_time, '%Y-%m-%d %H:%M:%S')
+                entry_time = entry_time.replace(tzinfo=HOUR_ZONE)
+            
+            close_time = datetime.now(HOUR_ZONE)
             
             # Log to Excel ONLY (NO PostgreSQL)
             self._log_to_excel(
@@ -232,25 +280,58 @@ class DemoOperative:
                 profit=profit_usd,
                 profit_pct=profit_pct,
                 reason=reason,
-                entry_time=position['entry_time'],
-                close_time=datetime.now(HOUR_ZONE),
+                entry_time=entry_time,
+                close_time=close_time,
                 usdt_amount=usdt_amount,
                 size=size,
                 tp_target=position['tp'],
                 sl_target=position['sl']
             )
             
-            logger.info(f"[DEMO] EXIT {symbol} | {reason} | "
-                       f"Profit: ${profit_usd:.2f} ({profit_pct:+.2f}%) | "
-                       f"Strategy: {strategy_id}")
+            logger.info(
+                f"[DEMO] EXIT {symbol} | {reason} | "
+                f"${profit_usd:.2f} ({profit_pct:+.2f}%) | "
+                f"Strategy: {strategy_id}"
+            )
             
-            # Remove from simulated positions list
-            self.simulated_positions.remove(position)
+            # ============================================================
+            # CRITICAL: Remove position by symbol (not by object reference)
+            # ============================================================
+            if strategy_id in self.open_positions:
+                # Count positions before removal
+                count_before = len(self.open_positions[strategy_id])
+                
+                # Filter out by symbol (NOT by object reference)
+                self.open_positions[strategy_id] = [
+                    p for p in self.open_positions[strategy_id] 
+                    if p['symbol'] != symbol
+                ]
+                
+                # Count positions after removal
+                count_after = len(self.open_positions[strategy_id])
+                
+                # Verify removal succeeded
+                if count_after == count_before:
+                    logger.error(
+                        f"[DEMO] CRITICAL: Failed to remove {symbol} from {strategy_id}! "
+                        f"Positions before: {count_before}, after: {count_after}"
+                    )
+                    raise RuntimeError(f"Failed to remove position {symbol} from state")
+                else:
+                    logger.debug(
+                        f"[DEMO] Removed {symbol} from {strategy_id} "
+                        f"({count_before} → {count_after} positions)"
+                    )
+            
+            # Save to JSON only
+            self._save_state_json()
             
         except Exception as e:
-            logger.error(f"[DEMO] Error closing simulated position {position.get('symbol')}: {e}")
+            logger.error(f"[DEMO] Error closing position {position.get('symbol')}: {e}")
             import traceback
             traceback.print_exc()
+            raise  # ← Re-raise to stop bot if position removal fails
+    
     
     def _log_to_excel(self, strategy: str, symbol: str, direction: str,
                      entry_price: float, close_price: float, profit: float,
@@ -260,16 +341,13 @@ class DemoOperative:
         """
         Write trade to Excel ONLY (bypass PostgreSQL).
         
-        Creates Excel file if it doesn't exist.
-        Appends trade to existing Excel file.
-        
         Args:
             All trade data fields for Excel logging
         """
         try:
             duration_days = (close_time - entry_time).total_seconds() / (3600 * 24)
             
-            # Build trade record (matching PostgreSQL schema for compatibility)
+            # Build trade record
             trade_data = {
                 'OPEN_AT': entry_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'CLOSE_AT': close_time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -282,10 +360,10 @@ class DemoOperative:
                 'PRICE_ENTRY': round(entry_price, 6),
                 'PRICE_CLOSE': round(close_price, 6),
                 'PROFIT': round(profit, 2),
-                'FEE': 0.0,  # No fees in simulation
+                'FEE': 0.0,
                 'PROFIT_PCT': round(profit_pct, 2),
                 'REASON_OUT': reason,
-                'REGIME_FAMILY': 'no_regime',  # No regime layers in demo
+                'REGIME_FAMILY': 'no_regime',
                 'REGIME_MULTIPLIER': 1.0,
                 'MARKET_DIRECTION': 'no_direction',
                 'DIRECTION_MULTIPLIER': 1.0,
@@ -294,7 +372,7 @@ class DemoOperative:
                 'EXEC_TS_CLOSE': None,
                 'TP_TARGET': round(tp_target, 6),
                 'SL_TARGET': round(sl_target, 6),
-                'SIMULATED': 'YES'  # Flag to identify demo trades
+                'SIMULATED': 'YES'
             }
             
             # Append to Excel
@@ -306,30 +384,64 @@ class DemoOperative:
             
             df.to_excel(self.excel_path, index=False, engine='openpyxl')
             
-            logger.debug(f"[DEMO] Trade logged to Excel: {symbol} | {reason}")
-            
         except Exception as e:
             logger.error(f"[DEMO] Error logging to Excel: {e}")
             import traceback
             traceback.print_exc()
     
-    def get_open_positions_count(self) -> int:
+    
+    def _save_state_json(self) -> None:
         """
-        Get count of currently open simulated positions.
+        Save state to JSON file ONLY (bypass PostgreSQL).
         
-        Returns:
-            Number of open positions
+        Serializes self.open_positions and self.strategy_candles to JSON.
         """
-        return len(self.simulated_positions)
+        try:
+            if self.open_positions is None or self.strategy_candles is None:
+                return
+            
+            # Serialize datetime objects to ISO format
+            serializable_positions = {}
+            for strategy_id, positions in self.open_positions.items():
+                serializable_positions[strategy_id] = []
+                for pos in positions:
+                    pos_copy = pos.copy()
+                    if isinstance(pos_copy.get('opened_at'), datetime):
+                        pos_copy['opened_at'] = pos_copy['opened_at'].isoformat()
+                    serializable_positions[strategy_id].append(pos_copy)
+            
+            state_data = {
+                'open_positions': serializable_positions,  # ← CAMBIAR AQUÍ
+                'strategy_candles': self.strategy_candles,
+                'account': self.account_number,
+                'last_updated': datetime.now(HOUR_ZONE).isoformat()
+            }
+            
+            # Write to JSON
+            with open(self.json_path, 'w') as f:
+                json.dump(state_data, f, indent=2)
+            
+        except Exception as e:
+            logger.error(f"[DEMO] Error saving JSON state: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    
+    def get_open_positions_count(self) -> int:
+        """Get count of open simulated positions."""
+        if not self.open_positions:
+            return 0
+        
+        count = 0
+        for positions in self.open_positions.values():
+            count += len([p for p in positions if p.get('simulated', False)])
+        
+        return count
+    
     
     def get_positions_by_strategy(self, strategy_id: str) -> List[Dict]:
-        """
-        Get all open positions for a specific strategy.
+        """Get positions for strategy."""
+        if not self.open_positions or strategy_id not in self.open_positions:
+            return []
         
-        Args:
-            strategy_id: Strategy identifier
-        
-        Returns:
-            List of position dictionaries
-        """
-        return [p for p in self.simulated_positions if p['strategy'] == strategy_id]
+        return [p for p in self.open_positions[strategy_id] if p.get('simulated', False)]

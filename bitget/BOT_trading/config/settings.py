@@ -23,7 +23,7 @@ ACCOUNTS = {
         "description": "Elite Account"
     },
     "01": {
-        "initial_capital": 117,
+        "initial_capital": 12000,
         "dashboard_port": 5099,
         "description": "Testing Account"
     }

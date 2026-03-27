@@ -1,5 +1,5 @@
 """
-State Manager - Handles bot state persistence and broker synchronization.
+state/state_manager.py State Manager - Handles bot state persistence and broker synchronization.
 
 This module is responsible for:
 - Loading bot state from JSON file
@@ -40,26 +40,22 @@ class BotState:
         self.closed_total_profit = 0.0
         
 def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
-    """
-    Load bot state from PostgreSQL (primary) with JSON fallback.
+    """..."""
     
-    Args:
-        account_number: Account identifier ('00', 'E1', '01')
-        state_file: Path to JSON file (for fallback only)
-    
-    Returns:
-        Tuple of (OPEN_POSITIONS, STRATEGY_CANDLES)
-    """
+    from config.settings import DEMO_MODE_ACCOUNTS  # ← AÑADIR
     
     OPEN_POSITIONS = {}
     STRATEGY_CANDLES = {}
     
     logger.info(f"Loading state for account {account_number}...")
     
+    # Check if demo mode
+    is_demo = account_number in DEMO_MODE_ACCOUNTS  # ← AÑADIR
+    
     # ======================================================================
     # PRIMARY: Try PostgreSQL first
     # ======================================================================
-    if POSTGRES_ENABLED:
+    if POSTGRES_ENABLED and not is_demo:
         try:
             import psycopg2
             
@@ -184,8 +180,16 @@ def save_state_local(
     account_number: str,
     state_file: str
 ) -> None:
-
+    
+    from config.settings import DEMO_MODE_ACCOUNTS
     try:
+        
+        # Check if demo mode
+        is_demo = account_number in DEMO_MODE_ACCOUNTS      
+        # EARLY RETURN for demo (demo_operative handles persistence)
+        if is_demo:  # ← AÑADIR AQUÍ
+            logger.debug(f"[STATE] Skipping save_state_local for demo account {account_number}")
+            return
         # Deep copy to avoid modifying original
         positions_copy = copy.deepcopy(open_positions)
         strategy_candles_copy = copy.deepcopy(strategy_candles)
@@ -232,7 +236,7 @@ def save_state_local(
             logger.error(f"✗ JSON state save failed: {e}")
         
         # Write to PostgreSQL (dual-write backup)
-        if POSTGRES_ENABLED:
+        if POSTGRES_ENABLED and not is_demo:
             try:
                 import psycopg2
                 from psycopg2 import sql
@@ -304,6 +308,11 @@ def sync_broker(open_positions: Dict,
     """
     import time
     from alerts.telegram_notifier import send_sync_alert
+    from config.settings import DEMO_MODE_ACCOUNTS
+    
+    if account_number in DEMO_MODE_ACCOUNTS:  # ← AÑADIR
+        logger.debug(f"[SYNC] Skipping broker sync for demo account {account_number}")
+        return
     
     if not get_ws_manager():
         raise RuntimeError("WebSocket manager not init.")

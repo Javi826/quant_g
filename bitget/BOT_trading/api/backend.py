@@ -56,6 +56,20 @@ class DashboardServer:
         self.implemented_strategies = implemented_strategies or set()
         self.symbols_by_strategy = symbols_by_strategy or {}
         
+        # ========================================================================
+        # DEMO MODE DETECTION
+        # ========================================================================
+        from config.settings import DEMO_MODE_ACCOUNTS
+        self.is_demo = account_number in DEMO_MODE_ACCOUNTS
+        
+        if self.is_demo:
+            self.demo_state_path = os.path.join(base_dir, f'demo_state_{account_number}.json')
+            self.demo_trades_path = os.path.join(base_dir, f'bot_trades_{account_number}.xlsx')
+            logger.info(f"[DASHBOARD] Demo mode detected for account {account_number}")
+            logger.info(f"[DASHBOARD] State: {self.demo_state_path}")
+            logger.info(f"[DASHBOARD] Trades: {self.demo_trades_path}")
+        # ========================================================================
+        
         self.state_file = os.path.join(base_dir, f'bot_state_{account_number}.json')
         self.trades_file = os.path.join(base_dir, f'bot_trades_{account_number}.xlsx')
         self.log_file = os.path.join(base_dir, f'BOT_orchestator_{account_number}.log')
@@ -99,46 +113,67 @@ class DashboardServer:
             return 5
     
     def _load_trades_dataframe(self):
-            """
-            Load and validate trades DataFrame from PostgreSQL.
-            """
+        """
+        Load and validate trades DataFrame from PostgreSQL or Excel (demo mode).
+        """
+        # DEMO MODE: Read from Excel
+        if self.is_demo:
             try:
-                conn = psycopg2.connect(**self.postgres_config)
-                query = f"SELECT * FROM trades WHERE account = '{self.account_number}'"
-                df = pd.read_sql(query, conn)
-                conn.close()
+                if not os.path.exists(self.demo_trades_path):
+                    return None
+                
+                df = pd.read_excel(self.demo_trades_path)
                 
                 if df.empty:
                     return None
                 
-                # Rename columns to match Excel format (for compatibility)
-                df.rename(columns={
-                    'open_at': 'OPEN_AT',
-                    'close_at': 'CLOSE_AT',
-                    'duration_days': 'DURATION_DAYS',
-                    'strategy': 'STRATEGY',
-                    'symbol': 'SYMBOL',
-                    'direction': 'DIRECTION',
-                    'usdt_amount': 'USDT_AMOUNT',
-                    'size': 'SIZE',
-                    'price_entry': 'PRICE_ENTRY',
-                    'price_close': 'PRICE_CLOSE',
-                    'profit': 'PROFIT',
-                    'fee': 'FEE',
-                    'profit_pct': 'PROFIT_PCT',
-                    'reason_out': 'REASON_OUT',
-                    'regime_family': 'REGIME_FAMILY',
-                    'regime_multiplier': 'REGIME_MULTIPLIER',
-                    'market_direction': 'MARKET_DIRECTION',
-                    'direction_multiplier': 'DIRECTION_MULTIPLIER',
-                    'tp_target': 'TP_TARGET',      # ← AÑADIR
-                    'sl_target': 'SL_TARGET'
-                }, inplace=True)
+                # Excel columns are already in uppercase format
+                # No need to rename
                 
                 return df
+            
             except Exception as e:
-                logger.error(f"Error loading trades from PostgreSQL: {e}")
+                logger.error(f"Error loading trades from Excel (demo): {e}")
                 return None
+        
+        # LIVE MODE: Read from PostgreSQL (código actual sin cambios)
+        try:
+            conn = psycopg2.connect(**self.postgres_config)
+            query = f"SELECT * FROM trades WHERE account = '{self.account_number}'"
+            df = pd.read_sql(query, conn)
+            conn.close()
+            
+            if df.empty:
+                return None
+            
+            # Rename columns to match Excel format (for compatibility)
+            df.rename(columns={
+                'open_at': 'OPEN_AT',
+                'close_at': 'CLOSE_AT',
+                'duration_days': 'DURATION_DAYS',
+                'strategy': 'STRATEGY',
+                'symbol': 'SYMBOL',
+                'direction': 'DIRECTION',
+                'usdt_amount': 'USDT_AMOUNT',
+                'size': 'SIZE',
+                'price_entry': 'PRICE_ENTRY',
+                'price_close': 'PRICE_CLOSE',
+                'profit': 'PROFIT',
+                'fee': 'FEE',
+                'profit_pct': 'PROFIT_PCT',
+                'reason_out': 'REASON_OUT',
+                'regime_family': 'REGIME_FAMILY',
+                'regime_multiplier': 'REGIME_MULTIPLIER',
+                'market_direction': 'MARKET_DIRECTION',
+                'direction_multiplier': 'DIRECTION_MULTIPLIER',
+                'tp_target': 'TP_TARGET',
+                'sl_target': 'SL_TARGET'
+            }, inplace=True)
+            
+            return df
+        except Exception as e:
+            logger.error(f"Error loading trades from PostgreSQL: {e}")
+            return None
     
     def _prepare_trades_dataframe(self, df):
         """
@@ -189,33 +224,55 @@ class DashboardServer:
     
     
     def _load_state(self):
-            """
-            Load bot state from PostgreSQL.
-            
-            Returns:
-                Dictionary with 'positions' and 'strategy_candles'
-            """
+        """
+        Load bot state from PostgreSQL or JSON (demo mode).
+        
+        Returns:
+            Dictionary with 'positions' and 'strategy_candles'
+        """
+        # DEMO MODE: Read from JSON
+        if self.is_demo:
             try:
-                conn = psycopg2.connect(**self.postgres_config)
-                cursor = conn.cursor()
-                
-                cursor.execute(
-                    "SELECT state_data FROM bot_state WHERE account = %s",
-                    (self.account_number,)
-                )
-                
-                result = cursor.fetchone()
-                cursor.close()
-                conn.close()
-                
-                if result:
-                    return result[0]  # JSONB data
-                else:
+                if not os.path.exists(self.demo_state_path):
                     return {'positions': {}, 'strategy_candles': {}}
-                    
+                
+                with open(self.demo_state_path, 'r') as f:
+                    state = json.load(f)
+                
+                # JSON structure already matches expected format
+                # Keys: 'open_positions', 'strategy_candles'
+                # Rename to match PostgreSQL format
+                return {
+                    'positions': state.get('open_positions', {}),
+                    'strategy_candles': state.get('strategy_candles', {})
+                }
+            
             except Exception as e:
-                logger.error(f"Error loading state from PostgreSQL: {e}")
+                logger.error(f"Error loading state from JSON (demo): {e}")
                 return {'positions': {}, 'strategy_candles': {}}
+        
+        # LIVE MODE: Read from PostgreSQL (código actual sin cambios)
+        try:
+            conn = psycopg2.connect(**self.postgres_config)
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT state_data FROM bot_state WHERE account = %s",
+                (self.account_number,)
+            )
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if result:
+                return result[0]  # JSONB data
+            else:
+                return {'positions': {}, 'strategy_candles': {}}
+                
+        except Exception as e:
+            logger.error(f"Error loading state from PostgreSQL: {e}")
+            return {'positions': {}, 'strategy_candles': {}}
     
     @staticmethod
     def _extract_number_from_id(strategy_id):

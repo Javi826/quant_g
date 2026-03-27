@@ -159,6 +159,22 @@ class StrategyProcessor:
         )
         
         # ====================================================================
+        # DEMO MODE: Skip balance checks and use simulated orders
+        # ====================================================================
+        if hasattr(self, 'demo_operative') and self.demo_operative:
+            for sig in signals:
+                self.demo_operative.place_simulated_order(
+                    symbol=sig['symbol'],
+                    direction=strat['direction'],
+                    usdt_amount=order_amount,
+                    tp_pct=strat['tp_pct'],
+                    sl_pct=strat['sl_pct'],
+                    strategy_id=strat_id
+                )
+                time.sleep(0.05)
+            return  # Exit early, don't process real orders
+        
+        # ====================================================================
         # PROCESS ALL SIGNALS 
         # ====================================================================
         for sig in signals:
@@ -170,18 +186,6 @@ class StrategyProcessor:
                 logger.warning(
                     f"WAR-Insufficient balance ({usdt_balance:.2f} USDT) for {sig['symbol']} "
                     f"(needs {order_amount:.2f} USDT)"
-                )
-                continue
-            
-            # Demo mode intercept
-            if hasattr(self, 'demo_operative') and self.demo_operative:
-                self.demo_operative.place_simulated_order(
-                    symbol=sig['symbol'],
-                    direction=strat['direction'],
-                    usdt_amount=order_amount,
-                    tp_pct=strat['tp_pct'],
-                    sl_pct=strat['sl_pct'],
-                    strategy_id=strat_id
                 )
                 continue
             
