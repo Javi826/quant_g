@@ -21,12 +21,12 @@ PG_CONFIG = {
 
 # Accounts to compare
 ACCOUNTS = ['00', 'E1', '01']
-
-# JSON paths
+from pathlib import Path
+_BASE_DIR = Path(__file__).resolve().parent.parent
 JSON_PATHS = {
-    '00': 'persistence/bot_files_00/bot_state_00.json',
-    'E1': 'persistence/bot_files_E1/bot_state_E1.json',
-    '01': 'persistence/bot_files_01/bot_state_01.json'
+    '00': _BASE_DIR / 'persistence/bot_files_00/bot_state_00.json',
+    'E1': _BASE_DIR / 'persistence/bot_files_E1/bot_state_E1.json',
+    '01': _BASE_DIR / 'persistence/bot_files_01/bot_state_01.json'
 }
 
 

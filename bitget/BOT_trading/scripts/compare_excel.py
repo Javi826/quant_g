@@ -18,17 +18,18 @@ PG_CONFIG = {
     'host': 'localhost',
     'port': 5432
 }
-
+from pathlib import Path
 # Accounts to compare
 ACCOUNTS = ['00', 'E1', '01']
 
 # Excel paths
+# Excel paths
+_BASE_DIR = Path(__file__).resolve().parent.parent
 EXCEL_PATHS = {
-    '00': 'persistence/bot_files_00/bot_trades_00.xlsx',
-    'E1': 'persistence/bot_files_E1/bot_trades_E1.xlsx',
-    '01': 'persistence/bot_files_01/bot_trades_01.xlsx'
+    '00': _BASE_DIR / 'persistence/bot_files_00/bot_trades_00.xlsx',
+    'E1': _BASE_DIR / 'persistence/bot_files_E1/bot_trades_E1.xlsx',
+    '01': _BASE_DIR / 'persistence/bot_files_01/bot_trades_01.xlsx'
 }
-
 def compare_account(account):
     """Compare single account"""
     
