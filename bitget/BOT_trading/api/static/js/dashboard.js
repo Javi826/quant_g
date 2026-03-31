@@ -6,8 +6,8 @@ const COLORS = {
     purple: '#6d28d9',
     green: '#3fb950',
     healthy: '#58a6ff',
-    warning: '#f0883e',   // ← AÑADIR
-    danger: '#f85149',    // ← AÑADIR
+    warning: '#f0883e',   
+    danger: '#f85149',    
     yellow: '#d29922',
     red: '#f85149',
     textPrimary: '#c9d1d9',
@@ -1034,7 +1034,7 @@ function switchEquitySubTab(subTabName) {
 function getLogClass(line) {
     if (line.includes('TP for')) return 'tp-hit';
     if (line.includes('SL for')) return 'sl-hit';
-    // Check que NO sea SHORTS/LONGS (evitar false positives)
+    if (line.includes('TIMEOUT')) return 'info';
     if (!line.includes('SHORTS') && !line.includes('LONGS')) {
         if (line.includes('SHORT') || line.includes('LONG')) return 'info';
     }

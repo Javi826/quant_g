@@ -27,7 +27,7 @@ from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
 from config.settings import HOUR_ZONE
-
+from config.utils import get_account_config
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -45,7 +45,7 @@ class DashboardServer:
             get_balance_func: Función para obtener balance USDT
             initial_capital: Capital inicial de la cuenta
             implemented_strategies: Set de estrategias implementadas
-            symbols_by_strategy: Dict con símbolos por estrategia
+            symbols_by_strategy: Dict con símbolos por estrategiafrom config.utils import get_account_config
         """
         self.account_number = account_number
         self.base_dir = base_dir
@@ -59,8 +59,8 @@ class DashboardServer:
         # ========================================================================
         # DEMO MODE DETECTION
         # ========================================================================
-        from config.settings import DEMO_MODE_ACCOUNTS
-        self.is_demo = account_number in DEMO_MODE_ACCOUNTS
+
+        self.is_demo = get_account_config(account_number).get('type') == 'demo'
         
         if self.is_demo:
             self.demo_state_path = os.path.join(base_dir, f'demo_state_{account_number}.json')
@@ -2384,7 +2384,7 @@ class DashboardServer:
         schedule.every().day.at("23:55").do(self._capture_snapshot)
         
         # Only account 00 captures BTC (shared across all accounts)
-        if self.account_number == '00':
+        if self.account_number == 'E1':
             schedule.every().day.at("23:55").do(self._capture_btc_snapshot)
             logger.info("[SNAPSHOT] Scheduler started - captures exposure + BTC daily at 23:55 UTC")
         else:

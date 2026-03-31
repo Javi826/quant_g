@@ -30,10 +30,7 @@ from validation import validate_strategy_configuration,validate_settings,validat
 from state.state_manager import BotState
 from api.backend import DashboardServer, create_dashboard_template
 
-from execution import configure_paths, get_current_price, check_tp_sl_for_strategy
-from execution import check_all_tp_sl, get_usdt_balance_ws, BitgetClient
-
-from state import load_state, save_state_local, sync_broker
+from execution import configure_paths, get_current_price, check_tp_sl_for_strategy, get_usdt_balance_ws, BitgetClient
 from state import increment_strategy_candles, check_candles_timeout_for_strategy
 
 from bot_utils import calculate_next_candle_time, group_strategies_by_timeframe
@@ -46,6 +43,8 @@ from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,
 from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
 from config.settings import LEVERAGE
 from core.split_brain_checker import check_split_brain
+from state.state_manager import BotState, configure_postgres as sm_configure_postgres
+from execution.trade_logger import configure_postgres as tl_configure_postgres
 
 class BotOrchestrator:
     """
@@ -94,6 +93,11 @@ class BotOrchestrator:
         self.state_file      = self.config['paths']['state_file']
         self.trades_log_path = self.config['paths']['trades_file']
         self.log_file_path   = self.config['paths']['log_file']
+        # Account feature flags
+        self.operative = None
+        self.account_flags = self.config
+        sm_configure_postgres(self.account_number)
+        tl_configure_postgres(self.account_number)
         
         # API clients
         self.bitget_client = bitget_client
@@ -187,15 +191,14 @@ class BotOrchestrator:
         self._initialized = True
         self.logger.info("BOT Initialization completed\n")
         
-        # Link demo_operative
-        if hasattr(self, 'demo_operative') and self.demo_operative:
-            self.demo_operative.ws_manager = self.ws_manager
-            self.demo_operative.strategy_configs = {s['id']: s for s in self.strategies}
-            
-            # NEW: Inject state references
-            self.demo_operative.open_positions = self.open_positions
-            self.demo_operative.strategy_candles = self.strategy_candles
-            self.demo_operative.state_file = self.state_file
+        # Attach operative references after initialization
+        self.operative.attach(
+            open_positions=self.open_positions,
+            strategy_candles=self.strategy_candles,
+            strategies=self.strategies
+        )
+        # Update bot_state reference in operative
+        self.operative.bot_state = self.bot_state
         
     def shutdown(self) -> None:
         """
@@ -205,7 +208,7 @@ class BotOrchestrator:
         """
         self._running = False
         try:
-           save_state_local(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
+           self.operative.save_state()
         except Exception as e:
             self.logger.error(f"CRITICAL ERROR saving state during shutdown")
             self.logger.error(f"Account: {self.account_number}, Positions: {sum(len(p) for p in self.open_positions.values())}")
@@ -258,46 +261,7 @@ class BotOrchestrator:
     # ======================================================================
     # INITIALIZATION METHODS (Private)
     # ======================================================================
-    #demo
-    def _load_demo_state(self) -> tuple:
-        """Load state from demo JSON file."""
-        import json
-        from datetime import datetime
-        
-        json_path = os.path.join(
-            self.base_dir, 
-            f'demo_state_{self.account_number}.json'
-        )
-        
-        self.logger.info(f"[DEMO DEBUG] Attempting to load: {json_path}")
-        self.logger.info(f"[DEMO DEBUG] File exists: {os.path.exists(json_path)}")
-        
-        if not os.path.exists(json_path):
-            self.logger.warning(f"[DEMO DEBUG] File does not exist! Returning empty state")
-            return {}, {}
-        
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-        
-        self.logger.info(f"[DEMO DEBUG] JSON loaded - strategies in data: {list(data.get('open_positions', {}).keys())}")  # ← CAMBIAR
-        
-        # Deserialize datetime strings
-        positions = {}
-        for strategy_id, pos_list in data.get('open_positions', {}).items():  # ← CAMBIAR AQUÍ
-            positions[strategy_id] = []
-            for pos in pos_list:
-                pos_copy = pos.copy()
-                if isinstance(pos_copy.get('opened_at'), str):
-                    pos_copy['opened_at'] = datetime.fromisoformat(pos_copy['opened_at'])
-                positions[strategy_id].append(pos_copy)
-            
-            self.logger.info(f"[DEMO DEBUG] Loaded {strategy_id}: {len(positions[strategy_id])} positions")
-        
-        total = sum(len(p) for p in positions.values())
-        self.logger.info(f"[DEMO DEBUG] Total positions to return: {total}")
-        
-        return positions, data.get('strategy_candles', {})
-    
+   
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
         os.makedirs(self.base_dir, exist_ok=True)
@@ -307,24 +271,8 @@ class BotOrchestrator:
         )
     
     def _load_bot_state(self) -> None:
-        """Load bot state from disk and initialize BotState."""
-        
-        from config.settings import DEMO_MODE_ACCOUNTS  # ← AÑADIR
-        
-        # Check if demo mode by account number
-        is_demo = self.account_number in DEMO_MODE_ACCOUNTS  # ← CAMBIAR
-        
-        if is_demo:  # ← CAMBIAR
-            # Load from demo JSON instead of PostgreSQL/bot_state
-            self.open_positions, self.strategy_candles = self._load_demo_state()
-            self.logger.info(f"[DEMO] Loaded {sum(len(p) for p in self.open_positions.values())} positions from demo_state_{self.account_number}.json")
-        else:
-            # Normal load (PostgreSQL + bot_state JSON)
-            self.open_positions, self.strategy_candles = load_state(
-                self.account_number,
-                self.state_file
-            )
-        
+        self.open_positions, self.strategy_candles = self.operative.load_state()
+    
         self.bot_state = BotState()
         if os.path.exists(self.trades_log_path):
             import pandas as pd
@@ -346,7 +294,8 @@ class BotOrchestrator:
         self.logger.info(f"Validating configuration...")
         self.logger.info(f"{'-' * 48}")
         
-        validate_postgresql_connection()
+        if self.account_flags.get('postgresql_enabled', True):
+            validate_postgresql_connection()
         
         all_errors   = []
         all_warnings = []
@@ -421,9 +370,8 @@ class BotOrchestrator:
             state_file=self.state_file,
             use_hardcoded=USE_HARDCODED_SIGNALS
         )
-        # Pass demo_operative 
-        if hasattr(self, 'demo_operative'):
-            self.strategy_processor.demo_operative = self.demo_operative
+
+        self.strategy_processor.operative = self.operative
     
     def _start_dashboard(self) -> None:
         """Start the web dashboard."""
@@ -566,15 +514,17 @@ class BotOrchestrator:
         # ========================================================================
         # BROKER SYNC: Load latest positions from exchange
         # ========================================================================
-        sync_broker(self.open_positions, self.strategy_candles, self.account_number, self.state_file)
+        self.operative.sync_broker()
         
         # LAYER 0: BTC 1D filter (once per cycle)
-        self._update_btc_1d_filter()  # ← NUEVO
+        if self.account_flags.get('regime0_enabled', True):
+            self._update_btc_1d_filter()
         
         # ========================================================================
         # REGIME UPDATE: Calculate market regime & direction for closed timeframes
         # ========================================================================
-        self._update_regime_for_timeframes(closed_timeframes)
+        if self.account_flags.get('regime1_enabled', True):
+            self._update_regime_for_timeframes(closed_timeframes)
         
         now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
         self.logger.info(f"Searching Signals... - {now}")
@@ -619,36 +569,29 @@ class BotOrchestrator:
             )
             
             if has_positions:
-                increment_strategy_candles(
-                    strat_id,
-                    self.strategy_candles,
-                    self.open_positions,
-                    self.account_number,
-                    self.state_file
-                )
-                    
+                self.operative.increment_candles(strat_id)
+            
                 candles       = self.strategy_candles.get(strat_id, 0)
                 num_positions = len(self.open_positions.get(strat_id, []))
-
-                
+            
                 self.logger.info(
                     f"Skip {strat_id:<23} {candles:>2}/"
                     f"{strat['sell_after_ncandles']:<2} | {num_positions:>2} pos."
                 )
-                
-                check_candles_timeout_for_strategy(
-                    strat_id,
-                    strat['sell_after_ncandles'],
-                    self.open_positions,
-                    self.strategy_candles,
-                    self.account_number,
-                    self.state_file,
-                    self._send_request_wrapper,
-                    bot_state=self.bot_state
-                )
-            # Demo candles (OUTSIDE the if block - same indentation as 'if has_positions:')
-            if hasattr(self, 'demo_operative') and self.demo_operative:
-                self.demo_operative.increment_candles(strat_id)
+            
+                if self.account_flags.get('postgresql_enabled', True):
+                    check_candles_timeout_for_strategy(
+                        strat_id,
+                        strat['sell_after_ncandles'],
+                        self.open_positions,
+                        self.strategy_candles,
+                        self.account_number,
+                        self.state_file,
+                        self._send_request_wrapper,
+                        bot_state=self.bot_state
+                    )
+                else:
+                    self.operative.monitor_exits()
     
     def _search_signals(self, strategies_to_process: List[Dict]) -> None:
             """
@@ -671,85 +614,64 @@ class BotOrchestrator:
                 if num_positions > 0:
                     continue
                 
-                # ========================================================================
-                # RISK CHECK: Skip if already at/above exposure limit
-                # ========================================================================
-                current_exposure = self.exposure_calculator.calculate_current_exposure(
-                    open_positions=self.open_positions,
-                    closed_pnl=self.bot_state.closed_total_profit if self.bot_state else 0,
-                    initial_capital=self.initial_capital,
-                    leverage=LEVERAGE
-                )
-                
-                blocked, reason, risk_metadata = self.risk_limiter.is_at_limit(
-                    current_gross_pct=current_exposure['gross_exposure_pct']
-                )
-                
-                # Check if blocked
-                if blocked:
-                    log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
-                    self.logger.info(log_msg)
-                    continue
-                
-                # Log risk decision (not blocked)
-                log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
-                self.logger.info(log_msg)
-                
-                # ========================================================================
-                # DEMO MODE: Skip regime layers for demo accounts
-                # ========================================================================
-                if hasattr(self, 'demo_operative') and self.demo_operative:
-                    try:
-                        self.strategy_processor.process(
-                            strat=strat,
-                            final_symbols=self.final_by_strat.get(strat['id'], []),
-                            exchange=self.exchange,
-                            open_positions=self.open_positions,
-                            strategy_candles=self.strategy_candles,
-                            adjusted_order_amount=strat['order_amount'],
-                            regime_family='no_regime',
-                            regime_multiplier=1.0,
-                            direction='no_direction',
-                            direction_multiplier=1.0
-                        )
-                    except Exception as e:
-                        self.logger.error(f"Error processing demo strategy {strat_id}: {e}")
-                    continue  # Skip to next strategy
-                # ========================================================================
-                # REGIME LAYER 0: Calculate adjusted order amount
-                # ========================================================================
-                direction = strat['direction']
-                if not self.btc_1d_cache.get(direction, True):
-                    # Log already printed by get_btc_1d_filter()
-                    continue
-                
-                # ========================================================================
-                # REGIME SIZING: Calculate adjusted order amount
-                # ========================================================================
-                timeframe = strat['timeframe']
-                market_regime = self.regime_cache.get(timeframe, 'ranging')
-                market_direction = self.direction_cache.get(timeframe, 'uptrend')
-                
-                # Calculate adjusted amount using PositionSizer
-                adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
-                    base_amount=strat['order_amount'],
-                    regime_trending=strat.get('regime_trending', 1.0),
-                    regime_ranging=strat.get('regime_ranging', 1.0),
-                    regime_volatile=strat.get('regime_volatile', 1.0),
-                    direction_mode=strat.get('direction_mode', 'general'),
-                    market_regime=market_regime,
-                    market_direction=market_direction
-                )
-                
-                # Check if blocked
-                if metadata['blocked']:
+                # ====================================================================
+                # REGIME LAYER 0
+                # ====================================================================
+                if self.account_flags.get('regime0_enabled', True):
+                    direction = strat['direction']
+                    if not self.btc_1d_cache.get(direction, True):
+                        continue
+
+                # ====================================================================
+                # REGIME LAYER 1
+                # ====================================================================
+                if self.account_flags.get('regime1_enabled', True):
+                    timeframe        = strat['timeframe']
+                    market_regime    = self.regime_cache.get(timeframe, 'ranging')
+                    market_direction = self.direction_cache.get(timeframe, 'uptrend')
+                    adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
+                        base_amount=strat['order_amount'],
+                        regime_trending=strat.get('regime_trending', 1.0),
+                        regime_ranging=strat.get('regime_ranging', 1.0),
+                        regime_volatile=strat.get('regime_volatile', 1.0),
+                        direction_mode=strat.get('direction_mode', 'general'),
+                        market_regime=market_regime,
+                        market_direction=market_direction
+                    )
+                    if metadata['blocked']:
+                        log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                        self.logger.info(log_msg)
+                        continue
                     log_msg = self.position_sizer.format_log_message(strat_id, metadata)
                     self.logger.info(log_msg)
-                    continue
-                               
-                # Log sizing decision (not blocked)
-                log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                self.logger.info(log_msg)
+                else:
+                    adjusted_amount = strat['order_amount']
+                    metadata = {
+                        'market_regime': 'no_regime',
+                        'regime_multiplier': 1.0,
+                        'market_direction': 'no_direction',
+                        'direction_multiplier': 1.0
+                    }
+                    
+                # ====================================================================
+                # RISK CHECK
+                # ====================================================================
+                if self.account_flags.get('risk_control_enabled', True):
+                    current_exposure = self.exposure_calculator.calculate_current_exposure(
+                        open_positions=self.open_positions,
+                        closed_pnl=self.bot_state.closed_total_profit if self.bot_state else 0,
+                        initial_capital=self.initial_capital,
+                        leverage=LEVERAGE
+                    )
+                    blocked, reason, risk_metadata = self.risk_limiter.is_at_limit(
+                        current_gross_pct=current_exposure['gross_exposure_pct']
+                    )
+                    if blocked:
+                        log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
+                        self.logger.info(log_msg)
+                        continue
+                    log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
+                    self.logger.info(log_msg)
                 
                 # ========================================================================
                 # SIGNAL PROCESSING: Execute strategy with retry logic
@@ -838,25 +760,7 @@ class BotOrchestrator:
             current_time: Current timestamp
         """
         if current_time - self.last_tpsl_check >= CHECK_INTERVAL:
-            # ============================================================
-            # DEMO MODE: Use demo_operative for monitoring (exclusive)
-            # LIVE MODE: Use production check_all_tp_sl (exclusive)
-            # ============================================================
-            if hasattr(self, 'demo_operative') and self.demo_operative:
-                # DEMO: Monitor via demo_operative (no broker calls)
-                self.demo_operative.monitor_exits(self.strategy_candles)
-            else:
-                # LIVE: Monitor via production system (broker calls)
-                check_all_tp_sl(
-                    self.strategies,
-                    self.open_positions,
-                    self.strategy_candles,
-                    self.account_number,
-                    self.state_file,
-                    self._send_request_wrapper,
-                    check_tp_sl_for_strategy,
-                    bot_state=self.bot_state
-                )
+            self.operative.monitor_exits()
             
             self.last_tpsl_check = current_time
     

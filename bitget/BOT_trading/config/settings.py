@@ -6,29 +6,44 @@ validation limits, paths, and account-specific settings.
 """
 
 from zoneinfo import ZoneInfo
-DEMO_MODE_ACCOUNTS = ['01']
+
 # ==========================================================================
 # ACCOUNT-SPECIFIC SETTINGS
 # ==========================================================================
 
 ACCOUNTS = {
-    "00": {
-        "initial_capital": 6000,
-        "dashboard_port": 5000,
-        "description": "Main Account"
-    },
     "E1": {
-        "initial_capital": 24000,
+        "initial_capital": 30000,
         "dashboard_port": 5001,
-        "description": "Elite Account"
+        "description": "Elite Account",
+        "type": "production",
+        "regime0_enabled": True,
+        "regime1_enabled": True,
+        "risk_control_enabled": True,
+        "postgresql_enabled": True,
+    },
+    "00": {
+        "initial_capital": 12000,
+        "dashboard_port": 5000,
+        "description": "Main Account",
+        "type": "demo",
+        "regime0_enabled": False,
+        "regime1_enabled": False,
+        "risk_control_enabled": False,
+        "postgresql_enabled": False,
     },
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,
-        "description": "Testing Account"
+        "description": "Testing Account",
+        "type": "demo",
+        "regime0_enabled": False,
+        "regime1_enabled": False,
+        "risk_control_enabled": False,
+        "postgresql_enabled": False,
     }
 }
-
+COMMISSION_PCT = 0.1
 # ==========================================================================
 # MARKET REGIME SETTINGS
 # ==========================================================================
@@ -132,8 +147,8 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 35
-MAX_ORDER_AMOUNT = 180
+MIN_ORDER_AMOUNT = 80
+MAX_ORDER_AMOUNT = 201
 
 # TP/SL limits (%)
 MIN_TP_PCT = 1.5

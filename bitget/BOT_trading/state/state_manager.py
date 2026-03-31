@@ -31,7 +31,14 @@ logger = logging.getLogger('BOT_trading.execution.state_manager')
 # ==========================================================================
 # POSTGRESQL CONFIGURATION (DUAL-WRITE)
 # ==========================================================================
-POSTGRES_ENABLED = True
+from config.settings import ACCOUNTS
+
+POSTGRES_ENABLED = True  # default, overridden at runtime by configure_postgres()
+
+def configure_postgres(account_number: str) -> None:
+    global POSTGRES_ENABLED
+    POSTGRES_ENABLED = ACCOUNTS.get(account_number, {}).get('postgresql_enabled', True)
+
 # ==========================================================================
 # STATE PERSISTENCE
 # ==========================================================================
@@ -41,21 +48,17 @@ class BotState:
         
 def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
     """..."""
-    
-    from config.settings import DEMO_MODE_ACCOUNTS  # ← AÑADIR
-    
+        
     OPEN_POSITIONS = {}
     STRATEGY_CANDLES = {}
     
     logger.info(f"Loading state for account {account_number}...")
     
-    # Check if demo mode
-    is_demo = account_number in DEMO_MODE_ACCOUNTS  # ← AÑADIR
     
     # ======================================================================
     # PRIMARY: Try PostgreSQL first
     # ======================================================================
-    if POSTGRES_ENABLED and not is_demo:
+    if POSTGRES_ENABLED:
         try:
             import psycopg2
             
@@ -181,15 +184,7 @@ def save_state_local(
     state_file: str
 ) -> None:
     
-    from config.settings import DEMO_MODE_ACCOUNTS
     try:
-        
-        # Check if demo mode
-        is_demo = account_number in DEMO_MODE_ACCOUNTS      
-        # EARLY RETURN for demo (demo_operative handles persistence)
-        if is_demo:  # ← AÑADIR AQUÍ
-            logger.debug(f"[STATE] Skipping save_state_local for demo account {account_number}")
-            return
         # Deep copy to avoid modifying original
         positions_copy = copy.deepcopy(open_positions)
         strategy_candles_copy = copy.deepcopy(strategy_candles)
@@ -236,7 +231,7 @@ def save_state_local(
             logger.error(f"✗ JSON state save failed: {e}")
         
         # Write to PostgreSQL (dual-write backup)
-        if POSTGRES_ENABLED and not is_demo:
+        if POSTGRES_ENABLED:
             try:
                 import psycopg2
                 from psycopg2 import sql
@@ -308,11 +303,7 @@ def sync_broker(open_positions: Dict,
     """
     import time
     from alerts.telegram_notifier import send_sync_alert
-    from config.settings import DEMO_MODE_ACCOUNTS
-    
-    if account_number in DEMO_MODE_ACCOUNTS:  # ← AÑADIR
-        logger.debug(f"[SYNC] Skipping broker sync for demo account {account_number}")
-        return
+
     
     if not get_ws_manager():
         raise RuntimeError("WebSocket manager not init.")

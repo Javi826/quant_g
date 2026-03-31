@@ -25,7 +25,9 @@ from config.connect_pass import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_
 from config.connect_pass import connect_bitget_00, connect_bitget_01, connect_bitget_E1
 
 from core.demo_operative import DemoOperative
-from config.settings import DEMO_MODE_ACCOUNTS
+from core.production_operative import ProductionOperative
+
+
 
 def main():
     """Main entry point."""
@@ -77,21 +79,29 @@ def main():
     active_strategy_ids = None
     if args.set_active:
         active_strategy_ids = [s.strip() for s in args.set_active.split(',')]
-    # Create and run bot
+
+    # Create bot
     bot = BotOrchestrator(
         account_number=account_number,
         bitget_client=BITGET_CLIENTS[account_number],
         connect_bitget_func=CCXT_CONNECTIONS[account_number],
         active_strategy_ids=active_strategy_ids
     )
-    # Inject demo_operative if demo mode
-    if account_number in DEMO_MODE_ACCOUNTS:
-        account_config = get_account_config(account_number)
-        bot.demo_operative = DemoOperative(
+
+    # Assign operative mode — single decision point
+    if account_config.get('type') == 'demo':
+        bot.operative = DemoOperative(
             account_number=account_number,
             ws_manager=None,
             excel_path=account_config['paths']['trades_file'],
             strategy_configs=[]
+        )
+    else:
+        bot.operative = ProductionOperative(
+            account_number=account_number,
+            state_file=account_config['paths']['state_file'],
+            send_request_func=bot._send_request_wrapper,
+            bot_state=None
         )
 
     bot.run()

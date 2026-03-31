@@ -31,7 +31,13 @@ from config.settings import HOUR_ZONE
 TRADES_LOG_PATH = None
 
 # PostgreSQL configuration (dual-write)
-POSTGRES_ENABLED = True
+from config.settings import ACCOUNTS
+
+POSTGRES_ENABLED = True  # default, overridden at runtime by configure_postgres()
+
+def configure_postgres(account_number: str) -> None:
+    global POSTGRES_ENABLED
+    POSTGRES_ENABLED = ACCOUNTS.get(account_number, {}).get('postgresql_enabled', True)
 
 # =============================================================================
 # CONFIGURATION FUNCTIONS
