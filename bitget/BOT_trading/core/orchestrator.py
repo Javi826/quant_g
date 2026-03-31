@@ -27,11 +27,10 @@ from risk_control import RiskLimiter, ExposureCalculator
 
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
 
-from state.state_manager import BotState
 from api.backend import DashboardServer, create_dashboard_template
 
-from execution import configure_paths, get_current_price, check_tp_sl_for_strategy, get_usdt_balance_ws, BitgetClient
-from state import increment_strategy_candles, check_candles_timeout_for_strategy
+from execution import configure_paths, get_current_price, get_usdt_balance_ws, BitgetClient
+from state import  check_candles_timeout_for_strategy
 
 from bot_utils import calculate_next_candle_time, group_strategies_by_timeframe
 from bot_utils import get_unique_timeframes
@@ -40,10 +39,9 @@ from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
 from config.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
-from config.settings import REGIME_GENERAL, DIRECTION_MATRIX, DIRECTION_GENERAL
 from config.settings import LEVERAGE
 from core.split_brain_checker import check_split_brain
-from state.state_manager import BotState, configure_postgres as sm_configure_postgres
+from state.state_manager import BotState, configure_postgres as sm_configure_postgres, configure_demo as sm_configure_demo
 from execution.trade_logger import configure_postgres as tl_configure_postgres
 
 class BotOrchestrator:
@@ -97,6 +95,7 @@ class BotOrchestrator:
         self.operative = None
         self.account_flags = self.config
         sm_configure_postgres(self.account_number)
+        sm_configure_demo(self.account_number)
         tl_configure_postgres(self.account_number)
         
         # API clients

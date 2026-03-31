@@ -38,7 +38,12 @@ POSTGRES_ENABLED = True  # default, overridden at runtime by configure_postgres(
 def configure_postgres(account_number: str) -> None:
     global POSTGRES_ENABLED
     POSTGRES_ENABLED = ACCOUNTS.get(account_number, {}).get('postgresql_enabled', True)
+    
+IS_DEMO = False  # default, overridden at runtime by configure_demo()
 
+def configure_demo(account_number: str) -> None:
+    global IS_DEMO
+    IS_DEMO = ACCOUNTS.get(account_number, {}).get('type') == 'demo'
 # ==========================================================================
 # STATE PERSISTENCE
 # ==========================================================================
@@ -183,6 +188,9 @@ def save_state_local(
     account_number: str,
     state_file: str
 ) -> None:
+    
+    if IS_DEMO:
+        return
     
     try:
         # Deep copy to avoid modifying original
