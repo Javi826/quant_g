@@ -2,7 +2,7 @@
 config/settings.pyBot Configuration Settings
 
 Centralizes all bot configuration including exchange settings,
-validation limits, paths, and account-specific settings.
+validation limits, paths, and account-specific settings.f
 """
 
 from zoneinfo import ZoneInfo
