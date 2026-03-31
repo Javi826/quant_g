@@ -27,7 +27,7 @@ from glob import glob
 TRADES_FOLDER = '/home/javi/projects/quant/quant_g/bitget/development/brief_trades'
 BTC_FILE = '/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet'
 MA_PERIOD = 5  # Options: 5, 10, 20, 50, 200
-LONG_TH = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
+LONG_TH = 1.02  # Threshold for LONG: BTC > MA * LONG_TH
 SHORT_TH = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
 INITIAL_CAPITAL = 800
 

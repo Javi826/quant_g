@@ -20,7 +20,7 @@ from signals.add_signals_flag import flag_short
 start_time   = time.time()
 SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
-STRATEGY     = "flag_short_1H_OOS"
+STRATEGY     = "flag_short_1H_OOSx"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
