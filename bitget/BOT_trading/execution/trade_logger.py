@@ -110,8 +110,8 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
         
         cursor.execute(insert_query, {
             'account': account,
-            'open_at': opened_at_dt,
-            'close_at': closed_at,
+            'open_at': opened_at_dt.replace(tzinfo=None),
+            'close_at': closed_at.replace(tzinfo=None),
             'duration_days': round(delta_days, 4),
             'strategy': strategy_id,
             'symbol': symbol,

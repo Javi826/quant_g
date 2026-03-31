@@ -2834,6 +2834,7 @@ async function loadData() {
         const tradesRes = await fetch('/api/trades/recent');
         if (!tradesRes.ok) throw new Error('HTTP ' + tradesRes.status);
         const trades = await tradesRes.json();
+
         
         requestAnimationFrame(() => {
             const tradesBody = document.getElementById('trades-body');
@@ -2851,7 +2852,7 @@ async function loadData() {
                         reasonBadge = '<span class="badge badge-timeout">TIMEOUT</span>';
                     }
                     return '<tr>' +
-                        '<td>' + new Date(trade.CLOSE_AT).toISOString().replace('T', ' ').substring(0, 19) + '</td>' +
+                        '<td>' + trade.CLOSE_AT + '</td>' +
                         '<td>' + trade.STRATEGY + '</td>' +
                         '<td>' + trade.SYMBOL + '</td>' +
                         '<td class="direction-' + trade.DIRECTION.toLowerCase() + '">' + trade.DIRECTION + '</td>' +
@@ -3714,7 +3715,8 @@ async function loadRiskHistoryChart() {
                         borderDash: [5, 5],
                         pointRadius: 0,
                         tension: 0.1,
-                        yAxisID: 'y2'
+                        yAxisID: 'y2',
+                        spanGaps: true
                     }
                 ]
             },

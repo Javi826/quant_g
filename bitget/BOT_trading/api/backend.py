@@ -126,10 +126,7 @@ class DashboardServer:
                 
                 if df.empty:
                     return None
-                
-                # Excel columns are already in uppercase format
-                # No need to rename
-                
+                                
                 return df
             
             except Exception as e:
@@ -169,6 +166,10 @@ class DashboardServer:
                 'tp_target': 'TP_TARGET',
                 'sl_target': 'SL_TARGET'
             }, inplace=True)
+            # Force UTC to avoid local timezone conversion
+            for col in ['OPEN_AT', 'CLOSE_AT']:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], utc=True).dt.strftime('%Y-%m-%d %H:%M:%S')
             
             return df
         except Exception as e:
@@ -2364,7 +2365,7 @@ class DashboardServer:
             if response.ok:
                 data = response.json()
                 if data.get('success'):
-                    logger.info(f"[BTC SNAPSHOT] ✓ Daily BTC price captured: ${data.get('price')}")
+                    logger.info(f"[BTC SNAPSHOT] Daily BTC price captured: ${data.get('price')}")
                 else:
                     logger.warning(f"[BTC SNAPSHOT] Endpoint returned error: {data.get('error')}")
             else:
