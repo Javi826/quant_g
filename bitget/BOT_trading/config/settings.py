@@ -2,7 +2,7 @@
 config/settings.pyBot Configuration Settings
 
 Centralizes all bot configuration including exchange settings,
-validation limits, paths, and account-specific settings.f
+validation limits, paths, and account-specific settings.
 """
 
 from zoneinfo import ZoneInfo
@@ -97,8 +97,8 @@ DIRECTION_GENERAL = {
 # RISK CONTROL SETTINGS
 # ==========================================================================
 RISK_LIMITS = {
-    'max_gross_exposure_pct': 50.0,  
-    'max_net_exposure_pct': 20.0     
+    'max_gross_exposure_pct': 10.0,  
+    'max_net_exposure_pct': 10.0     
 }
 LEVERAGE = 10
 

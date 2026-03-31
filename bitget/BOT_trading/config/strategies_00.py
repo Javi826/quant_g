@@ -98,7 +98,7 @@ STRATEGIES = [
         'lookback': 5,
         'tolerance': 30,
         'ma_period': 50,
-        'tp_pct': 1.9,
+        'tp_pct': 2.0,
         'sl_pct': 5
     },
     {
