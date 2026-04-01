@@ -930,6 +930,80 @@ class DashboardServer:
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
+            
+        @self.app.route('/api/weekly-analysis')
+        def get_weekly_analysis():
+            try:
+                strategies_param = request.args.get('strategies', '')
+                selected_strategies = [s.strip() for s in strategies_param.split(',') if s.strip()]
+
+                if not selected_strategies:
+                    return jsonify({'error': 'No strategies selected'}), 400
+
+                date_from = request.args.get('date_from', '')
+                date_to   = request.args.get('date_to', '')
+
+                df = self._load_trades_dataframe()
+                if df is None:
+                    return jsonify([])
+
+                df = self._prepare_trades_dataframe(df)
+                df = df[df['STRATEGY'].isin(selected_strategies)]
+
+                if date_from:
+                    df = df[df['CLOSE_AT'] >= pd.to_datetime(date_from)]
+                if date_to:
+                    df = df[df['CLOSE_AT'] <= pd.to_datetime(date_to) + pd.Timedelta(days=1)]
+
+                if df.empty:
+                    return jsonify([])
+
+                strategies_with_trades = df['STRATEGY'].unique()
+                num_strategies_with_trades = len(strategies_with_trades)
+                capital_per_strat = self._calculate_capital_allocation(num_strategies_with_trades)
+                capital_assigned  = capital_per_strat * num_strategies_with_trades
+
+                # Group by ISO week (Monday–Sunday)
+                df['week'] = df['CLOSE_AT'].dt.to_period('W')
+
+                results = []
+
+                for week in sorted(df['week'].unique()):
+                    df_week = df[df['week'] == week]
+
+                    num_trades     = len(df_week)
+                    total_profit   = df_week['PROFIT'].sum()
+                    profit_pct     = (total_profit / capital_assigned * 100) if capital_assigned > 0 else 0
+
+                    positive_trades = len(df_week[df_week['PROFIT'] > 0])
+                    win_rate        = (positive_trades / num_trades * 100) if num_trades > 0 else 0
+
+                    # Actual date boundaries (handles partial first/last weeks)
+                    actual_start = df_week['CLOSE_AT'].min()
+                    actual_end   = df_week['CLOSE_AT'].max()
+
+                    week_start = week.start_time  # Monday of that ISO week
+                    week_end   = week.end_time    # Sunday of that ISO week
+                    is_partial = (actual_start.date() > week_start.date()) or \
+                                 (actual_end.date()   < week_end.date())
+
+                    results.append({
+                        'week':         str(week),
+                        'week_label':   f"{actual_start.strftime('%d %b')} – {actual_end.strftime('%d %b %Y')}",
+                        'num_trades':   num_trades,
+                        'profit_usd':   round(float(total_profit), 2),
+                        'profit_pct':   round(float(profit_pct), 2),
+                        'win_rate':     round(float(win_rate), 1),
+                        'is_partial':   is_partial
+                    })
+
+                return jsonify(results)
+
+            except Exception as e:
+                logger.error(f"Error in weekly analysis: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({'error': str(e)}), 500
         
         @self.app.route('/api/monthly-analysis')
         def get_monthly_analysis():

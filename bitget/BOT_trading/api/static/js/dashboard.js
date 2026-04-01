@@ -1017,7 +1017,7 @@ function switchEquitySubTab(subTabName) {
     
     if (subTabName === 'symbols') loadSymbolsAnalysis();
     if (subTabName === 'weekday') loadWeekDayAnalysis();
-    if (subTabName === 'monthly') initMonthlyTab();
+    if (subTabName === 'period') initPeriodTab();
     if (subTabName === 'correlation') initCorrelationTab();
     if (subTabName === 'regime') loadRegimeAnalytics();
     if (subTabName === 'compose') {
@@ -1598,6 +1598,7 @@ async function initStrategyCheckboxes(containerId, checkboxPrefix, allCheckboxId
     // Clear and re-add ALL checkbox
     checkboxContainer.innerHTML = '';
     checkboxContainer.appendChild(allCheckbox);
+    allCheckbox.style.gridColumn = '1 / -1';
     
     // Create checkbox for each strategy
     strategies.forEach((strat) => {
@@ -1681,18 +1682,6 @@ async function loadEquityTab() {
     }
 }
 
-async function initMonthlyTab() {
-    try {
-        allStrategiesList = await initStrategyCheckboxes(
-            'monthly-strategy-checkboxes',
-            'monthly-strat-',
-            'monthly-strat-all'
-        );
-        
-    } catch (error) {
-        console.error('Error initializing monthly tab:', error);
-    }
-}
 
 async function loadMonthlyAnalysis() {
     try {
@@ -3930,6 +3919,259 @@ async function updateWinRateChart() {
         alert('Error loading win rate chart: ' + error.message);
     }
 }
+// =============================================================================
+// PERIOD ANALYSIS — Monthly & Weekly subtabs
+// =============================================================================
+
+let monthlyPeriodChart = null;
+let weeklyPeriodChart  = null;
+
+// --- Inner tab switching ---
+
+function switchPeriodInnerTab(tab) {
+    document.getElementById('period-inner-monthly').style.display = tab === 'monthly' ? '' : 'none';
+    document.getElementById('period-inner-weekly').style.display  = tab === 'weekly'  ? '' : 'none';
+
+    document.getElementById('period-inner-btn-monthly').classList.toggle('active', tab === 'monthly');
+    document.getElementById('period-inner-btn-weekly').classList.toggle('active',  tab === 'weekly');
+}
+
+// --- Date helpers ---
+
+function clearMonthlyDates() {
+    document.getElementById('monthly-date-from').value = '';
+    document.getElementById('monthly-date-to').value   = '';
+}
+
+function clearWeeklyDates() {
+    document.getElementById('weekly-date-from').value = '';
+    document.getElementById('weekly-date-to').value   = '';
+}
+
+function getMonthlyDateParams() {
+    const from = document.getElementById('monthly-date-from').value;
+    const to   = document.getElementById('monthly-date-to').value;
+    let params = '';
+    if (from) params += '&date_from=' + from;
+    if (to)   params += '&date_to='   + to;
+    return params;
+}
+
+function getWeeklyDateParams() {
+    const from = document.getElementById('weekly-date-from').value;
+    const to   = document.getElementById('weekly-date-to').value;
+    let params = '';
+    if (from) params += '&date_from=' + from;
+    if (to)   params += '&date_to='   + to;
+    return params;
+}
+
+// --- Chart builder (shared) ---
+
+function buildPeriodChart(canvasId, labels, profits, winRates, existingChart) {
+    if (existingChart) {
+        existingChart.destroy();
+        existingChart = null;
+    }
+
+    const profitColors = profits.map(v => v >= 0 ? COLORS.green : COLORS.red);
+    const ctx = document.getElementById(canvasId).getContext('2d');
+
+    return new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                {
+                    type:            'line',
+                    label:           'Profit %',
+                    data:            profits,
+                    backgroundColor: 'transparent',
+                    borderColor:     COLORS.green,
+                    pointBackgroundColor: COLORS.green,
+                    pointRadius:     4,
+                    tension:         0.1,
+                    borderWidth:     2,
+                    yAxisID:         'yProfit',
+                    order:           2
+                },
+                {
+                    type:                 'line',
+                    label:                'Win Rate %',
+                    data:                 winRates,
+                    borderColor:          COLORS.blue,
+                    backgroundColor:      'transparent',
+                    borderWidth:          2,
+                    pointRadius:          4,
+                    pointBackgroundColor: COLORS.blue,
+                    tension:              0.1,
+                    yAxisID:              'yWinRate',
+                    order:                1
+                }
+            ]
+        },
+        options: {
+            responsive:          true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    display:  true,
+                    position: 'top',
+                    labels: { color: COLORS.white, font: { size: 13 } }
+                },
+                title: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: COLORS.white, font: { size: 14 }, maxRotation: 45 },
+                    grid:  { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                },
+                yProfit: {
+                    type:     'linear',
+                    position: 'left',
+                    title:    { display: true, text: 'Profit %', color: COLORS.green, font: { size: 13 } },
+                    ticks:    { color: COLORS.white, font: { size: 14 }, callback: v => v.toFixed(1) + '%' },
+                    grid:     { color: CHART_DEFAULTS.gridColor, borderColor: CHART_DEFAULTS.borderColor, borderWidth: CHART_DEFAULTS.borderWidth }
+                },
+                yWinRate: {
+                    type:     'linear',
+                    position: 'right',
+                    min:      0,
+                    max:      100,
+                    title:    { display: true, text: 'Win Rate %', color: COLORS.blue, font: { size: 13 } },
+                    ticks:    { color: COLORS.white, font: { size: 14 }, callback: v => v.toFixed(0) + '%' },
+                    grid:     { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+// --- Cards builder (shared) ---
+
+function buildPeriodCards(data, containerId, labelKey) {
+    const container = document.getElementById(containerId);
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:#8b949e; padding:40px;">No data for selected period</div>';
+        return;
+    }
+
+    const html = '<div style="display:flex; flex-wrap:wrap; gap:12px; padding:10px 0;">' +
+        data.map(row => {
+            const profitColor  = row.profit_pct >= 0 ? COLORS.green : COLORS.red;
+            const profitUsdColor = row.profit_usd >= 0 ? COLORS.green : COLORS.red;
+            const prefixPct    = row.profit_pct >= 0 ? '+' : '';
+            const prefixUsd    = row.profit_usd >= 0 ? '+$' : '$';
+            const label        = row[labelKey] || row.week_label || row.month_name;
+
+            return `<div style="background:#1c2128; border:1px solid #21262d; border-radius:8px; padding:15px 20px; min-width:120px; text-align:center;">
+                <div style="color:${profitColor}; font-size:18px; font-weight:700; margin-bottom:2px;">${prefixPct}${row.profit_pct.toFixed(1)}%</div>
+                <div style="color:${profitUsdColor}; font-size:13px; font-weight:600; margin-bottom:6px;">${prefixUsd}${row.profit_usd.toFixed(0)}</div>
+                <div style="color:${COLORS.blue}; font-size:13px; font-weight:600; margin-bottom:6px;">WR: ${row.win_rate.toFixed(1)}%</div>
+                <div style="color:#8b949e; font-size:11px; margin-bottom:6px;">${row.num_trades} trades</div>
+                <div style="color:#58a6ff; font-size:12px; font-weight:600; text-transform:uppercase;">${label}</div>
+            </div>`;
+        }).join('') +
+        '</div>';
+
+    container.innerHTML = html;
+}
+
+// --- Monthly ---
+
+async function loadMonthlyAnalysis() {
+    try {
+        const selectedStrategies = getSelectedStrategies('monthly-strategy-checkboxes');
+
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+
+        const dateParams = getMonthlyDateParams();
+        const res  = await fetch('/api/monthly-analysis?strategies=' + selectedStrategies.join(',') + dateParams);
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+            document.getElementById('monthly-container').innerHTML =
+                '<div style="text-align:center; color:#8b949e; padding:40px;">No data for selected period</div>';
+            if (monthlyPeriodChart) { monthlyPeriodChart.destroy(); monthlyPeriodChart = null; }
+            return;
+        }
+
+        monthlyPeriodChart = buildPeriodChart(
+            'monthlyPeriodChart',
+            data.map(d => d.month_name),
+            data.map(d => d.profit_pct),
+            data.map(d => d.win_rate),
+            monthlyPeriodChart
+        );
+
+        buildPeriodCards(data, 'monthly-container', 'month_name');
+
+    } catch (error) {
+        console.error('Error loading monthly analysis:', error);
+    }
+}
+
+// --- Weekly ---
+
+async function loadWeeklyAnalysis() {
+    try {
+        const selectedStrategies = getSelectedStrategies('weekly-strategy-checkboxes');
+
+        if (selectedStrategies.length === 0) {
+            alert('Please select at least one strategy');
+            return;
+        }
+
+        const dateParams = getWeeklyDateParams();
+        const res  = await fetch('/api/weekly-analysis?strategies=' + selectedStrategies.join(',') + dateParams);
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+            document.getElementById('weekly-container').innerHTML =
+                '<div style="text-align:center; color:#8b949e; padding:40px;">No data for selected period</div>';
+            if (weeklyPeriodChart) { weeklyPeriodChart.destroy(); weeklyPeriodChart = null; }
+            return;
+        }
+
+        weeklyPeriodChart = buildPeriodChart(
+            'weeklyPeriodChart',
+            data.map(d => d.week_label),
+            data.map(d => d.profit_pct),
+            data.map(d => d.win_rate),
+            weeklyPeriodChart
+        );
+
+        buildPeriodCards(data, 'weekly-container', 'week_label');
+
+    } catch (error) {
+        console.error('Error loading weekly analysis:', error);
+    }
+}
+
+// --- Init Period tab ---
+
+async function initPeriodTab() {
+    try {
+        await initStrategyCheckboxes('monthly-strategy-checkboxes', 'monthly-strat-', 'monthly-strat-all');
+        await initStrategyCheckboxes('weekly-strategy-checkboxes',  'weekly-strat-',  'weekly-strat-all');
+    } catch (error) {
+        console.error('Error initializing period tab:', error);
+    }
+}
+
+// =============================================================================
+// END PERIOD ANALYSIS
+// =============================================================================
+
 
 // =============================================================================
 // END WIN RATE EVOLUTION CHART

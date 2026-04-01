@@ -304,11 +304,12 @@
                 <div class="tabs-container" style="margin-top: 20px;">
                     <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('monthly')">Monthly</button>
+                    <button class="tab-btn" onclick="switchEquitySubTab('period')">Period</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('correlation')">Correlation</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('regime')">Regime</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
+                    <button class="tab-btn" onclick="switchEquitySubTab('period-analysis')">Period Analysis</button>
                 </div>
                 
                 <div id="equity-subtab-curves" class="tab-content active">
@@ -434,26 +435,90 @@
                         </div>
                     </div>
                 </div>
-                
-                <div id="equity-subtab-monthly" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Monthly Performance</h3>
-                    
-                    <div class="strategy-checkboxes" id="monthly-strategy-checkboxes">
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="monthly-strat-all" value="ALL" checked>
-                            <label for="monthly-strat-all">ALL STRATEGIES</label>
+                <div id="equity-subtab-period" class="tab-content">
+                    <h3 style="margin-bottom: 16px; color: #c9d1d9;">Period Analysis</h3>
+
+                    <!-- Inner subtabs: Monthly / Weekly -->
+                    <div class="tabs-container" style="margin-bottom: 20px;">
+                        <button class="tab-btn active" id="period-inner-btn-monthly" onclick="switchPeriodInnerTab('monthly')">Monthly</button>
+                        <button class="tab-btn"        id="period-inner-btn-weekly"  onclick="switchPeriodInnerTab('weekly')">Weekly</button>
+                    </div>
+
+                    <!-- MONTHLY inner tab -->
+                    <div id="period-inner-monthly" class="period-inner-tab active">
+
+                        <div class="strategy-checkboxes" id="monthly-strategy-checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="monthly-strat-all" value="ALL" checked>
+                                <label for="monthly-strat-all">ALL STRATEGIES</label>
+                            </div>
+                        </div>
+
+                        <div class="date-filter-container" style="margin-top: 16px;">
+                            <div class="date-filter-group">
+                                <label>From:</label>
+                                <input type="date" id="monthly-date-from">
+                            </div>
+                            <div class="date-filter-group">
+                                <label>To:</label>
+                                <input type="date" id="monthly-date-to">
+                            </div>
+                            <button class="btn-clear-dates" onclick="clearMonthlyDates()">✕ Clear</button>
+                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;"
+                                    onclick="loadMonthlyAnalysis()">🔄 Update</button>
+                        </div>
+
+                        <!-- Chart -->
+                        <div id="monthly-chart-wrapper" style="position: relative; height: 420px; margin-top: 20px;">
+                            <canvas id="monthlyPeriodChart"></canvas>
+                        </div>
+
+                        <!-- Cards -->
+                        <div id="monthly-container" style="margin-top: 24px;">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Select strategies and click "Update"
+                            </div>
                         </div>
                     </div>
-                    
-                    <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd; margin-bottom: 20px;" onclick="loadMonthlyAnalysis()">🔄 Update Monthly</button>
-                    
-                    <div id="monthly-container" style="margin-top: 20px;">
-                        <div style="text-align: center; color: #8b949e; padding: 40px;">
-                            Select strategies and click "Update Monthly"
+
+                    <!-- WEEKLY inner tab -->
+                    <div id="period-inner-weekly" class="period-inner-tab" style="display:none;">
+
+                        <div class="strategy-checkboxes" id="weekly-strategy-checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="weekly-strat-all" value="ALL" checked>
+                                <label for="weekly-strat-all">ALL STRATEGIES</label>
+                            </div>
+                        </div>
+
+                        <div class="date-filter-container" style="margin-top: 16px;">
+                            <div class="date-filter-group">
+                                <label>From:</label>
+                                <input type="date" id="weekly-date-from">
+                            </div>
+                            <div class="date-filter-group">
+                                <label>To:</label>
+                                <input type="date" id="weekly-date-to">
+                            </div>
+                            <button class="btn-clear-dates" onclick="clearWeeklyDates()">✕ Clear</button>
+                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;"
+                                    onclick="loadWeeklyAnalysis()">🔄 Update</button>
+                        </div>
+
+                        <!-- Chart -->
+                        <div id="weekly-chart-wrapper" style="position: relative; height: 420px; margin-top: 20px;">
+                            <canvas id="weeklyPeriodChart"></canvas>
+                        </div>
+
+                        <!-- Cards -->
+                        <div id="weekly-container" style="margin-top: 24px;">
+                            <div style="text-align: center; color: #8b949e; padding: 40px;">
+                                Select strategies and click "Update"
+                            </div>
                         </div>
                     </div>
+
                 </div>
-                
                 <div id="equity-subtab-symbols" class="tab-content">
                     <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
                     <div id="symbols-container">Loading...</div>
