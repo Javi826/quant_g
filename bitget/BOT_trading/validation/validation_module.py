@@ -37,7 +37,7 @@ def validate_postgresql_connection():
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         conn.close()
         
-        logger.info("✓ PostgreSQL connection validated successfully")
+        logger.info("PostgreSQL connection validated successfully ✓")
         return True
         
     except OperationalError as e:
