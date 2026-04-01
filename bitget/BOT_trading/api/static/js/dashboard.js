@@ -3124,7 +3124,7 @@ async function loadRiskTab() {
         const strategies = exposureData.strategies;
         
         // Update cards with dynamic colors
-        updateRiskCards(metrics);
+        updateRiskCards(metrics, strategies);
         
         // Render strategy table
         renderRiskStrategyTable(strategies, metrics.available_capital);
@@ -3530,50 +3530,39 @@ function renderTargetDeviationTable(data) {
 // END QUALITY CONTROL TAB
 // =============================================================================
 
-function updateRiskCards(metrics) {
-    const grossPct = metrics.gross_exposure_pct;
-    const netPct = metrics.net_exposure_pct;
-    const longPct = metrics.long_exposure_pct;
-    const shortPct = metrics.short_exposure_pct;
-    
-    // Update Gross Exposure card (always blue)
+function updateRiskCards(metrics, strategies) {
+    const grossPct  = metrics.gross_exposure_pct;
+    const netPct    = metrics.net_exposure_pct;
+    const longPct   = metrics.long_exposure_pct;
+    const shortPct  = metrics.short_exposure_pct;
+
+    // Calculate USDT totals by side
+    const longUsdt  = (strategies || []).filter(s => s.side === 'LONG').reduce((sum, s) => sum + s.usdt, 0);
+    const shortUsdt = (strategies || []).filter(s => s.side === 'SHORT').reduce((sum, s) => sum + s.usdt, 0);
+
     const grossEl = document.getElementById('risk-gross-exp');
     if (grossEl) {
         grossEl.textContent = grossPct.toFixed(1) + '%';
-        grossEl.style.color = '#58a6ff';  // Blue
+        grossEl.style.color = '#58a6ff';
     }
-    
-    // Update Net Exposure card (always blue)
+
+    const netUsdt = longUsdt - shortUsdt;
     const netEl = document.getElementById('risk-net-exp');
     if (netEl) {
-        const netSign = netPct >= 0 ? '+' : '';
-        netEl.textContent = netSign + netPct.toFixed(1) + '%';
-        netEl.style.color = '#58a6ff';  // Blue
+        netEl.textContent = (netPct >= 0 ? '+' : '') + netPct.toFixed(1) + '% | ' + (netUsdt >= 0 ? '+$' : '-$') + Math.abs(netUsdt).toFixed(0);
+        netEl.style.color = '#58a6ff';
     }
-    
-    // Update Long Exposure card (always green)
+
     const longEl = document.getElementById('risk-long-exp');
-    if (longEl) {
-        longEl.textContent = longPct.toFixed(1) + '%';
-    }
-    
-    // Update Short Exposure card (always red)
+    if (longEl) longEl.textContent = longPct.toFixed(1) + '% | $' + longUsdt.toFixed(0);
+
     const shortEl = document.getElementById('risk-short-exp');
-    if (shortEl) {
-        shortEl.textContent = shortPct.toFixed(1) + '%';
-    }
-    
-    // Update config card
+    if (shortEl) shortEl.textContent = shortPct.toFixed(1) + '% | $' + shortUsdt.toFixed(0);
+
     const configGrossEl = document.getElementById('risk-config-max-gross');
-    const configNetEl = document.getElementById('risk-config-max-net');
-    
-    if (configGrossEl) {
-        configGrossEl.textContent = MAX_GROSS_EXPOSURE.toFixed(1) + '%';
-    }
-    
-    if (configNetEl) {
-        configNetEl.textContent = MAX_NET_EXPOSURE.toFixed(1) + '%';
-    }
+    const configNetEl   = document.getElementById('risk-config-max-net');
+    if (configGrossEl) configGrossEl.textContent = MAX_GROSS_EXPOSURE.toFixed(1) + '%';
+    if (configNetEl)   configNetEl.textContent   = MAX_NET_EXPOSURE.toFixed(1) + '%';
 }
 
 function renderRiskStrategyTable(strategies, availableCapital) {
