@@ -3976,7 +3976,7 @@ function buildPeriodChart(canvasId, labels, profits, winRates, existingChart) {
                     data:            profits,
                     backgroundColor: 'transparent',
                     borderColor:     COLORS.green,
-                    pointBackgroundColor: COLORS.green,
+                    pointBackgroundColor: profits.map(v => v >= 0 ? COLORS.green : COLORS.red),
                     pointRadius:     4,
                     tension:         0.1,
                     borderWidth:     2,
