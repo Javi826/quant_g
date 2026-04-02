@@ -2376,7 +2376,7 @@ class DashboardServer:
                 cursor.close()
                 conn.close()
                 
-                logger.info(f"[BTC SNAPSHOT] ✓ Captured: {today} -> ${btc_price:.2f}")
+                logger.info(f"[BTC SNAPSHOT] Captured: {today} -> ${btc_price:.2f}")
                 
                 return jsonify({
                     'success': True,
@@ -2412,7 +2412,7 @@ class DashboardServer:
             if response.ok:
                 data = response.json()
                 if data.get('success'):
-                    logger.info(f"[SNAPSHOT] ✓ Daily exposure captured for {self.account_number}")
+                    logger.info(f"[SNAPSHOT] Daily exposure captured for {self.account_number}")
                 else:
                     logger.warning(f"[SNAPSHOT] Endpoint returned error: {data.get('error')}")
             else:
