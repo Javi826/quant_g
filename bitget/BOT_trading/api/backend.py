@@ -1276,79 +1276,70 @@ class DashboardServer:
             """Calculate correlation matrix between selected strategies."""
             try:
                 import pandas as pd
-                
-                # Get selected strategies and metric from request
-                data = request.get_json()
+
+                data                = request.get_json()
                 selected_strategies = data.get('strategies', [])
-                metric = data.get('metric', 'profit')  # 'profit' or 'drawdown'
-                
+                metric              = data.get('metric', 'profit')
+
                 if not selected_strategies:
                     return jsonify({'error': 'No strategies selected'}), 400
-                
-                # Load trades from PostgreSQL
+
                 df = self._load_trades_dataframe()
-                
                 if df is None or df.empty:
                     return jsonify({'error': 'No trades data available'}), 404
-                
-                # Filter by selected strategies
+
                 df = df[df['STRATEGY'].isin(selected_strategies)]
-                
                 if df.empty:
                     return jsonify({'error': 'No trades found for selected strategies'}), 404
-                
-                # Group by strategy and date
+
+                # Build daily profit series per strategy
                 returns_by_strategy = {}
                 for strat_id in selected_strategies:
                     strat_df = df[df['STRATEGY'] == strat_id].copy()
-                    
                     if strat_df.empty:
                         continue
-                    
-                    # Convert to datetime and get date
+
                     strat_df['date'] = pd.to_datetime(strat_df['CLOSE_AT']).dt.date
-                    
-                    if metric == 'profit':
-                        # Sum daily profits
-                        daily_returns = strat_df.groupby('date')['PROFIT'].sum()
-                    else:  # drawdown
-                        # Calculate daily drawdown
-                        daily_returns = strat_df.groupby('date')['PROFIT'].sum()
-                        cumulative = daily_returns.cumsum()
-                        running_max = cumulative.cummax()
-                        daily_drawdown = cumulative - running_max
-                        daily_returns = daily_drawdown
-                    
-                    returns_by_strategy[strat_id] = daily_returns
-                
+                    daily_profit = strat_df.groupby('date')['PROFIT'].sum()
+                    returns_by_strategy[strat_id] = daily_profit
+
                 if len(returns_by_strategy) < 2:
                     return jsonify({'error': 'Need at least 2 strategies with trades'}), 400
-                
-                # Create DataFrame and calculate correlation
-                returns_df = pd.DataFrame(returns_by_strategy)
-                returns_df = returns_df.fillna(0)
-                
-                # Calculate correlation matrix
+
+                # Align all series on a common date index, fill missing days with 0 profit
+                profit_df = pd.DataFrame(returns_by_strategy).fillna(0)
+
+                if metric == 'profit':
+                    returns_df = profit_df
+
+                else:  # drawdown — method 4: structural DD, propagated across days without trades
+                    dd_series = {}
+                    for strat_id in profit_df.columns:
+                        cumulative  = profit_df[strat_id].cumsum()
+                        running_max = cumulative.cummax()
+                        dd_series[strat_id] = cumulative - running_max
+
+                    returns_df = pd.DataFrame(dd_series)
+
+                # Correlation matrix
                 corr_matrix = returns_df.corr()
-                
-                # Find high correlation pairs (>0.7)
-                high_corr_pairs = []
-                strategies_list = list(corr_matrix.columns)
-                
+
+                # High correlation pairs (> 0.7)
+                high_corr_pairs  = []
+                strategies_list  = list(corr_matrix.columns)
+
                 for i in range(len(strategies_list)):
                     for j in range(i + 1, len(strategies_list)):
                         corr_value = corr_matrix.iloc[i, j]
-                        
                         if pd.notna(corr_value) and corr_value > 0.7:
                             high_corr_pairs.append({
-                                'strat1': strategies_list[i],
-                                'strat2': strategies_list[j],
+                                'strat1':      strategies_list[i],
+                                'strat2':      strategies_list[j],
                                 'correlation': round(float(corr_value), 3)
                             })
-                
-                # Sort by correlation (highest first)
+
                 high_corr_pairs.sort(key=lambda x: x['correlation'], reverse=True)
-                
+
                 # Convert matrix to dict
                 matrix_dict = {}
                 for col in corr_matrix.columns:
@@ -1356,15 +1347,15 @@ class DashboardServer:
                     for idx in corr_matrix.index:
                         val = corr_matrix.loc[idx, col]
                         matrix_dict[col][idx] = round(float(val), 3) if pd.notna(val) else 0
-                
+
                 return jsonify({
-                    'success': True,
-                    'matrix': matrix_dict,
-                    'strategies': strategies_list,
+                    'success':        True,
+                    'matrix':         matrix_dict,
+                    'strategies':     strategies_list,
                     'high_corr_pairs': high_corr_pairs,
-                    'metric': metric
+                    'metric':         metric
                 })
-                
+
             except Exception as e:
                 import traceback
                 traceback.print_exc()

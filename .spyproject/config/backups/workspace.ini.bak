@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_trading/config/settings.py', 'bitget/BOT_trading/config/strategies_00.py']
+recent_files = ['bitget/BOT_trading/config/settings.py', 'bitget/BOT_trading/config/strategies_00.py', 'bitget/development/Z_montecarlo/M_montecarlo_orderblocks.py']
 
 [main]
 version = 0.2.0
