@@ -115,7 +115,7 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
                 for strat_id, positions in OPEN_POSITIONS.items():
                     if positions:
                         candles = STRATEGY_CANDLES.get(strat_id, 0)
-                        logger.info(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
+                        logger.debug(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
                 
                 return OPEN_POSITIONS, STRATEGY_CANDLES
             else:
@@ -165,14 +165,14 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
         
-        logger.info(f"✓ State loaded from JSON: {total_positions} positions")
-        logger.info(f"{'-' * 48}")
+        logger.debug(f"State loaded from JSON: {total_positions} positions")
+        logger.debug(f"{'-' * 48}")
         
         # Display summary
         for strat_id, positions in OPEN_POSITIONS.items():
             if positions:
                 candles = STRATEGY_CANDLES.get(strat_id, 0)
-                logger.info(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
+                logger.debug(f"{strat_id:<24}: {len(positions):>2} positions | Candles: {candles:>2}")
         
         return OPEN_POSITIONS, STRATEGY_CANDLES
         

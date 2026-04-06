@@ -31,7 +31,7 @@ def validate_postgresql_connection():
         bool: True if connection successful
     """
     try:
-        logger.info("Validating PostgreSQL connection...")
+        logger.debug("Validating PostgreSQL connection...")
         
         # Try to connect
         conn = psycopg2.connect(**POSTGRES_CONFIG)
@@ -75,7 +75,7 @@ def validate_settings():
         validation_s1_errors += 1
     
     if validation_s1_errors == 0:
-        logger.info("Val S1: Dashboard ports are unique")
+        logger.debug("Val S1: Dashboard ports are unique")
     
     # ========================================================================
     # Val S2: Valid timeframes
@@ -86,7 +86,7 @@ def validate_settings():
         validation_s2_errors += 1
     
     if validation_s2_errors == 0:
-        logger.info("Val S2: VALID_TIMEFRAMES configured")
+        logger.debug("Val S2: VALID_TIMEFRAMES configured")
     
     # ========================================================================
     # Val S3: Order amount limits
@@ -97,7 +97,7 @@ def validate_settings():
         validation_s3_errors += 1
     
     if validation_s3_errors == 0:
-        logger.info("Val S3: Order amount limits valid")
+        logger.debug("Val S3: Order amount limits valid")
     
     # ========================================================================
     # Val S4: TP percentage limits
@@ -108,7 +108,7 @@ def validate_settings():
         validation_s4_errors += 1
     
     if validation_s4_errors == 0:
-        logger.info("Val S4: TP percentage limits valid")
+        logger.debug("Val S4: TP percentage limits valid")
     
     # ========================================================================
     # Val S5: BASE_URL uses HTTPS
@@ -119,7 +119,7 @@ def validate_settings():
         validation_s5_errors += 1
     
     if validation_s5_errors == 0:
-        logger.info("Val S5: BASE_URL uses HTTPS")
+        logger.debug("Val S5: BASE_URL uses HTTPS")
     
     
     # ========================================================================
@@ -131,7 +131,7 @@ def validate_settings():
         validation_s7_errors += 1
     
     if validation_s7_errors == 0:
-        logger.info("Val S7: SL percentage limits valid")
+        logger.debug("Val S7: SL percentage limits valid")
     
     # ========================================================================
     # Val S8: Candles limits
@@ -142,7 +142,7 @@ def validate_settings():
         validation_s8_errors += 1
     
     if validation_s8_errors == 0:
-        logger.info("Val S8: Candles limits valid")
+        logger.debug("Val S8: Candles limits valid")
     
     # ========================================================================
     # Val S9: REGIME_FAMILIES required families
@@ -159,7 +159,7 @@ def validate_settings():
         validation_s9_errors += 1
     
     if validation_s9_errors == 0:
-        logger.info("Val S9: REGIME_FAMILIES has all required families")
+        logger.debug("Val S9: REGIME_FAMILIES has all required families")
     
     # ========================================================================
     # Val S10: REGIME_FAMILIES structure validation
@@ -210,7 +210,7 @@ def validate_settings():
                 validation_s10_errors += 1
     
     if validation_s10_errors == 0:
-        logger.info("Val S10: REGIME_FAMILIES structure valid")
+        logger.debug("Val S10: REGIME_FAMILIES structure valid")
     
     # ========================================================================
     # Val S11: REGIME_GENERAL required families
@@ -227,7 +227,7 @@ def validate_settings():
         )
     
     if validation_s11_errors == 0:
-        logger.info("Val S11: REGIME_GENERAL families checked")
+        logger.debug("Val S11: REGIME_GENERAL families checked")
     
     # ========================================================================
     # Val S12: REGIME_GENERAL multipliers validation
@@ -262,7 +262,7 @@ def validate_settings():
             )
     
     if validation_s12_errors == 0:
-        logger.info("Val S12: REGIME_GENERAL multipliers valid")
+        logger.debug("Val S12: REGIME_GENERAL multipliers valid")
     
     # ========================================================================
     # Val S13: REGIME thresholds coherence
@@ -317,7 +317,7 @@ def validate_settings():
                     )
     
     if validation_s13_errors == 0:
-        logger.info("Val S13: REGIME thresholds coherent")
+        logger.debug("Val S13: REGIME thresholds coherent")
     
     # ========================================================================
     # Val S14: REGIME reference symbol
@@ -339,7 +339,7 @@ def validate_settings():
         )
     
     if validation_s14_errors == 0:
-        logger.info(f"Val S14: REGIME_REFERENCE_SYMBOL = '{REGIME_REFERENCE_SYMBOL}'")
+        logger.debug(f"Val S14: REGIME_REFERENCE_SYMBOL = '{REGIME_REFERENCE_SYMBOL}'")
     
   
     
@@ -358,7 +358,7 @@ def validate_settings():
             validation_s17_errors += 1
     
     if validation_s17_errors == 0:
-        logger.info("Val S17: All account numbers have valid format")
+        logger.debug("Val S17: All account numbers have valid format")
     
     return errors, warnings
 
@@ -397,7 +397,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         warnings.append(f"Implemented but NOT declared: {unused_implementation}")
     
     if not missing_implementation:
-        logger.info("Val Y1: All strategy IDs implemented")
+        logger.debug("Val Y1: All strategy IDs implemented")
     
     # ========================================================================
     # Val Y2: Direction coherence with name
@@ -433,7 +433,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y2_errors += 1
     
     if validation_y2_errors == 0:
-        logger.info("Val Y2: All directions coherent with names")
+        logger.debug("Val Y2: All directions coherent with names")
     
     # ========================================================================
     # Val Y3: Order amount within valid range
@@ -469,7 +469,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y3_errors += 1
     
     if validation_y3_errors == 0:
-        logger.info("Val Y3: All order amounts in range")
+        logger.debug("Val Y3: All order amounts in range")
     
     # ========================================================================
     # Val Y4: Required parameters for each strategy type
@@ -513,7 +513,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             )
     
     if validation_y4_errors == 0:
-        logger.info("Val Y4: All strategies have required parameters")
+        logger.debug("Val Y4: All strategies have required parameters")
     
     # ========================================================================
     # Val Y5: TP/SL within valid ranges
@@ -540,7 +540,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y5_errors += 1
     
     if validation_y5_errors == 0:
-        logger.info("Val Y5: All TP/SL percentages within valid ranges")
+        logger.debug("Val Y5: All TP/SL percentages within valid ranges")
     
     # ========================================================================
     # Val Y6: Unique strategy IDs
@@ -554,7 +554,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         validation_y6_errors += 1
     
     if validation_y6_errors == 0:
-        logger.info("Val Y6: All strategy IDs are unique")
+        logger.debug("Val Y6: All strategy IDs are unique")
     
     # ========================================================================
     # Val Y7: Candles within reasonable range
@@ -573,7 +573,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y7_errors += 1
     
     if validation_y7_errors == 0:
-        logger.info("Val Y7: All sell_after_ncandles within range")
+        logger.debug("Val Y7: All sell_after_ncandles within range")
     
     # ========================================================================
     # Y8: Unique strategy names
@@ -587,7 +587,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         validation_y8_errors += 1
     
     if validation_y8_errors == 0:
-        logger.info("Val Y8: All strategy names are unique")
+        logger.debug("Val Y8: All strategy names are unique")
     
     # ========================================================================
     # Val Y9: Valid timeframes
@@ -606,7 +606,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y9_errors += 1
     
     if validation_y9_errors == 0:
-        logger.info("Val Y9: All timeframes are valid")
+        logger.debug("Val Y9: All timeframes are valid")
     
     # ========================================================================
     # Val Y10: ID format with numeric prefix
@@ -649,7 +649,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y10_errors += 1
     
     if validation_y10_errors == 0:
-        logger.info("Val Y10: All IDs have correct prefix format (NN_name)")
+        logger.debug("Val Y10: All IDs have correct prefix format (NN_name)")
     
 # ========================================================================
     # Val Y11: regime multipliers (trending, ranging, volatile)
@@ -729,7 +729,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
                 )
     
     if validation_y11_errors == 0:
-        logger.info("Val Y11: All regime multipliers valid")
+        logger.debug("Val Y11: All regime multipliers valid")
 
     # ========================================================================
 # ========================================================================
@@ -774,7 +774,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         )
     
     if validation_y12_errors == 0:
-        logger.info("Val Y12: All strategy direction_mode values valid")
+        logger.debug("Val Y12: All strategy direction_mode values valid")
     
 
  # ========================================================================
@@ -808,6 +808,6 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y13_errors += 1
     
     if validation_y13_errors == 0:
-        logger.info("Val Y13: All direction/dir_mode combinations are coherent")
+        logger.debug("Val Y13: All direction/dir_mode combinations are coherent")
         
     return errors, warnings

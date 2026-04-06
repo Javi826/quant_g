@@ -2452,9 +2452,9 @@ class DashboardServer:
         # Only account 00 captures BTC (shared across all accounts)
         if self.account_number == 'E1':
             schedule.every().day.at("23:55").do(self._capture_btc_snapshot)
-            logger.info("[SNAPSHOT] Scheduler started - captures exposure + BTC daily at 23:55 UTC")
+            logger.info("[SNAPSHOT] Scheduler started-captures exposure + BTC daily at 23:55 UTC")
         else:
-            logger.info("[SNAPSHOT] Scheduler started - captures exposure daily at 23:55 UTC")
+            logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 23:55 UTC")
         
         while self.snapshot_running:
             schedule.run_pending()
@@ -2515,12 +2515,10 @@ class DashboardServer:
         import time
         time.sleep(0.5)
         
-        logger.info(f"\nDashboard Web Started")
-        logger.info(f"{'─' * 45}")
+        logger.info(f"Dashboard Web Started")
         logger.info(f"Local:   http://localhost:{port}")
         logger.info(f"Network: http://127.0.0.1:{port}")
         logger.info(f"LAN:     http://<your-ip>:{port}")
-        logger.info(f"{'─' * 45}\n")
         
         # Start snapshot scheduler AFTER Flask is running
         self._start_snapshot_scheduler()

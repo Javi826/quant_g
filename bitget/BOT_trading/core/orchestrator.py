@@ -177,6 +177,7 @@ class BotOrchestrator:
             return
         
         self._setup_directories()
+        self._log_account_flags()
         self._load_bot_state()
         self._load_and_validate_strategies()
         self._initialize_position_sizing()     
@@ -260,6 +261,21 @@ class BotOrchestrator:
     # ======================================================================
     # INITIALIZATION METHODS (Private)
     # ======================================================================
+    
+    def _log_account_flags(self) -> None:
+        """Log account configuration flags at startup."""
+        capital_str = f"${self.initial_capital:,.0f}"
+        regime0     = self.account_flags.get('regime0_enabled', True)
+        regime1     = self.account_flags.get('regime1_enabled', True)
+        risk        = self.account_flags.get('risk_control_enabled', True)
+        pg          = self.account_flags.get('postgresql_enabled', True)
+    
+        self.logger.info(f"[{self.account_number}] ════ Account Configuration ════")
+        self.logger.info(f"[{self.account_number}] Initial capital:  {capital_str}")
+        self.logger.info(f"[{self.account_number}] Regime0:          {'✅ enabled' if regime0 else '❌ disabled'}")
+        self.logger.info(f"[{self.account_number}] Regime1:          {'✅ enabled' if regime1 else '❌ disabled'}")
+        self.logger.info(f"[{self.account_number}] Risk control:     {'✅ enabled' if risk else '❌ disabled'}")
+        self.logger.info(f"[{self.account_number}] PostgreSQL:       {'✅ enabled' if pg else '❌ disabled'}")
    
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
@@ -334,12 +350,12 @@ class BotOrchestrator:
         """Load market symbols for each strategy."""
         self.all_symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
         
-        self.logger.info(f"Operative Strategies: {len(self.strategies)}")
-        self.logger.info(f"{'-' * 48}")
+        self.logger.debug(f"Operative Strategies: {len(self.strategies)}")
+        self.logger.debug(f"{'-' * 48}")
         
         for strat in self.strategies:
             if not strat.get('active', True):
-                self.logger.info(f"{strat['id']:<24}: DEPRECATED")
+                self.logger.debug(f"{strat['id']:<24}: DEPRECATED")
                 continue
             
             self.final_by_strat[strat['id']] = load_final_symbols(
@@ -347,7 +363,7 @@ class BotOrchestrator:
                 strategy=strat['id'],
                 timeframe=strat['timeframe']
             )
-            self.logger.info(
+            self.logger.debug(
                 f"{strat['id']:<24} : {len(self.final_by_strat[strat['id']]):>2} symbols"
             )
         
@@ -391,7 +407,7 @@ class BotOrchestrator:
         )
         
         self.dashboard.start(port=self.dashboard_port)
-        self.logger.info(f"Bot monitoring at http://localhost:{self.dashboard_port}")
+        self.logger.debug(f"Bot monitoring at http://localhost:{self.dashboard_port}")
     
     def _initialize_websocket(self) -> None:
         """Initialize WebSocket connections."""
@@ -434,7 +450,6 @@ class BotOrchestrator:
         from market_regime import PositionSizer
         
         self.position_sizer = PositionSizer(self.logger)
-        self.logger.info("Position sizing initialized")
 
     def _initialize_risk_management(self) -> None:
         """Initialize risk management components."""
@@ -445,7 +460,6 @@ class BotOrchestrator:
             initial_capital=self.initial_capital,
             logger=self.logger
         )
-        self.logger.info("Risk management initialized")
         
     def _update_btc_1d_filter(self) -> None:
         """

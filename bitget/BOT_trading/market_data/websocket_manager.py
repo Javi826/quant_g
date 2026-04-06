@@ -133,7 +133,7 @@ class BitgetWSManager:
     def _on_public_open(self, ws):
         """Callback al conectar WS público"""
         now = datetime.now(ZoneInfo('UTC')).strftime('%Y-%m-%d %H:%M:%S UTC')
-        logger.info(f"PUBLIC- WS connected [{now}]")
+        logger.debug(f"PUBLIC- WS connected [{now}]")
         if self.subscribed_public:
             self._resubscribe_public()
     
@@ -231,16 +231,16 @@ class BitgetWSManager:
         if is_reconnect:
             # Mostrar razón de la desconexión anterior si existe
             if self.last_close_code or self.last_close_msg:
-                logger.info(f"PRIVATE WS connected [{now}]")
-                logger.info(f"Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
+                logger.debug(f"PRIVATE WS connected [{now}]")
+                logger.debug(f"Previous: code={self.last_close_code}, msg={self.last_close_msg}")  # ⭐ Más legible
                 self.last_close_code = None
                 self.last_close_msg = None
             else:
                 # Sin código de cierre guardado - puede ser timeout sin aviso
-                logger.info(f"PRIVATE WS connected [{now}]")
-                logger.info(f"Previous: code=unknown (likely timeout)")
+                logger.debug(f"PRIVATE WS connected [{now}]")
+                logger.debug(f"Previous: code=unknown (likely timeout)")
         else:
-            logger.info(f"PRIVATE WS connected [{now}]")
+            logger.debug(f"PRIVATE WS connected [{now}]")
         
         self._authenticate()
         time.sleep(0.5)
@@ -276,7 +276,7 @@ class BitgetWSManager:
         channels = ['orders', 'fill', 'positions', 'account', 'equity']
         
         if not is_reconnect:
-            logger.info(f"Subscribing to {len(channels)} private channels...")
+            logger.debug(f"Subscribing to {len(channels)} private channels...")
         
         for channel in channels:
             msg = {
@@ -296,7 +296,7 @@ class BitgetWSManager:
                 self.subscribed_private.add(channel)
                 # Solo mostrar en primera conexión
                 if not is_reconnect:
-                    logger.info(f"OK-{channel}")
+                    logger.debug(f"OK-{channel}")
     
     def _on_private_message(self, ws, message):
         try:
@@ -573,7 +573,7 @@ class BitgetWSManager:
         Pre-carga contratos via API REST (única excepción necesaria al inicio).
         send_request_func puede ser None - usa requests directo.
         """
-        logger.info(f"Pre-loading contract for {len(symbols)} symbols")
+        logger.debug(f"Pre-loading contract for {len(symbols)} symbols")
         
         loaded = 0
         
@@ -616,10 +616,10 @@ def init_websocket(api_key=None, api_secret=None, api_passphrase=None):
         time.sleep(1)  # Dar tiempo a conectar y autenticar
         
         # Verificar conexión
-        logger.info(f"WebSocket status:")
-        logger.info(f"Public- WS    : {'Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else 'Not connected'}")
-        logger.info(f"Private WS    : {'Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else 'Not connected'}")
-        logger.info(f"Authenticated : {'Yes' if _ws_manager.authenticated else 'No'}")
+        logger.debug(f"WebSocket status:")
+        logger.debug(f"Public- WS    : {'Connected' if _ws_manager.public_ws and _ws_manager.public_ws.sock and _ws_manager.public_ws.sock.connected else 'Not connected'}")
+        logger.debug(f"Private WS    : {'Connected' if _ws_manager.private_ws and _ws_manager.private_ws.sock and _ws_manager.private_ws.sock.connected else 'Not connected'}")
+        logger.debug(f"Authenticated : {'Yes' if _ws_manager.authenticated else 'No'}")
         
         # Verificar si la autenticación fue exitosa
         if api_key and api_secret:
