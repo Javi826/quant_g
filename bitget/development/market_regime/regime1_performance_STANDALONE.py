@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from regime_metrics import calc_all_metrics
 
 BASE_DIR              = '/home/javi/projects/quant/quant_g/bitget/development'
-TRADES_FOLDER         = f'{BASE_DIR}/market_regime/brief_trades_2026'
+TRADES_FOLDER         = f'{BASE_DIR}/brief_trades'
 OHLC_FOLDER           = f'{BASE_DIR}/data/crypto_OOS_2025'  
 MA_PERIOD             = 50
 INITIAL_CAPITAL       = 800

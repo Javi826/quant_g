@@ -16,7 +16,7 @@ from pathlib import Path
 from glob import glob
 
 # Configuration
-TRADES_FOLDER = "../market_regime/brief_trades_2026"
+TRADES_FOLDER   = '../brief_trades'
 EQUITIES_FOLDER = "../brief_equities"
 INITIAL_CAPITAL = 800
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-market_regime/regime_analyzer_STANDALONE.py
+regime_analyzer_STANDALONE.py
 
 Autonomous script that compares system performance with/without trend filtering.
 Calculates BTC MAs on-the-fly - no pre-enrichment needed.
@@ -27,6 +27,8 @@ from glob import glob
 TRADES_FOLDER = '/home/javi/projects/quant/quant_g/bitget/development/brief_trades'
 BTC_FILE = '/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet'
 MA_PERIOD = 5  # Options: 5, 10, 20, 50, 200
+LONG_TH = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
+SHORT_TH = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
 INITIAL_CAPITAL = 800
 
 # =============================================================================
@@ -126,15 +128,20 @@ def load_trades(filepath: str) -> pd.DataFrame:
     return df
 
 
-def classify_trades_by_trend(df: pd.DataFrame, btc_df: pd.DataFrame) -> pd.DataFrame:
-    """Add trend classification to each trade based on BTC MA"""
+def classify_trades_by_trend(df: pd.DataFrame, btc_df: pd.DataFrame, strategy_type: str) -> pd.DataFrame:
+    """Add trend classification to each trade based on BTC MA with asymmetric thresholds"""
     df['trend'] = 'unknown'
     
     for idx, trade in df.iterrows():
         btc_close, ma_value = get_btc_value_at_trade(btc_df, trade['buy_time'])
         
         if btc_close is not None and ma_value is not None:
-            df.at[idx, 'trend'] = 'uptrend' if btc_close > ma_value else 'downtrend'
+            if strategy_type == 'LONG':
+                # LONG: BTC > MA * LONG_TH
+                df.at[idx, 'trend'] = 'uptrend' if btc_close > ma_value * LONG_TH else 'downtrend'
+            else:  # SHORT
+                # SHORT: BTC < MA * SHORT_TH
+                df.at[idx, 'trend'] = 'downtrend' if btc_close < ma_value * SHORT_TH else 'uptrend'
     
     return df
 
@@ -147,8 +154,8 @@ def analyze_strategy(filepath: str, btc_df: pd.DataFrame, initial_capital: float
     # Detect strategy type
     strategy_type = detect_strategy_type(strategy)
     
-    # Classify trades by trend
-    df = classify_trades_by_trend(df, btc_df)
+    # Classify trades by trend (with asymmetric thresholds)
+    df = classify_trades_by_trend(df, btc_df, strategy_type)
     
     # SCENARIO A: WITHOUT FILTER (all trades)
     metrics_without = calculate_strategy_metrics(df, initial_capital)
@@ -176,7 +183,7 @@ def calculate_global_portfolio(results: list, btc_df: pd.DataFrame, initial_capi
     
     for r in results:
         df = load_trades(r['filepath'])
-        df = classify_trades_by_trend(df, btc_df)
+        df = classify_trades_by_trend(df, btc_df, r['type'])
         
         if use_filter:
             if r['type'] == 'LONG':
@@ -223,19 +230,26 @@ def calculate_global_portfolio(results: list, btc_df: pd.DataFrame, initial_capi
 # =============================================================================
 
 def main():
-    print("=" * 100)
-    print("TREND FILTERING COMPARISON (STANDALONE)")
-    print("=" * 100)
+    print("=" * 70)
+    print("REGIME ANALYZER - Trend Filtering Comparison (STANDALONE)")
+    print("=" * 70)
+    
     print(f"\nConfiguration:")
     print(f"  Trades folder: {TRADES_FOLDER}")
     print(f"  BTC file:      {BTC_FILE}")
     print(f"  MA period:     MA{MA_PERIOD}")
+    print(f"  LONG TH:       {LONG_TH}")
+    print(f"  SHORT TH:      {SHORT_TH}")
     print(f"  Capital:       ${INITIAL_CAPITAL}")
+    
+    print("\nComparison scenarios:")
+    print("  WITHOUT FILTER: All trades")
+    print(f"  WITH FILTER:    LONG when BTC > MA×{LONG_TH}, SHORT when BTC < MA×{SHORT_TH}")
     
     # Load BTC 1D
     print("\n📂 Loading BTC 1D data...")
     btc_df = load_btc_1d(BTC_FILE)
-    print(f"✅ Loaded {len(btc_df)} daily bars ({btc_df['ts'].min().date()} → {btc_df['ts'].max().date()})")
+    print(f"✅ Loaded {len(btc_df)} daily bars")
     
     # Find all trades files
     pattern = str(Path(TRADES_FOLDER) / 'all_trades_*.xlsx')
@@ -324,7 +338,7 @@ def main():
     print(f"  Net Gain:     {global_without['net_gain_pct']:.2f}%")
     print(f"  Max DD:       {global_without['max_dd_pct']:.2f}%")
     print(f"  Num Trades:   {global_without['num_trades']:,}")
-    print(f"\nWITH TREND FILTER (BTC > MA{MA_PERIOD} for LONG, BTC < MA{MA_PERIOD} for SHORT):")
+    print(f"\nWITH TREND FILTER (LONG: BTC > MA{MA_PERIOD}×{LONG_TH}, SHORT: BTC < MA{MA_PERIOD}×{SHORT_TH}):")
     print(f"  Total Profit: ${global_with['total_profit']:,.2f}")
     print(f"  Net Gain:     {global_with['net_gain_pct']:.2f}%")
     print(f"  Max DD:       {global_with['max_dd_pct']:.2f}%")
