@@ -239,9 +239,9 @@ STRATEGIES = [
         'direction_mode': 'general',
         'sell_after_ncandles': 50,
         'order_amount': 200,
-        'lookback': 13,
-        'impulse': 5,
-        'flag': 40,
+        'lookback': 15,
+        'impulse': 3,
+        'flag': 50,
         'ma_period': 50,
         'tp_pct': 4,
         'sl_pct': 10

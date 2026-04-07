@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-regime_analyzer_STANDALONE.py
+market_regime/regime_analyzer.py
 
 Autonomous script that compares system performance with/without trend filtering.
 Calculates BTC MAs on-the-fly - no pre-enrichment needed.
@@ -24,11 +24,12 @@ from glob import glob
 # CONFIGURATION - EDIT THESE PARAMETERS
 # =============================================================================
 
-TRADES_FOLDER = '/home/javi/projects/quant/quant_g/bitget/development/brief_trades'
-BTC_FILE = '/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet'
-MA_PERIOD = 5  # Options: 5, 10, 20, 50, 200
-LONG_TH = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
-SHORT_TH = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
+TRADES_FOLDER   = '../brief_trades_2026'
+BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
+BTC_FILE        = '../defense_mode/BTCUSDT_1Dutc.parquet'
+MA_PERIOD       = 5  # Options: 5, 10, 20, 50, 200
+LONG_TH         = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
+SHORT_TH        = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
 INITIAL_CAPITAL = 800
 
 # =============================================================================
