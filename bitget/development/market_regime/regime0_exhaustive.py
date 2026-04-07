@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-zasymetric_lab_exhaustive.py
+market_regime/zasymetric_lab_exhaustive.py
 Find Best LONG + SHORT Rule Combination by Testing All Pairs
 Tests all 400 combinations (20 LONG × 20 SHORT) on LAB data
 """
@@ -179,59 +179,75 @@ def print_combination_details(rank, combo):
     print(f"\n#{rank} {'='*130}")
     print(f"LONG:  BTC > {long_rule}")
     print(f"SHORT: BTC < {short_rule}")
-    print("="*140)
+    print("="*110)
     
     # Header
-    print(f"\n{'Direction':<10} {'TRADES':<30} {'PROFIT':<45} {'WIN RATE':<35} {'MAX DD':<35}")
+    print(f"\n{'Direction':<10} {'TRADES':<30} {'PROFIT':<45} {'WIN RATE':<20} {'MAX DD':<20}")
     print(f"{'':10} {'Before':<8} {'After':<8} {'Δ':<12} {'Before':<12} {'After':<12} {'Δ':<10} {'%Δ':<8} "
-          f"{'Before':<8} {'After':<8} {'Δ':<8} {'%Δ':<8} {'Before':<8} {'After':<8} {'Δ':<8} {'%Δ':<8}")
-    print("-"*140)
+          f"{'Before':<8} {'After':<10} {'Before':<8} {'After':<10}")
+    print("-"*110)
     
     # LONG
     long_profit_change = lr['filtered_profit'] - lr['total_profit']
     long_profit_pct = (long_profit_change / abs(lr['total_profit']) * 100) if lr['total_profit'] != 0 else 0
-    long_wr_change = lr['filtered_wr'] - lr['total_wr']
-    long_wr_pct = (long_wr_change / lr['total_wr'] * 100) if lr['total_wr'] != 0 else 0
-    long_dd_change = lr['filtered_dd'] - lr['total_dd']
-    long_dd_pct = (long_dd_change / abs(lr['total_dd']) * 100) if lr['total_dd'] != 0 else 0
     
     print(f"{'LONG':<10} {lr['total_trades']:<8} {lr['filtered_trades']:<8} {lr['filtered_trades']-lr['total_trades']:<12} "
           f"${lr['total_profit']:<11.2f} ${lr['filtered_profit']:<11.2f} ${long_profit_change:<9.2f} {long_profit_pct:>+6.1f}%  "
-          f"{lr['total_wr']:<7.1f}% {lr['filtered_wr']:<7.1f}% {long_wr_change:>+6.1f}p {long_wr_pct:>+6.1f}%  "
-          f"{lr['total_dd']:<7.1f}% {lr['filtered_dd']:<7.1f}% {long_dd_change:>+6.1f}p {long_dd_pct:>+6.1f}%")
+          f"{lr['total_wr']:<7.1f}% {lr['filtered_wr']:<9.1f}% "
+          f"{lr['total_dd']:<7.1f}% {lr['filtered_dd']:<9.1f}%")
     
     # SHORT
     short_profit_change = sr['filtered_profit'] - sr['total_profit']
     short_profit_pct = (short_profit_change / abs(sr['total_profit']) * 100) if sr['total_profit'] != 0 else 0
-    short_wr_change = sr['filtered_wr'] - sr['total_wr']
-    short_wr_pct = (short_wr_change / sr['total_wr'] * 100) if sr['total_wr'] != 0 else 0
-    short_dd_change = sr['filtered_dd'] - sr['total_dd']
-    short_dd_pct = (short_dd_change / abs(sr['total_dd']) * 100) if sr['total_dd'] != 0 else 0
     
     print(f"{'SHORT':<10} {sr['total_trades']:<8} {sr['filtered_trades']:<8} {sr['filtered_trades']-sr['total_trades']:<12} "
           f"${sr['total_profit']:<11.2f} ${sr['filtered_profit']:<11.2f} ${short_profit_change:<9.2f} {short_profit_pct:>+6.1f}%  "
-          f"{sr['total_wr']:<7.1f}% {sr['filtered_wr']:<7.1f}% {short_wr_change:>+6.1f}p {short_wr_pct:>+6.1f}%  "
-          f"{sr['total_dd']:<7.1f}% {sr['filtered_dd']:<7.1f}% {short_dd_change:>+6.1f}p {short_dd_pct:>+6.1f}%")
+          f"{sr['total_wr']:<7.1f}% {sr['filtered_wr']:<9.1f}% "
+          f"{sr['total_dd']:<7.1f}% {sr['filtered_dd']:<9.1f}%")
     
-    print("-"*140)
+    print("-"*110)
     
     # TOTAL
     total_trades_change = total_after_trades - total_before_trades
     total_profit_change = total_after_profit - total_before_profit
     total_profit_pct = (total_profit_change / abs(total_before_profit) * 100) if total_before_profit != 0 else 0
-    total_wr_change = total_after_wr - total_before_wr
-    total_wr_pct = (total_wr_change / total_before_wr * 100) if total_before_wr != 0 else 0
-    total_dd_change = total_after_dd - total_before_dd
-    total_dd_pct = (total_dd_change / abs(total_before_dd) * 100) if total_before_dd != 0 else 0
     
     print(f"{'TOTAL':<10} {total_before_trades:<8} {total_after_trades:<8} {total_trades_change:<12} "
           f"${total_before_profit:<11.2f} ${total_after_profit:<11.2f} ${total_profit_change:<9.2f} {total_profit_pct:>+6.1f}%  "
-          f"{total_before_wr:<7.1f}% {total_after_wr:<7.1f}% {total_wr_change:>+6.1f}p {total_wr_pct:>+6.1f}%  "
-          f"{total_before_dd:<7.1f}% {total_after_dd:<7.1f}% {total_dd_change:>+6.1f}p {total_dd_pct:>+6.1f}%")
+          f"{total_before_wr:<7.1f}% {total_after_wr:<9.1f}% "
+          f"{total_before_dd:<7.1f}% {total_after_dd:<9.1f}%")
     
     print(f"\n💰 COMBINED PROFIT: ${combo['combined_profit']:,.2f}")
 
-
+def print_summary_table(combinations):
+    """Print summary table of top 3 combinations"""
+    print("\n" + "="*110)
+    print("SUMMARY - TOP 3 COMBINATIONS")
+    print("="*110)
+    
+    print(f"\n{'#':>3} {'LONG RULE':<15} {'SHORT RULE':<15} {'TRADES':<12} {'PROFIT':<15} {'WIN RATE':<12} {'MAX DD':<12}")
+    print(f"{'':>3} {'':15} {'':15} {'After':>12} {'After':>15} {'After':>12} {'After':>12}")
+    print("-"*110)
+    
+    for rank, combo in enumerate(combinations[:3], 1):
+        long_rule = f"{combo['long_ma'].upper()}{combo['long_th']:.2f}"
+        short_rule = f"{combo['short_ma'].upper()}{combo['short_th']:.2f}"
+        
+        lr = combo['long_result']
+        sr = combo['short_result']
+        
+        # Calculate totals
+        total_after_trades = lr['filtered_trades'] + sr['filtered_trades']
+        total_after_profit = lr['filtered_profit'] + sr['filtered_profit']
+        total_after_wr = (lr['filtered_wr'] * lr['filtered_trades'] + sr['filtered_wr'] * sr['filtered_trades']) / total_after_trades if total_after_trades > 0 else 0
+        
+        # Weighted DD
+        total_after_dd = (abs(lr['filtered_dd']) * abs(lr['filtered_profit']) + abs(sr['filtered_dd']) * abs(sr['filtered_profit'])) / (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) if (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) > 0 else 0
+        total_after_dd = -total_after_dd
+        
+        print(f"{rank:>3} {long_rule:<15} {short_rule:<15} {total_after_trades:>12} ${total_after_profit:>14.2f} {total_after_wr:>11.1f}% {total_after_dd:>11.1f}%")
+    
+    print("-"*110)
 def main():
     print("="*140)
     print("FIND BEST LONG + SHORT COMBINATION (Testing All Pairs)")
@@ -296,11 +312,13 @@ def main():
     
     # Display top 5
     print("\n" + "="*140)
-    print("TOP 5 BEST COMBINATIONS (by Total Profit)")
+    print("TOP 3 BEST COMBINATIONS (by Total Profit)")
     print("="*140)
     
-    for rank, combo in enumerate(combinations[:5], 1):
+    for rank, combo in enumerate(combinations[:3], 1):
         print_combination_details(rank, combo)
+    
+    print_summary_table(combinations)
     
     # Best combination summary
     best = combinations[0]

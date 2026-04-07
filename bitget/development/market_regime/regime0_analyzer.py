@@ -26,7 +26,6 @@ from glob import glob
 
 TRADES_FOLDER   = '../brief_trades_2026'
 BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
-BTC_FILE        = '../defense_mode/BTCUSDT_1Dutc.parquet'
 MA_PERIOD       = 5  # Options: 5, 10, 20, 50, 200
 LONG_TH         = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
 SHORT_TH        = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
@@ -320,69 +319,51 @@ def main():
     
     print(df_comp.to_string(index=False))
     
-    # Global portfolio comparison
-    if global_without['total_profit'] != 0:
-        global_profit_change = ((global_with['total_profit'] - global_without['total_profit']) / abs(global_without['total_profit'])) * 100
-    else:
-        global_profit_change = 0.0
-    
-    if global_without['max_dd_pct'] != 0:
-        global_dd_change = ((global_with['max_dd_pct'] - global_without['max_dd_pct']) / abs(global_without['max_dd_pct'])) * 100
-    else:
-        global_dd_change = 0.0
-    
-    print("\n" + "-" * 80)
-    print(f"\n{'DETAILED GLOBAL METRICS':^80}")
-    print("-" * 80)
-    print(f"WITHOUT FILTER:")
-    print(f"  Total Profit: ${global_without['total_profit']:,.2f}")
-    print(f"  Net Gain:     {global_without['net_gain_pct']:.2f}%")
-    print(f"  Max DD:       {global_without['max_dd_pct']:.2f}%")
-    print(f"  Num Trades:   {global_without['num_trades']:,}")
-    print(f"\nWITH TREND FILTER (LONG: BTC > MA{MA_PERIOD}×{LONG_TH}, SHORT: BTC < MA{MA_PERIOD}×{SHORT_TH}):")
-    print(f"  Total Profit: ${global_with['total_profit']:,.2f}")
-    print(f"  Net Gain:     {global_with['net_gain_pct']:.2f}%")
-    print(f"  Max DD:       {global_with['max_dd_pct']:.2f}%")
-    print(f"  Num Trades:   {global_with['num_trades']:,}")
-    print(f"\nCHANGE:")
-    print(f"  Profit:       ${global_with['total_profit'] - global_without['total_profit']:,.2f} ({global_profit_change:+.1f}%)")
-    print(f"  Net Gain:     {global_with['net_gain_pct'] - global_without['net_gain_pct']:+.2f}% pts")
-    print(f"  DD:           {global_with['max_dd_pct'] - global_without['max_dd_pct']:.2f} pts ({global_dd_change:+.1f}%)")
-    print(f"  Trades:       {global_with['num_trades'] - global_without['num_trades']:,} ({(global_with['num_trades']/global_without['num_trades']-1)*100:+.1f}%)")
-    print("=" * 80)
-    
     # ==========================================================================
-    # SUMMARY STATISTICS
+    # GLOBAL SUMMARY TABLE
     # ==========================================================================
     print("\n" + "=" * 100)
-    print("SUMMARY STATISTICS")
+    print("GLOBAL PORTFOLIO SUMMARY")
     print("=" * 100)
     
+    print(f"\n{'Metric':<25} {'WITHOUT FILTER':>20} {'WITH FILTER':>20} {'CHANGE':>20}")
+    print("-" * 100)
+    
+    # Trades
+    trades_change = global_with['num_trades'] - global_without['num_trades']
+    trades_change_pct = (trades_change / global_without['num_trades'] * 100) if global_without['num_trades'] > 0 else 0
+    trades_without_str = f"{global_without['num_trades']:,}".replace(',', '.')
+    trades_with_str = f"{global_with['num_trades']:,}".replace(',', '.')
+    trades_change_str = f"{trades_change_pct:+.1f}".replace('.', ',')
+    print(f"{'Trades':<25} {trades_without_str:>20} {trades_with_str:>20} {trades_change_str:>19}%")
+    
+    # Profit
+    profit_change = global_with['total_profit'] - global_without['total_profit']
+    profit_change_pct = (profit_change / abs(global_without['total_profit']) * 100) if global_without['total_profit'] != 0 else 0
+    profit_without_str = f"{global_without['total_profit']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    profit_with_str = f"{global_with['total_profit']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    change_str = f"{profit_change_pct:+.1f}".replace('.', ',')
+    print(f"{'Total Profit':<25} {profit_without_str:>20} {profit_with_str:>20} {change_str:>19}%")
+    
+    # Net Gain
+    gain_change = global_with['net_gain_pct'] - global_without['net_gain_pct']
+    gain_without_str = f"{global_without['net_gain_pct']:.2f}".replace('.', ',')
+    gain_with_str = f"{global_with['net_gain_pct']:.2f}".replace('.', ',')
+    gain_change_str = f"{gain_change:+.2f}".replace('.', ',')
+    print(f"{'Net Gain %':<25} {gain_without_str:>19}% {gain_with_str:>19}% {gain_change_str:>19}%")
+    
+    # Max DD
+    dd_change = global_with['max_dd_pct'] - global_without['max_dd_pct']
+    dd_without_str = f"{global_without['max_dd_pct']:.2f}".replace('.', ',')
+    dd_with_str = f"{global_with['max_dd_pct']:.2f}".replace('.', ',')
+    dd_change_str = f"{dd_change:+.2f}".replace('.', ',')
+    print(f"{'Max Drawdown %':<25} {dd_without_str:>19}% {dd_with_str:>19}% {dd_change_str:>19}%")
+    
+    print("-" * 100)
+    
+    # Improvement stats
     improvements = sum(1 for r in results if r['with_filter']['net_gain_pct'] > r['without_filter']['net_gain_pct'])
-    degradations = sum(1 for r in results if r['with_filter']['net_gain_pct'] < r['without_filter']['net_gain_pct'])
-    unchanged = len(results) - improvements - degradations
-    
-    print(f"\nStrategies improved with filter:    {improvements}/{len(results)} ({improvements/len(results)*100:.1f}%)")
-    print(f"Strategies degraded with filter:    {degradations}/{len(results)} ({degradations/len(results)*100:.1f}%)")
-    print(f"Strategies unchanged:                {unchanged}/{len(results)} ({unchanged/len(results)*100:.1f}%)")
-    
-    avg_gain_improvement = np.mean([r['with_filter']['net_gain_pct'] - r['without_filter']['net_gain_pct'] for r in results])
-    avg_dd_improvement = np.mean([r['with_filter']['max_dd_pct'] - r['without_filter']['max_dd_pct'] for r in results])
-    
-    print(f"\nAverage Net Gain improvement:        {avg_gain_improvement:+.2f}%")
-    print(f"Average Max DD change:                {avg_dd_improvement:+.2f}%")
-    
-    delta_global_gain = global_with['net_gain_pct'] - global_without['net_gain_pct']
-    delta_global_dd = global_with['max_dd_pct'] - global_without['max_dd_pct']
-    
-    print(f"\n{'GLOBAL PORTFOLIO IMPACT':^50}")
-    print("-" * 50)
-    print(f"Without filter:  {global_without['net_gain_pct']:>6.2f}% gain, {global_without['max_dd_pct']:>6.2f}% DD")
-    print(f"With filter:     {global_with['net_gain_pct']:>6.2f}% gain, {global_with['max_dd_pct']:>6.2f}% DD")
-    print(f"Delta:           {delta_global_gain:>+6.2f}% gain, {delta_global_dd:>+6.2f}% DD")
-    
-    trades_reduction_pct = (1 - global_with['num_trades'] / global_without['num_trades']) * 100 if global_without['num_trades'] > 0 else 0
-    print(f"\nTrades reduction:    {global_without['num_trades']:,} → {global_with['num_trades']:,} ({trades_reduction_pct:.1f}% less)")
+    print(f"\nStrategies improved: {improvements}/{len(results)} ({improvements/len(results)*100:.1f}%)")
     
     # ==========================================================================
     # RECOMMENDATION
@@ -390,6 +371,9 @@ def main():
     print("\n" + "=" * 100)
     print("RECOMMENDATION")
     print("=" * 100)
+    
+    delta_global_gain = global_with['net_gain_pct'] - global_without['net_gain_pct']
+    delta_global_dd = global_with['max_dd_pct'] - global_without['max_dd_pct']
     
     if delta_global_gain > 2.0 and (delta_global_dd > -1.0):
         print("\n✅ RECOMMEND USING TREND FILTER")

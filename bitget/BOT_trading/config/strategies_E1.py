@@ -1,5 +1,5 @@
 """
-Trading Strategies Configuration
+BOT_trading/config/strategies_E1.py Trading Strategies Configuration
 
 This file defines all trading strategies used by the bot.
 Each strategy must have all required parameters defined.
