@@ -18,9 +18,9 @@ from signals.add_signals_flag import flag_long
 from signals.add_signals_flag import flag_short
 
 start_time   = time.time()
-SAVE_SYMBOLS = False
+SAVE_SYMBOLS = True
 MY_SYMBOLS   = False
-STRATEGY     = "flag_short_1H_OOSx"
+STRATEGY     = "flag_short_4H_OOSx"
 N_JOBS       = -1
 
 # -----------------------------------------------------------------------------
@@ -29,7 +29,7 @@ N_JOBS       = -1
 DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_OOS_2026"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 1_000_000
@@ -37,14 +37,6 @@ MIN_VOL_USDT        = 1_000_000
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST  = [0]  
-LOOKBACK_LIST    = [20]
-IMPULSE_LIST     = [3]
-FLAG_LIST        = [40]
-MA_PERIOD_LIST   = [50]
-
-TP_PCT_LIST      = [1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5]
-SL_PCT_LIST      = [9,5,9.6,9.7,9.8,9.9,10,10.1,10.2,10.3,10.4,10.5]
 
 # =============================================================================
 # #4HLONG-9(2025) 
@@ -73,13 +65,13 @@ SL_PCT_LIST      = [9,5,9.6,9.7,9.8,9.9,10,10.1,10.2,10.3,10.4,10.5]
 
 #1HSHORT-9 
 SELL_AFTER_LIST    = [0]  
-LOOKBACK_LIST      = [20]
+LOOKBACK_LIST      = [10]
 IMPULSE_LIST       = [3]
-FLAG_MAX_LIST      = [60]
-MA_PERIOD_LIST     = [25]
+FLAG_LIST          = [50]
+MA_PERIOD_LIST     = [50]
 
-TP_PCT_LIST        = [2]
-SL_PCT_LIST        = [8]
+TP_PCT_LIST        = [3]
+SL_PCT_LIST        = [9]
 
 
 param_names = ['SELL_AFTER','LOOKBACK','IMPULSE','FLAG','MA_PERIOD','TP_PCT','SL_PCT']
@@ -94,7 +86,7 @@ ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MI
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
-
+print(f"Symbols ({len(ohlcv_arr_minor)}): {sorted(ohlcv_arr_minor.keys())}")
 # -----------------------------------------------------------------------------
 # FUNCTION TO PROCESS ONE PARAMETER COMBINATION
 # -----------------------------------------------------------------------------

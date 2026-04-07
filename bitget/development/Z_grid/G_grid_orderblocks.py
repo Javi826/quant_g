@@ -1,4 +1,4 @@
-# === FILE: main_MONTECARLO_ ===
+# === FILE: main_grid_ ===
 # -----------------------------------------------------------
 import os
 import sys

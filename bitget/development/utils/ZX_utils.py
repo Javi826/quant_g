@@ -16,15 +16,18 @@ symbols_to_include = ["ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ET
  
 #symbols_to_include = ["BTCUSDT","ETHUSDT"]
 
-def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None, min_price=None, vol_window=50, my_symbols=False):
+def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
+                   min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
     ohlcv_data         = {}
     filtered_symbols   = []
     removed_symbols    = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
     
-    # ---- Filtro de inclusión ----
+    # ---- Inclusion filter ----
     if my_symbols:
-        symbols = [s for s in symbols if s in symbols_to_include]
+        inclusion_list = custom_symbols if custom_symbols is not None else symbols_to_include
+        symbols = [s for s in symbols if s in inclusion_list]
+    # --------------------------
     # -----------------------------
     
     for sym in symbols:
@@ -70,27 +73,25 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-# =============================================================================
-#             if df is not None:
-#                 n_rows = len(df)
-#                 if timeframe == "1H":
-#                     min_bars = 4320
-#                 elif timeframe == "30m":
-#                     min_bars = 7800
-#                 elif timeframe == "4H":
-#                     min_bars = 1080
-#                 elif timeframe == "6Hutc":
-#                     min_bars = 720
-#                 elif timeframe == "12Hutc":
-#                     min_bars = 360
-#                 elif timeframe == "1Dutc":
-#                     min_bars = 180
-#                 else:
-#                     min_bars = 999999999
-#                     
-#                 if n_rows < min_bars:
-#                     reasons.append("Not enough bars")
-# =============================================================================
+            if df is not None:
+                n_rows = len(df)
+                if timeframe == "1H":
+                    min_bars = 4320
+                elif timeframe == "30m":
+                    min_bars = 7800
+                elif timeframe == "4H":
+                    min_bars = 1080
+                elif timeframe == "6Hutc":
+                    min_bars = 720
+                elif timeframe == "12Hutc":
+                    min_bars = 360
+                elif timeframe == "1Dutc":
+                    min_bars = 180
+                else:
+                    min_bars = 999999999
+                    
+                if n_rows < min_bars:
+                    reasons.append("Not enough bars")
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:
