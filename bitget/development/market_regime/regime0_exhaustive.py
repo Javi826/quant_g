@@ -14,8 +14,8 @@ from glob import glob
 # CONFIGURATION
 # =============================================================================
 
-LAB_TRADES_FOLDER = "../brief_trades_2022"
-BTC_FILE          = "../data/crypto_2022_IS/BTCUSDT_1Dutc.parquet"
+LAB_TRADES_FOLDER = "../brief_trades"
+BTC_FILE          = "../data/crypto_2022_OOS/BTCUSDT_1Dutc.parquet"
 
 # MA thresholds to test
 MA_TYPES          = ['ma5', 'ma10', 'ma20', 'ma50']

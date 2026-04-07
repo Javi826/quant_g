@@ -21,8 +21,8 @@ from regime_metrics import calc_all_metrics
 # =============================================================================
 
 # IS (In-Sample) Configuration
-IS_TRADES_FOLDER = '../brief_trades_2022'
-IS_OHLC_FOLDER   = '../data/crypto_2022_IS'
+IS_TRADES_FOLDER = '../brief_trades'
+IS_OHLC_FOLDER   = '../data/crypto_2022_OOS'
 
 # OOS (Out-of-Sample) Configuration
 OOS_TRADES_FOLDER = '../brief_trades_2026'
@@ -32,6 +32,7 @@ OOS_OHLC_FOLDER   = '../data/crypto_2026_OOS'
 MA_PERIOD             = 50
 INITIAL_CAPITAL       = 800
 MIN_TRADES_CONFIDENCE = 50
+ANALYZE_DIRECTION     = False  # True: analyze FAMILY + DIRECTION + REGIME, False: analyze FAMILY only
 
 # =============================================================================
 
@@ -220,15 +221,17 @@ def analyze_strategy(filepath, ohlc_folder, families, initial_capital):
             if not pd.isna(metrics['price_vs_ma_50']):
                 df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'downtrend'
     
-    critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
+    critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50'] if ANALYZE_DIRECTION else ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy']
     df = df.dropna(subset=critical_cols).reset_index(drop=True)
     
-    df['regime'] = df['family'] + '_' + df['trend']
+    if ANALYZE_DIRECTION:
+        df['regime'] = df['family'] + '_' + df['trend']
+    
     df = df.sort_values('buy_time').reset_index(drop=True)
     
     family_stats = analyze_by_dimension(df, 'family', initial_capital)
-    trend_stats = analyze_by_dimension(df, 'trend', initial_capital)
-    regime_stats = analyze_by_dimension(df, 'regime', initial_capital)
+    trend_stats = analyze_by_dimension(df, 'trend', initial_capital) if ANALYZE_DIRECTION else {}
+    regime_stats = analyze_by_dimension(df, 'regime', initial_capital) if ANALYZE_DIRECTION else {}
     
     return {
         'strategy': strategy,
@@ -308,6 +311,9 @@ def compare_datasets(is_results, oos_results):
               f"{is_sig_str:>7} {oos_sig_str:>8} {match:>6} {decision:<30}")
     
     print("-"*160)
+    
+    if not ANALYZE_DIRECTION:
+        return  # Skip DIRECTION and REGIME comparison tables
     
     print("\n" + "="*160)
     print("IS vs OOS COMPARISON - DIRECTION")
@@ -422,6 +428,7 @@ def main():
     print(f"  MA period:  MA{MA_PERIOD}")
     print(f"  Capital:    ${INITIAL_CAPITAL}")
     print(f"  Min trades: {MIN_TRADES_CONFIDENCE}")
+    print(f"  Analyze Direction: {ANALYZE_DIRECTION}")
     
     # Analyze IS
     print(f"\n{'='*180}")

@@ -18,12 +18,14 @@ from glob import glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from regime_metrics import calc_all_metrics
 
+
 BASE_DIR              = '/home/javi/projects/quant/quant_g/bitget/development'
 TRADES_FOLDER         = f'{BASE_DIR}/brief_trades_2026'
 OHLC_FOLDER           = f'{BASE_DIR}/data/crypto_2026_OOS'  
 MA_PERIOD             = 50
 INITIAL_CAPITAL       = 800
 MIN_TRADES_CONFIDENCE = 50
+ANALYZE_DIRECTION = False  # True: analyze FAMILY + DIRECTION + REGIME, False: analyze FAMILY only
 
 _btc_cache = {}  # Cache for BTC dataframes by timeframe
 
@@ -33,11 +35,11 @@ FAMILIES = {
     'ranging': {}
 }
 
-HURST_WINDOW  = 100
-ER_WINDOW     = 14
-ATR_WINDOW    = 14
-PE_WINDOW     = 50
-PE_ORDER      = 3
+HURST_WINDOW = 100
+ER_WINDOW = 14
+ATR_WINDOW = 14
+PE_WINDOW = 50
+PE_ORDER = 3
 LOOKBACK_BARS = 100
 
 _btc_cache = {}  # Cache for BTC dataframes by timeframe
@@ -95,9 +97,9 @@ def calc_all_metrics_at_time(btc_df, buy_time, lookback):
     metrics = calc_all_metrics(ohlc, hurst_window=HURST_WINDOW, er_window=ER_WINDOW, 
                                 atr_window=ATR_WINDOW, pe_window=PE_WINDOW, pe_order=PE_ORDER)
     current_close = float(btc_df.iloc[idx]['close'])
-    if idx >= (MA_PERIOD - 1):
-        ma_data = btc_df.iloc[idx - (MA_PERIOD - 1):idx + 1]['close'].values
-        metrics['ma_50'] = float(np.mean(ma_data))
+    if idx >= 49:
+        ma_50_data = btc_df.iloc[idx - 49:idx + 1]['close'].values
+        metrics['ma_50'] = float(np.mean(ma_50_data))
         metrics['price_vs_ma_50'] = current_close / metrics['ma_50']
     else:
         metrics['ma_50'] = np.nan
@@ -207,8 +209,6 @@ def analyze_strategy(filepath, families, initial_capital):
     timeframe = extract_timeframe(Path(filepath).name)
     btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe)
     
-    print(f"   Processing {strategy} [{timeframe}]...")
-    
     df = load_trades(filepath)
     
     df['family'] = 'unknown'
@@ -235,18 +235,25 @@ def analyze_strategy(filepath, families, initial_capital):
                 df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'downtrend'
     
     # CRITICAL: Drop NaN rows (matches enricher.py lines 244-256)
-    critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
-    trades_before = len(df)
+    if ANALYZE_DIRECTION:
+        critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
+    else:
+        critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy']
     df = df.dropna(subset=critical_cols).reset_index(drop=True)
-    trades_after = len(df)
-    if trades_before != trades_after:
-        print(f"      Dropped {trades_before - trades_after} trades with NaN metrics")
     
-    df['regime'] = df['family'] + '_' + df['trend']
+    if ANALYZE_DIRECTION:
+        df['regime'] = df['family'] + '_' + df['trend']
+    
     df = df.sort_values('buy_time').reset_index(drop=True)
     family_stats = analyze_by_dimension(df, 'family', initial_capital)
-    trend_stats = analyze_by_dimension(df, 'trend', initial_capital)
-    regime_stats = analyze_by_dimension(df, 'regime', initial_capital)
+    
+    if ANALYZE_DIRECTION:
+        trend_stats = analyze_by_dimension(df, 'trend', initial_capital)
+        regime_stats = analyze_by_dimension(df, 'regime', initial_capital)
+    else:
+        trend_stats = {}
+        regime_stats = {}
+    
     df_sorted = df.sort_values('buy_time').reset_index(drop=True)
     df_sorted['equity_total'] = initial_capital + df_sorted['profit'].cumsum()
     total_dd_pct = calculate_max_dd_pct(df_sorted['equity_total'])
@@ -298,6 +305,9 @@ def print_single_strategy_all_dimensions(r):
         p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
         sig_str = format_significance(p_value)
         print(f"\n→ BEST: {best_fam} (${best_stats['profit']:.2f}) vs 2ND: {second_fam} (${second_stats['profit']:.2f}) | {sig_str}")
+    
+    if not ANALYZE_DIRECTION:
+        return  # Skip DIRECTION and REGIME tables
     
     print(f"\n{'─'*120}")
     print("BY DIRECTION (uptrend/downtrend)")
@@ -390,6 +400,9 @@ def print_summary_tables(results):
     
     print("-" * 145)
     
+    if not ANALYZE_DIRECTION:
+        return  # Skip DIRECTION and REGIME summary tables
+    
     print(f"\n{'─'*145}")
     print("BEST DIRECTION PER STRATEGY")
     print(f"{'─'*145}")
@@ -433,20 +446,25 @@ def print_summary_tables(results):
     print("-" * 145)
 
 def main():
-    print("=" * 70)
+    print("=" * 100)
     print("REGIME ANALYZER - Performance across 3 dimensions (STANDALONE)")
-    print("=" * 70)
+    print("=" * 100)
     
     print(f"\nConfiguration:")
     print(f"  Trades folder: {TRADES_FOLDER}")
     print(f"  OHLC folder:   {OHLC_FOLDER}")
     print(f"  MA period:     MA{MA_PERIOD}")
     print(f"  Capital:       ${INITIAL_CAPITAL}")
+    print(f"  Analyze Direction: {ANALYZE_DIRECTION}")
     
-    print("\nDimensions analyzed:")
-    print("  1. FAMILY: trending/volatile/ranging (ignoring BTC direction)")
-    print("  2. DIRECTION: uptrend/downtrend (ignoring family)")
-    print("  3. REGIME: 6 combined categories (full granularity)")
+    if ANALYZE_DIRECTION:
+        print("\nDimensions analyzed:")
+        print("  1. FAMILY: trending/volatile/ranging (ignoring BTC direction)")
+        print("  2. DIRECTION: uptrend/downtrend (ignoring family)")
+        print("  3. REGIME: 6 combined categories (full granularity)")
+    else:
+        print("\nDimensions analyzed:")
+        print("  1. FAMILY: trending/volatile/ranging (DIRECTION analysis disabled)")
     
     print(f"\nConfidence indicator (CONF):")
     print(f"  ✓ = >={MIN_TRADES_CONFIDENCE} trades (reliable)")
@@ -464,12 +482,14 @@ def main():
         return
     
     print(f"\n📂 Found {len(files)} strategy files")
+    
     print("\n🔍 Analyzing strategies...")
     
     results = []
     for filepath in files:
         result = analyze_strategy(filepath, FAMILIES, INITIAL_CAPITAL)
         results.append(result)
+        print(f"   ✅ {result['strategy']}")
     
     for r in results:
         print_single_strategy_all_dimensions(r)

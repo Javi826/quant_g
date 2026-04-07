@@ -27,13 +27,13 @@ from regime_metrics import calc_all_metrics
 # =============================================================================
 
 # Data paths
-TRADES_FOLDER   = '../brief_trades_2026'
-OHLC_FOLDER     = '../data/crypto_2026_OOS'
-BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
+TRADES_FOLDER   = '../brief_trades'
+OHLC_FOLDER     = '../data/crypto_2022_OOS'
+BTC_FILE        = '../data/crypto_2022_OOS/BTCUSDT_1Dutc.parquet'
 
 # REGIME 0 parameters (BTC MA filter)
 MA_PERIOD       = 5
-LONG_TH         = 1.00
+LONG_TH         = 1.02
 SHORT_TH        = 1.00
 
 # REGIME 1 parameters
