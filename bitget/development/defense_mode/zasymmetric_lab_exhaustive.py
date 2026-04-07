@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+zasymetric_lab_exhaustive.py
 Find Best LONG + SHORT Rule Combination by Testing All Pairs
 Tests all 400 combinations (20 LONG × 20 SHORT) on LAB data
 """
@@ -9,10 +10,21 @@ import numpy as np
 from pathlib import Path
 from glob import glob
 
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
 
+LAB_TRADES_FOLDER = "../brief_trades_2022"
+BTC_FILE          = "../data/crypto_2022_IS/BTCUSDT_1Dutc.parquet"
+
+# MA thresholds to test
+MA_TYPES          = ['ma5', 'ma10', 'ma20', 'ma50']
+THRESHOLDS        = [0.95, 0.98, 1.00, 1.02, 1.05]
+
+# =============================================================================
 def load_btc_1d():
     """Load BTC 1D data"""
-    btc_file = Path('/home/javi/projects/quant/quant_g/bitget/development/defense_mode/BTCUSDT_1Dutc.parquet')
+    btc_file = Path(BTC_FILE)
     
     if not btc_file.exists():
         raise FileNotFoundError(f"BTC 1D file not found: {btc_file}")
@@ -28,10 +40,9 @@ def load_btc_1d():
     df = df.sort_values('ts').reset_index(drop=True)
     
     # Calculate MAs
-    df['ma5'] = df['close'].rolling(window=5).mean()
-    df['ma10'] = df['close'].rolling(window=10).mean()
-    df['ma20'] = df['close'].rolling(window=20).mean()
-    df['ma50'] = df['close'].rolling(window=50).mean()
+    for ma_type in MA_TYPES:
+        period = int(ma_type.replace('ma', ''))
+        df[ma_type] = df['close'].rolling(window=period).mean()
     
     return df
 
@@ -53,7 +64,7 @@ def get_btc_value(btc_df, trade_time, ma_type):
 
 def load_all_lab_trades():
     """Load all lab trades"""
-    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades')
+    lab_folder = Path(LAB_TRADES_FOLDER)
     files = glob(str(lab_folder / 'all_trades_*.xlsx'))
     
     all_trades = []
@@ -223,7 +234,7 @@ def print_combination_details(rank, combo):
 
 def main():
     print("="*140)
-    print("FIND BEST LONG + SHORT COMBINATION (Testing All 400 Pairs)")
+    print("FIND BEST LONG + SHORT COMBINATION (Testing All Pairs)")
     print("="*140)
     
     # Load BTC 1D
@@ -243,8 +254,8 @@ def main():
     
     # Define rules
     rules = []
-    for ma_type in ['ma5', 'ma10', 'ma20', 'ma50']:
-        for threshold in [0.95, 0.98, 1.00, 1.02, 1.05]:
+    for ma_type in MA_TYPES:
+        for threshold in THRESHOLDS:
             rules.append((ma_type, threshold))
     
     print(f"\n🔍 Testing {len(rules)} LONG rules × {len(rules)} SHORT rules = {len(rules)**2} combinations...")

@@ -7,13 +7,13 @@ from datetime import datetime, timedelta
 # CONFIGURATION PARAMETERS
 # -----------------------------
 BASE_DIR          = Path(__file__).resolve().parent.parent  
-input_folder      = BASE_DIR / "data" / "crypto_2026_short_hl"
-output_folder_is  = BASE_DIR / "data" / "crypto_2026_short_IS"
-output_folder_oos = BASE_DIR / "data" / "crypto_2026_short_OOS"
+input_folder      = BASE_DIR / "data" / "crypto_2022_IS"
+output_folder_is  = BASE_DIR / "data" / "crypto_2022_OOS"
+output_folder_oos = BASE_DIR / "data" / "crypto_2022_NNN"
 
 # Date range for IN-SAMPLE (IS)
-IS_START = "2025-01-01"
-IS_END   = "2025-12-30"
+IS_START = "2022-01-01"
+IS_END   = "2022-12-31"
 
 # Automatic OOS: from IS_END until the end of the file
 # OOS_START = IS_END

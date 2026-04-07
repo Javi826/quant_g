@@ -14,7 +14,8 @@ FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '1D'
 BARS_PER_DAY        = 1
-DATA_FOLDER         = "../data/crypto_OOS_2026"
+DATA_FOLDER         = "../data/crypto_2022_IS"
+#DATA_FOLDER         = "../data/crypto_2022_OOS"
 
 # -------------------------------------------------
 # --- Metrics Functions

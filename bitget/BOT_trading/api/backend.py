@@ -1298,7 +1298,6 @@ class DashboardServer:
                     strat_df = df[df['STRATEGY'] == strat_id].copy()
                     if strat_df.empty:
                         continue
-
                     strat_df['date'] = pd.to_datetime(strat_df['CLOSE_AT']).dt.date
                     daily_profit = strat_df.groupby('date')['PROFIT'].sum()
                     returns_by_strategy[strat_id] = daily_profit
@@ -1307,26 +1306,28 @@ class DashboardServer:
                     return jsonify({'error': 'Need at least 2 strategies with trades'}), 400
 
                 # Align all series on a common date index, fill missing days with 0 profit
-                profit_df = pd.DataFrame(returns_by_strategy).fillna(0)
+                profit_df         = pd.DataFrame(returns_by_strategy).fillna(0)
+                capital_per_strat = self.initial_capital / len(profit_df.columns)
 
                 if metric == 'profit':
-                    returns_df = profit_df
+                    # Percentage returns on equity — aligned with compose_equities.py
+                    equity_df  = capital_per_strat + profit_df.cumsum()
+                    returns_df = equity_df.pct_change().fillna(0)
 
-                else:  # drawdown — method 4: structural DD, propagated across days without trades
+                else:  # drawdown — method 4: structural DD in % relative to peak
                     dd_series = {}
                     for strat_id in profit_df.columns:
-                        cumulative  = profit_df[strat_id].cumsum()
-                        running_max = cumulative.cummax()
-                        dd_series[strat_id] = cumulative - running_max
-
+                        equity          = capital_per_strat + profit_df[strat_id].cumsum()
+                        peak            = equity.cummax()
+                        dd_series[strat_id] = (equity - peak) / peak * 100
                     returns_df = pd.DataFrame(dd_series)
 
                 # Correlation matrix
                 corr_matrix = returns_df.corr()
 
                 # High correlation pairs (> 0.7)
-                high_corr_pairs  = []
-                strategies_list  = list(corr_matrix.columns)
+                high_corr_pairs = []
+                strategies_list = list(corr_matrix.columns)
 
                 for i in range(len(strategies_list)):
                     for j in range(i + 1, len(strategies_list)):
@@ -1349,11 +1350,11 @@ class DashboardServer:
                         matrix_dict[col][idx] = round(float(val), 3) if pd.notna(val) else 0
 
                 return jsonify({
-                    'success':        True,
-                    'matrix':         matrix_dict,
-                    'strategies':     strategies_list,
+                    'success':         True,
+                    'matrix':          matrix_dict,
+                    'strategies':      strategies_list,
                     'high_corr_pairs': high_corr_pairs,
-                    'metric':         metric
+                    'metric':          metric
                 })
 
             except Exception as e:

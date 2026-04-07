@@ -12,8 +12,7 @@ from joblib import Parallel, delayed
 
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
-from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints, save_equity_to_excel
+from utils.ZX_utils import filter_symbols, save_filtered_symbols, save_equity_to_excel
 
 from signals.add_signals_flag       import flag_long, flag_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
@@ -25,6 +24,7 @@ from signals.add_signals_reversal   import reversal_long, reversal_short
 # GLOBAL CONFIG
 # -----------------------------------------------------------------------------
 DATA_FOLDER  = "../data/crypto_OOS_2026"
+DATA_FOLDER  = "../data/crypto_2022_IS"
 SYMBOLS_DIR  = "../../BOT_trading/symbols_live"
 ORDER_AMOUNT = 80
 N_JOBS       = -1
@@ -325,6 +325,8 @@ def run_strategy(strategy: dict) -> None:
         custom_symbols=custom_symbols,
     )
     ohlcv_arr = prepare_ohlcv_arrays(ohlcv_data)
+    missing = [s for s in custom_symbols if s not in ohlcv_data.keys()]
+    print(f"Missing parquets: {missing}")
 
     # Build grid
     grid_param_names, lists_for_grid = build_param_grid(strategy, signal_params)

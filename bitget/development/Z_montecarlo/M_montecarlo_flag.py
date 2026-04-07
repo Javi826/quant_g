@@ -28,8 +28,8 @@ MY_SYMBOLS          = False
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
 DATA_FOLDER         = "../data/crypto_2022_IS"
+#DATA_FOLDER         = "../data/crypto_2022_OOS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 8_000_000
@@ -38,63 +38,14 @@ MIN_VOL_USDT        = 8_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 
-SELL_AFTER_LIST           = [0]  
-LOOKBACK_LIST             = [5,10,15,20]
-IMPULSE_LIST              = [3,5,7,10]
-FLAG_LIST                 = [30,40,50,60,70]
-MA_PERIOD_LIST            = [50]
+SELL_AFTER_LIST     = [0]  
+LOOKBACK_LIST       = [5,10,15,20]
+IMPULSE_LIST        = [3,5,7,10]
+FLAG_LIST           = [30,40,50,60,70]
+MA_PERIOD_LIST      = [50]
 
-TP_PCT_LIST               = [2,3,4]
-SL_PCT_LIST               = [2,3]
-
-# =============================================================================
-# #4HLONG-9(2025) 
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [15]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [40]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [4]
-# SL_PCT_LIST               = [10]
-# =============================================================================
-
-#4HSHORT-23(2025) 
-# =============================================================================
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [10]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [50]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [3]
-# SL_PCT_LIST               = [9]
-# =============================================================================
-
-#1HLONG-3(2025) 
-# =============================================================================
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [20]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [40]
-# MA_PERIOD_LIST            = [50]
-# 
-# TP_PCT_LIST               = [2]
-# SL_PCT_LIST               = [10]
-# =============================================================================
-
-# =============================================================================
-# #1HSHORT-9 
-# SELL_AFTER_LIST           = [0]  
-# LOOKBACK_LIST             = [20]
-# IMPULSE_MIN_PCT_LIST      = [3]
-# FLAG_MAX_RANGE_PCT_LIST   = [60]
-# MA_PERIOD_LIST            = [25]
-# 
-# TP_PCT_LIST               = [2]
-# SL_PCT_LIST               = [8]
-# =============================================================================
-
+TP_PCT_LIST         = [2,3,4,5,6]
+SL_PCT_LIST         = [2,3,4,5,6,7,8,9,10]
 
 param_names = [
     'SELL_AFTER',
