@@ -57,7 +57,7 @@ REGIME1_FILTERS = {
         'direction': None,
     },
     '06_reversal_long_1H': {
-        'family':    ['trending', 'ranging', 'volatile'],
+        'family':    ['trending'],
         'direction': None,
     },
     '07_reversal_short_1H': {
