@@ -368,7 +368,7 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
         cash_bank -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        n_velas = 100#VELAS  
+        n_velas = 50#VELAS  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)

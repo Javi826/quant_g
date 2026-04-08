@@ -14,12 +14,19 @@ FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '1D'
 BARS_PER_DAY        = 1
-DATA_FOLDER         = "../data/crypto_2022_IS"
-#DATA_FOLDER         = "../data/crypto_2022_OOS"
+DATA_FOLDER         = "../data/crypto_2026_OOS"
 
-# -------------------------------------------------
-# --- Metrics Functions
-# -------------------------------------------------
+# =============================================================================
+# DETAILED METRICS CONFIGURATION
+# =============================================================================
+
+# Select strategies to calculate detailed metrics (None = skip metrics table)
+SELECTED_STRATEGIES_FOR_METRICS = [
+    '02_reversal_long_4H',
+    '10_parity_long_1H',
+    '16_ranging_short_6Hutc'
+]
+
 def total_return(df, capital):
     """Calculate net gain percentage"""
     return (df['balance'].iloc[-1] - capital) / capital * 100
