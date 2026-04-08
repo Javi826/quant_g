@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 def load_all_lab_trades():
     """Load and combine all lab trades, return trades and initial capital"""
 
-    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades')
+    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades_2022')
     files = glob(str(lab_folder / 'all_trades_*.xlsx'))
 
     if not files:
