@@ -26,8 +26,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
-DATA_FOLDER         = "../data/crypto_OOS_2026"
+DATA_FOLDER         = "../data/crypto_2025_OOS"
 #DATA_FOLDER         = "../data/crypto_2022_OOS"
 #DATA_FOLDER         = "../data/crypto_2023_IS"
 TIMEFRAME_MINOR     = '4H'
@@ -39,12 +38,28 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
+IMPULSE_LIST         = [0.02] 
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [45] 
+
+TP_PCT_LIST          = [3]
+SL_PCT_LIST          = [11]
+
+SELL_AFTER_LIST      = [0]  
 IMPULSE_LIST         = [0.01] 
 LOOKBACK_LIST        = [50]
 TOLERANCE_LIST       = [35] 
 
 TP_PCT_LIST          = [4]
 SL_PCT_LIST          = [11]
+
+SELL_AFTER_LIST      = [0]  
+IMPULSE_LIST         = [0.01] 
+LOOKBACK_LIST        = [100]
+TOLERANCE_LIST       = [42] 
+
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [10]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
