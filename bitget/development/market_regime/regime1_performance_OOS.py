@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-regime1_performance_STANDALONE.py - MATCHES ENRICHER EXACTLY
+market_regime/regime1_performance_IS.py - MATCHES ENRICHER EXACTLY
 
 Replicates enricher.py behavior:
 - Drops NaN rows in critical metrics
 - Calculates MA50 and price_vs_ma_50
 - Uses closed candles only (no lookahead)
+
+Now uses regime_common.py for shared functions.
 """
 
 import os
@@ -16,7 +18,9 @@ from pathlib import Path
 from glob import glob
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from regime_metrics import calc_all_metrics
+from regime_common import extract_timeframe, load_btc_for_timeframe, calc_all_metrics_at_time
+from regime_common import classify_trade_by_family, load_trades, calculate_max_dd_pct
+from regime_common import permutation_test, format_significance, analyze_by_dimension
 
 
 BASE_DIR              = '/home/javi/projects/quant/quant_g/bitget/development'
@@ -25,9 +29,7 @@ OHLC_FOLDER           = f'{BASE_DIR}/data/crypto_2026_OOS'
 MA_PERIOD             = 50
 INITIAL_CAPITAL       = 800
 MIN_TRADES_CONFIDENCE = 50
-ANALYZE_DIRECTION = False  # True: analyze FAMILY + DIRECTION + REGIME, False: analyze FAMILY only
-
-_btc_cache = {}  # Cache for BTC dataframes by timeframe
+ANALYZE_DIRECTION     = False
 
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
@@ -35,179 +37,22 @@ FAMILIES = {
     'ranging': {}
 }
 
-HURST_WINDOW = 100
-ER_WINDOW = 14
-ATR_WINDOW = 14
-PE_WINDOW = 50
-PE_ORDER = 3
+HURST_WINDOW  = 100
+ER_WINDOW     = 14
+ATR_WINDOW    = 14
+PE_WINDOW     = 50
+PE_ORDER      = 3
 LOOKBACK_BARS = 100
 
-_btc_cache = {}  # Cache for BTC dataframes by timeframe
+_btc_cache = {}
 
-def extract_timeframe(filename):
-    """Extract timeframe from filename - matches enricher.py"""
-    name = Path(filename).stem.replace('all_trades_', '')
-    parts = name.split('_')
-    if parts[-1].upper() in ['IS', 'OOS']:
-        parts = parts[:-1]
-    if parts:
-        timeframe = parts[-1]
-        if any(c.isdigit() for c in timeframe.upper()) and 'H' in timeframe.upper():
-            return timeframe
-    print(f"    ⚠️  Could not extract timeframe from '{filename}', defaulting to 4H")
-    return '4H'
-
-def load_btc_for_timeframe(ohlc_folder, timeframe):
-    """Load BTC OHLC for specific timeframe - matches enricher.py"""
-    cache_key = f"BTCUSDT_{timeframe}"
-    if cache_key in _btc_cache:
-        return _btc_cache[cache_key]
-    
-    filepath = Path(ohlc_folder) / f"BTCUSDT_{timeframe}.parquet"
-    if not filepath.exists():
-        raise FileNotFoundError(f"BTC OHLC not found: {filepath}")
-    
-    df = pd.read_parquet(filepath)
-    df.columns = df.columns.str.lower()
-    if 'timestamp' in df.columns:
-        df['ts'] = pd.to_datetime(df['timestamp'])
-    else:
-        df['ts'] = pd.to_datetime(df.index)
-    df = df.sort_values('ts').reset_index(drop=True)
-    
-    _btc_cache[cache_key] = df
-    return df
-
-def calc_all_metrics_at_time(btc_df, buy_time, lookback):
-    """Calculate metrics - MATCHES enricher.py exactly"""
-    closed_candles = btc_df[btc_df['ts'] < buy_time]
-    if len(closed_candles) < lookback:
-        return None
-    idx = closed_candles.index[-1]
-    start_idx = max(0, idx - lookback + 1)
-    if idx - start_idx < 20:
-        return None
-    subset = btc_df.iloc[start_idx:idx + 1]
-    ohlc = {
-        'open': subset['open'].values.astype(np.float64),
-        'high': subset['high'].values.astype(np.float64),
-        'low': subset['low'].values.astype(np.float64),
-        'close': subset['close'].values.astype(np.float64)
-    }
-    metrics = calc_all_metrics(ohlc, hurst_window=HURST_WINDOW, er_window=ER_WINDOW, 
-                                atr_window=ATR_WINDOW, pe_window=PE_WINDOW, pe_order=PE_ORDER)
-    current_close = float(btc_df.iloc[idx]['close'])
-    if idx >= 49:
-        ma_50_data = btc_df.iloc[idx - 49:idx + 1]['close'].values
-        metrics['ma_50'] = float(np.mean(ma_50_data))
-        metrics['price_vs_ma_50'] = current_close / metrics['ma_50']
-    else:
-        metrics['ma_50'] = np.nan
-        metrics['price_vs_ma_50'] = np.nan
-    return metrics
-
-def load_btc_1d(btc_file):
-    """Load BTC data"""
-    df = pd.read_parquet(btc_file)
-    df.columns = df.columns.str.lower()
-    if 'timestamp' in df.columns:
-        df['ts'] = pd.to_datetime(df['timestamp'])
-    else:
-        df['ts'] = pd.to_datetime(df.index)
-    df = df.sort_values('ts').reset_index(drop=True)
-    return df
-
-def classify_trade_by_family(metrics, families):
-    """Classify trade into family"""
-    for family_name, rules in families.items():
-        if not rules:
-            continue
-        match = True
-        for metric, (op, val) in rules.items():
-            if metrics.get(metric) is None or pd.isna(metrics[metric]):
-                match = False
-                break
-            if op == '>' and not (metrics[metric] > val):
-                match = False
-                break
-            elif op == '<' and not (metrics[metric] < val):
-                match = False
-                break
-        if match:
-            return family_name
-    for family_name, rules in families.items():
-        if not rules:
-            return family_name
-    return 'unknown'
-
-def load_trades(filepath):
-    """Load trades"""
-    df = pd.read_excel(filepath)
-    df.columns = df.columns.str.lower().str.strip()
-    if 'buy_time' in df.columns:
-        df['buy_time'] = pd.to_datetime(df['buy_time'])
-    else:
-        raise ValueError("File missing buy_time column")
-    return df
-
-def calculate_max_dd_pct(equity_curve):
-    """Calculate Maximum Drawdown"""
-    if len(equity_curve) == 0:
-        return 0.0
-    cummax = equity_curve.cummax()
-    drawdown_pct = np.where(cummax > 0, ((cummax - equity_curve) / cummax) * 100, 0.0)
-    return float(np.max(drawdown_pct))
-
-def permutation_test(profits1, profits2, n_permutations=1000):
-    """Permutation test"""
-    if len(profits1) < 10 or len(profits2) < 10:
-        return 1.0
-    observed_diff = np.mean(profits1) - np.mean(profits2)
-    combined = profits1 + profits2
-    n1 = len(profits1)
-    count_extreme = 0
-    for _ in range(n_permutations):
-        np.random.shuffle(combined)
-        perm_diff = np.mean(combined[:n1]) - np.mean(combined[n1:])
-        if abs(perm_diff) >= abs(observed_diff):
-            count_extreme += 1
-    return count_extreme / n_permutations
-
-def format_significance(p_value):
-    """Format significance"""
-    if p_value < 0.1:
-        return f"✅ (p={p_value:.3f})"
-    else:
-        return f"❌ (p={p_value:.2f})"
-
-def analyze_by_dimension(df, dimension, initial_capital):
-    """Analyze performance by dimension"""
-    stats = {}
-    for category in df[dimension].unique():
-        cat_df = df[df[dimension] == category].copy()
-        cat_df = cat_df.sort_values('buy_time').reset_index(drop=True)
-        cat_df['equity'] = initial_capital + cat_df['profit'].cumsum()
-        num_trades = len(cat_df)
-        profit = cat_df['profit'].sum()
-        profits_list = cat_df['profit'].tolist()
-        confidence = "✓" if num_trades >= MIN_TRADES_CONFIDENCE else "✗"
-        stats[category] = {
-            'num_trades': num_trades,
-            'profit': profit,
-            'dd_pct': calculate_max_dd_pct(cat_df['equity']),
-            'win_rate': (cat_df['profit'] > 0).mean() * 100 if num_trades > 0 else 0.0,
-            'profits_list': profits_list,
-            'confidence': confidence
-        }
-    return stats
 
 def analyze_strategy(filepath, families, initial_capital):
     """Analyze single strategy - MATCHES enricher.py"""
     strategy = Path(filepath).stem.replace('all_trades_', '')
     
-    # Extract timeframe and load correct BTC file
     timeframe = extract_timeframe(Path(filepath).name)
-    btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe)
+    btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe, _btc_cache)
     
     df = load_trades(filepath)
     
@@ -221,7 +66,9 @@ def analyze_strategy(filepath, families, initial_capital):
     df['price_vs_ma_50'] = np.nan
     
     for idx, trade in df.iterrows():
-        metrics = calc_all_metrics_at_time(btc_df, trade['buy_time'], LOOKBACK_BARS)
+        metrics = calc_all_metrics_at_time(btc_df, trade['buy_time'], LOOKBACK_BARS, 
+                                           MA_PERIOD, HURST_WINDOW, ER_WINDOW, 
+                                           ATR_WINDOW, PE_WINDOW, PE_ORDER)
         if metrics:
             df.at[idx, 'hurst'] = metrics['hurst']
             df.at[idx, 'efficiency_ratio'] = metrics['efficiency_ratio']
@@ -234,7 +81,6 @@ def analyze_strategy(filepath, families, initial_capital):
             if not pd.isna(metrics['price_vs_ma_50']):
                 df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'downtrend'
     
-    # CRITICAL: Drop NaN rows (matches enricher.py lines 244-256)
     if ANALYZE_DIRECTION:
         critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
     else:
@@ -245,11 +91,11 @@ def analyze_strategy(filepath, families, initial_capital):
         df['regime'] = df['family'] + '_' + df['trend']
     
     df = df.sort_values('buy_time').reset_index(drop=True)
-    family_stats = analyze_by_dimension(df, 'family', initial_capital)
+    family_stats = analyze_by_dimension(df, 'family', initial_capital, MIN_TRADES_CONFIDENCE)
     
     if ANALYZE_DIRECTION:
-        trend_stats = analyze_by_dimension(df, 'trend', initial_capital)
-        regime_stats = analyze_by_dimension(df, 'regime', initial_capital)
+        trend_stats = analyze_by_dimension(df, 'trend', initial_capital, MIN_TRADES_CONFIDENCE)
+        regime_stats = analyze_by_dimension(df, 'regime', initial_capital, MIN_TRADES_CONFIDENCE)
     else:
         trend_stats = {}
         regime_stats = {}
@@ -268,6 +114,7 @@ def analyze_strategy(filepath, families, initial_capital):
         'trend_stats': trend_stats,
         'regime_stats': regime_stats
     }
+
 
 def print_single_strategy_all_dimensions(r):
     """Print tables"""
@@ -307,7 +154,7 @@ def print_single_strategy_all_dimensions(r):
         print(f"\n→ BEST: {best_fam} (${best_stats['profit']:.2f}) vs 2ND: {second_fam} (${second_stats['profit']:.2f}) | {sig_str}")
     
     if not ANALYZE_DIRECTION:
-        return  # Skip DIRECTION and REGIME tables
+        return
     
     print(f"\n{'─'*120}")
     print("BY DIRECTION (uptrend/downtrend)")
@@ -371,6 +218,7 @@ def print_single_strategy_all_dimensions(r):
         sig_str = format_significance(p_value)
         print(f"\n→ BEST: {best_reg} (${best_stats['profit']:.2f}) vs 2ND: {second_reg} (${second_stats['profit']:.2f}) | {sig_str}")
 
+
 def print_summary_tables(results):
     """Print summaries"""
     print(f"\n{'='*145}")
@@ -401,7 +249,7 @@ def print_summary_tables(results):
     print("-" * 145)
     
     if not ANALYZE_DIRECTION:
-        return  # Skip DIRECTION and REGIME summary tables
+        return
     
     print(f"\n{'─'*145}")
     print("BEST DIRECTION PER STRATEGY")
@@ -444,6 +292,7 @@ def print_summary_tables(results):
             print(f"{r['strategy']:<30} {best_reg:<20} {best_stats['confidence']:>5} {best_stats['num_trades']:>8} {best_stats['profit']:>10.2f} {'(only one)':<20} {0:>8} {0.0:>10.2f} {'N/A':>15}")
     
     print("-" * 145)
+
 
 def main():
     print("=" * 100)
@@ -511,6 +360,7 @@ def main():
     print("    - If REGIME is ✓✅: filter by specific regime")
     print("    - Otherwise: don't filter, operate in all conditions")
     print(f"{'='*145}")
+
 
 if __name__ == "__main__":
     main()

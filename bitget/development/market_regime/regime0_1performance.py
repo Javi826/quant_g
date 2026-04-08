@@ -27,9 +27,9 @@ from regime_metrics import calc_all_metrics
 # =============================================================================
 
 # Data paths
-TRADES_FOLDER   = '../brief_trades'
-OHLC_FOLDER     = '../data/crypto_2022_OOS'
-BTC_FILE        = '../data/crypto_2022_OOS/BTCUSDT_1Dutc.parquet'
+TRADES_FOLDER   = '../brief_trades_2026'
+OHLC_FOLDER     = '../data/crypto_2026_OOS'
+BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
 
 # REGIME 0 parameters (BTC MA filter)
 MA_PERIOD       = 5
@@ -105,13 +105,14 @@ REGIME1_FILTERS = {
         'direction': None,
     },
 }
+
 # Regime families classification
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging': {}
 }
- 
+
 # Regime metrics parameters
 HURST_WINDOW  = 100
 ER_WINDOW     = 14
@@ -119,11 +120,11 @@ ATR_WINDOW    = 14
 PE_WINDOW     = 50
 PE_ORDER      = 3
 LOOKBACK_BARS = 100
- 
+
 # =============================================================================
- 
+
 _btc_cache = {}
- 
+
 def extract_timeframe(filename):
     """Extract timeframe from filename"""
     name = Path(filename).stem.replace('all_trades_', '')
@@ -135,7 +136,7 @@ def extract_timeframe(filename):
         if any(c.isdigit() for c in timeframe.upper()) and 'H' in timeframe.upper():
             return timeframe
     return '4H'
- 
+
 def load_btc_for_timeframe(ohlc_folder, timeframe):
     """Load BTC OHLC for specific timeframe"""
     cache_key = f"{ohlc_folder}_{timeframe}"
@@ -156,7 +157,7 @@ def load_btc_for_timeframe(ohlc_folder, timeframe):
     
     _btc_cache[cache_key] = df
     return df
- 
+
 def load_btc_1d():
     """Load BTC 1D for REGIME 0"""
     df = pd.read_parquet(BTC_FILE)
@@ -168,7 +169,7 @@ def load_btc_1d():
     df = df.sort_values('ts').reset_index(drop=True)
     df[f'ma{MA_PERIOD}'] = df['close'].rolling(window=MA_PERIOD).mean()
     return df
- 
+
 def get_btc_value_at_trade(btc_df, trade_time):
     """Get BTC close and MA at trade time - REGIME 0 (no lookahead)"""
     closed_candles = btc_df[btc_df['ts'] < trade_time]
@@ -182,7 +183,7 @@ def get_btc_value_at_trade(btc_df, trade_time):
         return None, None
     
     return last_candle['close'], last_candle[f'ma{MA_PERIOD}']
- 
+
 def calc_all_metrics_at_time(btc_df, buy_time, lookback):
     """Calculate metrics at specific time - REGIME 1 (no lookahead)"""
     closed_candles = btc_df[btc_df['ts'] < buy_time]
@@ -210,7 +211,7 @@ def calc_all_metrics_at_time(btc_df, buy_time, lookback):
         metrics['ma_50'] = np.nan
         metrics['price_vs_ma_50'] = np.nan
     return metrics
- 
+
 def classify_trade_by_family(metrics, families):
     """Classify trade into family"""
     for family_name, rules in families.items():
@@ -233,7 +234,7 @@ def classify_trade_by_family(metrics, families):
         if not rules:
             return family_name
     return 'unknown'
- 
+
 def detect_strategy_type(strategy_name):
     """Detect if strategy is LONG or SHORT"""
     name_lower = strategy_name.lower()
@@ -242,7 +243,7 @@ def detect_strategy_type(strategy_name):
     elif '_short_' in name_lower or name_lower.endswith('_short'):
         return 'SHORT'
     return 'LONG'
- 
+
 def load_trades(filepath):
     """Load trades"""
     df = pd.read_excel(filepath)
@@ -252,7 +253,7 @@ def load_trades(filepath):
     else:
         raise ValueError(f"File {filepath} missing buy_time column")
     return df
- 
+
 def apply_regime0_filter(df, btc_1d_df, strategy_type):
     """Apply REGIME 0 filter (BTC MA)"""
     df['regime0_pass'] = False
@@ -270,7 +271,7 @@ def apply_regime0_filter(df, btc_1d_df, strategy_type):
             df.at[idx, 'regime0_pass'] = btc_close < ma_value * SHORT_TH
     
     return df
- 
+
 def apply_regime1_filter(df, btc_timeframe_df, strategy_name):
     """Apply REGIME 1 filter (Family + Direction)"""
     df['family'] = 'unknown'
@@ -320,7 +321,7 @@ def apply_regime1_filter(df, btc_timeframe_df, strategy_name):
         df.at[idx, 'regime1_pass'] = family_pass and direction_pass
     
     return df
- 
+
 def calculate_portfolio_metrics(df_list, initial_capital):
     """Calculate portfolio metrics from list of strategy dataframes"""
     if not df_list:
@@ -350,7 +351,7 @@ def calculate_portfolio_metrics(df_list, initial_capital):
         'net_gain_pct': net_gain_pct,
         'max_dd_pct': max_dd_pct
     }
- 
+
 def main():
     print("=" * 100)
     print("REGIME LAYERS COMPARISON")
@@ -426,13 +427,13 @@ def main():
     # ==========================================================================
     # STRATEGY-BY-STRATEGY COMPARISON
     # ==========================================================================
-    print("\n" + "=" * 120)
+    print("\n" + "=" * 100)
     print("STRATEGY-BY-STRATEGY COMPARISON")
-    print("=" * 120)
+    print("=" * 100)
     
     # Header
-    print(f"\n{'Strategy':<25} {'Type':<6} {'REGIME 0':>10} {'R0':>4} {'REGIME 1':>10} {'R1':>4} {'BOTH':>10} {'B':>4}")
-    print("-" * 120)
+    print(f"\n{'Strategy':<30} {'Type':<8} {'REGIME 0':>12} {'REGIME 1':>12} {'BOTH':>12}")
+    print("-" * 100)
     
     for i, filepath in enumerate(files):
         strategy = Path(filepath).stem.replace('all_trades_', '')
@@ -449,19 +450,41 @@ def main():
         r1_change = ((regime1_profit - baseline_profit) / abs(baseline_profit) * 100) if baseline_profit != 0 else 0
         both_change = ((both_profit - baseline_profit) / abs(baseline_profit) * 100) if baseline_profit != 0 else 0
         
-        # Format values
-        r0_str = f"{r0_change:+.1f}%".replace('.', ',')
-        r1_str = f"{r1_change:+.1f}%".replace('.', ',')
-        both_str = f"{both_change:+.1f}%".replace('.', ',')
+        # Format values with fixed width
+        r0_str = f"{r0_change:+7.1f}%".replace('.', ',')
+        r1_str = f"{r1_change:+7.1f}%".replace('.', ',')
+        both_str = f"{both_change:+7.1f}%".replace('.', ',')
         
-        # Indicators
-        r0_indicator = "✅" if r0_change > 5 else ("❌" if r0_change < -5 else "=")
-        r1_indicator = "✅" if r1_change > 5 else ("❌" if r1_change < -5 else "=")
-        both_indicator = "✅" if both_change > 5 else ("❌" if both_change < -5 else "=")
+        # Apply colors
+        if r0_change > 5:
+            r0_final = f"\033[92m{r0_str}\033[0m"
+        elif r0_change < -5:
+            r0_final = f"\033[91m{r0_str}\033[0m"
+        else:
+            r0_final = r0_str
         
-        print(f"{strategy:<25} {strategy_type:<6} {r0_str:>10} {r0_indicator:>4} {r1_str:>10} {r1_indicator:>4} {both_str:>10} {both_indicator:>4}")
+        if r1_change > 5:
+            r1_final = f"\033[92m{r1_str}\033[0m"
+        elif r1_change < -5:
+            r1_final = f"\033[91m{r1_str}\033[0m"
+        else:
+            r1_final = r1_str
+        
+        if both_change > 5:
+            both_final = f"\033[92m{both_str}\033[0m"
+        elif both_change < -5:
+            both_final = f"\033[91m{both_str}\033[0m"
+        else:
+            both_final = both_str
+        
+        # Manual padding to account for ANSI codes
+        r0_padded = ' ' * (12 - len(r0_str)) + r0_final
+        r1_padded = ' ' * (12 - len(r1_str)) + r1_final
+        both_padded = ' ' * (12 - len(both_str)) + both_final
+        
+        print(f"{strategy:<30} {strategy_type:<8} {r0_padded} {r1_padded} {both_padded}")
     
-    print("-" * 120)
+    print("-" * 100)
     
     # ==========================================================================
     # PRINT SUMMARY TABLE
@@ -557,7 +580,7 @@ def main():
     print("-" * 75)
     
     print("=" * 120)
- 
- 
+
+
 if __name__ == "__main__":
     main()
