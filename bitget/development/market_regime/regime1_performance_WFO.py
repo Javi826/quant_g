@@ -31,11 +31,11 @@ from regime_common import analyze_by_dimension
 # =============================================================================
 
 # OOS Data Configuration
-OOS_TRADES_FOLDER = '../brief_trades_2026'
+OOS_TRADES_FOLDER = '../brief_trades'
 OOS_OHLC_FOLDER   = '../data/crypto_2026_OOS'
 
 # WFO Parameters
-WFO_MODE          = 'unanchored'  # 'anchored' or 'unanchored'
+WFO_MODE          = 'anchored'  # 'anchored' or 'unanchored'
 WFO_WINDOW_MONTHS = 3             # Window size in months
 OOS_START_DATE    = '2025-01-01'
 OOS_END_DATE      = '2026-03-31'

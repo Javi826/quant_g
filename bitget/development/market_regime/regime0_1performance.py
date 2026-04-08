@@ -33,7 +33,7 @@ BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
 
 # REGIME 0 parameters (BTC MA filter)
 MA_PERIOD       = 5
-LONG_TH         = 1.02
+LONG_TH         = 1.00
 SHORT_TH        = 1.00
 
 # REGIME 1 parameters

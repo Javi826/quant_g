@@ -23,8 +23,8 @@ from signals.add_signals_reversal   import reversal_long, reversal_short
 # -----------------------------------------------------------------------------
 # GLOBAL CONFIG
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "../data/crypto_2022_OOS"
-DATA_FOLDER  = "../data/crypto_2022_OOS"
+DATA_FOLDER  = "../data/crypto_2026_OOS"
+DATA_FOLDER  = "../data/crypto_2026_OOS"
 SYMBOLS_DIR  = "../../BOT_trading/symbols_live"
 ORDER_AMOUNT = 80
 N_JOBS       = -1
