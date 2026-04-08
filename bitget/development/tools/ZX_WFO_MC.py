@@ -197,28 +197,27 @@ def walk_forward_optimization_mc(
         # ------------------------------------------------------------------
         # Store window result
         # ------------------------------------------------------------------
-        train_start = pd.to_datetime(ref_df.index[t0]).date()
-        train_end   = pd.to_datetime(ref_df.index[t1 - 1]).date()
-        test_start  = pd.to_datetime(ref_df.index[test0]).date()
-        test_end    = pd.to_datetime(ref_df.index[test1 - 1]).date()
+        def _fmt(d): return pd.to_datetime(d).strftime('%Y-%m')
+
+        is_period  = f"{_fmt(ref_df.index[t0])} / {_fmt(ref_df.index[t1 - 1])}"
+        oos_period = f"{_fmt(ref_df.index[test0])} / {_fmt(ref_df.index[test1 - 1])}"
+
+        oos_metrics.pop('OOS_Net_Gain', None)
 
         record = {
-            'window': window_idx,
-            'train_start': train_start,
-            'train_end': train_end,
-            'test_start': test_start,
-            'test_end': test_end,
-            'IS_Net_Gain_pct_m': round(best_is_score, 4),
+            'window':     window_idx,
+            'IS_period':  is_period,
+            'OOS_period': oos_period,
             **best_params,
             **oos_metrics
         }
         window_records.append(record)
 
         print(
-            f"\n✅ Window {window_idx} | IS: {train_start} → {train_end} | "
-            f"OOS: {test_start} → {test_end} | "
+            f"\n✅ Window {window_idx} | IS: {is_period} | "
+            f"OOS: {oos_period} | "
             f"IS_score: {best_is_score:.2f}% | "
-            f"OOS_Net_Gain: {oos_metrics['OOS_Net_Gain_pct']:.2f}%"
+            f"OOS_Net_Gain_pct: {oos_metrics['OOS_Net_Gain_pct']:.2f}%"
         )
         for k, v in best_params.items():
             print(f"   {k}: {v}")
@@ -233,18 +232,28 @@ def walk_forward_optimization_mc(
             start += length_test
             end = start + length_train_set
 
-    # ------------------------------------------------------------------
+# ------------------------------------------------------------------
     # Summary DataFrame
     # ------------------------------------------------------------------
     df_results = pd.DataFrame(window_records)
 
     mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
     mean_row['window'] = 'MEAN'
-    mean_row['train_start'] = ''
-    mean_row['train_end'] = ''
-    mean_row['test_start'] = ''
-    mean_row['test_end'] = ''
-    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
+    mean_row['IS_period'] = ''
+    mean_row['OOS_period'] = ''
+
+    mode_row = {}
+    for col in df_results.columns:
+        if col in list(param_ranges.keys()):
+            counts = Counter(df_results[col].dropna().tolist())
+            mode_row[col] = counts.most_common(1)[0][0] if counts else np.nan
+        else:
+            mode_row[col] = np.nan
+    mode_row['window'] = 'MODE'
+    mode_row['IS_period'] = ''
+    mode_row['OOS_period'] = ''
+
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row]), pd.DataFrame([mode_row])], ignore_index=True)
 
     numeric_cols = df_results.select_dtypes(include=[np.number]).columns
     df_results[numeric_cols] = df_results[numeric_cols].round(2)

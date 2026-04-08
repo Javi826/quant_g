@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/development/live_lab/live_lab.py', 'bitget/BOT_trading/api/backend.py', 'bitget/development/Z_grid/G_grid_flag.py']
+recent_files = ['bitget/development/analysis/Z_compose_equities_01.py', 'bitget/development/Z_montecarlo/M_montecarlo_orderblocks.py', 'bitget/development/utils/ZX_analysis.py', 'bitget/development/Z_WFO/W_WFO_orderblocks.py', 'bitget/development/tools/ZX_WFO.py', 'bitget/development/tools/ZX_optimize_MCf_tf.py', 'bitget/development/tools/ZX_WFO_MC.py', 'bitget/development/Z_WFO/W_WFO_trends1.py']
 
 [main]
 version = 0.2.0

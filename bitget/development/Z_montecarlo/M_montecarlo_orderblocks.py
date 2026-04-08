@@ -27,7 +27,7 @@ MY_SYMBOLS          = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
+DATA_FOLDER         = "../data/crypto_2022_OOS"
 #DATA_FOLDER         = "../data/crypto_2022_IS_2"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
@@ -41,8 +41,8 @@ LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [35,40,45] 
 IMPULSE_LIST         = [0.005,0.01,0.015]
 
-TP_PCT_LIST          = [2,3,4]
-SL_PCT_LIST          = [9,10,11]
+TP_PCT_LIST          = [2,3,4,5,6]
+SL_PCT_LIST          = [8,9,10,11]
 
 # =============================================================================
 # SELL_AFTER_LIST      = [0]  
@@ -60,7 +60,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 20
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -69,7 +69,7 @@ TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 # -----------------------------------------------------------------------------
 symbols_minor = [f.split('_')[0] for f in os.listdir(DATA_FOLDER) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor,min_vol_usdt=MIN_VOL_USDT,timeframe=TIMEFRAME_MINOR,data_folder=DATA_FOLDER,min_price=MIN_PRICE,vol_window=50,my_symbols=MY_SYMBOLS)
-
+print(f"Symbols: {sorted(list(ohlcv_data_minor.keys()))}")
 # -----------------------------------------------------------------------------
 # HELPER FUNCTIONS
 # -----------------------------------------------------------------------------

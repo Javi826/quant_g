@@ -13,7 +13,7 @@ from itertools import combinations
 from sklearn.linear_model import LinearRegression
 
 
-FOLDER              = "../brief_equities"
+FOLDER              = "../brief_equities_2022"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '1D'
 BARS_PER_DAY        = 1

@@ -14,7 +14,7 @@ symbols_to_include = ["ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ET
                       "DOTUSDT","DOGEUSDT","SOLUSDT","FARTCOINUSDT","WIFUSDT","WLDUSDT","NEARUSDT","LINKUSDT",
                       "BGBUSDT","SNXUSDT","BTCUSDT","SUIUSDT","APTUSDT","FORMUSDT","HYPEUSDT","ADAUSDT"]
  
-#symbols_to_include = ["BTCUSDT","ETHUSDT"]
+#symbols_to_include = ['BTCUSDT', 'ETHUSDT', 'XRPUSDT']
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
@@ -191,4 +191,3 @@ def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_na
         else:
             print("⚠️ No equity data to save")
 
-import numpy as np
