@@ -114,10 +114,9 @@ def walk_forward_optimization_mc(
     n_obs: int,
     order_amount: float,
     initial_balance: float,
-    final_params_method: str = 'ewm',
     n_jobs: int = -1,
     dtype=np.float32
-) -> tuple[dict, pd.DataFrame]:
+) -> pd.DataFrame:
 
     keys = list(param_ranges.keys())
     all_combinations = [dict(zip(keys, comb)) for comb in itertools.product(*[param_ranges[k] for k in keys])]
@@ -233,7 +232,7 @@ def walk_forward_optimization_mc(
     # ------------------------------------------------------------------
     if not window_records:
         print("\n⚠️  No windows were processed — insufficient data.")
-        return {}, pd.DataFrame()
+        return pd.DataFrame()
 
     df_results   = pd.DataFrame(window_records)
     param_cols   = list(param_ranges.keys())
@@ -274,7 +273,7 @@ def walk_forward_optimization_mc(
     )
     df_results[numeric_cols] = df_results[numeric_cols].round(2)
 
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Print: data rows + separator + summary rows
     # ------------------------------------------------------------------
     df_data    = df_results[df_results['window'].apply(lambda x: str(x).isdigit())]
@@ -283,7 +282,7 @@ def walk_forward_optimization_mc(
     full_table = pd.concat([df_data, df_summary], ignore_index=True)
     full_lines = full_table.to_string(index=False).split('\n')
     n_data_rows = len(df_data)
-    separator  = '-' * len(full_lines[0])
+    separator   = '-' * len(full_lines[0])
 
     print("\n📊 WFO-MC Summary:")
     print(full_lines[0])
@@ -292,29 +291,6 @@ def walk_forward_optimization_mc(
         if i == n_data_rows - 1:
             print(separator)
 
-    # ------------------------------------------------------------------
-    # Final params based on method
-    # ------------------------------------------------------------------
-    final_params = {}
-    if final_params_method == 'mean':
-        for col in param_cols:
-            final_params[col] = mean_row[col]
-    elif final_params_method == 'mode':
-        for col in param_cols:
-            val = mode_row[col]
-            final_params[col] = val if not np.isnan(float(val)) else None
-    elif final_params_method == 'ewm':
-        for col in param_cols:
-            final_params[col] = ewm_row[col]
-    else:
-        raise ValueError(f"final_params_method must be 'mean', 'mode' or 'ewm'. Got: {final_params_method}")
-
-    final_params = {
-        k: int(round(v)) if all(isinstance(x, int) for x in param_ranges[k]) else round(float(v), 4)
-        for k, v in final_params.items()
-    }
-
     print(f"\n✅ WFO-MC completed: {window_idx - 1} windows processed")
-    print(f"🏆 Final params ({final_params_method}): {final_params}")
-    
-    return final_params, df_results
+
+    return df_results

@@ -17,7 +17,6 @@ start_time  = time.time()
 N_JOBS      = -1
 STRATEGY    = "orderblocks"
 MY_SYMBOLS  = True
-
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -26,20 +25,16 @@ DATA_FOLDER_OOS     = "../data/crypto_2025_OOS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
-
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = False
 MONTHS_TRAIN        = 6
-MONTHS_TEST         = 3
-FINAL_PARAMS_METHOD = 'mean'
-
+MONTHS_TEST         = 2
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS       = 5
-
+FINAL_N_PATHS       = 100
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
@@ -53,7 +48,6 @@ SL_PCT_LIST          = [8,9,10,11]
 
 param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'IMPULSE', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}
-
 # -----------------------------------------------------------------------------
 # CANDLES PER MONTH BY TIMEFRAME
 # -----------------------------------------------------------------------------
@@ -113,7 +107,7 @@ final_prints(
 
 print(f"\n⚙️  Anchored: {ANCHORED} | Train: {MONTHS_TRAIN}m | Test: {MONTHS_TEST}m | Paths: {FINAL_N_PATHS} | N_obs: {FINAL_N_OBS}")
 
-final_params, df_wfo_results = walk_forward_optimization_mc(
+df_wfo_results = walk_forward_optimization_mc(
     ohlcv_data=ohlcv_data_minor,
     param_ranges=param_ranges,
     signal_fn=signal_fn,
@@ -125,45 +119,50 @@ final_params, df_wfo_results = walk_forward_optimization_mc(
     n_obs=FINAL_N_OBS,
     order_amount=ORDER_AMOUNT,
     initial_balance=INITIAL_BALANCE,
-    final_params_method=FINAL_PARAMS_METHOD,
     n_jobs=N_JOBS
 )
 # -----------------------------------------------------------------------------
-# OOS ANALYSIS WITH FINAL PARAMS (mode across windows)
+# OOS ANALYSIS — mean, mode, ewm
 # -----------------------------------------------------------------------------
-print(f"\n🔍 Final params ({FINAL_PARAMS_METHOD}) → OOS analysis:")
-for p in param_names:
-    print(f"   {p}: {final_params[p]}")
-
 symbols_oos       = [f.split('_')[0] for f in os.listdir(DATA_FOLDER_OOS) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
 ohlcv_data_oos, _ = filter_symbols(symbols_oos, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER_OOS, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS)
 ohlcv_arr_oos     = prepare_ohlcv_arrays(ohlcv_data_oos)
 
-ohlcv_arrays_oos = {}
-for sym, arr in ohlcv_arr_oos.items():
-    signals = signal_fn(
-        arr,
-        lookback=final_params['LOOKBACK'],
-        tolerance=final_params['TOLERANCE'],
-        impulse=final_params['IMPULSE'],
-        live_trading=False
-    )
-    ohlcv_arrays_oos[sym] = {**arr, 'signal': signals}
+_int_params = {k for k in param_names if all(isinstance(x, int) for x in param_ranges[k])}
 
-oos_result = run_grid_backtest(
-    ohlcv_arrays_oos,
-    sell_after=final_params['SELL_AFTER'],
-    tp_pct=final_params['TP_PCT'],
-    sl_pct=final_params['SL_PCT'],
-    order_amount=ORDER_AMOUNT
-)
+def _extract_params(row):
+    return {
+        k: int(round(row[k])) if k in _int_params else round(float(row[k]), 4)
+        for k in param_names
+    }
 
-best_comb      = tuple(final_params[p] for p in param_names)
-oos_records    = compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE)
-oos_results_df = pd.DataFrame(oos_records)
+for method in ['mean', 'mode', 'ewm']:
+    print(f"\n{'='*60}")
+    print(f"🔭 OOS analysis — {method.upper()} params")
+    print(f"{'='*60}")
 
-final_prints(f"🔭 OOS_{STRATEGY}", DATA_FOLDER_OOS, TIMEFRAME_MINOR, MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[n] for n in param_names])
-report_backtesting(df=oos_results_df, parameters=param_names, data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+    params = _extract_params(df_wfo_results[df_wfo_results['window'] == method.upper()].iloc[0])
+    print("   " + " | ".join(f"{k}: {v}" for k, v in params.items()))
+
+    ohlcv_arrays_oos = {}
+    for sym, arr in ohlcv_arr_oos.items():
+        signals = signal_fn(arr, 
+                            lookback=params['LOOKBACK'], 
+                            tolerance=params['TOLERANCE'], 
+                            impulse=params['IMPULSE'], 
+                            live_trading=False)
+        ohlcv_arrays_oos[sym] = {**arr, 'signal': signals}
+
+    oos_result  = run_grid_backtest(ohlcv_arrays_oos,
+                                    sell_after=params['SELL_AFTER'], 
+                                    tp_pct=params['TP_PCT'],
+                                    sl_pct=params['SL_PCT'], 
+                                    order_amount=ORDER_AMOUNT)
+    best_comb   = tuple(params[p] for p in param_names)
+    oos_df      = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
+
+    final_prints(f"🔭 OOS_{method.upper()}_{STRATEGY}", DATA_FOLDER_OOS, TIMEFRAME_MINOR, MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[n] for n in param_names])
+    report_backtesting(df=oos_df, parameters=param_names, data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
 # -----------------------------------------------------------------------------
 # ELAPSED TIME
 # -----------------------------------------------------------------------------
