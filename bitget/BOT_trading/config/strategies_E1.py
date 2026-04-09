@@ -15,7 +15,7 @@ STRATEGIES = [
         'id': '02_reversal_long_4H',
         'name': 'reversal_long_4H',
         'timeframe': '4H',
-        'active': True,
+        'active': False,
         'direction': 'long',
         'regime_trending': 0,
         'regime_ranging': 1.0,

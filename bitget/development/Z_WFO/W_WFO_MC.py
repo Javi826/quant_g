@@ -30,14 +30,15 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
-ANCHORED            = True
-MONTHS_TRAIN        = 12
-MONTHS_TEST         = 6
+ANCHORED            = False
+MONTHS_TRAIN        = 6
+MONTHS_TEST         = 3
+FINAL_PARAMS_METHOD = 'mean'
 
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS       = 100
+FINAL_N_PATHS       = 5
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -124,12 +125,13 @@ final_params, df_wfo_results = walk_forward_optimization_mc(
     n_obs=FINAL_N_OBS,
     order_amount=ORDER_AMOUNT,
     initial_balance=INITIAL_BALANCE,
+    final_params_method=FINAL_PARAMS_METHOD,
     n_jobs=N_JOBS
 )
 # -----------------------------------------------------------------------------
 # OOS ANALYSIS WITH FINAL PARAMS (mode across windows)
 # -----------------------------------------------------------------------------
-print(f"\n Final params (mode) → OOS analysis:")
+print(f"\n🔍 Final params ({FINAL_PARAMS_METHOD}) → OOS analysis:")
 for p in param_names:
     print(f"   {p}: {final_params[p]}")
 

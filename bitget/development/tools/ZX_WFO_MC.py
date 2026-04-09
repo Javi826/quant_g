@@ -94,12 +94,11 @@ def _evaluate_combo_on_real(
     net_gain_pct = (net_gain / initial_balance) * 100.0
 
     return {
-        'OOS_Net_Gain': net_gain,
         'OOS_Net_Gain_pct': net_gain_pct,
-        'OOS_Win_Ratio': float(port.get('proportion_winners', np.nan)),
-        'OOS_DD_pct': float(port.get('max_dd', 0.0)) * 100.0,
-        'OOS_Sharpe': float(port.get('sharpe', np.nan)),
-        'OOS_Num_Signals': int(port.get('num_signals', 0)),
+        'OOS_Win_Ratio':    float(port.get('proportion_winners', np.nan)),
+        'OOS_DD_pct':       float(port.get('max_dd', 0.0)) * 100.0,
+        'OOS_Sharpe':       float(port.get('sharpe', np.nan)),
+        'OOS_Num_Signals':  int(port.get('num_signals', 0)),
     }
 
 
@@ -115,6 +114,7 @@ def walk_forward_optimization_mc(
     n_obs: int,
     order_amount: float,
     initial_balance: float,
+    final_params_method: str = 'ewm',
     n_jobs: int = -1,
     dtype=np.float32
 ) -> tuple[dict, pd.DataFrame]:
@@ -124,14 +124,13 @@ def walk_forward_optimization_mc(
 
     length_test = int(length_train_set / pct_train_set - length_train_set)
 
-    ref_sym = max(ohlcv_data.keys(), key=lambda k: len(ohlcv_data[k]))
-    ref_df = ohlcv_data[ref_sym]
+    ref_sym    = max(ohlcv_data.keys(), key=lambda k: len(ohlcv_data[k]))
+    ref_df     = ohlcv_data[ref_sym]
     max_length = len(ref_df)
 
-    window_idx = 1
-    start = 0
-    end = length_train_set
-
+    window_idx     = 1
+    start          = 0
+    end            = length_train_set
     window_records = []
 
     while start < max_length:
@@ -139,18 +138,17 @@ def walk_forward_optimization_mc(
         is_last_window = remaining_data < (length_train_set + length_test)
 
         if is_last_window:
-            remaining = max_length - start
+            remaining  = max_length - start
             train_size = int(remaining * pct_train_set)
-            test_size = remaining - train_size
             if train_size < int(length_train_set * 0.8):
                 break
-            t0 = start
-            t1 = start + train_size
+            t0    = start
+            t1    = start + train_size
             test0 = t1
             test1 = max_length
         else:
-            t0 = 0 if anchored else start
-            t1 = end if anchored else start + length_train_set
+            t0    = 0 if anchored else start
+            t1    = end if anchored else start + length_train_set
             test0 = t1
             test1 = min(t1 + length_test, max_length)
 
@@ -178,14 +176,14 @@ def walk_forward_optimization_mc(
                 for param_dict in all_combinations
             )
 
-        best_idx = int(np.argmax(is_scores))
-        best_params = all_combinations[best_idx]
+        best_idx      = int(np.argmax(is_scores))
+        best_params   = all_combinations[best_idx]
         best_is_score = is_scores[best_idx]
 
         # ------------------------------------------------------------------
         # OOS: slice DataFrames → convert to arrays → evaluate best combo
         # ------------------------------------------------------------------
-        ohlcv_oos_df = _slice_ohlcv_data(ohlcv_data, test0, test1)
+        ohlcv_oos_df  = _slice_ohlcv_data(ohlcv_data, test0, test1)
         ohlcv_oos_arr = prepare_ohlcv_arrays(ohlcv_oos_df)
 
         oos_metrics = _evaluate_combo_on_real(
@@ -199,10 +197,8 @@ def walk_forward_optimization_mc(
         # ------------------------------------------------------------------
         def _fmt(d): return pd.to_datetime(d).strftime('%Y-%m')
 
-        is_period  = f"{_fmt(ref_df.index[t0])} / {_fmt(ref_df.index[t1 - 1])}"
-        oos_period = f"{_fmt(ref_df.index[test0])} / {_fmt(ref_df.index[test1 - 1])}"
-
-        oos_metrics.pop('OOS_Net_Gain', None)
+        is_period  = f"{_fmt(ref_df.index[t0])}-{_fmt(ref_df.index[t1 - 1])}"
+        oos_period = f"{_fmt(ref_df.index[test0])}-{_fmt(ref_df.index[test1 - 1])}"
 
         record = {
             'window':     window_idx,
@@ -232,49 +228,93 @@ def walk_forward_optimization_mc(
             start += length_test
             end = start + length_train_set
 
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Summary DataFrame
     # ------------------------------------------------------------------
-    df_results = pd.DataFrame(window_records)
+    if not window_records:
+        print("\n⚠️  No windows were processed — insufficient data.")
+        return {}, pd.DataFrame()
 
+    df_results   = pd.DataFrame(window_records)
+    param_cols   = list(param_ranges.keys())
+    numeric_cols = df_results.select_dtypes(include=[np.number]).columns
+
+    # MEAN
     mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
-    mean_row['window'] = 'MEAN'
-    mean_row['IS_period'] = ''
+    mean_row['window']     = 'MEAN'
+    mean_row['IS_period']  = ''
     mean_row['OOS_period'] = ''
 
+    # MODE
     mode_row = {}
     for col in df_results.columns:
-        if col in list(param_ranges.keys()):
+        if col in param_cols:
             counts = Counter(df_results[col].dropna().tolist())
             mode_row[col] = counts.most_common(1)[0][0] if counts else np.nan
         else:
             mode_row[col] = np.nan
-    mode_row['window'] = 'MODE'
-    mode_row['IS_period'] = ''
+    mode_row['window']     = 'MODE'
+    mode_row['IS_period']  = ''
     mode_row['OOS_period'] = ''
 
-    df_results = pd.concat([df_results, pd.DataFrame([mean_row]), pd.DataFrame([mode_row])], ignore_index=True)
+    # EWM
+    ewm_row = {}
+    for col in df_results.columns:
+        if col in param_cols:
+            ewm_row[col] = round(df_results[col].ewm(span=len(df_results), adjust=True).mean().iloc[-1], 2)
+        else:
+            ewm_row[col] = np.nan
+    ewm_row['window']     = 'EWM'
+    ewm_row['IS_period']  = ''
+    ewm_row['OOS_period'] = ''
 
-    numeric_cols = df_results.select_dtypes(include=[np.number]).columns
+    df_results = pd.concat(
+        [df_results, pd.DataFrame([mean_row]), pd.DataFrame([mode_row]), pd.DataFrame([ewm_row])],
+        ignore_index=True
+    )
     df_results[numeric_cols] = df_results[numeric_cols].round(2)
 
+# ------------------------------------------------------------------
+    # Print: data rows + separator + summary rows
+    # ------------------------------------------------------------------
+    df_data    = df_results[df_results['window'].apply(lambda x: str(x).isdigit())]
+    df_summary = df_results[df_results['window'].isin(['MEAN', 'MODE', 'EWM'])]
+
+    full_table = pd.concat([df_data, df_summary], ignore_index=True)
+    full_lines = full_table.to_string(index=False).split('\n')
+    n_data_rows = len(df_data)
+    separator  = '-' * len(full_lines[0])
+
     print("\n📊 WFO-MC Summary:")
-    print(df_results.to_string(index=False))
+    print(full_lines[0])
+    for i, line in enumerate(full_lines[1:]):
+        print(line)
+        if i == n_data_rows - 1:
+            print(separator)
 
     # ------------------------------------------------------------------
-    # Final params: mode of best_params across windows
+    # Final params based on method
     # ------------------------------------------------------------------
-    param_rows = df_results[df_results['window'] != 'MEAN'][list(param_ranges.keys())]
     final_params = {}
-    for col in param_rows.columns:
-        counts = Counter(param_rows[col].dropna().tolist())
-        most_common_val, _ = counts.most_common(1)[0]
-        if isinstance(most_common_val, (int, float)):
-            final_params[col] = int(round(most_common_val))
-        else:
-            final_params[col] = most_common_val
+    if final_params_method == 'mean':
+        for col in param_cols:
+            final_params[col] = mean_row[col]
+    elif final_params_method == 'mode':
+        for col in param_cols:
+            val = mode_row[col]
+            final_params[col] = val if not np.isnan(float(val)) else None
+    elif final_params_method == 'ewm':
+        for col in param_cols:
+            final_params[col] = ewm_row[col]
+    else:
+        raise ValueError(f"final_params_method must be 'mean', 'mode' or 'ewm'. Got: {final_params_method}")
+
+    final_params = {
+        k: int(round(v)) if all(isinstance(x, int) for x in param_ranges[k]) else round(float(v), 4)
+        for k, v in final_params.items()
+    }
 
     print(f"\n✅ WFO-MC completed: {window_idx - 1} windows processed")
-    print(f"🏆 Final params (mode): {final_params}")
-
+    print(f"🏆 Final params ({final_params_method}): {final_params}")
+    
     return final_params, df_results
