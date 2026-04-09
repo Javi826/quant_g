@@ -13,7 +13,7 @@ from itertools import combinations
 from sklearn.linear_model import LinearRegression
 
 
-FOLDER              = "../brief_equities_2022"
+FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '1D'
 BARS_PER_DAY        = 1
@@ -25,11 +25,14 @@ DATA_FOLDER         = "../data/crypto_2026_OOS"
 
 SELECTED_STRATEGIES_FOR_METRICS = [
     '10_parity_long_1H',
+    '11_parity_short_1H',
     '12_parity_long_6Hutc',
     '13_orderblocks_short_4H',
+    #'16_ranging_short_6Hutc',
+    '17_flag_long_4H',
     '19_flag_short_4H',
+    #'20_flag_short_1H',
 ]
-
 
 def total_return(df, capital):
     """Calculate net gain percentage"""

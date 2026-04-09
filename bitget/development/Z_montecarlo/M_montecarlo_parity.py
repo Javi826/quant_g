@@ -23,13 +23,13 @@ DTYPE               = np.float32
 start_time          = time.time()
 N_JOBS              = -1
 STRATEGY            = "parity"
-MY_SYMBOLS          = False
+MY_SYMBOLS          = True
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2025"
-DATA_FOLDER         = "../data/crypto_2022_IS"
+DATA_FOLDER         = "../data/crypto_2022_OOS"
+#DATA_FOLDER         = "../data/crypto_2025_OOS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
@@ -38,21 +38,12 @@ MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [100,150]
-TOLERANCE_LIST       = [20,25] 
-MA_PERIOD_LIST       = [25]
-
-TP_PCT_LIST          = [1,2]
-SL_PCT_LIST          = [8]
-
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50] 
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [40]
-
-TP_PCT_LIST          = [2,3,4]
-SL_PCT_LIST          = [10,20,25]
+SELL_AFTER_LIST      = [0]
+LOOKBACK_LIST        = [50,100,150]
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [10,20,30,40]
+TP_PCT_LIST          = [3,4,5]
+SL_PCT_LIST          = [8,9,10]
 
 param_names     = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 lists_for_grid  = [globals()[name + "_LIST"] for name in param_names]

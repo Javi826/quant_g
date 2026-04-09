@@ -10,13 +10,14 @@ import pandas as pd
 from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
 from utils.ZX_analysis import report_backtesting
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from signals.add_signals_orderblocks import orderblocks_long
-from signals.add_signals_orderblocks import orderblocks_short
+from signals.add_signals_parity import parity_long
+from signals.add_signals_parity import parity_short
 
 start_time  = time.time()
 N_JOBS      = -1
-STRATEGY    = "orderblocks"
+STRATEGY    = "parity"
 MY_SYMBOLS  = True
+
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
@@ -24,30 +25,33 @@ DATA_FOLDER         = "../data/crypto_2022_IS"
 DATA_FOLDER_OOS     = "../data/crypto_2025_OOS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 10_000_000
+MIN_VOL_USDT        = 4_200_000
+
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = False
-MONTHS_TRAIN        = 6
-MONTHS_TEST         = 2
+MONTHS_TRAIN        = 12
+MONTHS_TEST         = 6
+
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
 FINAL_N_PATHS       = 100
+
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
+SELL_AFTER_LIST      = [0]
 LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [35,40,45] 
-IMPULSE_LIST         = [0.005,0.01,0.015]
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [10,20,30,40]
+TP_PCT_LIST          = [3,4,5]
+SL_PCT_LIST          = [8,9,10]
 
-TP_PCT_LIST          = [2,3,4,5]
-SL_PCT_LIST          = [8,9,10,11]
-
-param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'IMPULSE', 'TP_PCT', 'SL_PCT']
+param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}
+
 # -----------------------------------------------------------------------------
 # CANDLES PER MONTH BY TIMEFRAME
 # -----------------------------------------------------------------------------
@@ -70,8 +74,8 @@ FINAL_N_OBS     = get_n_obs(TIMEFRAME_MINOR)
 # -----------------------------------------------------------------------------
 # SIGNAL FUNCTION — comment/uncomment as needed
 # -----------------------------------------------------------------------------
-signal_fn = orderblocks_short
-# signal_fn = orderblocks_long
+signal_fn = parity_long
+# signal_fn = parity_short
 
 # -----------------------------------------------------------------------------
 # LOAD AND FILTER DATA
@@ -92,6 +96,7 @@ ohlcv_data_minor, filtered_minor = filter_symbols(
     my_symbols=MY_SYMBOLS
 )
 print(f"Symbols: {sorted(list(ohlcv_data_minor.keys()))}")
+
 # -----------------------------------------------------------------------------
 # RUN WFO + MC
 # -----------------------------------------------------------------------------
@@ -121,6 +126,7 @@ df_wfo_results = walk_forward_optimization_mc(
     initial_balance=INITIAL_BALANCE,
     n_jobs=N_JOBS
 )
+
 # -----------------------------------------------------------------------------
 # OOS ANALYSIS — mean, mode, ewm
 # -----------------------------------------------------------------------------
@@ -146,23 +152,28 @@ for method in ['mean', 'mode', 'ewm']:
 
     ohlcv_arrays_oos = {}
     for sym, arr in ohlcv_arr_oos.items():
-        signals = signal_fn(arr, 
-                            lookback=params['LOOKBACK'], 
-                            tolerance=params['TOLERANCE'], 
-                            impulse=params['IMPULSE'], 
-                            live_trading=False)
+        signals = signal_fn(
+            arr,
+            lookback=params['LOOKBACK'],
+            tolerance=params['TOLERANCE'],
+            ma_period=params['MA_PERIOD'],
+            live_trading=False
+        )
         ohlcv_arrays_oos[sym] = {**arr, 'signal': signals}
 
-    oos_result  = run_grid_backtest(ohlcv_arrays_oos,
-                                    sell_after=params['SELL_AFTER'], 
-                                    tp_pct=params['TP_PCT'],
-                                    sl_pct=params['SL_PCT'], 
-                                    order_amount=ORDER_AMOUNT)
-    best_comb   = tuple(params[p] for p in param_names)
-    oos_df      = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
+    oos_result = run_grid_backtest(
+        ohlcv_arrays_oos,
+        sell_after=params['SELL_AFTER'],
+        tp_pct=params['TP_PCT'],
+        sl_pct=params['SL_PCT'],
+        order_amount=ORDER_AMOUNT
+    )
+    best_comb = tuple(params[p] for p in param_names)
+    oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
     final_prints(f"🔭 OOS_{method.upper()}_{STRATEGY}", DATA_FOLDER_OOS, TIMEFRAME_MINOR, MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[n] for n in param_names])
     report_backtesting(df=oos_df, parameters=param_names, data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+
 # -----------------------------------------------------------------------------
 # ELAPSED TIME
 # -----------------------------------------------------------------------------

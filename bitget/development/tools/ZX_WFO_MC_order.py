@@ -5,7 +5,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from collections import Counter
-
+from sklearn.linear_model import LinearRegression
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results, prepare_ohlcv_arrays
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 
@@ -88,17 +88,27 @@ def _evaluate_combo_on_real(
         order_amount=order_amount
     )
 
-    port = result.get('__PORTFOLIO__', {})
+    port   = result.get('__PORTFOLIO__', {})
     trades = np.asarray(port.get('trades', []), dtype=np.float64)
-    net_gain = float(np.sum(trades)) if trades.size > 0 else 0.0
+    net_gain     = float(np.sum(trades)) if trades.size > 0 else 0.0
     net_gain_pct = (net_gain / initial_balance) * 100.0
+
+    # R² equity curve
+    equity_hist = port.get('sim_balance_history', {})
+    balances    = equity_hist.get('balance', [])
+    if len(balances) >= 2:
+        y  = np.array(balances).reshape(-1, 1)
+        X  = np.arange(len(y)).reshape(-1, 1)
+        r2 = round(LinearRegression().fit(X, y).score(X, y), 2)
+    else:
+        r2 = np.nan
 
     return {
         'OOS_Net_Gain_pct': net_gain_pct,
         'OOS_Win_Ratio':    float(port.get('proportion_winners', np.nan)),
         'OOS_DD_pct':       float(port.get('max_dd', 0.0)) * 100.0,
         'OOS_Sharpe':       float(port.get('sharpe', np.nan)),
-        'OOS_Num_Signals':  int(port.get('num_signals', 0)),
+        'OOS_R2':           r2,
     }
 
 
@@ -184,6 +194,19 @@ def walk_forward_optimization_mc(
         # ------------------------------------------------------------------
         ohlcv_oos_df  = _slice_ohlcv_data(ohlcv_data, test0, test1)
         ohlcv_oos_arr = prepare_ohlcv_arrays(ohlcv_oos_df)
+
+        # Skip if OOS too short for indicators
+        if any(len(arr['close']) < 50 for arr in ohlcv_oos_arr.values()):
+            print(f"\n⚠️  Window {window_idx} OOS too short ({min(len(arr['close']) for arr in ohlcv_oos_arr.values())} bars), skipping.")
+            window_idx += 1
+            if is_last_window:
+                break
+            if anchored:
+                end += length_test
+            else:
+                start += length_test
+                end = start + length_train_set
+            continue
 
         oos_metrics = _evaluate_combo_on_real(
             best_params, ohlcv_oos_arr,
@@ -290,7 +313,10 @@ def walk_forward_optimization_mc(
         print(line)
         if i == n_data_rows - 1:
             print(separator)
-
+    oos_std      = df_data['OOS_Net_Gain_pct'].std()
+    oos_pos_pct  = (df_data['OOS_Net_Gain_pct'] > 0).mean() * 100
+    print(f"\nStd OOS_Net_Gain_pct     : {oos_std:.2f}%")
+    print(f"Positive OOS windows     : {oos_pos_pct:.1f}%")
     print(f"\n✅ WFO-MC completed: {window_idx - 1} windows processed")
 
     return df_results

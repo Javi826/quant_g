@@ -106,16 +106,22 @@ def calculate_monthly_metrics(equity_hist, initial_capital):
 
 
 def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain % y DD"):
+    from sklearn.linear_model import LinearRegression
 
     timestamps = pd.to_datetime(equity_hist['timestamp'])
     balances = np.array(equity_hist['balance'])
-   
+
     net_gain_pct = (balances - initial_capital) / initial_capital * 100
     cumulative_max = np.maximum.accumulate(balances)
     dd_pct = (balances - cumulative_max) / cumulative_max * 100
-   
+
+    # R² calculation
+    X = np.arange(len(balances)).reshape(-1, 1)
+    y = balances.reshape(-1, 1)
+    r2 = LinearRegression().fit(X, y).score(X, y)
+
     fig, ax1 = plt.subplots(figsize=(12,6))
-   
+
     # Load and process BTC data
     btc_file = os.path.join(data_folder, "BTCUSDT_4H.parquet")
     btc_df = pd.read_parquet(btc_file)
@@ -129,57 +135,58 @@ def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain %
     btc_df = btc_df[['timestamp', 'close']]
     btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
     btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
-   
+
     # Align BTC data with strategy timestamps
     btc_aligned = np.interp(
         timestamps.astype(np.int64) / 10**9,
         btc_df['timestamp'].astype(np.int64) / 10**9,
         btc_df['btc_net_gain_pct']
     )
-   
+
     # Color areas based on performance vs BTC
     above_btc = net_gain_pct >= btc_aligned
     below_btc = net_gain_pct < btc_aligned
-   
-    ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.1, color='green', interpolate=True)
-    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.1, color='red', interpolate=True)
+
+    ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.2, color='green', interpolate=True)
+    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red', interpolate=True)
     ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
-   
+
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Net_Gain_pct", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
-   
+
     ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'],
              color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
-   
+
     # Drawdown on secondary axis
     ax2 = ax1.twinx()
     ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
     ax2.set_ylabel("Drawdown", color='red')
     ax2.tick_params(axis='y', labelcolor='red')
-   
+
     # Statistics text box
     final_net_gain = net_gain_pct[-1]
     max_dd = dd_pct.min()
     final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
-   
+
     textstr = (
         f'Net Gain STR: {final_net_gain:.2f}%\n'
         f'Net Gain BTC: {final_btc:.2f}%\n'
-        f'Max DD        : {max_dd:.2f}%'
+        f'Max DD         : {max_dd:.2f}%\n'
+        f'R²               : {r2:.3f}'
     )
 
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-   
+
     fig.suptitle(title)
     fig.autofmt_xdate()
     ax1.grid(True, linestyle='--', alpha=0.6)
-   
+
     lines, labels = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc='best')
-   
+
     plt.show()
 
 
@@ -449,21 +456,37 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
    
-    # -------------------------------------------------------------------------
+# -------------------------------------------------------------------------
     # Best combinations per metric
     # -------------------------------------------------------------------------
+    def _calc_r2(equity_hist):
+        from sklearn.linear_model import LinearRegression
+        if not equity_hist or len(equity_hist.get('balance', [])) < 2:
+            return np.nan
+        y = np.array(equity_hist['balance']).reshape(-1, 1)
+        X = np.arange(len(y)).reshape(-1, 1)
+        return round(LinearRegression().fit(X, y).score(X, y), 2)
+
     best_netgain = df_portfolio.loc[df_portfolio['Net_Gain_pct'].idxmax()]
     best_sharpe  = df_portfolio.loc[df_portfolio['Sharpe'].idxmax()]
     best_dd      = df_portfolio.loc[df_portfolio['DD_pct'].idxmin()]
-   
+
+    r2 = _calc_r2(df.loc[df["Net_Gain_pct"].idxmax()].get("sim_balance_history"))
+
     df_summary = pd.DataFrame([
-        {'Metric':'Net_Gain_pct', **best_netgain},
-        {'Metric':'Sharpe      ', **best_sharpe},
-        {'Metric':'Lowest DD   ', **best_dd}
+        {'Metric': 'Net_Gain_pct', **best_netgain, 'R2': r2},
+        {'Metric': 'Sharpe      ', **best_sharpe,  'R2': r2},
+        {'Metric': 'Lowest DD   ', **best_dd,      'R2': r2}
     ])
     df_summary['Num_Signals'] = df_summary['Num_Signals'].apply(lambda x: f"{x:,.0f}".replace(",", "."))
     df_summary = df_summary.round(2)
-    print(df_summary.to_string(index=False))
+
+    all_cols = list(df_summary.columns)
+    all_cols.remove('R2')
+    all_cols.insert(all_cols.index('Sharpe'), 'R2')
+    df_summary = df_summary[all_cols]
+
+    print(df_summary.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
    
     # -------------------------------------------------------------------------
     # Monthly metrics analysis

@@ -207,7 +207,7 @@ STRATEGIES = [
         'tolerance': 35,
         'impulse': 0.01,
         'tp_pct': 4,
-        'sl_pct': 11
+        'sl_pct': 10
     },
     {
         'id': '16_ranging_short_6Hutc',

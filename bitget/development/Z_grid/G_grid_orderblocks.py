@@ -38,14 +38,6 @@ MIN_VOL_USDT        = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-IMPULSE_LIST         = [0.02] 
-LOOKBACK_LIST        = [100]
-TOLERANCE_LIST       = [45] 
-
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [11]
-
-SELL_AFTER_LIST      = [0]  
 IMPULSE_LIST         = [0.01] 
 LOOKBACK_LIST        = [50]
 TOLERANCE_LIST       = [35] 
@@ -53,13 +45,15 @@ TOLERANCE_LIST       = [35]
 TP_PCT_LIST          = [4]
 SL_PCT_LIST          = [11]
 
-SELL_AFTER_LIST      = [0]  
-IMPULSE_LIST         = [0.01] 
-LOOKBACK_LIST        = [100]
-TOLERANCE_LIST       = [42] 
-
-TP_PCT_LIST          = [4]
-SL_PCT_LIST          = [10]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]  
+# IMPULSE_LIST         = [0.02] 
+# LOOKBACK_LIST        = [50]
+# TOLERANCE_LIST       = [45] 
+# 
+# TP_PCT_LIST          = [4]
+# SL_PCT_LIST          = [9]
+# =============================================================================
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
@@ -124,8 +118,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=True)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
+save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

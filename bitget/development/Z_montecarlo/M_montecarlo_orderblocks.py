@@ -27,8 +27,8 @@ MY_SYMBOLS          = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2022_OOS"
-#DATA_FOLDER         = "../data/crypto_2022_IS_2"
+DATA_FOLDER         = "../data/crypto_2025_OOS"
+DATA_FOLDER         = "../data/crypto_2022_IS"
 TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
@@ -41,7 +41,7 @@ LOOKBACK_LIST        = [50,100,150]
 TOLERANCE_LIST       = [35,40,45] 
 IMPULSE_LIST         = [0.005,0.01,0.015]
 
-TP_PCT_LIST          = [2,3,4,5,6]
+TP_PCT_LIST          = [2,3,4,5]
 SL_PCT_LIST          = [8,9,10,11]
 
 # =============================================================================
