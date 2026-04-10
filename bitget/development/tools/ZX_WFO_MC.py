@@ -6,6 +6,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from collections import Counter
 from sklearn.linear_model import LinearRegression
+
 from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results, prepare_ohlcv_arrays
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 
@@ -29,18 +30,12 @@ def _evaluate_combo_on_paths(
     dtype=np.float32
 ) -> float:
     records = []
-
+    _BACKTEST_PARAMS = {'sell_after', 'tp_pct', 'sl_pct'}
     for path_idx in range(n_paths):
         ohlcv_arrays = extract_ohlcv_from_path(paths_per_symbol, path_idx, dtype=dtype)
 
         for sym, arr in ohlcv_arrays.items():
-            signals = signal_fn(
-                arr,
-                lookback=param_dict.get('LOOKBACK'),
-                tolerance=param_dict.get('TOLERANCE'),
-                impulse=param_dict.get('IMPULSE'),
-                live_trading=False
-            )
+            signals = signal_fn(arr, **{k.lower(): v for k, v in param_dict.items() if k.lower() not in _BACKTEST_PARAMS}, live_trading=False)
             arr['signal'] = np.asarray(signals, dtype=dtype)
 
         result = run_grid_backtest(
@@ -70,14 +65,9 @@ def _evaluate_combo_on_real(
     initial_balance: float,
     dtype=np.float32
 ) -> dict:
+    _BACKTEST_PARAMS = {'sell_after', 'tp_pct', 'sl_pct'}
     for sym, arr in ohlcv_arr.items():
-        signals = signal_fn(
-            arr,
-            lookback=param_dict.get('LOOKBACK'),
-            tolerance=param_dict.get('TOLERANCE'),
-            impulse=param_dict.get('IMPULSE'),
-            live_trading=False
-        )
+        signals = signal_fn(arr, **{k.lower(): v for k, v in param_dict.items() if k.lower() not in _BACKTEST_PARAMS}, live_trading=False)
         arr['signal'] = np.asarray(signals, dtype=dtype)
 
     result = run_grid_backtest(
@@ -109,6 +99,7 @@ def _evaluate_combo_on_real(
         'OOS_DD_pct':       float(port.get('max_dd', 0.0)) * 100.0,
         'OOS_Sharpe':       float(port.get('sharpe', np.nan)),
         'OOS_R2':           r2,
+        'OOS_Num_Signals':  int(port.get('num_signals', 0)),
     }
 
 
@@ -198,21 +189,19 @@ def walk_forward_optimization_mc(
         # Skip if OOS too short for indicators
         if any(len(arr['close']) < 50 for arr in ohlcv_oos_arr.values()):
             print(f"\n⚠️  Window {window_idx} OOS too short ({min(len(arr['close']) for arr in ohlcv_oos_arr.values())} bars), skipping.")
-            window_idx += 1
-            if is_last_window:
-                break
-            if anchored:
-                end += length_test
-            else:
-                start += length_test
-                end = start + length_train_set
-            continue
-
-        oos_metrics = _evaluate_combo_on_real(
-            best_params, ohlcv_oos_arr,
-            signal_fn, run_grid_backtest,
-            order_amount, initial_balance, dtype
-        )
+            oos_metrics = {
+                'OOS_Net_Gain_pct': np.nan,
+                'OOS_Win_Ratio':    np.nan,
+                'OOS_DD_pct':       np.nan,
+                'OOS_Sharpe':       np.nan,
+                'OOS_R2':           np.nan,
+            }
+        else:
+            oos_metrics = _evaluate_combo_on_real(
+                best_params, ohlcv_oos_arr,
+                signal_fn, run_grid_backtest,
+                order_amount, initial_balance, dtype
+            )
 
         # ------------------------------------------------------------------
         # Store window result
@@ -313,8 +302,9 @@ def walk_forward_optimization_mc(
         print(line)
         if i == n_data_rows - 1:
             print(separator)
-    oos_std      = df_data['OOS_Net_Gain_pct'].std()
-    oos_pos_pct  = (df_data['OOS_Net_Gain_pct'] > 0).mean() * 100
+
+    oos_std     = df_data['OOS_Net_Gain_pct'].std()
+    oos_pos_pct = (df_data['OOS_Net_Gain_pct'] > 0).mean() * 100
     print(f"\nStd OOS_Net_Gain_pct     : {oos_std:.2f}%")
     print(f"Positive OOS windows     : {oos_pos_pct:.1f}%")
     print(f"\n✅ WFO-MC completed: {window_idx - 1} windows processed")

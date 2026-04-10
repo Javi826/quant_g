@@ -153,7 +153,7 @@ STRATEGIES = [
         'tolerance': 15,
         'ma_period': 25,
         'tp_pct': 2,
-        'sl_pct': 10
+        'sl_pct': 9
     },
     {
         'id': '11_parity_short_1H',

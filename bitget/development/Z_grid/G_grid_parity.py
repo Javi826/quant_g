@@ -1,3 +1,4 @@
+#Z_grid/Grid_parity.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -24,12 +25,11 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2026"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
+DATA_FOLDER         = "../data/crypto_2026_OOS"
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 4_200_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -41,23 +41,12 @@ TOLERANCE_LIST       = [10,20,30,40]
 TP_PCT_LIST          = [3,4,5]
 SL_PCT_LIST          = [8,9,10]
 
-#LONG
-LOOKBACK_LIST        = [150]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [40] 
-
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [100]
+MA_PERIOD_LIST       = [25]
+TOLERANCE_LIST       = [45] 
 TP_PCT_LIST          = [3]
 SL_PCT_LIST          = [10]
-
-# =============================================================================
-# #SHORT
-# LOOKBACK_LIST        = [150]
-# MA_PERIOD_LIST       = [50]
-# TOLERANCE_LIST       = [20] 
-# 
-# TP_PCT_LIST          = [2]
-# SL_PCT_LIST          = [7.5]
-# =============================================================================
 # -----------------------------------------------------------------------------
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -72,7 +61,7 @@ ohlcv_data_minor, filtered_minor = filter_symbols(symbols_minor, min_vol_usdt=MI
 save_filtered_symbols(filtered_minor, strategy=STRATEGY, timeframe=TIMEFRAME_MINOR, save_symbols=SAVE_SYMBOLS)
 
 ohlcv_arr_minor = prepare_ohlcv_arrays(ohlcv_data_minor)
-
+print(f"Symbols: {sorted(list(ohlcv_data_minor.keys()))}")
 # -----------------------------------------------------------------------------
 # FUNCTION TO PROCESS ONE PARAMETER COMBINATION
 # -----------------------------------------------------------------------------
@@ -121,8 +110,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=True)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=False)
+save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

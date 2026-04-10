@@ -9,13 +9,19 @@ np.random.seed(42)
 random.seed(42)
 
 symbols_to_exclude = {}
+
+#3 
+symbols_to_include = ['BTCUSDT', 'ETHUSDT', 'XRPUSDT']
+#9
+symbols_to_include = ['BRETTUSDT', 'BTCUSDT', 'DOGEUSDT', 'ETHUSDT', 'LTCUSDT', 'REZUSDT', 'SOLUSDT', 'SUIUSDT', 'XRPUSDT']
+#32
 symbols_to_include = ["ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ETHUSDT","PENGUUSDT","AAVEUSDT",
                       "ENAUSDT","ONDOUSDT","XRPUSDT","LTCUSDT","ARBUSDT","AVAXUSDT","TAOUSDT","HBARUSDT",
                       "DOTUSDT","DOGEUSDT","SOLUSDT","FARTCOINUSDT","WIFUSDT","WLDUSDT","NEARUSDT","LINKUSDT",
                       "BGBUSDT","SNXUSDT","BTCUSDT","SUIUSDT","APTUSDT","FORMUSDT","HYPEUSDT","ADAUSDT"]
- 
-symbols_to_include = ['BTCUSDT', 'ETHUSDT', 'XRPUSDT']
-
+#3 
+symbols_to_include = ['ADAUSDT', 'BCHUSDT', 'BNBUSDT', 'BTCUSDT', 'DOGEUSDT', 'ETHUSDT', 'HUSDT', 'HYPEUSDT', 'LINKUSDT', 'LTCUSDT', 'PIPPINUSDT', 'SOLUSDT', 'SUIUSDT', 'TAOUSDT', 'XRPUSDT']
+#3 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
     ohlcv_data         = {}
@@ -23,16 +29,14 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     removed_symbols    = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
     
-    # ---- Inclusion filter ----
+    # ---- Inclusion ----
     if my_symbols:
         inclusion_list = custom_symbols if custom_symbols is not None else symbols_to_include
         symbols = [s for s in symbols if s in inclusion_list]
-    # --------------------------
-    # -----------------------------
     
     for sym in symbols:
         
-        # ---- Exclusión manual ----
+        # ---- Exclusion ----
         if sym in symbols_to_exclude:
             removed_symbols.append(sym)
             continue
@@ -103,14 +107,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     print(f"\n🔹Total symbols     : {len(symbols)}")
     print(f"🔹Symbols removed   : {len(removed_symbols)}")
     print(f"🔹Symbols remaining : {len(filtered_symbols)}\n")
-    
-    
-
-    #print(f"\n📊 Removal reasons breakdown:")
-    #for reason, count in removed_by_reasons.items():
-    #     if count > 0:
-    #         print(f"   • {reason:<25}: {count:>4} symbols")
-    #print()
     
     return ohlcv_data, filtered_symbols
 

@@ -1,0 +1,16 @@
+id,name,timeframe,active,direction,regime_trending,regime_ranging,regime_volatile,direction_mode,sell_after_ncandles,order_amount,lookback,tolerance,ma_period,tp_pct,sl_pct,impulse,range,flag,approved,last_run,bt_netgain_pct,bt_r2,prob_negative
+02_reversal_long_4H,reversal_long_4H,4H,False,long,0.0,1.0,0.0,long_only,50,200,4,20.0,50.0,3.0,10.0,,,,,,,,
+03_parity_long_4H,parity_long_4H,4H,False,long,1.0,0.0,0.0,general,50,200,100,45.0,25.0,3.0,10.0,,,,False,2026-04-10 15:30,29.42,0.884,31.5
+04_reversal_short_4H,reversal_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,4,25.0,50.0,3.0,9.0,,,,,,,,
+06_reversal_long_1H,reversal_long_1H,1H,True,long,1.0,0.0,0.0,general,100,200,7,40.0,25.0,2.0,10.0,,,,,,,,
+07_reversal_short_1H,reversal_short_1H,1H,True,short,1.0,1.0,1.0,general,100,200,5,30.0,50.0,2.0,5.0,,,,,,,,
+08_reversal_long_6Hutc,reversal_long_6Hutc,6Hutc,True,long,1.0,1.0,0.0,long_only,50,200,3,20.0,50.0,4.0,10.0,,,,,,,,
+09_reversal_short_6Hutc,reversal_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,6,30.0,25.0,4.0,7.5,,,,,,,,
+10_parity_long_1H,parity_long_1H,1H,True,long,1.0,0.0,0.0,long_only,75,200,150,15.0,25.0,2.0,9.0,,,,,,,,
+11_parity_short_1H,parity_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,150,20.0,50.0,2.0,7.5,,,,,,,,
+12_parity_long_6Hutc,parity_long_6Hutc,6Hutc,True,long,1.0,1.0,0.0,long_only,50,200,50,40.0,25.0,3.5,10.0,,,,,,,,
+13_orderblocks_short_4H,orderblocks_short_4H,4H,True,short,0.0,1.0,0.0,general,50,200,50,35.0,,4.0,10.0,0.01,,,,,,,
+16_ranging_short_6Hutc,ranging_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,10,5.0,,4.0,6.0,,25.0,,,,,,
+17_flag_long_4H,flag_long_4H,4H,True,long,1.0,1.0,1.0,general,50,200,15,,50.0,4.0,10.0,3.0,,50.0,,,,,
+19_flag_short_4H,flag_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,10,,50.0,3.0,9.0,3.0,,50.0,,,,,
+20_flag_short_1H,flag_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,20,,25.0,2.0,8.0,3.0,,60.0,,,,,

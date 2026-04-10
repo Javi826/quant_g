@@ -24,7 +24,7 @@ from regime_common import permutation_test, format_significance, analyze_by_dime
 
 
 BASE_DIR              = '/home/javi/projects/quant/quant_g/bitget/development'
-TRADES_FOLDER         = f'{BASE_DIR}/brief_trades_2026'
+TRADES_FOLDER         = f'{BASE_DIR}/brief_trades'
 OHLC_FOLDER           = f'{BASE_DIR}/data/crypto_2026_OOS'  
 MA_PERIOD             = 50
 INITIAL_CAPITAL       = 800

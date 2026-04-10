@@ -21,16 +21,16 @@ MY_SYMBOLS  = True
 # CONFIGURATION
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_2022_IS"
-DATA_FOLDER_OOS     = "../data/crypto_2025_OOS"
-TIMEFRAME_MINOR     = '4H'
+DATA_FOLDER_OOS     = "../data/crypto_2026_OOS"
+TIMEFRAME_MINOR     = '6Hutc'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = True
-MONTHS_TRAIN        = 6
-MONTHS_TEST         = 2
+MONTHS_TRAIN        = 12
+MONTHS_TEST         = 6
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
@@ -46,15 +46,13 @@ IMPULSE_LIST         = [0.005,0.01,0.015]
 TP_PCT_LIST          = [2,3,4,5]
 SL_PCT_LIST          = [8,9,10,11]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [35] 
-# IMPULSE_LIST         = [0.01]
-# 
-# TP_PCT_LIST          = [4]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+SELL_AFTER_LIST      = [0]  
+LOOKBACK_LIST        = [50]
+TOLERANCE_LIST       = [35] 
+IMPULSE_LIST         = [0.01]
+
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [10]
 
 param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'IMPULSE', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -102,6 +100,7 @@ ohlcv_data_minor, filtered_minor = filter_symbols(
     my_symbols=MY_SYMBOLS
 )
 print(f"Symbols: {sorted(list(ohlcv_data_minor.keys()))}")
+is_symbols = list(ohlcv_data_minor.keys())
 # -----------------------------------------------------------------------------
 # RUN WFO + MC
 # -----------------------------------------------------------------------------
@@ -134,8 +133,9 @@ df_wfo_results = walk_forward_optimization_mc(
 # -----------------------------------------------------------------------------
 # OOS ANALYSIS — mean, mode, ewm
 # -----------------------------------------------------------------------------
-symbols_oos       = [f.split('_')[0] for f in os.listdir(DATA_FOLDER_OOS) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
-ohlcv_data_oos, _ = filter_symbols(symbols_oos, min_vol_usdt=MIN_VOL_USDT, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER_OOS, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS)
+symbols_oos = [f.split('_')[0] for f in os.listdir(DATA_FOLDER_OOS) if f.endswith(f"_{TIMEFRAME_MINOR}.parquet")]
+symbols_oos_filtered = [s for s in symbols_oos if s in is_symbols]
+ohlcv_data_oos, _ = filter_symbols(symbols_oos_filtered, min_vol_usdt=0, timeframe=TIMEFRAME_MINOR, data_folder=DATA_FOLDER_OOS, min_price=0, vol_window=50, my_symbols=False)
 ohlcv_arr_oos     = prepare_ohlcv_arrays(ohlcv_data_oos)
 
 _int_params = {k for k in param_names if all(isinstance(x, int) for x in param_ranges[k])}
@@ -156,11 +156,7 @@ for method in ['mean', 'mode', 'ewm']:
 
     ohlcv_arrays_oos = {}
     for sym, arr in ohlcv_arr_oos.items():
-        signals = signal_fn(arr, 
-                            lookback=params['LOOKBACK'], 
-                            tolerance=params['TOLERANCE'], 
-                            impulse=params['IMPULSE'], 
-                            live_trading=False)
+        signals = signal_fn(arr, **{k.lower(): v for k, v in params.items() if k.lower() not in {'sell_after', 'tp_pct', 'sl_pct'}}, live_trading=False)
         ohlcv_arrays_oos[sym] = {**arr, 'signal': signals}
 
     oos_result  = run_grid_backtest(ohlcv_arrays_oos,
