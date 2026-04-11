@@ -10,6 +10,7 @@ Replicates enricher.py behavior:
 Now uses regime_common.py for shared functions.
 """
 
+import logging
 import os
 import sys
 import numpy as np
@@ -25,6 +26,8 @@ from regime_common import permutation_test, format_significance, analyze_by_dime
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW
 from shared_config import REGIME_ER_WINDOW as ER_WINDOW, REGIME_ATR_WINDOW as ATR_WINDOW
 from shared_config import REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
+
+logger = logging.getLogger("BOT_trading.batch.regime_performance")
 
 BASE_DIR              = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OHLC_FOLDER           = os.path.join(BASE_DIR, "data", "crypto_2026_OOS")
@@ -109,19 +112,20 @@ def analyze_strategy(filepath, families, initial_capital):
 
 def print_single_strategy_all_dimensions(r):
     """Print tables"""
-    print(f"\n\033[93m{'='*145}\033[0m")
-    print(f"\033[93mSTRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)\033[0m")
-    print(f"\033[93m{'='*145}\033[0m")
-    
-    print(f"\n{'─'*120}")
-    print("BY FAMILY (trending/volatile/ranging)")
-    print(f"{'─'*120}")
-    print(f"{'FAMILY':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
-    print("-" * 120)
-    
+    lines = []
+    lines.append(f"\n{'='*60}")
+    lines.append(f"STRATEGY: {r['strategy']} (Total: {r['total_trades']} trades, Profit: ${r['total_profit']:.2f}, DD: {r['total_dd_pct']:.2f}%, WR: {r['total_win_rate']:.1f}%)")
+    lines.append(f"{'='*60}")
+
+    lines.append(f"\n{'─'*120}")
+    lines.append("BY FAMILY (trending/volatile/ranging)")
+    lines.append(f"{'─'*120}")
+    lines.append(f"{'FAMILY':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
+    lines.append("-" * 120)
+
     family_stats = r['family_stats']
     sorted_family = sorted(family_stats.items(), key=lambda x: x[1]['profit'], reverse=True)
-    
+
     for idx, (category, stats) in enumerate(sorted_family):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
         if len(sorted_family) < 2:
@@ -132,30 +136,33 @@ def print_single_strategy_all_dimensions(r):
         else:
             p_value = permutation_test(stats['profits_list'], sorted_family[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
-    
-    print("-" * 120)
-    print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
-    
+        lines.append(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
+
+    lines.append("-" * 120)
+    lines.append(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
+
     if len(sorted_family) >= 2:
         best_fam, best_stats = sorted_family[0]
         second_fam, second_stats = sorted_family[1]
         p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
         sig_str = format_significance(p_value)
-        print(f"\n→ BEST: {best_fam} (${best_stats['profit']:.2f}) vs 2ND: {second_fam} (${second_stats['profit']:.2f}) | {sig_str}")
-    
+        lines.append(f"\n→ BEST: {best_fam} (${best_stats['profit']:.2f}) vs 2ND: {second_fam} (${second_stats['profit']:.2f}) | {sig_str}")
+
+    logger.debug("\n".join(lines))
+
     if not ANALYZE_DIRECTION:
         return
-    
-    print(f"\n{'─'*120}")
-    print("BY DIRECTION (uptrend/downtrend)")
-    print(f"{'─'*120}")
-    print(f"{'DIRECTION':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
-    print("-" * 120)
-    
+
+    lines = []
+    lines.append(f"\n{'─'*120}")
+    lines.append("BY DIRECTION (uptrend/downtrend)")
+    lines.append(f"{'─'*120}")
+    lines.append(f"{'DIRECTION':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
+    lines.append("-" * 120)
+
     trend_stats = r['trend_stats']
     sorted_trend = sorted(trend_stats.items(), key=lambda x: x[1]['profit'], reverse=True)
-    
+
     for idx, (category, stats) in enumerate(sorted_trend):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
         if len(sorted_trend) < 2:
@@ -166,27 +173,27 @@ def print_single_strategy_all_dimensions(r):
         else:
             p_value = permutation_test(stats['profits_list'], sorted_trend[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
-    
-    print("-" * 120)
-    print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
-    
+        lines.append(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
+
+    lines.append("-" * 120)
+    lines.append(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
+
     if len(sorted_trend) >= 2:
         best_dir, best_stats = sorted_trend[0]
         second_dir, second_stats = sorted_trend[1]
         p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
         sig_str = format_significance(p_value)
-        print(f"\n→ BEST: {best_dir} (${best_stats['profit']:.2f}) vs 2ND: {second_dir} (${second_stats['profit']:.2f}) | {sig_str}")
-    
-    print(f"\n{'─'*120}")
-    print("BY REGIME (6 combined categories)")
-    print(f"{'─'*120}")
-    print(f"{'REGIME':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
-    print("-" * 120)
-    
+        lines.append(f"\n→ BEST: {best_dir} (${best_stats['profit']:.2f}) vs 2ND: {second_dir} (${second_stats['profit']:.2f}) | {sig_str}")
+
+    lines.append(f"\n{'─'*120}")
+    lines.append("BY REGIME (6 combined categories)")
+    lines.append(f"{'─'*120}")
+    lines.append(f"{'REGIME':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
+    lines.append("-" * 120)
+
     regime_stats = r['regime_stats']
     sorted_regime = sorted(regime_stats.items(), key=lambda x: x[1]['profit'], reverse=True)
-    
+
     for idx, (category, stats) in enumerate(sorted_regime):
         profit_pct = (stats['profit'] / r['total_profit'] * 100) if r['total_profit'] != 0 else 0.0
         if len(sorted_regime) < 2:
@@ -197,15 +204,16 @@ def print_single_strategy_all_dimensions(r):
         else:
             p_value = permutation_test(stats['profits_list'], sorted_regime[0][1]['profits_list'])
             p_str = format_significance(p_value)
-        print(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
-    
-    print("-" * 120)
-    print(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
-    
+        lines.append(f"{category:<20} {stats['confidence']:>5} {stats['num_trades']:>10} {stats['profit']:>12.2f} {profit_pct:>9.1f}% {stats['dd_pct']:>10.2f} {stats['win_rate']:>10.1f} {p_str:>15}")
+
+    lines.append("-" * 120)
+    lines.append(f"{'TOTAL':<20} {'':>5} {r['total_trades']:>10} {r['total_profit']:>12.2f} {100.0:>9.1f}% {r['total_dd_pct']:>10.2f} {r['total_win_rate']:>10.1f} {'':>15}")
+
     if len(sorted_regime) >= 2:
         best_reg, best_stats = sorted_regime[0]
         second_reg, second_stats = sorted_regime[1]
         p_value = permutation_test(best_stats['profits_list'], second_stats['profits_list'])
         sig_str = format_significance(p_value)
-        print(f"\n→ BEST: {best_reg} (${best_stats['profit']:.2f}) vs 2ND: {second_reg} (${second_stats['profit']:.2f}) | {sig_str}")
+        lines.append(f"\n→ BEST: {best_reg} (${best_stats['profit']:.2f}) vs 2ND: {second_reg} (${second_stats['profit']:.2f}) | {sig_str}")
 
+    logger.debug("\n".join(lines))

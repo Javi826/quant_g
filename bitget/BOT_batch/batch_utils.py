@@ -1,8 +1,11 @@
+import logging
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+
+logger = logging.getLogger("BOT_trading.batch.batch_utils")
 
 # =============================================================================
 # HELPER — REPORT FILTERED TRADES
@@ -41,16 +44,16 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
         "R2": r2, "Sharpe": round(sharpe, 2), "DD_pct": round(dd_pct, 2),
         "Num_Signals": num_signals, "duration_d": round(duration_d, 2)
     }])
-    print(df_summary.to_string(index=False))
+    logger.debug(df_summary.to_string(index=False))
 
     # --- Monthly stats ---
     df["month"] = pd.to_datetime(df["buy_time"]).dt.to_period("M")
     monthly      = df.groupby("month")["profit"].sum()
     winning_m    = (monthly > 0).sum()
-    print(f"\n{'-'*60}")
-    print("MONTHLY STATISTICS")
-    print(f"{'-'*60}")
-    print(f"Winning Months: {winning_m} / {len(monthly)} ({winning_m/len(monthly)*100:.2f}%)")
+    logger.debug(f"\n{'-'*60}")
+    logger.debug("MONTHLY STATISTICS")
+    logger.debug(f"{'-'*60}")
+    logger.debug(f"Winning Months: {winning_m} / {len(monthly)} ({winning_m/len(monthly)*100:.2f}%)")
 
     # --- Plot ---
     net_gain_arr = (balances - initial_balance) / initial_balance * 100
@@ -93,7 +96,14 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines + lines2, labels + labels2, loc="best")
     plt.show()
-    
+    return {
+        "net_gain_pct": round(net_gain_pct, 2),
+        "dd_pct":       round(dd_pct, 2),
+        "win_ratio":    round(win_ratio * 100, 1),
+        "r2":           r2,
+    }
+
+
 # =============================================================================
 # HELPER — EXTRACT BEST PARAMS
 # =============================================================================
@@ -108,9 +118,10 @@ def extract_best_params(df_summary, param_names, lists_for_grid):
         k: int(round(best_row[k])) if k in int_params else round(float(best_row[k]), 4)
         for k in param_names
     }
-    print("\n   ▶ Extracting optimal params (best Net_Gain_pct_m)...")
-    print("   Best params: " + " | ".join(f"{k}: {v}" for k, v in best_params.items()))
+    logger.debug("Extracting optimal params (best Net_Gain_pct_m)...")
+    logger.debug("Best params: " + " | ".join(f"{k}: {v}" for k, v in best_params.items()))
     return best_params
+
 
 # =============================================================================
 # HELPER — SELECT UNIVERSE
@@ -140,17 +151,18 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     needed               = max(0, n_symbols - len(in_both))
     symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
 
-    print(f"\n  OOS pool         ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
-    print(f"  IS  pool         ({len(filtered_is):>3}): {len(filtered_is)} candidates")
-    print(f"\n  In both          ({len(in_both):>3}): {in_both}")
-    print(f"  Only in OOS      ({len(only_in_oos):>3}): {only_in_oos}")
-    print(f"\n  ▶ OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
-    print(f"  ▶ IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
+    logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
+    logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
+    logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
+    logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
+    logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
+    logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
 
     if len(symbols_is_final) < n_symbols:
-        print(f"\n  ⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
+        logger.warning(f"IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
+
 
 # =============================================================================
 # HELPER — ENRICH TRADES WITH REGIME
@@ -176,6 +188,7 @@ def enrich_trades_with_regime(trade_log, ohlc_folder, timeframe, families, lookb
 
     return df
 
+
 # =============================================================================
 # HELPER — UPDATE STRATEGIES PARAMS CSV
 # =============================================================================
@@ -187,35 +200,35 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, app
             return None
 
     if not os.path.exists(csv_path):
-        print(f"  ⚠️  strategies_params.csv not found at {csv_path} — skipping update.")
+        logger.warning(f"strategies_params.csv not found at {csv_path} — skipping update.")
         return
 
     df_params = pd.read_csv(csv_path)
     mask      = df_params["id"] == strategy_id
 
     if not mask.any():
-        print(f"  ⚠️  Strategy id '{strategy_id}' not found in CSV — skipping update.")
+        logger.warning(f"Strategy id '{strategy_id}' not found in CSV — skipping update.")
         return
 
     idx      = df_params[mask].index[0]
     prev_row = df_params.loc[idx]
 
-    print(f"\n  ID : {strategy_id}")
-    print(f"\n  {'Parameter':<20} {'Previous':>12} {'New':>12} {'Changed':>10}")
-    print(f"  {'-'*56}")
+    logger.debug(f"ID : {strategy_id}")
+    logger.debug(f"  {'Parameter':<20} {'Previous':>12} {'New':>12} {'Changed':>10}")
+    logger.debug(f"  {'-'*56}")
     for k in param_keys:
         if k == "sell_after":
             continue
         prev_val = normalize(prev_row.get(k, None))
         new_val  = normalize(best_params.get(k.upper(), None))
         changed  = "⚠️  YES" if prev_val != new_val else "✅"
-        print(f"  {k:<20} {str(prev_val):>12} {str(new_val):>12} {changed:>10}")
+        logger.debug(f"  {k:<20} {str(prev_val):>12} {str(new_val):>12} {changed:>10}")
 
-    print(f"\n  {'Metric':<20} {'Previous':>12} {'New':>12}")
-    print(f"  {'-'*46}")
+    logger.debug(f"  {'Metric':<20} {'Previous':>12} {'New':>12}")
+    logger.debug(f"  {'-'*46}")
     for metric, new_val in [("bt_netgain_pct", round(bt_netgain_pct, 2)), ("bt_r2", round(r2, 3)), ("prob_negative", round(prob_negative_oos, 2))]:
         prev_val = prev_row.get(metric, None)
-        print(f"  {metric:<20} {str(prev_val):>12} {str(new_val):>12}")
+        logger.debug(f"  {metric:<20} {str(prev_val):>12} {str(new_val):>12}")
 
     df_params.at[idx, "approved"]       = approved
     df_params.at[idx, "bt_netgain_pct"] = round(bt_netgain_pct, 2)
@@ -228,10 +241,10 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, app
             if k in df_params.columns:
                 df_params.at[idx, k] = best_params.get(k.upper())
         df_params.at[idx, "active"] = True
-        print(f"\n  ✅ strategies_params.csv updated — params updated, active set to True for '{strategy_id}'")
+        logger.info(f"strategies_params.csv updated — params updated, active=True for '{strategy_id}'")
     else:
         df_params.at[idx, "active"] = False
-        print(f"\n  ❌ Strategy rejected — params NOT updated, active set to False for '{strategy_id}'")
+        logger.info(f"Strategy rejected — params NOT updated, active=False for '{strategy_id}'")
 
     df_params.to_csv(csv_path, index=False)
 
@@ -257,8 +270,9 @@ def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final):
         ], ignore_index=True)
 
     df_symbols.to_csv(csv_path, index=False)
-    print(f"\n  ✅ strategies_symbols.csv updated — {len(symbols_oos_final)} symbols for '{strategy_id}'")
-    
+    logger.info(f"strategies_symbols.csv updated — {len(symbols_oos_final)} symbols for '{strategy_id}'")
+
+
 # =============================================================================
 # HELPER — LOAD BTC 1D
 # =============================================================================
@@ -293,3 +307,76 @@ def get_btc_direction(buy_time, btc_df, side, ma_period=5, long_th=1.00, short_t
         return "uptrend" if last["close"] > last[f"ma{ma_period}"] * long_th else "downtrend"
     else:
         return "downtrend" if last["close"] < last[f"ma{ma_period}"] * short_th else "uptrend"
+
+
+# =============================================================================
+# PORTFOLIO ANALYSIS — EQUITY METRICS
+# =============================================================================
+RESAMPLE_FREQ = '1D'
+BARS_PER_DAY  = 1
+
+
+def resample_equity(df_indexed):
+    common_index = pd.date_range(
+        start=df_indexed.index.min(),
+        end=df_indexed.index.max(),
+        freq=RESAMPLE_FREQ
+    )
+    df_r = df_indexed[['balance']].reindex(common_index)
+    df_r['balance'] = df_r['balance'].ffill().bfill()
+    df_r.index.name = 'timestamp'
+    return df_r
+
+
+def compute_metrics(trade_log, capital, name="Equity"):
+    from sklearn.linear_model import LinearRegression as _LR
+
+    tl      = trade_log.sort_values("buy_time").reset_index(drop=True)
+    profits = tl["profit"].values
+    eq      = capital + np.cumsum(profits)
+    cm      = np.maximum.accumulate(eq)
+    max_dd  = ((eq - cm) / cm * 100).min()
+    net_gain = (eq[-1] - capital) / capital * 100
+    gains   = profits[profits > 0].sum()
+    losses  = -profits[profits < 0].sum()
+    pf      = round(gains / losses, 3) if losses > 0 else np.inf
+    X       = np.arange(len(eq)).reshape(-1, 1)
+    y       = eq.reshape(-1, 1)
+    r2      = round(_LR().fit(X, y).score(X, y), 3)
+
+    # Monthly consistency — resample to daily for monthly grouping
+    tl["date"] = pd.to_datetime(tl["buy_time"]).dt.to_period("M")
+    monthly    = tl.groupby("date")["profit"].sum()
+    consistency = (monthly > 0).mean() * 100
+    volatility  = pd.Series(profits).std() / capital * 100
+
+    return {
+        "Curve":          name,
+        "Volatility_pct": round(volatility, 2),
+        "Monthly_pct":    round(consistency, 2),
+        "Net_Gain_pct":   round(net_gain, 2),
+        "Max_DD_pct":     round(max_dd, 2),
+        "Profit_Factor":  pf,
+        "R_Squared":      r2,
+        "Win_Rate":       round((profits > 0).mean() * 100, 1),
+    }
+
+
+def print_metrics_table(metrics_list, title, shorten_names=False):
+    def _shorten(name):
+        segments = name.strip().split("+")
+        result = []
+        for seg in segments:
+            for part in seg.split("_"):
+                if part.isdigit():
+                    result.append(part)
+                    break
+        return "+".join(result) if result else name
+
+    df = pd.DataFrame(metrics_list)
+    df['Curve'] = df['Curve'].astype(str)
+    if shorten_names:
+        df['Curve'] = df['Curve'].apply(_shorten)
+    max_len = df['Curve'].str.len().max()
+    df['Curve'] = df['Curve'].apply(lambda x: x.ljust(max_len))
+    logger.debug(f"\n{title}\n{df.to_string(index=False)}")

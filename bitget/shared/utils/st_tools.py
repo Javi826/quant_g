@@ -3,6 +3,8 @@ from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
 
+import logging
+logger = logging.getLogger("shared.utils.st_tools")
 
 def tf_to_pandas_freq(tf):
     tf = tf.lower().replace("utc", "")
@@ -159,7 +161,7 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_
 
     all_trades_records = []
     
-    for comb, results in tqdm(grid_results_list, desc="📊 Processing trades"):
+    for comb, results in grid_results_list:
         port = results.get("__PORTFOLIO__", None)
         if port is None:
             continue
@@ -190,8 +192,7 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_
         all_trades_df = all_trades_df[param_cols + trade_cols]
         all_trades_df.to_excel(final_path, index=False, engine='openpyxl')
         file_size_mb = os.path.getsize(final_path) / 1024 / 1024
-        print(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
-        print(f"📦 Size: {file_size_mb:.2f} MB")
+        logger.debug(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
     else:
         print("⚠️ No trades to be saved")
 

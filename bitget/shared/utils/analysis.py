@@ -1,4 +1,4 @@
-#utils/ZX_analysis.py
+#utils/analysis.py
 import os
 import warnings
 import pandas as pd
@@ -13,7 +13,8 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
-
+import logging
+logger = logging.getLogger("BOT_trading.batch.analysis")
 
 # =============================================================================
 # CONFIGURATION
@@ -487,7 +488,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     all_cols.insert(all_cols.index('Sharpe'), 'R2')
     df_summary = df_summary[all_cols]
 
-    print(df_summary.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
+    logger.debug(df_summary.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
    
     # -------------------------------------------------------------------------
     # Monthly metrics analysis
@@ -503,11 +504,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
             total_months   = len(monthly_df)
             winning_pct    = (winning_months / total_months) * 100 if total_months > 0 else 0
             
-            print("\n" + "-"*60)
-            print("MONTHLY STATISTICS")
-            print("-"*60)
-            print(f"Winning Months:       {winning_months} / {total_months} ({winning_pct:.2f}%)")
-            print()
+            logger.debug(f"\n{'-'*60}\nMONTHLY STATISTICS\n{'-'*60}\nWinning Months: {winning_months} / {total_months} ({winning_pct:.2f}%)")
             
     # -------------------------------------------------------------------------
     # Symbol distribution analysis
@@ -521,10 +518,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
         symbol_stats['Trades_pct'] = (symbol_stats['Num_Trades'] / total_trades * 100).round(1)
         symbol_stats = symbol_stats.sort_values('Trades_pct', ascending=False).reset_index()
         
-        print("\n" + "-"*60)
-        print("SYMBOL DISTRIBUTION (Best Net Gain Combination)")
-        print("-"*60)
-        print(symbol_stats.to_string(index=False))
+        logger.debug(f"\n{'-'*60}\nSYMBOL DISTRIBUTION (Best Net Gain Combination)\n{'-'*60}\n{symbol_stats.to_string(index=False)}")
  
     # -------------------------------------------------------------------------
     # Optional: Parameter vs Metrics plots
@@ -717,21 +711,26 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     df_best = df_best[cols]
     df_best = df_best.round(2)
 
-    print(df_best.to_string(index=False))
-
     median_gain   = np.percentile(path_grouped['Net_Gain_pct'].dropna(), 50)
-    print(f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%")
+
     std_gain      = path_grouped['Net_Gain_pct'].dropna().std()
-    print(f"Std Dev Net_Gain_pct per Path: {std_gain:.2f}%")
+
     prob_negative = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
-    print(f"Probability of Negative Path : {prob_negative:.2f}%")
+
     
     # Luego calcular P5 y P50 del Win Rate
     win_rates = path_grouped['Win_Ratio'].dropna()
     p5_winrate = np.percentile(win_rates, 5)
     p50_winrate = np.percentile(win_rates, 50)
     
-    print(f"\nP5  Win Rate per Path: {p5_winrate:.2f}%")
-    print(f"P50 Win Rate per Path: {p50_winrate:.2f}%")
+
+    logger.debug(
+    f"{df_best.to_string(index=False)}\n"
+    f"\nP50 Net_Gain_pct per Path    : {median_gain:.2f}%"
+    f"\nStd Dev Net_Gain_pct per Path: {std_gain:.2f}%"
+    f"\nProbability of Negative Path : {prob_negative:.2f}%"
+    f"\nP5  Win Rate per Path: {p5_winrate:.2f}%"
+    f"\nP50 Win Rate per Path: {p50_winrate:.2f}%"
+)
 
     return df_summary

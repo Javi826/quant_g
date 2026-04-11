@@ -4,6 +4,8 @@ import hashlib
 import numpy as np
 import pandas as pd
 from typing import Union
+import logging
+logger = logging.getLogger("BOT_trading.batch.utils")
 
 np.random.seed(42)
 random.seed(42)
@@ -104,9 +106,9 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             ohlcv_data[sym] = df
             filtered_symbols.append(sym)
             
-    print(f"\n🔹Total symbols     : {len(symbols)}")
-    print(f"🔹Symbols removed   : {len(removed_symbols)}")
-    print(f"🔹Symbols remaining : {len(filtered_symbols)}\n")
+    logger.debug(f"🔹Total symbols     : {len(symbols)}")
+    logger.debug(f"🔹Symbols removed   : {len(removed_symbols)}")
+    logger.debug(f"🔹Symbols remaining : {len(filtered_symbols)}")
     
     return ohlcv_data, filtered_symbols
 
