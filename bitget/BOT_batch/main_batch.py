@@ -510,11 +510,11 @@ def run_batch(strategy_config: dict) -> None:
     _ce.DATA_FOLDER = os.path.abspath(DATA_FOLDER_OOS)
 
     def _trades_to_equity(df, initial_balance):
-        """Build daily resampled equity curve from trade_log."""
+        """Build daily resampled equity curve from trade_log — for metrics and combinations."""
         df = df.sort_values("buy_time").reset_index(drop=True)
         df["equity"] = initial_balance + df["profit"].cumsum()
         df_eq = df[["buy_time", "equity"]].rename(columns={"buy_time": "timestamp", "equity": "balance"})
-        df_eq = df_eq.drop_duplicates(subset="timestamp", keep="last")
+        df_eq = df_eq.groupby("timestamp")["balance"].last().reset_index()
         df_eq = df_eq.set_index("timestamp")
         return resample_equity(df_eq)
 
@@ -522,8 +522,9 @@ def run_batch(strategy_config: dict) -> None:
     eq_baseline = _trades_to_equity(trade_log, INITIAL_BALANCE)
     _equity_curves_baseline.append((STRATEGY_ID, eq_baseline))
 
-    plot_netgain_dd(eq_baseline.reset_index(), capital=INITIAL_BALANCE,
-                    title=f"Baseline — {STRATEGY_ID}")
+    report_filtered_trades(trade_log, initial_balance=INITIAL_BALANCE,
+                           data_folder=DATA_FOLDER_OOS,
+                           title=f"Baseline — {STRATEGY_ID}")
     metrics_baseline = compute_metrics(eq_baseline.reset_index(), capital=INITIAL_BALANCE, name=STRATEGY_ID)
     print_metrics_table([metrics_baseline], f"  Metrics — {STRATEGY_ID} (Baseline)")
 
@@ -532,8 +533,9 @@ def run_batch(strategy_config: dict) -> None:
         eq_regime01 = _trades_to_equity(r01_filtered, INITIAL_BALANCE)
         _equity_curves_regime01.append((STRATEGY_ID, eq_regime01))
 
-        plot_netgain_dd(eq_regime01.reset_index(), capital=INITIAL_BALANCE,
-                        title=f"Regime 0+1 — {STRATEGY_ID}")
+        report_filtered_trades(r01_filtered, initial_balance=INITIAL_BALANCE,
+                               data_folder=DATA_FOLDER_OOS,
+                               title=f"Regime 0+1 — {STRATEGY_ID}")
         metrics_regime01 = compute_metrics(eq_regime01.reset_index(), capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_r01")
         print_metrics_table([metrics_regime01], f"  Metrics — {STRATEGY_ID} (Regime 0+1)")
 
