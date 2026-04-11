@@ -18,6 +18,7 @@ from tools.ZX_st_tools import (
     compile_grid_results,
     prepare_ohlcv_arrays,
     get_n_obs,
+    save_all_trades_to_excel,
 )
 from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.ZX_analysis import report_montecarlo, report_backtesting
@@ -30,7 +31,7 @@ start_time = time.time()
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGY_ID     = "03_parity_long_1H"
+STRATEGY_ID     = "03_parity_long_4H"
 SIDE            = "long"           # "long" | "short"
 N_JOBS          = -1
 MY_SYMBOLS      = False
@@ -39,7 +40,7 @@ DATA_FOLDER_IS  = "../data/crypto_2022_IS"
 DATA_FOLDER_OOS = "../data/crypto_2026_OOS"
 TIMEFRAME_MINOR = "4H"
 ORDER_AMOUNT    = 80
-N_SYMBOLS       = 7               # top N OOS symbols by volume
+N_SYMBOLS       = 9               # top N OOS symbols by volume
 
 # =============================================================================
 # PARAMETER GRID
@@ -50,6 +51,15 @@ MA_PERIOD_LIST   = [25]
 TOLERANCE_LIST   = [15, 30, 45]
 TP_PCT_LIST      = [2, 3, 4]
 SL_PCT_LIST      = [8, 9, 10]
+
+# =============================================================================
+# SELL_AFTER_LIST  = [0]
+# LOOKBACK_LIST    = [150]
+# MA_PERIOD_LIST   = [50]
+# TOLERANCE_LIST   = [40]
+# TP_PCT_LIST      = [3]
+# SL_PCT_LIST      = [10]
+# =============================================================================
 
 param_names     = ["SELL_AFTER", "LOOKBACK", "TOLERANCE", "MA_PERIOD", "TP_PCT", "SL_PCT"]
 lists_for_grid  = [globals()[f"{name}_LIST"] for name in param_names]
@@ -111,6 +121,101 @@ print(f"  ▶ IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final
 
 if len(symbols_is_final) < N_SYMBOLS:
     print(f"\n  ⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({N_SYMBOLS}). Proceeding with available.")
+
+# =============================================================================
+# HELPER — REPORT FILTERED TRADES
+# =============================================================================
+def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filtered Trades"):
+    """
+    Recompute equity curve, key metrics and plot from a filtered trade_log.
+    Mirrors the output format of report_backtesting.
+    """
+    from sklearn.linear_model import LinearRegression
+
+    df = trade_log.copy().sort_values("buy_time").reset_index(drop=True)
+    df["duration_m"] = (pd.to_datetime(df["sell_time"]) - pd.to_datetime(df["buy_time"])).dt.total_seconds() / 60
+
+    # --- Equity curve ---
+    df["equity"] = initial_balance + df["profit"].cumsum()
+    balances     = df["equity"].values
+    timestamps   = pd.to_datetime(df["buy_time"])
+
+    # --- Metrics ---
+    net_gain      = balances[-1] - initial_balance
+    net_gain_pct  = net_gain / initial_balance * 100
+    win_ratio     = (df["profit"] > 0).mean()
+    num_signals   = len(df)
+    duration_m    = df["duration_m"].mean()
+    cummax        = np.maximum.accumulate(balances)
+    dd_pct        = ((balances - cummax) / cummax * 100).min()
+
+    X  = np.arange(len(balances)).reshape(-1, 1)
+    y  = balances.reshape(-1, 1)
+    r2 = round(LinearRegression().fit(X, y).score(X, y), 3)
+
+    sharpe = (df["profit"].mean() / df["profit"].std() * np.sqrt(252)) if df["profit"].std() > 0 else np.nan
+
+    # --- Summary table ---
+    df_summary = pd.DataFrame([{
+        "Metric": "Net_Gain_pct", **{k.upper(): v for k, v in trade_log[["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct"]].iloc[0].items()},
+        "Net_Gain_pct": round(net_gain_pct, 2), "Win_Ratio": round(win_ratio, 2),
+        "R2": r2, "Sharpe": round(sharpe, 2), "DD_pct": round(dd_pct, 2),
+        "Num_Signals": num_signals, "duration_m": round(duration_m, 2)
+    }])
+    print(df_summary.to_string(index=False))
+
+    # --- Monthly stats ---
+    df["month"] = pd.to_datetime(df["buy_time"]).dt.to_period("M")
+    monthly     = df.groupby("month")["profit"].sum()
+    winning_m   = (monthly > 0).sum()
+    print(f"\n{'-'*60}")
+    print("MONTHLY STATISTICS")
+    print(f"{'-'*60}")
+    print(f"Winning Months: {winning_m} / {len(monthly)} ({winning_m/len(monthly)*100:.2f}%)")
+
+    # --- Plot ---
+    import matplotlib.pyplot as plt
+    net_gain_arr = (balances - initial_balance) / initial_balance * 100
+    cummax_arr   = np.maximum.accumulate(balances)
+    dd_arr       = (balances - cummax_arr) / cummax_arr * 100
+
+    btc_file = os.path.join(data_folder, "BTCUSDT_4H.parquet")
+    btc_df   = pd.read_parquet(btc_file)
+    if "timestamp" not in btc_df.columns:
+        btc_df = btc_df.reset_index().rename(columns={"index": "timestamp"})
+    btc_df["timestamp"]     = pd.to_datetime(btc_df["timestamp"])
+    btc_df["btc_net_gain"]  = (btc_df["close"] / btc_df["close"].iloc[0] - 1) * 100
+    btc_aligned = np.interp(
+        timestamps.astype(np.int64) / 10**9,
+        btc_df["timestamp"].astype(np.int64) / 10**9,
+        btc_df["btc_net_gain"]
+    )
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    above = net_gain_arr >= btc_aligned
+    ax1.fill_between(timestamps, net_gain_arr, 0, where=above,  alpha=0.2, color="green", interpolate=True)
+    ax1.fill_between(timestamps, net_gain_arr, 0, where=~above, alpha=0.2, color="red",   interpolate=True)
+    ax1.plot(timestamps, net_gain_arr, color="blue",       linewidth=1.2, label="Net Gain %")
+    ax1.plot(btc_df["timestamp"], btc_df["btc_net_gain"], color="darkorange", linewidth=0.6, linestyle="--", label="BTC %")
+    ax2 = ax1.twinx()
+    ax2.plot(timestamps, dd_arr, color="lightcoral", linewidth=0.1, label="DD %")
+    ax2.set_ylabel("Drawdown", color="red")
+
+    textstr = (
+        f"Net Gain STR : {net_gain_pct:.2f}%\n"
+        f"Net Gain BTC : {btc_df['btc_net_gain'].iloc[-1]:.2f}%\n"
+        f"Max DD       : {dd_pct:.2f}%\n"
+        f"R²           : {r2:.3f}"
+    )
+    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+             verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+    fig.suptitle(title)
+    fig.autofmt_xdate()
+    ax1.grid(True, linestyle="--", alpha=0.6)
+    lines, labels   = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc="best")
+    plt.show()
 
 # =============================================================================
 # BLOCK 1 — MONTE CARLO IS
@@ -312,6 +417,9 @@ report_montecarlo(
     initial_balance=INITIAL_BALANCE,
 )
 
+# Extract best backtest row — used in Block 4 (regime) and Block 5 (validation)
+best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
+
 # =============================================================================
 # BLOCK 4 — REGIME ANALYSIS
 # =============================================================================
@@ -321,43 +429,60 @@ print("="*60)
 
 import sys as _sys
 _sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "market_regime")))
-from regime1_performance_OOS import analyze_strategy, print_single_strategy_all_dimensions
-from regime_common import load_btc_for_timeframe
+from regime1_performance_OOS import analyze_strategy, print_single_strategy_all_dimensions, FAMILIES
+from regime1_performance_OOS import OHLC_FOLDER, MA_PERIOD, HURST_WINDOW, ER_WINDOW, ATR_WINDOW, PE_WINDOW, PE_ORDER, LOOKBACK_BARS
+from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time, classify_trade_by_family
 
-# --- Save trades to trades/ folder ---
-TRADES_FOLDER  = os.path.join(os.path.dirname(__file__), "trades")
-os.makedirs(TRADES_FOLDER, exist_ok=True)
-TRADES_PATH    = os.path.join(TRADES_FOLDER, f"all_trades_{STRATEGY_ID}.xlsx")
+# --- Save trades ---
+save_all_trades_to_excel(
+    [(best_comb, oos_result)],
+    param_names,
+    f"all_trades_{STRATEGY_ID}.xlsx",
+    strategy_name=STRATEGY_ID,
+    save=True,
+)
+TRADES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "brief_trades", f"all_trades_{STRATEGY_ID}.xlsx"))
+trade_log   = pd.read_excel(TRADES_PATH)
+trade_log.columns = trade_log.columns.str.lower().str.strip()
+trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
+print(f"\n  ✅ Trades saved → {TRADES_PATH}  ({len(trade_log)} trades)")
 
-trade_log = best_bt_row.get("trade_log", None)
-if trade_log is not None and not trade_log.empty:
-    trade_log.to_excel(TRADES_PATH, index=False)
-    print(f"\n  ✅ Trades saved → {TRADES_PATH}  ({len(trade_log)} trades)")
+# --- Run regime analysis (for print) ---
+regime_result = analyze_strategy(TRADES_PATH, FAMILIES, INITIAL_BALANCE)
+print_single_strategy_all_dimensions(regime_result)
+
+# --- Enrich trade_log with family inline ---
+btc_cache  = {}
+btc_df     = load_btc_for_timeframe(OHLC_FOLDER, TIMEFRAME_MINOR, btc_cache)
+
+trade_log["family"] = "unknown"
+for idx, trade in trade_log.iterrows():
+    metrics = calc_all_metrics_at_time(
+        btc_df, trade["buy_time"], LOOKBACK_BARS,
+        MA_PERIOD, HURST_WINDOW, ER_WINDOW, ATR_WINDOW, PE_WINDOW, PE_ORDER
+    )
+    if metrics:
+        trade_log.at[idx, "family"] = classify_trade_by_family(metrics, FAMILIES)
+
+# --- Filter: exclude regimes with negative profit ---
+excluded_families = [
+    fam for fam, stats in regime_result["family_stats"].items()
+    if stats["profit"] < 0
+]
+
+if excluded_families:
+    print(f"\n  ▶ Excluding regimes with negative profit: {excluded_families}")
+    trade_log_filtered = trade_log[~trade_log["family"].isin(excluded_families)].reset_index(drop=True)
+    print(f"  ▶ Trades after filter: {len(trade_log_filtered)} / {len(trade_log)}")
+
+    report_filtered_trades(
+        trade_log_filtered,
+        initial_balance=INITIAL_BALANCE,
+        data_folder=DATA_FOLDER_OOS,
+        title=f"Filtered Trades — {STRATEGY_ID} (excl. {excluded_families})",
+    )
 else:
-    print(f"\n  ⚠️  No trade_log found — skipping regime analysis.")
-    trade_log = None
-
-if trade_log is not None:
-    # --- Run regime analysis ---
-    regime_result = analyze_strategy(TRADES_PATH, FAMILIES, INITIAL_BALANCE)
-    print_single_strategy_all_dimensions(regime_result)
-
-    # --- Filter: exclude regimes with negative profit ---
-    excluded_families = [
-        fam for fam, stats in regime_result["family_stats"].items()
-        if stats["profit"] < 0
-    ]
-
-    if excluded_families:
-        print(f"\n  ▶ Excluding regimes with negative profit: {excluded_families}")
-        trade_log_filtered = trade_log[~trade_log["family"].isin(excluded_families)].reset_index(drop=True)
-        print(f"  ▶ Trades after filter: {len(trade_log_filtered)} / {len(trade_log)}")
-
-        # --- Recompute metrics with filtered trades ---
-        # TODO: rebuild oos_df from filtered trade_log and call report_backtesting
-        # Pending: confirm how to reconstruct equity curve from filtered trade_log
-    else:
-        print(f"\n  ✅ No regimes with negative profit — no filtering applied.")
+    print(f"\n  ✅ No regimes with negative profit — no filtering applied.")
 
 # =============================================================================
 # BLOCK 5 — VALIDATION
@@ -371,7 +496,6 @@ print(f"  BLOCK 5 — Validation  |  {STRATEGY_ID}")
 print("="*60)
 
 # --- Backtest OOS metrics ---
-best_bt_row    = oos_df.loc[oos_df["Net_Gain"].idxmax()]
 bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
 
 equity_hist = best_bt_row.get("sim_balance_history", None)

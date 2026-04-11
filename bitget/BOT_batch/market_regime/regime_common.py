@@ -15,17 +15,11 @@ from pathlib import Path
 from regime_metrics import calc_all_metrics
 
 
-def extract_timeframe(filename):
-    """Extract timeframe from filename"""
-    name = Path(filename).stem.replace('all_trades_', '')
-    parts = name.split('_')
-    if parts[-1].upper() in ['IS', 'OOS']:
-        parts = parts[:-1]
-    if parts:
-        timeframe = parts[-1]
-        if any(c.isdigit() for c in timeframe.upper()) and 'H' in timeframe.upper():
-            return timeframe
-    return '4H'
+def extract_timeframe(df):
+    strategy_val = df['strategy'].iloc[0]  # e.g. "03_parity_long_4H"
+    parts = strategy_val.split('_')
+    # el timeframe es el último elemento
+    return parts[-1]
 
 
 def load_btc_for_timeframe(ohlc_folder, timeframe, cache):

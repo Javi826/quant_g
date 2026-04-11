@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-market_regime/regime1_performance_IS.py - MATCHES ENRICHER EXACTLY
+market_regime/regime1_performance_OOS.py - MATCHES ENRICHER EXACTLY
 
 Replicates enricher.py behavior:
 - Drops NaN rows in critical metrics
@@ -49,9 +49,9 @@ _btc_cache = {}
 
 def analyze_strategy(filepath, families, initial_capital):
     """Analyze single strategy - MATCHES enricher.py"""
-    strategy = Path(filepath).stem.replace('all_trades_', '')
-    
-    timeframe = extract_timeframe(Path(filepath).name)
+    df = load_trades(filepath)
+    strategy = df['strategy'].iloc[0]
+    timeframe = extract_timeframe(df)
     btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe, _btc_cache)
     
     df = load_trades(filepath)
