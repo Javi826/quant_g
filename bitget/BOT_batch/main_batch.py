@@ -91,9 +91,8 @@ THRESHOLD_R2          = 0.7
 THRESHOLD_PROB_NEG    = 31.0
 
 # Validation thresholds — second round (regime filtered)
-THRESHOLD_WR_IMPROVEMENT = 5.0
-THRESHOLD_R2_FILTERED    = 0.8
-THRESHOLD_PROB_NEG_MAX   = 40.0
+THRESHOLD_R2_FILTERED    = 0.85
+THRESHOLD_PROB_NEG_MAX   = 50.0
 
 # Regime 0 settings
 R0_MA_PERIOD = 5
@@ -174,7 +173,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -477,21 +476,15 @@ def run_batch(strategy_config: dict) -> None:
     if not approved and "r01_filtered" in vars() and r01_filtered is not None and len(r01_filtered) > 0:
         df_filt     = r01_filtered.copy().sort_values("buy_time").reset_index(drop=True)
         equity_filt = INITIAL_BALANCE + df_filt["profit"].cumsum().values
-        wr_filtered = (df_filt["profit"] > 0).mean() * 100
         r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
 
-        wr_original    = best_bt_row.get("Win_Ratio", 0) * 100
-        wr_improvement = wr_filtered - wr_original
-
-        ok_wr_improvement = wr_improvement    > THRESHOLD_WR_IMPROVEMENT
-        ok_r2_filtered    = r2_filtered       > THRESHOLD_R2_FILTERED
-        ok_prob_neg_max   = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
-        approved_regime   = ok_wr_improvement and ok_r2_filtered and ok_prob_neg_max
+        ok_r2_filtered  = r2_filtered       > THRESHOLD_R2_FILTERED
+        ok_prob_neg_max = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
+        approved_regime = ok_r2_filtered and ok_prob_neg_max
 
         logger.debug(f"  Second Round — Regime 0+1 Filtered")
-        logger.debug(f"    WR improvement : {wr_improvement:>7.2f}pp  (threshold > {THRESHOLD_WR_IMPROVEMENT}pp)   {'✅' if ok_wr_improvement else '❌'}  ({wr_original:.2f}% → {wr_filtered:.2f}%)")
-        logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered    else '❌'}")
-        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max   else '❌'}")
+        logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered  else '❌'}")
+        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max else '❌'}")
         logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
 
         approved = approved or approved_regime
@@ -650,8 +643,8 @@ def run_portfolio_analysis():
         combo_df = _pd.DataFrame(combo_results)
 
         for metric, ascending, title in [
-            ("Net_Gain_pct",  False, "📈 TOP 5 BY NET GAIN"),
-            ("R_Squared",     False, "📐 TOP 5 BY R²"),
+            ("Net_Gain_pct",  False, "💵 TOP 5 BY NET GAIN"),
+            ("R_Squared",     False, "📈 TOP 5 BY R²"),
             ("Max_DD_pct",    False, "📉 TOP 5 BY LOWEST DD"),
         ]:
             top5 = combo_df.sort_values(metric, ascending=ascending).head(5)
@@ -758,8 +751,8 @@ def run_portfolio_analysis():
         best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
 
         rows = [
-            ("📈 Net Gain",     best_ng),
-            ("📐 R²",           best_r2),
+            ("💵 Net Gain",     best_ng),
+            ("📈 R²",           best_r2),
             ("💰 ProfitFactor", best_pf),
         ]
 

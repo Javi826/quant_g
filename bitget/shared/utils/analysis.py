@@ -697,7 +697,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     df_summary['Sharpe_m']   = df_summary['Sharpe_m'] / SHARPE_ADJUSTMENT_FACTOR
    
     best_netgain = df_summary.loc[df_summary['Net_Gain_pct_m'].idxmax()]
-    best_sharpe  = df_summary.loc[df_summary['Sharpe_m'].idxmax()]
+    best_sharpe  = df_summary.loc[df_summary['Sharpe_m'].dropna().idxmax()] if df_summary['Sharpe_m'].notna().any() else best_netgain
     best_dd      = df_summary.loc[df_summary['DD_m'].idxmin()]
    
     df_best = pd.DataFrame([
