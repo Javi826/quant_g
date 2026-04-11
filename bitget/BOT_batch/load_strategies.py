@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading")))
+sys.path.append("/home/javi/projects/quant/quant_g/bitget/BOT_trading")
 
 import pandas as pd
 from config.strategies_E1 import STRATEGIES
@@ -8,7 +8,7 @@ from config.strategies_E1 import STRATEGIES
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "strategies.csv")
+OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
 
 # Batch-managed columns — added on first run, updated by each batch execution
 BATCH_COLUMNS = {

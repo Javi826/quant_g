@@ -159,7 +159,7 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
 
     if len(symbols_is_final) < n_symbols:
-        logger.warning(f"IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
+        logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
 
@@ -192,27 +192,31 @@ def enrich_trades_with_regime(trade_log, ohlc_folder, timeframe, families, lookb
 # =============================================================================
 # HELPER — UPDATE STRATEGIES PARAMS CSV
 # =============================================================================
-def update_strategies_params(csv_path, strategy_id, best_params, param_keys, approved, bt_netgain_pct, r2, prob_negative_oos):
+def update_strategies_params(csv_path, strategy_id, best_params, param_keys, validated, bt_netgain_pct, r2, prob_negative_oos):
     def normalize(val):
         try:
             return float(val)
         except (TypeError, ValueError):
             return None
 
+    _no_change = {"params_changed": False, "active_prev": None, "active_new": None}
+
     if not os.path.exists(csv_path):
-        logger.warning(f"strategies_params.csv not found at {csv_path} — skipping update.")
-        return
+        logger.warning(f"⚠️  strategies_params.csv not found at {csv_path} — skipping update.")
+        return _no_change
 
     df_params = pd.read_csv(csv_path)
     mask      = df_params["id"] == strategy_id
 
     if not mask.any():
-        logger.warning(f"Strategy id '{strategy_id}' not found in CSV — skipping update.")
-        return
+        logger.warning(f"⚠️  Strategy id '{strategy_id}' not found in CSV — skipping update.")
+        return _no_change
 
     idx      = df_params[mask].index[0]
     prev_row = df_params.loc[idx]
 
+    # Detect param changes
+    params_changed = False
     logger.debug(f"ID : {strategy_id}")
     logger.debug(f"  {'Parameter':<20} {'Previous':>12} {'New':>12} {'Changed':>10}")
     logger.debug(f"  {'-'*56}")
@@ -222,6 +226,8 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, app
         prev_val = normalize(prev_row.get(k, None))
         new_val  = normalize(best_params.get(k.upper(), None))
         changed  = "⚠️  YES" if prev_val != new_val else "✅"
+        if prev_val != new_val:
+            params_changed = True
         logger.debug(f"  {k:<20} {str(prev_val):>12} {str(new_val):>12} {changed:>10}")
 
     logger.debug(f"  {'Metric':<20} {'Previous':>12} {'New':>12}")
@@ -230,23 +236,39 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, app
         prev_val = prev_row.get(metric, None)
         logger.debug(f"  {metric:<20} {str(prev_val):>12} {str(new_val):>12}")
 
-    df_params.at[idx, "approved"]       = approved
+    # Detect active change
+    prev_active = bool(prev_row.get("active", False)) if pd.notna(prev_row.get("active")) else False
+    new_active  = bool(validated)
+
+    # Always update diagnostic metrics
+    df_params.at[idx, "validated"]      = validated
     df_params.at[idx, "bt_netgain_pct"] = round(bt_netgain_pct, 2)
     df_params.at[idx, "bt_r2"]          = round(r2, 3)
     df_params.at[idx, "prob_negative"]  = round(prob_negative_oos, 2)
     df_params.at[idx, "last_run"]       = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
 
-    if approved:
+    if validated:
+        # Update production params only if validated
         for k in param_keys:
             if k in df_params.columns:
                 df_params.at[idx, k] = best_params.get(k.upper())
         df_params.at[idx, "active"] = True
-        logger.info(f"strategies_params.csv updated — params updated, active=True for '{strategy_id}'")
+        if params_changed:
+            logger.info(f"🔵 strategies_params.csv — params updated for '{strategy_id}'")
+        if not prev_active:
+            logger.info(f"🟠 strategies_params.csv — activated '{strategy_id}'")
     else:
         df_params.at[idx, "active"] = False
-        logger.info(f"Strategy rejected — params NOT updated, active=False for '{strategy_id}'")
+        if prev_active:
+            logger.info(f"🔴 strategies_params.csv — deprecated '{strategy_id}'")
 
     df_params.to_csv(csv_path, index=False)
+
+    return {
+        "params_changed": params_changed and validated,
+        "active_prev":    prev_active,
+        "active_new":     new_active,
+    }
 
 
 # =============================================================================
@@ -257,8 +279,12 @@ def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final):
 
     if not os.path.exists(csv_path):
         df_symbols = pd.DataFrame(columns=["id", "symbols"])
+        symbols_changed = True
     else:
         df_symbols = pd.read_csv(csv_path)
+        mask_sym = df_symbols["id"] == strategy_id
+        prev_symbols_str = df_symbols.loc[mask_sym, "symbols"].values[0] if mask_sym.any() else None
+        symbols_changed = prev_symbols_str != symbols_str
 
     mask_sym = df_symbols["id"] == strategy_id
     if mask_sym.any():
@@ -270,7 +296,11 @@ def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final):
         ], ignore_index=True)
 
     df_symbols.to_csv(csv_path, index=False)
-    logger.info(f"strategies_symbols.csv updated — {len(symbols_oos_final)} symbols for '{strategy_id}'")
+    if symbols_changed:
+        logger.info(f"🔵 strategies_symbols.csv — symbols updated for '{strategy_id}'")
+    else:
+        logger.debug(f"⚪ strategies_symbols.csv — symbols unchanged for '{strategy_id}'")
+    return {"symbols_changed": symbols_changed}
 
 
 # =============================================================================
@@ -380,3 +410,16 @@ def print_metrics_table(metrics_list, title, shorten_names=False):
     max_len = df['Curve'].str.len().max()
     df['Curve'] = df['Curve'].apply(lambda x: x.ljust(max_len))
     logger.debug(f"\n{title}\n{df.to_string(index=False)}")
+# =============================================================================
+# HELPER — CALC R2 FROM EQUITY HISTORY
+# =============================================================================
+def calc_r2_from_equity_hist(equity_hist):
+    """
+    Compute R² of equity curve vs straight line from sim_balance_history dict.
+    Returns np.nan if insufficient data.
+    """
+    if not equity_hist or len(equity_hist.get("balance", [])) < 2:
+        return np.nan
+    y = np.array(equity_hist["balance"]).reshape(-1, 1)
+    X = np.arange(len(y)).reshape(-1, 1)
+    return round(LinearRegression().fit(X, y).score(X, y), 3)

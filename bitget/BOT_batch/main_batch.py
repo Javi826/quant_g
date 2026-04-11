@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 
 import logging
+import contextlib
 import time
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ from itertools import product
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from sklearn.linear_model import LinearRegression
 
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from utils.st_tools import (
@@ -44,6 +44,7 @@ from batch_utils import (
     get_btc_direction,
     compute_metrics,
     print_metrics_table,
+    calc_r2_from_equity_hist,
 )
 
 logger = logging.getLogger("BOT_trading.batch.main_batch")
@@ -79,9 +80,10 @@ DATA_FOLDER_IS  = "data/crypto_2022_IS"
 DATA_FOLDER_OOS = "data/crypto_2026_OOS"
 N_JOBS          = -1
 MY_SYMBOLS      = False
+SHOW_PROGRESS   = False   # set to True from run_batch.py when LOG_LEVEL=DEBUG
 
-N_PATHS_IS  = 10
-N_PATHS_OOS = 200
+N_PATHS_IS  = 100
+N_PATHS_OOS = 2000
 
 # Validation thresholds — first round
 THRESHOLD_NETGAIN_PCT = 20.0
@@ -91,7 +93,7 @@ THRESHOLD_PROB_NEG    = 31.0
 # Validation thresholds — second round (regime filtered)
 THRESHOLD_WR_IMPROVEMENT = 5.0
 THRESHOLD_R2_FILTERED    = 0.8
-THRESHOLD_PROB_NEG_MAX   = 50.0
+THRESHOLD_PROB_NEG_MAX   = 40.0
 
 # Regime 0 settings
 R0_MA_PERIOD = 5
@@ -103,14 +105,10 @@ CSV_PARAMS  = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
 CSV_SYMBOLS = os.path.join(os.path.dirname(__file__), "strategies_symbols.csv")
 
 # Global trade_log accumulators (populated by each run_batch call)
-_trade_logs_baseline : list = []   # (strategy_id, trade_log_df)
-_trade_logs_regime1  : list = []   # (strategy_id, trade_log_df)
-_trade_logs_regime0  : list = []   # (strategy_id, trade_log_df)
-_trade_logs_regime01 : list = []   # (strategy_id, trade_log_df)
-_oos_metrics         : list = []   # {strategy_id, net_gain_pct, dd_pct, win_ratio, r2}
-_oos_bt_regime1      : dict = {}   # strategy_id -> metrics dict from report_filtered_trades
-_oos_bt_regime0      : dict = {}   # strategy_id -> metrics dict from report_filtered_trades
-_oos_bt_regime01     : dict = {}   # strategy_id -> metrics dict from report_filtered_trades
+_trade_logs_baseline  : list = []   # (strategy_id, trade_log_df)
+_trade_logs_regime01  : list = []   # (strategy_id, trade_log_df)
+_oos_metrics          : list = []   # {strategy_id, net_gain_pct, dd_pct, win_ratio, r2}
+_validation_results   : list = []   # {strategy_id, verdict, round, net_gain_pct, dd_pct, win_ratio, r2, prob_neg_pct}
 
 
 # =============================================================================
@@ -176,7 +174,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1 [{STRATEGY_ID}] ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -203,12 +201,10 @@ def run_batch(strategy_config: dict) -> None:
             all_results.append(compile_MC_results(result, param_dict, path_idx, INITIAL_BALANCE, dtype=DTYPE))
         return all_results
 
-# =============================================================================
-#     final_prints(f"🎲 MC_{STRATEGY_ID} 🎲", DATA_FOLDER_IS, TIMEFRAME, min_vol_usdt=0,
-#                  order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
-# 
-# =============================================================================
-    with tqdm_joblib(tqdm(total=N_PATHS_IS, desc="🔄 Evaluating MC IS paths", disable=logger.level > logging.DEBUG)):
+    # final_prints(f"🎲 MC_{STRATEGY_ID} 🎲", DATA_FOLDER_IS, TIMEFRAME, min_vol_usdt=0,
+    #              order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
+
+    with (tqdm_joblib(tqdm(total=N_PATHS_IS, desc="🔄 Evaluating MC IS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
         results_list = Parallel(n_jobs=N_JOBS)(
             delayed(_process_path)(i, paths_minor, param_dict_list)
             for i in range(N_PATHS_IS)
@@ -220,7 +216,7 @@ def run_batch(strategy_config: dict) -> None:
     best_params  = extract_best_params(df_summary, param_names, lists_for_grid)
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 2 [{STRATEGY_ID}] ── Backtest OOS           ── {params_str}")
+    logger.info(f"STAGE 2  [{STRATEGY_ID}] ── Backtest OOS           ── {params_str}")
     ohlcv_data_oos = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
     ohlcv_arr_oos  = prepare_ohlcv_arrays(ohlcv_data_oos)
 
@@ -242,21 +238,15 @@ def run_batch(strategy_config: dict) -> None:
     best_comb = tuple(best_params[p] for p in param_names)
     oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
-# =============================================================================
-#     final_prints(f"🔭 OOS_{STRATEGY_ID}", DATA_FOLDER_OOS, TIMEFRAME, 0, ORDER_AMOUNT, param_names, lists_for_grid)
-#     oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
-#                                              data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
-# =============================================================================
+    # final_prints(f"🔭 OOS_{STRATEGY_ID}", DATA_FOLDER_OOS, TIMEFRAME, 0, ORDER_AMOUNT, param_names, lists_for_grid)
+    oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
+                                             data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
 
     best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
 
     _r2_oos = np.nan
     eq_hist = best_bt_row.get("sim_balance_history", None)
-    if eq_hist and len(eq_hist.get("balance", [])) >= 2:
-        y   = np.array(eq_hist["balance"]).reshape(-1, 1)
-        X   = np.arange(len(y)).reshape(-1, 1)
-        from sklearn.linear_model import LinearRegression as _LR
-        _r2_oos = round(_LR().fit(X, y).score(X, y), 3)
+    _r2_oos = calc_r2_from_equity_hist(eq_hist)
 
     _oos_metrics.append({
         "strategy_id":   STRATEGY_ID,
@@ -266,7 +256,7 @@ def run_batch(strategy_config: dict) -> None:
         "r2":            _r2_oos,
     })
 
-    logger.info(f"STAGE 3 [{STRATEGY_ID}] ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
+    logger.info(f"STAGE 3  [{STRATEGY_ID}] ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
     n_obs_oos    = get_n_obs(TIMEFRAME)
     paths_oos    = generate_paths_for_all_symbols_functional(
         ohlcv_data_oos, n_paths=N_PATHS_OOS, n_obs=n_obs_oos, raw_columns=[])
@@ -290,13 +280,11 @@ def run_batch(strategy_config: dict) -> None:
             all_results.append(compile_MC_results(result, param_dict, path_idx, INITIAL_BALANCE, dtype=DTYPE))
         return all_results
 
-# =============================================================================
-#     final_prints(f"🎲 MC_OOS_{STRATEGY_ID} 🎲", DATA_FOLDER_OOS, TIMEFRAME, min_vol_usdt=0,
-#                  order_amount=ORDER_AMOUNT, param_names=param_names,
-#                  lists_for_grid=[[best_params[n]] for n in param_names])
-# 
-# =============================================================================
-    with tqdm_joblib(tqdm(total=N_PATHS_IS, desc="🔄 Evaluating MC IS paths", disable=logger.level > logging.DEBUG)):
+    # final_prints(f"🎲 MC_OOS_{STRATEGY_ID} 🎲", DATA_FOLDER_OOS, TIMEFRAME, min_vol_usdt=0,
+    #              order_amount=ORDER_AMOUNT, param_names=param_names,
+    #              lists_for_grid=[[best_params[n]] for n in param_names])
+
+    with (tqdm_joblib(tqdm(total=N_PATHS_OOS, desc="🔄 Evaluating MC OOS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
         results_oos = Parallel(n_jobs=N_JOBS)(
             delayed(_process_path_oos)(i, paths_oos, best_params_list)
             for i in range(N_PATHS_OOS)
@@ -342,17 +330,15 @@ def run_batch(strategy_config: dict) -> None:
     ]
 
     excl_str = str(excluded_families) if excluded_families else "none"
-    logger.info(f"STAGE 4 [{STRATEGY_ID}] ── Regime Analysis        ── {len(trade_log)} trades | excl: {excl_str}")
+    logger.info(f"STAGE 4  [{STRATEGY_ID}] ── Regime Analysis        ── {len(trade_log)} trades | excl: {excl_str}")
 
     if excluded_families:
         logger.debug(f"Excluding regimes with negative profit: {excluded_families}")
         trade_log_filtered = trade_log[~trade_log["family"].isin(excluded_families)].reset_index(drop=True)
         logger.debug(f"Trades after filter: {len(trade_log_filtered)} / {len(trade_log)}")
-        _r1_bt = report_filtered_trades(trade_log_filtered, initial_balance=INITIAL_BALANCE,
-                                        data_folder=DATA_FOLDER_OOS,
-                                        title=f"Filtered Trades — {STRATEGY_ID} (excl. {excluded_families})")
-        if _r1_bt:
-            _oos_bt_regime1[STRATEGY_ID] = _r1_bt
+        report_filtered_trades(trade_log_filtered, initial_balance=INITIAL_BALANCE,
+                               data_folder=DATA_FOLDER_OOS,
+                               title=f"Filtered Trades — {STRATEGY_ID} (excl. {excluded_families})")
     else:
         logger.debug("No regimes with negative profit — no filtering applied.")
 
@@ -366,7 +352,7 @@ def run_batch(strategy_config: dict) -> None:
     R0_BTC_FILE = os.path.join(DATA_FOLDER_OOS, "BTCUSDT_1Dutc.parquet")
 
     if not os.path.exists(R0_BTC_FILE):
-        logger.warning("BTC 1Dutc file not found — skipping Regime 0 analysis.")
+        logger.warning("⚠️  BTC 1Dutc file not found — skipping Regime 0 analysis.")
     else:
         r0_btc_df = load_btc_1d(R0_BTC_FILE, ma_period=R0_MA_PERIOD)
 
@@ -384,14 +370,12 @@ def run_batch(strategy_config: dict) -> None:
         keep_direction = "uptrend" if SIDE == "long" else "downtrend"
         r0_filtered    = r0_trade_log[r0_trade_log["r0_direction"] == keep_direction].reset_index(drop=True)
         logger.debug(f"Keeping '{keep_direction}' trades: {len(r0_filtered)} / {len(r0_trade_log)}")
-        logger.info(f"STAGE 5 [{STRATEGY_ID}] ── Regime 0 (BTC filter)  ── {len(r0_filtered)} / {len(r0_trade_log)} kept ({keep_direction})")
+        logger.info(f"STAGE 5  [{STRATEGY_ID}] ── Regime 0 (BTC filter)  ── {len(r0_filtered)} / {len(r0_trade_log)} kept ({keep_direction})")
 
         if len(r0_filtered) > 0:
-            _r0_bt = report_filtered_trades(r0_filtered, initial_balance=INITIAL_BALANCE,
-                                            data_folder=DATA_FOLDER_OOS,
-                                            title=f"Regime 0 Filtered — {STRATEGY_ID} ({keep_direction} only, MA{R0_MA_PERIOD})")
-            if _r0_bt:
-                _oos_bt_regime0[STRATEGY_ID] = _r0_bt
+            report_filtered_trades(r0_filtered, initial_balance=INITIAL_BALANCE,
+                                   data_folder=DATA_FOLDER_OOS,
+                                   title=f"Regime 0 Filtered — {STRATEGY_ID} ({keep_direction} only, MA{R0_MA_PERIOD})")
 
     # -------------------------------------------------------------------------
     # BLOCK 6 — REGIME 0 + 1 COMBINED FILTER
@@ -401,7 +385,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"{'='*60}")
 
     if not os.path.exists(R0_BTC_FILE):
-        logger.warning("BTC 1Dutc file not found — skipping combined analysis.")
+        logger.warning("⚠️  BTC 1Dutc file not found — skipping combined analysis.")
     else:
         r01_base = trade_log_filtered if excluded_families and "trade_log_filtered" in vars() else trade_log
         logger.debug(f"Base trades (after Regime 1): {len(r01_base)}")
@@ -411,14 +395,12 @@ def run_batch(strategy_config: dict) -> None:
 
         r01_filtered = r01_trade_log[r01_trade_log["r0_direction"] == keep_direction].reset_index(drop=True)
         logger.debug(f"After Regime 0 filter ({keep_direction}): {len(r01_filtered)} / {len(r01_trade_log)}")
-        logger.info(f"STAGE 6 [{STRATEGY_ID}] ── Regime 0+1 Combined    ── {len(r01_filtered)} / {len(r01_trade_log)} kept")
+        logger.info(f"STAGE 6  [{STRATEGY_ID}] ── Regime 0+1 Combined    ── {len(r01_filtered)} / {len(r01_trade_log)} kept")
 
         if len(r01_filtered) > 0:
-            _r01_bt = report_filtered_trades(r01_filtered, initial_balance=INITIAL_BALANCE,
-                                             data_folder=DATA_FOLDER_OOS,
-                                             title=f"Regime 0+1 Combined — {STRATEGY_ID} (excl. {excluded_families}, {keep_direction} only)")
-            if _r01_bt:
-                _oos_bt_regime01[STRATEGY_ID] = _r01_bt
+            report_filtered_trades(r01_filtered, initial_balance=INITIAL_BALANCE,
+                                   data_folder=DATA_FOLDER_OOS,
+                                   title=f"Regime 0+1 Combined — {STRATEGY_ID} (excl. {excluded_families}, {keep_direction} only)")
             r01_trades_path = os.path.join(os.path.dirname(__file__), "brief_trades", f"all_trades_{STRATEGY_ID}_regime01.xlsx")
             r01_filtered.to_excel(r01_trades_path, index=False)
             logger.debug(f"Regime 0+1 trades saved → {r01_trades_path}  ({len(r01_filtered)} trades)")
@@ -426,33 +408,21 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # SUMMARY TABLE — Baseline vs Regime 1 vs Regime 0 vs Regime 0+1
     # -------------------------------------------------------------------------
-    def _calc_metrics(df, initial_balance):
+    def _m(df):
         if df is None or len(df) == 0:
             return {"trades": 0, "net_gain_pct": np.nan, "win_rate": np.nan, "dd_pct": np.nan, "r2": np.nan}
-        df = df.sort_values("buy_time").reset_index(drop=True)
-        equity   = initial_balance + df["profit"].cumsum().values
-        cummax   = np.maximum.accumulate(equity)
-        dd_pct   = ((equity - cummax) / cummax * 100).min()
-        X        = np.arange(len(equity)).reshape(-1, 1)
-        y        = equity.reshape(-1, 1)
-        r2       = round(LinearRegression().fit(X, y).score(X, y), 3)
-        return {
-            "trades":       len(df),
-            "net_gain_pct": round((equity[-1] - initial_balance) / initial_balance * 100, 2),
-            "win_rate":     round((df["profit"] > 0).mean() * 100, 1),
-            "dd_pct":       round(dd_pct, 2),
-            "r2":           r2,
-        }
+        m = compute_metrics(df, capital=INITIAL_BALANCE, name="")
+        return {"trades": len(df), "net_gain_pct": m["Net_Gain_pct"], "win_rate": m["Win_Rate"], "dd_pct": m["Max_DD_pct"], "r2": m["R_Squared"]}
 
     r1_df   = trade_log_filtered if excluded_families and "trade_log_filtered" in vars() else None
     r0_df   = r0_filtered        if "r0_filtered"  in vars() and len(r0_filtered)  > 0 else None
     r01_df  = r01_filtered       if "r01_filtered" in vars() and len(r01_filtered) > 0 else None
 
     rows = [
-        ("Baseline",    _calc_metrics(trade_log, INITIAL_BALANCE)),
-        ("Regime 1",    _calc_metrics(r1_df,     INITIAL_BALANCE)),
-        ("Regime 0",    _calc_metrics(r0_df,     INITIAL_BALANCE)),
-        ("Regime 0+1",  _calc_metrics(r01_df,    INITIAL_BALANCE)),
+        ("Baseline",    _m(trade_log)),
+        ("Regime 1",    _m(r1_df)),
+        ("Regime 0",    _m(r0_df)),
+        ("Regime 0+1",  _m(r01_df)),
     ]
 
     logger.debug(f"\n{'─'*75}")
@@ -476,12 +446,7 @@ def run_batch(strategy_config: dict) -> None:
 
     bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
     equity_hist    = best_bt_row.get("sim_balance_history", None)
-    if equity_hist and len(equity_hist.get("balance", [])) >= 2:
-        y_bt = np.array(equity_hist["balance"]).reshape(-1, 1)
-        X_bt = np.arange(len(y_bt)).reshape(-1, 1)
-        r2   = round(LinearRegression().fit(X_bt, y_bt).score(X_bt, y_bt), 3)
-    else:
-        r2 = np.nan
+    r2             = calc_r2_from_equity_hist(equity_hist)
 
     path_grouped_oos = df_portfolio_oos.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
     path_grouped_oos["Net_Gain_pct"] = (path_grouped_oos["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
@@ -492,8 +457,8 @@ def run_batch(strategy_config: dict) -> None:
     ok_prob_neg = prob_negative_oos < THRESHOLD_PROB_NEG
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
-    verdict = "🟢 APPROVED" if approved else "🔴 REJECTED"
-    logger.info(f"STAGE 7 [{STRATEGY_ID}] ── Validation             ── {verdict}  NetGain={bt_netgain_pct:.2f}% R2={r2:.3f} ProbNeg={prob_negative_oos:.1f}%")
+    verdict = "🟢 VALIDATED" if approved else "🔴 REJECTED"
+    logger.info(f"STAGE 7  [{STRATEGY_ID}] ── Validation             ── {verdict}  NetGain={bt_netgain_pct:.2f}% R2={r2:.3f} ProbNeg={prob_negative_oos:.1f}%")
 
     logger.debug(f"  Backtest OOS")
     logger.debug(f"    Net_Gain_pct : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT}%)   {'✅' if ok_netgain  else '❌'}")
@@ -503,13 +468,17 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"{'🟢 STRATEGY APPROVED' if approved else '🔴 STRATEGY REJECTED — checking regime filter...'} | {STRATEGY_ID}")
 
     approved_regime = False
-    if not approved and excluded_families and "trade_log_filtered" in vars():
-        df_filt     = trade_log_filtered.copy().sort_values("buy_time").reset_index(drop=True)
+
+    approved = approved or approved_regime
+
+    # -------------------------------------------------------------------------
+    # SECOND ROUND VALIDATION — Regime 0+1
+    # -------------------------------------------------------------------------
+    if not approved and "r01_filtered" in vars() and r01_filtered is not None and len(r01_filtered) > 0:
+        df_filt     = r01_filtered.copy().sort_values("buy_time").reset_index(drop=True)
         equity_filt = INITIAL_BALANCE + df_filt["profit"].cumsum().values
         wr_filtered = (df_filt["profit"] > 0).mean() * 100
-        X2          = np.arange(len(equity_filt)).reshape(-1, 1)
-        y2          = equity_filt.reshape(-1, 1)
-        r2_filtered = round(LinearRegression().fit(X2, y2).score(X2, y2), 3)
+        r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
 
         wr_original    = best_bt_row.get("Win_Ratio", 0) * 100
         wr_improvement = wr_filtered - wr_original
@@ -519,13 +488,33 @@ def run_batch(strategy_config: dict) -> None:
         ok_prob_neg_max   = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
         approved_regime   = ok_wr_improvement and ok_r2_filtered and ok_prob_neg_max
 
-        logger.debug(f"  Second Round — Regime Filtered")
+        logger.debug(f"  Second Round — Regime 0+1 Filtered")
         logger.debug(f"    WR improvement : {wr_improvement:>7.2f}pp  (threshold > {THRESHOLD_WR_IMPROVEMENT}pp)   {'✅' if ok_wr_improvement else '❌'}  ({wr_original:.2f}% → {wr_filtered:.2f}%)")
         logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered    else '❌'}")
         logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max   else '❌'}")
-        logger.debug(f"{'🟢 STRATEGY APPROVED (regime filtered)' if approved_regime else '🔴 STRATEGY REJECTED (regime filtered)'} | {STRATEGY_ID}")
+        logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
 
-    approved = approved or approved_regime
+        approved = approved or approved_regime
+
+    _round = "—"
+    if approved and not approved_regime:
+        _round = "Round 1"
+    elif approved and approved_regime:
+        _round = "Round 2"
+    _validation_results.append({
+        "strategy_id":   STRATEGY_ID,
+        "verdict":       "🟢 VALIDATED" if approved else "🔴 REJECTED",
+        "round":         _round,
+        "net_gain_pct":  round(bt_netgain_pct, 2),
+        "dd_pct":        round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
+        "win_ratio":     round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
+        "r2":            r2,
+        "prob_neg_pct":  round(prob_negative_oos, 2),
+        "params_changed":  False,
+        "active_prev":     None,
+        "active_new":      None,
+        "symbols_changed": False,
+    })
 
     # -------------------------------------------------------------------------
     # BLOCK 7 — EQUITY CURVES
@@ -539,14 +528,6 @@ def run_batch(strategy_config: dict) -> None:
 
     metrics_baseline = compute_metrics(trade_log, capital=INITIAL_BALANCE, name=STRATEGY_ID)
     print_metrics_table([metrics_baseline], f"  Metrics — {STRATEGY_ID} (Baseline)")
-
-    # Regime 1
-    if excluded_families and "trade_log_filtered" in vars() and trade_log_filtered is not None and len(trade_log_filtered) > 0:
-        _trade_logs_regime1.append((STRATEGY_ID, trade_log_filtered.copy()))
-
-    # Regime 0
-    if "r0_filtered" in vars() and r0_filtered is not None and len(r0_filtered) > 0:
-        _trade_logs_regime0.append((STRATEGY_ID, r0_filtered.copy()))
 
     # Regime 0+1
     if "r01_filtered" in vars() and r01_filtered is not None and len(r01_filtered) > 0:
@@ -563,21 +544,30 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"{'='*60}")
 
     active_str = "active=True" if approved else "active=False"
-    logger.info(f"STAGE 8 [{STRATEGY_ID}] ── Update & Compare       ── params saved | {active_str}")
+    logger.info(f"STAGE 8  [{STRATEGY_ID}] ── Update & Compare       ── params saved | {active_str}")
 
     PARAM_KEYS = [p.lower() for p in param_names]
 
-    update_strategies_params(
+    _params_result  = update_strategies_params(
         csv_path=CSV_PARAMS, strategy_id=STRATEGY_ID, best_params=best_params,
-        param_keys=PARAM_KEYS, approved=approved, bt_netgain_pct=bt_netgain_pct,
+        param_keys=PARAM_KEYS, validated=approved, bt_netgain_pct=bt_netgain_pct,
         r2=r2, prob_negative_oos=prob_negative_oos,
     )
-    update_strategies_symbols(
+    _symbols_result = update_strategies_symbols(
         csv_path=CSV_SYMBOLS, strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
     )
 
     elapsed = int(time.time() - start_time)
     logger.info(f"🏁 {STRATEGY_ID} — Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")
+
+    # Backfill update info into last validation result
+    if _validation_results:
+        _validation_results[-1].update({
+            "params_changed":  _params_result.get("params_changed", False)  if _params_result else False,
+            "active_prev":     _params_result.get("active_prev", None)      if _params_result else None,
+            "active_new":      _params_result.get("active_new", None)       if _params_result else None,
+            "symbols_changed": _symbols_result.get("symbols_changed", False) if _symbols_result else False,
+        })
 
     # -------------------------------------------------------------------------
     # FINAL COMPARISON SUMMARY
@@ -586,24 +576,19 @@ def run_batch(strategy_config: dict) -> None:
     r0_tl  = r0_filtered        if "r0_filtered"  in vars() and len(r0_filtered)  > 0 else None
     r01_tl = r01_filtered       if "r01_filtered" in vars() and len(r01_filtered) > 0 else None
 
-    def _quick(tl, cap):
+    def _q(tl):
         if tl is None or len(tl) == 0:
             return np.nan, np.nan, np.nan
-        profits = tl.sort_values("buy_time")["profit"].values
-        eq      = cap + np.cumsum(profits)
-        cm      = np.maximum.accumulate(eq)
-        dd      = ((eq - cm) / cm * 100).min()
-        ng      = (eq[-1] - cap) / cap * 100
-        wr      = (profits > 0).mean() * 100
-        return round(ng, 2), round(dd, 2), round(wr, 1)
+        m = compute_metrics(tl, capital=INITIAL_BALANCE, name="")
+        return m["Net_Gain_pct"], m["Max_DD_pct"], m["Win_Rate"]
 
     bt_dd = float(best_bt_row.get("DD_pct", np.nan))
 
     rows = [
-        ("OOS Backtest",  bt_netgain_pct,          bt_dd,                (best_bt_row.get("Win_Ratio", np.nan) * 100)),
-        ("Regime 1",      *_quick(r1_tl,  INITIAL_BALANCE)),
-        ("Regime 0",      *_quick(r0_tl,  INITIAL_BALANCE)),
-        ("Regime 0+1",    *_quick(r01_tl, INITIAL_BALANCE)),
+        ("OOS Backtest",  bt_netgain_pct,    bt_dd,                (best_bt_row.get("Win_Ratio", np.nan) * 100)),
+        ("Regime 1",      *_q(r1_tl)),
+        ("Regime 0",      *_q(r0_tl)),
+        ("Regime 0+1",    *_q(r01_tl)),
     ]
 
     logger.debug(f"\n{'─'*65}")
@@ -672,49 +657,123 @@ def run_portfolio_analysis():
             top5 = combo_df.sort_values(metric, ascending=ascending).head(5)
             print_metrics_table(top5.to_dict("records"), f"\n{title} — {label}", shorten_names=True)
 
-    # OOS BACKTEST vs BASELINE COMPARISON
-    if _oos_metrics and _trade_logs_baseline:
-        b_metrics      = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                          for sid, df in _trade_logs_baseline}
-        r01_metrics    = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                          for sid, df in _trade_logs_regime01}
-        r1_metrics_map = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                          for sid, df in _trade_logs_regime1}
-        r0_metrics_map = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                          for sid, df in _trade_logs_regime0}
+    # Pre-compute r01_metrics once — reused in best combinations
+    r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
+                   for sid, df in _trade_logs_regime01}
+
+    # =========================================================================
+    # STRATEGIES SUMMARY
+    # =========================================================================
+    if _validation_results:
+        lines = []
+        lines.append(f"\n{'─'*92}")
+        lines.append(f"  STRATEGIES SUMMARY")
+        lines.append(f"{'─'*92}")
+        lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<10} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
+        lines.append(f"  {'-'*90}")
+        for v in _validation_results:
+            lines.append(
+                f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<10} "
+                f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
+                f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
+            )
+        lines.append(f"  {'─'*90}")
+        logger.info("\n".join(lines))
+
+    # =========================================================================
+    # UPDATE STATUS TABLE
+    # =========================================================================
+    if _validation_results:
+        def _params_icon(v):
+            if v["params_changed"]:
+                return "🔵 updated"
+            return "⚪ no change"
+
+        def _active_icon(v):
+            prev, new = v["active_prev"], v["active_new"]
+            if prev is None:
+                return "⚪ no change"
+            if not prev and new:
+                return "🟠 activated"
+            if prev and not new:
+                return "🔴 deprecated"
+            return "⚪ no change"
+
+        def _symbols_icon(v):
+            if v["symbols_changed"]:
+                return "🔵 updated"
+            return "⚪ no change"
 
         lines = []
-        lines.append(f"\n{'─'*87}")
-        lines.append(f"  OOS BACKTEST vs BASELINE COMPARISON")
-        lines.append(f"{'─'*87}")
-        lines.append(f"  {'Strategy':<25} {'Source':<14} {'Net Gain%':>10} {'DD%':>8} {'Win Rate%':>10} {'R2':>7}")
-        lines.append(f"  {'-'*83}")
+        lines.append(f"\n{'─'*75}")
+        lines.append(f"  UPDATE STATUS")
+        lines.append(f"{'─'*75}")
+        lines.append(f"  {'Strategy':<25} {'Params':<16} {'Active':<16} {'Symbols':<16}")
+        lines.append(f"  {'-'*71}")
+        for v in _validation_results:
+            lines.append(
+                f"  {v['strategy_id']:<25} {_params_icon(v):<16} {_active_icon(v):<16} {_symbols_icon(v):<16}"
+            )
+        lines.append(f"  {'─'*71}")
+        logger.info("\n".join(lines))
 
-        for oos in _oos_metrics:
-            sid    = oos["strategy_id"]
-            b      = b_metrics.get(sid)
-            r1     = r1_metrics_map.get(sid)
-            r0     = r0_metrics_map.get(sid)
-            r01    = r01_metrics.get(sid)
-            r1_bt  = _oos_bt_regime1.get(sid)
-            r0_bt  = _oos_bt_regime0.get(sid)
-            r01_bt = _oos_bt_regime01.get(sid)
-            lines.append(f"  {sid:<25} {'OOS BT':<14} {oos['net_gain_pct']:>9.2f}% {oos['dd_pct']:>7.2f}% {oos['win_ratio']:>9.1f}% {oos['r2']:>7.3f}")
-            if b:
-                lines.append(f"  {'':<25} {'Baseline':<14} {b['Net_Gain_pct']:>9.2f}% {b['Max_DD_pct']:>7.2f}% {b['Win_Rate']:>9.1f}% {b['R_Squared']:>7.3f}")
-            if r1_bt:
-                lines.append(f"  {'':<25} {'R1 (OOS BT)':<14} {r1_bt['net_gain_pct']:>9.2f}% {r1_bt['dd_pct']:>7.2f}% {r1_bt['win_ratio']:>9.1f}% {r1_bt['r2']:>7.3f}")
-            if r1:
-                lines.append(f"  {'':<25} {'R1 (metrics)':<14} {r1['Net_Gain_pct']:>9.2f}% {r1['Max_DD_pct']:>7.2f}% {r1['Win_Rate']:>9.1f}% {r1['R_Squared']:>7.3f}")
-            if r0_bt:
-                lines.append(f"  {'':<25} {'R0 (OOS BT)':<14} {r0_bt['net_gain_pct']:>9.2f}% {r0_bt['dd_pct']:>7.2f}% {r0_bt['win_ratio']:>9.1f}% {r0_bt['r2']:>7.3f}")
-            if r0:
-                lines.append(f"  {'':<25} {'R0 (metrics)':<14} {r0['Net_Gain_pct']:>9.2f}% {r0['Max_DD_pct']:>7.2f}% {r0['Win_Rate']:>9.1f}% {r0['R_Squared']:>7.3f}")
-            if r01_bt:
-                lines.append(f"  {'':<25} {'R0+1 (OOS BT)':<14} {r01_bt['net_gain_pct']:>9.2f}% {r01_bt['dd_pct']:>7.2f}% {r01_bt['win_ratio']:>9.1f}% {r01_bt['r2']:>7.3f}")
-            if r01:
-                lines.append(f"  {'':<25} {'R0+1 (metrics)':<14} {r01['Net_Gain_pct']:>9.2f}% {r01['Max_DD_pct']:>7.2f}% {r01['Win_Rate']:>9.1f}% {r01['R_Squared']:>7.3f}")
-            lines.append(f"  {'-'*83}")
-        lines.append(f"  {'─'*83}")
+    # =========================================================================
+    # BEST COMBINATIONS — Regime 0+1
+    # =========================================================================
+    if len(_trade_logs_regime01) > 0:
+        import pandas as _pd
+        from itertools import combinations as _combinations
 
+        named_r01 = {sid: df for sid, df in _trade_logs_regime01}
+
+        def _num(sid):
+            for part in sid.split("_"):
+                if part.isdigit():
+                    return int(part)
+            return 0
+
+        combo_results = []
+        for r in range(1, len(named_r01) + 1):
+            for combo in _combinations(named_r01.keys(), r):
+                if len(combo) == 1:
+                    # Reuse pre-computed metrics — no recalculation
+                    sid  = combo[0]
+                    nums = str(_num(sid))
+                    m    = r01_metrics.get(sid)
+                    if m:
+                        combo_results.append({**m, "Curve": nums})
+                else:
+                    combo_tl = _pd.concat(
+                        [named_r01[sid] for sid in combo], ignore_index=True
+                    ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+                    capital  = INITIAL_BALANCE * len(combo)
+                    nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
+                    combo_results.append(compute_metrics(combo_tl, capital=capital, name=nums))
+
+        combo_df = _pd.DataFrame(combo_results)
+
+        best_ng    = combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
+        best_r2    = combo_df.loc[combo_df["R_Squared"].idxmax()]
+        best_pf_df = combo_df[combo_df["Profit_Factor"] != float("inf")]
+        best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
+
+        rows = [
+            ("📈 Net Gain",     best_ng),
+            ("📐 R²",           best_r2),
+            ("💰 ProfitFactor", best_pf),
+        ]
+
+        lines = []
+        lines.append(f"\n{'─'*85}")
+        lines.append(f"  BEST COMBINATIONS — Regime 0+1")
+        lines.append(f"{'─'*85}")
+        lines.append(f"  {'Metric':<16} {'Combo':<12} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
+        lines.append(f"  {'-'*81}")
+        for label, row in rows:
+            pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
+            lines.append(
+                f"  {label:<16} {str(row['Curve']):<12} {row['Net_Gain_pct']:>9.2f}% "
+                f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
+            )
+        lines.append(f"  {'─'*81}")
         logger.info("\n".join(lines))
