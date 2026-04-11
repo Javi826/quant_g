@@ -1,8 +1,8 @@
 #Z_grid/Grid_parity.py
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))        # bitget/ → signals/
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "core"))) # core/ → utils, tools, backtesters
 import time
 import pandas as pd
 from itertools import product
@@ -10,9 +10,9 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
-from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
+from utils.st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
+from utils.analysis import report_backtesting
+from utils.utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
 from signals.add_signals_parity import parity_long
 from signals.add_signals_parity import parity_short
 
@@ -25,7 +25,7 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2026_OOS"
+DATA_FOLDER         = "../../BOT_batch/data/crypto_2026_OOS"  # se queda igual por ahora
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80

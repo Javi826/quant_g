@@ -11,7 +11,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple
 
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from market_regime.regime_metrics import calc_all_metrics
+from shared.market_regime.regime_metrics import calc_all_metrics
 from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER

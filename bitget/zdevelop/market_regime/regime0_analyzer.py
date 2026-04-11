@@ -24,8 +24,8 @@ from glob import glob
 # CONFIGURATION - EDIT THESE PARAMETERS
 # =============================================================================
 
-TRADES_FOLDER   = '../brief_trades_2026'
-BTC_FILE        = '../data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
+TRADES_FOLDER = '../brief_trades'
+BTC_FILE      = '../../BOT_batch/data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
 MA_PERIOD       = 5  # Options: 5, 10, 20, 50, 200
 LONG_TH         = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
 SHORT_TH        = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH

@@ -1,5 +1,5 @@
 """
-market_regime/regime_metrics.py - LIBRARY-ONLY VERSION
+BOT_trading/market_regime/regime_metrics.py - LIBRARY-ONLY VERSION
 
 Calculates market regime metrics using ONLY proven libraries.
 NO fallback implementations - if library is missing, raises ImportError.
@@ -21,13 +21,11 @@ import warnings
 
 # Suppress warnings from external libraries
 warnings.filterwarnings('ignore')
-
-
+import logging
+logger = logging.getLogger('BOT_trading.market_regime.regime_metrics')
 import nolds
 from ta.volatility import AverageTrueRange
 import neurokit2 as nk
-
-print("✅ All required libraries loaded successfully!")
 
 
 def calc_hurst(close: np.ndarray, window: int = 100) -> float:
@@ -145,8 +143,6 @@ def calc_atr_pct(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: i
         return np.nan
 
 
-
-
 def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
     """
     Calculates Permutation Entropy using neurokit2 library.
@@ -196,6 +192,8 @@ def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3
     
     except Exception as e:
         return np.nan
+
+
 def calc_all_metrics(
     ohlc: Dict[str, np.ndarray],
     hurst_window: int = 100,
@@ -228,4 +226,3 @@ def calc_all_metrics(
         'atr_pct': calc_atr_pct(high, low, close, atr_window),
         'permutation_entropy': calc_permutation_entropy(close, pe_window, pe_order)
     }
-

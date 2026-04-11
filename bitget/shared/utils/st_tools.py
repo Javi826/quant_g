@@ -143,21 +143,19 @@ def _calculate_duration_optimized(trade_log):
     except Exception:
         return np.nan
 
-
-def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_name=None, save=True):
+def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_name=None, save=True, output_folder=None):
 
     if not save:
         return
     
-    # Forzar que el archivo se guarde dentro de la carpeta "brief_trades"
-    folder = "../brief_trades"
+    if output_folder is not None:
+        folder = output_folder
+    else:
+        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "brief_trades")
     os.makedirs(folder, exist_ok=True)
     
-    # Extraer solo el nombre del archivo (sin carpetas que pueda tener filename)
     base_filename = os.path.basename(filename)
-    
-    # Construir la ruta final dentro de brief_trades
-    final_path = os.path.join(folder, base_filename)
+    final_path    = os.path.join(folder, base_filename)
 
     all_trades_records = []
     
@@ -180,8 +178,6 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_
         for param_name, param_value in zip(param_names, comb):
             tl_df[param_name] = param_value
         
-        
-        # ✅ AÑADIR COLUMNA STRATEGY
         if strategy_name is not None:
             tl_df['strategy'] = strategy_name
                 
@@ -189,18 +185,49 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_
     
     if all_trades_records:
         all_trades_df = pd.concat(all_trades_records, ignore_index=True)
-
-        param_cols = param_names
-        trade_cols = [col for col in all_trades_df.columns if col not in param_names]
+        param_cols    = param_names
+        trade_cols    = [col for col in all_trades_df.columns if col not in param_names]
         all_trades_df = all_trades_df[param_cols + trade_cols]
-
         all_trades_df.to_excel(final_path, index=False, engine='openpyxl')
-        
         file_size_mb = os.path.getsize(final_path) / 1024 / 1024
         print(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
         print(f"📦 Size: {file_size_mb:.2f} MB")
     else:
         print("⚠️ No trades to be saved")
+
+
+def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_name, save_file=False, output_folder=None):
+    
+    if not save_file:
+        return
+
+    if output_folder is not None:
+        folder = output_folder
+    
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    all_dfs = []
+
+    for comb, res in grid_results_list:
+        for name, r in res.items():
+            equity_hist = r['sim_balance_history']
+            if equity_hist is None or len(equity_hist['timestamp']) == 0:
+                continue
+            df_eq = pd.DataFrame(equity_hist)
+            df_eq['net_gain_pct'] = (df_eq['balance'] - initial_capital) / initial_capital * 100
+            df_eq['strategy']     = strategy_name
+            df_eq['params']       = str(comb)
+            all_dfs.append(df_eq)
+
+    if all_dfs:
+        final_df  = pd.concat(all_dfs, ignore_index=True)
+        file_name = f"equity_{strategy_name}.xlsx"
+        save_path = os.path.join(folder, file_name)
+        final_df.to_excel(save_path, index=False)
+        print(f"📂 Excel saved at {save_path}")
+    else:
+        print("⚠️ No equity data to save")
 
         
 def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):

@@ -1,10 +1,11 @@
 """
-config/settings.pyBot Configuration Settings
+BOT_trading/config/settings.pyBot Configuration Settings
 
 Centralizes all bot configuration including exchange settings,
 validation limits, paths, and account-specific settings.
 """
-
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
 from zoneinfo import ZoneInfo
 
 # ==========================================================================
@@ -48,22 +49,15 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-# BTC settings for regime calculation
-REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
-
-# Metric calculation windows
-REGIME_HURST_WINDOW = 100
-REGIME_ER_WINDOW    = 14
-REGIME_ATR_WINDOW   = 14
-REGIME_PE_WINDOW    = 50
-REGIME_PE_ORDER     = 3
-
-REGIME_FAMILIES = {
-    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
-    'ranging': {}
-}
-
+from shared_config import (
+    REGIME_REFERENCE_SYMBOL,
+    REGIME_HURST_WINDOW,
+    REGIME_ER_WINDOW,
+    REGIME_ATR_WINDOW,
+    REGIME_PE_WINDOW,
+    REGIME_PE_ORDER,
+    REGIME_FAMILIES,
+)
 REGIME_GENERAL = {
     'trending': 1.0,   
     'ranging': 1.0,

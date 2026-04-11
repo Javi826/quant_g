@@ -2,8 +2,8 @@
 # -----------------------------------------------------------
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))        # bitget/ → signals/
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "core"))) #
 import time
 import numpy as np
 import pandas as pd
@@ -11,11 +11,11 @@ from tqdm import tqdm
 from itertools import product
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from utils.ZX_analysis import report_montecarlo
-from utils.ZX_utils import filter_symbols, final_prints
+from utils.analysis import report_montecarlo
+from utils.utils import filter_symbols, final_prints
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
-from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
+from utils.st_tools import extract_ohlcv_from_path, compile_MC_results,get_n_obs
+from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from signals.add_signals_parity import parity_long
 from signals.add_signals_parity import parity_short
 
@@ -28,8 +28,8 @@ MY_SYMBOLS          = False
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2022_IS"
-DATA_FOLDER        = "../data/crypto_2026_OOS"
+DATA_FOLDER         = "../../BOT_batch/data/crypto_2022_IS"
+DATA_FOLDER         = "../../BOT_batch/data/crypto_2026_OOS"
 TIMEFRAME_MINOR     = "4H"
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 4_200_000
@@ -59,7 +59,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 200
+FINAL_N_PATHS        = 10
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 

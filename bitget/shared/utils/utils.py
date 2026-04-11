@@ -159,31 +159,3 @@ def save_filtered_symbols(filtered_symbols, strategy="_", timeframe="10H", save_
         df_symbols.to_csv(path_symbols, index=False, header=False)  # Sin index, sin header
         print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
 
-def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_name,save_file=False):
-    
-    if save_file:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-    
-        all_dfs = []
-    
-        for comb, res in grid_results_list:
-            for name, r in res.items():
-                equity_hist = r['sim_balance_history']
-                if equity_hist is None or len(equity_hist['timestamp']) == 0:
-                    continue
-                df_eq = pd.DataFrame(equity_hist)
-                df_eq['net_gain_pct'] = (df_eq['balance'] - initial_capital) / initial_capital * 100
-                df_eq['strategy'] = strategy_name
-                df_eq['params'] = str(comb)
-                all_dfs.append(df_eq)
-    
-        if all_dfs:
-            final_df = pd.concat(all_dfs, ignore_index=True)
-            file_name = f"equity_{strategy_name}.xlsx"
-            save_path = os.path.join(folder, file_name)
-            final_df.to_excel(save_path, index=False)
-            print(f"📂 Excel saved at {save_path}")
-        else:
-            print("⚠️ No equity data to save")
-
