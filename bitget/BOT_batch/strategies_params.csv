@@ -1,16 +1,16 @@
 id,name,timeframe,active,direction,regime_trending,regime_ranging,regime_volatile,direction_mode,sell_after_ncandles,order_amount,lookback,tolerance,ma_period,tp_pct,sl_pct,impulse,range,flag,approved,last_run,bt_netgain_pct,bt_r2,prob_negative,validated
-02_reversal_long_4H,reversal_long_4H,4H,False,long,0.0,1.0,0.0,long_only,50,200,4,20.0,50.0,3.0,10.0,,,,,2026-04-12 00:43,46.73,0.676,100.0,False
-03_parity_long_4H,parity_long_4H,4H,False,long,1.0,0.0,0.0,general,50,200,150,30.0,50.0,4.0,10.0,,,,True,2026-04-12 00:45,6.09,0.327,60.0,False
-04_reversal_short_4H,reversal_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,4,30.0,25.0,3.0,10.0,,,,,2026-04-12 00:46,167.54,0.66,0.0,True
-06_reversal_long_1H,reversal_long_1H,1H,False,long,1.0,0.0,0.0,general,100,200,7,40.0,25.0,2.0,10.0,,,,,2026-04-12 00:47,-8.45,0.133,80.0,False
-07_reversal_short_1H,reversal_short_1H,1H,True,short,1.0,1.0,1.0,general,100,200,5,35.0,50.0,2.0,7.0,,,,,2026-04-12 00:48,156.35,0.948,0.0,True
-08_reversal_long_6Hutc,reversal_long_6Hutc,6Hutc,True,long,1.0,1.0,0.0,long_only,50,200,4,25.0,25.0,2.0,10.0,,,,,2026-04-12 00:48,25.45,0.836,40.0,True
-09_reversal_short_6Hutc,reversal_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,6,25.0,50.0,5.0,10.0,,,,,2026-04-12 00:48,227.69,0.884,0.0,True
-10_parity_long_1H,parity_long_1H,1H,True,long,1.0,0.0,0.0,long_only,75,200,100,10.0,25.0,5.0,7.0,,,,,2026-04-12 00:53,-10.54,0.012,40.0,True
-11_parity_short_1H,parity_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,150,20.0,50.0,2.0,7.5,,,,True,2026-04-12 00:12,112.52,0.921,2.5,True
-12_parity_long_6Hutc,parity_long_6Hutc,6Hutc,True,long,1.0,1.0,0.0,long_only,50,200,50,40.0,25.0,3.5,10.0,,,,,,,,,
-13_orderblocks_short_4H,orderblocks_short_4H,4H,True,short,0.0,1.0,0.0,general,50,200,50,35.0,,4.0,10.0,0.01,,,,,,,,
-16_ranging_short_6Hutc,ranging_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,10,5.0,,4.0,6.0,,25.0,,,,,,,
-17_flag_long_4H,flag_long_4H,4H,True,long,1.0,1.0,1.0,general,50,200,15,,50.0,4.0,10.0,3.0,,50.0,,,,,,
-19_flag_short_4H,flag_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,10,,50.0,3.0,9.0,3.0,,50.0,,,,,,
-20_flag_short_1H,flag_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,20,,25.0,2.0,8.0,3.0,,60.0,,,,,,
+02_reversal_long_4H,reversal_long_4H,4H,False,long,0.0,1.0,0.0,long_only,50,200,4,20.0,50.0,3.0,10.0,,,,,2026-04-12 10:10,35.29,0.545,55.25,False
+03_parity_long_4H,parity_long_4H,4H,True,long,1.0,0.0,0.0,general,50,200,150,40.0,50.0,3.0,10.0,,,,True,2026-04-12 10:11,34.55,0.717,36.55,True
+04_reversal_short_4H,reversal_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,4,25.0,50.0,3.0,9.0,,,,,2026-04-12 10:12,222.11,0.895,5.8,True
+06_reversal_long_1H,reversal_long_1H,1H,True,long,1.0,0.0,0.0,general,100,200,7,40.0,25.0,2.0,10.0,,,,,2026-04-12 10:13,50.79,0.892,20.85,True
+07_reversal_short_1H,reversal_short_1H,1H,True,short,1.0,1.0,1.0,general,100,200,5,30.0,50.0,2.0,5.0,,,,,2026-04-12 10:14,149.43,0.973,1.55,True
+08_reversal_long_6Hutc,reversal_long_6Hutc,6Hutc,True,long,1.0,1.0,0.0,long_only,50,200,3,20.0,50.0,4.0,10.0,,,,,2026-04-12 10:14,29.36,0.839,37.8,True
+09_reversal_short_6Hutc,reversal_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,6,30.0,25.0,4.0,7.5,,,,,2026-04-12 10:14,362.43,0.924,6.55,True
+10_parity_long_1H,parity_long_1H,1H,True,long,1.0,0.0,0.0,long_only,75,200,150,15.0,25.0,2.0,10.0,,,,,2026-04-12 10:17,31.41,0.941,19.45,True
+11_parity_short_1H,parity_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,150,20.0,50.0,2.0,7.5,,,,True,2026-04-12 10:19,112.52,0.921,2.4,True
+12_parity_long_6Hutc,parity_long_6Hutc,6Hutc,False,long,1.0,1.0,0.0,long_only,50,200,75,30.0,25.0,4.0,10.0,,,,,2026-04-12 10:20,6.89,0.275,41.1,False
+13_orderblocks_short_4H,orderblocks_short_4H,4H,True,short,0.0,1.0,0.0,general,50,200,50,35.0,,4.0,11.0,0.01,,,,2026-04-12 10:21,147.74,0.876,8.95,True
+16_ranging_short_6Hutc,ranging_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,12,6.0,,3.0,10.0,,25.0,,,2026-04-12 04:12,53.19,0.935,20.3,True
+17_flag_long_4H,flag_long_4H,4H,True,long,1.0,1.0,1.0,general,50,200,20,,50.0,3.0,10.0,3.0,,40.0,,2026-04-12 04:19,11.98,0.395,31.45,True
+19_flag_short_4H,flag_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,12,,50.0,3.0,7.0,2.0,,60.0,,2026-04-12 04:37,223.42,0.88,4.85,True
+20_flag_short_1H,flag_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,20,,25.0,2.0,6.0,2.0,,70.0,,2026-04-12 05:45,187.33,0.946,1.9,True

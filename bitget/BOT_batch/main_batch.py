@@ -82,8 +82,8 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False   # set to True from run_batch.py when LOG_LEVEL=DEBUG
 
-N_PATHS_IS  = 100
-N_PATHS_OOS = 2000
+N_PATHS_IS  = 20
+N_PATHS_OOS = 200
 
 # Validation thresholds — first round
 THRESHOLD_NETGAIN_PCT = 20.0
@@ -92,7 +92,7 @@ THRESHOLD_PROB_NEG    = 31.0
 
 # Validation thresholds — second round (regime filtered)
 THRESHOLD_R2_FILTERED    = 0.85
-THRESHOLD_PROB_NEG_MAX   = 50.0
+THRESHOLD_PROB_NEG_MAX   = 45.0
 
 # Regime 0 settings
 R0_MA_PERIOD = 5
@@ -173,7 +173,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -632,27 +632,69 @@ def run_portfolio_analysis():
 
         print_metrics_table(metrics_list, f"📊 METRICS TABLE — {label}")
 
-        # Best combinations
-        combo_results = []
-        for r in range(1, len(named_logs) + 1):
-            for combo in combinations(named_logs.keys(), r):
-                combo_tl = _pd.concat([named_logs[sid] for sid in combo], ignore_index=True).sort_values("buy_time").reset_index(drop=True)
-                capital  = INITIAL_BALANCE * len(combo)
-                combo_results.append(compute_metrics(combo_tl, capital=capital, name="+".join(combo)))
-
-        combo_df = _pd.DataFrame(combo_results)
-
-        for metric, ascending, title in [
-            ("Net_Gain_pct",  False, "💵 TOP 5 BY NET GAIN"),
-            ("R_Squared",     False, "📈 TOP 5 BY R²"),
-            ("Max_DD_pct",    False, "📉 TOP 5 BY LOWEST DD"),
-        ]:
-            top5 = combo_df.sort_values(metric, ascending=ascending).head(5)
-            print_metrics_table(top5.to_dict("records"), f"\n{title} — {label}", shorten_names=True)
-
     # Pre-compute r01_metrics once — reused in best combinations
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
                    for sid, df in _trade_logs_regime01}
+
+    # =========================================================================
+    # BEST COMBINATIONS — Baseline (all processed strategies, no filter)
+    # =========================================================================
+    if len(_trade_logs_baseline) > 0:
+        named_bl = {sid: df for sid, df in _trade_logs_baseline}
+
+        def _num(sid):
+            for part in sid.split("_"):
+                if part.isdigit():
+                    return int(part)
+            return 0
+
+        bl_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
+                      for sid, df in _trade_logs_baseline}
+
+        combo_results_bl = []
+        for r in range(1, len(named_bl) + 1):
+            for combo in combinations(named_bl.keys(), r):
+                if len(combo) == 1:
+                    sid  = combo[0]
+                    nums = str(_num(sid))
+                    m    = bl_metrics.get(sid)
+                    if m:
+                        combo_results_bl.append({**m, "Curve": nums})
+                else:
+                    combo_tl = _pd.concat(
+                        [named_bl[sid] for sid in combo], ignore_index=True
+                    ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+                    capital  = INITIAL_BALANCE * len(combo)
+                    nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
+                    combo_results_bl.append(compute_metrics(combo_tl, capital=capital, name=nums))
+
+        combo_df_bl = _pd.DataFrame(combo_results_bl)
+
+        best_ng_bl    = combo_df_bl.loc[combo_df_bl["Net_Gain_pct"].idxmax()]
+        best_r2_bl    = combo_df_bl.loc[combo_df_bl["R_Squared"].idxmax()]
+        best_pf_bl_df = combo_df_bl[combo_df_bl["Profit_Factor"] != float("inf")]
+        best_pf_bl    = best_pf_bl_df.loc[best_pf_bl_df["Profit_Factor"].idxmax()] if not best_pf_bl_df.empty else best_ng_bl
+
+        rows_bl = [
+            ("💵 Net Gain",     best_ng_bl),
+            ("📈 R²",           best_r2_bl),
+            ("💰 ProfitFactor", best_pf_bl),
+        ]
+
+        lines = []
+        lines.append(f"\n{'─'*85}")
+        lines.append(f"  BEST COMBINATIONS — Baseline")
+        lines.append(f"{'─'*85}")
+        lines.append(f"  {'Metric':<16} {'Combo':<12} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
+        lines.append(f"  {'-'*81}")
+        for label, row in rows_bl:
+            pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
+            lines.append(
+                f"  {label:<16} {str(row['Curve']):<12} {row['Net_Gain_pct']:>9.2f}% "
+                f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
+            )
+        lines.append(f"  {'─'*81}")
+        logger.info("\n".join(lines))
 
     # =========================================================================
     # STRATEGIES SUMMARY

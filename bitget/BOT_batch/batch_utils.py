@@ -37,9 +37,10 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
     sharpe        = (df["profit"].mean() / df["profit"].std() * np.sqrt(252)) if df["profit"].std() > 0 else np.nan
 
     # --- Summary table ---
+    _param_cols = [c for c in ["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct","impulse","range_str"] if c in trade_log.columns]
     df_summary = pd.DataFrame([{
         "Metric": "Net_Gain_pct",
-        **{k.upper(): v for k, v in trade_log[["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct"]].iloc[0].items()},
+        **{k.upper(): v for k, v in trade_log[_param_cols].iloc[0].items()},
         "Net_Gain_pct": round(net_gain_pct, 2), "Win_Ratio": round(win_ratio, 2),
         "R2": r2, "Sharpe": round(sharpe, 2), "DD_pct": round(dd_pct, 2),
         "Num_Signals": num_signals, "duration_d": round(duration_d, 2)
@@ -363,32 +364,57 @@ def compute_metrics(trade_log, capital, name="Equity"):
 
     tl      = trade_log.sort_values("buy_time").reset_index(drop=True)
     profits = tl["profit"].values
-    eq      = capital + np.cumsum(profits)
-    cm      = np.maximum.accumulate(eq)
-    max_dd  = ((eq - cm) / cm * 100).min()
-    net_gain = (eq[-1] - capital) / capital * 100
-    gains   = profits[profits > 0].sum()
-    losses  = -profits[profits < 0].sum()
-    pf      = round(gains / losses, 3) if losses > 0 else np.inf
-    X       = np.arange(len(eq)).reshape(-1, 1)
-    y       = eq.reshape(-1, 1)
-    r2      = round(_LR().fit(X, y).score(X, y), 3)
 
-    # Monthly consistency — resample to daily for monthly grouping
-    tl["date"] = pd.to_datetime(tl["buy_time"]).dt.to_period("M")
-    monthly    = tl.groupby("date")["profit"].sum()
+    # Win rate — computed on trade level (not affected by resampling)
+    win_rate = round((profits > 0).mean() * 100, 1)
+
+    # --- Build daily equity curve (aligned with compose_equities) ---
+    tl["_date"] = pd.to_datetime(tl["buy_time"]).dt.normalize()
+    daily_profit = tl.groupby("_date")["profit"].sum()
+
+    date_range = pd.date_range(start=daily_profit.index.min(),
+                               end=daily_profit.index.max(),
+                               freq="1D")
+    daily_profit = daily_profit.reindex(date_range, fill_value=0.0)
+    eq_daily     = capital + daily_profit.cumsum().values
+
+    # Forward-fill to match compose_equities resample_equity behaviour
+    eq_series = pd.Series(eq_daily, index=date_range)
+    eq_series = eq_series.ffill()
+    eq        = eq_series.values
+
+    # --- Metrics on daily curve ---
+    cm       = np.maximum.accumulate(eq)
+    max_dd   = ((eq - cm) / cm * 100).min()
+    net_gain = (eq[-1] - capital) / capital * 100
+
+    # Profit factor on daily returns (aligned with compose_equities)
+    daily_returns = eq_series.pct_change().dropna()
+    gains  = daily_returns[daily_returns > 0].sum()
+    losses = -daily_returns[daily_returns < 0].sum()
+    pf     = round(gains / losses, 3) if losses > 0 else np.inf
+
+    # R² on daily curve
+    X  = np.arange(len(eq)).reshape(-1, 1)
+    y  = eq.reshape(-1, 1)
+    r2 = round(_LR().fit(X, y).score(X, y), 3)
+
+    # Volatility on daily returns
+    volatility = daily_returns.std() * 100
+
+    # Monthly consistency on daily curve
+    monthly = eq_series.resample("ME").last().pct_change().dropna()
     consistency = (monthly > 0).mean() * 100
-    volatility  = pd.Series(profits).std() / capital * 100
 
     return {
         "Curve":          name,
-        "Volatility_pct": round(volatility, 2),
-        "Monthly_pct":    round(consistency, 2),
-        "Net_Gain_pct":   round(net_gain, 2),
-        "Max_DD_pct":     round(max_dd, 2),
+        "Volatility_pct": round(float(volatility), 2),
+        "Monthly_pct":    round(float(consistency), 2),
+        "Net_Gain_pct":   round(float(net_gain), 2),
+        "Max_DD_pct":     round(float(max_dd), 2),
         "Profit_Factor":  pf,
         "R_Squared":      r2,
-        "Win_Rate":       round((profits > 0).mean() * 100, 1),
+        "Win_Rate":       win_rate,
     }
 
 
