@@ -256,16 +256,19 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
             for k in param_keys:
                 if k in df_params.columns:
                     df_params.at[idx, k] = best_params.get(k.upper())
-            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change_detail"] = " | ".join(param_changes)
             logger.info(f"🔵 strategies_params.csv — params updated for '{strategy_id}'")
         df_params.at[idx, "active"] = True
         if not prev_active:
-            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change_detail"] = f"active: False→True"
             logger.info(f"🟠 strategies_params.csv — activated '{strategy_id}'")
     else:
         df_params.at[idx, "active"] = False
         if prev_active:
-            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
+            df_params.at[idx, "last_change_detail"] = f"active: True→False"
             logger.info(f"🔴 strategies_params.csv — deprecated '{strategy_id}'")
 
     df_params.to_csv(csv_path, index=False)

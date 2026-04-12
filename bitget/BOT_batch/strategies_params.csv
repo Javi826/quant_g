@@ -10,7 +10,7 @@ id,name,timeframe,active,direction,regime_trending,regime_ranging,regime_volatil
 11_parity_short_1H,parity_short_1H,1H,False,short,1.0,1.0,1.0,general,50,200,150,20.0,50.0,2.0,7.5,,,,True,2026-04-12 18:02,112.52,0.921,5.0,False,2026-04-12 18:02
 12_parity_long_6Hutc,parity_long_6Hutc,6Hutc,False,long,1.0,1.0,0.0,long_only,50,200,75,30.0,25.0,4.0,10.0,,,,,2026-04-12 18:02,6.89,0.275,45.0,False,
 13_orderblocks_short_4H,orderblocks_short_4H,4H,False,short,0.0,1.0,0.0,general,50,200,50,35.0,,4.0,11.0,0.01,,,,2026-04-12 18:03,147.74,0.876,5.0,False,2026-04-12 18:03
-16_ranging_short_6Hutc,ranging_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,10,5.0,25.0,4.0,6.0,,25.0,,,2026-04-12 18:09,94.11,0.936,30.0,True,2026-04-12 18:09
+16_ranging_short_6Hutc,ranging_short_6Hutc,6Hutc,True,short,1.0,1.0,1.0,general,50,200,10,5.0,25.0,4.0,6.0,,25.0,,,2026-04-12 18:16,94.11,0.936,30.0,True,2026-04-12 18:09
 17_flag_long_4H,flag_long_4H,4H,False,long,1.0,1.0,1.0,general,50,200,13,,50.0,4.0,10.0,5.0,,40.0,,2026-04-12 18:03,22.2,0.675,65.0,False,
 19_flag_short_4H,flag_short_4H,4H,True,short,1.0,1.0,1.0,general,50,200,10,,50.0,3.0,9.0,3.0,,50.0,,2026-04-12 18:03,189.59,0.859,0.0,True,
 20_flag_short_1H,flag_short_1H,1H,True,short,1.0,1.0,1.0,general,50,200,20,,25.0,2.0,8.0,3.0,,60.0,,2026-04-12 18:03,188.55,0.958,0.0,True,
