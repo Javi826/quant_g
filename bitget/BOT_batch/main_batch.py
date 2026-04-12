@@ -80,22 +80,30 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 1
-N_PATHS_OOS = 20
+N_PATHS_IS  = 100
+N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
 THRESHOLD_NETGAIN_PCT  = 20.0
 THRESHOLD_R2           = 0.7
-THRESHOLD_PROB_NEG     = 30.0
+THRESHOLD_PROB_NEG     = 31.0
 
 # Validation thresholds — Round 2 (regime filtered)
 THRESHOLD_NETGAIN_PCT_FILTERED = 20.0
 THRESHOLD_R2_FILTERED          = 0.85
-THRESHOLD_PROB_NEG_MAX         = 50.0
+THRESHOLD_PROB_NEG_MAX         = 40.0
+
+# Validation thresholds — Round 2 path B (high netgain)
+THRESHOLD_NETGAIN_HIGH         = 80.0
+THRESHOLD_PROB_NEG_STRICT      = 15.0
 
 R0_MA_PERIOD = 5
 R0_LONG_TH   = 1.00
 R0_SHORT_TH  = 1.00
+
+# IS symbol selection
+FIX_SYMBOLS_MCIS_TRAINING = True   # If True, use top N_SYMBOLS_MCIS from IS by volume directly
+N_SYMBOLS_MCIS            = 6      # Number of IS symbols when FIX_SYMBOLS_MCIS_TRAINING=True
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
@@ -165,6 +173,8 @@ def run_batch(strategy_config: dict) -> None:
         min_price=MIN_PRICE,
         filter_symbols_fn=filter_symbols,
         my_symbols=MY_SYMBOLS,
+        fix_symbols_mcis=FIX_SYMBOLS_MCIS_TRAINING,
+        n_symbols_mcis=N_SYMBOLS_MCIS,
     )
 
     # -------------------------------------------------------------------------
@@ -217,6 +227,14 @@ def run_batch(strategy_config: dict) -> None:
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
     logger.info(f"STAGE 2  [{STRATEGY_ID}] ── Backtest OOS           ── {params_str}")
+
+    # -------------------------------------------------------------------------
+    # BLOCK 2 — BACKTEST OOS
+    # -------------------------------------------------------------------------
+    logger.debug(f"{'='*60}")
+    logger.debug(f"  BLOCK 2 — Backtest OOS  |  {STRATEGY_ID}")
+    logger.debug(f"{'='*60}")
+
     ohlcv_data_oos = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
     ohlcv_arr_oos  = prepare_ohlcv_arrays(ohlcv_data_oos)
 
@@ -257,7 +275,15 @@ def run_batch(strategy_config: dict) -> None:
     })
 
     logger.info(f"STAGE 3  [{STRATEGY_ID}] ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
-    n_obs_oos    = get_n_obs(TIMEFRAME)
+
+    # -------------------------------------------------------------------------
+    # BLOCK 3 — MONTE CARLO OOS
+    # -------------------------------------------------------------------------
+    logger.debug(f"{'='*60}")
+    logger.debug(f"  BLOCK 3 — Monte Carlo OOS  |  {STRATEGY_ID}")
+    logger.debug(f"{'='*60}")
+
+    n_obs_oos = get_n_obs(TIMEFRAME)
     paths_oos    = generate_paths_for_all_symbols_functional(
         ohlcv_data_oos, n_paths=N_PATHS_OOS, n_obs=n_obs_oos, raw_columns=[])
     best_params_list = [best_params]
@@ -468,6 +494,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"{'🟢 STRATEGY APPROVED' if approved else '🔴 STRATEGY REJECTED — checking regime filter...'} | {STRATEGY_ID}")
 
     approved_regime = False
+    round_path      = ""
 
     approved = approved or approved_regime
 
@@ -480,16 +507,30 @@ def run_batch(strategy_config: dict) -> None:
         r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
 
         netgain_filtered    = compute_metrics(r01_filtered, capital=INITIAL_BALANCE, name="")["Net_Gain_pct"]
-        ok_netgain_filtered = netgain_filtered      > THRESHOLD_NETGAIN_PCT_FILTERED
-        ok_r2_filtered      = r2_filtered           > THRESHOLD_R2_FILTERED
-        ok_prob_neg_max     = prob_negative_oos     < THRESHOLD_PROB_NEG_MAX
-        approved_regime     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
 
-        logger.debug(f"  Second Round — Regime 0+1 Filtered")
+        # Path A — regime filtered metrics
+        ok_netgain_filtered = netgain_filtered  > THRESHOLD_NETGAIN_PCT_FILTERED
+        ok_r2_filtered      = r2_filtered       > THRESHOLD_R2_FILTERED
+        ok_prob_neg_max     = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
+        approved_path_a     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
+
+        # Path B — high netgain OOS + strict prob neg
+        ok_netgain_high    = bt_netgain_pct     > THRESHOLD_NETGAIN_HIGH
+        ok_prob_neg_strict = prob_negative_oos  < THRESHOLD_PROB_NEG_STRICT
+        approved_path_b    = ok_netgain_high and ok_prob_neg_strict
+
+        approved_regime = approved_path_a or approved_path_b
+        round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
+
+        logger.debug(f"  Second Round — Path A (regime filtered)")
         logger.debug(f"    Net Gain       : {netgain_filtered:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT_FILTERED}%)    {'✅' if ok_netgain_filtered else '❌'}")
         logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered  else '❌'}")
         logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max else '❌'}")
-        logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
+        logger.debug(f"  Second Round — Path B (high netgain)")
+        logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_HIGH}%)    {'✅' if ok_netgain_high    else '❌'}")
+        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_STRICT}%)   {'✅' if ok_prob_neg_strict else '❌'}")
+        path_str = f" ({round_path})" if approved_regime else ""
+        logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' + path_str if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
 
         approved = approved or approved_regime
 
@@ -497,7 +538,7 @@ def run_batch(strategy_config: dict) -> None:
     if approved and not approved_regime:
         _round = "Round 1"
     elif approved and approved_regime:
-        _round = "Round 2"
+        _round = f"Round 2 ({round_path})"
     _validation_results.append({
         "strategy_id":   STRATEGY_ID,
         "verdict":       "🟢 VALIDATED" if approved else "🔴 REJECTED",

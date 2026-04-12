@@ -2,8 +2,8 @@
 # -----------------------------------------------------------
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))        # bitget/ → signals/
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "core"))) 
 import time
 import pandas as pd
 from itertools import product
@@ -11,16 +11,26 @@ from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 
 from joblib import Parallel, delayed
-from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
-from utils.ZX_analysis import report_backtesting
+from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from shared.utils.st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results,save_equity_to_excel
+from shared.utils.analysis import report_backtesting
 
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
+from shared.utils.utils import filter_symbols, save_filtered_symbols, final_prints
 from signals.add_signals_reversal import reversal_long
 from signals.add_signals_reversal import reversal_short
+import logging
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+handler.setFormatter(logging.Formatter("%(message)s"))
+
+logger_bot = logging.getLogger("BOT_batch")
+logger_bot.setLevel(logging.DEBUG)
+if not logger_bot.handlers:
+    logger_bot.addHandler(handler)
+logger_bot.propagate = False
 
 start_time   = time.time()
-SAVE_SYMBOLS = True
+SAVE_SYMBOLS = False
 MY_SYMBOLS   = False
 STRATEGY     = "reversal_long_1H_OOS"
 N_JOBS       = -1
@@ -28,12 +38,12 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_OOS_2026"
+DATA_FOLDER  = "../../BOT_batch/data/crypto_2026_OOS"
 #DATA_FOLDER         = "../data/crypto_2022_IS"
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 6_000_000
+MIN_VOL_USDT        = 430_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
@@ -47,11 +57,11 @@ TP_PCT_LIST          = [3,4,5,6,7,8,9]
 SL_PCT_LIST          = [3,4,5,6,7,9,10]
 
 SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [3]
+LOOKBACK_LIST        = [4]
 MA_PERIOD_LIST       = [50]
 TOLERANCE_LIST       = [20]
 
-TP_PCT_LIST          = [4]
+TP_PCT_LIST          = [3]
 SL_PCT_LIST          = [10]
 
 
@@ -79,7 +89,7 @@ def process_combo(comb):
     for sym in ohlcv_arr_minor.keys():
         arr_minor = ohlcv_arr_minor[sym]
 
-        signals = reversal_long(
+        signals = reversal_short(
             arr_minor,
             lookback=params['LOOKBACK'],
             tolerance=params['TOLERANCE'],
@@ -117,8 +127,8 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=True)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=True)
+save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=False)
+save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

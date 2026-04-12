@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from typing import Union
 import logging
-logger = logging.getLogger("BOT_trading.batch.utils")
+logger = logging.getLogger("BOT_batch.utils")
 
 np.random.seed(42)
 random.seed(42)
@@ -22,7 +22,7 @@ symbols_to_include = ["ZENUSDT","SEIUSDT","1000BONKUSDT","BNBUSDT","FETUSDT","ET
                       "DOTUSDT","DOGEUSDT","SOLUSDT","FARTCOINUSDT","WIFUSDT","WLDUSDT","NEARUSDT","LINKUSDT",
                       "BGBUSDT","SNXUSDT","BTCUSDT","SUIUSDT","APTUSDT","FORMUSDT","HYPEUSDT","ADAUSDT"]
 #3 
-symbols_to_include = ['ADAUSDT', 'BCHUSDT', 'BNBUSDT', 'BTCUSDT', 'DOGEUSDT', 'ETHUSDT', 'HUSDT', 'HYPEUSDT', 'LINKUSDT', 'LTCUSDT', 'PIPPINUSDT', 'SOLUSDT', 'SUIUSDT', 'TAOUSDT', 'XRPUSDT']
+symbols_to_include = ['AAVEUSDT', 'ADAUSDT', 'APTUSDT', 'ARBUSDT', 'AVAXUSDT', 'BCHUSDT', 'BGBUSDT', 'BNBUSDT', 'BRETTUSDT', 'BTCUSDT', 'DOGEUSDT', 'DOTUSDT', 'ENAUSDT', 'ETHUSDT', 'FETUSDT', 'GLMUSDT', 'HBARUSDT', 'LINKUSDT', 'LTCUSDT', 'NEARUSDT', 'NOTUSDT', 'ONDOUSDT', 'REZUSDT', 'SEIUSDT', 'SNXUSDT', 'SOLUSDT', 'SUIUSDT', 'TAOUSDT', 'WIFUSDT', 'WLDUSDT', 'XRPUSDT']
 #3 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):

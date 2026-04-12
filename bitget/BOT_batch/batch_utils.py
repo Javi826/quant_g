@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
-logger = logging.getLogger("BOT_trading.batch.batch_utils")
+logger = logging.getLogger("BOT_batch.batch_utils")
 
 # =============================================================================
 # HELPER — REPORT FILTERED TRADES
@@ -127,9 +127,10 @@ def extract_best_params(df_summary, param_names, lists_for_grid):
 # =============================================================================
 # HELPER — SELECT UNIVERSE
 # =============================================================================
-def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_price, filter_symbols_fn, my_symbols=False):
+def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_price, filter_symbols_fn, my_symbols=False, fix_symbols_mcis=False, n_symbols_mcis=20):
     """
     Select OOS universe (top N by volume) and match IS universe.
+    If fix_symbols_mcis=True, IS universe is top n_symbols_mcis from IS by volume directly.
     Returns: symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
     """
     raw_is  = sorted([f.split("_")[0] for f in os.listdir(data_folder_is)  if f.endswith(f"_{timeframe}.parquet")])
@@ -142,25 +143,38 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
     symbols_oos_final = oos_ranked[:n_symbols]
 
-    syms_is  = set(filtered_is)
-    syms_oos = set(symbols_oos_final)
-    in_both     = sorted(syms_is & syms_oos)
-    only_in_oos = sorted(syms_oos - syms_is)
+    if fix_symbols_mcis:
+        # IS universe: top n_symbols_mcis from IS by volume directly
+        vol_is           = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in filtered_is}
+        is_ranked        = sorted(filtered_is, key=lambda s: vol_is.get(s, 0), reverse=True)
+        symbols_is_final = is_ranked[:n_symbols_mcis]
+        logger.debug(f"FIX_SYMBOLS_MCIS_TRAINING=True — IS top {n_symbols_mcis} by volume: {symbols_is_final}")
+    else:
+        syms_is  = set(filtered_is)
+        syms_oos = set(symbols_oos_final)
+        in_both     = sorted(syms_is & syms_oos)
+        only_in_oos = sorted(syms_oos - syms_is)
 
-    vol_is               = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in syms_is}
-    is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
-    needed               = max(0, n_symbols - len(in_both))
-    symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
+        vol_is               = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in syms_is}
+        is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
+        needed               = max(0, n_symbols - len(in_both))
+        symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
 
-    logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
-    logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
-    logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
-    logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
+        logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
+        logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
+        logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
+        logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
+
     logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
+    logger.info(f"IS symbols — {'FIX_SYMBOLS_MCIS_TRAINING=True' if fix_symbols_mcis else 'FIX_SYMBOLS_MCIS_TRAINING=False'} | {len(symbols_is_final)} symbols selected")
 
-    if len(symbols_is_final) < n_symbols:
-        logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
+    if fix_symbols_mcis:
+        if len(symbols_is_final) < n_symbols_mcis:
+            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS_MCIS ({n_symbols_mcis}). Proceeding with available.")
+    else:
+        if len(symbols_is_final) < n_symbols:
+            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
 
@@ -450,24 +464,21 @@ def print_strategies_summary(validation_results):
     if not validation_results:
         return
     lines = []
-    lines.append(f"\n{'─'*92}")
+    lines.append(f"\n{'─'*106}")
     lines.append(f"  STRATEGIES SUMMARY")
-    lines.append(f"{'─'*92}")
-    lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<10} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-    lines.append(f"  {'-'*90}")
+    lines.append(f"{'─'*106}")
+    lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
+    lines.append(f"  {'-'*104}")
     for v in validation_results:
         lines.append(
-            f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<10} "
+            f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
-    lines.append(f"  {'─'*90}")
-    logging.getLogger("BOT_batch.main_batch").info("\n".join(lines))
+    lines.append(f"  {'─'*104}")
+    logger.info("\n".join(lines))
 
 
-# =============================================================================
-# HELPER — PRINT UPDATE STATUS
-# =============================================================================
 def print_update_status(validation_results):
     """Print update status table for all strategies."""
     if not validation_results:
@@ -508,7 +519,7 @@ def print_update_status(validation_results):
             f"  {v['strategy_id']:<25} {_params_icon(v):<16} {_active_icon(v):<16} {_symbols_icon(v):<16} {_changes_detail(v):<30}"
         )
     lines.append(f"  {'─'*106}")
-    logging.getLogger("BOT_batch.main_batch").info("\n".join(lines))
+    logger.info("\n".join(lines))
 
 
 # =============================================================================
