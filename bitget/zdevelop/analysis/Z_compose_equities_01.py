@@ -164,16 +164,35 @@ def build_combined_equity(dfs_list):
     return pd.DataFrame({'timestamp': common_index, 'balance': combined_balance})
 
 
+def extract_numeric_id(segment):
+    """Extract the numeric ID from a strategy segment string. e.g. '03_parity_long_4H' -> '03'"""
+    for part in segment.split("_"):
+        if part.isdigit():
+            return part
+    return segment
+
+
 def shorten_curve_name(name):
-    """Extract numeric IDs from curve name(s). e.g. 'equity_02_reversal_long_4H+equity_09_...' -> '02+09'"""
+    """
+    Extract numeric IDs from curve name(s) and sort them numerically.
+    e.g. 'equity_08_...+equity_02_...+equity_10_...' -> '02+08+10'
+    """
     segments = name.strip().split("+")
-    result   = []
-    for segment in segments:
-        for part in segment.split("_"):
-            if part.isdigit():
-                result.append(part)
-                break
-    return "+".join(result) if result else name
+    ids      = [extract_numeric_id(seg) for seg in segments]
+    ids_sorted = sorted(ids, key=lambda x: int(x) if x.isdigit() else float('inf'))
+    return "+".join(ids_sorted) if ids_sorted else name
+
+
+def sort_combo_name(name):
+    """
+    Given a raw combination name (joined full strategy names with '+'),
+    return a version with segments sorted numerically by their ID.
+    e.g. '08_flag+02_parity+10_ob' -> '02_parity+08_flag+10_ob'
+    """
+    segments   = name.strip().split("+")
+    seg_sorted = sorted(segments, key=lambda s: int(extract_numeric_id(s))
+                        if extract_numeric_id(s).isdigit() else float('inf'))
+    return "+".join(seg_sorted)
 
 
 def print_metrics_table(metrics_list, title, shorten_names=False):
@@ -366,6 +385,8 @@ if __name__ == "__main__":
     # -------------------------------------------------
     # Final table (all curves)
     # -------------------------------------------------
+    metrics_table.sort(key=lambda m: int(extract_numeric_id(m["Curve"]))
+                       if extract_numeric_id(m["Curve"]).isdigit() else float('inf'))
     print_metrics_table(metrics_table, "📊 FINAL METRICS TABLE (ALL CURVES):")
     
     # -------------------------------------------------
@@ -375,12 +396,15 @@ if __name__ == "__main__":
     
     for r in range(1, len(named_dfs) + 1):
         for combo in combinations(named_dfs.keys(), r):
-            combo_dfs = [named_dfs[name] for name in combo]
-            combined  = build_combined_equity(combo_dfs)
-            capital   = INITIAL_CAPITAL * len(combo_dfs)
+            # Sort combo segments numerically before joining
+            combo_sorted = tuple(sorted(combo, key=lambda s: int(extract_numeric_id(s))
+                                        if extract_numeric_id(s).isdigit() else float('inf')))
+            combo_dfs    = [named_dfs[name] for name in combo_sorted]
+            combined     = build_combined_equity(combo_dfs)
+            capital      = INITIAL_CAPITAL * len(combo_dfs)
     
             combo_results.append(
-                compute_metrics(combined, capital=capital, name="+".join(combo))
+                compute_metrics(combined, capital=capital, name="+".join(combo_sorted))
             )
     
     # =============================================================================

@@ -243,7 +243,7 @@ def detect_signals_for_strategy(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
-                    range_str=strat['range'],
+                    ranges=strat['ranges'],
                     live_trading=True
                 )
                 

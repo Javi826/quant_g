@@ -16,15 +16,24 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for full verbosity
+logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
+logging.getLogger("joblib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+
+SHOW_PLOTS = False   # Set to False to suppress all plots
+if not SHOW_PLOTS:
+    import matplotlib
+    matplotlib.use("Agg")
+
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from utils.st_tools import (
-    extract_ohlcv_from_path,
-    compile_MC_results,
-    compile_grid_results,
-    prepare_ohlcv_arrays,
-    get_n_obs,
-    save_all_trades_to_excel,
-)
+from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
+from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
+from utils.st_tools import get_n_obs, save_all_trades_to_excel
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.analysis import report_montecarlo, report_backtesting
 from utils.utils import filter_symbols, final_prints
@@ -33,30 +42,17 @@ from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time, clas
 from regime_performance import OHLC_FOLDER, MA_PERIOD, LOOKBACK_BARS
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
-from batch_utils import (
-    report_filtered_trades,
-    extract_best_params,
-    select_universe,
-    enrich_trades_with_regime,
-    update_strategies_params,
-    update_strategies_symbols,
-    load_btc_1d,
-    get_btc_direction,
-    compute_metrics,
-    print_metrics_table,
-    calc_r2_from_equity_hist,
-)
+from batch_utils import report_filtered_trades, extract_best_params, select_universe
+from batch_utils import enrich_trades_with_regime, update_strategies_params, update_strategies_symbols, load_btc_1d
+from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
+from batch_utils import print_all_curves_table, print_best_combinations
+from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
 
-logger = logging.getLogger("BOT_trading.batch.main_batch")
-
-# =============================================================================
-# SIGNAL REGISTRY
-# =============================================================================
-from signals.add_signals_parity   import parity_long, parity_short
-from signals.add_signals_reversal import reversal_long, reversal_short
-from signals.add_signals_flag     import flag_long, flag_short
+from signals.add_signals_parity      import parity_long, parity_short
+from signals.add_signals_reversal    import reversal_long, reversal_short
+from signals.add_signals_flag        import flag_long, flag_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
-from signals.add_signals_ranging  import ranging_long, ranging_short
+from signals.add_signals_ranging     import ranging_long, ranging_short
 
 SIGNAL_REGISTRY = {
     "parity_long":       {"fn": parity_long,       "params": ["lookback", "tolerance", "ma_period"]},
@@ -67,42 +63,46 @@ SIGNAL_REGISTRY = {
     "flag_short":        {"fn": flag_short,        "params": ["lookback", "impulse", "flag", "ma_period"]},
     "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
     "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
-    "ranging_long":      {"fn": ranging_long,      "params": ["lookback", "tolerance", "ma_period", "range_str"]},
-    "ranging_short":     {"fn": ranging_short,     "params": ["lookback", "tolerance", "ma_period", "range_str"]},
+    "ranging_long":      {"fn": ranging_long,      "params": ["lookback", "tolerance", "ma_period", "ranges"]},
+    "ranging_short":     {"fn": ranging_short,     "params": ["lookback", "tolerance", "ma_period", "ranges"]},
 }
 
 DTYPE = np.float32
 
+logger = logging.getLogger("BOT_batch.main_batch")
+
 # =============================================================================
-# GLOBAL CONFIGURATION — shared across all strategies
+# GLOBAL CONFIGURATION — defaults, overridden by run_batch at runtime
 # =============================================================================
 DATA_FOLDER_IS  = "data/crypto_2022_IS"
 DATA_FOLDER_OOS = "data/crypto_2026_OOS"
 N_JOBS          = -1
 MY_SYMBOLS      = False
-SHOW_PROGRESS   = False   # set to True from run_batch.py when LOG_LEVEL=DEBUG
+SHOW_PROGRESS   = False
 
 N_PATHS_IS  = 1
 N_PATHS_OOS = 20
 
-# Validation thresholds — first round
-THRESHOLD_NETGAIN_PCT = 20.0
-THRESHOLD_R2          = 0.7
-THRESHOLD_PROB_NEG    = 31.0
+# Validation thresholds — Round 1
+THRESHOLD_NETGAIN_PCT  = 20.0
+THRESHOLD_R2           = 0.7
+THRESHOLD_PROB_NEG     = 30.0
 
-# Validation thresholds — second round (regime filtered)
-THRESHOLD_R2_FILTERED    = 0.85
-THRESHOLD_PROB_NEG_MAX   = 50.0
+# Validation thresholds — Round 2 (regime filtered)
+THRESHOLD_NETGAIN_PCT_FILTERED = 20.0
+THRESHOLD_R2_FILTERED          = 0.85
+THRESHOLD_PROB_NEG_MAX         = 50.0
 
-# Regime 0 settings
 R0_MA_PERIOD = 5
 R0_LONG_TH   = 1.00
 R0_SHORT_TH  = 1.00
 
-# Paths
-CSV_PARAMS   = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
-CSV_SYMBOLS  = os.path.join(os.path.dirname(__file__), "strategies_symbols.csv")
-SYMBOLS_LIVE_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "BOT_trading", "symbols_live"))
+# Portfolio analysis flags
+RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
+RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
+
+CSV_PARAMS          = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
+SYMBOLS_LIVE_FOLDER = os.path.join(os.path.dirname(__file__), "symbols_live")
 
 # Global trade_log accumulators (populated by each run_batch call)
 _trade_logs_baseline  : list = []   # (strategy_id, trade_log_df)
@@ -479,11 +479,14 @@ def run_batch(strategy_config: dict) -> None:
         equity_filt = INITIAL_BALANCE + df_filt["profit"].cumsum().values
         r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
 
-        ok_r2_filtered  = r2_filtered       > THRESHOLD_R2_FILTERED
-        ok_prob_neg_max = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
-        approved_regime = ok_r2_filtered and ok_prob_neg_max
+        netgain_filtered    = compute_metrics(r01_filtered, capital=INITIAL_BALANCE, name="")["Net_Gain_pct"]
+        ok_netgain_filtered = netgain_filtered      > THRESHOLD_NETGAIN_PCT_FILTERED
+        ok_r2_filtered      = r2_filtered           > THRESHOLD_R2_FILTERED
+        ok_prob_neg_max     = prob_negative_oos     < THRESHOLD_PROB_NEG_MAX
+        approved_regime     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
 
         logger.debug(f"  Second Round — Regime 0+1 Filtered")
+        logger.debug(f"    Net Gain       : {netgain_filtered:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT_FILTERED}%)    {'✅' if ok_netgain_filtered else '❌'}")
         logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered  else '❌'}")
         logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max else '❌'}")
         logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
@@ -548,7 +551,7 @@ def run_batch(strategy_config: dict) -> None:
         r2=r2, prob_negative_oos=prob_negative_oos,
     )
     _symbols_result = update_strategies_symbols(
-        csv_path=CSV_SYMBOLS, strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
+        strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
         timeframe=TIMEFRAME, symbols_live_folder=SYMBOLS_LIVE_FOLDER,
     )
 
@@ -559,6 +562,7 @@ def run_batch(strategy_config: dict) -> None:
     if _validation_results:
         _validation_results[-1].update({
             "params_changed":  _params_result.get("params_changed", False)  if _params_result else False,
+            "param_changes":   _params_result.get("param_changes", [])      if _params_result else [],
             "active_prev":     _params_result.get("active_prev", None)      if _params_result else None,
             "active_new":      _params_result.get("active_new", None)       if _params_result else None,
             "symbols_changed": _symbols_result.get("symbols_changed", False) if _symbols_result else False,
@@ -608,237 +612,80 @@ def run_portfolio_analysis():
     for baseline and regime 0+1 trade_logs.
     Call this after all run_batch() calls in the orchestrator.
     """
-    from itertools import combinations
-    import pandas as _pd
+    if not RUN_PORTFOLIO_ANALYSIS:
+        return
 
     for label, trade_logs in [("Baseline", _trade_logs_baseline), ("Regime 0+1", _trade_logs_regime01)]:
         if not trade_logs:
             continue
-
         logger.debug(f"\n{'='*70}")
         logger.debug(f"  PORTFOLIO ANALYSIS — {label}")
         logger.debug(f"{'='*70}")
-
-        named_logs = {sid: df for sid, df in trade_logs}
-
-        # Individual metrics
-        metrics_list = []
-        for sid, df in named_logs.items():
-            metrics_list.append(compute_metrics(df, capital=INITIAL_BALANCE, name=sid))
-
-        # Combined portfolio
-        if len(named_logs) > 1:
-            combined_tl      = _pd.concat(list(named_logs.values()), ignore_index=True).sort_values("buy_time").reset_index(drop=True)
-            combined_capital = INITIAL_BALANCE * len(named_logs)
-            metrics_list.append(compute_metrics(combined_tl, capital=combined_capital, name="Combined"))
-
-        print_metrics_table(metrics_list, f"📊 METRICS TABLE — {label}")
+        print_portfolio_metrics_table(trade_logs, label, INITIAL_BALANCE)
 
     # Pre-compute r01_metrics once — reused in best combinations
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
                    for sid, df in _trade_logs_regime01}
 
     # =========================================================================
-    # ALL CURVES COMBINED — Baseline vs Regime 0+1
-    # =========================================================================
-    if _trade_logs_baseline:
-
-        def _print_all_curves_table(trade_logs, label):
-            named = {sid: df for sid, df in trade_logs}
-            rows  = []
-            for sid, df in named.items():
-                rows.append(compute_metrics(df, capital=INITIAL_BALANCE, name=sid))
-
-            # Combined row
-            all_tl  = _pd.concat(list(named.values()), ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-            all_cap = INITIAL_BALANCE * len(named)
-            rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
-
-            cols = ["Curve", "Volatility_pct", "Monthly_pct", "Net_Gain_pct", "Max_DD_pct", "Profit_Factor", "R_Squared", "Win_Rate"]
-            df_out = _pd.DataFrame(rows)[cols]
-            max_len = df_out["Curve"].str.len().max()
-            df_out["Curve"] = df_out["Curve"].apply(lambda x: x.ljust(max_len))
-            lines = [f"\n📊 ALL CURVES COMBINED — {label}\n", df_out.to_string(index=False)]
-            logger.info("\n".join(lines))
-
-        _print_all_curves_table(_trade_logs_baseline, "Baseline")
-
-        if _trade_logs_regime01:
-            _print_all_curves_table(_trade_logs_regime01, "Regime 0+1")
-
-    # =========================================================================
-    # BEST COMBINATIONS — Baseline (all processed strategies, no filter)
-    # =========================================================================
-    if len(_trade_logs_baseline) > 0:
-        named_bl = {sid: df for sid, df in _trade_logs_baseline}
-
-        def _num(sid):
-            for part in sid.split("_"):
-                if part.isdigit():
-                    return int(part)
-            return 0
-
-        bl_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                      for sid, df in _trade_logs_baseline}
-
-        combo_results_bl = []
-        for r in range(1, len(named_bl) + 1):
-            for combo in combinations(named_bl.keys(), r):
-                if len(combo) == 1:
-                    sid  = combo[0]
-                    nums = str(_num(sid))
-                    m    = bl_metrics.get(sid)
-                    if m:
-                        combo_results_bl.append({**m, "Curve": nums})
-                else:
-                    combo_tl = _pd.concat(
-                        [named_bl[sid] for sid in combo], ignore_index=True
-                    ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-                    capital  = INITIAL_BALANCE * len(combo)
-                    nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
-                    combo_results_bl.append(compute_metrics(combo_tl, capital=capital, name=nums))
-
-        combo_df_bl = _pd.DataFrame(combo_results_bl)
-
-        best_ng_bl    = combo_df_bl.loc[combo_df_bl["Net_Gain_pct"].idxmax()]
-        best_r2_bl    = combo_df_bl.loc[combo_df_bl["R_Squared"].idxmax()]
-        best_pf_bl_df = combo_df_bl[combo_df_bl["Profit_Factor"] != float("inf")]
-        best_pf_bl    = best_pf_bl_df.loc[best_pf_bl_df["Profit_Factor"].idxmax()] if not best_pf_bl_df.empty else best_ng_bl
-
-        rows_bl = [
-            ("💵 Net Gain",     best_ng_bl),
-            ("📈 R²",           best_r2_bl),
-            ("💰 ProfitFactor", best_pf_bl),
-        ]
-
-        lines = []
-        lines.append(f"\n{'─'*85}")
-        lines.append(f"  BEST COMBINATIONS — Baseline")
-        lines.append(f"{'─'*85}")
-        lines.append(f"  {'Metric':<16} {'Combo':<12} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
-        lines.append(f"  {'-'*81}")
-        for label, row in rows_bl:
-            pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
-            lines.append(
-                f"  {label:<16} {str(row['Curve']):<12} {row['Net_Gain_pct']:>9.2f}% "
-                f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
-            )
-        lines.append(f"  {'─'*81}")
-        logger.info("\n".join(lines))
-
-    # =========================================================================
     # STRATEGIES SUMMARY
     # =========================================================================
-    if _validation_results:
-        lines = []
-        lines.append(f"\n{'─'*92}")
-        lines.append(f"  STRATEGIES SUMMARY")
-        lines.append(f"{'─'*92}")
-        lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<10} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-        lines.append(f"  {'-'*90}")
-        for v in _validation_results:
-            lines.append(
-                f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<10} "
-                f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
-                f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
-            )
-        lines.append(f"  {'─'*90}")
-        logger.info("\n".join(lines))
+    print_strategies_summary(_validation_results)
 
     # =========================================================================
     # UPDATE STATUS TABLE
     # =========================================================================
-    if _validation_results:
-        def _params_icon(v):
-            if v["params_changed"]:
-                return "🔵 updated"
-            return "⚪ no change"
-
-        def _active_icon(v):
-            prev, new = v["active_prev"], v["active_new"]
-            if prev is None:
-                return "⚪ no change"
-            if not prev and new:
-                return "🟠 activated"
-            if prev and not new:
-                return "🔴 deprecated"
-            return "⚪ no change"
-
-        def _symbols_icon(v):
-            if v["symbols_changed"]:
-                return "🔵 updated"
-            return "⚪ no change"
-
-        lines = []
-        lines.append(f"\n{'─'*75}")
-        lines.append(f"  UPDATE STATUS")
-        lines.append(f"{'─'*75}")
-        lines.append(f"  {'Strategy':<25} {'Params':<16} {'Active':<16} {'Symbols':<16}")
-        lines.append(f"  {'-'*71}")
-        for v in _validation_results:
-            lines.append(
-                f"  {v['strategy_id']:<25} {_params_icon(v):<16} {_active_icon(v):<16} {_symbols_icon(v):<16}"
-            )
-        lines.append(f"  {'─'*71}")
-        logger.info("\n".join(lines))
+    print_update_status(_validation_results)
 
     # =========================================================================
-    # BEST COMBINATIONS — Regime 0+1
+    # ALL CURVES COMBINED — Baseline vs Regime 0+1
     # =========================================================================
-    if len(_trade_logs_regime01) > 0:
-        import pandas as _pd
-        from itertools import combinations as _combinations
+    if _trade_logs_baseline:
+        print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
 
-        named_r01 = {sid: df for sid, df in _trade_logs_regime01}
+        if _trade_logs_regime01:
+            print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
 
-        def _num(sid):
-            for part in sid.split("_"):
-                if part.isdigit():
-                    return int(part)
-            return 0
+    # =========================================================================
+    # ALL CURVES COMBINED — Validated only
+    # =========================================================================
+    validated_ids = {v["strategy_id"] for v in _validation_results if v["verdict"] == "🟢 VALIDATED"}
 
-        combo_results = []
-        for r in range(1, len(named_r01) + 1):
-            for combo in _combinations(named_r01.keys(), r):
-                if len(combo) == 1:
-                    # Reuse pre-computed metrics — no recalculation
-                    sid  = combo[0]
-                    nums = str(_num(sid))
-                    m    = r01_metrics.get(sid)
-                    if m:
-                        combo_results.append({**m, "Curve": nums})
-                else:
-                    combo_tl = _pd.concat(
-                        [named_r01[sid] for sid in combo], ignore_index=True
-                    ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-                    capital  = INITIAL_BALANCE * len(combo)
-                    nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
-                    combo_results.append(compute_metrics(combo_tl, capital=capital, name=nums))
+    validated_baseline = [(sid, df) for sid, df in _trade_logs_baseline if sid in validated_ids]
+    validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 
-        combo_df = _pd.DataFrame(combo_results)
+    if validated_baseline:
+        print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
+    if validated_regime01:
+        print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
 
-        best_ng    = combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
-        best_r2    = combo_df.loc[combo_df["R_Squared"].idxmax()]
-        best_pf_df = combo_df[combo_df["Profit_Factor"] != float("inf")]
-        best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
+    # =========================================================================
+    # BEST COMBINATIONS
+    # =========================================================================
+    if RUN_BEST_COMBINATIONS:
+        if len(_trade_logs_baseline) > 0:
+            print_best_combinations(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
 
-        rows = [
-            ("💵 Net Gain",     best_ng),
-            ("📈 R²",           best_r2),
-            ("💰 ProfitFactor", best_pf),
-        ]
+        if len(_trade_logs_regime01) > 0:
+            print_best_combinations(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
 
-        lines = []
-        lines.append(f"\n{'─'*85}")
-        lines.append(f"  BEST COMBINATIONS — Regime 0+1")
-        lines.append(f"{'─'*85}")
-        lines.append(f"  {'Metric':<16} {'Combo':<12} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
-        lines.append(f"  {'-'*81}")
-        for label, row in rows:
-            pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
-            lines.append(
-                f"  {label:<16} {str(row['Curve']):<12} {row['Net_Gain_pct']:>9.2f}% "
-                f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
-            )
-        lines.append(f"  {'─'*81}")
-        logger.info("\n".join(lines))
+
+# =============================================================================
+# MAIN
+# =============================================================================
+if __name__ == "__main__":
+    from strategies_config import STRATEGIES
+
+    start  = time.time()
+    logger = logging.getLogger("BOT_batch.main_batch")
+
+    for strategy in STRATEGIES:
+        logger.info(f"\n\033[94m{'='*100}\033[0m")
+        logger.info(f"\033[94m  Running: {strategy['strategy_id']}\033[0m")
+        logger.info(f"\033[94m{'='*100}\033[0m")
+        run_batch(strategy)
+
+    run_portfolio_analysis()
+
+    elapsed = int(time.time() - start)
+    logger.info(f"\n🏁 TOTAL — {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

@@ -223,7 +223,7 @@ STRATEGIES = [
         'order_amount': 200,
         'lookback': 10,
         'tolerance': 5,
-        'range': 25,
+        'ranges': 25,
         'tp_pct': 4,
         'sl_pct': 6
     },

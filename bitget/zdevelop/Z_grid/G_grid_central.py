@@ -42,8 +42,8 @@ SIGNAL_REGISTRY = {
     "orderblocks_short": {"fn": orderblocks_short,  "params": ["lookback", "tolerance", "impulse"]},
     "parity_long":       {"fn": parity_long,        "params": ["lookback", "tolerance", "ma_period"]},
     "parity_short":      {"fn": parity_short,       "params": ["lookback", "tolerance", "ma_period"]},
-    "ranging_long":      {"fn": ranging_long,       "params": ["lookback", "tolerance", "ma_period", "range_str"]},
-    "ranging_short":     {"fn": ranging_short,      "params": ["lookback", "tolerance", "ma_period", "range_str"]},
+    "ranging_long":      {"fn": ranging_long,       "params": ["lookback", "tolerance", "ma_period", "ranges"]},
+    "ranging_short":     {"fn": ranging_short,      "params": ["lookback", "tolerance", "ma_period", "ranges"]},
     "reversal_long":     {"fn": reversal_long,      "params": ["lookback", "tolerance", "ma_period"]},
     "reversal_short":    {"fn": reversal_short,     "params": ["lookback", "tolerance", "ma_period"]},
 }
@@ -197,7 +197,7 @@ STRATEGIES = [
         "lookback":  [10],
         "ma_period": [25],
         "tolerance": [5],
-        "range_str": [25],
+        "ranges": [25],
     },
     {
         "id":        "17",

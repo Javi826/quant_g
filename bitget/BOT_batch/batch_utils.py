@@ -37,7 +37,7 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
     sharpe        = (df["profit"].mean() / df["profit"].std() * np.sqrt(252)) if df["profit"].std() > 0 else np.nan
 
     # --- Summary table ---
-    _param_cols = [c for c in ["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct","impulse","range_str"] if c in trade_log.columns]
+    _param_cols = [c for c in ["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct","impulse","ranges"] if c in trade_log.columns]
     df_summary = pd.DataFrame([{
         "Metric": "Net_Gain_pct",
         **{k.upper(): v for k, v in trade_log[_param_cols].iloc[0].items()},
@@ -200,7 +200,7 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
         except (TypeError, ValueError):
             return None
 
-    _no_change = {"params_changed": False, "active_prev": None, "active_new": None}
+    _no_change = {"params_changed": False, "param_changes": [], "active_prev": None, "active_new": None}
 
     if not os.path.exists(csv_path):
         logger.warning(f"⚠️  strategies_params.csv not found at {csv_path} — skipping update.")
@@ -218,6 +218,7 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
 
     # Detect param changes
     params_changed = False
+    param_changes  = []
     logger.debug(f"ID : {strategy_id}")
     logger.debug(f"  {'Parameter':<20} {'Previous':>12} {'New':>12} {'Changed':>10}")
     logger.debug(f"  {'-'*56}")
@@ -229,6 +230,7 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
         changed  = "⚠️  YES" if prev_val != new_val else "✅"
         if prev_val != new_val:
             params_changed = True
+            param_changes.append(f"{k}: {prev_val}→{new_val}")
         logger.debug(f"  {k:<20} {str(prev_val):>12} {str(new_val):>12} {changed:>10}")
 
     logger.debug(f"  {'Metric':<20} {'Previous':>12} {'New':>12}")
@@ -249,24 +251,28 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
     df_params.at[idx, "last_run"]       = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
 
     if validated:
-        # Update production params only if validated
-        for k in param_keys:
-            if k in df_params.columns:
-                df_params.at[idx, k] = best_params.get(k.upper())
-        df_params.at[idx, "active"] = True
+        # Update production params only if validated and changed
         if params_changed:
+            for k in param_keys:
+                if k in df_params.columns:
+                    df_params.at[idx, k] = best_params.get(k.upper())
+            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
             logger.info(f"🔵 strategies_params.csv — params updated for '{strategy_id}'")
+        df_params.at[idx, "active"] = True
         if not prev_active:
+            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
             logger.info(f"🟠 strategies_params.csv — activated '{strategy_id}'")
     else:
         df_params.at[idx, "active"] = False
         if prev_active:
+            df_params.at[idx, "last_change"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
             logger.info(f"🔴 strategies_params.csv — deprecated '{strategy_id}'")
 
     df_params.to_csv(csv_path, index=False)
 
     return {
         "params_changed": params_changed and validated,
+        "param_changes":  param_changes if validated else [],
         "active_prev":    prev_active,
         "active_new":     new_active,
     }
@@ -275,41 +281,29 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
 # =============================================================================
 # HELPER — UPDATE STRATEGIES SYMBOLS CSV
 # =============================================================================
-def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final, timeframe=None, symbols_live_folder=None):
-    symbols_str = str(symbols_oos_final)
+def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, symbols_live_folder=None):
+    symbols_changed = False
 
-    if not os.path.exists(csv_path):
-        df_symbols = pd.DataFrame(columns=["id", "symbols"])
-        symbols_changed = True
-    else:
-        df_symbols = pd.read_csv(csv_path)
-        mask_sym = df_symbols["id"] == strategy_id
-        prev_symbols_str = df_symbols.loc[mask_sym, "symbols"].values[0] if mask_sym.any() else None
-        symbols_changed = prev_symbols_str != symbols_str
-
-    mask_sym = df_symbols["id"] == strategy_id
-    if mask_sym.any():
-        df_symbols.loc[df_symbols["id"] == strategy_id, "symbols"] = symbols_str
-    else:
-        df_symbols = pd.concat([
-            df_symbols,
-            pd.DataFrame([{"id": strategy_id, "symbols": symbols_str}])
-        ], ignore_index=True)
-
-    df_symbols.to_csv(csv_path, index=False)
-
-    # Generate symbols_live file
     if timeframe and symbols_live_folder:
         os.makedirs(symbols_live_folder, exist_ok=True)
         live_filename = f"symbols_live_{strategy_id}_{timeframe}.csv"
         live_path     = os.path.join(symbols_live_folder, live_filename)
+
+        # Detect changes by comparing with existing file
+        if os.path.exists(live_path):
+            prev_symbols = pd.read_csv(live_path, header=None)[0].tolist()
+            symbols_changed = prev_symbols != list(symbols_oos_final)
+        else:
+            symbols_changed = True
+
         pd.DataFrame(symbols_oos_final).to_csv(live_path, index=False, header=False)
         logger.debug(f"symbols_live saved → {live_path}")
 
     if symbols_changed:
-        logger.info(f"🔵 strategies_symbols.csv — symbols updated for '{strategy_id}'")
+        logger.info(f"🔵 symbols_live — symbols updated for '{strategy_id}'")
     else:
-        logger.debug(f"⚪ strategies_symbols.csv — symbols unchanged for '{strategy_id}'")
+        logger.debug(f"⚪ symbols_live — symbols unchanged for '{strategy_id}'")
+
     return {"symbols_changed": symbols_changed}
 
 
@@ -443,6 +437,93 @@ def print_metrics_table(metrics_list, title, shorten_names=False, use_info=False
         logger.info(msg)
     else:
         logger.debug(msg)
+
+
+# =============================================================================
+# HELPER — PRINT STRATEGIES SUMMARY
+# =============================================================================
+def print_strategies_summary(validation_results):
+    """Print validation summary table for all strategies."""
+    if not validation_results:
+        return
+    lines = []
+    lines.append(f"\n{'─'*92}")
+    lines.append(f"  STRATEGIES SUMMARY")
+    lines.append(f"{'─'*92}")
+    lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<10} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
+    lines.append(f"  {'-'*90}")
+    for v in validation_results:
+        lines.append(
+            f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<10} "
+            f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
+            f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
+        )
+    lines.append(f"  {'─'*90}")
+    logging.getLogger("BOT_batch.main_batch").info("\n".join(lines))
+
+
+# =============================================================================
+# HELPER — PRINT UPDATE STATUS
+# =============================================================================
+def print_update_status(validation_results):
+    """Print update status table for all strategies."""
+    if not validation_results:
+        return
+
+    def _params_icon(v):
+        return "🔵 updated" if v["params_changed"] else "⚪ no change"
+
+    def _active_icon(v):
+        prev, new = v["active_prev"], v["active_new"]
+        if prev is None:
+            return "⚪ no change"
+        if not prev and new:
+            return "🟠 activated"
+        if prev and not new:
+            return "🔴 deprecated"
+        return "⚪ no change"
+
+    def _symbols_icon(v):
+        return "🔵 updated" if v["symbols_changed"] else "⚪ no change"
+
+    def _changes_detail(v):
+        parts = []
+        prev, new = v["active_prev"], v["active_new"]
+        if prev is not None and prev != new:
+            parts.append(f"active: {prev}→{new}")
+        parts.extend(v.get("param_changes", []))
+        return " | ".join(parts) if parts else "—"
+
+    lines = []
+    lines.append(f"\n{'─'*110}")
+    lines.append(f"  UPDATE STATUS")
+    lines.append(f"{'─'*110}")
+    lines.append(f"  {'Strategy':<25} {'Params':<16} {'Active':<16} {'Symbols':<16} {'Changes':<30}")
+    lines.append(f"  {'-'*106}")
+    for v in validation_results:
+        lines.append(
+            f"  {v['strategy_id']:<25} {_params_icon(v):<16} {_active_icon(v):<16} {_symbols_icon(v):<16} {_changes_detail(v):<30}"
+        )
+    lines.append(f"  {'─'*106}")
+    logging.getLogger("BOT_batch.main_batch").info("\n".join(lines))
+
+
+# =============================================================================
+# HELPER — PRINT PORTFOLIO METRICS TABLE
+# =============================================================================
+def print_portfolio_metrics_table(trade_logs, label, initial_balance):
+    """Print individual + combined metrics table for a list of trade_logs."""
+    named_logs = {sid: df for sid, df in trade_logs}
+    metrics_list = []
+    for sid, df in named_logs.items():
+        metrics_list.append(compute_metrics(df, capital=initial_balance, name=sid))
+    if len(named_logs) > 1:
+        combined_tl      = pd.concat(list(named_logs.values()), ignore_index=True).sort_values("buy_time").reset_index(drop=True)
+        combined_capital = initial_balance * len(named_logs)
+        metrics_list.append(compute_metrics(combined_tl, capital=combined_capital, name="Combined"))
+    print_metrics_table(metrics_list, f"📊 METRICS TABLE — {label}")
+
+
 # =============================================================================
 # HELPER — CALC R2 FROM EQUITY HISTORY
 # =============================================================================
@@ -456,3 +537,98 @@ def calc_r2_from_equity_hist(equity_hist):
     y = np.array(equity_hist["balance"]).reshape(-1, 1)
     X = np.arange(len(y)).reshape(-1, 1)
     return round(LinearRegression().fit(X, y).score(X, y), 3)
+
+
+# =============================================================================
+# HELPER — PRINT ALL CURVES TABLE
+# =============================================================================
+def print_all_curves_table(trade_logs, label, initial_balance):
+    """
+    Print a metrics table for all curves plus a combined row.
+    trade_logs: list of (strategy_id, trade_log_df)
+    """
+    from itertools import combinations as _combinations
+
+    named = {sid: df for sid, df in trade_logs}
+    rows  = []
+    for sid, df in named.items():
+        rows.append(compute_metrics(df, capital=initial_balance, name=sid))
+
+    all_tl  = pd.concat(list(named.values()), ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+    all_cap = initial_balance * len(named)
+    rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
+
+    cols   = ["Curve", "Volatility_pct", "Monthly_pct", "Net_Gain_pct", "Max_DD_pct", "Profit_Factor", "R_Squared", "Win_Rate"]
+    df_out = pd.DataFrame(rows)[cols]
+    max_len = df_out["Curve"].str.len().max()
+    df_out["Curve"] = df_out["Curve"].apply(lambda x: x.ljust(max_len))
+    lines = [f"\n📊 ALL CURVES COMBINED — {label}\n", df_out.to_string(index=False)]
+    logger.info("\n".join(lines))
+
+
+# =============================================================================
+# HELPER — PRINT BEST COMBINATIONS
+# =============================================================================
+def print_best_combinations(trade_logs, label, initial_balance, precomputed_metrics=None):
+    """
+    Compute and print best strategy combinations by Net Gain, R² and Profit Factor.
+    trade_logs         : list of (strategy_id, trade_log_df)
+    precomputed_metrics: optional dict {strategy_id: metrics} to avoid recalculation
+    """
+    from itertools import combinations as _combinations
+
+    def _num(sid):
+        for part in sid.split("_"):
+            if part.isdigit():
+                return int(part)
+        return 0
+
+    named   = {sid: df for sid, df in trade_logs}
+    metrics = precomputed_metrics or {
+        sid: compute_metrics(df, capital=initial_balance, name=sid)
+        for sid, df in named.items()
+    }
+
+    combo_results = []
+    for r in range(1, len(named) + 1):
+        for combo in _combinations(named.keys(), r):
+            if len(combo) == 1:
+                sid  = combo[0]
+                m    = metrics.get(sid)
+                if m:
+                    combo_results.append({**m, "Curve": str(_num(sid))})
+            else:
+                combo_tl = pd.concat(
+                    [named[sid] for sid in combo], ignore_index=True
+                ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+                capital  = initial_balance * len(combo)
+                nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
+                combo_results.append(compute_metrics(combo_tl, capital=capital, name=nums))
+
+    combo_df = pd.DataFrame(combo_results)
+
+    best_ng    = combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
+    best_r2    = combo_df.loc[combo_df["R_Squared"].idxmax()]
+    best_pf_df = combo_df[combo_df["Profit_Factor"] != float("inf")]
+    best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
+
+    rows = [
+        ("💵 Net Gain",     best_ng),
+        ("📈 R²",           best_r2),
+        ("💰 ProfitFactor", best_pf),
+    ]
+
+    lines = []
+    lines.append(f"\n{'─'*93}")
+    lines.append(f"  BEST COMBINATIONS — {label}")
+    lines.append(f"{'─'*93}")
+    lines.append(f"  {'Metric':<16} {'Combo':<20} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
+    lines.append(f"  {'-'*89}")
+    for lbl, row in rows:
+        pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
+        lines.append(
+            f"  {lbl:<16} {str(row['Curve']):<20} {row['Net_Gain_pct']:>9.2f}% "
+            f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
+        )
+    lines.append(f"  {'─'*89}")
+    logger.info("\n".join(lines))

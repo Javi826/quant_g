@@ -135,8 +135,8 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
     'parity_short': ['lookback', 'tolerance', 'ma_period'],
     'orderblocks_long': ['lookback', 'tolerance', 'impulse'],
     'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'ranging_long': ['lookback', 'tolerance', 'range'],
-    'ranging_short': ['lookback', 'tolerance', 'range'],
+    'ranging_long': ['lookback', 'tolerance', 'ranges'],
+    'ranging_short': ['lookback', 'tolerance', 'ranges'],
     'flag_long': ['lookback', 'impulse', 'flag', 'ma_period'],
     'flag_short': ['lookback', 'impulse', 'flag', 'ma_period'],
 }
