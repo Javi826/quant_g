@@ -275,7 +275,7 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
 # =============================================================================
 # HELPER — UPDATE STRATEGIES SYMBOLS CSV
 # =============================================================================
-def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final):
+def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final, timeframe=None, symbols_live_folder=None):
     symbols_str = str(symbols_oos_final)
 
     if not os.path.exists(csv_path):
@@ -297,6 +297,15 @@ def update_strategies_symbols(csv_path, strategy_id, symbols_oos_final):
         ], ignore_index=True)
 
     df_symbols.to_csv(csv_path, index=False)
+
+    # Generate symbols_live file
+    if timeframe and symbols_live_folder:
+        os.makedirs(symbols_live_folder, exist_ok=True)
+        live_filename = f"symbols_live_{strategy_id}_{timeframe}.csv"
+        live_path     = os.path.join(symbols_live_folder, live_filename)
+        pd.DataFrame(symbols_oos_final).to_csv(live_path, index=False, header=False)
+        logger.debug(f"symbols_live saved → {live_path}")
+
     if symbols_changed:
         logger.info(f"🔵 strategies_symbols.csv — symbols updated for '{strategy_id}'")
     else:
@@ -362,49 +371,43 @@ def resample_equity(df_indexed):
 def compute_metrics(trade_log, capital, name="Equity"):
     from sklearn.linear_model import LinearRegression as _LR
 
-    tl      = trade_log.sort_values("buy_time").reset_index(drop=True)
+    tl      = trade_log.sort_values("sell_time").reset_index(drop=True)
     profits = tl["profit"].values
 
-    # Win rate — computed on trade level (not affected by resampling)
+    # Win rate — trade level
     win_rate = round((profits > 0).mean() * 100, 1)
 
-    # --- Build daily equity curve (aligned with compose_equities) ---
-    tl["_date"] = pd.to_datetime(tl["buy_time"]).dt.normalize()
+    # Profit factor — trade level (standard definition)
+    gains  = profits[profits > 0].sum()
+    losses = -profits[profits < 0].sum()
+    pf     = round(float(gains / losses), 3) if losses > 0 else np.inf
+
+    # Daily equity curve
+    tl["_date"]  = pd.to_datetime(tl["sell_time"]).dt.normalize()
     daily_profit = tl.groupby("_date")["profit"].sum()
 
-    date_range = pd.date_range(start=daily_profit.index.min(),
-                               end=daily_profit.index.max(),
-                               freq="1D")
+    date_range   = pd.date_range(start=daily_profit.index.min(),
+                                 end=daily_profit.index.max(),
+                                 freq="1D")
     daily_profit = daily_profit.reindex(date_range, fill_value=0.0)
-    eq_daily     = capital + daily_profit.cumsum().values
+    eq           = capital + daily_profit.cumsum().values
+    eq_series    = pd.Series(eq, index=date_range)
 
-    # Forward-fill to match compose_equities resample_equity behaviour
-    eq_series = pd.Series(eq_daily, index=date_range)
-    eq_series = eq_series.ffill()
-    eq        = eq_series.values
-
-    # --- Metrics on daily curve ---
+    # Drawdown & net gain
     cm       = np.maximum.accumulate(eq)
     max_dd   = ((eq - cm) / cm * 100).min()
     net_gain = (eq[-1] - capital) / capital * 100
 
-    # Profit factor on daily returns (aligned with compose_equities)
+    # Volatility & monthly consistency — daily returns
     daily_returns = eq_series.pct_change().dropna()
-    gains  = daily_returns[daily_returns > 0].sum()
-    losses = -daily_returns[daily_returns < 0].sum()
-    pf     = round(gains / losses, 3) if losses > 0 else np.inf
+    volatility    = daily_returns.std() * 100
+    monthly       = eq_series.resample("ME").last().pct_change().dropna()
+    consistency   = (monthly > 0).mean() * 100
 
-    # R² on daily curve
+    # R²
     X  = np.arange(len(eq)).reshape(-1, 1)
     y  = eq.reshape(-1, 1)
     r2 = round(_LR().fit(X, y).score(X, y), 3)
-
-    # Volatility on daily returns
-    volatility = daily_returns.std() * 100
-
-    # Monthly consistency on daily curve
-    monthly = eq_series.resample("ME").last().pct_change().dropna()
-    consistency = (monthly > 0).mean() * 100
 
     return {
         "Curve":          name,
@@ -418,7 +421,7 @@ def compute_metrics(trade_log, capital, name="Equity"):
     }
 
 
-def print_metrics_table(metrics_list, title, shorten_names=False):
+def print_metrics_table(metrics_list, title, shorten_names=False, use_info=False):
     def _shorten(name):
         segments = name.strip().split("+")
         result = []
@@ -435,7 +438,11 @@ def print_metrics_table(metrics_list, title, shorten_names=False):
         df['Curve'] = df['Curve'].apply(_shorten)
     max_len = df['Curve'].str.len().max()
     df['Curve'] = df['Curve'].apply(lambda x: x.ljust(max_len))
-    logger.debug(f"\n{title}\n{df.to_string(index=False)}")
+    msg = f"\n{title}\n{df.to_string(index=False)}"
+    if use_info:
+        logger.info(msg)
+    else:
+        logger.debug(msg)
 # =============================================================================
 # HELPER — CALC R2 FROM EQUITY HISTORY
 # =============================================================================

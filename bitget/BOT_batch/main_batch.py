@@ -82,8 +82,8 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False   # set to True from run_batch.py when LOG_LEVEL=DEBUG
 
-N_PATHS_IS  = 20
-N_PATHS_OOS = 200
+N_PATHS_IS  = 1
+N_PATHS_OOS = 20
 
 # Validation thresholds — first round
 THRESHOLD_NETGAIN_PCT = 20.0
@@ -92,7 +92,7 @@ THRESHOLD_PROB_NEG    = 31.0
 
 # Validation thresholds — second round (regime filtered)
 THRESHOLD_R2_FILTERED    = 0.85
-THRESHOLD_PROB_NEG_MAX   = 45.0
+THRESHOLD_PROB_NEG_MAX   = 50.0
 
 # Regime 0 settings
 R0_MA_PERIOD = 5
@@ -100,8 +100,9 @@ R0_LONG_TH   = 1.00
 R0_SHORT_TH  = 1.00
 
 # Paths
-CSV_PARAMS  = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
-CSV_SYMBOLS = os.path.join(os.path.dirname(__file__), "strategies_symbols.csv")
+CSV_PARAMS   = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
+CSV_SYMBOLS  = os.path.join(os.path.dirname(__file__), "strategies_symbols.csv")
+SYMBOLS_LIVE_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "BOT_trading", "symbols_live"))
 
 # Global trade_log accumulators (populated by each run_batch call)
 _trade_logs_baseline  : list = []   # (strategy_id, trade_log_df)
@@ -173,7 +174,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -548,6 +549,7 @@ def run_batch(strategy_config: dict) -> None:
     )
     _symbols_result = update_strategies_symbols(
         csv_path=CSV_SYMBOLS, strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
+        timeframe=TIMEFRAME, symbols_live_folder=SYMBOLS_LIVE_FOLDER,
     )
 
     elapsed = int(time.time() - start_time)
@@ -635,6 +637,34 @@ def run_portfolio_analysis():
     # Pre-compute r01_metrics once — reused in best combinations
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
                    for sid, df in _trade_logs_regime01}
+
+    # =========================================================================
+    # ALL CURVES COMBINED — Baseline vs Regime 0+1
+    # =========================================================================
+    if _trade_logs_baseline:
+
+        def _print_all_curves_table(trade_logs, label):
+            named = {sid: df for sid, df in trade_logs}
+            rows  = []
+            for sid, df in named.items():
+                rows.append(compute_metrics(df, capital=INITIAL_BALANCE, name=sid))
+
+            # Combined row
+            all_tl  = _pd.concat(list(named.values()), ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+            all_cap = INITIAL_BALANCE * len(named)
+            rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
+
+            cols = ["Curve", "Volatility_pct", "Monthly_pct", "Net_Gain_pct", "Max_DD_pct", "Profit_Factor", "R_Squared", "Win_Rate"]
+            df_out = _pd.DataFrame(rows)[cols]
+            max_len = df_out["Curve"].str.len().max()
+            df_out["Curve"] = df_out["Curve"].apply(lambda x: x.ljust(max_len))
+            lines = [f"\n📊 ALL CURVES COMBINED — {label}\n", df_out.to_string(index=False)]
+            logger.info("\n".join(lines))
+
+        _print_all_curves_table(_trade_logs_baseline, "Baseline")
+
+        if _trade_logs_regime01:
+            _print_all_curves_table(_trade_logs_regime01, "Regime 0+1")
 
     # =========================================================================
     # BEST COMBINATIONS — Baseline (all processed strategies, no filter)
