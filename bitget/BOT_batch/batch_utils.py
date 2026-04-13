@@ -1,23 +1,9 @@
-#BOT_batch/batch_utils.py
 import logging
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-
-# =============================================================================
-# LOGGING CONFIGURATION
-# =============================================================================
-LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for full verbosity
-logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
-logging.getLogger("joblib").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
-logging.getLogger("PIL").setLevel(logging.WARNING)
-SHOW_PLOTS = False   # Set to False to suppress all plots
-if not SHOW_PLOTS:
-    import matplotlib
-    matplotlib.use("Agg")
 
 logger = logging.getLogger("BOT_batch.batch_utils")
 
@@ -218,7 +204,7 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
     fix_str = "FIX=True" if fix_symbols_mcis else "FIX=False"
-    logger.info(f"STAGE 0  ── Universe Selection         ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
+    logger.info(f"STAGE 0  ── Universe Selection     ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
 
     if fix_symbols_mcis:
         if len(symbols_is_final) < n_symbols_mcis:
@@ -369,7 +355,6 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
                 if k in df_params.columns:
                     df_params.at[idx, k] = best_params.get(k.upper())
             df_params.at[idx, "last_change_params"] = " | ".join(param_changes)
-            logger.info(f"🔵 strategies_params.csv — params updated for '{strategy_id}'")
 
         # Regime
         for col, new_flag in new_regime_flags.items():
@@ -504,6 +489,7 @@ def compute_metrics(trade_log, capital, name="Equity"):
     cm       = np.maximum.accumulate(eq)
     max_dd   = ((eq - cm) / cm * 100).min()
     net_gain = (eq[-1] - capital) / capital * 100
+    profit_abs = round(float(eq[-1] - capital), 2)
 
     daily_returns = eq_series.pct_change().dropna()
     volatility    = daily_returns.std() * 100
@@ -521,6 +507,7 @@ def compute_metrics(trade_log, capital, name="Equity"):
         "Net_Gain_pct":   round(float(net_gain), 2),
         "Max_DD_pct":     round(float(max_dd), 2),
         "Profit_Factor":  pf,
+        "Profit_abs":     profit_abs,
         "R_Squared":      r2,
         "Win_Rate":       win_rate,
     }
@@ -728,10 +715,20 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     all_cap = initial_balance * len(named)
     rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
 
-    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Volatility_pct", "Monthly_pct"]
-    df_out = pd.DataFrame(rows)[cols]
+    df_out = pd.DataFrame(rows)
+
+    # Compute Profit_pctT excluding the Combined row
+    strategy_rows  = df_out[df_out["Curve"].str.strip() != "── Combined"]
+    total_profit   = strategy_rows["Profit_abs"].sum()
+    df_out["Profit_pctT"] = df_out["Profit_abs"].apply(
+        lambda x: round(x / total_profit * 100, 1) if total_profit != 0 else np.nan
+    )
+
+    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Volatility_pct", "Monthly_pct"]
+    df_out = df_out[cols].copy()
     max_len = df_out["Curve"].str.len().max()
-    df_out["Curve"] = df_out["Curve"].apply(lambda x: x.ljust(max_len))
+    df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
+    df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     lines = [f"\n📊 ALL CURVES COMBINED — {label}\n", df_out.to_string(index=False)]
     logger.info("\n".join(lines))
 

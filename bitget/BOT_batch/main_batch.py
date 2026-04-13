@@ -1,4 +1,3 @@
-#BOT_batch/main_batch.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -20,8 +19,17 @@ from joblib import Parallel, delayed
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
-LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for full verbosity
+LOG_LEVEL  = logging.INFO   # Change to logging.DEBUG for full verbosity
+SHOW_PLOTS = True           # Set to True to enable matplotlib plots
+
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
+logging.getLogger("joblib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+
+if not SHOW_PLOTS:
+    import matplotlib
+    matplotlib.use("Agg")
 
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
@@ -78,18 +86,18 @@ N_PATHS_IS  = 1
 N_PATHS_OOS = 20
 
 # Validation thresholds — Round 1
-THRESHOLD_NETGAIN_PCT  = 20.0
-THRESHOLD_R2           = 0.7
-THRESHOLD_PROB_NEG     = 31.0
+R1_NETGAIN_ROUND1    = 20.0
+R1_RSQUARED_ROUND1   = 0.7
+R1_PROBNEG_ROUND1    = 31.0
 
-# Validation thresholds — Round 2 (regime filtered)
-THRESHOLD_NETGAIN_PCT_FILTERED = 20.0
-THRESHOLD_R2_FILTERED          = 0.85
-THRESHOLD_PROB_NEG_MAX         = 41.0
+# Validation thresholds — Round 2 path A (regime filtered)
+R2A_NETGAIN_ROUND2   = 20.0
+R2A_RSQUARED_ROUND2  = 0.9
+R2A_PROBNEG_ROUND1   = 100.0
 
-# Validation thresholds — Round 2 path B (high netgain)
-THRESHOLD_NETGAIN_HIGH         = 80.0
-THRESHOLD_PROB_NEG_STRICT      = 20.0
+# Validation thresholds — Round 2 path B (high netgain OOS)
+R2B_NETGAIN_ROUND1   = 80.0
+R2B_PROBNEG_ROUND1   = 20.0
 
 R0_MA_PERIOD = 5
 R0_LONG_TH   = 1.00
@@ -180,7 +188,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1  ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -466,9 +474,9 @@ def run_batch(strategy_config: dict) -> None:
     path_grouped_oos["Net_Gain_pct"] = (path_grouped_oos["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
     prob_negative_oos = (path_grouped_oos["Net_Gain_pct"] < 0).mean() * 100
 
-    ok_netgain  = bt_netgain_pct    > THRESHOLD_NETGAIN_PCT
-    ok_r2       = r2                > THRESHOLD_R2
-    ok_prob_neg = prob_negative_oos < THRESHOLD_PROB_NEG
+    ok_netgain  = bt_netgain_pct    > R1_NETGAIN_ROUND1
+    ok_r2       = r2                > R1_RSQUARED_ROUND1
+    ok_prob_neg = prob_negative_oos < R1_PROBNEG_ROUND1
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     verdict = "🟢 VALIDATED" if approved else "🔴 REJECTED"
@@ -476,10 +484,10 @@ def run_batch(strategy_config: dict) -> None:
     logger.info(f"STAGE 7  ── Validation             ── {'🔴' if not approved else '🟢'} {_v1} NetGain={bt_netgain_pct:.2f}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     logger.debug(f"  Backtest OOS")
-    logger.debug(f"    Net_Gain_pct : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT}%)   {'✅' if ok_netgain  else '❌'}")
-    logger.debug(f"    R2           : {r2:>7.3f}    (threshold > {THRESHOLD_R2})     {'✅' if ok_r2       else '❌'}")
+    logger.debug(f"    Net_Gain_pct : {bt_netgain_pct:>7.2f}%   (threshold > {R1_NETGAIN_ROUND1}%)   {'✅' if ok_netgain  else '❌'}")
+    logger.debug(f"    R2           : {r2:>7.3f}    (threshold > {R1_RSQUARED_ROUND1})     {'✅' if ok_r2       else '❌'}")
     logger.debug(f"  Monte Carlo OOS")
-    logger.debug(f"    Prob Negative: {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG}%)  {'✅' if ok_prob_neg else '❌'}")
+    logger.debug(f"    Prob Negative: {prob_negative_oos:>7.2f}%   (threshold < {R1_PROBNEG_ROUND1}%)  {'✅' if ok_prob_neg else '❌'}")
     logger.debug(f"{'🟢 STRATEGY APPROVED' if approved else '🔴 STRATEGY REJECTED — checking regime filter...'} | {STRATEGY_ID}")
 
     approved_regime = False
@@ -497,25 +505,25 @@ def run_batch(strategy_config: dict) -> None:
 
         netgain_filtered    = compute_metrics(r01_filtered, capital=INITIAL_BALANCE, name="")["Net_Gain_pct"]
 
-        ok_netgain_filtered = netgain_filtered  > THRESHOLD_NETGAIN_PCT_FILTERED
-        ok_r2_filtered      = r2_filtered       > THRESHOLD_R2_FILTERED
-        ok_prob_neg_max     = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
+        ok_netgain_filtered = netgain_filtered  > R2A_NETGAIN_ROUND2
+        ok_r2_filtered      = r2_filtered       > R2A_RSQUARED_ROUND2
+        ok_prob_neg_max     = prob_negative_oos < R2A_PROBNEG_ROUND1
         approved_path_a     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
 
-        ok_netgain_high    = bt_netgain_pct     > THRESHOLD_NETGAIN_HIGH
-        ok_prob_neg_strict = prob_negative_oos  < THRESHOLD_PROB_NEG_STRICT
+        ok_netgain_high    = bt_netgain_pct     > R2B_NETGAIN_ROUND1
+        ok_prob_neg_strict = prob_negative_oos  < R2B_PROBNEG_ROUND1
         approved_path_b    = ok_netgain_high and ok_prob_neg_strict
 
         approved_regime = approved_path_a or approved_path_b
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
 
         logger.debug(f"  Second Round — Path A (regime filtered)")
-        logger.debug(f"    Net Gain       : {netgain_filtered:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT_FILTERED}%)    {'✅' if ok_netgain_filtered else '❌'}")
-        logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {THRESHOLD_R2_FILTERED})      {'✅' if ok_r2_filtered  else '❌'}")
-        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_MAX}%)   {'✅' if ok_prob_neg_max else '❌'}")
+        logger.debug(f"    Net Gain       : {netgain_filtered:>7.2f}%   (threshold > {R2A_NETGAIN_ROUND2}%)    {'✅' if ok_netgain_filtered else '❌'}")
+        logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {R2A_RSQUARED_ROUND2})      {'✅' if ok_r2_filtered  else '❌'}")
+        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {R2A_PROBNEG_ROUND1}%)   {'✅' if ok_prob_neg_max else '❌'}")
         logger.debug(f"  Second Round — Path B (high netgain)")
-        logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_HIGH}%)    {'✅' if ok_netgain_high    else '❌'}")
-        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_STRICT}%)   {'✅' if ok_prob_neg_strict else '❌'}")
+        logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {R2B_NETGAIN_ROUND1}%)    {'✅' if ok_netgain_high    else '❌'}")
+        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {R2B_PROBNEG_ROUND1}%)   {'✅' if ok_prob_neg_strict else '❌'}")
         path_str       = f" ({round_path})" if approved_regime else ""
         verdict_r2     = f"{'🟢 VALIDATED' if approved_regime else '🔴 REJECTED'}{path_str}"
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
@@ -609,7 +617,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.info(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"STAGE 9  ── Done                   ── 🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+    logger.info(f"DONE     ──  🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
     # Backfill update info into last validation result
     if _validation_results:
@@ -757,9 +765,9 @@ if __name__ == "__main__":
     logger.info(f"  CSV update       : {'✅ enabled' if UPDATE_CSV else '⚪ disabled'}")
     logger.info(f"  Data IS          : {DATA_FOLDER_IS}")
     logger.info(f"  Data OOS         : {DATA_FOLDER_OOS}")
-    logger.info(f"  Round 1          : NetGain>{THRESHOLD_NETGAIN_PCT}%  R2>{THRESHOLD_R2}  ProbNeg<{THRESHOLD_PROB_NEG}%")
-    logger.info(f"  Round 2 (A)      : NetGain>{THRESHOLD_NETGAIN_PCT_FILTERED}%  R2>{THRESHOLD_R2_FILTERED}  ProbNeg<{THRESHOLD_PROB_NEG_MAX}%")
-    logger.info(f"  Round 2 (B)      : NetGain>{THRESHOLD_NETGAIN_HIGH}%  ProbNeg<{THRESHOLD_PROB_NEG_STRICT}%")
+    logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
+    logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}  ProbNeg<{R2A_PROBNEG_ROUND1}%")
+    logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND1}%  ProbNeg<{R2B_PROBNEG_ROUND1}%")
     logger.info(f"  Regime 0         : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}")
     logger.info(f"{'='*105}\n")
 
