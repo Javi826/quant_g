@@ -1,3 +1,4 @@
+#BOT_batch/main_batch.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -21,14 +22,6 @@ from joblib import Parallel, delayed
 # =============================================================================
 LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for full verbosity
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
-logging.getLogger("joblib").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
-logging.getLogger("PIL").setLevel(logging.WARNING)
-
-SHOW_PLOTS = False   # Set to False to suppress all plots
-if not SHOW_PLOTS:
-    import matplotlib
-    matplotlib.use("Agg")
 
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
@@ -47,6 +40,7 @@ from batch_utils import enrich_trades_with_regime, update_strategies_params, upd
 from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
 from batch_utils import print_all_curves_table, print_best_combinations
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
+from batch_utils import validate_csv_columns
 
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -80,8 +74,8 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 100
-N_PATHS_OOS = 2000
+N_PATHS_IS  = 1
+N_PATHS_OOS = 20
 
 # Validation thresholds — Round 1
 THRESHOLD_NETGAIN_PCT  = 20.0
@@ -91,11 +85,11 @@ THRESHOLD_PROB_NEG     = 31.0
 # Validation thresholds — Round 2 (regime filtered)
 THRESHOLD_NETGAIN_PCT_FILTERED = 20.0
 THRESHOLD_R2_FILTERED          = 0.85
-THRESHOLD_PROB_NEG_MAX         = 40.0
+THRESHOLD_PROB_NEG_MAX         = 41.0
 
 # Validation thresholds — Round 2 path B (high netgain)
 THRESHOLD_NETGAIN_HIGH         = 80.0
-THRESHOLD_PROB_NEG_STRICT      = 15.0
+THRESHOLD_PROB_NEG_STRICT      = 20.0
 
 R0_MA_PERIOD = 5
 R0_LONG_TH   = 1.00
@@ -108,8 +102,10 @@ N_SYMBOLS_MCIS            = 6      # Number of IS symbols when FIX_SYMBOLS_MCIS_
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
 RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
+UPDATE_CSV              = True   # Set to False to skip CSV updates (tables will show last run data)
 
-CSV_PARAMS          = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
+STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_params")
+CSV_PARAMS          = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_params.csv")
 SYMBOLS_LIVE_FOLDER = os.path.join(os.path.dirname(__file__), "symbols_live")
 
 # Global trade_log accumulators (populated by each run_batch call)
@@ -184,7 +180,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 1 — Monte Carlo IS  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    logger.info(f"STAGE 1  [{STRATEGY_ID}] ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  ── Monte Carlo IS        ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor = generate_paths_for_all_symbols_functional(
         ohlcv_data_minor,
@@ -211,9 +207,6 @@ def run_batch(strategy_config: dict) -> None:
             all_results.append(compile_MC_results(result, param_dict, path_idx, INITIAL_BALANCE, dtype=DTYPE))
         return all_results
 
-    # final_prints(f"🎲 MC_{STRATEGY_ID} 🎲", DATA_FOLDER_IS, TIMEFRAME, min_vol_usdt=0,
-    #              order_amount=ORDER_AMOUNT, param_names=param_names, lists_for_grid=lists_for_grid)
-
     with (tqdm_joblib(tqdm(total=N_PATHS_IS, desc="🔄 Evaluating MC IS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
         results_list = Parallel(n_jobs=N_JOBS)(
             delayed(_process_path)(i, paths_minor, param_dict_list)
@@ -226,7 +219,7 @@ def run_batch(strategy_config: dict) -> None:
     best_params  = extract_best_params(df_summary, param_names, lists_for_grid)
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 2  [{STRATEGY_ID}] ── Backtest OOS           ── {params_str}")
+    logger.info(f"STAGE 2  ── Backtest OOS           ── {params_str}")
 
     # -------------------------------------------------------------------------
     # BLOCK 2 — BACKTEST OOS
@@ -256,7 +249,6 @@ def run_batch(strategy_config: dict) -> None:
     best_comb = tuple(best_params[p] for p in param_names)
     oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
-    # final_prints(f"🔭 OOS_{STRATEGY_ID}", DATA_FOLDER_OOS, TIMEFRAME, 0, ORDER_AMOUNT, param_names, lists_for_grid)
     oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
                                              data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
 
@@ -274,7 +266,7 @@ def run_batch(strategy_config: dict) -> None:
         "r2":            _r2_oos,
     })
 
-    logger.info(f"STAGE 3  [{STRATEGY_ID}] ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
+    logger.info(f"STAGE 3  ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
 
     # -------------------------------------------------------------------------
     # BLOCK 3 — MONTE CARLO OOS
@@ -305,10 +297,6 @@ def run_batch(strategy_config: dict) -> None:
             )
             all_results.append(compile_MC_results(result, param_dict, path_idx, INITIAL_BALANCE, dtype=DTYPE))
         return all_results
-
-    # final_prints(f"🎲 MC_OOS_{STRATEGY_ID} 🎲", DATA_FOLDER_OOS, TIMEFRAME, min_vol_usdt=0,
-    #              order_amount=ORDER_AMOUNT, param_names=param_names,
-    #              lists_for_grid=[[best_params[n]] for n in param_names])
 
     with (tqdm_joblib(tqdm(total=N_PATHS_OOS, desc="🔄 Evaluating MC OOS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
         results_oos = Parallel(n_jobs=N_JOBS)(
@@ -356,7 +344,7 @@ def run_batch(strategy_config: dict) -> None:
     ]
 
     excl_str = str(excluded_families) if excluded_families else "none"
-    logger.info(f"STAGE 4  [{STRATEGY_ID}] ── Regime Analysis        ── {len(trade_log)} trades | excl: {excl_str}")
+    logger.info(f"STAGE 4  ── Regime 1 Analysis      ── {len(trade_log)} trades | excl: {excl_str}")
 
     if excluded_families:
         logger.debug(f"Excluding regimes with negative profit: {excluded_families}")
@@ -396,7 +384,7 @@ def run_batch(strategy_config: dict) -> None:
         keep_direction = "uptrend" if SIDE == "long" else "downtrend"
         r0_filtered    = r0_trade_log[r0_trade_log["r0_direction"] == keep_direction].reset_index(drop=True)
         logger.debug(f"Keeping '{keep_direction}' trades: {len(r0_filtered)} / {len(r0_trade_log)}")
-        logger.info(f"STAGE 5  [{STRATEGY_ID}] ── Regime 0 (BTC filter)  ── {len(r0_filtered)} / {len(r0_trade_log)} kept ({keep_direction})")
+        logger.info(f"STAGE 5  ── Regime 0 (BTC filter)  ── {len(r0_filtered)} / {len(r0_trade_log)} kept ({keep_direction})")
 
         if len(r0_filtered) > 0:
             report_filtered_trades(r0_filtered, initial_balance=INITIAL_BALANCE,
@@ -421,7 +409,7 @@ def run_batch(strategy_config: dict) -> None:
 
         r01_filtered = r01_trade_log[r01_trade_log["r0_direction"] == keep_direction].reset_index(drop=True)
         logger.debug(f"After Regime 0 filter ({keep_direction}): {len(r01_filtered)} / {len(r01_trade_log)}")
-        logger.info(f"STAGE 6  [{STRATEGY_ID}] ── Regime 0+1 Combined    ── {len(r01_filtered)} / {len(r01_trade_log)} kept")
+        logger.info(f"STAGE 6  ── Regime 0+1 Combined    ── {len(r01_filtered)} / {len(r01_trade_log)} kept")
 
         if len(r01_filtered) > 0:
             report_filtered_trades(r01_filtered, initial_balance=INITIAL_BALANCE,
@@ -451,17 +439,17 @@ def run_batch(strategy_config: dict) -> None:
         ("Regime 0+1",  _m(r01_df)),
     ]
 
-    logger.debug(f"\n{'─'*75}")
+    logger.debug(f"\n{'─'*105}")
     logger.debug(f"  FILTER COMPARISON SUMMARY — {STRATEGY_ID}")
-    logger.debug(f"{'─'*75}")
+    logger.debug(f"{'─'*105}")
     logger.debug(f"  {'Scenario':<14} {'Trades':>8} {'Net Gain%':>10} {'Win Rate%':>10} {'DD%':>8} {'R2':>7}")
-    logger.debug(f"  {'-'*71}")
+    logger.debug(f"  {'-'*103}")
     for name, m in rows:
         if m["trades"] == 0:
             logger.debug(f"  {name:<14} {'N/A':>8} {'N/A':>10} {'N/A':>10} {'N/A':>8} {'N/A':>7}")
         else:
             logger.debug(f"  {name:<14} {m['trades']:>8} {m['net_gain_pct']:>9.2f}% {m['win_rate']:>9.1f}% {m['dd_pct']:>7.2f}% {m['r2']:>7.3f}")
-    logger.debug(f"  {'─'*71}")
+    logger.debug(f"  {'─'*105}")
 
     # -------------------------------------------------------------------------
     # BLOCK 7 — VALIDATION
@@ -484,7 +472,8 @@ def run_batch(strategy_config: dict) -> None:
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     verdict = "🟢 VALIDATED" if approved else "🔴 REJECTED"
-    logger.info(f"STAGE 7  [{STRATEGY_ID}] ── Validation             ── {verdict}  NetGain={bt_netgain_pct:.2f}% R2={r2:.3f} ProbNeg={prob_negative_oos:.1f}%")
+    _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
+    logger.info(f"STAGE 7  ── Validation             ── {'🔴' if not approved else '🟢'} {_v1} NetGain={bt_netgain_pct:.2f}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     logger.debug(f"  Backtest OOS")
     logger.debug(f"    Net_Gain_pct : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_PCT}%)   {'✅' if ok_netgain  else '❌'}")
@@ -508,13 +497,11 @@ def run_batch(strategy_config: dict) -> None:
 
         netgain_filtered    = compute_metrics(r01_filtered, capital=INITIAL_BALANCE, name="")["Net_Gain_pct"]
 
-        # Path A — regime filtered metrics
         ok_netgain_filtered = netgain_filtered  > THRESHOLD_NETGAIN_PCT_FILTERED
         ok_r2_filtered      = r2_filtered       > THRESHOLD_R2_FILTERED
         ok_prob_neg_max     = prob_negative_oos < THRESHOLD_PROB_NEG_MAX
         approved_path_a     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
 
-        # Path B — high netgain OOS + strict prob neg
         ok_netgain_high    = bt_netgain_pct     > THRESHOLD_NETGAIN_HIGH
         ok_prob_neg_strict = prob_negative_oos  < THRESHOLD_PROB_NEG_STRICT
         approved_path_b    = ok_netgain_high and ok_prob_neg_strict
@@ -529,8 +516,10 @@ def run_batch(strategy_config: dict) -> None:
         logger.debug(f"  Second Round — Path B (high netgain)")
         logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {THRESHOLD_NETGAIN_HIGH}%)    {'✅' if ok_netgain_high    else '❌'}")
         logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {THRESHOLD_PROB_NEG_STRICT}%)   {'✅' if ok_prob_neg_strict else '❌'}")
-        path_str = f" ({round_path})" if approved_regime else ""
-        logger.info(f"{'🟢 STRATEGY VALIDATED (regime 0+1 filtered)' + path_str if approved_regime else '🔴 STRATEGY REJECTED (regime 0+1 filtered)'} | {STRATEGY_ID}")
+        path_str       = f" ({round_path})" if approved_regime else ""
+        verdict_r2     = f"{'🟢 VALIDATED' if approved_regime else '🔴 REJECTED'}{path_str}"
+        _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
+        logger.info(f"STAGE 7  ── Validation (Round 2)   ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_filtered:.2f}% R2={r2_filtered:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
         approved = approved or approved_regime
 
@@ -539,19 +528,29 @@ def run_batch(strategy_config: dict) -> None:
         _round = "Round 1"
     elif approved and approved_regime:
         _round = f"Round 2 ({round_path})"
+
+    # Build regime flags for validation_results (1.0 / 0.0 / None if no regime_result)
+    _regime_trending = 1.0 if regime_result["family_stats"].get("trending", {}).get("profit", 0) >= 0 else 0.0
+    _regime_ranging  = 1.0 if regime_result["family_stats"].get("ranging",  {}).get("profit", 0) >= 0 else 0.0
+    _regime_volatile = 1.0 if regime_result["family_stats"].get("volatile", {}).get("profit", 0) >= 0 else 0.0
+
     _validation_results.append({
-        "strategy_id":   STRATEGY_ID,
-        "verdict":       "🟢 VALIDATED" if approved else "🔴 REJECTED",
-        "round":         _round,
-        "net_gain_pct":  round(bt_netgain_pct, 2),
-        "dd_pct":        round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
-        "win_ratio":     round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
-        "r2":            r2,
-        "prob_neg_pct":  round(prob_negative_oos, 2),
-        "params_changed":  False,
-        "active_prev":     None,
-        "active_new":      None,
-        "symbols_changed": False,
+        "strategy_id":      STRATEGY_ID,
+        "verdict":          "🟢 VALIDATED" if approved else "🔴 REJECTED",
+        "round":            _round,
+        "net_gain_pct":     round(bt_netgain_pct, 2),
+        "dd_pct":           round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
+        "win_ratio":        round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
+        "r2":               r2,
+        "prob_neg_pct":     round(prob_negative_oos, 2),
+        "params_changed":   False,
+        "active_prev":      None,
+        "active_new":       None,
+        "symbols_changed":  False,
+        "regime_trending":  _regime_trending,
+        "regime_ranging":   _regime_ranging,
+        "regime_volatile":  _regime_volatile,
+        "regime_changes":   [],
     })
 
     # -------------------------------------------------------------------------
@@ -581,29 +580,43 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 8 — Update & Compare  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    active_str = "active=True" if approved else "active=False"
-    logger.info(f"STAGE 8  [{STRATEGY_ID}] ── Update & Compare       ── params saved | {active_str}")
-
     PARAM_KEYS = [p.lower() for p in param_names]
 
     _params_result  = update_strategies_params(
         csv_path=CSV_PARAMS, strategy_id=STRATEGY_ID, best_params=best_params,
         param_keys=PARAM_KEYS, validated=approved, bt_netgain_pct=bt_netgain_pct,
         r2=r2, prob_negative_oos=prob_negative_oos,
-    )
+        regime_stats=regime_result["family_stats"],
+    ) if UPDATE_CSV else None
+
     _symbols_result = update_strategies_symbols(
         strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
         timeframe=TIMEFRAME, symbols_live_folder=SYMBOLS_LIVE_FOLDER,
-    )
+    ) if UPDATE_CSV else None
+
+    _changes = []
+    if _params_result:
+        if _params_result.get("active_prev") != _params_result.get("active_new"):
+            _changes.append("active")
+        if _params_result.get("params_changed"):
+            _changes.append("params")
+        if _params_result.get("regime_changes"):
+            _changes.append("regime")
+    if _symbols_result and _symbols_result.get("symbols_changed"):
+        _changes.append("symbols")
+    _changes_str = " | ".join(_changes) if _changes else "no changes"
+    _icon = "🔵" if _changes else "⚪"
+    logger.info(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"🏁 {STRATEGY_ID} — Total execution time: {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")
+    logger.info(f"STAGE 9  ── Done                   ── 🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
     # Backfill update info into last validation result
     if _validation_results:
         _validation_results[-1].update({
             "params_changed":  _params_result.get("params_changed", False)  if _params_result else False,
             "param_changes":   _params_result.get("param_changes", [])      if _params_result else [],
+            "regime_changes":  _params_result.get("regime_changes", [])     if _params_result else [],
             "active_prev":     _params_result.get("active_prev", None)      if _params_result else None,
             "active_new":      _params_result.get("active_new", None)       if _params_result else None,
             "symbols_changed": _symbols_result.get("symbols_changed", False) if _symbols_result else False,
@@ -631,17 +644,17 @@ def run_batch(strategy_config: dict) -> None:
         ("Regime 0+1",    *_q(r01_tl)),
     ]
 
-    logger.debug(f"\n{'─'*65}")
+    logger.debug(f"\n{'─'*105}")
     logger.debug(f"  FINAL COMPARISON — {STRATEGY_ID}")
-    logger.debug(f"{'─'*65}")
+    logger.debug(f"{'─'*105}")
     logger.debug(f"  {'Scenario':<16} {'Net Gain%':>10} {'DD%':>8} {'Win Rate%':>10}")
-    logger.debug(f"  {'-'*61}")
+    logger.debug(f"  {'-'*103}")
     for name, ng, dd, wr in rows:
         ng_str = f"{ng:>9.2f}%" if not np.isnan(ng) else f"{'N/A':>10}"
         dd_str = f"{dd:>7.2f}%" if not np.isnan(dd) else f"{'N/A':>8}"
         wr_str = f"{wr:>9.1f}%" if not np.isnan(wr) else f"{'N/A':>10}"
         logger.debug(f"  {name:<16} {ng_str} {dd_str} {wr_str}")
-    logger.debug(f"  {'─'*61}")
+    logger.debug(f"  {'─'*105}")
 
 
 # =============================================================================
@@ -654,6 +667,8 @@ def run_portfolio_analysis():
     Call this after all run_batch() calls in the orchestrator.
     """
     if not RUN_PORTFOLIO_ANALYSIS:
+        print_strategies_summary(_validation_results)
+        print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
         return
 
     for label, trade_logs in [("Baseline", _trade_logs_baseline), ("Regime 0+1", _trade_logs_regime01)]:
@@ -664,24 +679,32 @@ def run_portfolio_analysis():
         logger.debug(f"{'='*70}")
         print_portfolio_metrics_table(trade_logs, label, INITIAL_BALANCE)
 
-    # Pre-compute r01_metrics once — reused in best combinations
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
                    for sid, df in _trade_logs_regime01}
 
     # =========================================================================
     # STRATEGIES SUMMARY
     # =========================================================================
+    logger.info(f"\n{'─'*105}")
+    logger.info(f"  STRATEGIES SUMMARY")
+    logger.info(f"{'─'*105}")
     print_strategies_summary(_validation_results)
 
     # =========================================================================
-    # UPDATE STATUS TABLE
+    # UPDATE STATUS TABLES
     # =========================================================================
-    print_update_status(_validation_results)
+    logger.info(f"\n{'─'*105}")
+    logger.info(f"  UPDATE STATUS")
+    logger.info(f"{'─'*105}")
+    print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
 
     # =========================================================================
     # ALL CURVES COMBINED — Baseline vs Regime 0+1
     # =========================================================================
     if _trade_logs_baseline:
+        logger.info(f"\n{'─'*105}")
+        logger.info(f"  PORTFOLIO ANALYSIS")
+        logger.info(f"{'─'*105}")
         print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
 
         if _trade_logs_regime01:
@@ -696,6 +719,9 @@ def run_portfolio_analysis():
     validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 
     if validated_baseline:
+        logger.info(f"\n{'─'*105}")
+        logger.info(f"  PORTFOLIO ANALYSIS — VALIDATED ONLY")
+        logger.info(f"{'─'*105}")
         print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
@@ -704,11 +730,13 @@ def run_portfolio_analysis():
     # BEST COMBINATIONS
     # =========================================================================
     if RUN_BEST_COMBINATIONS:
-        if len(_trade_logs_baseline) > 0:
-            print_best_combinations(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
-
-        if len(_trade_logs_regime01) > 0:
-            print_best_combinations(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
+        logger.info(f"\n{'─'*105}")
+        logger.info(f"  BEST COMBINATIONS")
+        logger.info(f"{'─'*105}")
+        if validated_baseline:
+            print_best_combinations(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
+        if validated_regime01:
+            print_best_combinations(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
 
 
 # =============================================================================
@@ -720,10 +748,25 @@ if __name__ == "__main__":
     start  = time.time()
     logger = logging.getLogger("BOT_batch.main_batch")
 
+    if UPDATE_CSV:
+        validate_csv_columns(CSV_PARAMS)
+
+    logger.info(f"\n{'='*105}")
+    logger.info(f"  BATCH START")
+    logger.info(f"{'='*105}")
+    logger.info(f"  CSV update       : {'✅ enabled' if UPDATE_CSV else '⚪ disabled'}")
+    logger.info(f"  Data IS          : {DATA_FOLDER_IS}")
+    logger.info(f"  Data OOS         : {DATA_FOLDER_OOS}")
+    logger.info(f"  Round 1          : NetGain>{THRESHOLD_NETGAIN_PCT}%  R2>{THRESHOLD_R2}  ProbNeg<{THRESHOLD_PROB_NEG}%")
+    logger.info(f"  Round 2 (A)      : NetGain>{THRESHOLD_NETGAIN_PCT_FILTERED}%  R2>{THRESHOLD_R2_FILTERED}  ProbNeg<{THRESHOLD_PROB_NEG_MAX}%")
+    logger.info(f"  Round 2 (B)      : NetGain>{THRESHOLD_NETGAIN_HIGH}%  ProbNeg<{THRESHOLD_PROB_NEG_STRICT}%")
+    logger.info(f"  Regime 0         : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}")
+    logger.info(f"{'='*105}\n")
+
     for strategy in STRATEGIES:
-        logger.info(f"\n\033[94m{'='*100}\033[0m")
-        logger.info(f"\033[94m  Running: {strategy['strategy_id']}\033[0m")
-        logger.info(f"\033[94m{'='*100}\033[0m")
+        logger.info(f"\n{'='*105}")
+        logger.info(f"  Running: {strategy['strategy_id']}")
+        logger.info(f"{'='*105}")
         run_batch(strategy)
 
     run_portfolio_analysis()

@@ -1,3 +1,4 @@
+#BOT_batch/batch_utils.py
 import logging
 import os
 import numpy as np
@@ -5,7 +6,57 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+LOG_LEVEL = logging.INFO  # Change to logging.DEBUG for full verbosity
+logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
+logging.getLogger("joblib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+SHOW_PLOTS = False   # Set to False to suppress all plots
+if not SHOW_PLOTS:
+    import matplotlib
+    matplotlib.use("Agg")
+
 logger = logging.getLogger("BOT_batch.batch_utils")
+
+# =============================================================================
+# CSV COLUMN VALIDATION
+# =============================================================================
+EXPECTED_CSV_COLUMNS = [
+    "id", "name", "timeframe", "active", "direction",
+    "regime_trending", "regime_ranging", "regime_volatile",
+    "direction_mode", "sell_after_ncandles", "order_amount",
+    "lookback", "tolerance", "ma_period", "tp_pct", "sl_pct",
+    "impulse", "ranges", "flag",
+    "last_run", "bt_netgain_pct", "bt_r2", "prob_negative", "validated",
+    "last_change_active", "last_change_params", "last_change_regime",
+]
+
+def validate_csv_columns(csv_path):
+    """
+    Validate that strategies_params.csv has exactly the expected columns.
+    Raises ValueError and stops execution if columns do not match.
+    """
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"strategies_params.csv not found at {csv_path}")
+
+    df      = pd.read_csv(csv_path, nrows=0)
+    actual  = list(df.columns)
+    missing = [c for c in EXPECTED_CSV_COLUMNS if c not in actual]
+    extra   = [c for c in actual if c not in EXPECTED_CSV_COLUMNS]
+
+    if missing or extra:
+        msg = "❌ strategies_params.csv column mismatch — aborting."
+        if missing:
+            msg += f"\n  Missing : {missing}"
+        if extra:
+            msg += f"\n  Extra   : {extra}"
+        raise ValueError(msg)
+
+    logger.info("✅ strategies_params.csv columns validated.")
+
 
 # =============================================================================
 # HELPER — REPORT FILTERED TRADES
@@ -144,7 +195,6 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     symbols_oos_final = oos_ranked[:n_symbols]
 
     if fix_symbols_mcis:
-        # IS universe: top n_symbols_mcis from IS by volume directly
         vol_is           = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in filtered_is}
         is_ranked        = sorted(filtered_is, key=lambda s: vol_is.get(s, 0), reverse=True)
         symbols_is_final = is_ranked[:n_symbols_mcis]
@@ -167,7 +217,8 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
 
     logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
-    logger.info(f"IS symbols — {'FIX_SYMBOLS_MCIS_TRAINING=True' if fix_symbols_mcis else 'FIX_SYMBOLS_MCIS_TRAINING=False'} | {len(symbols_is_final)} symbols selected")
+    fix_str = "FIX=True" if fix_symbols_mcis else "FIX=False"
+    logger.info(f"STAGE 0  ── Universe Selection         ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
 
     if fix_symbols_mcis:
         if len(symbols_is_final) < n_symbols_mcis:
@@ -207,22 +258,35 @@ def enrich_trades_with_regime(trade_log, ohlc_folder, timeframe, families, lookb
 # =============================================================================
 # HELPER — UPDATE STRATEGIES PARAMS CSV
 # =============================================================================
-def update_strategies_params(csv_path, strategy_id, best_params, param_keys, validated, bt_netgain_pct, r2, prob_negative_oos):
+def update_strategies_params(csv_path, strategy_id, best_params, param_keys, validated,
+                             bt_netgain_pct, r2, prob_negative_oos, regime_stats=None):
+    """
+    Update strategies_params.csv with new params, validation result and regime flags.
+    Production columns (params, regime) are only updated when validated=True.
+
+    regime_stats: dict with keys 'trending', 'ranging', 'volatile', each containing
+                  at least a 'profit' key. If None, regime columns are not updated.
+    """
     def normalize(val):
         try:
             return float(val)
         except (TypeError, ValueError):
             return None
 
-    _no_change = {"params_changed": False, "param_changes": [], "active_prev": None, "active_new": None}
+    _no_change = {"params_changed": False, "param_changes": [], "regime_changes": [],
+                  "active_prev": None, "active_new": None}
 
     if not os.path.exists(csv_path):
         logger.warning(f"⚠️  strategies_params.csv not found at {csv_path} — skipping update.")
         return _no_change
 
-    df_params = pd.read_csv(csv_path)
-    mask      = df_params["id"] == strategy_id
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
 
+    df_params = pd.read_csv(csv_path)
+    for col in ("bt_netgain_pct", "bt_r2", "prob_negative"):
+        df_params[col] = pd.to_numeric(df_params[col], errors="coerce").astype("float64")
+
+    mask = df_params["id"] == strategy_id
     if not mask.any():
         logger.warning(f"⚠️  Strategy id '{strategy_id}' not found in CSV — skipping update.")
         return _no_change
@@ -230,7 +294,9 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
     idx      = df_params[mask].index[0]
     prev_row = df_params.loc[idx]
 
-    # Detect param changes
+    # -------------------------------------------------------------------------
+    # Detect param changes (computed always, applied only if validated)
+    # -------------------------------------------------------------------------
     params_changed = False
     param_changes  = []
     logger.debug(f"ID : {strategy_id}")
@@ -253,43 +319,78 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
         prev_val = prev_row.get(metric, None)
         logger.debug(f"  {metric:<20} {str(prev_val):>12} {str(new_val):>12}")
 
+    # -------------------------------------------------------------------------
+    # Detect regime changes (computed always, applied only if validated)
+    # -------------------------------------------------------------------------
+    regime_changes = []
+    new_regime_flags = {}
+    if regime_stats:
+        for family in ("trending", "ranging", "volatile"):
+            col       = f"regime_{family}"
+            new_flag  = 1.0 if (regime_stats.get(family, {}).get("profit", 0) >= 0) else 0.0
+            prev_flag = normalize(prev_row.get(col, None))
+            new_regime_flags[col] = new_flag
+            if prev_flag != new_flag:
+                regime_changes.append(f"{col}: {prev_flag}→{new_flag}")
+
+    # -------------------------------------------------------------------------
     # Detect active change
+    # -------------------------------------------------------------------------
     prev_active = bool(prev_row.get("active", False)) if pd.notna(prev_row.get("active")) else False
     new_active  = bool(validated)
 
+    # -------------------------------------------------------------------------
     # Always update diagnostic metrics
+    # -------------------------------------------------------------------------
     df_params.at[idx, "validated"]      = validated
     df_params.at[idx, "bt_netgain_pct"] = round(bt_netgain_pct, 2)
-    df_params.at[idx, "bt_r2"]          = round(r2, 3)
+    df_params.at[idx, "bt_r2"]          = round(float(r2), 2)
     df_params.at[idx, "prob_negative"]  = round(prob_negative_oos, 2)
     df_params.at[idx, "last_run"]       = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
 
+    # Force string dtype to prevent NaN passthrough on empty cells
+    for col in ("last_change_active", "last_change_params", "last_change_regime"):
+        df_params[col] = df_params[col].astype(object)
+
+    # Default change columns to N/A — overwritten below based on outcome
+    df_params.at[idx, "last_change_active"] = "N/A"
+    df_params.at[idx, "last_change_params"] = "N/A"
+    df_params.at[idx, "last_change_regime"] = "N/A"
+
     if validated:
-        # Update production params only if validated and changed
+        # Active
+        df_params.at[idx, "active"] = True
+        if not prev_active:
+            df_params.at[idx, "last_change_active"] = "False→True"
+
+        # Params
         if params_changed:
             for k in param_keys:
                 if k in df_params.columns:
                     df_params.at[idx, k] = best_params.get(k.upper())
-            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
-            df_params.at[idx, "last_change_detail"] = " | ".join(param_changes)
+            df_params.at[idx, "last_change_params"] = " | ".join(param_changes)
             logger.info(f"🔵 strategies_params.csv — params updated for '{strategy_id}'")
-        df_params.at[idx, "active"] = True
-        if not prev_active:
-            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
-            df_params.at[idx, "last_change_detail"] = f"active: False→True"
-            logger.info(f"🟠 strategies_params.csv — activated '{strategy_id}'")
+
+        # Regime
+        for col, new_flag in new_regime_flags.items():
+            df_params.at[idx, col] = new_flag
+        if regime_changes:
+            df_params.at[idx, "last_change_regime"] = " | ".join(regime_changes)
     else:
-        df_params.at[idx, "active"] = False
-        if prev_active:
-            df_params.at[idx, "last_change"]        = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
-            df_params.at[idx, "last_change_detail"] = f"active: True→False"
-            logger.info(f"🔴 strategies_params.csv — deprecated '{strategy_id}'")
+        df_params.at[idx, "active"]             = False
+        df_params.at[idx, "last_change_active"] = "True→False" if prev_active else "REJECTED"
+        df_params.at[idx, "last_change_params"] = "REJECTED"
+        df_params.at[idx, "last_change_regime"] = "REJECTED"
+
+    for col in ("last_change_active", "last_change_params", "last_change_regime"):
+        df_params[col] = df_params[col].fillna("N/A")
 
     df_params.to_csv(csv_path, index=False)
 
     return {
         "params_changed": params_changed and validated,
         "param_changes":  param_changes if validated else [],
+        "regime_changes": regime_changes if validated else [],
         "active_prev":    prev_active,
         "active_new":     new_active,
     }
@@ -306,7 +407,6 @@ def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, sy
         live_filename = f"symbols_live_{strategy_id}_{timeframe}.csv"
         live_path     = os.path.join(symbols_live_folder, live_filename)
 
-        # Detect changes by comparing with existing file
         if os.path.exists(live_path):
             prev_symbols = pd.read_csv(live_path, header=None)[0].tolist()
             symbols_changed = prev_symbols != list(symbols_oos_final)
@@ -385,15 +485,12 @@ def compute_metrics(trade_log, capital, name="Equity"):
     tl      = trade_log.sort_values("sell_time").reset_index(drop=True)
     profits = tl["profit"].values
 
-    # Win rate — trade level
     win_rate = round((profits > 0).mean() * 100, 1)
 
-    # Profit factor — trade level (standard definition)
     gains  = profits[profits > 0].sum()
     losses = -profits[profits < 0].sum()
     pf     = round(float(gains / losses), 3) if losses > 0 else np.inf
 
-    # Daily equity curve
     tl["_date"]  = pd.to_datetime(tl["sell_time"]).dt.normalize()
     daily_profit = tl.groupby("_date")["profit"].sum()
 
@@ -404,18 +501,15 @@ def compute_metrics(trade_log, capital, name="Equity"):
     eq           = capital + daily_profit.cumsum().values
     eq_series    = pd.Series(eq, index=date_range)
 
-    # Drawdown & net gain
     cm       = np.maximum.accumulate(eq)
     max_dd   = ((eq - cm) / cm * 100).min()
     net_gain = (eq[-1] - capital) / capital * 100
 
-    # Volatility & monthly consistency — daily returns
     daily_returns = eq_series.pct_change().dropna()
     volatility    = daily_returns.std() * 100
     monthly       = eq_series.resample("ME").last().pct_change().dropna()
     consistency   = (monthly > 0).mean() * 100
 
-    # R²
     X  = np.arange(len(eq)).reshape(-1, 1)
     y  = eq.reshape(-1, 1)
     r2 = round(_LR().fit(X, y).score(X, y), 3)
@@ -464,61 +558,125 @@ def print_strategies_summary(validation_results):
     if not validation_results:
         return
     lines = []
-    lines.append(f"\n{'─'*106}")
+    lines.append(f"\n{'─'*105}")
     lines.append(f"  STRATEGIES SUMMARY")
-    lines.append(f"{'─'*106}")
+    lines.append(f"{'─'*105}")
     lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-    lines.append(f"  {'-'*104}")
+    lines.append(f"  {'-'*103}")
     for v in validation_results:
         lines.append(
             f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
-    lines.append(f"  {'─'*104}")
+    lines.append(f"  {'─'*105}")
     logger.info("\n".join(lines))
 
 
-def print_update_status(validation_results):
-    """Print update status table for all strategies."""
+# =============================================================================
+# HELPER — PRINT UPDATE STATUS (four separate tables, reads from CSV)
+# =============================================================================
+def print_update_status(csv_path, symbols_live_folder, validation_results):
+    """
+    Print four update status tables reading from CSV as source of truth:
+      1. Active
+      2. Params
+      3. Market Regime
+      4. Symbols
+    """
     if not validation_results:
         return
 
-    def _params_icon(v):
-        return "🔵 updated" if v["params_changed"] else "⚪ no change"
+    if not os.path.exists(csv_path):
+        logger.warning(f"⚠️  strategies_params.csv not found — skipping update status tables.")
+        return
 
-    def _active_icon(v):
-        prev, new = v["active_prev"], v["active_new"]
-        if prev is None:
-            return "⚪ no change"
-        if not prev and new:
-            return "🟠 activated"
-        if prev and not new:
-            return "🔴 deprecated"
-        return "⚪ no change"
+    df = pd.read_csv(csv_path)
+    strategy_ids = [v["strategy_id"] for v in validation_results]
+    df = df[df["id"].isin(strategy_ids)].set_index("id")
 
-    def _symbols_icon(v):
-        return "🔵 updated" if v["symbols_changed"] else "⚪ no change"
+    def _get(sid, col, default="—"):
+        try:
+            val = df.loc[sid, col]
+            return str(val) if pd.notna(val) else default
+        except KeyError:
+            return default
 
-    def _changes_detail(v):
-        parts = []
-        prev, new = v["active_prev"], v["active_new"]
-        if prev is not None and prev != new:
-            parts.append(f"active: {prev}→{new}")
-        parts.extend(v.get("param_changes", []))
-        return " | ".join(parts) if parts else "—"
+    def _active_icon(sid):
+        val = _get(sid, "active")
+        if val == "True":  return "🟢 active"
+        if val == "False": return "🔴 inactive"
+        return "—"
 
+    def _change_icon(val):
+        if val in ("N/A", "—", ""):    return "⚪ no change"
+        if val == "REJECTED":                   return "🔴 REJECTED"
+        return f"🔵 {val}"
+
+    # -------------------------------------------------------------------------
+    # Table 1 — Active
+    # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*110}")
-    lines.append(f"  UPDATE STATUS")
-    lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Params':<16} {'Active':<16} {'Symbols':<16} {'Changes':<30}")
-    lines.append(f"  {'-'*106}")
-    for v in validation_results:
+    lines.append(f"\n{'─'*105}")
+    lines.append(f"  ACTIVE")
+    lines.append(f"{'─'*105}")
+    lines.append(f"  {'Strategy':<25} {'Status':<16} {'Changes':<35}")
+    lines.append(f"  {'-'*103}")
+    for sid in strategy_ids:
+        change = _get(sid, "last_change_active")
+        lines.append(f"  {sid:<25} {_active_icon(sid):<16} {_change_icon(change):<35}")
+    lines.append(f"  {'─'*103}")
+    logger.info("\n".join(lines))
+
+    # -------------------------------------------------------------------------
+    # Table 2 — Params
+    # -------------------------------------------------------------------------
+    lines = []
+    lines.append(f"\n{'─'*105}")
+    lines.append(f"  PARAMS")
+    lines.append(f"{'─'*105}")
+    lines.append(f"  {'Strategy':<25} {'Changes':<50}")
+    lines.append(f"  {'-'*103}")
+    for sid in strategy_ids:
+        change = _get(sid, "last_change_params")
+        lines.append(f"  {sid:<25} {_change_icon(change):<50}")
+    lines.append(f"  {'─'*103}")
+    logger.info("\n".join(lines))
+
+    # -------------------------------------------------------------------------
+    # Table 3 — Market Regime
+    # -------------------------------------------------------------------------
+    lines = []
+    lines.append(f"\n{'─'*105}")
+    lines.append(f"  MARKET REGIME")
+    lines.append(f"{'─'*105}")
+    lines.append(f"  {'Strategy':<25} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}")
+    lines.append(f"  {'-'*103}")
+    for sid in strategy_ids:
+        trending = _get(sid, "regime_trending")
+        ranging  = _get(sid, "regime_ranging")
+        volatile = _get(sid, "regime_volatile")
+        change   = _get(sid, "last_change_regime")
         lines.append(
-            f"  {v['strategy_id']:<25} {_params_icon(v):<16} {_active_icon(v):<16} {_symbols_icon(v):<16} {_changes_detail(v):<30}"
+            f"  {sid:<25} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
         )
-    lines.append(f"  {'─'*106}")
+    lines.append(f"  {'─'*105}")
+    logger.info("\n".join(lines))
+
+    # -------------------------------------------------------------------------
+    # Table 4 — Symbols
+    # -------------------------------------------------------------------------
+    lines = []
+    lines.append(f"\n{'─'*105}")
+    lines.append(f"  SYMBOLS")
+    lines.append(f"{'─'*105}")
+    lines.append(f"  {'Strategy':<25} {'Status':<16}")
+    lines.append(f"  {'-'*103}")
+    for v in validation_results:
+        sid  = v["strategy_id"]
+        icon = "🔵 updated" if v.get("symbols_changed") else "⚪ no change"
+        lines.append(f"  {sid:<25} {icon:<16}")
+    lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
 
 
@@ -561,8 +719,6 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     Print a metrics table for all curves plus a combined row.
     trade_logs: list of (strategy_id, trade_log_df)
     """
-    from itertools import combinations as _combinations
-
     named = {sid: df for sid, df in trade_logs}
     rows  = []
     for sid, df in named.items():
@@ -572,7 +728,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     all_cap = initial_balance * len(named)
     rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
 
-    cols   = ["Curve", "Volatility_pct", "Monthly_pct", "Net_Gain_pct", "Max_DD_pct", "Profit_Factor", "R_Squared", "Win_Rate"]
+    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Volatility_pct", "Monthly_pct"]
     df_out = pd.DataFrame(rows)[cols]
     max_len = df_out["Curve"].str.len().max()
     df_out["Curve"] = df_out["Curve"].apply(lambda x: x.ljust(max_len))
@@ -607,8 +763,8 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
     for r in range(1, len(named) + 1):
         for combo in _combinations(named.keys(), r):
             if len(combo) == 1:
-                sid  = combo[0]
-                m    = metrics.get(sid)
+                sid = combo[0]
+                m   = metrics.get(sid)
                 if m:
                     combo_results.append({**m, "Curve": str(_num(sid))})
             else:
@@ -633,16 +789,16 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
     ]
 
     lines = []
-    lines.append(f"\n{'─'*93}")
+    lines.append(f"\n{'─'*105}")
     lines.append(f"  BEST COMBINATIONS — {label}")
-    lines.append(f"{'─'*93}")
+    lines.append(f"{'─'*105}")
     lines.append(f"  {'Metric':<16} {'Combo':<20} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
-    lines.append(f"  {'-'*89}")
+    lines.append(f"  {'-'*103}")
     for lbl, row in rows:
         pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
         lines.append(
             f"  {lbl:<16} {str(row['Curve']):<20} {row['Net_Gain_pct']:>9.2f}% "
             f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
         )
-    lines.append(f"  {'─'*89}")
+    lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
