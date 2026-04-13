@@ -14,7 +14,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.expand_frame_repr', False)
 pd.set_option('display.max_colwidth', None)
 import logging
-logger = logging.getLogger("BOT_trading.batch.analysis")
+logger = logging.getLogger("BOT_batch.analysis")
 
 # =============================================================================
 # CONFIGURATION

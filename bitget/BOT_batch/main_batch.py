@@ -20,7 +20,7 @@ from joblib import Parallel, delayed
 # LOGGING CONFIGURATION
 # =============================================================================
 LOG_LEVEL  = logging.INFO   # Change to logging.DEBUG for full verbosity
-SHOW_PLOTS = True           # Set to True to enable matplotlib plots
+SHOW_PLOTS = False           # Set to True to enable matplotlib plots
 
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -69,6 +69,26 @@ SIGNAL_REGISTRY = {
     "ranging_short":     {"fn": ranging_short,     "params": ["lookback", "tolerance", "ma_period", "ranges"]},
 }
 
+SELECTED_STRATEGIES = [
+# =============================================================================
+#     "02_reversal_long_4H",
+#     "03_parity_long_4H",
+#     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
+#     "07_reversal_short_1H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "10_parity_long_1H",
+#     "11_parity_short_1H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "16_ranging_short_6Hutc",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+# =============================================================================
+]
+
 DTYPE = np.float32
 
 logger = logging.getLogger("BOT_batch.main_batch")
@@ -82,13 +102,13 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 1
-N_PATHS_OOS = 20
+N_PATHS_IS  = 100
+N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
 R1_NETGAIN_ROUND1    = 20.0
 R1_RSQUARED_ROUND1   = 0.7
-R1_PROBNEG_ROUND1    = 31.0
+R1_PROBNEG_ROUND1    = 15.0
 
 # Validation thresholds — Round 2 path A (regime filtered)
 R2A_NETGAIN_ROUND2   = 20.0
@@ -750,15 +770,18 @@ def run_portfolio_analysis():
 # =============================================================================
 # MAIN
 # =============================================================================
+# =============================================================================
+# MAIN
+# =============================================================================
 if __name__ == "__main__":
     from strategies_config import STRATEGIES
-
+ 
     start  = time.time()
     logger = logging.getLogger("BOT_batch.main_batch")
-
+ 
     if UPDATE_CSV:
         validate_csv_columns(CSV_PARAMS)
-
+ 
     logger.info(f"\n{'='*105}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*105}")
@@ -770,14 +793,18 @@ if __name__ == "__main__":
     logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND1}%  ProbNeg<{R2B_PROBNEG_ROUND1}%")
     logger.info(f"  Regime 0         : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}")
     logger.info(f"{'='*105}\n")
-
-    for strategy in STRATEGIES:
+ 
+    strategies_to_run = (
+        [s for s in STRATEGIES if s["strategy_id"] in SELECTED_STRATEGIES]
+        if SELECTED_STRATEGIES else STRATEGIES
+    )
+    for strategy in strategies_to_run:
         logger.info(f"\n{'='*105}")
         logger.info(f"  Running: {strategy['strategy_id']}")
         logger.info(f"{'='*105}")
         run_batch(strategy)
-
+ 
     run_portfolio_analysis()
-
+ 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")
