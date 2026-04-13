@@ -1,3 +1,15 @@
+"""
+BOT_trading/config/strategies_E1.py Trading Strategies Configuration
+
+This file defines all trading strategies used by the bot.
+Each strategy must have all required parameters defined.
+
+IMPORTANT:
+- Strategy IDs must match those in IMPLEMENTED_STRATEGIES
+- All strategies must be listed here even if inactive
+- Parameter validation happens at bot startup
+"""
+
 STRATEGIES = [
     {
         'id': '02_reversal_long_4H',
