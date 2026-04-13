@@ -190,8 +190,7 @@ def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_
         param_cols    = param_names
         trade_cols    = [col for col in all_trades_df.columns if col not in param_names]
         all_trades_df = all_trades_df[param_cols + trade_cols]
-        all_trades_df.to_excel(final_path, index=False, engine='openpyxl')
-        file_size_mb = os.path.getsize(final_path) / 1024 / 1024
+        all_trades_df.to_csv(final_path, index=False)
         logger.debug(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
     else:
         print("⚠️ No trades to be saved")

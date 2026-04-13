@@ -27,10 +27,9 @@ from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HU
 from shared_config import REGIME_ER_WINDOW as ER_WINDOW, REGIME_ATR_WINDOW as ATR_WINDOW
 from shared_config import REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
 
-logger = logging.getLogger("BOT_trading.batch.regime_performance")
+logger = logging.getLogger("BOT_batch.regime_performance")
 
 BASE_DIR              = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OHLC_FOLDER           = os.path.join(BASE_DIR, "data", "crypto_2026_OOS")
 MA_PERIOD             = 50
 MIN_TRADES_CONFIDENCE = 50
 ANALYZE_DIRECTION     = False
@@ -41,12 +40,12 @@ LOOKBACK_BARS = 100
 _btc_cache = {}
 
 
-def analyze_strategy(filepath, families, initial_capital):
+def analyze_strategy(filepath, families, initial_capital, ohlc_folder):
     """Analyze single strategy - MATCHES enricher.py"""
     df = load_trades(filepath)
     strategy = df['strategy'].iloc[0]
     timeframe = extract_timeframe(df)
-    btc_df = load_btc_for_timeframe(OHLC_FOLDER, timeframe, _btc_cache)
+    btc_df = load_btc_for_timeframe(ohlc_folder, timeframe, _btc_cache)
     
     df = load_trades(filepath)
     
