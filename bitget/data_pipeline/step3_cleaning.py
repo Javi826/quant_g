@@ -1,18 +1,25 @@
-# step2_cleaning.py
-# -----------------------------
+# step3_cleaning.py
+# =============================================================================
+# Step 3 — Cleaning — fixes data quality issues in raw OHLCV files.
+# OHLC zero/NaN → drop row | Volume zero/NaN → ffill
+# =============================================================================
 import logging
 import os
 
 import numpy as np
 import pandas as pd
 
-logger = logging.getLogger("pipeline.step2")
+logger = logging.getLogger("pipeline.step3")
 
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 OHLC_COLS   = ["open", "high", "low", "close"]
 VOLUME_COLS = ["volume_base", "volume_quote"]
 
-
-# ---------------- CLEANING ----------------
+# =============================================================================
+# CLEANING
+# =============================================================================
 
 def _clean_symbol(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     initial_rows = len(df)
@@ -46,18 +53,21 @@ def _clean_symbol(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
     logger.debug(f"  [{symbol}] Rows: {initial_rows} → {len(df)}")
     return df
 
-
-# ---------------- RUN ----------------
+# =============================================================================
+# RUN
+# =============================================================================
 
 def run(config: dict) -> bool:
     input_dir: str  = config["raw_dir"]
     output_dir: str = config["clean_dir"]
+    timeframe: str  = config.get("timeframe", "")
+    export_csv: bool = config.get("export_csv", False)
     os.makedirs(output_dir, exist_ok=True)
 
     files = sorted([
         os.path.join(input_dir, f)
         for f in os.listdir(input_dir)
-        if f.endswith(".parquet")
+        if f.endswith(".parquet") and (not timeframe or f.endswith(f"_{timeframe}.parquet"))
     ]) if os.path.exists(input_dir) else []
 
     if not files:
@@ -78,12 +88,9 @@ def run(config: dict) -> bool:
             continue
 
         df = _clean_symbol(df, symbol)
-
-        out_parquet = os.path.join(output_dir, filename)
-        out_csv     = os.path.join(output_dir, os.path.splitext(filename)[0] + ".csv")
-        df.to_parquet(out_parquet, index=False)
-        df.to_csv(out_csv, index=False)
-
+        df.to_parquet(os.path.join(output_dir, filename), index=False)
+        if export_csv:
+            df.to_csv(os.path.join(output_dir, os.path.splitext(filename)[0] + ".csv"), index=False)
         logger.info(f"  💾 [{symbol}] Saved {len(df)} rows → {filename}")
 
     if errors:
@@ -93,13 +100,15 @@ def run(config: dict) -> bool:
     logger.info("✅ Cleaning complete")
     return True
 
-
-# ---------------- ENTRY POINT ----------------
+# =============================================================================
+# ENTRY POINT
+# =============================================================================
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     _config = {
-        "raw_dir":   os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "01_raw"),
-        "clean_dir": os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "02_clean"),
+        "raw_dir":    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "01_raw"),
+        "clean_dir":  os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "02_clean"),
+        "export_csv": False,
     }
     run(_config)

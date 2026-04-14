@@ -1,27 +1,36 @@
 # step1_extraction.py
-# -----------------------------
+# =============================================================================
+# Step 1 — Extraction — downloads OHLCV candles from Bitget API.
+# Supports incremental download: resumes from last saved timestamp.
+# =============================================================================
 import logging
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 
 import pandas as pd
-import requests
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "broker_api")))
+from api_client import (
+    _call_history_candles,
+    to_dataframe_from_api,
+    get_futures_symbols_from_api,
+)
 
 logger = logging.getLogger("pipeline.step1")
 
-# ---------------- CONSTANTS ----------------
-BASE_URL               = "https://api.bitget.com"
-PRODUCT_TYPE           = "usdt-futures"
+# =============================================================================
+# CONSTANTS
+# =============================================================================
 LIMIT                  = 200
-REQUEST_TIMEOUT        = 20
 SLEEP_BETWEEN_REQUESTS = 0.06
-MAX_RETRIES            = 3
 MS_90_DAYS             = 90 * 24 * 60 * 60 * 1000
 
-
-# ---------------- UTILITIES ----------------
+# =============================================================================
+# UTILITIES
+# =============================================================================
 
 def sanitize_filename(name: str) -> str:
     return re.sub(r'[^\w\-_\. ]', '_', name).strip()
@@ -69,81 +78,9 @@ def validate_append_border(df_old: pd.DataFrame, df_new: pd.DataFrame, gran_ms: 
         gap_candles = diff_ms // gran_ms - 1
         logger.warning(f"  ⚠ Border GAP in {symbol}: {gap_candles} candle(s) missing at junction ({last_old} → {first_new})")
 
-
-# ---------------- API WRAPPERS ----------------
-
-def _http_get(url: str, params: dict | None = None) -> requests.Response:
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
-            if r.status_code in (429, 502, 503, 504) or r.status_code >= 500:
-                time.sleep(0.5 * attempt)
-                continue
-            r.raise_for_status()
-            return r
-        except requests.RequestException:
-            time.sleep(0.5 * attempt)
-    raise Exception("Max retries exceeded")
-
-
-def get_futures_symbols_from_api(product_type: str = PRODUCT_TYPE) -> list[str]:
-    url = f"{BASE_URL}/api/v2/mix/market/contracts"
-    try:
-        r    = _http_get(url, params={'productType': product_type})
-        data = r.json().get('data') or []
-        symbols = []
-        for item in data:
-            s = item.get('symbol') or item.get('contract') or item.get('symbolName')
-            if s:
-                symbols.append(str(s))
-        return sorted(set(symbols))
-    except Exception as e:
-        logger.warning(f"⚠️ Error fetching symbols: {e}")
-        return []
-
-
-def _call_history_candles(
-    symbol: str,
-    granularity: str,
-    limit: int = LIMIT,
-    startTime: int | None = None,
-    endTime: int | None = None,
-) -> list:
-    url    = f"{BASE_URL}/api/v2/mix/market/history-candles"
-    params = {"symbol": symbol, "granularity": granularity, "limit": limit, "productType": PRODUCT_TYPE}
-    if startTime is not None:
-        params["startTime"] = str(int(startTime))
-    if endTime is not None:
-        params["endTime"] = str(int(endTime))
-    try:
-        r = _http_get(url, params=params)
-        j = r.json()
-        if isinstance(j, dict) and j.get("code") not in (None, "00000"):
-            return []
-        data = j.get("data") if isinstance(j, dict) else j
-        return data if isinstance(data, list) else []
-    except Exception as e:
-        logger.debug(f"  ⚠ API error (symbol={symbol} start={startTime} end={endTime}): {e}")
-        return []
-
-
-def _to_dataframe(data: list) -> pd.DataFrame:
-    if not data:
-        return pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume_base", "volume_quote"])
-    clean = []
-    for row in data:
-        if not row or len(row) < 7:
-            continue
-        try:
-            clean.append([int(row[0]), row[1], row[2], row[3], row[4], row[5], row[6]])
-        except Exception:
-            continue
-    df = pd.DataFrame(clean, columns=["timestamp", "open", "high", "low", "close", "volume_base", "volume_quote"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"].astype("int64"), unit="ms", utc=True)
-    return df.sort_values("timestamp").reset_index(drop=True)
-
-
-# ---------------- DOWNLOAD ----------------
+# =============================================================================
+# DOWNLOAD
+# =============================================================================
 
 def find_earliest_available_timestamp(symbol: str, gran_ms: int, timeframe: str, max_iters: int = 500) -> int | None:
     end            = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
@@ -218,13 +155,14 @@ def download_candles_from_start(
         if no_progress >= 5:
             break
 
-    df = _to_dataframe(all_rows)
+    df = to_dataframe_from_api(all_rows)
     if not df.empty:
         df = df.drop_duplicates(subset=["timestamp"], keep="first").reset_index(drop=True)
     return df
 
-
-# ---------------- INCREMENTAL ----------------
+# =============================================================================
+# INCREMENTAL LOGIC
+# =============================================================================
 
 def _load_existing_parquet(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
@@ -265,8 +203,9 @@ def _save_csv(df: pd.DataFrame, path: str) -> None:
         df_save["timestamp"] = df_save["timestamp"].dt.tz_localize(None)
     df_save.to_csv(path, index=False)
 
-
-# ---------------- SYMBOL PROCESSOR ----------------
+# =============================================================================
+# SYMBOL PROCESSOR
+# =============================================================================
 
 def _process_symbol(
     sym: str,
@@ -325,8 +264,9 @@ def _process_symbol(
     new_candles = len(df_new) if not df_new.empty else 0
     logger.info(f"  💾 {len(df_final)} candles total (+{new_candles} new) → {os.path.basename(parquet_path)}")
 
-
-# ---------------- RUN ----------------
+# =============================================================================
+# RUN
+# =============================================================================
 
 def run(config: dict) -> bool:
     start_date       = config["start_date"]
@@ -355,7 +295,7 @@ def run(config: dict) -> bool:
     gran_ms  = parse_timeframe_to_ms(timeframe)
     os.makedirs(output_dir, exist_ok=True)
 
-    symbols = get_futures_symbols_from_api(PRODUCT_TYPE)
+    symbols = get_futures_symbols_from_api()
     if not symbols:
         logger.warning("⚠️ No symbols retrieved. Aborting.")
         return False
@@ -375,8 +315,9 @@ def run(config: dict) -> bool:
 
     return True
 
-
-# ---------------- ENTRY POINT ----------------
+# =============================================================================
+# ENTRY POINT
+# =============================================================================
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")

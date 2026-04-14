@@ -1,10 +1,8 @@
 """
-Bot Orchestrator
-
+BOT_trading/core/orchestator.py
 Main orchestration class for the trading bot.
 Encapsulates all bot state and execution logic.
 """
-
 import os
 import sys
 import time
@@ -13,14 +11,14 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 # Ensure BOT_trading is in path
-current_dir = os.path.dirname(os.path.abspath(__file__))  # core/
-parent_dir  = os.path.dirname(current_dir)                # BOT_trading/
-
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir  = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Now do imports
-from market_data.api_client import get_futures_symbols_from_api
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "broker_api")))
+
+from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
 from market_regime import get_current_regime, get_current_direction, PositionSizer, get_btc_1d_filter
 from risk_control import RiskLimiter, ExposureCalculator

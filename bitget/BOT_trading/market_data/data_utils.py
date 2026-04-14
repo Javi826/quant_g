@@ -1,18 +1,21 @@
 """
+BOT_trading/market_data/data_utils.py
 Market Data Utils - OHLCV data processing and symbol management.
-
 This module provides utilities for:
 - Loading and filtering trading symbols
 - Fetching OHLCV data from API
 - Normalizing DataFrames
 - Converting DataFrames to numpy arrays
 """
-
 import os
+import sys
 import logging
 import numpy as np
 import pandas as pd
-from market_data.api_client import _call_history_candles, to_dataframe_from_api
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "broker_api")))
+
+from api_client import _call_history_candles, to_dataframe_from_api
 from pandas.api.types import is_datetime64_any_dtype
 from config.settings import API_LIMIT_DATA
 

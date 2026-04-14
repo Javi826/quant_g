@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_batch/B_batch_parity.py', 'bitget/develop/Z_grid/G_grid_parity.py', 'bitget/develop/Z_montecarlo/M_montecarlo_parity.py']
+recent_files = ['bitget/data_pipeline/data_main.py']
 
 [main]
 version = 0.2.0

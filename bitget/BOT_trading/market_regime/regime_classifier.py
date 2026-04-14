@@ -1,17 +1,19 @@
 """
-market_regime/regime_classifier.py
-
+BOT_trading/market_regime/regime_classifier.py
 Core module for market regime classification and position sizing.
 Integrates with BOT_trading's market_data infrastructure.
 """
-
 import logging
+import os
+import sys
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional, Tuple
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_market_regime")))
+
+from regime_metrics import calc_all_metrics
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from shared.market_regime.regime_metrics import calc_all_metrics
 from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
