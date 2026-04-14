@@ -40,29 +40,29 @@ DEBUG_HIGHLOW_INTEGRITY_DIR = os.path.join(DATA_DIR, "debug_06_highlow_integrity
 # PIPELINE CONFIG
 # =============================================================================
 DEBUG_MODE = True
-EXPORT_CSV = False   # Set True to export CSV alongside parquet at each step
+EXPORT_CSV = True   # Set True to export CSV alongside parquet at each step
 
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SYMBOL_MODE        = "manual"               # "manual" → use SELECTED_SYMBOLS list
-                                            # "auto"   → rank all symbols by avg daily volume
-                                            #            and pick top N_SYMBOLS_DOWNLOAD
+# "auto"   → rank all symbols by avg daily volume
+# "manual" → use SELECTED_SYMBOLS list and pick top N_SYMBOLS_DOWNLOAD
+SYMBOL_MODE        = "auto"              
 SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] # only used when SYMBOL_MODE = "manual"
 N_SYMBOLS_DOWNLOAD = 50                     # only used when SYMBOL_MODE = "auto"
 
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc", "4H", "1H"]
-START_DATE = "2025-01-01"
+TIMEFRAMES = ["1Dutc", "4H", "1H","15m"]
+START_DATE = "2022-01-01"
 END_DATE   = None   # None = download up to today
                     # Set e.g. "2025-06-01" to limit download (useful for testing incremental)
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"], ["4H", "1H"]]   # list of [higher_tf, intrabar_tf] pairs
+TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"], ["4H", "1H"],["1H", "15m"]]   # list of [higher_tf, intrabar_tf] pairs
 
 # =============================================================================
 # IS/OOS SPLIT
@@ -85,8 +85,8 @@ TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"], ["4H", "1H"]]   # list of [higher_tf, int
 #                  useful for backtesting or reconstructing historical splits
 
 SPLIT_MODE           = "expanding"
-WINDOW_IS_MONTHS     = 12    # only used when SPLIT_MODE = "rolling"
-WINDOW_OOS_MONTHS    = 3
+WINDOW_IS_MONTHS     = 36    # only used when SPLIT_MODE = "rolling"
+WINDOW_OOS_MONTHS    = 12
 SPLIT_REFERENCE_DATE = None
 
 

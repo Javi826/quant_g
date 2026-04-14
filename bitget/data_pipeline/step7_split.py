@@ -5,24 +5,32 @@
 # SPLIT_MODE = "expanding"
 #   IS  : from START_DATE until (today - WINDOW_OOS_MONTHS)
 #   OOS : last WINDOW_OOS_MONTHS up to today
-#   Each run the IS grows as more data becomes available.
+#   Each monthly run the IS grows as more data is available.
 #
 # SPLIT_MODE = "rolling"
+#   IS  : fixed WINDOW_IS_MONTHS duration, slides forward WINDOW_OOS_MONTHS each run
+#   OOS : next WINDOW_OOS_MONTHS after IS end
 #   Run 1: IS = START_DATE → START_DATE + WINDOW_IS_MONTHS
-#           OOS = IS_end → IS_end + WINDOW_OOS_MONTHS
-#   Run 2: IS shifts forward by WINDOW_OOS_MONTHS
-#           IS = Run1_IS_start + WINDOW_OOS_MONTHS → same duration
-#           OOS = IS_end → IS_end + WINDOW_OOS_MONTHS
-#   Each run the entire window slides forward by WINDOW_OOS_MONTHS.
+#   Run 2: IS = START_DATE + WINDOW_OOS_MONTHS → same duration
+#   Run 3: IS = START_DATE + 2*WINDOW_OOS_MONTHS → same duration ...
+#   State is persisted in rolling_state.csv so each run knows where to resume.
 #
 # SPLIT_REFERENCE_DATE
-#   Use None to always split relative to today (normal production use).
-#   Set to a past date (e.g. "2025-10-01") to simulate how the split
-#   would have looked at that point in time — useful for backtesting
-#   or reconstructing historical train/test sets.
+#   None  → split is always calculated relative to today (normal monthly use)
+#   "YYYY-MM-DD" → simulate how the split would look at a past date,
+#                  useful for backtesting or reconstructing historical splits
 #
-# Output folders are dated: 04_split/YYYY-MM/IS and 04_split/YYYY-MM/OOS
+# Output structure:
+#   04_split/
+#       expanding/
+#           IS/  crypto_2025-01_2026-01_IS/  ← parquets here
+#           OOS/ crypto_2026-01_2026-04_OOS/ ← parquets here
+#       rolling/
+#           rolling_state.csv
+#           IS/  crypto_2025-01_2026-01_IS/
+#           OOS/ crypto_2026-01_2026-04_OOS/
 # =============================================================================
+import csv
 import logging
 import os
 from datetime import datetime, timezone
@@ -32,12 +40,53 @@ import pandas as pd
 
 logger = logging.getLogger("pipeline.step7")
 
+ROLLING_STATE_FILE = "rolling_state.csv"
+
+
+# =============================================================================
+# ROLLING STATE
+# =============================================================================
+
+def _load_rolling_state(mode_dir: str) -> dict | None:
+    """Loads rolling window state from CSV. Returns None if no state exists."""
+    path = os.path.join(mode_dir, ROLLING_STATE_FILE)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            return rows[0] if rows else None
+    except Exception as e:
+        logger.warning(f"  ⚠ Could not load rolling state: {e}")
+        return None
+
+
+def _save_rolling_state(mode_dir: str, is_start: str, is_end: str, oos_start: str, oos_end: str) -> None:
+    """Persists rolling window state to CSV for next run."""
+    state = {
+        "last_run":  datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "is_start":  is_start,
+        "is_end":    is_end,
+        "oos_start": oos_start,
+        "oos_end":   oos_end,
+    }
+    path = os.path.join(mode_dir, ROLLING_STATE_FILE)
+    try:
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=state.keys())
+            writer.writeheader()
+            writer.writerow(state)
+        logger.debug(f"  Rolling state saved → {ROLLING_STATE_FILE}")
+    except Exception as e:
+        logger.warning(f"  ⚠ Could not save rolling state: {e}")
+
 
 # =============================================================================
 # WINDOW CALCULATION
 # =============================================================================
 
-def _compute_windows(config: dict) -> tuple[str, str, str, str]:
+def _compute_windows(config: dict, mode_dir: str) -> tuple[str, str, str, str]:
     """Returns (is_start, is_end, oos_start, oos_end) as ISO date strings."""
     split_mode   = config.get("split_mode", "expanding")
     window_is    = config.get("window_is_months", 12)
@@ -45,7 +94,6 @@ def _compute_windows(config: dict) -> tuple[str, str, str, str]:
     ref_date_str = config.get("split_reference_date", None)
     start_date   = config.get("start_date", "2020-01-01")
 
-    # Reference date — today or override
     if ref_date_str:
         ref = pd.to_datetime(ref_date_str).to_pydatetime()
     else:
@@ -58,14 +106,17 @@ def _compute_windows(config: dict) -> tuple[str, str, str, str]:
         is_end    = oos_start
 
     elif split_mode == "rolling":
-        # Determine which run we are on based on existing split folders
-        split_dir   = config.get("split_dir", "")
-        run_number  = _get_run_number(split_dir)
-        offset      = relativedelta(months=window_oos * run_number)
-        is_start    = pd.to_datetime(start_date).to_pydatetime() + offset
-        is_end      = is_start + relativedelta(months=window_is)
-        oos_start   = is_end
-        oos_end     = oos_start + relativedelta(months=window_oos)
+        state = _load_rolling_state(mode_dir)
+        if state is None:
+            logger.info("  Rolling state not found — starting from run 1.")
+            is_start = pd.to_datetime(start_date).to_pydatetime()
+        else:
+            logger.info(f"  Rolling state loaded — last run: {state['last_run']}")
+            is_start = pd.to_datetime(state["is_start"]).to_pydatetime() + relativedelta(months=window_oos)
+
+        is_end    = is_start + relativedelta(months=window_is)
+        oos_start = is_end
+        oos_end   = oos_start + relativedelta(months=window_oos)
     else:
         raise ValueError(f"Unknown SPLIT_MODE: '{split_mode}'. Use 'expanding' or 'rolling'.")
 
@@ -77,15 +128,23 @@ def _compute_windows(config: dict) -> tuple[str, str, str, str]:
     )
 
 
-def _get_run_number(split_dir: str) -> int:
-    """Counts existing dated split folders to determine current run number."""
-    if not os.path.exists(split_dir):
-        return 0
-    existing = [
-        d for d in os.listdir(split_dir)
-        if os.path.isdir(os.path.join(split_dir, d)) and len(d) == 7 and d[4] == "-"
-    ]
-    return len(existing)
+# =============================================================================
+# FOLDER NAMING
+# =============================================================================
+
+def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, subset: str) -> str:
+    """
+    Builds descriptive folder name.
+    IS  → crypto_2025-01_2026-01_IS
+    OOS → crypto_2026-01_2026-04_OOS
+    """
+    if subset == "IS":
+        start = is_start[:7].replace("-", "-")
+        end   = is_end[:7].replace("-", "-")
+    else:
+        start = oos_start[:7].replace("-", "-")
+        end   = oos_end[:7].replace("-", "-")
+    return f"crypto_{start}_{end}_{subset}"
 
 
 # =============================================================================
@@ -122,11 +181,17 @@ def run(config: dict) -> bool:
     export_csv: bool = config.get("export_csv", False)
     split_mode: str  = config.get("split_mode", "expanding")
 
-    is_start, is_end, oos_start, oos_end = _compute_windows(config)
+    # Mode subfolder: expanding/ or rolling/
+    mode_dir = os.path.join(split_dir, split_mode)
+    os.makedirs(mode_dir, exist_ok=True)
 
-    period_label = oos_start[:7]
-    is_dir  = os.path.join(split_dir, period_label, "IS")
-    oos_dir = os.path.join(split_dir, period_label, "OOS")
+    is_start, is_end, oos_start, oos_end = _compute_windows(config, mode_dir)
+
+    # Descriptive folder names
+    is_folder_name  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS")
+    oos_folder_name = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS")
+    is_dir  = os.path.join(mode_dir, "IS",  is_folder_name)
+    oos_dir = os.path.join(mode_dir, "OOS", oos_folder_name)
     os.makedirs(is_dir, exist_ok=True)
     os.makedirs(oos_dir, exist_ok=True)
 
@@ -138,9 +203,8 @@ def run(config: dict) -> bool:
         return False
 
     logger.info(f"✂️  IS/OOS split [{split_mode}] — {len(files)} file(s)")
-    logger.info(f"   IS  : {is_start} → {is_end}")
-    logger.info(f"   OOS : {oos_start} → {oos_end}")
-    logger.info(f"   Period: {period_label}")
+    logger.info(f"   IS  : {is_start} → {is_end}  →  {is_folder_name}")
+    logger.info(f"   OOS : {oos_start} → {oos_end}  →  {oos_folder_name}")
 
     skipped_is = skipped_oos = errors = processed = 0
 
@@ -184,6 +248,9 @@ def run(config: dict) -> bool:
     if errors:
         logger.warning(f"⚠ Step 7 completed with {errors} error(s)")
         return False
+
+    if split_mode == "rolling":
+        _save_rolling_state(mode_dir, is_start, is_end, oos_start, oos_end)
 
     logger.info("✅ IS/OOS split complete")
     return True
