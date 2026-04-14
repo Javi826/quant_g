@@ -146,15 +146,12 @@ def _calculate_duration_optimized(trade_log):
         return np.nan
 
 def save_all_trades_to_csv(grid_results_list, param_names, filename, strategy_name=None, save=True, output_folder=None):
-
     if not save:
         return
-    
-    if output_folder is not None:
-        folder = output_folder
-    else:
-        folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "brief_trades")
-    os.makedirs(folder, exist_ok=True)
+    if output_folder is None:
+        raise ValueError("output_folder is required")
+    os.makedirs(output_folder, exist_ok=True)
+    folder = output_folder
     
     base_filename = os.path.basename(filename)
     final_path    = os.path.join(folder, base_filename)

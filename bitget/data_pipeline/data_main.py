@@ -40,29 +40,35 @@ DEBUG_HIGHLOW_INTEGRITY_DIR = os.path.join(DATA_DIR, "debug_06_highlow_integrity
 # PIPELINE CONFIG
 # =============================================================================
 DEBUG_MODE = True
-EXPORT_CSV = True   # Set True to export CSV alongside parquet at each step
+EXPORT_CSV = False   # Set True to export CSV alongside parquet at each step
 
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
+# "manual" → use SELECTED_SYMBOLS list
 # "auto"   → rank all symbols by avg daily volume
-# "manual" → use SELECTED_SYMBOLS list and pick top N_SYMBOLS_DOWNLOAD
-SYMBOL_MODE        = "auto"              
-SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] # only used when SYMBOL_MODE = "manual"
-N_SYMBOLS_DOWNLOAD = 50                     # only used when SYMBOL_MODE = "auto"
+# only used when SYMBOL_MODE = "manual"
+# only used when SYMBOL_MODE = "auto"
+# and pick top N_SYMBOLS_DOWNLOAD
+SYMBOL_MODE        = "manual"               
+N_SYMBOLS_DOWNLOAD = 50                                                             
+SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] 
+                                          
 
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc", "4H", "1H","15m"]
-START_DATE = "2022-01-01"
-END_DATE   = None   # None = download up to today
-                    # Set e.g. "2025-06-01" to limit download (useful for testing incremental)
+TIMEFRAMES = ["1Dutc","6Hutc", "4H", "1H"]
+START_DATE = "2025-01-01"
+END_DATE   = None   # Controls how far data is downloaded (step 1 only).
+                    # None  → download up to today
+                    # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
+                    # Example: END_DATE = "2025-06-01" downloads data up to June 2025 only
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"], ["4H", "1H"],["1H", "15m"]]   # list of [higher_tf, intrabar_tf] pairs
+TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"],["6Hutc", "1H"]["4H", "1H"], ["1H", "30m"]]   # list of [higher_tf, intrabar_tf] pairs
 
 # =============================================================================
 # IS/OOS SPLIT
@@ -73,20 +79,24 @@ TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"], ["4H", "1H"],["1H", "15m"]]   # list of [
 #   Each monthly run the IS grows as more data is available.
 #
 # SPLIT_MODE = "rolling"
-#   IS  : fixed WINDOW_IS_MONTHS duration, slides forward WINDOW_OOS_MONTHS each run
-#   OOS : next WINDOW_OOS_MONTHS after IS end
-#   Run 1: IS = START_DATE → START_DATE + WINDOW_IS_MONTHS
-#   Run 2: IS = START_DATE + WINDOW_OOS_MONTHS → same duration
-#   Run 3: IS = START_DATE + 2*WINDOW_OOS_MONTHS → same duration ...
+#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
+#   IS ends where OOS starts.
+#   IS_ROLLING_MONTHS controls how much the IS start advances on each consecutive run.
+#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
+#   Run 2: IS start advances by IS_ROLLING_MONTHS
+#   State is persisted in rolling_state.csv so each run knows where to resume.
 #
 # SPLIT_REFERENCE_DATE
-#   None  → split is always calculated relative to today (normal monthly use)
-#   "YYYY-MM-DD" → simulate how the split would look at a past date,
-#                  useful for backtesting or reconstructing historical splits
+#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
+#   None        → split calculated relative to today (normal monthly production use)
+#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
+#                 Useful for backtesting or reconstructing historical train/test sets.
+#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
+#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 
 SPLIT_MODE           = "expanding"
-WINDOW_IS_MONTHS     = 36    # only used when SPLIT_MODE = "rolling"
 WINDOW_OOS_MONTHS    = 12
+IS_ROLLING_MONTHS    = 3     # only used when SPLIT_MODE = "rolling"
 SPLIT_REFERENCE_DATE = None
 
 
@@ -129,8 +139,8 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
         "n_symbols_download":            N_SYMBOLS_DOWNLOAD,
         "timeframes_highlow":            TIMEFRAMES_HIGHLOW,
         "split_mode":                    SPLIT_MODE,
-        "window_is_months":              WINDOW_IS_MONTHS,
         "window_oos_months":             WINDOW_OOS_MONTHS,
+        "is_rolling_months":             IS_ROLLING_MONTHS,
         "split_reference_date":          SPLIT_REFERENCE_DATE,
         "export_csv":                    EXPORT_CSV,
         "raw_dir":                       RAW_DIR,
@@ -149,6 +159,12 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
 # =============================================================================
 
 def _run_pipeline() -> None:
+
+    # Split preview + confirmation before any work is done
+    config_preview = _build_config()
+    if not step7_split.print_split_preview(config_preview):
+        logger.info("❌ Pipeline cancelled by user.")
+        return
 
     # Step 0 — Symbol selection (resolves symbol list once for all timeframes)
     config_s0 = _build_config()

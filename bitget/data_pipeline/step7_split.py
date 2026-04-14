@@ -8,26 +8,29 @@
 #   Each monthly run the IS grows as more data is available.
 #
 # SPLIT_MODE = "rolling"
-#   IS  : fixed WINDOW_IS_MONTHS duration, slides forward WINDOW_OOS_MONTHS each run
-#   OOS : next WINDOW_OOS_MONTHS after IS end
-#   Run 1: IS = START_DATE → START_DATE + WINDOW_IS_MONTHS
-#   Run 2: IS = START_DATE + WINDOW_OOS_MONTHS → same duration
-#   Run 3: IS = START_DATE + 2*WINDOW_OOS_MONTHS → same duration ...
+#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
+#   IS ends where OOS starts. IS_ROLLING_MONTHS controls how much
+#   the IS start advances on each consecutive run.
+#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
+#   Run 2: IS start advances by IS_ROLLING_MONTHS
 #   State is persisted in rolling_state.csv so each run knows where to resume.
 #
 # SPLIT_REFERENCE_DATE
-#   None  → split is always calculated relative to today (normal monthly use)
-#   "YYYY-MM-DD" → simulate how the split would look at a past date,
-#                  useful for backtesting or reconstructing historical splits
+#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
+#   None        → split calculated relative to today (normal monthly production use)
+#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
+#                 Useful for backtesting or reconstructing historical train/test sets.
+#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
+#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 #
 # Output structure:
 #   04_split/
 #       expanding/
-#           IS/  crypto_2025-01_2026-01_IS/  ← parquets here
+#           IS/  crypto_2022-01_2026-01_IS/  ← parquets here
 #           OOS/ crypto_2026-01_2026-04_OOS/ ← parquets here
 #       rolling/
 #           rolling_state.csv
-#           IS/  crypto_2025-01_2026-01_IS/
+#           IS/  crypto_2022-01_2026-01_IS/
 #           OOS/ crypto_2026-01_2026-04_OOS/
 # =============================================================================
 import csv
@@ -40,7 +43,8 @@ import pandas as pd
 
 logger = logging.getLogger("pipeline.step7")
 
-ROLLING_STATE_FILE = "rolling_state.csv"
+ROLLING_STATE_FILE  = "rolling_state.csv"
+REFERENCE_SYMBOL_TF = "1Dutc"   # Used to read available data range for preview
 
 
 # =============================================================================
@@ -55,7 +59,7 @@ def _load_rolling_state(mode_dir: str) -> dict | None:
     try:
         with open(path, "r", newline="") as f:
             reader = csv.DictReader(f)
-            rows = list(reader)
+            rows   = list(reader)
             return rows[0] if rows else None
     except Exception as e:
         logger.warning(f"  ⚠ Could not load rolling state: {e}")
@@ -88,11 +92,11 @@ def _save_rolling_state(mode_dir: str, is_start: str, is_end: str, oos_start: st
 
 def _compute_windows(config: dict, mode_dir: str) -> tuple[str, str, str, str]:
     """Returns (is_start, is_end, oos_start, oos_end) as ISO date strings."""
-    split_mode   = config.get("split_mode", "expanding")
-    window_is    = config.get("window_is_months", 12)
-    window_oos   = config.get("window_oos_months", 3)
-    ref_date_str = config.get("split_reference_date", None)
-    start_date   = config.get("start_date", "2020-01-01")
+    split_mode      = config.get("split_mode", "expanding")
+    window_oos      = config.get("window_oos_months", 3)
+    is_rolling      = config.get("is_rolling_months", 3)
+    ref_date_str    = config.get("split_reference_date", None)
+    start_date      = config.get("start_date", "2020-01-01")
 
     if ref_date_str:
         ref = pd.to_datetime(ref_date_str).to_pydatetime()
@@ -106,17 +110,18 @@ def _compute_windows(config: dict, mode_dir: str) -> tuple[str, str, str, str]:
         is_end    = oos_start
 
     elif split_mode == "rolling":
+        # OOS always ends at ref and lasts WINDOW_OOS_MONTHS
+        oos_end   = ref
+        oos_start = ref - relativedelta(months=window_oos)
+        is_end    = oos_start
+
         state = _load_rolling_state(mode_dir)
         if state is None:
             logger.info("  Rolling state not found — starting from run 1.")
             is_start = pd.to_datetime(start_date).to_pydatetime()
         else:
             logger.info(f"  Rolling state loaded — last run: {state['last_run']}")
-            is_start = pd.to_datetime(state["is_start"]).to_pydatetime() + relativedelta(months=window_oos)
-
-        is_end    = is_start + relativedelta(months=window_is)
-        oos_start = is_end
-        oos_end   = oos_start + relativedelta(months=window_oos)
+            is_start = pd.to_datetime(state["is_start"]).to_pydatetime() + relativedelta(months=is_rolling)
     else:
         raise ValueError(f"Unknown SPLIT_MODE: '{split_mode}'. Use 'expanding' or 'rolling'.")
 
@@ -135,16 +140,139 @@ def _compute_windows(config: dict, mode_dir: str) -> tuple[str, str, str, str]:
 def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, subset: str) -> str:
     """
     Builds descriptive folder name.
-    IS  → crypto_2025-01_2026-01_IS
+    IS  → crypto_2022-01_2026-01_IS
     OOS → crypto_2026-01_2026-04_OOS
     """
     if subset == "IS":
-        start = is_start[:7].replace("-", "-")
-        end   = is_end[:7].replace("-", "-")
+        start = is_start[:7]
+        end   = is_end[:7]
     else:
-        start = oos_start[:7].replace("-", "-")
-        end   = oos_end[:7].replace("-", "-")
+        start = oos_start[:7]
+        end   = oos_end[:7]
     return f"crypto_{start}_{end}_{subset}"
+
+
+# =============================================================================
+# DATA RANGE READER — for preview
+# =============================================================================
+
+def _get_data_range(raw_dir: str) -> tuple[str, str] | None:
+    """Reads min/max date from BTCUSDT 1Dutc parquet for preview calculation."""
+    filename = f"BTCUSDT_{REFERENCE_SYMBOL_TF}.parquet"
+    # Try clean dir first, then raw
+    for folder in [raw_dir.replace("01_raw", "02_clean"), raw_dir]:
+        path = os.path.join(folder, filename)
+        if os.path.exists(path):
+            try:
+                df = pd.read_parquet(path)
+                if "timestamp" not in df.columns:
+                    df = df.reset_index()
+                df["timestamp"] = pd.to_datetime(df["timestamp"])
+                return (
+                    df["timestamp"].min().strftime("%Y-%m-%d"),
+                    df["timestamp"].max().strftime("%Y-%m-%d"),
+                )
+            except Exception:
+                pass
+    return None
+
+
+# =============================================================================
+# SPLIT PREVIEW
+# =============================================================================
+
+def print_split_preview(config: dict) -> bool:
+    """
+    Prints IS/OOS split preview before execution and asks for confirmation.
+    Returns True if user confirms, False if user aborts.
+    """
+    split_mode   = config.get("split_mode", "expanding")
+    window_oos   = config.get("window_oos_months", 3)
+    is_rolling   = config.get("is_rolling_months", 3)
+    start_date   = config.get("start_date", "2020-01-01")
+    ref_date_str = config.get("split_reference_date", None)
+    split_dir    = config.get("split_dir", "")
+    raw_dir      = config.get("raw_dir", "")
+
+    mode_dir = os.path.join(split_dir, split_mode)
+    os.makedirs(mode_dir, exist_ok=True)
+
+    # Compute windows
+    is_start, is_end, oos_start, oos_end = _compute_windows(config, mode_dir)
+
+    # IS/OOS durations
+    is_start_dt  = pd.to_datetime(is_start).to_pydatetime()
+    is_end_dt    = pd.to_datetime(is_end).to_pydatetime()
+    oos_start_dt = pd.to_datetime(oos_start).to_pydatetime()
+    oos_end_dt   = pd.to_datetime(oos_end).to_pydatetime()
+
+    is_months  = (is_end_dt.year - is_start_dt.year) * 12 + (is_end_dt.month - is_start_dt.month)
+    oos_months = (oos_end_dt.year - oos_start_dt.year) * 12 + (oos_end_dt.month - oos_start_dt.month)
+
+    # Folder names
+    is_folder  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS")
+    oos_folder = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS")
+
+    # Data range
+    data_range = _get_data_range(raw_dir)
+
+    ref_label = ref_date_str if ref_date_str else datetime.now(tz=timezone.utc).strftime("%Y-%m-%d") + " (today)"
+
+    print(f"\n{'='*60}")
+    print(f"  📊 Split preview — {ref_label}")
+    print(f"{'='*60}")
+    print(f"  Mode              : {split_mode}")
+    if data_range:
+        print(f"  Data available    : {data_range[0]} → {data_range[1]}")
+    print(f"  START_DATE        : {start_date}")
+    print(f"  WINDOW_OOS_MONTHS : {window_oos}")
+    if split_mode == "rolling":
+        state = _load_rolling_state(mode_dir)
+        last_is_start = state["is_start"] if state else "n/a (run 1)"
+        print(f"  IS_ROLLING_MONTHS : {is_rolling}")
+        print(f"  Last run IS start : {last_is_start}")
+    print(f"")
+    print(f"  IS  : {is_start} → {is_end}  ({is_months} months)")
+    print(f"  OOS : {oos_start} → {oos_end}  ({oos_months} months available)")
+    print(f"")
+    print(f"  📁 Output folders:")
+    print(f"  IS  → {os.path.join(split_mode, 'IS',  is_folder)}/")
+    print(f"  OOS → {os.path.join(split_mode, 'OOS', oos_folder)}/")
+    print(f"{'='*60}")
+
+    answer = input("\n  Continue? [y/n]: ").strip().lower()
+    return answer == "y"
+
+
+# =============================================================================
+# GET LATEST SPLIT FOLDERS — utility for downstream scripts
+# =============================================================================
+
+def get_latest_split_folders(split_dir: str, mode: str = "expanding") -> dict | None:
+    """
+    Returns paths to the most recent IS and OOS folders for the given mode.
+    Useful for downstream scripts (e.g. wfo_mc_parity.py) to auto-resolve data paths.
+
+    Returns:
+        {"IS": "/path/to/IS/crypto_..._IS", "OOS": "/path/to/OOS/crypto_..._OOS"}
+        or None if no folders found.
+    """
+    mode_dir = os.path.join(split_dir, mode)
+    result   = {}
+
+    for subset in ["IS", "OOS"]:
+        subset_dir = os.path.join(mode_dir, subset)
+        if not os.path.exists(subset_dir):
+            return None
+        folders = sorted([
+            f for f in os.listdir(subset_dir)
+            if os.path.isdir(os.path.join(subset_dir, f)) and f.startswith("crypto_")
+        ])
+        if not folders:
+            return None
+        result[subset] = os.path.join(subset_dir, folders[-1])
+
+    return result
 
 
 # =============================================================================
@@ -181,13 +309,11 @@ def run(config: dict) -> bool:
     export_csv: bool = config.get("export_csv", False)
     split_mode: str  = config.get("split_mode", "expanding")
 
-    # Mode subfolder: expanding/ or rolling/
     mode_dir = os.path.join(split_dir, split_mode)
     os.makedirs(mode_dir, exist_ok=True)
 
     is_start, is_end, oos_start, oos_end = _compute_windows(config, mode_dir)
 
-    # Descriptive folder names
     is_folder_name  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS")
     oos_folder_name = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS")
     is_dir  = os.path.join(mode_dir, "IS",  is_folder_name)
@@ -266,9 +392,10 @@ if __name__ == "__main__":
     _config = {
         "highlow_dir":          os.path.join(_base, "data", "03_highlow"),
         "split_dir":            os.path.join(_base, "data", "04_split"),
+        "raw_dir":              os.path.join(_base, "data", "01_raw"),
         "split_mode":           "expanding",
-        "window_is_months":     12,
         "window_oos_months":    3,
+        "is_rolling_months":    3,
         "start_date":           "2025-01-01",
         "split_reference_date": None,
         "export_csv":           False,

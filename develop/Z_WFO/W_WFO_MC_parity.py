@@ -1,15 +1,16 @@
 #wfo_mc_parity.py
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "signals")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 import time
-from utils.ZX_utils import filter_symbols, final_prints
-from tools.ZX_WFO_MC import walk_forward_optimization_mc
-from tools.ZX_st_tools import get_n_obs
+from utils.utils import filter_symbols, final_prints
+from tools.wfo_mc import walk_forward_optimization_mc
+from utils.st_tools import get_n_obs
 import pandas as pd
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
-from utils.ZX_analysis import report_backtesting
+from utils.st_tools import prepare_ohlcv_arrays, compile_grid_results
+from utils.analysis import report_backtesting
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from signals.add_signals_parity import parity_long
 from signals.add_signals_parity import parity_short
@@ -24,16 +25,16 @@ MY_SYMBOLS  = False
 # -----------------------------------------------------------------------------
 DATA_FOLDER         = "../data/crypto_2022_IS"
 DATA_FOLDER_OOS     = "../data/crypto_2026_OOS"
-TIMEFRAME_MINOR     = '1H'
+TIMEFRAME_MINOR     = '4H'
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 2_500_000
+MIN_VOL_USDT        = 10_000_000
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = False
-MONTHS_TRAIN        = 12
-MONTHS_TEST         = 6
+MONTHS_TRAIN        = 36
+MONTHS_TEST         = 2
 
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
@@ -44,18 +45,20 @@ FINAL_N_PATHS       = 100
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [100,150]
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [15,30,45]
-TP_PCT_LIST          = [2,3,4]
-SL_PCT_LIST          = [8,9,10]
+LOOKBACK_LIST        = [50,100,150]
+MA_PERIOD_LIST       = [50]
+TOLERANCE_LIST       = [10,20,30,40]
+TP_PCT_LIST          = [2,3,4,5,6]
+SL_PCT_LIST          = [6,7,8,9,10]
 
-SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [50]
-MA_PERIOD_LIST       = [25]
-TOLERANCE_LIST       = [15]
-TP_PCT_LIST          = [2]
-SL_PCT_LIST          = [9]
+# =============================================================================
+# SELL_AFTER_LIST      = [0]
+# LOOKBACK_LIST        = [50]
+# MA_PERIOD_LIST       = [25]
+# TOLERANCE_LIST       = [15]
+# TP_PCT_LIST          = [2]
+# SL_PCT_LIST          = [9]
+# =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}

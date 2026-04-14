@@ -344,7 +344,7 @@ def run_strategy(strategy: dict) -> None:
 
     save_all_trades_to_csv(
         grid_results_list, grid_param_names,
-        f"all_trades_{strategy_label}.xlsx",
+        f"all_trades_{strategy_label}.csv",
         strategy_name=strategy_label,
         save=True,
         output_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "brief_trades"),

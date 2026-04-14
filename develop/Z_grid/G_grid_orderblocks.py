@@ -1,19 +1,21 @@
-# === FILE: main_grid_ ===
+# === FILE: main_grid===
 # -----------------------------------------------------------
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "signals")))
 import time
 import pandas as pd
 from itertools import product
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
+
 from joblib import Parallel, delayed
-from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_excel, save_results
-from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, save_filtered_symbols, final_prints,save_equity_to_excel
+from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from shared.utils.st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_csv, save_results,save_equity_to_excel
+from shared.utils.analysis import report_backtesting
+
+from shared.utils.utils import filter_symbols, save_filtered_symbols, final_prints
 from signals.add_signals_orderblocks import orderblocks_long
 from signals.add_signals_orderblocks import orderblocks_short
 
@@ -118,7 +120,7 @@ grid_results_df = pd.DataFrame(grid_records)
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
 save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_excel(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
+save_all_trades_to_csv(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", save=False)
 save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)

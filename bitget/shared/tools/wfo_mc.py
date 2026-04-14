@@ -7,8 +7,12 @@ from tqdm_joblib import tqdm_joblib
 from collections import Counter
 from sklearn.linear_model import LinearRegression
 
-from tools.ZX_st_tools import extract_ohlcv_from_path, compile_MC_results, prepare_ohlcv_arrays
-from tools.ZX_optimize_MCf_tf import generate_paths_for_all_symbols_functional
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from utils.st_tools import extract_ohlcv_from_path, compile_MC_results, prepare_ohlcv_arrays
+from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 
 
 def _slice_ohlcv_data(ohlcv_data: dict, t0: int, t1: int) -> dict:
