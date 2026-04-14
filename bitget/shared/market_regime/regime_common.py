@@ -98,8 +98,8 @@ def classify_trade_by_family(metrics, families):
 
 
 def load_trades(filepath):
-    """Load trades from Excel file"""
-    df = pd.read_excel(filepath)
+    """Load trades from CSV file"""
+    df = pd.read_csv(filepath)
     df.columns = df.columns.str.lower().str.strip()
     if 'buy_time' in df.columns:
         df['buy_time'] = pd.to_datetime(df['buy_time'])

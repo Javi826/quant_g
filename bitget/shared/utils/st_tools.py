@@ -145,7 +145,7 @@ def _calculate_duration_optimized(trade_log):
     except Exception:
         return np.nan
 
-def save_all_trades_to_excel(grid_results_list, param_names, filename, strategy_name=None, save=True, output_folder=None):
+def save_all_trades_to_csv(grid_results_list, param_names, filename, strategy_name=None, save=True, output_folder=None):
 
     if not save:
         return

@@ -34,13 +34,13 @@ if not SHOW_PLOTS:
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
 from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
-from utils.st_tools import get_n_obs, save_all_trades_to_excel
+from utils.st_tools import get_n_obs, save_all_trades_to_csv
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.analysis import report_montecarlo, report_backtesting
 from utils.utils import filter_symbols, final_prints
 from regime_performance import analyze_strategy, print_single_strategy_all_dimensions
 from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time, classify_trade_by_family
-from regime_performance import  MA_PERIOD, LOOKBACK_BARS
+from regime_performance import MA_PERIOD, LOOKBACK_BARS
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
 from batch_utils import report_filtered_trades, extract_best_params, select_universe
@@ -82,18 +82,18 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 1
-N_PATHS_OOS = 20
+N_PATHS_IS  = 100
+N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
 R1_NETGAIN_ROUND1    = 20.0
-R1_RSQUARED_ROUND1   = 0.7
-R1_PROBNEG_ROUND1    = 31.0
+R1_RSQUARED_ROUND1   = 0.8
+R1_PROBNEG_ROUND1    = 15.0
 
 # Validation thresholds — Round 2 path A (regime filtered)
 R2A_NETGAIN_ROUND2   = 20.0
-R2A_RSQUARED_ROUND2  = 0.85
-R2A_PROBNEG_ROUND1   = 41.0
+R2A_RSQUARED_ROUND2  = 0.90
+R2A_PROBNEG_ROUND1   = 100.0
 
 # Validation thresholds — Round 2 path B (high netgain OOS)
 R2B_NETGAIN_ROUND1   = 80.0
@@ -128,7 +128,7 @@ SELECTED_STRATEGIES = [
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
-RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
+RUN_BEST_COMBINATIONS   = False # Set to False to skip best combinations (expensive)
 UPDATE_CSV              = True   # Set to False to skip CSV updates (tables will show last run data)
 
 STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_params")
@@ -342,7 +342,7 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 4 — Regime Analysis  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    save_all_trades_to_excel(
+    save_all_trades_to_csv(
         [(best_comb, oos_result)], param_names,
         f"all_trades_{STRATEGY_ID}.csv",
         strategy_name=STRATEGY_ID, save=True,
@@ -353,7 +353,7 @@ def run_batch(strategy_config: dict) -> None:
     trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
     logger.debug(f"Trades saved → {TRADES_PATH}  ({len(trade_log)} trades)")
 
-    regime_result = analyze_strategy(TRADES_PATH, FAMILIES, INITIAL_BALANCE)
+    regime_result = analyze_strategy(TRADES_PATH, FAMILIES, INITIAL_BALANCE, ohlc_folder=DATA_FOLDER_OOS)
     print_single_strategy_all_dimensions(regime_result)
 
     trade_log = enrich_trades_with_regime(

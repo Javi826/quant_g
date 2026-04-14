@@ -18,8 +18,8 @@ import pandas as pd
 # =============================================================================
 # PATHS
 # =============================================================================
-CSV_PATH    = os.path.join(os.path.dirname(__file__), "strategies_params", "strategies_params.csv")
-OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "strategies_params", "strategies_E1_from_csv.py")
+CSV_PATH    = os.path.join(os.path.dirname(__file__), "strategies_params.csv")
+OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "strategies_E1_from_csv.py")
 
 # =============================================================================
 # SCHEMA
