@@ -6,6 +6,7 @@ env_quant/
 *.xlsx
 *.h5
 *.pt
+*.csv
 
 # Logs
 *.log
