@@ -45,66 +45,6 @@ def validate_csv_columns(csv_path):
 
 
 # =============================================================================
-# HELPER — REPORT FILTERED TRADES
-# =============================================================================
-def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filtered Trades"):
-    """
-    Recompute equity curve, key metrics and plot from a filtered trade_log.
-    Mirrors the output format of report_backtesting.
-    """
-    df = trade_log.copy().sort_values("buy_time").reset_index(drop=True)
-    if len(df) == 0:
-        logger.debug(f"{title} — no trades after filter, skipping.")
-        return {"net_gain_pct": 0.0, "dd_pct": 0.0, "win_ratio": 0.0, "r2": 0.0}
-    df["duration_d"] = (pd.to_datetime(df["sell_time"]) - pd.to_datetime(df["buy_time"])).dt.total_seconds() / 86400
-
-    # --- Equity curve ---
-    df["equity"] = initial_balance + df["profit"].cumsum()
-    balances     = df["equity"].values
-    timestamps   = pd.to_datetime(df["buy_time"])
-
-    # --- Metrics ---
-    net_gain      = balances[-1] - initial_balance
-    net_gain_pct  = net_gain / initial_balance * 100
-    win_ratio     = (df["profit"] > 0).mean()
-    num_signals   = len(df)
-    duration_d    = df["duration_d"].mean()
-    cummax        = np.maximum.accumulate(balances)
-    dd_pct        = ((balances - cummax) / cummax * 100).min()
-    X             = np.arange(len(balances)).reshape(-1, 1)
-    y             = balances.reshape(-1, 1)
-    r2            = round(LinearRegression().fit(X, y).score(X, y), 3)
-    sharpe        = (df["profit"].mean() / df["profit"].std() * np.sqrt(252)) if df["profit"].std() > 0 else np.nan
-
-    # --- Summary table ---
-    _param_cols = [c for c in ["sell_after","lookback","tolerance","ma_period","tp_pct","sl_pct","impulse","ranges"] if c in trade_log.columns]
-    df_summary = pd.DataFrame([{
-        "Metric": "Net_Gain_pct",
-        **{k.upper(): v for k, v in trade_log[_param_cols].iloc[0].items()},
-        "Net_Gain_pct": round(net_gain_pct, 2), "Win_Ratio": round(win_ratio, 2),
-        "R2": r2, "Sharpe": round(sharpe, 2), "DD_pct": round(dd_pct, 2),
-        "Num_Signals": num_signals, "duration_d": round(duration_d, 2)
-    }])
-    logger.debug(df_summary.to_string(index=False))
-
-    # --- Monthly stats ---
-    df["month"] = pd.to_datetime(df["buy_time"]).dt.to_period("M")
-    monthly      = df.groupby("month")["profit"].sum()
-    winning_m    = (monthly > 0).sum()
-    logger.debug(f"\n{'-'*60}")
-    logger.debug("MONTHLY STATISTICS")
-    logger.debug(f"{'-'*60}")
-    logger.debug(f"Winning Months: {winning_m} / {len(monthly)} ({winning_m/len(monthly)*100:.2f}%)")
-
-    return {
-        "net_gain_pct": round(net_gain_pct, 2),
-        "dd_pct":       round(dd_pct, 2),
-        "win_ratio":    round(win_ratio * 100, 1),
-        "r2":           r2,
-    }
-
-
-# =============================================================================
 # HELPER — PLOT FILTER COMPARISON
 # =============================================================================
 def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_folder, initial_balance):
@@ -114,15 +54,16 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
     """
     import matplotlib.dates as mdates
 
-    def _equity_pct(tl):
-        tl = tl.sort_values("buy_time").reset_index(drop=True)
+    def _equity_pct(tl, t_start):
+        tl  = tl.sort_values("buy_time").reset_index(drop=True)
         eq  = initial_balance + tl["profit"].cumsum().values
         pct = (eq - initial_balance) / initial_balance * 100
         m   = compute_metrics(tl, capital=initial_balance, name="")
-        return pd.to_datetime(tl["buy_time"]).values, pct, m
-
-    ts_base, eq_base, m_base = _equity_pct(trade_log_baseline)
-    ts_r01,  eq_r01,  m_r01  = _equity_pct(trade_log_r01) if trade_log_r01 is not None and len(trade_log_r01) > 0 else (None, None, None)
+        ts  = pd.to_datetime(tl["buy_time"]).values
+        # Prepend origin point at t_start with 0%
+        ts  = np.concatenate([[np.datetime64(t_start)], ts])
+        pct = np.concatenate([[0.0], pct])
+        return ts, pct, m
 
     # Load BTC 1Dutc
     btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
@@ -134,11 +75,14 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
         btc_df["ts"] = pd.to_datetime(btc_df.index)
     btc_df = btc_df.sort_values("ts").reset_index(drop=True)
 
-    t_start = pd.Timestamp(ts_base.min())
-    t_end   = pd.Timestamp(ts_base.max())
+    t_start = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).min())
+    t_end   = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).max())
+
+    ts_base, eq_base, m_base = _equity_pct(trade_log_baseline, t_start)
+    ts_r01,  eq_r01,  m_r01  = _equity_pct(trade_log_r01, t_start) if trade_log_r01 is not None and len(trade_log_r01) > 0 else (None, None, None)
     btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
     if len(btc_sub) > 0:
-        btc_pct = (btc_sub["close"].values / btc_sub["close"].values[0] - 1) * 100
+        btc_pct = (btc_sub["close"].values / btc_df["close"].iloc[0] - 1) * 100
         btc_ts  = btc_sub["ts"].values
     else:
         btc_pct, btc_ts = None, None
@@ -155,9 +99,91 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
         ax.plot(ts_r01, eq_r01, color="seagreen", linewidth=1.2, label=lbl_r01)
 
     if btc_ts is not None:
-        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="BTC (normalized)")
+        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="_BTC")
 
+    ax.axhline(0, color="black", linewidth=1.0, alpha=0.6)
     ax.set_title(strategy_id)
+    ax.set_ylabel("Net Gain (%)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    fig.autofmt_xdate()
+    ax.grid(True, linestyle="--", alpha=0.4)
+    legend = ax.legend(loc="upper left")
+    for text in legend.get_texts():
+        text.set_fontfamily("monospace")
+    plt.tight_layout()
+    plt.show()
+
+
+# =============================================================================
+# HELPER — PLOT PORTFOLIO COMPARISON (validated combined curves)
+# =============================================================================
+def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_folder, initial_balance):
+    """
+    Single plot with combined baseline + combined regime 0+1 + BTC.
+    Used at the end of run_portfolio_analysis for validated strategies only.
+    """
+    import matplotlib.dates as mdates
+
+    if not trade_logs_baseline:
+        return
+
+    def _combined_equity_pct(trade_logs, capital_per_strategy):
+        all_tl = pd.concat(
+            [df for _, df in trade_logs], ignore_index=True
+        ).sort_values("buy_time").reset_index(drop=True)
+        total_capital = capital_per_strategy * len(trade_logs)
+        eq  = total_capital + all_tl["profit"].cumsum().values
+        pct = (eq - total_capital) / total_capital * 100
+        ts  = pd.to_datetime(all_tl["buy_time"]).values
+        m   = compute_metrics(all_tl, capital=total_capital, name="")
+        t_start = pd.Timestamp(all_tl["buy_time"].min())
+        ts  = np.concatenate([[np.datetime64(t_start)], ts])
+        pct = np.concatenate([[0.0], pct])
+        return ts, pct, m, t_start
+
+    # Load BTC
+    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
+    btc_df   = pd.read_parquet(btc_file)
+    btc_df.columns = btc_df.columns.str.lower()
+    if "timestamp" in btc_df.columns:
+        btc_df["ts"] = pd.to_datetime(btc_df["timestamp"])
+    else:
+        btc_df["ts"] = pd.to_datetime(btc_df.index)
+    btc_df = btc_df.sort_values("ts").reset_index(drop=True)
+
+    ts_base, eq_base, m_base, t_start_base = _combined_equity_pct(trade_logs_baseline, initial_balance)
+
+    ts_r01, eq_r01, m_r01, t_start_r01 = (
+        _combined_equity_pct(trade_logs_regime01, initial_balance)
+        if trade_logs_regime01 else (None, None, None, None)
+    )
+
+    t_start = min(t_start_base, t_start_r01) if t_start_r01 else t_start_base
+    t_end   = pd.Timestamp(pd.to_datetime(ts_base).max())
+    btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
+    if len(btc_sub) > 0:
+        btc_pct = (btc_sub["close"].values / btc_df["close"].iloc[0] - 1) * 100
+        btc_ts  = btc_sub["ts"].values
+    else:
+        btc_pct, btc_ts = None, None
+
+    fig, ax = plt.subplots(figsize=(14, 5))
+
+    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
+                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
+    ax.plot(ts_base, eq_base, color="steelblue", linewidth=1.2, label=lbl_base)
+
+    if ts_r01 is not None:
+        lbl_r01 = (f"Regime 0+1  NetGain={m_r01['Net_Gain_pct']:>6.1f}%  "
+                   f"DD={m_r01['Max_DD_pct']:>6.1f}%  R²={m_r01['R_Squared']:.3f}")
+        ax.plot(ts_r01, eq_r01, color="seagreen", linewidth=1.2, label=lbl_r01)
+
+    if btc_ts is not None:
+        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="_BTC")
+
+    ax.axhline(0, color="black", linewidth=1.0, alpha=0.6)
+    ax.set_title("Portfolio — Validated only")
     ax.set_ylabel("Net Gain (%)")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.xaxis.set_major_locator(mdates.MonthLocator())
@@ -247,6 +273,7 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     else:
         if len(symbols_is_final) < n_symbols:
             logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
+    
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
 
@@ -521,9 +548,9 @@ def compute_metrics(trade_log, capital, name="Equity"):
     eq           = capital + daily_profit.cumsum().values
     eq_series    = pd.Series(eq, index=date_range)
 
-    cm       = np.maximum.accumulate(eq)
-    max_dd   = ((eq - cm) / cm * 100).min()
-    net_gain = (eq[-1] - capital) / capital * 100
+    cm         = np.maximum.accumulate(eq)
+    max_dd     = ((eq - cm) / cm * 100).min()
+    net_gain   = (eq[-1] - capital) / capital * 100
     profit_abs = round(float(eq[-1] - capital), 2)
 
     daily_returns = eq_series.pct_change().dropna()
@@ -531,20 +558,33 @@ def compute_metrics(trade_log, capital, name="Equity"):
     monthly       = eq_series.resample("ME").last().pct_change().dropna()
     consistency   = (monthly > 0).mean() * 100
 
+    sharpe = (round(float(profits.mean() / profits.std() * np.sqrt(252)), 3)
+              if profits.std() > 0 else np.nan)
+
+    if "buy_time" in tl.columns and "sell_time" in tl.columns:
+        duration_d = round(float(
+            (pd.to_datetime(tl["sell_time"]) - pd.to_datetime(tl["buy_time"]))
+            .dt.total_seconds().mean() / 86400
+        ), 2)
+    else:
+        duration_d = np.nan
+
     X  = np.arange(len(eq)).reshape(-1, 1)
     y  = eq.reshape(-1, 1)
     r2 = round(_LR().fit(X, y).score(X, y), 3)
 
     return {
         "Curve":          name,
-        "Volatility_pct": round(float(volatility), 2),
-        "Monthly_pct":    round(float(consistency), 2),
         "Net_Gain_pct":   round(float(net_gain), 2),
         "Max_DD_pct":     round(float(max_dd), 2),
+        "Win_Rate":       win_rate,
+        "R_Squared":      r2,
         "Profit_Factor":  pf,
         "Profit_abs":     profit_abs,
-        "R_Squared":      r2,
-        "Win_Rate":       win_rate,
+        "Sharpe":         sharpe,
+        "Duration_d":     duration_d,
+        "Volatility_pct": round(float(volatility), 2),
+        "Monthly_pct":    round(float(consistency), 2),
     }
 
 

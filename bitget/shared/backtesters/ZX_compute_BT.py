@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 MIN_PRICE       = 0.0001
 INITIAL_BALANCE = 800
 COMISION        = 0.1
+DEFAULT_CANDLES = 50
 
 # ============================
 # prepare_data - 
@@ -368,7 +369,7 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
         cash_bank -= (order_amount + commission_buy)
 
     if sell_after == 0:
-        n_velas = 50#VELAS  
+        n_velas = DEFAULT_CANDLES  
         sell_idx = min(buy_idx + n_velas, d['len'] - 1)
     else:
         sell_idx = min(buy_idx + sell_after, d['len'] - 1)
@@ -467,7 +468,7 @@ def run_backtest_loop(
                         if buy_idx + sa > len(ca[sym]):
                             continue
                     else:
-                        if buy_idx + 50 >= len(ca[sym]):
+                        if buy_idx + DEFAULT_CANDLES >= len(ca[sym]):
                             continue
                     
 

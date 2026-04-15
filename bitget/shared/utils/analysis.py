@@ -426,7 +426,7 @@ def analyze_parameter_surface(df, parameters, param_x, param_y, metric):
 # MAIN REPORTING FUNCTION
 # =============================================================================
 
-def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=False):
+def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=False, strategy_id=None):
     
     df = df.copy()
     
@@ -531,7 +531,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     # -------------------------------------------------------------------------
     best_row = df.loc[df["Net_Gain_pct"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
-    plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net_Gain_pct & DD - Best Net Gain")
+    plot_netgain_dd(equity_hist, initial_capital, data_folder, title=f"{strategy_id} — Net Gain % & DD" if strategy_id else "Net_Gain_pct & DD - Best Net Gain")
     
     # -------------------------------------------------------------------------
     # Parameter Surface Analysis

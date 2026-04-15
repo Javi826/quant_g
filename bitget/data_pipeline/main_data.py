@@ -50,16 +50,17 @@ EXPORT_CSV = True   # Set True to export CSV alongside parquet at each step
 # only used when SYMBOL_MODE = "manual"
 # only used when SYMBOL_MODE = "auto"
 # and pick top N_SYMBOLS_DOWNLOAD
+SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] 
 SYMBOL_MODE        = "auto"               
 N_SYMBOLS_DOWNLOAD = 50                                                             
-SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] 
+
                                           
 
 # =============================================================================
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-START_DATE = "2022-01-01"
+START_DATE = "2025-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -94,9 +95,14 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   
 #   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
 #            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 
+# =============================================================================
+# SPLIT DATA
+# =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 6
-IS_ROLLING_MONTHS    = 3     # only used when SPLIT_MODE = "rolling"
+WINDOW_OOS_MONTHS    = 1
+
+# IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
+IS_ROLLING_MONTHS    = 3     
 SPLIT_REFERENCE_DATE = None
 
 

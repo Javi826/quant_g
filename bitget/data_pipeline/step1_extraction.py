@@ -264,7 +264,7 @@ def _process_symbol(
     _save_parquet(df_final, parquet_path)
     _save_csv(df_final, csv_path)
 
-    new_candles = len(df_new) if not df_new.empty else 0
+    new_candles = len(df_final) - len(df_existing)
     logger.info(f"  💾 {len(df_final)} candles total (+{new_candles} new) → {os.path.basename(parquet_path)}")
 
 # =============================================================================

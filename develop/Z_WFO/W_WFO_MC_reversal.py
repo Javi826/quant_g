@@ -1,3 +1,4 @@
+#wfo_mc_reversal.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
@@ -11,12 +12,12 @@ import pandas as pd
 from utils.st_tools import prepare_ohlcv_arrays, compile_grid_results
 from utils.analysis import report_backtesting
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from signals.add_signals_orderblocks import orderblocks_long
-from signals.add_signals_orderblocks import orderblocks_short
+from signals.add_signals_reversal import reversal_long
+from signals.add_signals_reversal import reversal_short
 
 start_time  = time.time()
 N_JOBS      = -1
-STRATEGY    = "orderblocks"
+STRATEGY    = "reversal"
 MY_SYMBOLS  = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
@@ -24,8 +25,9 @@ MY_SYMBOLS  = True
 SPLIT_MODE          = "expanding"
 SPLIT_BASE          = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-04_IS")
+#DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2025-01_2026-03_IS")
 DATA_FOLDER_OOS     = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
-TIMEFRAME_MINOR     = '6Hutc'
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
 # -----------------------------------------------------------------------------
@@ -38,29 +40,29 @@ MONTHS_TEST         = 2
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
 FINAL_N_PATHS       = 100
+
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150]
-TOLERANCE_LIST       = [20,30,35,40,45] 
-IMPULSE_LIST         = [0.005, 0.01, 0.02]
-
+SELL_AFTER_LIST      = [100]
+LOOKBACK_LIST        = [6,7,8]
+TOLERANCE_LIST       = [10,20,30,40]
+MA_PERIOD_LIST       = [50]
 TP_PCT_LIST          = [2,3,4,5]
-SL_PCT_LIST          = [5,6,7,8,9,10]
+SL_PCT_LIST          = [6,7,8,9,10]
 
 # =============================================================================
-# SELL_AFTER_LIST      = [0]  
-# LOOKBACK_LIST        = [50]
-# TOLERANCE_LIST       = [35] 
-# IMPULSE_LIST         = [0.01]
-# 
-# TP_PCT_LIST          = [4]
+# SELL_AFTER_LIST      = [100]
+# LOOKBACK_LIST        = [7]
+# TOLERANCE_LIST       = [40]
+# MA_PERIOD_LIST       = [25]
+# TP_PCT_LIST          = [2]
 # SL_PCT_LIST          = [10]
 # =============================================================================
 
-param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'IMPULSE', 'TP_PCT', 'SL_PCT']
+param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}
+
 # -----------------------------------------------------------------------------
 # CANDLES PER MONTH BY TIMEFRAME
 # -----------------------------------------------------------------------------
@@ -83,8 +85,8 @@ FINAL_N_OBS     = get_n_obs(TIMEFRAME_MINOR)
 # -----------------------------------------------------------------------------
 # SIGNAL FUNCTION — comment/uncomment as needed
 # -----------------------------------------------------------------------------
-signal_fn = orderblocks_short
-# signal_fn = orderblocks_long
+signal_fn = reversal_long
+# signal_fn = reversal_short
 
 # -----------------------------------------------------------------------------
 # LOAD AND FILTER DATA
@@ -135,6 +137,7 @@ df_wfo_results = walk_forward_optimization_mc(
     initial_balance=INITIAL_BALANCE,
     n_jobs=N_JOBS
 )
+
 # -----------------------------------------------------------------------------
 # OOS ANALYSIS — mean, mode, ewm
 # -----------------------------------------------------------------------------
@@ -164,16 +167,19 @@ for method in ['mean', 'mode', 'ewm']:
         signals = signal_fn(arr, **{k.lower(): v for k, v in params.items() if k.lower() not in {'sell_after', 'tp_pct', 'sl_pct'}}, live_trading=False)
         ohlcv_arrays_oos[sym] = {**arr, 'signal': signals}
 
-    oos_result  = run_grid_backtest(ohlcv_arrays_oos,
-                                    sell_after=params['SELL_AFTER'], 
-                                    tp_pct=params['TP_PCT'],
-                                    sl_pct=params['SL_PCT'], 
-                                    order_amount=ORDER_AMOUNT)
-    best_comb   = tuple(params[p] for p in param_names)
-    oos_df      = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
+    oos_result = run_grid_backtest(
+        ohlcv_arrays_oos,
+        sell_after=params['SELL_AFTER'],
+        tp_pct=params['TP_PCT'],
+        sl_pct=params['SL_PCT'],
+        order_amount=ORDER_AMOUNT
+    )
+    best_comb = tuple(params[p] for p in param_names)
+    oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
     final_prints(f"🔭 OOS_{method.upper()}_{STRATEGY}", DATA_FOLDER_OOS, TIMEFRAME_MINOR, MIN_VOL_USDT, ORDER_AMOUNT, param_names, [param_ranges[n] for n in param_names])
     report_backtesting(df=oos_df, parameters=param_names, data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+
 # -----------------------------------------------------------------------------
 # ELAPSED TIME
 # -----------------------------------------------------------------------------

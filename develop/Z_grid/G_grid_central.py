@@ -24,7 +24,7 @@ from signals.add_signals_reversal   import reversal_long, reversal_short
 # GLOBAL CONFIG
 # -----------------------------------------------------------------------------
 DATA_FOLDER  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS")
-SYMBOLS_DIR  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "symbols_live")
+SYMBOLS_DIR  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "symbols_live_old")
 ORDER_AMOUNT = 80
 N_JOBS       = -1
 VOL_WINDOW   = 50

@@ -20,7 +20,7 @@ from joblib import Parallel, delayed
 # LOGGING CONFIGURATION
 # =============================================================================
 LOG_LEVEL  = logging.INFO   # Change to logging.DEBUG for full verbosity
-SHOW_PLOTS = True           # Set to True to enable matplotlib plots
+SHOW_PLOTS = True          # Set to True to enable matplotlib plots
 
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -43,10 +43,10 @@ from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time, clas
 from regime_performance import MA_PERIOD, LOOKBACK_BARS
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
-from batch_utils import report_filtered_trades, extract_best_params, select_universe
+from batch_utils import extract_best_params, select_universe
 from batch_utils import enrich_trades_with_regime, update_strategies_params, update_strategies_symbols, load_btc_1d
 from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
-from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison
+from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
 from batch_utils import validate_csv_columns
 
@@ -78,11 +78,8 @@ logger = logging.getLogger("BOT_batch.main_batch")
 # =============================================================================
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-04_IS")
-DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
-
-DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
-DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
+DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-01_IS")
+DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
 N_JOBS          = -1
 MY_SYMBOLS      = False
@@ -98,7 +95,7 @@ R1_PROBNEG_ROUND1    = 15.0
 
 # Validation thresholds — Round 2 path A (regime filtered)
 R2A_NETGAIN_ROUND2   = 10.0
-R2A_RSQUARED_ROUND2  = 0.90
+R2A_RSQUARED_ROUND2  = 0.8
 R2A_PROBNEG_ROUND1   = 100.0
 
 # Validation thresholds — Round 2 path B (high netgain OOS)
@@ -134,7 +131,7 @@ SELECTED_STRATEGIES = [
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
-RUN_BEST_COMBINATIONS   = False # Set to False to skip best combinations (expensive)
+RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
 UPDATE_CSV              = True   # Set to False to skip CSV updates (tables will show last run data)
 
 STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_params")
@@ -283,7 +280,8 @@ def run_batch(strategy_config: dict) -> None:
     oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
     oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
-                                             data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+                                         data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE,
+                                         strategy_id=STRATEGY_ID)
 
     best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
 
@@ -383,9 +381,10 @@ def run_batch(strategy_config: dict) -> None:
         logger.debug(f"Excluding regimes with negative profit: {excluded_families}")
         trade_log_filtered = trade_log[~trade_log["family"].isin(excluded_families)].reset_index(drop=True)
         logger.debug(f"Trades after filter: {len(trade_log_filtered)} / {len(trade_log)}")
-        report_filtered_trades(trade_log_filtered, initial_balance=INITIAL_BALANCE,
-                               data_folder=DATA_FOLDER_OOS,
-                               title=f"Filtered Trades — {STRATEGY_ID} (excl. {excluded_families})")
+        print_metrics_table(
+            [compute_metrics(trade_log_filtered, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID} (Regime 1)")],
+            f"  Filtered Trades — {STRATEGY_ID} (excl. {excluded_families})"
+        )
     else:
         logger.debug("No regimes with negative profit — no filtering applied.")
 
@@ -420,9 +419,10 @@ def run_batch(strategy_config: dict) -> None:
         logger.info(f"STAGE 5  ── Regime 0 (BTC filter)  ── {len(r0_filtered)} / {len(r0_trade_log)} kept ({keep_direction})")
 
         if len(r0_filtered) > 0:
-            report_filtered_trades(r0_filtered, initial_balance=INITIAL_BALANCE,
-                                   data_folder=DATA_FOLDER_OOS,
-                                   title=f"Regime 0 Filtered — {STRATEGY_ID} ({keep_direction} only, MA{R0_MA_PERIOD})")
+            print_metrics_table(
+                [compute_metrics(r0_filtered, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID} (Regime 0)")],
+                f"  Regime 0 Filtered — {STRATEGY_ID} ({keep_direction} only, MA{R0_MA_PERIOD})"
+            )
 
     # -------------------------------------------------------------------------
     # BLOCK 6 — REGIME 0 + 1 COMBINED FILTER
@@ -445,9 +445,10 @@ def run_batch(strategy_config: dict) -> None:
         logger.info(f"STAGE 6  ── Regime 0+1 Combined    ── {len(r01_filtered)} / {len(r01_trade_log)} kept")
 
         if len(r01_filtered) > 0:
-            report_filtered_trades(r01_filtered, initial_balance=INITIAL_BALANCE,
-                                   data_folder=DATA_FOLDER_OOS,
-                                   title=f"Regime 0+1 Combined — {STRATEGY_ID} (excl. {excluded_families}, {keep_direction} only)")
+            print_metrics_table(
+                [compute_metrics(r01_filtered, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID} (Regime 0+1)")],
+                f"  Regime 0+1 Combined — {STRATEGY_ID} (excl. {excluded_families}, {keep_direction} only)"
+            )
             r01_trades_path = os.path.join(os.path.dirname(__file__), "brief_trades", f"all_trades_{STRATEGY_ID}_regime01.csv")
             r01_filtered.to_csv(r01_trades_path, index=False)
             logger.debug(f"Regime 0+1 trades saved → {r01_trades_path}  ({len(r01_filtered)} trades)")
@@ -688,6 +689,7 @@ def run_batch(strategy_config: dict) -> None:
         wr_str = f"{wr:>9.1f}%" if not np.isnan(wr) else f"{'N/A':>10}"
         logger.debug(f"  {name:<16} {ng_str} {dd_str} {wr_str}")
     logger.debug(f"  {'─'*105}")
+
     plot_filter_comparison(
         strategy_id=STRATEGY_ID,
         trade_log_baseline=trade_log,
@@ -765,6 +767,14 @@ def run_portfolio_analysis():
         print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
+
+    if validated_baseline:
+        plot_portfolio_comparison(
+            trade_logs_baseline=validated_baseline,
+            trade_logs_regime01=validated_regime01,
+            data_folder=DATA_FOLDER_OOS,
+            initial_balance=INITIAL_BALANCE,
+        )
 
     # =========================================================================
     # BEST COMBINATIONS

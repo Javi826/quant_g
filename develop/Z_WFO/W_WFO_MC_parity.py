@@ -18,24 +18,24 @@ from signals.add_signals_parity import parity_short
 start_time  = time.time()
 N_JOBS      = -1
 STRATEGY    = "parity"
-MY_SYMBOLS  = False
-
+MY_SYMBOLS  = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER         = "../data/crypto_2022_IS"
-DATA_FOLDER_OOS     = "../data/crypto_2026_OOS"
-TIMEFRAME_MINOR     = '4H'
+SPLIT_MODE          = "expanding"
+SPLIT_BASE          = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-04_IS")
+DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2025-01_2026-03_IS")
+DATA_FOLDER_OOS     = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
+TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
 MIN_VOL_USDT        = 10_000_000
-
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
 ANCHORED            = False
-MONTHS_TRAIN        = 36
-MONTHS_TEST         = 2
-
+MONTHS_TRAIN        = 12
+MONTHS_TEST         = 3
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
@@ -44,16 +44,16 @@ FINAL_N_PATHS       = 100
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]
+SELL_AFTER_LIST      = [75]
 LOOKBACK_LIST        = [50,100,150]
-MA_PERIOD_LIST       = [50]
+MA_PERIOD_LIST       = [25,50]
 TOLERANCE_LIST       = [10,20,30,40]
-TP_PCT_LIST          = [2,3,4,5,6]
+TP_PCT_LIST          = [2,3,4,5]
 SL_PCT_LIST          = [6,7,8,9,10]
 
 # =============================================================================
-# SELL_AFTER_LIST      = [0]
-# LOOKBACK_LIST        = [50]
+# SELL_AFTER_LIST      = [75]
+# LOOKBACK_LIST        = [150]
 # MA_PERIOD_LIST       = [25]
 # TOLERANCE_LIST       = [15]
 # TP_PCT_LIST          = [2]
