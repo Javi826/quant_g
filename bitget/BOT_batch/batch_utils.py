@@ -53,6 +53,9 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
     Mirrors the output format of report_backtesting.
     """
     df = trade_log.copy().sort_values("buy_time").reset_index(drop=True)
+    if len(df) == 0:
+        logger.debug(f"{title} — no trades after filter, skipping.")
+        return {"net_gain_pct": 0.0, "dd_pct": 0.0, "win_ratio": 0.0, "r2": 0.0}
     df["duration_d"] = (pd.to_datetime(df["sell_time"]) - pd.to_datetime(df["buy_time"])).dt.total_seconds() / 86400
 
     # --- Equity curve ---
@@ -93,53 +96,78 @@ def report_filtered_trades(trade_log, initial_balance, data_folder, title="Filte
     logger.debug(f"{'-'*60}")
     logger.debug(f"Winning Months: {winning_m} / {len(monthly)} ({winning_m/len(monthly)*100:.2f}%)")
 
-    # --- Plot ---
-    net_gain_arr = (balances - initial_balance) / initial_balance * 100
-    cummax_arr   = np.maximum.accumulate(balances)
-    dd_arr       = (balances - cummax_arr) / cummax_arr * 100
-
-    btc_file = os.path.join(data_folder, "BTCUSDT_4H.parquet")
-    btc_df   = pd.read_parquet(btc_file)
-    if "timestamp" not in btc_df.columns:
-        btc_df = btc_df.reset_index().rename(columns={"index": "timestamp"})
-    btc_df["timestamp"]    = pd.to_datetime(btc_df["timestamp"])
-    btc_df["btc_net_gain"] = (btc_df["close"] / btc_df["close"].iloc[0] - 1) * 100
-    btc_aligned = np.interp(
-        timestamps.astype(np.int64) / 10**9,
-        btc_df["timestamp"].astype(np.int64) / 10**9,
-        btc_df["btc_net_gain"]
-    )
-
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-    above = net_gain_arr >= btc_aligned
-    ax1.fill_between(timestamps, net_gain_arr, 0, where=above,  alpha=0.2, color="green", interpolate=True)
-    ax1.fill_between(timestamps, net_gain_arr, 0, where=~above, alpha=0.2, color="red",   interpolate=True)
-    ax1.plot(timestamps, net_gain_arr, color="blue",       linewidth=1.2, label="Net Gain %")
-    ax1.plot(btc_df["timestamp"], btc_df["btc_net_gain"], color="darkorange", linewidth=0.6, linestyle="--", label="BTC %")
-    ax2 = ax1.twinx()
-    ax2.plot(timestamps, dd_arr, color="lightcoral", linewidth=0.1, label="DD %")
-    ax2.set_ylabel("Drawdown", color="red")
-    textstr = (
-        f"Net Gain STR : {net_gain_pct:.2f}%\n"
-        f"Net Gain BTC : {btc_df['btc_net_gain'].iloc[-1]:.2f}%\n"
-        f"Max DD       : {dd_pct:.2f}%\n"
-        f"R²           : {r2:.3f}"
-    )
-    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
-             verticalalignment="top", bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
-    fig.suptitle(title)
-    fig.autofmt_xdate()
-    ax1.grid(True, linestyle="--", alpha=0.6)
-    lines, labels   = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines + lines2, labels + labels2, loc="best")
-    plt.show()
     return {
         "net_gain_pct": round(net_gain_pct, 2),
         "dd_pct":       round(dd_pct, 2),
         "win_ratio":    round(win_ratio * 100, 1),
         "r2":           r2,
     }
+
+
+# =============================================================================
+# HELPER — PLOT FILTER COMPARISON
+# =============================================================================
+def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_folder, initial_balance):
+    """
+    Single plot with 3 equity curves (baseline, regime 0+1) + BTC normalized.
+    Blue = baseline, green = regime 0+1, orange dashed = BTC.
+    """
+    import matplotlib.dates as mdates
+
+    def _equity_pct(tl):
+        tl = tl.sort_values("buy_time").reset_index(drop=True)
+        eq  = initial_balance + tl["profit"].cumsum().values
+        pct = (eq - initial_balance) / initial_balance * 100
+        m   = compute_metrics(tl, capital=initial_balance, name="")
+        return pd.to_datetime(tl["buy_time"]).values, pct, m
+
+    ts_base, eq_base, m_base = _equity_pct(trade_log_baseline)
+    ts_r01,  eq_r01,  m_r01  = _equity_pct(trade_log_r01) if trade_log_r01 is not None and len(trade_log_r01) > 0 else (None, None, None)
+
+    # Load BTC 1Dutc
+    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
+    btc_df   = pd.read_parquet(btc_file)
+    btc_df.columns = btc_df.columns.str.lower()
+    if "timestamp" in btc_df.columns:
+        btc_df["ts"] = pd.to_datetime(btc_df["timestamp"])
+    else:
+        btc_df["ts"] = pd.to_datetime(btc_df.index)
+    btc_df = btc_df.sort_values("ts").reset_index(drop=True)
+
+    t_start = pd.Timestamp(ts_base.min())
+    t_end   = pd.Timestamp(ts_base.max())
+    btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
+    if len(btc_sub) > 0:
+        btc_pct = (btc_sub["close"].values / btc_sub["close"].values[0] - 1) * 100
+        btc_ts  = btc_sub["ts"].values
+    else:
+        btc_pct, btc_ts = None, None
+
+    fig, ax = plt.subplots(figsize=(14, 5))
+
+    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
+                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
+    ax.plot(ts_base, eq_base, color="steelblue", linewidth=1.2, label=lbl_base)
+
+    if ts_r01 is not None:
+        lbl_r01 = (f"Regime 0+1  NetGain={m_r01['Net_Gain_pct']:>6.1f}%  "
+                   f"DD={m_r01['Max_DD_pct']:>6.1f}%  R²={m_r01['R_Squared']:.3f}")
+        ax.plot(ts_r01, eq_r01, color="seagreen", linewidth=1.2, label=lbl_r01)
+
+    if btc_ts is not None:
+        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="BTC (normalized)")
+
+    ax.set_title(strategy_id)
+    ax.set_ylabel("Net Gain (%)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    fig.autofmt_xdate()
+    ax.grid(True, linestyle="--", alpha=0.4)
+    legend = ax.legend(loc="upper left")
+    for text in legend.get_texts():
+        text.set_fontfamily("monospace")
+    plt.tight_layout()
+    plt.show()
 
 
 # =============================================================================
@@ -176,12 +204,19 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     ohlcv_oos, filtered_oos = filter_symbols_fn(raw_oos, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_oos, min_price=min_price, vol_window=50, my_symbols=my_symbols)
     ohlcv_is,  filtered_is  = filter_symbols_fn(raw_is,  min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is,  min_price=min_price, vol_window=50, my_symbols=my_symbols)
 
-    vol_oos           = {sym: ohlcv_oos[sym]["volume_quote"].tail(50).mean() for sym in filtered_oos}
+    def _vol_1d(sym, folder):
+        path = os.path.join(folder, f"{sym}_1Dutc.parquet")
+        if not os.path.exists(path):
+            return 0.0
+        df = pd.read_parquet(path, columns=["volume_quote"])
+        return float(df["volume_quote"].tail(180).mean())
+
+    vol_oos           = {sym: _vol_1d(sym, data_folder_oos) for sym in filtered_oos}
     oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
     symbols_oos_final = oos_ranked[:n_symbols]
 
     if fix_symbols_mcis:
-        vol_is           = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in filtered_is}
+        vol_is           = {sym: _vol_1d(sym, data_folder_is) for sym in filtered_is}
         is_ranked        = sorted(filtered_is, key=lambda s: vol_is.get(s, 0), reverse=True)
         symbols_is_final = is_ranked[:n_symbols_mcis]
         logger.debug(f"FIX_SYMBOLS_MCIS_TRAINING=True — IS top {n_symbols_mcis} by volume: {symbols_is_final}")
@@ -191,7 +226,7 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
         in_both     = sorted(syms_is & syms_oos)
         only_in_oos = sorted(syms_oos - syms_is)
 
-        vol_is               = {sym: ohlcv_is[sym]["volume_quote"].tail(50).mean() for sym in syms_is}
+        vol_is               = {sym: _vol_1d(sym, data_folder_is) for sym in syms_is}
         is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
         needed               = max(0, n_symbols - len(in_both))
         symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])

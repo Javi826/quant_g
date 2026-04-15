@@ -73,7 +73,10 @@ def validate_append_border(df_old: pd.DataFrame, df_new: pd.DataFrame, gran_ms: 
         logger.debug(f"  ✅ Border OK: {last_old} → {first_new}")
     elif first_new < expected:
         overlap = int((expected - first_new).total_seconds() * 1000) // gran_ms
-        logger.warning(f"  ⚠ Border OVERLAP in {symbol}: {overlap} candle(s) at junction ({last_old} / {first_new})")
+        if first_new == last_old:
+            logger.debug(f"  Border: last candle repeated by API for {symbol} — handled by dedup")
+        else:
+            logger.warning(f"  ⚠ Border OVERLAP in {symbol}: {overlap} candle(s) at junction ({last_old} / {first_new})")
     else:
         gap_candles = diff_ms // gran_ms - 1
         logger.warning(f"  ⚠ Border GAP in {symbol}: {gap_candles} candle(s) missing at junction ({last_old} → {first_new})")

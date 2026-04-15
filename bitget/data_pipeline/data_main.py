@@ -40,7 +40,7 @@ DEBUG_HIGHLOW_INTEGRITY_DIR = os.path.join(DATA_DIR, "debug_06_highlow_integrity
 # PIPELINE CONFIG
 # =============================================================================
 DEBUG_MODE = True
-EXPORT_CSV = False   # Set True to export CSV alongside parquet at each step
+EXPORT_CSV = True   # Set True to export CSV alongside parquet at each step
 
 # =============================================================================
 # SYMBOL SELECTION
@@ -50,7 +50,7 @@ EXPORT_CSV = False   # Set True to export CSV alongside parquet at each step
 # only used when SYMBOL_MODE = "manual"
 # only used when SYMBOL_MODE = "auto"
 # and pick top N_SYMBOLS_DOWNLOAD
-SYMBOL_MODE        = "manual"               
+SYMBOL_MODE        = "auto"               
 N_SYMBOLS_DOWNLOAD = 50                                                             
 SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] 
                                           
@@ -58,8 +58,8 @@ SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"]
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc","6Hutc", "4H", "1H"]
-START_DATE = "2025-01-01"
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
+START_DATE = "2022-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -68,7 +68,7 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"],["6Hutc", "1H"]["4H", "1H"], ["1H", "30m"]]   # list of [higher_tf, intrabar_tf] pairs
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   # list of [higher_tf, intrabar_tf] pairs
 
 # =============================================================================
 # IS/OOS SPLIT
@@ -95,7 +95,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc", "1H"],["6Hutc", "1H"]["4H", "1H"], ["1H", "30m"]
 #            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 12
+WINDOW_OOS_MONTHS    = 6
 IS_ROLLING_MONTHS    = 3     # only used when SPLIT_MODE = "rolling"
 SPLIT_REFERENCE_DATE = None
 

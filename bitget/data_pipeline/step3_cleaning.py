@@ -91,7 +91,8 @@ def run(config: dict) -> bool:
         df.to_parquet(os.path.join(output_dir, filename), index=False)
         if export_csv:
             df.to_csv(os.path.join(output_dir, os.path.splitext(filename)[0] + ".csv"), index=False)
-        logger.info(f"  💾 [{symbol}] Saved {len(df)} rows → {filename}")
+        csv_note = " + .csv" if export_csv else ""
+        logger.info(f"  💾 [{symbol}] Saved {len(df)} rows → {filename}{csv_note}")
 
     if errors:
         logger.warning(f"⚠ Cleaning completed with {errors} error(s)")

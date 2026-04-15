@@ -38,8 +38,9 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "../../BOT_batch/data/crypto_2026_OOS"
-#DATA_FOLDER         = "../data/crypto_2022_IS"
+SPLIT_MODE = "expanding"
+SPLIT_BASE = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 TIMEFRAME_MINOR     = '4H'
 
 ORDER_AMOUNT        = 80

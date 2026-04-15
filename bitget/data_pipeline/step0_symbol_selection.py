@@ -20,7 +20,7 @@ logger = logging.getLogger("pipeline.step0")
 # CONSTANTS
 # =============================================================================
 SLEEP_BETWEEN_REQUESTS = 0.06
-N_LOOKBACK             = 100     # Number of candles to compute average volume
+N_LOOKBACK             = 180     # Number of candles to compute average volume
 TIMEFRAME_SYMBOL_SEL   = "1Dutc" # Reference timeframe for volume ranking — always daily
 
 

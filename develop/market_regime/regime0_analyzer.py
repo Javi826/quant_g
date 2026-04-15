@@ -14,7 +14,7 @@ Parameters (edit at top of script):
     MA_PERIOD: Moving average period for trend detection (5, 10, 20, 50, 200)
     INITIAL_CAPITAL: Capital per strategy (default 800)
 """
-
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -24,8 +24,9 @@ from glob import glob
 # CONFIGURATION - EDIT THESE PARAMETERS
 # =============================================================================
 
-TRADES_FOLDER = '../brief_trades'
-BTC_FILE      = '../../BOT_batch/data/crypto_2026_OOS/BTCUSDT_1Dutc.parquet'
+TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "brief_trades")
+TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "..", "develop", "brief_trades")
+BTC_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS", "BTCUSDT_1Dutc.parquet")
 MA_PERIOD       = 5  # Options: 5, 10, 20, 50, 200
 LONG_TH         = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
 SHORT_TH        = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH
@@ -117,7 +118,7 @@ def calculate_strategy_metrics(df: pd.DataFrame, initial_capital: float) -> dict
 
 def load_trades(filepath: str) -> pd.DataFrame:
     """Load trades from Excel file"""
-    df = pd.read_excel(filepath)
+    df = pd.read_csv(filepath)
     df.columns = df.columns.str.lower().str.strip()
     
     if 'buy_time' in df.columns:
@@ -252,7 +253,7 @@ def main():
     print(f"✅ Loaded {len(btc_df)} daily bars")
     
     # Find all trades files
-    pattern = str(Path(TRADES_FOLDER) / 'all_trades_*.xlsx')
+    pattern = str(Path(TRADES_FOLDER) / 'all_trades_*.csv')
     files = sorted(glob(pattern))
     
     if not files:
@@ -272,6 +273,137 @@ def main():
     # Calculate global portfolios
     global_without = calculate_global_portfolio(results, btc_df, INITIAL_CAPITAL, use_filter=False)
     global_with = calculate_global_portfolio(results, btc_df, INITIAL_CAPITAL, use_filter=True)
+    # =============================================================================
+    # DIAGNOSTIC BLOCK — paste at the end of regime0_analyzer.py
+    # For each strategy: one plot (3 lines) + verification print
+    # =============================================================================
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+
+    def _build_equity(df, initial_capital):
+        df = df.sort_values("buy_time").reset_index(drop=True)
+        eq = initial_capital + df["profit"].cumsum().values
+        pct = (eq - initial_capital) / initial_capital * 100
+        return df["buy_time"].values, pct
+
+    def _build_btc_trend(btc_df, start, end):
+        mask = (btc_df["ts"] >= start) & (btc_df["ts"] <= end)
+        sub  = btc_df[mask].copy()
+        return sub["ts"].values, sub["close"].values, sub[f"ma{MA_PERIOD}"].values
+
+    def _verify_condition(df_all, btc_df, strategy_type):
+        rows = []
+        for _, trade in df_all.iterrows():
+            closed  = btc_df[btc_df["ts"] < trade["buy_time"]]
+            if len(closed) < MA_PERIOD:
+                direction = "unknown"
+                btc_close = np.nan
+                ma_val    = np.nan
+            else:
+                last      = closed.iloc[-1]
+                btc_close = last["close"]
+                ma_val    = last[f"ma{MA_PERIOD}"]
+                if pd.isna(ma_val):
+                    direction = "unknown"
+                elif strategy_type == "LONG":
+                    direction = "uptrend" if btc_close > ma_val * LONG_TH else "downtrend"
+                else:
+                    direction = "downtrend" if btc_close < ma_val * SHORT_TH else "uptrend"
+            rows.append({
+                "buy_time":  trade["buy_time"],
+                "btc_close": round(btc_close, 2) if not np.isnan(btc_close) else np.nan,
+                "ma":        round(ma_val, 2)    if not np.isnan(ma_val)    else np.nan,
+                "direction": direction,
+                "taken":     (strategy_type == "LONG" and direction == "uptrend") or
+                             (strategy_type == "SHORT" and direction == "downtrend"),
+            })
+        return pd.DataFrame(rows)
+
+    print("\n" + "=" * 80)
+    print("  DIAGNOSTIC — Per-strategy plot + verification")
+    print("=" * 80)
+
+    for r in results:
+        strategy_name = r["strategy"]
+        strategy_type = r["type"]
+
+        df_all  = load_trades(r["filepath"])
+        df_all  = classify_trades_by_trend(df_all, btc_df, strategy_type)
+
+        keep_trend = "uptrend" if strategy_type == "LONG" else "downtrend"
+        df_filt = df_all[df_all["trend"] == keep_trend].copy()
+
+        # --- Verification table ---
+        verif = _verify_condition(df_all, btc_df, strategy_type)
+        taken    = verif[verif["taken"]]
+        discarded = verif[~verif["taken"] & (verif["direction"] != "unknown")]
+
+        print(f"\n{'─'*80}")
+        print(f"  {strategy_name}  [{strategy_type}]  |  MA{MA_PERIOD}  LONG_TH={LONG_TH}  SHORT_TH={SHORT_TH}")
+        print(f"{'─'*80}")
+        print(f"  Total trades   : {len(verif)}")
+        print(f"  Taken          : {len(taken)}  "
+              f"({len(taken)/len(verif)*100:.1f}%)  "
+              f"date range: {taken['buy_time'].min().date() if len(taken) > 0 else 'N/A'} → "
+              f"{taken['buy_time'].max().date() if len(taken) > 0 else 'N/A'}")
+        print(f"  Discarded      : {len(discarded)}  "
+              f"({len(discarded)/len(verif)*100:.1f}%)  "
+              f"date range: {discarded['buy_time'].min().date() if len(discarded) > 0 else 'N/A'} → "
+              f"{discarded['buy_time'].max().date() if len(discarded) > 0 else 'N/A'}")
+
+        # Sample of discarded trades with BTC values
+        if len(discarded) > 0:
+            sample = discarded.tail(5)[["buy_time", "btc_close", "ma", "direction"]]
+            print(f"\n  Last discarded trades (BTC close vs MA{MA_PERIOD}):")
+            print(sample.to_string(index=False))
+
+        # Days in uptrend vs downtrend over full BTC period
+        start_d = df_all["buy_time"].min()
+        end_d   = df_all["buy_time"].max()
+        btc_sub = btc_df[(btc_df["ts"] >= start_d) & (btc_df["ts"] <= end_d)].dropna(subset=[f"ma{MA_PERIOD}"])
+        n_up   = (btc_sub["close"] > btc_sub[f"ma{MA_PERIOD}"] * LONG_TH).sum()
+        n_down = (btc_sub["close"] < btc_sub[f"ma{MA_PERIOD}"] * SHORT_TH).sum()
+        print(f"\n  BTC days in period [{start_d.date()} → {end_d.date()}]:")
+        print(f"    uptrend  : {n_up}  ({n_up/(n_up+n_down)*100:.1f}%)")
+        print(f"    downtrend: {n_down}  ({n_down/(n_up+n_down)*100:.1f}%)")
+
+        # --- Plot ---
+        ts_all,  eq_all  = _build_equity(df_all,  INITIAL_CAPITAL)
+        ts_filt, eq_filt = _build_equity(df_filt, INITIAL_CAPITAL)
+
+        t_start = pd.Timestamp(df_all["buy_time"].min())
+        t_end   = pd.Timestamp(df_all["buy_time"].max())
+        btc_ts, btc_close_vals, btc_ma_vals = _build_btc_trend(btc_df, t_start, t_end)
+
+        # Normalize BTC to start at INITIAL_CAPITAL for visual comparison
+        if len(btc_close_vals) > 0 and btc_close_vals[0] != 0:
+            btc_norm = (btc_close_vals / btc_close_vals[0] - 1) * 100
+
+        fig, ax = plt.subplots(figsize=(14, 5))
+
+        ax.plot(ts_all,  eq_all,  color="steelblue",  linewidth=1.2, label="Equity (no filter)")
+        ax.plot(ts_filt, eq_filt, color="seagreen",   linewidth=1.2, label=f"Equity ({keep_trend} only)")
+        if len(btc_ts) > 0:
+            ax.plot(btc_ts, btc_norm, color="darkorange", linewidth=0.8, linestyle="--", label=f"BTC (normalized)")
+
+        # Shade uptrend/downtrend regions on BTC
+        if len(btc_ts) > 1:
+            for i in range(len(btc_ts) - 1):
+                if pd.isna(btc_ma_vals[i]):
+                    continue
+                is_up = btc_close_vals[i] > btc_ma_vals[i] * LONG_TH
+                color = "green" if is_up else "red"
+                ax.axvspan(btc_ts[i], btc_ts[i+1], alpha=0.04, color=color)
+
+        ax.set_title(f"{strategy_name}  [{strategy_type}]  — MA{MA_PERIOD} filter  |  taken={len(taken)}  discarded={len(discarded)}")
+        ax.set_ylabel("Net Gain (%)")
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        ax.xaxis.set_major_locator(mdates.MonthLocator())
+        fig.autofmt_xdate()
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.legend(loc="upper left")
+        plt.tight_layout()
+        plt.show()
     
     # ==========================================================================
     # PRINT COMPARISON TABLE
@@ -401,3 +533,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

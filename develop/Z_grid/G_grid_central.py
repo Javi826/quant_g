@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 import time
 import pandas as pd
 from itertools import product
@@ -23,8 +23,8 @@ from signals.add_signals_reversal   import reversal_long, reversal_short
 # -----------------------------------------------------------------------------
 # GLOBAL CONFIG
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = "../BOT_batch/data/crypto_2026_OOS"
-SYMBOLS_DIR  = "../BOT_trading/symbols_live"
+DATA_FOLDER  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS")
+SYMBOLS_DIR  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "symbols_live")
 ORDER_AMOUNT = 80
 N_JOBS       = -1
 VOL_WINDOW   = 50

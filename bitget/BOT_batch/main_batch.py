@@ -3,7 +3,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "market_regime")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_market_regime")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 
 import logging
@@ -20,7 +20,7 @@ from joblib import Parallel, delayed
 # LOGGING CONFIGURATION
 # =============================================================================
 LOG_LEVEL  = logging.INFO   # Change to logging.DEBUG for full verbosity
-SHOW_PLOTS = False           # Set to True to enable matplotlib plots
+SHOW_PLOTS = True           # Set to True to enable matplotlib plots
 
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -46,7 +46,7 @@ from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as P
 from batch_utils import report_filtered_trades, extract_best_params, select_universe
 from batch_utils import enrich_trades_with_regime, update_strategies_params, update_strategies_symbols, load_btc_1d
 from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
-from batch_utils import print_all_curves_table, print_best_combinations
+from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
 from batch_utils import validate_csv_columns
 
@@ -76,8 +76,14 @@ logger = logging.getLogger("BOT_batch.main_batch")
 # =============================================================================
 # GLOBAL CONFIGURATION — defaults, overridden by run_batch at runtime
 # =============================================================================
-DATA_FOLDER_IS  = "data/crypto_2022_IS"
-DATA_FOLDER_OOS = "data/crypto_2026_OOS"
+SPLIT_MODE      = "expanding"
+SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-04_IS")
+DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+
+DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
+DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
+
 N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
@@ -86,17 +92,17 @@ N_PATHS_IS  = 100
 N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
-R1_NETGAIN_ROUND1    = 20.0
+R1_NETGAIN_ROUND1    = 10.0
 R1_RSQUARED_ROUND1   = 0.8
 R1_PROBNEG_ROUND1    = 15.0
 
 # Validation thresholds — Round 2 path A (regime filtered)
-R2A_NETGAIN_ROUND2   = 20.0
+R2A_NETGAIN_ROUND2   = 10.0
 R2A_RSQUARED_ROUND2  = 0.90
 R2A_PROBNEG_ROUND1   = 100.0
 
 # Validation thresholds — Round 2 path B (high netgain OOS)
-R2B_NETGAIN_ROUND1   = 80.0
+R2B_NETGAIN_ROUND1   = 40.0
 R2B_PROBNEG_ROUND1   = 20.0
 
 R0_MA_PERIOD = 5
@@ -682,6 +688,13 @@ def run_batch(strategy_config: dict) -> None:
         wr_str = f"{wr:>9.1f}%" if not np.isnan(wr) else f"{'N/A':>10}"
         logger.debug(f"  {name:<16} {ng_str} {dd_str} {wr_str}")
     logger.debug(f"  {'─'*105}")
+    plot_filter_comparison(
+        strategy_id=STRATEGY_ID,
+        trade_log_baseline=trade_log,
+        trade_log_r01=r01_tl,
+        data_folder=DATA_FOLDER_OOS,
+        initial_balance=INITIAL_BALANCE,
+    )
 
 
 # =============================================================================
