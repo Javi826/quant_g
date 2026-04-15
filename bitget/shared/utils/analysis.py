@@ -716,4 +716,4 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
     f"\nP50 Win Rate per Path: {p50_winrate:.2f}%"
 )
 
-    return df_summary
+    return df_summary, p5_winrate, p50_winrate

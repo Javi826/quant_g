@@ -47,7 +47,7 @@ from batch_utils import enrich_trades_with_regime, update_strategies_params, upd
 from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
 from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
-from batch_utils import validate_csv_columns, save_drift_reference, save_strategies_e1, generate_csv_from_batch
+from batch_utils import validate_csv_columns
 
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -77,15 +77,15 @@ logger = logging.getLogger("BOT_batch.main_batch")
 # =============================================================================
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
-DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
+DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-01_IS")
+DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
 N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 10
-N_PATHS_OOS = 200
+N_PATHS_IS  = 100
+N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
 R1_NETGAIN_ROUND1    = 10.0
@@ -94,7 +94,7 @@ R1_PROBNEG_ROUND1    = 15.0
 
 # Validation thresholds — Round 2 path A (regime filtered)
 R2A_NETGAIN_ROUND2   = 10.0
-R2A_RSQUARED_ROUND2  = 0.90
+R2A_RSQUARED_ROUND2  = 0.8
 R2A_PROBNEG_ROUND1   = 100.0
 
 # Validation thresholds — Round 2 path B (high netgain OOS)
@@ -133,20 +133,15 @@ RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
 RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
 UPDATE_CSV              = True   # Set to False to skip CSV updates (tables will show last run data)
 
-STRATEGIES_PARAMS_FOLDER  = os.path.join(os.path.dirname(__file__), "strategies_params")
-CSV_PARAMS                = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_params.csv")
-STRATEGIES_E1_BATCH_PATH  = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
-SYMBOLS_LIVE_FOLDER       = os.path.join(os.path.dirname(__file__), "symbols_live")
-DRIFT_MONTECARLO_FOLDER   = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
-DRIFT_BATCH_PATH          = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
+STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_params")
+CSV_PARAMS          = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_params.csv")
+SYMBOLS_LIVE_FOLDER = os.path.join(os.path.dirname(__file__), "symbols_live")
 
 # Global trade_log accumulators (populated by each run_batch call)
 _trade_logs_baseline  : list = []   # (strategy_id, trade_log_df)
 _trade_logs_regime01  : list = []   # (strategy_id, trade_log_df)
 _oos_metrics          : list = []   # {strategy_id, net_gain_pct, dd_pct, win_ratio, r2}
 _validation_results   : list = []   # {strategy_id, verdict, round, net_gain_pct, dd_pct, win_ratio, r2, prob_neg_pct}
-_drift_results        : list = []   # {strategy_id, p5_winrate, p50_winrate}
-_best_params_results  : dict = {}   # {strategy_id: best_params}
 
 
 # =============================================================================
@@ -162,25 +157,20 @@ def run_batch(strategy_config: dict) -> None:
         side          : str   "long" | "short"
         timeframe     : str   e.g. "4H"
         n_symbols     : int   top N OOS symbols by volume
-        order_amount     : int   (batch backtest amount)
-        order_amount_prod: int   (production amount)
-        direction_mode   : str
-        sell_after_ncandles: int
-        param_grid       : dict  {PARAM_NAME: [values], ...}
+        order_amount  : int
+        param_grid    : dict  {PARAM_NAME: [values], ...}
     """
     start_time = time.time()
 
     # -------------------------------------------------------------------------
     # Unpack config
     # -------------------------------------------------------------------------
-    STRATEGY_ID        = strategy_config["strategy_id"]
-    SIDE               = strategy_config["side"]
-    TIMEFRAME          = strategy_config["timeframe"]
-    N_SYMBOLS          = strategy_config["n_symbols"]
-    ORDER_AMOUNT       = strategy_config["order_amount"]
-    ORDER_AMOUNT_PROD  = strategy_config.get("order_amount_prod", strategy_config["order_amount"])
-    DIRECTION_MODE     = strategy_config.get("direction_mode", "general")
-    param_grid         = strategy_config["param_grid"]
+    STRATEGY_ID   = strategy_config["strategy_id"]
+    SIDE          = strategy_config["side"]
+    TIMEFRAME     = strategy_config["timeframe"]
+    N_SYMBOLS     = strategy_config["n_symbols"]
+    ORDER_AMOUNT  = strategy_config["order_amount"]
+    param_grid    = strategy_config["param_grid"]
 
     registry      = SIGNAL_REGISTRY[strategy_config["signal"]]
     signal_fn     = registry["fn"]
@@ -254,7 +244,7 @@ def run_batch(strategy_config: dict) -> None:
 
     all_results  = [r for sublist in results_list for r in sublist]
     df_portfolio = pd.DataFrame(all_results)
-    df_summary, _, _ = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
+    df_summary   = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
     best_params  = extract_best_params(df_summary, param_names, lists_for_grid)
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
@@ -289,7 +279,8 @@ def run_batch(strategy_config: dict) -> None:
     oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
     oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
-                                             data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+                                         data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE,
+                                         strategy_id=STRATEGY_ID)
 
     best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
 
@@ -345,7 +336,7 @@ def run_batch(strategy_config: dict) -> None:
 
     all_results_oos  = [r for sublist in results_oos for r in sublist]
     df_portfolio_oos = pd.DataFrame(all_results_oos)
-    _, p5_winrate_oos, p50_winrate_oos = report_montecarlo(df_portfolio=df_portfolio_oos, param_names=param_names, initial_balance=INITIAL_BALANCE)
+    report_montecarlo(df_portfolio=df_portfolio_oos, param_names=param_names, initial_balance=INITIAL_BALANCE)
 
     # -------------------------------------------------------------------------
     # BLOCK 4 — REGIME ANALYSIS
@@ -650,14 +641,6 @@ def run_batch(strategy_config: dict) -> None:
     _icon = "🔵" if _changes else "⚪"
     logger.info(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
-    # Accumulate and save drift reference values
-    _drift_results.append({
-        "strategy_id":  STRATEGY_ID,
-        "p5_winrate":   round(float(p5_winrate_oos) * 100, 1),
-        "p50_winrate":  round(float(p50_winrate_oos) * 100, 1),
-    })
-    _best_params_results[STRATEGY_ID] = best_params
-
     elapsed = int(time.time() - start_time)
     logger.info(f"DONE     ──  🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
@@ -809,21 +792,13 @@ def run_portfolio_analysis():
 # MAIN
 # =============================================================================
 if __name__ == "__main__":
-    from strategies_batch import STRATEGIES as STRATEGIES_BATCH
-    from strategies_loop  import STRATEGIES_LOOP
-
-    # Merge: static+dynamic from strategies_batch + loop config from strategies_loop
-    _loop_map = {s["strategy_id"]: s for s in STRATEGIES_LOOP}
-    STRATEGIES = []
-    for s in STRATEGIES_BATCH:
-        loop = _loop_map.get(s["strategy_id"], {})
-        if not loop:
-            logger.warning(f"⚠️  {s['strategy_id']} not found in strategies_loop — skipping.")
-            continue
-        STRATEGIES.append({**s, **loop})
+    from strategies_config import STRATEGIES
 
     start  = time.time()
     logger = logging.getLogger("BOT_batch.main_batch")
+
+    if UPDATE_CSV:
+        validate_csv_columns(CSV_PARAMS)
 
     logger.info(f"\n{'='*105}")
     logger.info(f"  BATCH START")
@@ -846,16 +821,6 @@ if __name__ == "__main__":
         logger.info(f"  Running: {strategy['strategy_id']}")
         logger.info(f"{'='*105}")
         run_batch(strategy)
-
-    _strategies_batch_path = os.path.join(os.path.dirname(__file__), "strategies_batch.py")
-    save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
-    save_strategies_e1(
-        strategies_batch_path=_strategies_batch_path,
-        output_path=STRATEGIES_E1_BATCH_PATH,
-        validation_results=_validation_results,
-        best_params_map=_best_params_results,
-    )
-    generate_csv_from_batch(_strategies_batch_path, CSV_PARAMS)
 
     run_portfolio_analysis()
 

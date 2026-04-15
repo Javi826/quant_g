@@ -1,5 +1,5 @@
 """
-Montecarlo OOS reference values for drift detection.
+BOT_trading/quality_control/drift_montecarlo.py Montecarlo OOS reference values for drift detection.
 
 P5_WINRATE: Percentile 5 (floor - worst acceptable performance)
 P50_WINRATE: Percentile 50 (median - expected performance)

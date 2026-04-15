@@ -43,10 +43,58 @@ def validate_csv_columns(csv_path):
 
     logger.info("✅ strategies_params.csv columns validated.")
 
+def generate_csv_from_batch(strategies_batch_path, csv_path):
+    """
+    Generate strategies_params.csv from strategies_batch.py if it doesn't exist.
+    strategies_batch.py is the source of truth — CSV is derived and diagnostic only.
+    """
+    if os.path.exists(csv_path):
+        return
 
-# =============================================================================
-# HELPER — PLOT FILTER COMPARISON
-# =============================================================================
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("strategies_batch", strategies_batch_path)
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    strategies = mod.STRATEGIES
+
+    rows = []
+    for s in strategies:
+        rows.append({
+            "id":                  s["strategy_id"],
+            "name":                "_".join(s["strategy_id"].split("_")[1:]),
+            "timeframe":           s["timeframe"],
+            "active":              s.get("active", False),
+            "direction":           s["side"],
+            "regime_trending":     s.get("regime_trending", 1.0),
+            "regime_ranging":      s.get("regime_ranging",  1.0),
+            "regime_volatile":     s.get("regime_volatile", 1.0),
+            "direction_mode":      s.get("direction_mode", "general"),
+            "sell_after_ncandles": s.get("sell_after_ncandles", 0),
+            "order_amount":        s.get("order_amount_prod", 200),
+            "lookback":            s.get("lookback",   None),
+            "tolerance":           s.get("tolerance",  None),
+            "ma_period":           s.get("ma_period",  None),
+            "tp_pct":              s.get("tp_pct",     None),
+            "sl_pct":              s.get("sl_pct",     None),
+            "impulse":             s.get("impulse",    None),
+            "ranges":              s.get("ranges",     None),
+            "flag":                s.get("flag",       None),
+            "last_run":            None,
+            "bt_netgain_pct":      None,
+            "bt_r2":               None,
+            "prob_negative":       None,
+            "validated":           None,
+            "last_change_active":  None,
+            "last_change_params":  None,
+            "last_change_regime":  None,
+        })
+
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    logger.info(f"✅ strategies_params.csv generated from strategies_batch.py → {csv_path}")
+
+
+
 def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_folder, initial_balance):
     """
     Single plot with 3 equity curves (baseline, regime 0+1) + BTC normalized.
@@ -273,7 +321,6 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     else:
         if len(symbols_is_final) < n_symbols:
             logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
-    
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
 
@@ -405,29 +452,25 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
     df_params.at[idx, "last_change_params"] = "N/A"
     df_params.at[idx, "last_change_regime"] = "N/A"
 
-    if validated:
-        # Active
-        df_params.at[idx, "active"] = True
-        if not prev_active:
-            df_params.at[idx, "last_change_active"] = "False→True"
+    # Active
+    df_params.at[idx, "active"] = bool(validated)
+    if prev_active and not validated:
+        df_params.at[idx, "last_change_active"] = "True→False"
+    elif not prev_active and validated:
+        df_params.at[idx, "last_change_active"] = "False→True"
 
-        # Params
-        if params_changed:
-            for k in param_keys:
-                if k in df_params.columns:
-                    df_params.at[idx, k] = best_params.get(k.upper())
-            df_params.at[idx, "last_change_params"] = " | ".join(param_changes)
+    # Params — always updated
+    if params_changed:
+        for k in param_keys:
+            if k in df_params.columns:
+                df_params.at[idx, k] = best_params.get(k.upper())
+        df_params.at[idx, "last_change_params"] = " | ".join(param_changes)
 
-        # Regime
-        for col, new_flag in new_regime_flags.items():
-            df_params.at[idx, col] = new_flag
-        if regime_changes:
-            df_params.at[idx, "last_change_regime"] = " | ".join(regime_changes)
-    else:
-        df_params.at[idx, "active"]             = False
-        df_params.at[idx, "last_change_active"] = "True→False" if prev_active else "REJECTED"
-        df_params.at[idx, "last_change_params"] = "REJECTED"
-        df_params.at[idx, "last_change_regime"] = "REJECTED"
+    # Regime — always updated
+    for col, new_flag in new_regime_flags.items():
+        df_params.at[idx, col] = new_flag
+    if regime_changes:
+        df_params.at[idx, "last_change_regime"] = " | ".join(regime_changes)
 
     for col in ("last_change_active", "last_change_params", "last_change_regime"):
         df_params[col] = df_params[col].fillna("N/A")
@@ -441,6 +484,191 @@ def update_strategies_params(csv_path, strategy_id, best_params, param_keys, val
         "active_prev":    prev_active,
         "active_new":     new_active,
     }
+
+
+# =============================================================================
+# HELPER — SAVE DRIFT REFERENCE
+# =============================================================================
+def save_drift_reference(drift_results, output_path):
+    """
+    Write drift_montecarlo_batch.py with P5/P50 winrate reference values
+    from Montecarlo OOS simulations.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    lines = [
+        '"""',
+        'Montecarlo OOS reference values for drift detection.',
+        'P5_WINRATE: Percentile 5 (floor - worst acceptable performance)',
+        'P50_WINRATE: Percentile 50 (median - expected performance)',
+        'These values come from Montecarlo simulations and represent the statistical',
+        'boundaries for strategy health evaluation.',
+        '"""',
+        'DRIFT_REFERENCE = {',
+    ]
+    for entry in drift_results:
+        lines += [
+            f"    '{entry['strategy_id']}': {{",
+            f"        'p5_winrate':  {entry['p5_winrate']},",
+            f"        'p50_winrate': {entry['p50_winrate']},",
+            f"    }},",
+        ]
+    lines.append("}")
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    logger.debug(f"drift_montecarlo_batch.py updated → {output_path}")
+
+
+# =============================================================================
+# HELPER — SAVE STRATEGIES BATCH (update dynamic fields + write E1 output)
+# =============================================================================
+def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map):
+    """
+    Update strategies_batch.py with dynamic fields from memory and generate
+    strategies_E1_batch.py for production deployment.
+
+    strategies_batch_path : path to strategies_batch.py (source of truth)
+    output_path           : path to write strategies_E1_batch.py
+    validation_results    : list of dicts with strategy_id, verdict, regime_*
+    best_params_map       : dict {strategy_id: best_params dict}
+    """
+    if not os.path.exists(strategies_batch_path):
+        logger.warning(f"⚠️  strategies_batch.py not found — skipping.")
+        return
+
+    # Load current strategies_batch
+    import importlib.util
+    spec   = importlib.util.spec_from_file_location("strategies_batch", strategies_batch_path)
+    mod    = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    strategies = mod.STRATEGIES
+
+    # Build lookup from validation results
+    val_map = {v["strategy_id"]: v for v in validation_results}
+
+    def _fmt(val):
+        if isinstance(val, bool):
+            return str(val)
+        if isinstance(val, str):
+            return f'"{val}"'
+        return str(val)
+
+    # -------------------------------------------------------------------------
+    # Update strategies_batch.py
+    # -------------------------------------------------------------------------
+    batch_lines = [
+        '"""',
+        'strategies_batch.py — Source of truth for BOT_batch.',
+        '',
+        'Static fields : strategy_id, signal, side, timeframe,',
+        '                direction_mode, order_amount_prod, sell_after_ncandles.',
+        '',
+        'Dynamic fields (updated by batch): active, regime_trending,',
+        '                                   regime_ranging, regime_volatile,',
+        '                                   and all optimized params.',
+        '"""',
+        '',
+        'STRATEGIES = [',
+    ]
+
+    for s in strategies:
+        sid = s["strategy_id"]
+        v   = val_map.get(sid, {})
+        bp  = best_params_map.get(sid, {})
+
+        updated = dict(s)
+        if v:
+            updated["active"]           = v["verdict"] == "🟢 VALIDATED"
+            updated["regime_trending"]  = v.get("regime_trending", s.get("regime_trending", 1.0))
+            updated["regime_ranging"]   = v.get("regime_ranging",  s.get("regime_ranging",  1.0))
+            updated["regime_volatile"]  = v.get("regime_volatile", s.get("regime_volatile", 1.0))
+        if bp:
+            for k, val in bp.items():
+                updated[k.lower()] = val
+
+        batch_lines.append("    {")
+        batch_lines.append(f'        # --- Identification ---')
+        batch_lines.append(f'        "strategy_id": "{updated["strategy_id"]}",')
+        batch_lines.append(f'        "signal": "{updated["signal"]}",')
+        batch_lines.append(f'        "side": "{updated["side"]}",')
+        batch_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
+        batch_lines.append(f'')
+        batch_lines.append(f'        # --- Production config (static) ---')
+        batch_lines.append(f'        "direction_mode": "{updated.get("direction_mode", "general")}",')
+        batch_lines.append(f'        "order_amount_prod": {updated.get("order_amount_prod", 200)},')
+        batch_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
+        batch_lines.append(f'')
+        batch_lines.append(f'        # --- Updated by batch ---')
+        batch_lines.append(f'        "active": {updated.get("active", False)},')
+        batch_lines.append(f'        "regime_trending": {float(updated.get("regime_trending", 1.0))},')
+        batch_lines.append(f'        "regime_ranging": {float(updated.get("regime_ranging", 1.0))},')
+        batch_lines.append(f'        "regime_volatile": {float(updated.get("regime_volatile", 1.0))},')
+
+        _PARAM_KEYS = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
+        for k in _PARAM_KEYS:
+            if k in updated:
+                batch_lines.append(f'        "{k}": {_fmt(updated[k])},')
+        batch_lines.append("    },")
+
+    batch_lines.append("]")
+    os.makedirs(os.path.dirname(os.path.abspath(strategies_batch_path)), exist_ok=True)
+    with open(strategies_batch_path, "w") as f:
+        f.write("\n".join(batch_lines) + "\n")
+    logger.debug(f"strategies_batch.py updated → {strategies_batch_path}")
+
+    # -------------------------------------------------------------------------
+    # Write strategies_E1_batch.py (production format)
+    # -------------------------------------------------------------------------
+    e1_lines = [
+        '"""',
+        'Trading Strategies Configuration',
+        '',
+        'Auto-generated by BOT_batch. Do not edit manually.',
+        'Copy to BOT_trading/config/strategies_E1.py to deploy.',
+        '"""',
+        '',
+        'STRATEGIES = [',
+    ]
+
+    for s in strategies:
+        sid = s["strategy_id"]
+        v   = val_map.get(sid, {})
+        bp  = best_params_map.get(sid, {})
+
+        updated = dict(s)
+        if v:
+            updated["active"]          = v["verdict"] == "🟢 VALIDATED"
+            updated["regime_trending"] = v.get("regime_trending", s.get("regime_trending", 1.0))
+            updated["regime_ranging"]  = v.get("regime_ranging",  s.get("regime_ranging",  1.0))
+            updated["regime_volatile"] = v.get("regime_volatile", s.get("regime_volatile", 1.0))
+        if bp:
+            for k, val in bp.items():
+                updated[k.lower()] = val
+
+        name = "_".join(sid.split("_")[1:])  # e.g. "reversal_long_4H"
+
+        e1_lines.append("    {")
+        e1_lines.append(f'        "id": "{sid}",')
+        e1_lines.append(f'        "name": "{name}",')
+        e1_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
+        e1_lines.append(f'        "active": {updated.get("active", False)},')
+        e1_lines.append(f'        "direction": "{updated["side"]}",')
+        e1_lines.append(f'        "regime_trending": {float(updated.get("regime_trending", 1.0))},')
+        e1_lines.append(f'        "regime_ranging": {float(updated.get("regime_ranging", 1.0))},')
+        e1_lines.append(f'        "regime_volatile": {float(updated.get("regime_volatile", 1.0))},')
+        e1_lines.append(f'        "direction_mode": "{updated.get("direction_mode", "general")}",')
+        e1_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
+        e1_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
+
+        for k in _PARAM_KEYS:
+            if k in updated:
+                e1_lines.append(f'        "{k}": {_fmt(updated[k])},')
+        e1_lines.append("    },")
+
+    e1_lines.append("]")
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("\n".join(e1_lines) + "\n")
+    logger.debug(f"strategies_E1_batch.py updated → {output_path}")
 
 
 # =============================================================================

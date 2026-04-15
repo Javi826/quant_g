@@ -3179,14 +3179,14 @@ function renderBinomialDriftTable(data, windowSize) {
                     <th>Strategy</th>
                     <th>Status</th>
                     <th>Trades</th>
-                    <th>WR 100</th>
-                    <th>WR 100L30</th>
+                    <th>WR 50</th>
+                    <th>WR 50L15</th>
                     <th>P Target</th>
                     <th>Warning Limit</th>
                     <th>Danger Limit</th>
                     <th>σ</th>
                     <th>Z-Score</th>
-                    <th>Z-ScoreL30</th>
+                    <th>Z-ScoreL15</th>
                 </tr>
             </thead>
             <tbody>
