@@ -153,7 +153,7 @@ STRATEGIES = [
         'tolerance': 15,
         'ma_period': 25,
         'tp_pct': 2,
-        'sl_pct': 9
+        'sl_pct': 10
     },
     {
         'id': '11_parity_short_1H',
@@ -207,7 +207,7 @@ STRATEGIES = [
         'tolerance': 35,
         'impulse': 0.01,
         'tp_pct': 4,
-        'sl_pct': 10
+        'sl_pct': 11
     },
     {
         'id': '16_ranging_short_6Hutc',
@@ -239,9 +239,9 @@ STRATEGIES = [
         'direction_mode': 'general',
         'sell_after_ncandles': 50,
         'order_amount': 80,
-        'lookback': 15,
-        'impulse': 3,
-        'flag': 50,
+        'lookback': 13,
+        'impulse': 5,
+        'flag': 40,
         'ma_period': 50,
         'tp_pct': 4,
         'sl_pct': 10

@@ -25,7 +25,7 @@ MY_SYMBOLS  = True
 SPLIT_MODE          = "expanding"
 SPLIT_BASE          = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-04_IS")
-#DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2025-01_2026-03_IS")
+DATA_FOLDER         = os.path.join(SPLIT_BASE, "IS",  "crypto_2025-01_2026-03_IS")
 DATA_FOLDER_OOS     = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
 TIMEFRAME_MINOR     = '1H'
 ORDER_AMOUNT        = 80
@@ -51,14 +51,19 @@ MA_PERIOD_LIST       = [50]
 TP_PCT_LIST          = [2,3,4,5]
 SL_PCT_LIST          = [6,7,8,9,10]
 
-# =============================================================================
-# SELL_AFTER_LIST      = [100]
-# LOOKBACK_LIST        = [7]
-# TOLERANCE_LIST       = [40]
-# MA_PERIOD_LIST       = [25]
-# TP_PCT_LIST          = [2]
-# SL_PCT_LIST          = [10]
-# =============================================================================
+SELL_AFTER_LIST      = [100]
+LOOKBACK_LIST        = [7]
+TOLERANCE_LIST       = [40]
+MA_PERIOD_LIST       = [25]
+TP_PCT_LIST          = [2]
+SL_PCT_LIST          = [10]
+
+SELL_AFTER_LIST      = [100]
+LOOKBACK_LIST        = [6]
+TOLERANCE_LIST       = [40]
+MA_PERIOD_LIST       = [50]
+TP_PCT_LIST          = [2]
+SL_PCT_LIST          = [6]
 
 param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}

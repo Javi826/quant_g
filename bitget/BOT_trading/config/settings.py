@@ -65,7 +65,7 @@ REGIME_GENERAL = {
 }
 
 GLOBAL_SYSTEM_REGIME_TH1 = 1.00  # SHORT threshold (BTC < MA5 * TH1)
-GLOBAL_SYSTEM_REGIME_TH2 = 1.02  # LONG threshold (BTC > MA5 * TH2)
+GLOBAL_SYSTEM_REGIME_TH2 = 1.00  # LONG threshold (BTC > MA5 * TH2)
 
 # ==========================================================================
 # DIRECTION SIZING (BTC TREND FILTER)
@@ -101,8 +101,10 @@ LEVERAGE = 10
 # =============================================================================
 
 # Drift detection
-DRIFT_WINDOW_SIZE    = 100
-DRIFT_CHECK_INTERVAL = 30
+DRIFT_WINDOW_SIZE          = 100
+DRIFT_CHECK_INTERVAL       = 15
+DRIFT_BINOMIAL_WINDOW      = 50
+DRIFT_BINOMIAL_DEFAULT_P50 = 0.55 
 
 # Execution quality
 EXECUTION_WINDOW_SIZE = 20
@@ -110,9 +112,6 @@ SLIPPAGE_WARNING_PCT  = 0.2
 SLIPPAGE_CRITICAL_PCT = 0.3
 LATENCY_WARNING_SEC   = 0.5
 LATENCY_CRITICAL_SEC  = 1.0
-
-DRIFT_BINOMIAL_WINDOW      = 100
-DRIFT_BINOMIAL_DEFAULT_P50 = 0.55 
 
 
 # ==========================================================================
