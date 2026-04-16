@@ -123,7 +123,7 @@ STRATEGIES = [
         'id': '09_reversal_short_6Hutc',
         'name': 'reversal_short_6Hutc',
         'timeframe': '6Hutc',
-        'active': True,
+        'active': False,
         'direction': 'short',
         'regime_trending': 1.0,
         'regime_ranging': 1.0,

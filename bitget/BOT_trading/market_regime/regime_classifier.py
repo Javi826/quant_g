@@ -17,7 +17,7 @@ from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to
 from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
-from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
+from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2, REGIME0_MA_PERIOD
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
@@ -359,13 +359,13 @@ def get_btc_1d_filter(direction: str) -> bool:
     try:
         df = fetch_btc_ohlcv('1Dutc')
         
-        if df is None or df.empty or len(df) < 5:  # ← Restaurado df.empty
+        if df is None or df.empty or len(df) < REGIME0_MA_PERIOD: # ← Restaurado df.empty
             logger.warning("[REGIME0] Insufficient BTC 1D data, allowing trade")
             return True
         
         # Safe conversion (como el original)
         btc_close = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
-        ma5 = float(pd.to_numeric(df['close'], errors='coerce').tail(5).mean())
+        ma5 = float(pd.to_numeric(df['close'], errors='coerce').tail(REGIME0_MA_PERIOD).mean())
         
         if direction == 'long':
             allowed = btc_close > ma5 * GLOBAL_SYSTEM_REGIME_TH2

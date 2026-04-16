@@ -64,8 +64,11 @@ REGIME_GENERAL = {
     'volatile': 1.0,    
 }
 
-GLOBAL_SYSTEM_REGIME_TH1 = 1.00  # SHORT threshold (BTC < MA5 * TH1)
-GLOBAL_SYSTEM_REGIME_TH2 = 1.00  # LONG threshold (BTC > MA5 * TH2)
+from shared_config import REGIME0_MA_PERIOD, REGIME0_LONG_TH, REGIME0_SHORT_TH
+
+REGIME0_MA_PERIOD        = REGIME0_MA_PERIOD
+GLOBAL_SYSTEM_REGIME_TH1 = REGIME0_SHORT_TH  # SHORT threshold (BTC < MA5 * TH1)
+GLOBAL_SYSTEM_REGIME_TH2 = REGIME0_LONG_TH   # LONG threshold (BTC > MA5 * TH2)
 
 # ==========================================================================
 # DIRECTION SIZING (BTC TREND FILTER)

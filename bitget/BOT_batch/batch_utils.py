@@ -1,4 +1,5 @@
 import logging
+import importlib.util
 import os
 import numpy as np
 import pandas as pd
@@ -8,90 +9,109 @@ from sklearn.linear_model import LinearRegression
 logger = logging.getLogger("BOT_batch.batch_utils")
 
 # =============================================================================
-# CSV COLUMN VALIDATION
+# MODULE CONSTANTS
 # =============================================================================
-EXPECTED_CSV_COLUMNS = [
-    "id", "name", "timeframe", "active", "direction",
-    "regime_trending", "regime_ranging", "regime_volatile",
-    "direction_mode", "sell_after_ncandles", "order_amount",
-    "lookback", "tolerance", "ma_period", "tp_pct", "sl_pct",
-    "impulse", "ranges", "flag",
-    "last_run", "bt_netgain_pct", "bt_r2", "prob_negative", "validated",
-    "last_change_active", "last_change_params", "last_change_regime",
-]
+PARAM_KEYS        = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
+SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
 
-def validate_csv_columns(csv_path):
-    """
-    Validate that strategies_params.csv has exactly the expected columns.
-    Raises ValueError and stops execution if columns do not match.
-    """
-    if not os.path.exists(csv_path):
-        raise FileNotFoundError(f"strategies_params.csv not found at {csv_path}")
 
-    df      = pd.read_csv(csv_path, nrows=0)
-    actual  = list(df.columns)
-    missing = [c for c in EXPECTED_CSV_COLUMNS if c not in actual]
-    extra   = [c for c in actual if c not in EXPECTED_CSV_COLUMNS]
+def _fmt_py_val(val):
+    """Format a Python value for writing into a .py file."""
+    if isinstance(val, bool):
+        return str(val)
+    if isinstance(val, str):
+        return f'"{val}"'
+    return str(val)
 
-    if missing or extra:
-        msg = "❌ strategies_params.csv column mismatch — aborting."
-        if missing:
-            msg += f"\n  Missing : {missing}"
-        if extra:
-            msg += f"\n  Extra   : {extra}"
-        raise ValueError(msg)
 
-    logger.info("✅ strategies_params.csv columns validated.")
-
-def generate_csv_from_batch(strategies_batch_path, csv_path):
-    """
-    Generate strategies_params.csv from strategies_batch.py if it doesn't exist.
-    strategies_batch.py is the source of truth — CSV is derived and diagnostic only.
-    """
-    if os.path.exists(csv_path):
-        return
-
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("strategies_batch", strategies_batch_path)
+def _load_py_module(path, module_name):
+    """Load a .py file as a module and return it."""
+    spec = importlib.util.spec_from_file_location(module_name, path)
     mod  = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    strategies = mod.STRATEGIES
+    return mod
+
+# =============================================================================
+# HELPER — COMPARE BATCH VS E1_BATCH AND GENERATE CSV
+# =============================================================================
+def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
+    """
+    Compare strategies_batch.py (previous state) vs strategies_E1_batch.py (new state).
+    Generate strategies_params.csv with change columns for diagnostics.
+    """
+    if not os.path.exists(strategies_batch_path):
+        logger.warning(f"⚠️  strategies_batch.py not found — skipping CSV generation.")
+        return
+    if not os.path.exists(e1_batch_path):
+        logger.warning(f"⚠️  strategies_E1_batch.py not found — skipping CSV generation.")
+        return
+
+    prev_map = {s["id"]: s for s in _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES}
+    new_map  = {s["id"]: s for s in _load_py_module(e1_batch_path, "strategies_e1_batch").STRATEGIES}
 
     rows = []
-    for s in strategies:
+    for sid, new in new_map.items():
+        prev = prev_map.get(sid, {})
+
+        # Active change
+        prev_active = prev.get("active", False)
+        new_active  = new.get("active", False)
+        if prev_active != new_active:
+            change_active = f"{'True' if prev_active else 'False'}→{'True' if new_active else 'False'}"
+        else:
+            change_active = "N/A"
+
+        # Param changes
+        param_changes = []
+        for k in PARAM_KEYS:
+            prev_val = prev.get(k)
+            new_val  = new.get(k)
+            if prev_val is not None and new_val is not None and prev_val != new_val:
+                param_changes.append(f"{k}: {prev_val}→{new_val}")
+        change_params = " | ".join(param_changes) if param_changes else "N/A"
+
+        # Regime changes
+        regime_changes = []
+        for r in ("regime_trending", "regime_ranging", "regime_volatile"):
+            prev_val = prev.get(r)
+            new_val  = new.get(r)
+            if prev_val is not None and new_val is not None and float(prev_val) != float(new_val):
+                regime_changes.append(f"{r}: {prev_val}→{new_val}")
+        change_regime = " | ".join(regime_changes) if regime_changes else "N/A"
+
         rows.append({
-            "id":                  s["strategy_id"],
-            "name":                "_".join(s["strategy_id"].split("_")[1:]),
-            "timeframe":           s["timeframe"],
-            "active":              s.get("active", False),
-            "direction":           s["side"],
-            "regime_trending":     s.get("regime_trending", 1.0),
-            "regime_ranging":      s.get("regime_ranging",  1.0),
-            "regime_volatile":     s.get("regime_volatile", 1.0),
-            "direction_mode":      s.get("direction_mode", "general"),
-            "sell_after_ncandles": s.get("sell_after_ncandles", 0),
-            "order_amount":        s.get("order_amount_prod", 200),
-            "lookback":            s.get("lookback",   None),
-            "tolerance":           s.get("tolerance",  None),
-            "ma_period":           s.get("ma_period",  None),
-            "tp_pct":              s.get("tp_pct",     None),
-            "sl_pct":              s.get("sl_pct",     None),
-            "impulse":             s.get("impulse",    None),
-            "ranges":              s.get("ranges",     None),
-            "flag":                s.get("flag",       None),
-            "last_run":            None,
+            "id":                  sid,
+            "name":                new["name"],
+            "timeframe":           new["timeframe"],
+            "active":              new_active,
+            "direction":           new["direction"],
+            "regime_trending":     new.get("regime_trending", 1.0),
+            "regime_ranging":      new.get("regime_ranging",  1.0),
+            "regime_volatile":     new.get("regime_volatile", 1.0),
+            "direction_mode":      new.get("direction_mode", "general"),
+            "sell_after_ncandles": new.get("sell_after_ncandles", 0),
+            "order_amount":        new.get("order_amount", 200),
+            "lookback":            new.get("lookback"),
+            "tolerance":           new.get("tolerance"),
+            "ma_period":           new.get("ma_period"),
+            "tp_pct":              new.get("tp_pct"),
+            "sl_pct":              new.get("sl_pct"),
+            "impulse":             new.get("impulse"),
+            "ranges":              new.get("ranges"),
+            "flag":                new.get("flag"),
+            "last_run":            pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
             "bt_netgain_pct":      None,
             "bt_r2":               None,
             "prob_negative":       None,
-            "validated":           None,
-            "last_change_active":  None,
-            "last_change_params":  None,
-            "last_change_regime":  None,
+            "validated":           new_active,
+            "last_change_active":  change_active,
+            "last_change_params":  change_params,
+            "last_change_regime":  change_regime,
         })
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     pd.DataFrame(rows).to_csv(csv_path, index=False)
-    logger.info(f"✅ strategies_params.csv generated from strategies_batch.py → {csv_path}")
+    logger.info(f"✅ strategies_params.csv generated → {csv_path}")
 
 
 
@@ -351,142 +371,6 @@ def enrich_trades_with_regime(trade_log, ohlc_folder, timeframe, families, lookb
 
 
 # =============================================================================
-# HELPER — UPDATE STRATEGIES PARAMS CSV
-# =============================================================================
-def update_strategies_params(csv_path, strategy_id, best_params, param_keys, validated,
-                             bt_netgain_pct, r2, prob_negative_oos, regime_stats=None):
-    """
-    Update strategies_params.csv with new params, validation result and regime flags.
-    Production columns (params, regime) are only updated when validated=True.
-
-    regime_stats: dict with keys 'trending', 'ranging', 'volatile', each containing
-                  at least a 'profit' key. If None, regime columns are not updated.
-    """
-    def normalize(val):
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            return None
-
-    _no_change = {"params_changed": False, "param_changes": [], "regime_changes": [],
-                  "active_prev": None, "active_new": None}
-
-    if not os.path.exists(csv_path):
-        logger.warning(f"⚠️  strategies_params.csv not found at {csv_path} — skipping update.")
-        return _no_change
-
-    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-
-    df_params = pd.read_csv(csv_path)
-    for col in ("bt_netgain_pct", "bt_r2", "prob_negative"):
-        df_params[col] = pd.to_numeric(df_params[col], errors="coerce").astype("float64")
-
-    mask = df_params["id"] == strategy_id
-    if not mask.any():
-        logger.warning(f"⚠️  Strategy id '{strategy_id}' not found in CSV — skipping update.")
-        return _no_change
-
-    idx      = df_params[mask].index[0]
-    prev_row = df_params.loc[idx]
-
-    # -------------------------------------------------------------------------
-    # Detect param changes (computed always, applied only if validated)
-    # -------------------------------------------------------------------------
-    params_changed = False
-    param_changes  = []
-    logger.debug(f"ID : {strategy_id}")
-    logger.debug(f"  {'Parameter':<20} {'Previous':>12} {'New':>12} {'Changed':>10}")
-    logger.debug(f"  {'-'*56}")
-    for k in param_keys:
-        if k == "sell_after":
-            continue
-        prev_val = normalize(prev_row.get(k, None))
-        new_val  = normalize(best_params.get(k.upper(), None))
-        changed  = "⚠️  YES" if prev_val != new_val else "✅"
-        if prev_val != new_val:
-            params_changed = True
-            param_changes.append(f"{k}: {prev_val}→{new_val}")
-        logger.debug(f"  {k:<20} {str(prev_val):>12} {str(new_val):>12} {changed:>10}")
-
-    logger.debug(f"  {'Metric':<20} {'Previous':>12} {'New':>12}")
-    logger.debug(f"  {'-'*46}")
-    for metric, new_val in [("bt_netgain_pct", round(bt_netgain_pct, 2)), ("bt_r2", round(r2, 3)), ("prob_negative", round(prob_negative_oos, 2))]:
-        prev_val = prev_row.get(metric, None)
-        logger.debug(f"  {metric:<20} {str(prev_val):>12} {str(new_val):>12}")
-
-    # -------------------------------------------------------------------------
-    # Detect regime changes (computed always, applied only if validated)
-    # -------------------------------------------------------------------------
-    regime_changes = []
-    new_regime_flags = {}
-    if regime_stats:
-        for family in ("trending", "ranging", "volatile"):
-            col       = f"regime_{family}"
-            new_flag  = 1.0 if (regime_stats.get(family, {}).get("profit", 0) >= 0) else 0.0
-            prev_flag = normalize(prev_row.get(col, None))
-            new_regime_flags[col] = new_flag
-            if prev_flag != new_flag:
-                regime_changes.append(f"{col}: {prev_flag}→{new_flag}")
-
-    # -------------------------------------------------------------------------
-    # Detect active change
-    # -------------------------------------------------------------------------
-    prev_active = bool(prev_row.get("active", False)) if pd.notna(prev_row.get("active")) else False
-    new_active  = bool(validated)
-
-    # -------------------------------------------------------------------------
-    # Always update diagnostic metrics
-    # -------------------------------------------------------------------------
-    df_params.at[idx, "validated"]      = validated
-    df_params.at[idx, "bt_netgain_pct"] = round(bt_netgain_pct, 2)
-    df_params.at[idx, "bt_r2"]          = round(float(r2), 2)
-    df_params.at[idx, "prob_negative"]  = round(prob_negative_oos, 2)
-    df_params.at[idx, "last_run"]       = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")
-
-    # Force string dtype to prevent NaN passthrough on empty cells
-    for col in ("last_change_active", "last_change_params", "last_change_regime"):
-        df_params[col] = df_params[col].astype(object)
-
-    # Default change columns to N/A — overwritten below based on outcome
-    df_params.at[idx, "last_change_active"] = "N/A"
-    df_params.at[idx, "last_change_params"] = "N/A"
-    df_params.at[idx, "last_change_regime"] = "N/A"
-
-    # Active
-    df_params.at[idx, "active"] = bool(validated)
-    if prev_active and not validated:
-        df_params.at[idx, "last_change_active"] = "True→False"
-    elif not prev_active and validated:
-        df_params.at[idx, "last_change_active"] = "False→True"
-
-    # Params — always updated
-    if params_changed:
-        for k in param_keys:
-            if k in df_params.columns:
-                df_params.at[idx, k] = best_params.get(k.upper())
-        df_params.at[idx, "last_change_params"] = " | ".join(param_changes)
-
-    # Regime — always updated
-    for col, new_flag in new_regime_flags.items():
-        df_params.at[idx, col] = new_flag
-    if regime_changes:
-        df_params.at[idx, "last_change_regime"] = " | ".join(regime_changes)
-
-    for col in ("last_change_active", "last_change_params", "last_change_regime"):
-        df_params[col] = df_params[col].fillna("N/A")
-
-    df_params.to_csv(csv_path, index=False)
-
-    return {
-        "params_changed": params_changed and validated,
-        "param_changes":  param_changes if validated else [],
-        "regime_changes": regime_changes if validated else [],
-        "active_prev":    prev_active,
-        "active_new":     new_active,
-    }
-
-
-# =============================================================================
 # HELPER — SAVE DRIFT REFERENCE
 # =============================================================================
 def save_drift_reference(drift_results, output_path):
@@ -519,14 +403,14 @@ def save_drift_reference(drift_results, output_path):
 
 
 # =============================================================================
-# HELPER — SAVE STRATEGIES BATCH (update dynamic fields + write E1 output)
+# HELPER — SAVE STRATEGIES E1 BATCH
 # =============================================================================
 def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map):
     """
-    Update strategies_batch.py with dynamic fields from memory and generate
-    strategies_E1_batch.py for production deployment.
+    Generate strategies_E1_batch.py for production deployment.
+    Reads strategies_batch.py (never modified), applies dynamic fields from memory.
 
-    strategies_batch_path : path to strategies_batch.py (source of truth)
+    strategies_batch_path : path to strategies_batch.py (input, never modified)
     output_path           : path to write strategies_E1_batch.py
     validation_results    : list of dicts with strategy_id, verdict, regime_*
     best_params_map       : dict {strategy_id: best_params dict}
@@ -535,89 +419,9 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
         logger.warning(f"⚠️  strategies_batch.py not found — skipping.")
         return
 
-    # Load current strategies_batch
-    import importlib.util
-    spec   = importlib.util.spec_from_file_location("strategies_batch", strategies_batch_path)
-    mod    = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    strategies = mod.STRATEGIES
+    strategies = _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES
+    val_map    = {v["strategy_id"]: v for v in validation_results}
 
-    # Build lookup from validation results
-    val_map = {v["strategy_id"]: v for v in validation_results}
-
-    def _fmt(val):
-        if isinstance(val, bool):
-            return str(val)
-        if isinstance(val, str):
-            return f'"{val}"'
-        return str(val)
-
-    # -------------------------------------------------------------------------
-    # Update strategies_batch.py
-    # -------------------------------------------------------------------------
-    batch_lines = [
-        '"""',
-        'strategies_batch.py — Source of truth for BOT_batch.',
-        '',
-        'Static fields : strategy_id, signal, side, timeframe,',
-        '                direction_mode, order_amount_prod, sell_after_ncandles.',
-        '',
-        'Dynamic fields (updated by batch): active, regime_trending,',
-        '                                   regime_ranging, regime_volatile,',
-        '                                   and all optimized params.',
-        '"""',
-        '',
-        'STRATEGIES = [',
-    ]
-
-    for s in strategies:
-        sid = s["strategy_id"]
-        v   = val_map.get(sid, {})
-        bp  = best_params_map.get(sid, {})
-
-        updated = dict(s)
-        if v:
-            updated["active"]           = v["verdict"] == "🟢 VALIDATED"
-            updated["regime_trending"]  = v.get("regime_trending", s.get("regime_trending", 1.0))
-            updated["regime_ranging"]   = v.get("regime_ranging",  s.get("regime_ranging",  1.0))
-            updated["regime_volatile"]  = v.get("regime_volatile", s.get("regime_volatile", 1.0))
-        if bp:
-            for k, val in bp.items():
-                updated[k.lower()] = val
-
-        batch_lines.append("    {")
-        batch_lines.append(f'        # --- Identification ---')
-        batch_lines.append(f'        "strategy_id": "{updated["strategy_id"]}",')
-        batch_lines.append(f'        "signal": "{updated["signal"]}",')
-        batch_lines.append(f'        "side": "{updated["side"]}",')
-        batch_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
-        batch_lines.append(f'')
-        batch_lines.append(f'        # --- Production config (static) ---')
-        batch_lines.append(f'        "direction_mode": "{updated.get("direction_mode", "general")}",')
-        batch_lines.append(f'        "order_amount_prod": {updated.get("order_amount_prod", 200)},')
-        batch_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
-        batch_lines.append(f'')
-        batch_lines.append(f'        # --- Updated by batch ---')
-        batch_lines.append(f'        "active": {updated.get("active", False)},')
-        batch_lines.append(f'        "regime_trending": {float(updated.get("regime_trending", 1.0))},')
-        batch_lines.append(f'        "regime_ranging": {float(updated.get("regime_ranging", 1.0))},')
-        batch_lines.append(f'        "regime_volatile": {float(updated.get("regime_volatile", 1.0))},')
-
-        _PARAM_KEYS = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
-        for k in _PARAM_KEYS:
-            if k in updated:
-                batch_lines.append(f'        "{k}": {_fmt(updated[k])},')
-        batch_lines.append("    },")
-
-    batch_lines.append("]")
-    os.makedirs(os.path.dirname(os.path.abspath(strategies_batch_path)), exist_ok=True)
-    with open(strategies_batch_path, "w") as f:
-        f.write("\n".join(batch_lines) + "\n")
-    logger.debug(f"strategies_batch.py updated → {strategies_batch_path}")
-
-    # -------------------------------------------------------------------------
-    # Write strategies_E1_batch.py (production format)
-    # -------------------------------------------------------------------------
     e1_lines = [
         '"""',
         'Trading Strategies Configuration',
@@ -630,11 +434,11 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
     ]
 
     for s in strategies:
-        sid = s["strategy_id"]
-        v   = val_map.get(sid, {})
-        bp  = best_params_map.get(sid, {})
-
+        sid     = s["id"]
+        v       = val_map.get(sid, {})
+        bp      = best_params_map.get(sid, {})
         updated = dict(s)
+
         if v:
             updated["active"]          = v["verdict"] == "🟢 VALIDATED"
             updated["regime_trending"] = v.get("regime_trending", s.get("regime_trending", 1.0))
@@ -644,31 +448,31 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
             for k, val in bp.items():
                 updated[k.lower()] = val
 
-        name = "_".join(sid.split("_")[1:])  # e.g. "reversal_long_4H"
-
         e1_lines.append("    {")
         e1_lines.append(f'        "id": "{sid}",')
-        e1_lines.append(f'        "name": "{name}",')
+        e1_lines.append(f'        "name": "{updated["name"]}",')
         e1_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
         e1_lines.append(f'        "active": {updated.get("active", False)},')
-        e1_lines.append(f'        "direction": "{updated["side"]}",')
+        e1_lines.append(f'        "direction": "{updated["direction"]}",')
         e1_lines.append(f'        "regime_trending": {float(updated.get("regime_trending", 1.0))},')
         e1_lines.append(f'        "regime_ranging": {float(updated.get("regime_ranging", 1.0))},')
         e1_lines.append(f'        "regime_volatile": {float(updated.get("regime_volatile", 1.0))},')
         e1_lines.append(f'        "direction_mode": "{updated.get("direction_mode", "general")}",')
         e1_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
         e1_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
-
-        for k in _PARAM_KEYS:
+        for k in SIGNAL_PARAM_KEYS:
             if k in updated:
-                e1_lines.append(f'        "{k}": {_fmt(updated[k])},')
+                e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
+        for k in ("tp_pct", "sl_pct"):
+            if k in updated:
+                e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
         e1_lines.append("    },")
 
     e1_lines.append("]")
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w") as f:
         f.write("\n".join(e1_lines) + "\n")
-    logger.debug(f"strategies_E1_batch.py updated → {output_path}")
+    logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
 
 
 # =============================================================================
@@ -738,22 +542,6 @@ def get_btc_direction(buy_time, btc_df, side, ma_period=5, long_th=1.00, short_t
 # =============================================================================
 # PORTFOLIO ANALYSIS — EQUITY METRICS
 # =============================================================================
-RESAMPLE_FREQ = '1D'
-BARS_PER_DAY  = 1
-
-
-def resample_equity(df_indexed):
-    common_index = pd.date_range(
-        start=df_indexed.index.min(),
-        end=df_indexed.index.max(),
-        freq=RESAMPLE_FREQ
-    )
-    df_r = df_indexed[['balance']].reindex(common_index)
-    df_r['balance'] = df_r['balance'].ffill().bfill()
-    df_r.index.name = 'timestamp'
-    return df_r
-
-
 def compute_metrics(trade_log, capital, name="Equity"):
     from sklearn.linear_model import LinearRegression as _LR
 
@@ -816,28 +604,12 @@ def compute_metrics(trade_log, capital, name="Equity"):
     }
 
 
-def print_metrics_table(metrics_list, title, shorten_names=False, use_info=False):
-    def _shorten(name):
-        segments = name.strip().split("+")
-        result = []
-        for seg in segments:
-            for part in seg.split("_"):
-                if part.isdigit():
-                    result.append(part)
-                    break
-        return "+".join(result) if result else name
-
+def print_metrics_table(metrics_list, title):
     df = pd.DataFrame(metrics_list)
     df['Curve'] = df['Curve'].astype(str)
-    if shorten_names:
-        df['Curve'] = df['Curve'].apply(_shorten)
     max_len = df['Curve'].str.len().max()
     df['Curve'] = df['Curve'].apply(lambda x: x.ljust(max_len))
-    msg = f"\n{title}\n{df.to_string(index=False)}"
-    if use_info:
-        logger.info(msg)
-    else:
-        logger.debug(msg)
+    logger.debug(f"\n{title}\n{df.to_string(index=False)}")
 
 
 # =============================================================================
@@ -868,11 +640,10 @@ def print_strategies_summary(validation_results):
 # =============================================================================
 def print_update_status(csv_path, symbols_live_folder, validation_results):
     """
-    Print four update status tables reading from CSV as source of truth:
+    Print update status tables reading from CSV:
       1. Active
-      2. Params
-      3. Market Regime
-      4. Symbols
+      2. Market Regime
+      3. Symbols
     """
     if not validation_results:
         return
@@ -899,8 +670,7 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
         return "—"
 
     def _change_icon(val):
-        if val in ("N/A", "—", ""):    return "⚪ no change"
-        if val == "REJECTED":                   return "🔴 REJECTED"
+        if val in ("N/A", "—", ""):  return "⚪ no change"
         return f"🔵 {val}"
 
     # -------------------------------------------------------------------------

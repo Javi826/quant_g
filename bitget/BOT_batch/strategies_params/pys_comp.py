@@ -13,7 +13,7 @@ import importlib.util
 # PATHS
 # =============================================================================
 PRODUCTION_PATH = "/home/javi/projects/quant/quant_g/bitget/BOT_trading/config/strategies_E1.py"
-CANDIDATE_PATH = os.path.join(os.path.dirname(__file__), "strategies_E1_from_csv.py")
+CANDIDATE_PATH = os.path.join(os.path.dirname(__file__), "strategies_E1_batch.py")
 
 # =============================================================================
 # LOADER

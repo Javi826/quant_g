@@ -31,7 +31,7 @@ logger_bot.propagate = False
 
 start_time   = time.time()
 SAVE_SYMBOLS = False
-MY_SYMBOLS   = False
+MY_SYMBOLS   = True
 STRATEGY     = "reversal_long_1H_OOS"
 N_JOBS       = -1
 
@@ -40,30 +40,23 @@ N_JOBS       = -1
 # -----------------------------------------------------------------------------
 SPLIT_MODE = "expanding"
 SPLIT_BASE = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
-TIMEFRAME_MINOR     = '4H'
+DATA_FOLDER = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-04_OOS")
+TIMEFRAME_MINOR     = '6Hutc'
 
 ORDER_AMOUNT        = 80
-MIN_VOL_USDT        = 430_000
+MIN_VOL_USDT        = 3_000_000
 
 # -----------------------------------------------------------------------------
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
-SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [1,2,3,4,5,6,7,8,9,10]
-MA_PERIOD_LIST       = [5,10,25,50]
-TOLERANCE_LIST       = [5,10,15,20,25,30]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9]
-SL_PCT_LIST          = [3,4,5,6,7,9,10]
+SELL_AFTER_LIST      = [16]
+LOOKBACK_LIST        = [6]
+MA_PERIOD_LIST       = [25]
+TOLERANCE_LIST       = [30]
 
-SELL_AFTER_LIST      = [0]
-LOOKBACK_LIST        = [4]
-MA_PERIOD_LIST       = [50]
-TOLERANCE_LIST       = [20]
-
-TP_PCT_LIST          = [3]
-SL_PCT_LIST          = [10]
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [7.5]
 
 
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','MA_PERIOD','TP_PCT','SL_PCT']

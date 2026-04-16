@@ -1,3 +1,4 @@
+#BOT_batch/main_bacth.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -36,18 +37,19 @@ from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
 from utils.st_tools import get_n_obs, save_all_trades_to_csv
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.analysis import report_montecarlo, report_backtesting
-from utils.utils import filter_symbols, final_prints
+from utils.utils import filter_symbols
 from regime_performance import analyze_strategy, print_single_strategy_all_dimensions
 from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time, classify_trade_by_family
 from regime_performance import MA_PERIOD, LOOKBACK_BARS
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
+from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 from batch_utils import extract_best_params, select_universe
-from batch_utils import enrich_trades_with_regime, update_strategies_params, update_strategies_symbols, load_btc_1d
+from batch_utils import enrich_trades_with_regime, update_strategies_symbols, load_btc_1d
 from batch_utils import get_btc_direction, compute_metrics, print_metrics_table, calc_r2_from_equity_hist
 from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
-from batch_utils import validate_csv_columns, save_drift_reference, save_strategies_e1, generate_csv_from_batch
+from batch_utils import save_drift_reference, save_strategies_e1, compare_and_generate_csv
 
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -77,33 +79,30 @@ logger = logging.getLogger("BOT_batch.main_batch")
 # =============================================================================
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
-DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
+DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-07_IS")
+DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-07_2026-04_OOS")
 
 N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-N_PATHS_IS  = 10
-N_PATHS_OOS = 200
+N_PATHS_IS  = 1
+N_PATHS_OOS = 2000
 
 # Validation thresholds — Round 1
-R1_NETGAIN_ROUND1    = 10.0
+R1_NETGAIN_ROUND1    = 15
 R1_RSQUARED_ROUND1   = 0.8
-R1_PROBNEG_ROUND1    = 15.0
+R1_PROBNEG_ROUND1    = 21
 
 # Validation thresholds — Round 2 path A (regime filtered)
-R2A_NETGAIN_ROUND2   = 10.0
-R2A_RSQUARED_ROUND2  = 0.90
+R2A_NETGAIN_ROUND2   = 10
+R2A_RSQUARED_ROUND2  = 0.8
 R2A_PROBNEG_ROUND1   = 100.0
 
 # Validation thresholds — Round 2 path B (high netgain OOS)
-R2B_NETGAIN_ROUND1   = 40.0
-R2B_PROBNEG_ROUND1   = 20.0
+R2B_NETGAIN_ROUND1   = 15
+R2B_MAX_DD           = 25  # por ejempl
 
-R0_MA_PERIOD = 5
-R0_LONG_TH   = 1.00
-R0_SHORT_TH  = 1.00
 
 # IS symbol selection
 FIX_SYMBOLS_MCIS_TRAINING = True   # If True, use top N_SYMBOLS_MCIS from IS by volume directly
@@ -130,8 +129,8 @@ SELECTED_STRATEGIES = [
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS  = True   # Set to False to skip all portfolio analysis
-RUN_BEST_COMBINATIONS   = False  # Set to False to skip best combinations (expensive)
-UPDATE_CSV              = True   # Set to False to skip CSV updates (tables will show last run data)
+RUN_BEST_COMBINATIONS   = True  # Set to False to skip best combinations (expensive)
+UPDATE_OUTPUTS          = True   # Set to False to skip all file outputs (strategies, csv, drift)
 
 STRATEGIES_PARAMS_FOLDER  = os.path.join(os.path.dirname(__file__), "strategies_params")
 CSV_PARAMS                = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_params.csv")
@@ -140,13 +139,12 @@ SYMBOLS_LIVE_FOLDER       = os.path.join(os.path.dirname(__file__), "symbols_liv
 DRIFT_MONTECARLO_FOLDER   = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
 DRIFT_BATCH_PATH          = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
 
-# Global trade_log accumulators (populated by each run_batch call)
-_trade_logs_baseline  : list = []   # (strategy_id, trade_log_df)
-_trade_logs_regime01  : list = []   # (strategy_id, trade_log_df)
-_oos_metrics          : list = []   # {strategy_id, net_gain_pct, dd_pct, win_ratio, r2}
-_validation_results   : list = []   # {strategy_id, verdict, round, net_gain_pct, dd_pct, win_ratio, r2, prob_neg_pct}
-_drift_results        : list = []   # {strategy_id, p5_winrate, p50_winrate}
-_best_params_results  : dict = {}   # {strategy_id: best_params}
+# Global accumulators (populated by each run_batch call)
+_trade_logs_baseline : list = []   # (strategy_id, trade_log_df)
+_trade_logs_regime01 : list = []   # (strategy_id, trade_log_df)
+_validation_results  : list = []   # {strategy_id, verdict, round, ...}
+_drift_results       : list = []   # {strategy_id, p5_winrate, p50_winrate}
+_best_params_results : dict = {}   # {strategy_id: best_params}
 
 
 # =============================================================================
@@ -173,18 +171,19 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # Unpack config
     # -------------------------------------------------------------------------
-    STRATEGY_ID        = strategy_config["strategy_id"]
-    SIDE               = strategy_config["side"]
-    TIMEFRAME          = strategy_config["timeframe"]
-    N_SYMBOLS          = strategy_config["n_symbols"]
-    ORDER_AMOUNT       = strategy_config["order_amount"]
-    ORDER_AMOUNT_PROD  = strategy_config.get("order_amount_prod", strategy_config["order_amount"])
-    DIRECTION_MODE     = strategy_config.get("direction_mode", "general")
-    param_grid         = strategy_config["param_grid"]
+    STRATEGY_ID       = strategy_config["id"]
+    SIDE              = strategy_config["direction"]
+    TIMEFRAME         = strategy_config["timeframe"]
+    N_SYMBOLS         = strategy_config["n_symbols"]
+    ORDER_AMOUNT      = strategy_config["order_amount"]
+    ORDER_AMOUNT_PROD = strategy_config.get("order_amount_prod", strategy_config["order_amount"])
+    DIRECTION_MODE    = strategy_config.get("direction_mode", "general")
+    param_grid        = strategy_config["param_grid"]
 
-    registry      = SIGNAL_REGISTRY[strategy_config["signal"]]
-    signal_fn     = registry["fn"]
-    signal_params_keys = registry["params"]  # e.g. ["lookback", "tolerance", "ma_period"]
+    signal_key        = "_".join(strategy_config["name"].split("_")[:-1])
+    registry          = SIGNAL_REGISTRY[signal_key]
+    signal_fn         = registry["fn"]
+    signal_params_keys = registry["params"]
 
     param_names     = list(param_grid.keys())
     lists_for_grid  = [param_grid[k] for k in param_names]
@@ -288,22 +287,11 @@ def run_batch(strategy_config: dict) -> None:
     best_comb = tuple(best_params[p] for p in param_names)
     oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result)], param_names, INITIAL_BALANCE))
 
-    oos_bt_portfolio, _ = report_backtesting(df=oos_df, parameters=param_names,
-                                             data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE)
+    _, _ = report_backtesting(df=oos_df, parameters=param_names,
+                               data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE,
+                               strategy_id=STRATEGY_ID)
 
     best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
-
-    _r2_oos = np.nan
-    eq_hist = best_bt_row.get("sim_balance_history", None)
-    _r2_oos = calc_r2_from_equity_hist(eq_hist)
-
-    _oos_metrics.append({
-        "strategy_id":   STRATEGY_ID,
-        "net_gain_pct":  round(float(best_bt_row["Net_Gain"]) / INITIAL_BALANCE * 100, 2),
-        "dd_pct":        round(-abs(float(best_bt_row["DD_pct"])), 2),
-        "win_ratio":     round(float(best_bt_row["Win_Ratio"]) * 100, 1),
-        "r2":            _r2_oos,
-    })
 
     logger.info(f"STAGE 3  ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
 
@@ -544,9 +532,9 @@ def run_batch(strategy_config: dict) -> None:
         ok_prob_neg_max     = prob_negative_oos < R2A_PROBNEG_ROUND1
         approved_path_a     = ok_netgain_filtered and ok_r2_filtered and ok_prob_neg_max
 
-        ok_netgain_high    = bt_netgain_pct     > R2B_NETGAIN_ROUND1
-        ok_prob_neg_strict = prob_negative_oos  < R2B_PROBNEG_ROUND1
-        approved_path_b    = ok_netgain_high and ok_prob_neg_strict
+        ok_netgain_high    = bt_netgain_pct > R2B_NETGAIN_ROUND1
+        ok_max_dd          = abs(float(best_bt_row.get("DD_pct", 0))) < R2B_MAX_DD
+        approved_path_b    = ok_netgain_high and ok_max_dd
 
         approved_regime = approved_path_a or approved_path_b
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
@@ -555,11 +543,10 @@ def run_batch(strategy_config: dict) -> None:
         logger.debug(f"    Net Gain       : {netgain_filtered:>7.2f}%   (threshold > {R2A_NETGAIN_ROUND2}%)    {'✅' if ok_netgain_filtered else '❌'}")
         logger.debug(f"    R2 filtered    : {r2_filtered:>7.3f}    (threshold > {R2A_RSQUARED_ROUND2})      {'✅' if ok_r2_filtered  else '❌'}")
         logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {R2A_PROBNEG_ROUND1}%)   {'✅' if ok_prob_neg_max else '❌'}")
-        logger.debug(f"  Second Round — Path B (high netgain)")
-        logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {R2B_NETGAIN_ROUND1}%)    {'✅' if ok_netgain_high    else '❌'}")
-        logger.debug(f"    Prob Negative  : {prob_negative_oos:>7.2f}%   (threshold < {R2B_PROBNEG_ROUND1}%)   {'✅' if ok_prob_neg_strict else '❌'}")
-        path_str       = f" ({round_path})" if approved_regime else ""
-        verdict_r2     = f"{'🟢 VALIDATED' if approved_regime else '🔴 REJECTED'}{path_str}"
+        logger.debug(f"  Second Round — Path B (high netgain + low dd)")
+        logger.debug(f"    Net Gain OOS   : {bt_netgain_pct:>7.2f}%   (threshold > {R2B_NETGAIN_ROUND1}%)    {'✅' if ok_netgain_high else '❌'}")
+        logger.debug(f"    Max DD         : {abs(float(best_bt_row.get('DD_pct', 0))):>7.2f}%   (threshold < {R2B_MAX_DD}%)        {'✅' if ok_max_dd else '❌'}")
+        path_str   = f" ({round_path})" if approved_regime else ""
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
         logger.info(f"STAGE 7  ── Validation (Round 2)   ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_filtered:.2f}% R2={r2_filtered:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
@@ -577,22 +564,18 @@ def run_batch(strategy_config: dict) -> None:
     _regime_volatile = 1.0 if regime_result["family_stats"].get("volatile", {}).get("profit", 0) >= 0 else 0.0
 
     _validation_results.append({
-        "strategy_id":      STRATEGY_ID,
-        "verdict":          "🟢 VALIDATED" if approved else "🔴 REJECTED",
-        "round":            _round,
-        "net_gain_pct":     round(bt_netgain_pct, 2),
-        "dd_pct":           round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
-        "win_ratio":        round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
-        "r2":               r2,
-        "prob_neg_pct":     round(prob_negative_oos, 2),
-        "params_changed":   False,
-        "active_prev":      None,
-        "active_new":       None,
-        "symbols_changed":  False,
-        "regime_trending":  _regime_trending,
-        "regime_ranging":   _regime_ranging,
-        "regime_volatile":  _regime_volatile,
-        "regime_changes":   [],
+        "strategy_id":     STRATEGY_ID,
+        "verdict":         "🟢 VALIDATED" if approved else "🔴 REJECTED",
+        "round":           _round,
+        "net_gain_pct":    round(bt_netgain_pct, 2),
+        "dd_pct":          round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
+        "win_ratio":       round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
+        "r2":              r2,
+        "prob_neg_pct":    round(prob_negative_oos, 2),
+        "symbols_changed": False,
+        "regime_trending": _regime_trending,
+        "regime_ranging":  _regime_ranging,
+        "regime_volatile": _regime_volatile,
     })
 
     # -------------------------------------------------------------------------
@@ -622,28 +605,12 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"  BLOCK 8 — Update & Compare  |  {STRATEGY_ID}")
     logger.debug(f"{'='*60}")
 
-    PARAM_KEYS = [p.lower() for p in param_names]
-
-    _params_result  = update_strategies_params(
-        csv_path=CSV_PARAMS, strategy_id=STRATEGY_ID, best_params=best_params,
-        param_keys=PARAM_KEYS, validated=approved, bt_netgain_pct=bt_netgain_pct,
-        r2=r2, prob_negative_oos=prob_negative_oos,
-        regime_stats=regime_result["family_stats"],
-    ) if UPDATE_CSV else None
-
     _symbols_result = update_strategies_symbols(
         strategy_id=STRATEGY_ID, symbols_oos_final=symbols_oos_final,
         timeframe=TIMEFRAME, symbols_live_folder=SYMBOLS_LIVE_FOLDER,
-    ) if UPDATE_CSV else None
+    ) if UPDATE_OUTPUTS else None
 
     _changes = []
-    if _params_result:
-        if _params_result.get("active_prev") != _params_result.get("active_new"):
-            _changes.append("active")
-        if _params_result.get("params_changed"):
-            _changes.append("params")
-        if _params_result.get("regime_changes"):
-            _changes.append("regime")
     if _symbols_result and _symbols_result.get("symbols_changed"):
         _changes.append("symbols")
     _changes_str = " | ".join(_changes) if _changes else "no changes"
@@ -664,11 +631,6 @@ def run_batch(strategy_config: dict) -> None:
     # Backfill update info into last validation result
     if _validation_results:
         _validation_results[-1].update({
-            "params_changed":  _params_result.get("params_changed", False)  if _params_result else False,
-            "param_changes":   _params_result.get("param_changes", [])      if _params_result else [],
-            "regime_changes":  _params_result.get("regime_changes", [])     if _params_result else [],
-            "active_prev":     _params_result.get("active_prev", None)      if _params_result else None,
-            "active_new":      _params_result.get("active_new", None)       if _params_result else None,
             "symbols_changed": _symbols_result.get("symbols_changed", False) if _symbols_result else False,
         })
 
@@ -749,14 +711,6 @@ def run_portfolio_analysis():
     print_strategies_summary(_validation_results)
 
     # =========================================================================
-    # UPDATE STATUS TABLES
-    # =========================================================================
-    logger.info(f"\n{'─'*105}")
-    logger.info(f"  UPDATE STATUS")
-    logger.info(f"{'─'*105}")
-    print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
-
-    # =========================================================================
     # ALL CURVES COMBINED — Baseline vs Regime 0+1
     # =========================================================================
     if _trade_logs_baseline:
@@ -813,12 +767,12 @@ if __name__ == "__main__":
     from strategies_loop  import STRATEGIES_LOOP
 
     # Merge: static+dynamic from strategies_batch + loop config from strategies_loop
-    _loop_map = {s["strategy_id"]: s for s in STRATEGIES_LOOP}
+    _loop_map = {s["id"]: s for s in STRATEGIES_LOOP}
     STRATEGIES = []
     for s in STRATEGIES_BATCH:
-        loop = _loop_map.get(s["strategy_id"], {})
+        loop = _loop_map.get(s["id"], {})
         if not loop:
-            logger.warning(f"⚠️  {s['strategy_id']} not found in strategies_loop — skipping.")
+            logger.warning(f"⚠️  {s['id']} not found in strategies_loop — skipping.")
             continue
         STRATEGIES.append({**s, **loop})
 
@@ -828,34 +782,42 @@ if __name__ == "__main__":
     logger.info(f"\n{'='*105}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*105}")
-    logger.info(f"  CSV update       : {'✅ enabled' if UPDATE_CSV else '⚪ disabled'}")
+    logger.info(f"  Outputs update   : {'✅ enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS          : {DATA_FOLDER_IS}")
     logger.info(f"  Data OOS         : {DATA_FOLDER_OOS}")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
     logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}  ProbNeg<{R2A_PROBNEG_ROUND1}%")
-    logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND1}%  ProbNeg<{R2B_PROBNEG_ROUND1}%")
+    logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND1}%  MaxDD<{R2B_MAX_DD}%")
     logger.info(f"  Regime 0         : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}")
     logger.info(f"{'='*105}\n")
 
     strategies_to_run = (
-        [s for s in STRATEGIES if s["strategy_id"] in SELECTED_STRATEGIES]
+        [s for s in STRATEGIES if s["id"] in SELECTED_STRATEGIES]
         if SELECTED_STRATEGIES else STRATEGIES
     )
     for strategy in strategies_to_run:
         logger.info(f"\n{'='*105}")
-        logger.info(f"  Running: {strategy['strategy_id']}")
+        logger.info(f"  Running: {strategy['id']}")
         logger.info(f"{'='*105}")
         run_batch(strategy)
 
     _strategies_batch_path = os.path.join(os.path.dirname(__file__), "strategies_batch.py")
-    save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
-    save_strategies_e1(
-        strategies_batch_path=_strategies_batch_path,
-        output_path=STRATEGIES_E1_BATCH_PATH,
-        validation_results=_validation_results,
-        best_params_map=_best_params_results,
-    )
-    generate_csv_from_batch(_strategies_batch_path, CSV_PARAMS)
+
+    if UPDATE_OUTPUTS:
+        save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
+        save_strategies_e1(
+            strategies_batch_path=_strategies_batch_path,
+            output_path=STRATEGIES_E1_BATCH_PATH,
+            validation_results=_validation_results,
+            best_params_map=_best_params_results,
+        )
+        compare_and_generate_csv(
+            strategies_batch_path=_strategies_batch_path,
+            e1_batch_path=STRATEGIES_E1_BATCH_PATH,
+            csv_path=CSV_PARAMS,
+        )
+
+    print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
 
     run_portfolio_analysis()
 

@@ -14,6 +14,16 @@ symbols_to_exclude = {}
 
 symbols_to_include = ['BTCUSDT', 'ETHUSDT','SOLUSDT','XRPUSDT','HYPEUSDT','SUIUSDT']
 
+symbols_to_include = [
+    'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT',
+    'HYPEUSDT', 'SUIUSDT', 'ADAUSDT', 'BCHUSDT', 'LINKUSDT',
+    'BNBUSDT', 'TAOUSDT', 'DOTUSDT', 'AAVEUSDT', 'ENAUSDT',
+    'NEARUSDT', 'AVAXUSDT', 'ARBUSDT', 'LTCUSDT', 'FARTCOINUSDT',
+    'APTUSDT', 'HBARUSDT', 'PENGUUSDT', 'HUSDT', 'WLDUSDT',
+    'WIFUSDT', 'SEIUSDT', 'ONDOUSDT', 'FETUSDT', 'SNXUSDT',
+    'BGBUSDT'
+]
+
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
     ohlcv_data         = {}
