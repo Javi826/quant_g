@@ -805,39 +805,31 @@ class DashboardServer:
         @self.app.route('/api/regime/strategies')
         def get_regime_strategies():
             """
-            Returns strategies with their regime multipliers and direction_mode for the matrix table.
+            Returns strategies with their regime multipliers and direction for the matrix table.
             """
             try:
-                from config.settings import DIRECTION_MATRIX, DIRECTION_GENERAL
-                
                 strategies_info = []
-                
+        
                 for idx, strat in enumerate(self.strategies, 1):
-                    direction_mode = strat.get('direction_mode', 'general')
-                    
-                    # Get regime multipliers directly from strategy config
-                    regime_trending = strat.get('regime_trending', 1.0)
-                    regime_ranging = strat.get('regime_ranging', 1.0)
-                    regime_volatile = strat.get('regime_volatile', 1.0)
-                    
                     strategies_info.append({
                         'number': idx,
                         'id': strat['id'],
-                        'direction_mode': direction_mode,
-                        'regime_trending': regime_trending,
-                        'regime_ranging': regime_ranging,
-                        'regime_volatile': regime_volatile,
+                        'direction': strat.get('direction', 'long'),
+                        'regime_trending_uptrend':  strat.get('regime_trending_uptrend',  0),
+                        'regime_trending_dwtrend':  strat.get('regime_trending_dwtrend',  0),
+                        'regime_ranging_uptrend':   strat.get('regime_ranging_uptrend',   0),
+                        'regime_ranging_dwtrend':   strat.get('regime_ranging_dwtrend',   0),
+                        'regime_volatile_uptrend':  strat.get('regime_volatile_uptrend',  0),
+                        'regime_volatile_dwtrend':  strat.get('regime_volatile_dwtrend',  0),
                         'active': strat.get('active', True)
                     })
-                
+        
                 return jsonify({
                     'success': True,
                     'strategies': strategies_info,
-                    'regime_general': REGIME_GENERAL,
-                    'direction_matrix': DIRECTION_MATRIX,
-                    'direction_general': DIRECTION_GENERAL
+                    'regime_general': REGIME_GENERAL
                 })
-                
+        
             except Exception as e:
                 logger.error(f"Error getting regime strategies: {e}")
                 return jsonify({

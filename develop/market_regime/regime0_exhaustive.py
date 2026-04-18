@@ -1,339 +1,242 @@
 #!/usr/bin/env python3
 """
-market_regime/zasymetric_lab_exhaustive.py
-Find Best LONG + SHORT Rule Combination by Testing All Pairs
-Tests all 400 combinations (20 LONG × 20 SHORT) on LAB data
+develop/market_regime/regime0_exhaustive.py
+
+Find best LONG + SHORT BTC MA threshold combination by testing all pairs.
+Tests all combinations (MA_TYPES x THRESHOLDS) on IS trades data.
+
+Output: optimal LONG_TH + SHORT_TH to use in regime_unified_analyzer.py
 """
 
+import os
+import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from glob import glob
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
+from regime_common import get_btc_macro_direction
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-LAB_TRADES_FOLDER = "../brief_trades"
-BTC_FILE          = "../data/crypto_2022_OOS/BTCUSDT_1Dutc.parquet"
+TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades_22")
 
-# MA thresholds to test
-MA_TYPES          = ['ma5', 'ma10', 'ma20', 'ma50']
-THRESHOLDS        = [0.95, 0.98, 1.00, 1.02, 1.05]
+SPLIT_MODE      = "expanding"
+SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-04_IS")
+
+MA_TYPES   = [5, 10, 20, 50]
+THRESHOLDS = [0.95, 0.98, 1.00, 1.02, 1.05]
+
 
 # =============================================================================
-def load_btc_1d():
-    """Load BTC 1D data"""
-    btc_file = Path(BTC_FILE)
-    
-    if not btc_file.exists():
-        raise FileNotFoundError(f"BTC 1D file not found: {btc_file}")
-    
-    df = pd.read_parquet(btc_file)
+# DATA LOADING
+# =============================================================================
+
+def load_btc_1d() -> pd.DataFrame:
+    """Load BTC 1D OHLC"""
+    filepath = Path(BTC_FOLDER) / "BTCUSDT_1Dutc.parquet"
+    if not filepath.exists():
+        raise FileNotFoundError(f"BTC 1D file not found: {filepath}")
+
+    df = pd.read_parquet(filepath)
     df.columns = df.columns.str.lower()
-    
-    if 'timestamp' in df.columns:
-        df['ts'] = pd.to_datetime(df['timestamp'])
-    else:
-        df['ts'] = pd.to_datetime(df.index)
-    
-    df = df.sort_values('ts').reset_index(drop=True)
-    
-    # Calculate MAs
-    for ma_type in MA_TYPES:
-        period = int(ma_type.replace('ma', ''))
-        df[ma_type] = df['close'].rolling(window=period).mean()
-    
-    return df
+    df['ts'] = pd.to_datetime(df['timestamp'] if 'timestamp' in df.columns else df.index)
+    return df.sort_values('ts').reset_index(drop=True)
 
 
-def get_btc_value(btc_df, trade_time, ma_type):
-    """Get BTC close and MA at trade time"""
-    closed_candles = btc_df[btc_df['ts'] < trade_time]
-    
-    if len(closed_candles) == 0:
-        return None, None
-    
-    last_candle = closed_candles.iloc[-1]
-    
-    if pd.isna(last_candle[ma_type]):
-        return None, None
-    
-    return last_candle['close'], last_candle[ma_type]
+def load_all_trades() -> pd.DataFrame:
+    """Load all trades from CSV files"""
+    files = sorted(glob(str(Path(TRADES_FOLDER) / "*.csv")))
+    if not files:
+        raise FileNotFoundError(f"No CSV files found in {TRADES_FOLDER}")
 
-
-def load_all_lab_trades():
-    """Load all lab trades"""
-    lab_folder = Path(LAB_TRADES_FOLDER)
-    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
-    
     all_trades = []
     for filepath in files:
-        df = pd.read_excel(filepath)
-        df['sell_time'] = pd.to_datetime(df['sell_time'])
+        df = pd.read_csv(filepath)
+        df.columns = df.columns.str.lower().str.strip()
         df['buy_time'] = pd.to_datetime(df['buy_time'])
         all_trades.append(df)
-    
+
     combined = pd.concat(all_trades, ignore_index=True)
     return combined.sort_values('buy_time').reset_index(drop=True)
 
 
-def calculate_max_dd(profits):
-    """Calculate max drawdown %"""
-    if len(profits) == 0:
-        return 0
-    
-    cumulative = 0
-    peak = 0
-    max_dd = 0
-    
-    for profit in profits:
-        cumulative += profit
-        if cumulative > peak:
-            peak = cumulative
-        dd = peak - cumulative
-        if dd > max_dd:
-            max_dd = dd
-    
-    dd_pct = (max_dd / peak * 100) if peak > 0 else 0
-    return -dd_pct if dd_pct > 0 else 0
+# =============================================================================
+# EVALUATION
+# =============================================================================
 
+def evaluate_combination(
+    df_trades: pd.DataFrame,
+    btc_df: pd.DataFrame,
+    ma_period: int,
+    long_th: float,
+    short_th: float,
+) -> dict:
+    """
+    Evaluate a single MA + threshold combination.
+    Uses get_btc_macro_direction — no lookahead bias.
+    """
+    long_profits_all      = []
+    long_profits_filtered = []
+    short_profits_all     = []
+    short_profits_filtered = []
 
-def evaluate_direction(df_trades, btc_df, ma_type, threshold, direction):
-    """
-    Evaluate rule for specific direction
-    
-    For LONG: if BTC > MA*threshold → allow, else skip
-    For SHORT: if BTC < MA*threshold → allow, else skip
-    """
-    df_dir = df_trades[df_trades['position_type'] == direction].copy()
-    
-    all_profits = []
-    filtered_profits = []
-    
-    for idx, trade in df_dir.iterrows():
-        profit = trade['profit']
-        all_profits.append(profit)
-        
-        btc_close, ma_value = get_btc_value(btc_df, trade['buy_time'], ma_type)
-        
-        if btc_close is None or ma_value is None:
-            filtered_profits.append(profit)
-            continue
-        
-        ma_threshold = ma_value * threshold
-        
-        # Apply rule
-        if direction == 'LONG':
-            if btc_close > ma_threshold:
-                filtered_profits.append(profit)
-        else:  # SHORT
-            if btc_close < ma_threshold:
-                filtered_profits.append(profit)
-    
-    # Calculate metrics
-    total_trades = len(all_profits)
-    total_profit = sum(all_profits)
-    total_wr = sum(1 for p in all_profits if p > 0) / total_trades * 100 if total_trades > 0 else 0
-    total_dd = calculate_max_dd(all_profits)
-    
-    filtered_trades = len(filtered_profits)
-    filtered_profit = sum(filtered_profits)
-    filtered_wr = sum(1 for p in filtered_profits if p > 0) / filtered_trades * 100 if filtered_trades > 0 else 0
-    filtered_dd = calculate_max_dd(filtered_profits)
-    
+    for _, trade in df_trades.iterrows():
+        profit        = trade['profit']
+        position_type = trade['position_type']
+        direction     = get_btc_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
+
+        if position_type == 'LONG':
+            long_profits_all.append(profit)
+            if direction == 'uptrend':
+                long_profits_filtered.append(profit)
+
+        elif position_type == 'SHORT':
+            short_profits_all.append(profit)
+            if direction == 'downtrend':
+                short_profits_filtered.append(profit)
+
+    combined_profit = sum(long_profits_filtered) + sum(short_profits_filtered)
+
     return {
-        'total_trades': total_trades,
-        'total_profit': total_profit,
-        'total_wr': total_wr,
-        'total_dd': total_dd,
-        'filtered_trades': filtered_trades,
-        'filtered_profit': filtered_profit,
-        'filtered_wr': filtered_wr,
-        'filtered_dd': filtered_dd
+        'long_total_trades':    len(long_profits_all),
+        'long_total_profit':    sum(long_profits_all),
+        'long_filtered_trades': len(long_profits_filtered),
+        'long_filtered_profit': sum(long_profits_filtered),
+        'short_total_trades':    len(short_profits_all),
+        'short_total_profit':    sum(short_profits_all),
+        'short_filtered_trades': len(short_profits_filtered),
+        'short_filtered_profit': sum(short_profits_filtered),
+        'combined_profit':       combined_profit,
     }
 
 
-def print_combination_details(rank, combo):
-    """Print detailed results for a combination"""
-    long_rule = f"{combo['long_ma'].upper()}*{combo['long_th']:.2f}"
-    short_rule = f"{combo['short_ma'].upper()}*{combo['short_th']:.2f}"
-    
-    lr = combo['long_result']
-    sr = combo['short_result']
-    
-    # Calculate totals
-    total_before_trades = lr['total_trades'] + sr['total_trades']
-    total_after_trades = lr['filtered_trades'] + sr['filtered_trades']
-    total_before_profit = lr['total_profit'] + sr['total_profit']
-    total_after_profit = lr['filtered_profit'] + sr['filtered_profit']
-    total_before_wr = (lr['total_wr'] * lr['total_trades'] + sr['total_wr'] * sr['total_trades']) / total_before_trades if total_before_trades > 0 else 0
-    total_after_wr = (lr['filtered_wr'] * lr['filtered_trades'] + sr['filtered_wr'] * sr['filtered_trades']) / total_after_trades if total_after_trades > 0 else 0
-    
-    # Weighted DD
-    total_before_dd = (abs(lr['total_dd']) * abs(lr['total_profit']) + abs(sr['total_dd']) * abs(sr['total_profit'])) / (abs(lr['total_profit']) + abs(sr['total_profit'])) if (abs(lr['total_profit']) + abs(sr['total_profit'])) > 0 else 0
-    total_after_dd = (abs(lr['filtered_dd']) * abs(lr['filtered_profit']) + abs(sr['filtered_dd']) * abs(sr['filtered_profit'])) / (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) if (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) > 0 else 0
-    total_before_dd = -total_before_dd
-    total_after_dd = -total_after_dd
-    
-    print(f"\n#{rank} {'='*130}")
-    print(f"LONG:  BTC > {long_rule}")
-    print(f"SHORT: BTC < {short_rule}")
-    print("="*110)
-    
-    # Header
-    print(f"\n{'Direction':<10} {'TRADES':<30} {'PROFIT':<45} {'WIN RATE':<20} {'MAX DD':<20}")
-    print(f"{'':10} {'Before':<8} {'After':<8} {'Δ':<12} {'Before':<12} {'After':<12} {'Δ':<10} {'%Δ':<8} "
-          f"{'Before':<8} {'After':<10} {'Before':<8} {'After':<10}")
-    print("-"*110)
-    
-    # LONG
-    long_profit_change = lr['filtered_profit'] - lr['total_profit']
-    long_profit_pct = (long_profit_change / abs(lr['total_profit']) * 100) if lr['total_profit'] != 0 else 0
-    
-    print(f"{'LONG':<10} {lr['total_trades']:<8} {lr['filtered_trades']:<8} {lr['filtered_trades']-lr['total_trades']:<12} "
-          f"${lr['total_profit']:<11.2f} ${lr['filtered_profit']:<11.2f} ${long_profit_change:<9.2f} {long_profit_pct:>+6.1f}%  "
-          f"{lr['total_wr']:<7.1f}% {lr['filtered_wr']:<9.1f}% "
-          f"{lr['total_dd']:<7.1f}% {lr['filtered_dd']:<9.1f}%")
-    
-    # SHORT
-    short_profit_change = sr['filtered_profit'] - sr['total_profit']
-    short_profit_pct = (short_profit_change / abs(sr['total_profit']) * 100) if sr['total_profit'] != 0 else 0
-    
-    print(f"{'SHORT':<10} {sr['total_trades']:<8} {sr['filtered_trades']:<8} {sr['filtered_trades']-sr['total_trades']:<12} "
-          f"${sr['total_profit']:<11.2f} ${sr['filtered_profit']:<11.2f} ${short_profit_change:<9.2f} {short_profit_pct:>+6.1f}%  "
-          f"{sr['total_wr']:<7.1f}% {sr['filtered_wr']:<9.1f}% "
-          f"{sr['total_dd']:<7.1f}% {sr['filtered_dd']:<9.1f}%")
-    
-    print("-"*110)
-    
-    # TOTAL
-    total_trades_change = total_after_trades - total_before_trades
-    total_profit_change = total_after_profit - total_before_profit
-    total_profit_pct = (total_profit_change / abs(total_before_profit) * 100) if total_before_profit != 0 else 0
-    
-    print(f"{'TOTAL':<10} {total_before_trades:<8} {total_after_trades:<8} {total_trades_change:<12} "
-          f"${total_before_profit:<11.2f} ${total_after_profit:<11.2f} ${total_profit_change:<9.2f} {total_profit_pct:>+6.1f}%  "
-          f"{total_before_wr:<7.1f}% {total_after_wr:<9.1f}% "
-          f"{total_before_dd:<7.1f}% {total_after_dd:<9.1f}%")
-    
-    print(f"\n💰 COMBINED PROFIT: ${combo['combined_profit']:,.2f}")
+# =============================================================================
+# PRINTING
+# =============================================================================
 
-def print_summary_table(combinations):
-    """Print summary table of top 3 combinations"""
-    print("\n" + "="*110)
-    print("SUMMARY - TOP 3 COMBINATIONS")
-    print("="*110)
-    
-    print(f"\n{'#':>3} {'LONG RULE':<15} {'SHORT RULE':<15} {'TRADES':<12} {'PROFIT':<15} {'WIN RATE':<12} {'MAX DD':<12}")
-    print(f"{'':>3} {'':15} {'':15} {'After':>12} {'After':>15} {'After':>12} {'After':>12}")
-    print("-"*110)
-    
-    for rank, combo in enumerate(combinations[:3], 1):
-        long_rule = f"{combo['long_ma'].upper()}{combo['long_th']:.2f}"
-        short_rule = f"{combo['short_ma'].upper()}{combo['short_th']:.2f}"
-        
-        lr = combo['long_result']
-        sr = combo['short_result']
-        
-        # Calculate totals
-        total_after_trades = lr['filtered_trades'] + sr['filtered_trades']
-        total_after_profit = lr['filtered_profit'] + sr['filtered_profit']
-        total_after_wr = (lr['filtered_wr'] * lr['filtered_trades'] + sr['filtered_wr'] * sr['filtered_trades']) / total_after_trades if total_after_trades > 0 else 0
-        
-        # Weighted DD
-        total_after_dd = (abs(lr['filtered_dd']) * abs(lr['filtered_profit']) + abs(sr['filtered_dd']) * abs(sr['filtered_profit'])) / (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) if (abs(lr['filtered_profit']) + abs(sr['filtered_profit'])) > 0 else 0
-        total_after_dd = -total_after_dd
-        
-        print(f"{rank:>3} {long_rule:<15} {short_rule:<15} {total_after_trades:>12} ${total_after_profit:>14.2f} {total_after_wr:>11.1f}% {total_after_dd:>11.1f}%")
-    
-    print("-"*110)
+def print_combination_details(rank: int, combo: dict):
+    """Print detailed results for a single combination"""
+    long_rule  = f"MA{combo['ma_period']} * {combo['long_th']:.2f}"
+    short_rule = f"MA{combo['ma_period']} * {combo['short_th']:.2f}"
+    r          = combo['result']
+
+    total_before = r['long_total_trades']    + r['short_total_trades']
+    total_after  = r['long_filtered_trades'] + r['short_filtered_trades']
+    profit_before = r['long_total_profit']    + r['short_total_profit']
+    profit_after  = r['long_filtered_profit'] + r['short_filtered_profit']
+    delta         = profit_after - profit_before
+
+    print(f"\n#{rank} {'='*110}")
+    print(f"  LONG:  BTC > {long_rule}")
+    print(f"  SHORT: BTC < {short_rule}")
+    print(f"{'='*110}")
+    print(f"\n{'Direction':<10} {'TR_TOT':>8} {'TR_FILT':>8} {'PF_TOT':>12} {'PF_FILT':>12} {'Δ_PROFIT':>12}")
+    print("-" * 70)
+    print(f"{'LONG':<10} {r['long_total_trades']:>8} {r['long_filtered_trades']:>8} "
+          f"{r['long_total_profit']:>12.2f} {r['long_filtered_profit']:>12.2f} "
+          f"{r['long_filtered_profit'] - r['long_total_profit']:>+12.2f}")
+    print(f"{'SHORT':<10} {r['short_total_trades']:>8} {r['short_filtered_trades']:>8} "
+          f"{r['short_total_profit']:>12.2f} {r['short_filtered_profit']:>12.2f} "
+          f"{r['short_filtered_profit'] - r['short_total_profit']:>+12.2f}")
+    print("-" * 70)
+    print(f"{'TOTAL':<10} {total_before:>8} {total_after:>8} "
+          f"{profit_before:>12.2f} {profit_after:>12.2f} {delta:>+12.2f}")
+    print(f"\n  Combined profit after filter: ${r['combined_profit']:,.2f}")
+
+
+def print_summary_table(combinations: list):
+    """Print summary table of top combinations"""
+    print(f"\n{'='*110}")
+    print("SUMMARY — TOP 5 COMBINATIONS")
+    print(f"{'='*110}")
+    print(f"\n{'#':>3} {'MA':>6} {'LONG_TH':>10} {'SHORT_TH':>10} {'TR_FILT':>10} {'PF_FILT':>14} {'Δ_PROFIT':>12}")
+    print("-" * 110)
+
+    for rank, combo in enumerate(combinations[:5], 1):
+        r = combo['result']
+        total_trades  = r['long_filtered_trades'] + r['short_filtered_trades']
+        total_profit  = r['combined_profit']
+        profit_before = r['long_total_profit'] + r['short_total_profit']
+        delta         = total_profit - profit_before
+        print(f"{rank:>3} {'MA'+str(combo['ma_period']):>6} {combo['long_th']:>10.2f} {combo['short_th']:>10.2f} "
+              f"{total_trades:>10} {total_profit:>14.2f} {delta:>+12.2f}")
+
+    print("-" * 110)
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
 def main():
-    print("="*140)
-    print("FIND BEST LONG + SHORT COMBINATION (Testing All Pairs)")
-    print("="*140)
-    
-    # Load BTC 1D
+    print("=" * 80)
+    print("REGIME0 EXHAUSTIVE — Find best MA + threshold combination")
+    print("=" * 80)
+
+    print(f"\nConfiguration:")
+    print(f"  Trades folder: {TRADES_FOLDER}")
+    print(f"  BTC folder   : {BTC_FOLDER}")
+    print(f"  MA types     : {MA_TYPES}")
+    print(f"  Thresholds   : {THRESHOLDS}")
+
     print("\n📂 Loading BTC 1D data...")
     btc_df = load_btc_1d()
-    print(f"✅ Loaded {len(btc_df)} daily bars")
-    
-    # Load LAB trades
-    print("\n📂 Loading LAB trades...")
-    df_lab = load_all_lab_trades()
-    print(f"✅ Loaded {len(df_lab)} LAB trades")
-    
-    long_count = len(df_lab[df_lab['position_type'] == 'LONG'])
-    short_count = len(df_lab[df_lab['position_type'] == 'SHORT'])
-    print(f"   LONG:  {long_count} trades")
-    print(f"   SHORT: {short_count} trades")
-    
-    # Define rules
-    rules = []
-    for ma_type in MA_TYPES:
-        for threshold in THRESHOLDS:
-            rules.append((ma_type, threshold))
-    
-    print(f"\n🔍 Testing {len(rules)} LONG rules × {len(rules)} SHORT rules = {len(rules)**2} combinations...")
-    
-    # Test all combinations
-    combinations = []
-    total_combos = len(rules) ** 2
-    current = 0
-    
-    for long_ma, long_th in rules:
-        for short_ma, short_th in rules:
-            current += 1
-            print(f"   Progress: {current}/{total_combos} ({current/total_combos*100:.1f}%)...", end='\r')
-            
-            # Evaluate LONG
-            long_result = evaluate_direction(df_lab, btc_df, long_ma, long_th, 'LONG')
-            
-            # Evaluate SHORT
-            short_result = evaluate_direction(df_lab, btc_df, short_ma, short_th, 'SHORT')
-            
-            # Combined profit
-            combined_profit = long_result['filtered_profit'] + short_result['filtered_profit']
-            
-            combinations.append({
-                'long_ma': long_ma,
-                'long_th': long_th,
-                'short_ma': short_ma,
-                'short_th': short_th,
-                'long_result': long_result,
-                'short_result': short_result,
-                'combined_profit': combined_profit
-            })
-    
+    print(f"✅ {len(btc_df)} daily bars loaded")
+
+    print("\n📂 Loading trades...")
+    df_trades = load_all_trades()
+    print(f"✅ {len(df_trades)} trades loaded")
+    print(f"   LONG : {len(df_trades[df_trades['position_type'] == 'LONG'])}")
+    print(f"   SHORT: {len(df_trades[df_trades['position_type'] == 'SHORT'])}")
+
+    # Build all combinations
+    combos = [
+        (ma, long_th, short_th)
+        for ma in MA_TYPES
+        for long_th in THRESHOLDS
+        for short_th in THRESHOLDS
+    ]
+    total = len(combos)
+    print(f"\n🔍 Testing {total} combinations ({len(MA_TYPES)} MA × {len(THRESHOLDS)} LONG_TH × {len(THRESHOLDS)} SHORT_TH)...")
+
+    results = []
+    for i, (ma_period, long_th, short_th) in enumerate(combos, 1):
+        print(f"   Progress: {i}/{total} ({i/total*100:.1f}%)...", end='\r')
+        result = evaluate_combination(df_trades, btc_df, ma_period, long_th, short_th)
+        results.append({
+            'ma_period': ma_period,
+            'long_th':   long_th,
+            'short_th':  short_th,
+            'result':    result,
+        })
+
     print()
-    
+
     # Sort by combined profit
-    combinations = sorted(combinations, key=lambda x: x['combined_profit'], reverse=True)
-    
-    # Display top 5
-    print("\n" + "="*140)
-    print("TOP 3 BEST COMBINATIONS (by Total Profit)")
-    print("="*140)
-    
-    for rank, combo in enumerate(combinations[:3], 1):
+    results = sorted(results, key=lambda x: x['result']['combined_profit'], reverse=True)
+
+    print(f"\n{'='*80}")
+    print("TOP 3 COMBINATIONS (by combined filtered profit)")
+    print(f"{'='*80}")
+    for rank, combo in enumerate(results[:3], 1):
         print_combination_details(rank, combo)
-    
-    print_summary_table(combinations)
-    
-    # Best combination summary
-    best = combinations[0]
-    
-    print("\n" + "="*140)
-    print("BEST COMBINATION SUMMARY")
-    print("="*140)
-    
-    print(f"\n✅ LONG:  BTC > {best['long_ma'].upper()}*{best['long_th']:.2f}")
-    print(f"✅ SHORT: BTC < {best['short_ma'].upper()}*{best['short_th']:.2f}")
-    print(f"\n💰 TOTAL PROFIT: ${best['combined_profit']:,.2f}")
-    
-    print("\n" + "="*140)
-    print("\n💡 Next step: Validate this combination on LIVE data")
-    print("="*140)
+
+    print_summary_table(results)
+
+    best = results[0]
+    print(f"\n{'='*80}")
+    print("BEST COMBINATION — use these values in regime_unified_analyzer.py")
+    print(f"{'='*80}")
+    print(f"\n  BTC_MA_PERIOD = {best['ma_period']}")
+    print(f"  LONG_TH       = {best['long_th']}")
+    print(f"  SHORT_TH      = {best['short_th']}")
+    print(f"\n  Combined profit after filter: ${best['result']['combined_profit']:,.2f}")
+    print(f"{'='*80}")
 
 
 if __name__ == "__main__":

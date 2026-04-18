@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-market_regime/regime1_performance_WFO.py - Walk-Forward Optimization on OOS data
+develop/market_regime/regime1_performance_WFO.py 
 
 Analyzes regime performance using Walk-Forward Optimization with two modes:
 - ANCHORED: Expanding window from fixed start date

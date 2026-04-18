@@ -652,130 +652,44 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         logger.debug("Val Y10: All IDs have correct prefix format (NN_name)")
     
 # ========================================================================
-    # Val Y11: regime multipliers (trending, ranging, volatile)
+    # Val Y11: regime01 bin flags (6 bins: family x direction)
     # ========================================================================
     validation_y11_errors = 0
-    
-    for strat in strategies:
-        strat_id = strat.get('id', 'UNKNOWN')
-        
-        # Check regime_trending
-        if 'regime_trending' not in strat:
-            errors.append(
-                f"Strategy '{strat_id}' missing required field 'regime_trending'"
-            )
-            validation_y11_errors += 1
-        else:
-            val = strat['regime_trending']
-            if not isinstance(val, (int, float)):
-                errors.append(
-                    f"Strategy '{strat_id}' regime_trending must be numeric, got {type(val)}"
-                )
-                validation_y11_errors += 1
-            elif val < 0:
-                errors.append(
-                    f"Strategy '{strat_id}' regime_trending = {val} (must be >= 0)"
-                )
-                validation_y11_errors += 1
-            elif val > 5.0:
-                warnings.append(
-                    f"Strategy '{strat_id}' regime_trending = {val} (>5.0 is very aggressive)"
-                )
-        
-        # Check regime_ranging
-        if 'regime_ranging' not in strat:
-            errors.append(
-                f"Strategy '{strat_id}' missing required field 'regime_ranging'"
-            )
-            validation_y11_errors += 1
-        else:
-            val = strat['regime_ranging']
-            if not isinstance(val, (int, float)):
-                errors.append(
-                    f"Strategy '{strat_id}' regime_ranging must be numeric, got {type(val)}"
-                )
-                validation_y11_errors += 1
-            elif val < 0:
-                errors.append(
-                    f"Strategy '{strat_id}' regime_ranging = {val} (must be >= 0)"
-                )
-                validation_y11_errors += 1
-            elif val > 5.0:
-                warnings.append(
-                    f"Strategy '{strat_id}' regime_ranging = {val} (>5.0 is very aggressive)"
-                )
-        
-        # Check regime_volatile
-        if 'regime_volatile' not in strat:
-            errors.append(
-                f"Strategy '{strat_id}' missing required field 'regime_volatile'"
-            )
-            validation_y11_errors += 1
-        else:
-            val = strat['regime_volatile']
-            if not isinstance(val, (int, float)):
-                errors.append(
-                    f"Strategy '{strat_id}' regime_volatile must be numeric, got {type(val)}"
-                )
-                validation_y11_errors += 1
-            elif val < 0:
-                errors.append(
-                    f"Strategy '{strat_id}' regime_volatile = {val} (must be >= 0)"
-                )
-                validation_y11_errors += 1
-            elif val > 5.0:
-                warnings.append(
-                    f"Strategy '{strat_id}' regime_volatile = {val} (>5.0 is very aggressive)"
-                )
-    
-    if validation_y11_errors == 0:
-        logger.debug("Val Y11: All regime multipliers valid")
 
-    # ========================================================================
-# ========================================================================
-    # Val Y12: direction_mode field
-    # ========================================================================
-    validation_y12_errors = 0
-    
-    valid_dir_modes = {'long_only', 'short_only', 'general'}
-    strategies_without_dir_mode = []
-    
+    regime01_bins = [
+        'regime_trending_uptrend', 'regime_trending_dwtrend',
+        'regime_ranging_uptrend',  'regime_ranging_dwtrend',
+        'regime_volatile_uptrend', 'regime_volatile_dwtrend',
+    ]
+
     for strat in strategies:
         strat_id = strat.get('id', 'UNKNOWN')
-        
-        if 'direction_mode' not in strat:
-            strategies_without_dir_mode.append(strat_id)
-            continue
-        
-        direction_mode = strat['direction_mode']
-        
-        # Validate type
-        if not isinstance(direction_mode, str):
-            errors.append(
-                f"Strategy '{strat_id}' direction_mode must be string, "
-                f"got {type(direction_mode)}"
-            )
-            validation_y12_errors += 1
-            continue
-        
-        # Validate value
-        if direction_mode not in valid_dir_modes:
-            errors.append(
-                f"Strategy '{strat_id}' has invalid direction_mode='{direction_mode}' "
-                f"(valid: {valid_dir_modes})"
-            )
-            validation_y12_errors += 1
-    
-    # Warning for strategies without direction_mode
-    if strategies_without_dir_mode:
-        warnings.append(
-            f"{len(strategies_without_dir_mode)} strategies without 'direction_mode' "
-            f"(will default to 'general'): {strategies_without_dir_mode}"
-        )
-    
-    if validation_y12_errors == 0:
-        logger.debug("Val Y12: All strategy direction_mode values valid")
-    
+
+        for bin_key in regime01_bins:
+            if bin_key not in strat:
+                errors.append(
+                    f"Strategy '{strat_id}' missing required field '{bin_key}'"
+                )
+                validation_y11_errors += 1
+            else:
+                val = strat[bin_key]
+                if not isinstance(val, (int, float)):
+                    errors.append(
+                        f"Strategy '{strat_id}' {bin_key} must be numeric, got {type(val)}"
+                    )
+                    validation_y11_errors += 1
+                elif val < 0:
+                    errors.append(
+                        f"Strategy '{strat_id}' {bin_key} = {val} (must be >= 0)"
+                    )
+                    validation_y11_errors += 1
+                elif val > 5.0:
+                    warnings.append(
+                        f"Strategy '{strat_id}' {bin_key} = {val} (>5.0 is very aggressive)"
+                    )
+
+    if validation_y11_errors == 0:
+        logger.debug("Val Y11: All regime01 bin flags valid")
 
  # ========================================================================
     # Val Y13: Coherencia entre direction y dir_mode

@@ -5,6 +5,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from regime_common import (
+     load_btc_for_timeframe,
+     calc_all_metrics_at_time,
+     classify_trade_by_family,
+     get_btc_macro_direction,
+ )
+from backtesters.ZX_compute_BT import INITIAL_BALANCE
+from regime_common import calculate_max_dd_pct
 
 logger = logging.getLogger("BOT_batch.batch_utils")
 
@@ -14,6 +22,150 @@ logger = logging.getLogger("BOT_batch.batch_utils")
 PARAM_KEYS        = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
 
+
+# =============================================================================
+# HELPER — ANALIZING REGIME
+# =============================================================================
+
+def analyze_regime_is(
+    trade_log_is: pd.DataFrame,
+    timeframe: str,
+    data_folder_is: str,
+    families: dict,
+    regime_min_trades: int = 2,
+    regime_lookback: int = 100,
+    family_source: str = 'strategy',
+    hurst_window: int = 100,
+    er_window: int = 14,
+    atr_window: int = 14,
+    pe_window: int = 50,
+    pe_order: int = 3,
+    ma_period: int = 5,
+    long_th: float = 1.0,
+    short_th: float = 1.0,
+    strategy_direction: str = 'long',
+    force_direction_filter: bool = False,
+) -> set:
+    """
+    Analyze regime on IS trades to determine bins to filter for OOS.
+    Evaluates all 6 bins (3 families x 2 directions).
+    Flags a bin if trades >= regime_min_trades and total profit < 0.
+ 
+    Args:
+        trade_log_is      : IS trades DataFrame with 'buy_time' and 'profit' columns
+        timeframe         : strategy timeframe e.g. '4H', '1H', '6Hutc'
+        data_folder_is    : path to IS data folder containing BTC parquets
+        families          : family classification rules dict
+        regime_min_trades : minimum trades per bin to trust result
+        regime_lookback   : lookback bars for metric calculation
+        family_source     : 'strategy' = BTC at strategy TF | 'macro' = BTC 1D
+        hurst_window      : window for Hurst exponent
+        er_window         : window for Efficiency Ratio
+        atr_window        : window for ATR
+        pe_window         : window for Permutation Entropy
+        pe_order          : order for Permutation Entropy
+        ma_period         : MA period for macro direction
+        long_th           : multiplier threshold for uptrend
+        short_th          : multiplier threshold for dwtrend
+ 
+    Returns:
+        bins_to_filter : set of bin keys to block e.g. {'trending_dwtrend', 'ranging_uptrend'}
+    """
+    btc_cache = {}
+    btc_1d_df = load_btc_for_timeframe(data_folder_is, '1Dutc', btc_cache)
+    btc_tf_df = load_btc_for_timeframe(data_folder_is, timeframe, btc_cache) \
+                if family_source == 'strategy' else btc_1d_df
+ 
+    directions = []
+    families_  = []
+    
+    # DEBUG no-lookahead check — remove after validation
+# =============================================================================
+#     first_trade = trade_log_is.iloc[0]
+#     closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
+#     closed_tf = btc_tf_df[btc_tf_df['ts'] < first_trade['buy_time']]
+#     logger.info(f"DEBUG lookahead | buy_time={first_trade['buy_time']} | last 1D bar={closed_1d.iloc[-1]['ts']} | last {timeframe} bar={closed_tf.iloc[-1]['ts']}")
+#      
+# =============================================================================
+    for _, trade in trade_log_is.iterrows():
+        direction = get_btc_macro_direction(
+            btc_1d_df  = btc_1d_df,
+            trade_time = trade['buy_time'],
+            ma_period  = ma_period,
+            long_th    = long_th,
+            short_th   = short_th,
+        )
+        metrics = calc_all_metrics_at_time(
+            btc_df       = btc_tf_df,
+            buy_time     = trade['buy_time'],
+            lookback     = regime_lookback,
+            ma_period    = ma_period,
+            hurst_window = hurst_window,
+            er_window    = er_window,
+            atr_window   = atr_window,
+            pe_window    = pe_window,
+            pe_order     = pe_order,
+        )
+        family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
+        directions.append(direction)
+        families_.append(family)
+ 
+    df = trade_log_is.copy()
+    df['direction'] = directions
+    df['family']    = families_
+ 
+    df_valid = df[
+        (df['family'] != 'unknown') &
+        (df['direction'].isin(['uptrend', 'dwtrend']))
+    ].copy()
+ 
+    bins_to_filter = set()
+ 
+    for family in ['trending', 'ranging', 'volatile']:
+        for direction in ['uptrend', 'dwtrend']:
+            subset = df_valid[(df_valid['family'] == family) & (df_valid['direction'] == direction)]
+            n      = len(subset)
+            profit = subset['profit'].sum() if n > 0 else 0.0
+            if n >= regime_min_trades and profit < 0:
+                bins_to_filter.add(f"{family}_{direction}")
+ 
+    n_total    = len(trade_log_is)
+    n_valid    = len(df_valid)
+    n_filtered = df_valid[
+        df_valid.apply(lambda r: f"{r['family']}_{r['direction']}" in bins_to_filter, axis=1)
+    ].shape[0]
+    pct_remain = round((n_valid - n_filtered) / n_valid * 100, 1) if n_valid > 0 else 0.0
+ 
+    logger.info(
+        f"STAGE 2  ── Regime IS Analysis     ── "
+        f"total={n_total} | remaining={pct_remain}%"
+    )
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        lines = []
+        lines.append(f"\n  {'BIN':<30} {'CONF':>5} {'TRADES':>8} {'PROFIT':>12} {'WIN%':>8} {'DD%':>8} {'FILTER':>8}")
+        lines.append("  " + "-" * 88)
+        for fam in ['trending', 'ranging', 'volatile']:
+            for dir_ in ['uptrend', 'dwtrend']:
+                bin_key = f"{fam}_{dir_}"
+                subset  = df_valid[(df_valid['family'] == fam) & (df_valid['direction'] == dir_)]
+                n       = len(subset)
+                profit  = subset['profit'].sum() if n > 0 else 0.0
+                wr      = (subset['profit'] > 0).mean() * 100 if n > 0 else 0.0
+                eq      = INITIAL_BALANCE + subset.sort_values('buy_time')['profit'].cumsum()
+                dd      = calculate_max_dd_pct(eq) if n > 0 else 0.0
+                conf    = "✓" if n >= regime_min_trades else "✗"
+                flag    = "🚫 FILTER" if bin_key in bins_to_filter else ""
+                lines.append(f"  {bin_key:<30} {conf:>5} {n:>8} {profit:>12.2f} {wr:>7.1f}% {dd:>7.2f}% {flag}")
+        lines.append("  " + "-" * 88)
+        logger.debug("\n".join(lines))
+    
+    if force_direction_filter:
+        forced = 'dwtrend' if strategy_direction == 'long' else 'uptrend'
+        for fam in ['trending', 'ranging', 'volatile']:
+            bins_to_filter.add(f"{fam}_{forced}")
+ 
+    return bins_to_filter
 
 def _fmt_py_val(val):
     """Format a Python value for writing into a .py file."""
@@ -49,6 +201,12 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
     prev_map = {s["id"]: s for s in _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES}
     new_map  = {s["id"]: s for s in _load_py_module(e1_batch_path, "strategies_e1_batch").STRATEGIES}
 
+    regime_bin_keys = (
+        "regime_trending_uptrend", "regime_trending_dwtrend",
+        "regime_ranging_uptrend",  "regime_ranging_dwtrend",
+        "regime_volatile_uptrend", "regime_volatile_dwtrend",
+    )
+
     rows = []
     for sid, new in new_map.items():
         prev = prev_map.get(sid, {})
@@ -56,10 +214,10 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
         # Active change
         prev_active = prev.get("active", False)
         new_active  = new.get("active", False)
-        if prev_active != new_active:
-            change_active = f"{'True' if prev_active else 'False'}→{'True' if new_active else 'False'}"
-        else:
-            change_active = "N/A"
+        change_active = (
+            f"{'True' if prev_active else 'False'}→{'True' if new_active else 'False'}"
+            if prev_active != new_active else "N/A"
+        )
 
         # Param changes
         param_changes = []
@@ -70,25 +228,21 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
                 param_changes.append(f"{k}: {prev_val}→{new_val}")
         change_params = " | ".join(param_changes) if param_changes else "N/A"
 
-        # Regime changes
+        # Regime bin changes
         regime_changes = []
-        for r in ("regime_trending", "regime_ranging", "regime_volatile"):
-            prev_val = prev.get(r)
-            new_val  = new.get(r)
+        for bin_key in regime_bin_keys:
+            prev_val = prev.get(bin_key)
+            new_val  = new.get(bin_key)
             if prev_val is not None and new_val is not None and float(prev_val) != float(new_val):
-                regime_changes.append(f"{r}: {prev_val}→{new_val}")
+                regime_changes.append(f"{bin_key}: {prev_val}→{new_val}")
         change_regime = " | ".join(regime_changes) if regime_changes else "N/A"
 
-        rows.append({
+        row = {
             "id":                  sid,
             "name":                new["name"],
             "timeframe":           new["timeframe"],
             "active":              new_active,
             "direction":           new["direction"],
-            "regime_trending":     new.get("regime_trending", 1.0),
-            "regime_ranging":      new.get("regime_ranging",  1.0),
-            "regime_volatile":     new.get("regime_volatile", 1.0),
-            "direction_mode":      new.get("direction_mode", "general"),
             "sell_after_ncandles": new.get("sell_after_ncandles", 0),
             "order_amount":        new.get("order_amount", 200),
             "lookback":            new.get("lookback"),
@@ -107,92 +261,127 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
             "last_change_active":  change_active,
             "last_change_params":  change_params,
             "last_change_regime":  change_regime,
-        })
+        }
+        for bin_key in regime_bin_keys:
+            row[bin_key] = new.get(bin_key, 1.0)
+
+        rows.append(row)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     pd.DataFrame(rows).to_csv(csv_path, index=False)
     logger.info(f"✅ strategies_params.csv generated → {csv_path}")
 
+def _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc_ts, btc_pct, title):
+    """
+    Core rendering function for equity curve comparison plots.
+    Shared by plot_filter_comparison and plot_portfolio_comparison.
+    """
+    import matplotlib.dates as mdates
+
+    fig, ax = plt.subplots(figsize=(14, 5))
+    fig.patch.set_facecolor("#F8F9FA")
+    ax.set_facecolor("#F8F9FA")
+
+    if ts_r01 is not None and btc_ts is not None:
+        btc_aligned = np.interp(
+            pd.to_datetime(ts_r01).astype(np.int64) / 1e9,
+            pd.to_datetime(btc_ts).astype(np.int64) / 1e9,
+            btc_pct,
+        )
+        above = eq_r01 >= btc_aligned
+        below = eq_r01 < btc_aligned
+        ax.fill_between(ts_r01, eq_r01, 0, where=above, alpha=0.35, color="#00897B", interpolate=True)
+        ax.fill_between(ts_r01, eq_r01, 0, where=below, alpha=0.35, color="#C62828", interpolate=True)
+
+    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
+                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
+    ax.plot(ts_base, eq_base, color="#2E86C1", linewidth=0.8, label=lbl_base)
+
+    if ts_r01 is not None:
+        lbl_r01 = (f"Regime 0+1  NetGain={m_r01['Net_Gain_pct']:>6.1f}%  "
+                   f"DD={m_r01['Max_DD_pct']:>6.1f}%  R²={m_r01['R_Squared']:.3f}")
+        ax.plot(ts_r01, eq_r01, color="#00897B", linewidth=1.4, label=lbl_r01)
+
+    if btc_ts is not None:
+        ax.plot(btc_ts, btc_pct, color="#FF8C00", linewidth=0.9,
+                linestyle="--", alpha=0.6, label="_BTC")
+
+    ax.axhline(0, color="#888888", linewidth=0.8, linestyle="--", alpha=0.5)
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=10)
+    ax.set_ylabel("Net Gain (%)", fontsize=9)
+    ax.tick_params(axis="both", labelsize=8)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.grid(True, linestyle="--", alpha=0.5, linewidth=0.8, color="#CCCCCC")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.autofmt_xdate()
+
+    legend = ax.legend(
+        loc="upper left",
+        fontsize=10,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="#AAAAAA",
+        fancybox=False,
+        borderpad=0.8,
+        labelspacing=0.6,
+        handlelength=2.5,
+    )
+    for text in legend.get_texts():
+        text.set_fontfamily("monospace")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def _load_btc(data_folder, t_start, t_end):
+    """Load and normalize BTC 1D data for a given time range."""
+    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
+    btc_df   = pd.read_parquet(btc_file)
+    btc_df.columns = btc_df.columns.str.lower()
+    btc_df["ts"] = pd.to_datetime(btc_df["timestamp"] if "timestamp" in btc_df.columns else btc_df.index)
+    btc_df = btc_df.sort_values("ts").reset_index(drop=True)
+
+    btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
+    if len(btc_sub) > 0:
+        btc_ref = btc_sub["close"].iloc[0]
+        return btc_sub["ts"].values, (btc_sub["close"].values / btc_ref - 1) * 100
+    return None, None
 
 
 def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_folder, initial_balance):
     """
-    Single plot with 3 equity curves (baseline, regime 0+1) + BTC normalized.
-    Blue = baseline, green = regime 0+1, orange dashed = BTC.
+    Plot equity curves for a single strategy: baseline vs regime 0+1 vs BTC.
     """
-    import matplotlib.dates as mdates
-
     def _equity_pct(tl, t_start):
         tl  = tl.sort_values("buy_time").reset_index(drop=True)
         eq  = initial_balance + tl["profit"].cumsum().values
         pct = (eq - initial_balance) / initial_balance * 100
         m   = compute_metrics(tl, capital=initial_balance, name="")
         ts  = pd.to_datetime(tl["buy_time"]).values
-        # Prepend origin point at t_start with 0%
         ts  = np.concatenate([[np.datetime64(t_start)], ts])
         pct = np.concatenate([[0.0], pct])
         return ts, pct, m
-
-    # Load BTC 1Dutc
-    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
-    btc_df   = pd.read_parquet(btc_file)
-    btc_df.columns = btc_df.columns.str.lower()
-    if "timestamp" in btc_df.columns:
-        btc_df["ts"] = pd.to_datetime(btc_df["timestamp"])
-    else:
-        btc_df["ts"] = pd.to_datetime(btc_df.index)
-    btc_df = btc_df.sort_values("ts").reset_index(drop=True)
 
     t_start = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).min())
     t_end   = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).max())
 
     ts_base, eq_base, m_base = _equity_pct(trade_log_baseline, t_start)
-    ts_r01,  eq_r01,  m_r01  = _equity_pct(trade_log_r01, t_start) if trade_log_r01 is not None and len(trade_log_r01) > 0 else (None, None, None)
-    btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
-    if len(btc_sub) > 0:
-        btc_pct = (btc_sub["close"].values / btc_df["close"].iloc[0] - 1) * 100
-        btc_ts  = btc_sub["ts"].values
-    else:
-        btc_pct, btc_ts = None, None
+    ts_r01,  eq_r01,  m_r01  = (
+        _equity_pct(trade_log_r01, t_start)
+        if trade_log_r01 is not None and len(trade_log_r01) > 0
+        else (None, None, None)
+    )
+    btc_ts, btc_pct = _load_btc(data_folder, t_start, t_end)
 
-    fig, ax = plt.subplots(figsize=(14, 5))
-
-    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
-                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
-    ax.plot(ts_base, eq_base, color="steelblue", linewidth=1.2, label=lbl_base)
-
-    if ts_r01 is not None:
-        lbl_r01 = (f"Regime 0+1  NetGain={m_r01['Net_Gain_pct']:>6.1f}%  "
-                   f"DD={m_r01['Max_DD_pct']:>6.1f}%  R²={m_r01['R_Squared']:.3f}")
-        ax.plot(ts_r01, eq_r01, color="seagreen", linewidth=1.2, label=lbl_r01)
-
-    if btc_ts is not None:
-        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="_BTC")
-
-    ax.axhline(0, color="black", linewidth=1.0, alpha=0.6)
-    ax.set_title(strategy_id)
-    ax.set_ylabel("Net Gain (%)")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    fig.autofmt_xdate()
-    ax.grid(True, linestyle="--", alpha=0.4)
-    legend = ax.legend(loc="upper left")
-    for text in legend.get_texts():
-        text.set_fontfamily("monospace")
-    plt.tight_layout()
-    plt.show()
+    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc_ts, btc_pct, strategy_id)
 
 
-# =============================================================================
-# HELPER — PLOT PORTFOLIO COMPARISON (validated combined curves)
-# =============================================================================
-def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_folder, initial_balance):
+def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_folder, initial_balance, title="Portfolio"):
     """
-    Single plot with combined baseline + combined regime 0+1 + BTC.
-    Used at the end of run_portfolio_analysis for validated strategies only.
+    Plot combined portfolio equity curves: baseline vs regime 0+1 vs BTC.
     """
-    import matplotlib.dates as mdates
-
     if not trade_logs_baseline:
         return
 
@@ -210,18 +399,7 @@ def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_fol
         pct = np.concatenate([[0.0], pct])
         return ts, pct, m, t_start
 
-    # Load BTC
-    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
-    btc_df   = pd.read_parquet(btc_file)
-    btc_df.columns = btc_df.columns.str.lower()
-    if "timestamp" in btc_df.columns:
-        btc_df["ts"] = pd.to_datetime(btc_df["timestamp"])
-    else:
-        btc_df["ts"] = pd.to_datetime(btc_df.index)
-    btc_df = btc_df.sort_values("ts").reset_index(drop=True)
-
     ts_base, eq_base, m_base, t_start_base = _combined_equity_pct(trade_logs_baseline, initial_balance)
-
     ts_r01, eq_r01, m_r01, t_start_r01 = (
         _combined_equity_pct(trade_logs_regime01, initial_balance)
         if trade_logs_regime01 else (None, None, None, None)
@@ -229,41 +407,9 @@ def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_fol
 
     t_start = min(t_start_base, t_start_r01) if t_start_r01 else t_start_base
     t_end   = pd.Timestamp(pd.to_datetime(ts_base).max())
-    btc_sub = btc_df[(btc_df["ts"] >= t_start) & (btc_df["ts"] <= t_end)]
-    if len(btc_sub) > 0:
-        btc_pct = (btc_sub["close"].values / btc_df["close"].iloc[0] - 1) * 100
-        btc_ts  = btc_sub["ts"].values
-    else:
-        btc_pct, btc_ts = None, None
+    btc_ts, btc_pct = _load_btc(data_folder, t_start, t_end)
 
-    fig, ax = plt.subplots(figsize=(14, 5))
-
-    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
-                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
-    ax.plot(ts_base, eq_base, color="steelblue", linewidth=1.2, label=lbl_base)
-
-    if ts_r01 is not None:
-        lbl_r01 = (f"Regime 0+1  NetGain={m_r01['Net_Gain_pct']:>6.1f}%  "
-                   f"DD={m_r01['Max_DD_pct']:>6.1f}%  R²={m_r01['R_Squared']:.3f}")
-        ax.plot(ts_r01, eq_r01, color="seagreen", linewidth=1.2, label=lbl_r01)
-
-    if btc_ts is not None:
-        ax.plot(btc_ts, btc_pct, color="darkorange", linewidth=0.8, linestyle="--", label="_BTC")
-
-    ax.axhline(0, color="black", linewidth=1.0, alpha=0.6)
-    ax.set_title("Portfolio — Validated only")
-    ax.set_ylabel("Net Gain (%)")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
-    fig.autofmt_xdate()
-    ax.grid(True, linestyle="--", alpha=0.4)
-    legend = ax.legend(loc="upper left")
-    for text in legend.get_texts():
-        text.set_fontfamily("monospace")
-    plt.tight_layout()
-    plt.show()
-
-
+    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc_ts, btc_pct, title)
 # =============================================================================
 # HELPER — EXTRACT BEST PARAMS
 # =============================================================================
@@ -345,29 +491,6 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
 
 
-# =============================================================================
-# HELPER — ENRICH TRADES WITH REGIME
-# =============================================================================
-def enrich_trades_with_regime(trade_log, ohlc_folder, timeframe, families, lookback_bars, ma_period, hurst_window, er_window, atr_window, pe_window, pe_order, load_btc_fn, calc_metrics_fn, classify_fn):
-    """
-    Enrich trade_log with regime family classification.
-    Returns trade_log with 'family' column added.
-    """
-    btc_cache = {}
-    btc_df    = load_btc_fn(ohlc_folder, timeframe, btc_cache)
-
-    df = trade_log.copy()
-    df["family"] = "unknown"
-
-    for idx, trade in df.iterrows():
-        metrics = calc_metrics_fn(
-            btc_df, trade["buy_time"], lookback_bars,
-            ma_period, hurst_window, er_window, atr_window, pe_window, pe_order
-        )
-        if metrics:
-            df.at[idx, "family"] = classify_fn(metrics, families)
-
-    return df
 
 
 # =============================================================================
@@ -405,23 +528,39 @@ def save_drift_reference(drift_results, output_path):
 # =============================================================================
 # HELPER — SAVE STRATEGIES E1 BATCH
 # =============================================================================
-def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map):
+# =============================================================================
+# HELPER — SAVE STRATEGIES E1 BATCH
+# =============================================================================
+def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map, strategy_ids_to_run=None):
     """
     Generate strategies_E1_batch.py for production deployment.
     Reads strategies_batch.py (never modified), applies dynamic fields from memory.
-
+ 
     strategies_batch_path : path to strategies_batch.py (input, never modified)
     output_path           : path to write strategies_E1_batch.py
-    validation_results    : list of dicts with strategy_id, verdict, regime_*
+    validation_results    : list of dicts with strategy_id, verdict, bins_to_filter
     best_params_map       : dict {strategy_id: best_params dict}
+    strategy_ids_to_run   : list of strategy IDs to include — None = all
     """
     if not os.path.exists(strategies_batch_path):
         logger.warning(f"⚠️  strategies_batch.py not found — skipping.")
         return
-
+ 
     strategies = _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES
-    val_map    = {v["strategy_id"]: v for v in validation_results}
-
+    if strategy_ids_to_run is not None:
+        strategies = [s for s in strategies if s["id"] in strategy_ids_to_run]
+ 
+    val_map = {v["strategy_id"]: v for v in validation_results}
+ 
+    all_bins = [
+        "regime_trending_uptrend",
+        "regime_trending_dwtrend",
+        "regime_ranging_uptrend",
+        "regime_ranging_dwtrend",
+        "regime_volatile_uptrend",
+        "regime_volatile_dwtrend",
+    ]
+ 
     e1_lines = [
         '"""',
         'Trading Strategies Configuration',
@@ -432,46 +571,56 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
         '',
         'STRATEGIES = [',
     ]
-
+ 
     for s in strategies:
         sid     = s["id"]
         v       = val_map.get(sid, {})
         bp      = best_params_map.get(sid, {})
         updated = dict(s)
-
+ 
         if v:
-            updated["active"]          = v["verdict"] == "🟢 VALIDATED"
-            updated["regime_trending"] = v.get("regime_trending", s.get("regime_trending", 1.0))
-            updated["regime_ranging"]  = v.get("regime_ranging",  s.get("regime_ranging",  1.0))
-            updated["regime_volatile"] = v.get("regime_volatile", s.get("regime_volatile", 1.0))
+            updated["active"] = v["verdict"] == "🟢 VALIDATED"
+            bins_to_filter    = v.get("bins_to_filter", set())
+        else:
+            bins_to_filter = set()
+ 
         if bp:
             for k, val in bp.items():
                 updated[k.lower()] = val
-
+ 
         e1_lines.append("    {")
         e1_lines.append(f'        "id": "{sid}",')
         e1_lines.append(f'        "name": "{updated["name"]}",')
         e1_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
         e1_lines.append(f'        "active": {updated.get("active", False)},')
         e1_lines.append(f'        "direction": "{updated["direction"]}",')
-        e1_lines.append(f'        "regime_trending": {float(updated.get("regime_trending", 1.0))},')
-        e1_lines.append(f'        "regime_ranging": {float(updated.get("regime_ranging", 1.0))},')
-        e1_lines.append(f'        "regime_volatile": {float(updated.get("regime_volatile", 1.0))},')
-        e1_lines.append(f'        "direction_mode": "{updated.get("direction_mode", "general")}",')
+ 
+        for bin_key in all_bins:
+            family, direction = bin_key.replace("regime_", "").rsplit("_", 1)
+            blocked = f"{family}_{direction}" in bins_to_filter
+            e1_lines.append(f'        "{bin_key}": {0 if blocked else 1},')
+ 
         e1_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
         e1_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
+ 
         for k in SIGNAL_PARAM_KEYS:
             if k in updated:
                 e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
+ 
         for k in ("tp_pct", "sl_pct"):
             if k in updated:
                 e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
+ 
         e1_lines.append("    },")
-
+ 
     e1_lines.append("]")
+ 
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w") as f:
         f.write("\n".join(e1_lines) + "\n")
+ 
+    logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
+ 
     logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
 
 
@@ -501,43 +650,6 @@ def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, sy
         logger.debug(f"⚪ symbols_live — symbols unchanged for '{strategy_id}'")
 
     return {"symbols_changed": symbols_changed}
-
-
-# =============================================================================
-# HELPER — LOAD BTC 1D
-# =============================================================================
-def load_btc_1d(btc_file, ma_period=5):
-    """
-    Load BTC 1Dutc parquet and compute rolling MA.
-    Returns DataFrame with 'ts' and 'ma{ma_period}' columns.
-    """
-    df = pd.read_parquet(btc_file)
-    df.columns = df.columns.str.lower()
-    df["ts"] = pd.to_datetime(df["timestamp"] if "timestamp" in df.columns else df.index)
-    df = df.sort_values("ts").reset_index(drop=True)
-    df[f"ma{ma_period}"] = df["close"].rolling(window=ma_period).mean()
-    return df
-
-
-# =============================================================================
-# HELPER — GET BTC DIRECTION AT TRADE TIME
-# =============================================================================
-def get_btc_direction(buy_time, btc_df, side, ma_period=5, long_th=1.00, short_th=1.00):
-    """
-    Classify a trade's BTC direction at buy_time (no lookahead).
-    Returns 'uptrend', 'downtrend' or 'unknown'.
-    """
-    closed = btc_df[btc_df["ts"] < buy_time]
-    if len(closed) < ma_period:
-        return "unknown"
-    last = closed.iloc[-1]
-    if pd.isna(last[f"ma{ma_period}"]):
-        return "unknown"
-    if side == "long":
-        return "uptrend" if last["close"] > last[f"ma{ma_period}"] * long_th else "downtrend"
-    else:
-        return "downtrend" if last["close"] < last[f"ma{ma_period}"] * short_th else "uptrend"
-
 
 # =============================================================================
 # PORTFOLIO ANALYSIS — EQUITY METRICS
@@ -872,3 +984,55 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
         )
     lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
+    
+def get_best_r2_combination(trade_logs, initial_balance, precomputed_metrics=None):
+    """
+    Find the strategy combination with highest R² and return its trade logs.
+    
+    Args:
+        trade_logs          : list of (strategy_id, trade_log_df)
+        initial_balance     : capital per strategy
+        precomputed_metrics : optional dict {strategy_id: metrics}
+    
+    Returns:
+        list of (strategy_id, trade_log_df) for the best R² combination
+    """
+    from itertools import combinations as _combinations
+    
+    def _num(sid):
+        for part in sid.split("_"):
+            if part.isdigit():
+                return int(part)
+        return 0
+    
+    named   = {sid: df for sid, df in trade_logs}
+    metrics = precomputed_metrics or {
+        sid: compute_metrics(df, capital=initial_balance, name=sid)
+        for sid, df in named.items()
+    }
+    
+    best_r2    = -1.0
+    best_combo = None
+    
+    for r in range(1, len(named) + 1):
+        for combo in _combinations(named.keys(), r):
+            if len(combo) == 1:
+                sid = combo[0]
+                m   = metrics.get(sid)
+                r2  = m["R_Squared"] if m else -1.0
+            else:
+                combo_tl = pd.concat(
+                    [named[sid] for sid in combo], ignore_index=True
+                ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+                capital  = initial_balance * len(combo)
+                m        = compute_metrics(combo_tl, capital=capital, name="")
+                r2       = m["R_Squared"]
+    
+            if r2 > best_r2:
+                best_r2    = r2
+                best_combo = combo
+    
+    if best_combo is None:
+        return trade_logs
+    
+    return [(sid, named[sid]) for sid in best_combo]

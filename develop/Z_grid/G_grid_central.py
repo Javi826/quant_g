@@ -1,3 +1,4 @@
+#develop/Z_grid/G_grid_central.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -23,8 +24,10 @@ from signals.add_signals_reversal   import reversal_long, reversal_short
 # -----------------------------------------------------------------------------
 # GLOBAL CONFIG
 # -----------------------------------------------------------------------------
-DATA_FOLDER  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS")
-SYMBOLS_DIR  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "symbols_live_old")
+SPLIT_MODE   = "expanding"
+SPLIT_BASE   = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-04_IS")
+SYMBOLS_DIR  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "symbols_live")
 ORDER_AMOUNT = 80
 N_JOBS       = -1
 VOL_WINDOW   = 50
@@ -54,18 +57,33 @@ SIGNAL_REGISTRY = {
 # All values are lists so they plug directly into the grid (single-combo grid).
 # -----------------------------------------------------------------------------
 STRATEGIES = [
+    
     {
         "id":        "02",
         "name":      "reversal_long_4H",
         "signal":    "reversal_long",
         "timeframe": "4H",
         "sell_after": [0],
-        "tp_pct":    [3],
+        "tp_pct":    [5],
         "sl_pct":    [10],
         "lookback":  [4],
         "ma_period": [50],
-        "tolerance": [20],
+        "tolerance": [40],
     },
+# =============================================================================
+#     {
+#         "id":        "02",
+#         "name":      "reversal_long_4H",
+#         "signal":    "reversal_long",
+#         "timeframe": "4H",
+#         "sell_after": [0],
+#         "tp_pct":    [3],
+#         "sl_pct":    [10],
+#         "lookback":  [4],
+#         "ma_period": [50],
+#         "tolerance": [20],
+#     },
+# =============================================================================
     {
         "id":        "03",
         "name":      "parity_long_4H",
@@ -95,7 +113,7 @@ STRATEGIES = [
         "name":      "reversal_long_1H",
         "signal":    "reversal_long",
         "timeframe": "1H",
-        "sell_after": [0],
+        "sell_after": [100],
         "tp_pct":    [2],
         "sl_pct":    [10],
         "lookback":  [7],
@@ -107,7 +125,7 @@ STRATEGIES = [
         "name":      "reversal_short_1H",
         "signal":    "reversal_short",
         "timeframe": "1H",
-        "sell_after": [0],
+        "sell_after": [100],
         "tp_pct":    [2],
         "sl_pct":    [5],
         "lookback":  [5],
@@ -143,7 +161,7 @@ STRATEGIES = [
         "name":      "parity_long_1H",
         "signal":    "parity_long",
         "timeframe": "1H",
-        "sell_after": [0],
+        "sell_after": [75],
         "tp_pct":    [2],
         "sl_pct":    [10],
         "lookback":  [150],

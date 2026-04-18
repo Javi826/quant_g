@@ -1,5 +1,5 @@
 """
-BOT_trading/market_regime/regime_metrics.py - LIBRARY-ONLY VERSION
+shared/shared_market_regime/regimm_metrics.py - Shared functions for regime analysis scripts
 
 Calculates market regime metrics using ONLY proven libraries.
 NO fallback implementations - if library is missing, raises ImportError.

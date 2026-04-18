@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-market_regime/regime_analyzer.py
+develop/market_regime/regime0_analyzer.py
 
 Autonomous script that compares system performance with/without trend filtering.
 Calculates BTC MAs on-the-fly - no pre-enrichment needed.

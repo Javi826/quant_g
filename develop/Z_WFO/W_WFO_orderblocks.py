@@ -1,17 +1,18 @@
 # Z_WFO_backtest_multi_tf.py (MAIN - Multi-Timeframe Strategy)
 import os
-import time
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import time
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "signals")))
 import numpy as np
 import pandas as pd
-from utils.ZX_analysis import report_backtesting
-from utils.ZX_utils import filter_symbols, final_prints
-from tools.ZX_WFO import walk_forward_optimization
-from tools.ZX_st_tools import prepare_ohlcv_arrays, compile_grid_results
-from ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from Z_add_signals_orderblocks import orderblocks_long
-
+from shared.utils.analysis import report_backtesting
+from shared.utils.utils import filter_symbols, final_prints
+from shared.tools.wfo import walk_forward_optimization
+from shared.utils.st_tools import prepare_ohlcv_arrays, compile_grid_results
+from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from signals.add_signals_orderblocks import orderblocks_long
+from signals.add_signals_orderblocks import orderblocks_short
 
 start_time        = time.time()
 N_JOBS            = -1
@@ -19,7 +20,10 @@ STRATEGY          = "orderblocks"
 # -----------------------------------------------------------------------------
 # CONFIGURACIÓN
 # -----------------------------------------------------------------------------
-DATA_FOLDER       = "../data/crypto_2023_IS"
+SPLIT_MODE        = "expanding"
+SPLIT_BASE        = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER       = os.path.join(SPLIT_BASE, "IS",  "crypto_2021-01_2025-04_IS")
+DATA_FOLDER       = "../data/crypto_2026_OOS"
 TIMEFRAME_MINOR   = '4H'
 ORDER_AMOUNT      = 400
 MIN_VOL_USDT      = 10_000_000
@@ -28,20 +32,26 @@ MIN_VOL_USDT      = 10_000_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST      = [0]  
-LOOKBACK_LIST        = [50,100,150,200]
-TOLERANCE_LIST       = [5,10,20,30,40] 
-IMPULSE_LIST         = [0.1,1.0,10.0]
+LOOKBACK_LIST        = [50,100,150]
+TOLERANCE_LIST       = [10,20,30,40] 
+IMPULSE_LIST         = [0.01,0.1,1.0]
 
-TP_PCT_LIST          = [3,4,5,6,7,8,9,10]
-SL_PCT_LIST          = [3,4,5,6,7,8,9,10]
+TP_PCT_LIST          = [2,3,4,5]
+SL_PCT_LIST          = [6,7,8,9,10]
 
+LOOKBACK_LIST        = [70]
+TOLERANCE_LIST       = [20] 
+IMPULSE_LIST         = [0.2]
+
+TP_PCT_LIST          = [4]
+SL_PCT_LIST          = [11]
 param_names    = ['SELL_AFTER','LOOKBACK','TOLERANCE','IMPULSE','TP_PCT','SL_PCT']
 param_ranges   = {name: globals()[f"{name}_LIST"] for name in param_names}
 
 # -----------------------------------------------------------------------------
 # WFO SETTINGS
 # -----------------------------------------------------------------------------
-ANCHORED          = True
+ANCHORED          = False
 YEARS_TRAIN       = 1.0
 
 # Calculamos LENGTH_TRAIN_SET según el timeframe MENOR
@@ -72,7 +82,7 @@ def strategy_builder(params, base_arrays_minor):
     for sym in base_arrays_minor.keys():         
         arr_minor = base_arrays_minor[sym]
       
-        signals = orderblocks_long(
+        signals = orderblocks_short(
             arr=arr_minor,
             lookback=params.get('LOOKBACK'),
             tolerance=params.get('TOLERANCE'),

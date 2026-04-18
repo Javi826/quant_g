@@ -11,10 +11,15 @@ from config.strategies_E1 import STRATEGIES as PROD_STRATEGIES
 OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_batch.py")
 OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_loop.py")
 
-PARAM_GRID_KEYS        = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
-SIGNAL_PARAM_KEYS      = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
-DEFAULT_N_SYMBOLS      = 10
-DEFAULT_ORDER_AMOUNT   = 80
+PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
+SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
+REGIME_BIN_KEYS   = (
+    "regime_trending_uptrend", "regime_trending_dwtrend",
+    "regime_ranging_uptrend",  "regime_ranging_dwtrend",
+    "regime_volatile_uptrend", "regime_volatile_dwtrend",
+)
+DEFAULT_N_SYMBOLS    = 10
+DEFAULT_ORDER_AMOUNT = 80
 
 
 # =============================================================================
@@ -54,10 +59,8 @@ def generate_batch():
         lines.append(f'        "timeframe": "{s["timeframe"]}",')
         lines.append(f'        "active": {s.get("active", False)},')
         lines.append(f'        "direction": "{s["direction"]}",')
-        lines.append(f'        "regime_trending": {float(s.get("regime_trending", 1.0))},')
-        lines.append(f'        "regime_ranging": {float(s.get("regime_ranging", 1.0))},')
-        lines.append(f'        "regime_volatile": {float(s.get("regime_volatile", 1.0))},')
-        lines.append(f'        "direction_mode": "{s.get("direction_mode", "general")}",')
+        for bin_key in REGIME_BIN_KEYS:
+            lines.append(f'        "{bin_key}": {float(s.get(bin_key, 1.0))},')
         lines.append(f'        "sell_after_ncandles": {s.get("sell_after_ncandles", 0)},')
         lines.append(f'        "order_amount_prod": {s.get("order_amount", 200)},')
         for k in SIGNAL_PARAM_KEYS:

@@ -10,19 +10,16 @@ This module provides:
 
 from .regime_classifier import (
     get_current_regime,
-    get_current_direction,
+    get_btc_1d_direction,
     get_regime_multiplier,
     get_regime_info,
-    get_btc_1d_filter,  # ← AÑADIDO
 )
-
 from .position_sizer import PositionSizer
 
 __all__ = [
     'get_current_regime',
-    'get_current_direction',
+    'get_btc_1d_direction',
     'get_regime_multiplier',
     'get_regime_info',
-    'get_btc_1d_filter',  # ← AÑADIDO
     'PositionSizer',
 ]

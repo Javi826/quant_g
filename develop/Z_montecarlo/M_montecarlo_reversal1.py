@@ -4,6 +4,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "core")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 import time
 import logging
 import numpy as np
@@ -41,8 +42,10 @@ MY_SYMBOLS = True
 # -----------------------------------------------------------------------------
 # CONFIGURATION
 # -----------------------------------------------------------------------------
-DATA_FOLDER     = "../../BOT_batch/data/crypto_2026_OOS"
-#DATA_FOLDER     = "../../BOT_batch/data/crypto_2022_IS"
+SPLIT_MODE  = "expanding"
+SPLIT_BASE  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-04_IS")
+# DATA_FOLDER = os.path.join(SPLIT_BASE, "IS", "crypto_2022-01_2025-04_IS")
 TIMEFRAME_MINOR = '4H'
 ORDER_AMOUNT    = 80
 MIN_VOL_USDT    = 1_800_000
@@ -51,18 +54,20 @@ MIN_VOL_USDT    = 1_800_000
 # PARAMETER GRID
 # -----------------------------------------------------------------------------
 SELL_AFTER_LIST = [0]
-LOOKBACK_LIST   = [3, 4, 5]
+LOOKBACK_LIST   = [2,3,4,5,6]
 MA_PERIOD_LIST  = [50]
-TOLERANCE_LIST  = [20,25,30]
+TOLERANCE_LIST  = [10,20,30,40]
 TP_PCT_LIST     = [2,3,4,5]
 SL_PCT_LIST     = [6,7,8,9,10]
 
-SELL_AFTER_LIST = [0]
-LOOKBACK_LIST   = [4]
-MA_PERIOD_LIST  = [50]
-TOLERANCE_LIST  = [20]
-TP_PCT_LIST     = [4]
-SL_PCT_LIST     = [6]
+# =============================================================================
+# SELL_AFTER_LIST = [0]
+# LOOKBACK_LIST   = [4]
+# MA_PERIOD_LIST  = [50]
+# TOLERANCE_LIST  = [20]
+# TP_PCT_LIST     = [4]
+# SL_PCT_LIST     = [6]
+# =============================================================================
 
 param_names     = ['SELL_AFTER', 'LOOKBACK', 'TOLERANCE', 'MA_PERIOD', 'TP_PCT', 'SL_PCT']
 param_ranges    = {name: globals()[f"{name}_LIST"] for name in param_names}
@@ -72,7 +77,7 @@ param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_g
 # -----------------------------------------------------------------------------
 # MONTE CARLO SETTINGS
 # -----------------------------------------------------------------------------
-FINAL_N_PATHS        = 2000
+FINAL_N_PATHS        = 100
 FINAL_N_OBS_PER_PATH = get_n_obs(TIMEFRAME_MINOR)
 TS_INDEX             = np.arange(FINAL_N_OBS_PER_PATH).astype('datetime64[ns]')
 
@@ -93,7 +98,7 @@ def process_path_IDX(path_idx, paths_minor, param_dict_list):
 
         for sym in ohlcv_arrays_minor.keys():
             arr_minor = ohlcv_arrays_minor[sym]
-            signals = reversal_short(
+            signals = reversal_long(
                 arr_minor,
                 lookback=param_dict.get('LOOKBACK'),
                 tolerance=param_dict.get('TOLERANCE'),

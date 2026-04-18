@@ -403,73 +403,7 @@ function updateRegimeUI(data) {
     const btcPrice = data.btc_price;
     const btcMa50 = data.btc_ma50;
     const btcTrend = data.btc_trend;
-    
-    // Update BTC trend cards
-    const btcCardShort = document.getElementById('btc-card-short');
-    const btcCardInfo = document.getElementById('btc-card-info');
-    const btcCardLong = document.getElementById('btc-card-long');
-    
-    if (btcCardInfo) {
-        // Update center card with BTC info
-        const priceEl = document.getElementById('btc-trend-price');
-        const ma50El = document.getElementById('btc-trend-ma50');
-        const statusEl = document.getElementById('btc-trend-status');
-        
-        if (priceEl && btcPrice !== undefined && btcPrice !== null) {
-            priceEl.textContent = '$' + btcPrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
-        }
-        
-        if (ma50El && btcMa50 !== undefined && btcMa50 !== null) {
-            ma50El.textContent = '$' + btcMa50.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
-        }
-        
-        if (statusEl && btcTrend) {
-            if (btcTrend === 'uptrend') {
-                statusEl.textContent = '⬆️ UPTREND';
-                statusEl.style.color = '#3fb950'; // Verde
-            } else if (btcTrend === 'downtrend') {
-                statusEl.textContent = '⬇️ DOWNTREND';
-                statusEl.style.color = '#f85149'; // Rojo
-            } else {
-                statusEl.textContent = '-';
-                statusEl.style.color = '#c9d1d9';
-            }
-        }
-    }
-    
-    // Highlight active card based on btcTrend
-    if (btcCardShort && btcCardLong && btcTrend) {
-        if (btcTrend === 'downtrend') {
-            // SHORT card activa
-            btcCardShort.style.border = '2px solid #f85149';
-            btcCardShort.style.background = 'rgba(248, 81, 73, 0.15)';
-            btcCardShort.style.opacity = '1';
-            
-            // LONG card inactiva
-            btcCardLong.style.border = '2px solid #21262d';
-            btcCardLong.style.background = '#1c2128';
-            btcCardLong.style.opacity = '0.4';
-        } else if (btcTrend === 'uptrend') {
-            // LONG card activa
-            btcCardLong.style.border = '2px solid #3fb950';
-            btcCardLong.style.background = 'rgba(63, 185, 80, 0.15)';
-            btcCardLong.style.opacity = '1';
-            
-            // SHORT card inactiva
-            btcCardShort.style.border = '2px solid #21262d';
-            btcCardShort.style.background = '#1c2128';
-            btcCardShort.style.opacity = '0.4';
-        } else {
-            // Ambas inactivas
-            btcCardShort.style.border = '2px solid #21262d';
-            btcCardShort.style.background = '#1c2128';
-            btcCardShort.style.opacity = '0.4';
-            
-            btcCardLong.style.border = '2px solid #21262d';
-            btcCardLong.style.background = '#1c2128';
-            btcCardLong.style.opacity = '0.4';
-        }
-    }
+
     
     // Get badge style
     const badgeStyle = getRegimeBadgeStyle(family);
@@ -1382,68 +1316,60 @@ async function loadStrategyAnalysis() {
 // =============================================================================
 // REGIME STRATEGY MATRIX
 // =============================================================================
-async function renderRegimeStrategyMatrix(strategies) {
+async function renderRegimeStrategyMatrix() {
     try {
         const res = await fetch('/api/regime/strategies');
         const data = await res.json();
-        
+
         if (!data.success) {
             console.error('Failed to load regime strategies:', data.error);
             return;
         }
-        
+
         const tbody = document.getElementById('regime-strategy-matrix-body');
         if (!tbody) return;
-        
+
         const strategiesData = data.strategies || [];
-        
+
         if (strategiesData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No strategies</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No strategies</td></tr>';
             return;
         }
-        
-        // Sort by ID
+
         const sorted = strategiesData.sort((a, b) => a.id.localeCompare(b.id));
-        
+
+        const cellColor = (val) => {
+            if (val === 0) return '#6b7280';
+            if (val === 1) return '#c9d1d9';
+            if (val > 1)  return '#58a6ff';
+            return '#f85149';
+        };
+
+        const dirColor = (dir) => dir === 'long' ? '#3fb950' : '#f85149';
+
         let html = '';
         sorted.forEach((strat, idx) => {
             const num = String(idx + 1).padStart(2, '0');
-            
-            // Color coding for multipliers
-            // Color coding for multipliers
-            const getMultiplierColor = (val) => {
-                if (val === '-' || val === 0) return '#6b7280';  // Gray for blocked
-                if (val === 1) return '#c9d1d9';  // White for 1x
-                if (val > 1) return '#58a6ff';   // Blue for >1x
-                return '#f85149';  // Red for <1x
-            };
-            
-            // Color coding for direction_mode
-            let dirColor;
-            if (strat.direction_mode === 'long_only') {
-                dirColor = '#3fb950';  // Green
-            } else if (strat.direction_mode === 'short_only') {
-                dirColor = '#f85149';  // Red
-            } else {
-                dirColor = '#8b949e';  // Gray for general
-            }
-            
-            const trendVal = strat.regime_trending;
-            const rangVal = strat.regime_ranging;
-            const volVal = strat.regime_volatile;
-            
+            const fields = [
+                'regime_trending_uptrend', 'regime_trending_dwtrend',
+                'regime_ranging_uptrend',  'regime_ranging_dwtrend',
+                'regime_volatile_uptrend', 'regime_volatile_dwtrend'
+            ];
+            const cells = fields.map(f => {
+                const val = strat[f];
+                return `<td style="color: ${cellColor(val)}; font-weight: 700;">${val}x</td>`;
+            }).join('');
+
             html += `<tr>
                 <td style="color: #8b949e; font-weight: 600;">${num}</td>
                 <td>${strat.id}</td>
-                <td style="color: ${getMultiplierColor(trendVal)}; font-weight: 700;">${trendVal !== '-' ? trendVal + 'x' : '-'}</td>
-                <td style="color: ${getMultiplierColor(rangVal)}; font-weight: 700;">${rangVal !== '-' ? rangVal + 'x' : '-'}</td>
-                <td style="color: ${getMultiplierColor(volVal)}; font-weight: 700;">${volVal !== '-' ? volVal + 'x' : '-'}</td>
-                <td style="color: ${dirColor}; font-weight: 600; text-transform: uppercase;">${strat.direction_mode}</td>
+                <td style="color: ${dirColor(strat.direction)}; font-weight: 600; text-transform: uppercase;">${strat.direction}</td>
+                ${cells}
             </tr>`;
         });
-        
+
         tbody.innerHTML = html;
-        
+
     } catch (error) {
         console.error('Error rendering regime strategy matrix:', error);
     }
@@ -1497,7 +1423,12 @@ async function loadBotConfig() {
             // ✅ MODIFICACIÓN: Añadido 'dir_mode' a fixedKeys
             const fixedKeys = ['id', 'name', 'number', 'timeframe', 'status', 'symbols_count'];
             const commonKeys = ['tp_pct', 'sl_pct', 'order_amount', 'sell_after_ncandles'];
-            const excludeKeys = new Set([...fixedKeys, ...commonKeys, 'direction', 'family_sizing', 'direction_mode', 'active', 'regime_trending', 'regime_ranging', 'regime_volatile']);
+            const excludeKeys = new Set([...fixedKeys, ...commonKeys, 'direction', 'family_sizing', 'direction_mode', 'active',
+                    'regime_trending', 'regime_ranging', 'regime_volatile',
+                    'regime_trending_uptrend', 'regime_trending_dwtrend',
+                    'regime_ranging_uptrend',  'regime_ranging_dwtrend',
+                    'regime_volatile_uptrend', 'regime_volatile_dwtrend'
+                ]);
             
             const extraParamKeys = new Set();
             sortedStrategies.forEach(strat => {

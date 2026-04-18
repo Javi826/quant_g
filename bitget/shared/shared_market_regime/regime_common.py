@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-regime_common.py - Shared functions for regime analysis scripts
+shared/shared_market_regime/regimm_common.py - Shared functions for regime analysis scripts
 
 Contains all common functions used across:
 - regime1_performance_IS.py
@@ -178,3 +178,126 @@ def analyze_by_dimension(df, dimension, initial_capital, min_trades_confidence=N
             stats[category]['confidence'] = "✓" if num_trades >= min_trades_confidence else "✗"
     
     return stats
+#EXTRA
+def get_btc_macro_direction(
+    btc_1d_df: pd.DataFrame,
+    trade_time: pd.Timestamp,
+    ma_period: int,
+    long_th: float,
+    short_th: float
+) -> str:
+    """
+    Returns BTC macro direction at trade time using closed candles only.
+
+    Args:
+        btc_1d_df : BTC daily OHLC DataFrame with 'ts' and 'close' columns
+        trade_time: Entry time of the trade (no lookahead)
+        ma_period : MA period (e.g. 5, 10, 20, 50)
+        long_th   : Multiplier threshold for uptrend  (e.g. 1.02 -> BTC > MA * 1.02)
+        short_th  : Multiplier threshold for dwtrend (e.g. 0.98 -> BTC < MA * 0.98)
+
+    Returns:
+        'uptrend' | 'dwtrend' | 'neutral' | 'unknown'
+    """
+    closed = btc_1d_df[btc_1d_df['ts'] < trade_time]
+
+    if len(closed) < ma_period:
+        return 'unknown'
+
+    last      = closed.iloc[-1]
+    ma_series = closed['close'].iloc[-ma_period:]
+
+    if len(ma_series) < ma_period:
+        return 'unknown'
+
+    ma_value  = ma_series.mean()
+    btc_close = last['close']
+
+    if pd.isna(ma_value) or pd.isna(btc_close):
+        return 'unknown'
+
+    if btc_close > ma_value * long_th:
+        return 'uptrend'
+    if btc_close < ma_value * short_th:
+        return 'dwtrend'
+
+    return 'neutral'
+
+def filter_signals_by_regime(
+    signals: np.ndarray,
+    ts: np.ndarray,
+    btc_1d_df: pd.DataFrame,
+    btc_tf_df: pd.DataFrame,
+    bins_to_filter: set,
+    ma_period: int = 5,
+    long_th: float = 1.0,
+    short_th: float = 1.0,
+    families: dict = None,
+    lookback_bars: int = 100,
+    hurst_window: int = 100,
+    er_window: int = 14,
+    atr_window: int = 14,
+    pe_window: int = 50,
+    pe_order: int = 3,
+) -> np.ndarray:
+    """
+    Filters signal array by market regime — sets signal to 0 where bin is blocked.
+    Uses closed candles only — no lookahead bias.
+
+    Args:
+        signals        : numpy array of signals (1=LONG, -1=SHORT, 0=no signal)
+        ts             : numpy array of timestamps (datetime64) matching signals
+        btc_1d_df      : BTC 1D OHLC DataFrame with 'ts' and 'close' columns
+        btc_tf_df      : BTC OHLC at strategy timeframe for family metrics
+        bins_to_filter : set of bin keys to block e.g. {'trending_dwtrend', 'ranging_uptrend'}
+        ma_period      : MA period for macro direction
+        long_th        : multiplier threshold for uptrend
+        short_th       : multiplier threshold for dwtrend
+        families       : family classification rules dict
+        lookback_bars  : lookback for metric calculation
+        hurst_window   : window for Hurst exponent
+        er_window      : window for Efficiency Ratio
+        atr_window     : window for ATR
+        pe_window      : window for Permutation Entropy
+        pe_order       : order for Permutation Entropy
+
+    Returns:
+        Filtered signals array (same shape, 0 where bin is blocked)
+    """
+    if not bins_to_filter:
+        return signals
+
+    filtered    = signals.copy()
+    signal_idxs = np.nonzero(signals)[0]
+
+    for idx in signal_idxs:
+        trade_time = pd.Timestamp(ts[idx])
+
+        direction = get_btc_macro_direction(
+            btc_1d_df  = btc_1d_df,
+            trade_time = trade_time,
+            ma_period  = ma_period,
+            long_th    = long_th,
+            short_th   = short_th,
+        )
+
+        metrics = calc_all_metrics_at_time(
+            btc_df       = btc_tf_df,
+            buy_time     = trade_time,
+            lookback     = lookback_bars,
+            ma_period    = ma_period,
+            hurst_window = hurst_window,
+            er_window    = er_window,
+            atr_window   = atr_window,
+            pe_window    = pe_window,
+            pe_order     = pe_order,
+        )
+        family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
+
+        if family == 'unknown':
+            continue
+
+        if f"{family}_{direction}" in bins_to_filter:
+            filtered[idx] = 0
+
+    return filtered

@@ -39,8 +39,8 @@ DEBUG_HIGHLOW_INTEGRITY_DIR = os.path.join(DATA_DIR, "debug_06_highlow_integrity
 # =============================================================================
 # PIPELINE CONFIG
 # =============================================================================
-DEBUG_MODE = True
-EXPORT_CSV = True   # Set True to export CSV alongside parquet at each step
+DEBUG_MODE = False
+EXPORT_CSV = False   
 
 # =============================================================================
 # SYMBOL SELECTION
@@ -60,7 +60,7 @@ N_SYMBOLS_DOWNLOAD = 50
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-START_DATE = "2022-01-01"
+START_DATE = "2023-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -99,7 +99,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 9
+WINDOW_OOS_MONTHS    = 12
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-market_regime/regime1_performance_OOS.py - MATCHES ENRICHER EXACTLY
+BOT_batch/market_regime/regime_performance.py - MATCHES ENRICHER EXACTLY
 
 Replicates enricher.py behavior:
 - Drops NaN rows in critical metrics
@@ -72,7 +72,7 @@ def analyze_strategy(filepath, families, initial_capital, ohlc_folder):
             family = classify_trade_by_family(metrics, families)
             df.at[idx, 'family'] = family
             if not pd.isna(metrics['price_vs_ma_50']):
-                df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'downtrend'
+                df.at[idx, 'trend'] = 'uptrend' if metrics['price_vs_ma_50'] > 1.0 else 'dwtrend'
     
     if ANALYZE_DIRECTION:
         critical_cols = ['hurst', 'efficiency_ratio', 'atr_pct', 'permutation_entropy', 'ma_50', 'price_vs_ma_50']
@@ -154,7 +154,7 @@ def print_single_strategy_all_dimensions(r):
 
     lines = []
     lines.append(f"\n{'─'*120}")
-    lines.append("BY DIRECTION (uptrend/downtrend)")
+    lines.append("BY DIRECTION (uptrend/dwtrend)")
     lines.append(f"{'─'*120}")
     lines.append(f"{'DIRECTION':<20} {'CONF':>5} {'TRADES':>10} {'PROFIT':>12} {'%PROFIT':>10} {'DD%':>10} {'WIN%':>10} {'P-VALUE':>15}")
     lines.append("-" * 120)
