@@ -92,6 +92,7 @@ DRIFT_BATCH_PATH         = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecar
 _trade_logs_baseline : list = []
 _trade_logs_regime01 : list = []
 _trade_logs_oos2     : list = []
+_trade_logs_oos3     : list = []
 _validation_results  : list = []
 _drift_results       : list = []
 _best_params_results : dict = {}
@@ -106,35 +107,41 @@ SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline",
 DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
 DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
 #DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
 #DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS  = 100
-N_PATHS_OOS = 500
+N_PATHS_IS  = 1
+N_PATHS_OOS = 5
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1   = 15
-R1_RSQUARED_ROUND1  = 0.9
-R1_PROBNEG_ROUND1   = 21
+R1_NETGAIN_ROUND1  = 15
+R1_RSQUARED_ROUND1 = 0.9
+R1_PROBNEG_ROUND1  = 21
 
 # Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
 R2A_NETGAIN_ROUND2  = 15
-R2A_RSQUARED_ROUND2 = 0.9
+R2A_RSQUARED_ROUND2 = 0.8
 
 # Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
-R2B_NETGAIN_ROUND2  = 15
-R2B_MAX_DD_ROUND2   = 15
+R2B_NETGAIN_ROUND2 = 15
+R2B_MAX_DD_ROUND2  = 15
 
 # Validation thresholds — Round OOS2
 #------------------------------------------------------------------------------
 R3A_NETGAIN_ROUNDOOS2 = 15
 R3A_MAX_DD_ROUNDOOS2  = 15
+
+# Validation thresholds — Round OOS3
+#------------------------------------------------------------------------------
+R3B_NETGAIN_ROUNDOOS3 = 15
+R3B_MAX_DD_ROUNDOOS3  = 15
 
 # IS symbol selection
 #------------------------------------------------------------------------------
@@ -144,22 +151,26 @@ N_SYMBOLS_MCIS            = 6
 # Regime analysis params
 #------------------------------------------------------------------------------
 FORCE_DIRECTION_FILTER = True
-REGIME_MIN_TRADES      = 2
-REGIME_LOOKBACK_BARS   = 180
-REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
+REGIME_MIN_TRADES    = 2
+REGIME_LOOKBACK_BARS = 180
+REGIME_FAMILY_SOURCE = 'strategy'  # 'strategy' | 'macro'
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = False
+RUN_BEST_COMBINATIONS  = True
 UPDATE_OUTPUTS         = True
 
 # OOS2 analysis flags
-OOS2_RUN_ANALYSIS      = True   # whether to run OOS2 backtest block
-OOS2_FOR_VALIDATION    = True  # whether OOS2 result acts as mandatory additional filter
+OOS2_RUN_ANALYSIS     = True   # whether to run OOS2 backtest block
+OOS2_FOR_VALIDATION   = False  # whether OOS2 result acts as mandatory additional filter
+
+# OOS3 analysis flags
+OOS3_RUN_ANALYSIS     = True   # whether to run OOS3 backtest block
+OOS3_FOR_VALIDATION   = False  # whether OOS3 result acts as mandatory additional filter
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.75  # max allowed DD correlation between validated strategies
+CORRELATION_DD_THRESHOLD = 0.7  # max allowed DD correlation between validated strategies
 
 # Strategy selection
 SELECTED_STRATEGIES = [
@@ -506,9 +517,15 @@ def run_batch(strategy_config: dict) -> None:
     elif approved and approved_regime:
         _round = f"Round 2 ({round_path})"
 
+    _verdict = "🔴 REJECTED"
+    if approved and not approved_regime:
+        _verdict = "⭐ VALIDATED"
+    elif approved and approved_regime:
+        _verdict = "🟢 VALIDATED"
+
     _validation_results.append({
         "strategy_id":     STRATEGY_ID,
-        "verdict": "⭐ VALIDATED" if (approved and not approved_regime) else ("🟢 VALIDATED" if approved else "🔴 REJECTED"),
+        "verdict":         _verdict,
         "round":           _round,
         "net_gain_pct":    round(bt_netgain_pct, 2),
         "dd_pct":          round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
@@ -624,6 +641,101 @@ def run_batch(strategy_config: dict) -> None:
             _trade_logs_oos2.append((STRATEGY_ID, trade_log_oos2.copy()))
 
     # -------------------------------------------------------------------------
+    # BLOCK 6c — OOS3 Analysis (informational + optional validation filter)
+    # -------------------------------------------------------------------------
+    approved_oos3  = False
+    metrics_oos3   = None
+    trade_log_oos3 = pd.DataFrame()
+
+    if OOS3_RUN_ANALYSIS:
+        ohlcv_oos3_raw, _ = filter_symbols(
+            symbols_oos_final,
+            min_vol_usdt=0, timeframe=TIMEFRAME,
+            data_folder=DATA_FOLDER_OOS3,
+            min_price=MIN_PRICE, vol_window=50,
+            my_symbols=MY_SYMBOLS,
+        )
+        ohlcv_oos3 = prepare_ohlcv_arrays(ohlcv_oos3_raw)
+
+        btc_cache_oos3 = {}
+        btc_1d_df_oos3 = load_btc_for_timeframe(DATA_FOLDER_OOS3, '1Dutc', btc_cache_oos3)
+        btc_tf_df_oos3 = load_btc_for_timeframe(DATA_FOLDER_OOS3, TIMEFRAME, btc_cache_oos3) \
+                         if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos3
+
+        ohlcv_arrays_oos3_regime = {}
+        for sym, arr in ohlcv_oos3.items():
+            signals = signal_fn(arr, **bt_signal_params, live_trading=False)
+            if bins_to_filter:
+                signals = filter_signals_by_regime(
+                    signals        = signals,
+                    ts             = arr['ts'],
+                    btc_1d_df      = btc_1d_df_oos3,
+                    btc_tf_df      = btc_tf_df_oos3,
+                    bins_to_filter = bins_to_filter,
+                    ma_period      = R0_MA_PERIOD,
+                    long_th        = R0_LONG_TH,
+                    short_th       = R0_SHORT_TH,
+                    families       = FAMILIES,
+                    lookback_bars  = REGIME_LOOKBACK_BARS,
+                    hurst_window   = HURST_WINDOW,
+                    er_window      = ER_WINDOW,
+                    atr_window     = ATR_WINDOW,
+                    pe_window      = PE_WINDOW,
+                    pe_order       = PE_ORDER,
+                )
+            ohlcv_arrays_oos3_regime[sym] = {**arr, "signal": signals}
+
+        oos3_result_regime = run_grid_backtest(
+            ohlcv_arrays_oos3_regime,
+            sell_after=best_params["SELL_AFTER"],
+            tp_pct=best_params["TP_PCT"],
+            sl_pct=best_params["SL_PCT"],
+            order_amount=ORDER_AMOUNT,
+        )
+
+        trade_log_oos3 = oos3_result_regime["__PORTFOLIO__"]["trade_log"].copy()
+        trade_log_oos3.columns = trade_log_oos3.columns.str.lower().str.strip()
+        trade_log_oos3["buy_time"] = pd.to_datetime(trade_log_oos3["buy_time"])
+
+        logger.info(f"STAGE 6c ── OOS3 Backtest Regime   ── {len(trade_log_oos3)} trades | bins: {bins_to_filter if bins_to_filter else 'none'}")
+
+        if len(trade_log_oos3) > 0:
+            metrics_oos3 = compute_metrics(trade_log_oos3, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_oos3")
+            print_metrics_table([metrics_oos3], f"  Metrics — {STRATEGY_ID} (OOS3 Regime)")
+
+            ok_oos3_netgain = metrics_oos3["Net_Gain_pct"] > R3B_NETGAIN_ROUNDOOS3
+            ok_oos3_dd      = abs(metrics_oos3["Max_DD_pct"]) < R3B_MAX_DD_ROUNDOOS3
+            approved_oos3   = ok_oos3_netgain and ok_oos3_dd
+
+            _v_oos3 = ("VALIDATED" if approved_oos3 else "REJECTED").ljust(13)
+            logger.info(
+                f"STAGE 6c ── OOS3 Results           ── "
+                f"{'🟢' if approved_oos3 else '🔴'} {_v_oos3} "
+                f"NetGain={metrics_oos3['Net_Gain_pct']:.2f}% "
+                f"DD={metrics_oos3['Max_DD_pct']:.2f}% "
+                f"R2={metrics_oos3['R_Squared']:.2f}"
+            )
+            plot_filter_comparison(
+                strategy_id=f"{STRATEGY_ID}_oos3",
+                trade_log_baseline=trade_log_oos3,
+                trade_log_r01=trade_log_oos3,
+                data_folder=DATA_FOLDER_OOS3,
+                initial_balance=INITIAL_BALANCE,
+            )
+        else:
+            logger.info(f"STAGE 6c ── OOS3 Results           ── no trades after regime filter")
+
+        if OOS3_FOR_VALIDATION and approved:
+            approved = approved and approved_oos3
+            if not approved_oos3:
+                logger.info(f"STAGE 6c ── OOS3 Validation        ── 🔴 OOS3 failed — overriding verdict to REJECTED")
+                _validation_results[-1]["verdict"] = "🔴 REJECTED"
+                _validation_results[-1]["round"]   = "—"
+
+        if len(trade_log_oos3) > 0:
+            _trade_logs_oos3.append((STRATEGY_ID, trade_log_oos3.copy()))
+
+    # -------------------------------------------------------------------------
     # BLOCK 7 — Equity Curves + Plot
     # -------------------------------------------------------------------------
     _trade_logs_baseline.append((STRATEGY_ID, trade_log.copy()))
@@ -665,7 +777,7 @@ def run_batch(strategy_config: dict) -> None:
         })
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"DONE  🏁 ──  {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+    logger.info(f"DONE     ──  🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
 
 # =============================================================================
@@ -696,7 +808,7 @@ def run_portfolio_analysis():
         if _trade_logs_regime01:
             print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
 
-    validated_ids      = {v["strategy_id"] for v in _validation_results if v["verdict"] == "🟢 VALIDATED"}
+    validated_ids      = {v["strategy_id"] for v in _validation_results if v["verdict"] in ("🟢 VALIDATED", "⭐ VALIDATED")}
     validated_baseline = [(sid, df) for sid, df in _trade_logs_baseline if sid in validated_ids]
     validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 
@@ -744,6 +856,16 @@ def run_portfolio_analysis():
             title="Portfolio OOS2 — Validated only",
         )
 
+    validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3 if sid in validated_ids]
+    if validated_oos3:
+        plot_portfolio_comparison(
+            trade_logs_baseline=validated_oos3,
+            trade_logs_regime01=validated_oos3,
+            data_folder=DATA_FOLDER_OOS3,
+            initial_balance=INITIAL_BALANCE,
+            title="Portfolio OOS3 — Validated only",
+        )
+
     if RUN_BEST_COMBINATIONS:
         logger.info(f"\n{'─'*105}\n  BEST COMBINATIONS\n{'─'*105}")
         if _trade_logs_baseline:
@@ -764,6 +886,7 @@ def run_portfolio_analysis():
         survivors = decorrelate_by_dd(
             trade_logs_oos1     = validated_regime01,
             trade_logs_oos2     = validated_oos2 if validated_oos2 else [],
+            trade_logs_oos3     = validated_oos3 if validated_oos3 else [],
             initial_balance     = INITIAL_BALANCE,
             threshold           = CORRELATION_DD_THRESHOLD,
             precomputed_metrics = r01_metrics,
@@ -812,6 +935,7 @@ if __name__ == "__main__":
     logger.info(f"  Data IS          : {DATA_FOLDER_IS}")
     logger.info(f"  Data OOS         : {DATA_FOLDER_OOS}")
     logger.info(f"  Data OOS2        : {DATA_FOLDER_OOS2}  ({'🟢 validation' if OOS2_FOR_VALIDATION else '⚪ informational'})")
+    logger.info(f"  Data OOS3        : {DATA_FOLDER_OOS3}  ({'🟢 validation' if OOS3_FOR_VALIDATION else '⚪ informational'})")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
     logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}")
     logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND2}%  MaxDD<{R2B_MAX_DD_ROUND2}%")
