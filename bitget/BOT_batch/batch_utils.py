@@ -1033,21 +1033,11 @@ def get_best_r2_combination(trade_logs, initial_balance, precomputed_metrics=Non
     
     return [(sid, named[sid]) for sid in best_combo]
 
-def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, threshold=0.7, precomputed_metrics=None):
+def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, threshold=0.7, precomputed_metrics=None, trade_logs_oos3=None):
     """
     Greedy DD-correlation filter on validated strategies.
-    Combines OOS1 + OOS2 daily DD series per strategy.
+    Combines OOS1 + OOS2 + OOS3 daily DD series per strategy.
     Keeps the best NetGain strategy from each correlated pair.
-
-    Args:
-        trade_logs_oos1     : list of (strategy_id, trade_log_df) — OOS1 regime
-        trade_logs_oos2     : list of (strategy_id, trade_log_df) — OOS2 regime (can be empty)
-        initial_balance     : capital per strategy
-        threshold           : max allowed DD correlation (default 0.7)
-        precomputed_metrics : optional dict {strategy_id: metrics} for OOS1
-
-    Returns:
-        list of (strategy_id, trade_log_df) survivors from trade_logs_oos1
     """
     def _num(sid):
         for part in sid.split("_"):
@@ -1062,20 +1052,21 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
 
     oos1_map = {sid: df for sid, df in trade_logs_oos1}
     oos2_map = {sid: df for sid, df in trade_logs_oos2}
+    oos3_map = {sid: df for sid, df in (trade_logs_oos3 or [])}
     all_sids = [sid for sid, _ in trade_logs_oos1]
 
     def _dd_series(df, capital):
-        tl             = df.copy()
-        tl["_date"]    = pd.to_datetime(tl["sell_time"]).dt.normalize()
-        daily          = tl.groupby("_date")["profit"].sum()
-        date_range     = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-        daily          = daily.reindex(date_range, fill_value=0.0)
-        equity         = capital + daily.cumsum()
-        peak           = equity.cummax()
-        dd             = (equity - peak) / peak * 100
+        tl          = df.copy()
+        tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+        daily       = tl.groupby("_date")["profit"].sum()
+        daily       = daily.groupby(level=0).sum()
+        date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily       = daily.reindex(date_range, fill_value=0.0)
+        equity      = capital + daily.cumsum()
+        peak        = equity.cummax()
+        dd          = (equity - peak) / peak * 100
         return dd
 
-    # Build combined DD series (OOS1 + OOS2) per strategy
     dd_combined = {}
     for sid in all_sids:
         parts = []
@@ -1083,6 +1074,8 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
             parts.append(_dd_series(oos1_map[sid], initial_balance))
         if sid in oos2_map:
             parts.append(_dd_series(oos2_map[sid], initial_balance))
+        if sid in oos3_map:
+            parts.append(_dd_series(oos3_map[sid], initial_balance))
         if parts:
             dd_combined[sid] = pd.concat(parts).sort_index()
 
@@ -1090,12 +1083,10 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         logger.info("  Not enough strategies for correlation analysis.")
         return trade_logs_oos1
 
-    # Use strategy number as column label for compact display
     num_map = {sid: str(_num(sid)) for sid in dd_combined}
     dd_df   = pd.DataFrame({num_map[sid]: s for sid, s in dd_combined.items()}).fillna(0)
     corr_mx = dd_df.corr()
 
-    # Print correlation matrix
     cols  = list(corr_mx.columns)
     width = 7
     lines = []
@@ -1109,9 +1100,7 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         lines.append(f"  {idx:>6} | {row_str}")
     logger.info("\n".join(lines))
 
-    # Sort by NetGain descending — greedy selection
-    ranked = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
-
+    ranked    = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
     selected  = []
     discarded = []
     lines2    = [f"\n  {'Rank':<6} {'Strategy':<30} {'NetGain%':>10} {'Action':<20} {'Reason'}"]

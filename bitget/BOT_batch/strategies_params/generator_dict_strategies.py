@@ -8,9 +8,8 @@ from config.strategies_E1 import STRATEGIES as PROD_STRATEGIES
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_batch.py")
-OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_loop.py")
-
+OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_batch.py")
+OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_loop.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
 REGIME_BIN_KEYS   = (

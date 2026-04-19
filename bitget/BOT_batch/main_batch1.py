@@ -115,12 +115,12 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 #MONTECARLO
 #------------------------------------------------------------------------------
 N_PATHS_IS  = 1
-N_PATHS_OOS = 5
+N_PATHS_OOS = 1
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1  = 15
-R1_RSQUARED_ROUND1 = 0.9
+R1_RSQUARED_ROUND1 = 0.8
 R1_PROBNEG_ROUND1  = 21
 
 # Validation thresholds — Round 2 path A
@@ -158,7 +158,7 @@ REGIME_FAMILY_SOURCE = 'strategy'  # 'strategy' | 'macro'
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = True
-UPDATE_OUTPUTS         = True
+UPDATE_OUTPUTS         = False
 
 # OOS2 analysis flags
 OOS2_RUN_ANALYSIS     = True   # whether to run OOS2 backtest block
@@ -167,6 +167,10 @@ OOS2_FOR_VALIDATION   = False  # whether OOS2 result acts as mandatory additiona
 # OOS3 analysis flags
 OOS3_RUN_ANALYSIS     = True   # whether to run OOS3 backtest block
 OOS3_FOR_VALIDATION   = False  # whether OOS3 result acts as mandatory additional filter
+
+# OOS2/3 symbol selection
+#------------------------------------------------------------------------------
+OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
 # Correlation analysis
 #------------------------------------------------------------------------------
@@ -553,14 +557,29 @@ def run_batch(strategy_config: dict) -> None:
     trade_log_oos2 = pd.DataFrame()
 
     if OOS2_RUN_ANALYSIS:
-        ohlcv_oos2_raw, _ = filter_symbols(
-            symbols_oos_final,
-            min_vol_usdt=0, timeframe=TIMEFRAME,
-            data_folder=DATA_FOLDER_OOS2,
-            min_price=MIN_PRICE, vol_window=50,
-            my_symbols=MY_SYMBOLS,
-        )
+        if OOS23_MATCH_SYMBOLS:
+            _, _oos2_syms, _, ohlcv_oos2_all = select_universe(
+                data_folder_is=DATA_FOLDER_IS,
+                data_folder_oos=DATA_FOLDER_OOS2,
+                timeframe=TIMEFRAME,
+                n_symbols=N_SYMBOLS,
+                min_price=MIN_PRICE,
+                filter_symbols_fn=filter_symbols,
+                my_symbols=MY_SYMBOLS,
+                fix_symbols_mcis=FIX_SYMBOLS_MCIS_TRAINING,
+                n_symbols_mcis=N_SYMBOLS_MCIS,
+            )
+            ohlcv_oos2_raw = {sym: ohlcv_oos2_all[sym] for sym in _oos2_syms if sym in ohlcv_oos2_all}
+        else:
+            ohlcv_oos2_raw, _ = filter_symbols(
+                symbols_oos_final,
+                min_vol_usdt=0, timeframe=TIMEFRAME,
+                data_folder=DATA_FOLDER_OOS2,
+                min_price=MIN_PRICE, vol_window=50,
+                my_symbols=MY_SYMBOLS,
+            )
         ohlcv_oos2 = prepare_ohlcv_arrays(ohlcv_oos2_raw)
+        logger.debug(f"STAGE 6b ── OOS2 symbols           ── {sorted(ohlcv_oos2.keys())}")
 
         btc_cache_oos2 = {}
         btc_1d_df_oos2 = load_btc_for_timeframe(DATA_FOLDER_OOS2, '1Dutc', btc_cache_oos2)
@@ -648,14 +667,29 @@ def run_batch(strategy_config: dict) -> None:
     trade_log_oos3 = pd.DataFrame()
 
     if OOS3_RUN_ANALYSIS:
-        ohlcv_oos3_raw, _ = filter_symbols(
-            symbols_oos_final,
-            min_vol_usdt=0, timeframe=TIMEFRAME,
-            data_folder=DATA_FOLDER_OOS3,
-            min_price=MIN_PRICE, vol_window=50,
-            my_symbols=MY_SYMBOLS,
-        )
+        if OOS23_MATCH_SYMBOLS:
+            _, _oos3_syms, _, ohlcv_oos3_all = select_universe(
+                data_folder_is=DATA_FOLDER_IS,
+                data_folder_oos=DATA_FOLDER_OOS3,
+                timeframe=TIMEFRAME,
+                n_symbols=N_SYMBOLS,
+                min_price=MIN_PRICE,
+                filter_symbols_fn=filter_symbols,
+                my_symbols=MY_SYMBOLS,
+                fix_symbols_mcis=FIX_SYMBOLS_MCIS_TRAINING,
+                n_symbols_mcis=N_SYMBOLS_MCIS,
+            )
+            ohlcv_oos3_raw = {sym: ohlcv_oos3_all[sym] for sym in _oos3_syms if sym in ohlcv_oos3_all}
+        else:
+            ohlcv_oos3_raw, _ = filter_symbols(
+                symbols_oos_final,
+                min_vol_usdt=0, timeframe=TIMEFRAME,
+                data_folder=DATA_FOLDER_OOS3,
+                min_price=MIN_PRICE, vol_window=50,
+                my_symbols=MY_SYMBOLS,
+            )
         ohlcv_oos3 = prepare_ohlcv_arrays(ohlcv_oos3_raw)
+        logger.debug(f"STAGE 6c ── OOS3 symbols           ── {sorted(ohlcv_oos3.keys())}")
 
         btc_cache_oos3 = {}
         btc_1d_df_oos3 = load_btc_for_timeframe(DATA_FOLDER_OOS3, '1Dutc', btc_cache_oos3)
@@ -913,8 +947,8 @@ def run_portfolio_analysis():
 # =============================================================================
 
 if __name__ == "__main__":
-    from strategies_batch import STRATEGIES as STRATEGIES_BATCH
-    from strategies_loop  import STRATEGIES_LOOP
+    from strategies_files.strategies_batch import STRATEGIES as STRATEGIES_BATCH
+    from strategies_files.strategies_loop  import STRATEGIES_LOOP
 
     _loop_map  = {s["id"]: s for s in STRATEGIES_LOOP}
     STRATEGIES = []
