@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #BOT_batch/main_batch.py
 import os
 import sys
@@ -101,21 +100,19 @@ _best_params_results : dict = {}
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
-SPLIT_MODE      = "expanding"
-SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-#DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-04_IS")
-DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
-DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+SPLIT_MODE       = "expanding"
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
+DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
-#DATA_FOLDER_IS  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2025-10_IS")
-#DATA_FOLDER_OOS = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-10_2026-04_OOS")
-
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS  = 1
-N_PATHS_OOS = 500
+N_PATHS_IS                = 1
+N_PATHS_OOS               = 500
+FIX_SYMBOLS_MCIS_TRAINING = True
+N_SYMBOLS_MCIS            = 6
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
@@ -125,8 +122,8 @@ R1_PROBNEG_ROUND1  = 21
 
 # Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 15
-R2A_RSQUARED_ROUND2 = 0.8
+R2A_NETGAIN_ROUND2  = 40
+R2A_RSQUARED_ROUND2 = 0.9
 
 # Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
@@ -137,16 +134,20 @@ R2B_MAX_DD_ROUND2  = 15
 #------------------------------------------------------------------------------
 R3A_NETGAIN_ROUNDOOS2 = 15
 R3A_MAX_DD_ROUNDOOS2  = 15
+OOS2_RUN_ANALYSIS     = True  
+OOS2_FOR_VALIDATION   = True
 
 # Validation thresholds — Round OOS3
 #------------------------------------------------------------------------------
 R3B_NETGAIN_ROUNDOOS3 = 15
 R3B_MAX_DD_ROUNDOOS3  = 15
+OOS3_RUN_ANALYSIS     = True   
+OOS3_FOR_VALIDATION   = True 
 
-# IS symbol selection
+# OOS2/3 symbol selection
 #------------------------------------------------------------------------------
-FIX_SYMBOLS_MCIS_TRAINING = True
-N_SYMBOLS_MCIS            = 6
+OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
+
 
 # Regime analysis params
 #------------------------------------------------------------------------------
@@ -159,18 +160,6 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
 UPDATE_OUTPUTS         = True
-
-# OOS2 analysis flags
-OOS2_RUN_ANALYSIS     = True   # whether to run OOS2 backtest block
-OOS2_FOR_VALIDATION   = True  # whether OOS2 result acts as mandatory additional filter
-
-# OOS3 analysis flags
-OOS3_RUN_ANALYSIS     = True   # whether to run OOS3 backtest block
-OOS3_FOR_VALIDATION   = True  # whether OOS3 result acts as mandatory additional filter
-
-# OOS2/3 symbol selection
-#------------------------------------------------------------------------------
-OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
 # Correlation analysis
 #------------------------------------------------------------------------------
