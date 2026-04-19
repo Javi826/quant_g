@@ -31,8 +31,8 @@ DRIFT_REFERENCE = {
         'p50_winrate': 80.7,
     },
     '09_reversal_short_6Hutc': {
-        'p5_winrate':  70.2,
-        'p50_winrate': 79.5,
+        'p5_winrate':  68.6,
+        'p50_winrate': 80.0,
     },
     '10_parity_long_1H': {
         'p5_winrate':  76.0,

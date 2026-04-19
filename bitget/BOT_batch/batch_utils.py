@@ -579,7 +579,7 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
         updated = dict(s)
  
         if v:
-            updated["active"] = v["verdict"] == "🟢 VALIDATED"
+            updated["active"] = "VALIDATED" in v["verdict"]
             bins_to_filter    = v.get("bins_to_filter", set())
         else:
             bins_to_filter = set()

@@ -939,7 +939,7 @@ def run_portfolio_analysis():
                 [compute_metrics(df, capital=INITIAL_BALANCE, name=sid) for sid, df in survivors],
                 "  Survivor Strategies — OOS1 Regime Metrics",
             )
-            print_best_combinations(survivors, "Decorrelated — Validated only", INITIAL_BALANCE)
+            print_all_curves_table(survivors, "Decorrelated — Validated only", INITIAL_BALANCE)
             plot_portfolio_comparison(
                 trade_logs_baseline=survivors,
                 trade_logs_regime01=survivors,
@@ -947,7 +947,6 @@ def run_portfolio_analysis():
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (DD filter)",
             )
-
 
 # =============================================================================
 # MAIN
