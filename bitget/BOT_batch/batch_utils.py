@@ -1059,7 +1059,7 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         tl          = df.copy()
         tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
         daily       = tl.groupby("_date")["profit"].sum()
-        daily       = daily.groupby(level=0).sum()  # remove duplicate dates
+        daily       = daily.groupby(level=0).sum()
         date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
         daily       = daily.reindex(date_range, fill_value=0.0)
         equity      = capital + daily.cumsum()
@@ -1077,7 +1077,8 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         if sid in oos3_map:
             parts.append(_dd_series(oos3_map[sid], initial_balance))
         if parts:
-            dd_combined[sid] = pd.concat(parts).sort_index()
+            combined = pd.concat(parts).sort_index()
+            dd_combined[sid] = combined.groupby(level=0).mean()
 
     if len(dd_combined) < 2:
         logger.info("  Not enough strategies for correlation analysis.")
@@ -1120,7 +1121,7 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
                 discarded.append(sid)
                 break
         if correlated:
-            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✂️  DISCARDED':<20} {corr_reason}")
+            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'❌ DISCARDED':<20} {corr_reason}")
         else:
             selected.append(sid)
             lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")

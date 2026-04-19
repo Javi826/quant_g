@@ -120,7 +120,7 @@ N_PATHS_OOS = 500
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1  = 15
-R1_RSQUARED_ROUND1 = 0.8
+R1_RSQUARED_ROUND1 = 0.9
 R1_PROBNEG_ROUND1  = 21
 
 # Validation thresholds — Round 2 path A
@@ -158,7 +158,7 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = False
+UPDATE_OUTPUTS         = True
 
 # OOS2 analysis flags
 OOS2_RUN_ANALYSIS     = True   # whether to run OOS2 backtest block
@@ -255,7 +255,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 1 — Monte Carlo IS
     # -------------------------------------------------------------------------
-    logger.info(f"STAGE 1  ── Monte Carlo IS         ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
+    logger.info(f"STAGE 1  ── MC IS                  ── {N_PATHS_IS} paths | {len(param_dict_list)} combos")
 
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
     paths_minor      = generate_paths_for_all_symbols_functional(
@@ -487,7 +487,7 @@ def run_batch(strategy_config: dict) -> None:
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S R1      ── {'🔴' if not approved else '🟢'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S R1        ── {'🔴' if not approved else '🟢'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     approved_regime = False
     round_path      = ""
@@ -512,7 +512,7 @@ def run_batch(strategy_config: dict) -> None:
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
 
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S R2      ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
+        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
 
         approved = approved or approved_regime
 
@@ -636,12 +636,12 @@ def run_batch(strategy_config: dict) -> None:
 
             _v_oos2 = ("VALIDATED" if approved_oos2 else "REJECTED").ljust(13)
             logger.info(
-                f"STAGE 6b ── Backtest OOS2           ── "
+                f"STAGE 6b ── Backtest OOS2          ── "
                 f"{'🟢' if approved_oos2 else '🔴'} {_v_oos2} "
-                f"trades={len(trade_log_oos2)}  "
-                f"NetGain={metrics_oos2['Net_Gain_pct']:.2f}%  "
-                f"DD={metrics_oos2['Max_DD_pct']:.2f}%  "
-                f"R2={metrics_oos2['R_Squared']:.2f}"
+                f"NetGain={metrics_oos2['Net_Gain_pct']:.2f}% "
+                f"DD={metrics_oos2['Max_DD_pct']:.2f}% "
+                f"R2={metrics_oos2['R_Squared']:.2f}  "
+                f"trades={len(trade_log_oos2)}"
             )
             plot_filter_comparison(
                 strategy_id=f"{STRATEGY_ID}_oos2",
@@ -749,10 +749,10 @@ def run_batch(strategy_config: dict) -> None:
 
             _v_oos3 = ("VALIDATED" if approved_oos3 else "REJECTED").ljust(13)
             logger.info(
-                f"STAGE 6c ── Backtest OOS3           ── "
+                f"STAGE 6c ── Backtest OOS3          ── "
                 f"{'🟢' if approved_oos3 else '🔴'} {_v_oos3} "
-                f"NetGain={metrics_oos3['Net_Gain_pct']:.2f}%  "
-                f"DD={metrics_oos3['Max_DD_pct']:.2f}%  "
+                f"NetGain={metrics_oos3['Net_Gain_pct']:.2f}% "
+                f"DD={metrics_oos3['Max_DD_pct']:.2f}% "
                 f"R2={metrics_oos3['R_Squared']:.2f}  "
                 f"trades={len(trade_log_oos3)}"
             )
@@ -818,7 +818,7 @@ def run_batch(strategy_config: dict) -> None:
         })
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"DONE  🏁  ──   {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+    logger.info(f"DONE  🏁 ──  {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
 
 # =============================================================================
@@ -992,7 +992,7 @@ if __name__ == "__main__":
         logger.info(f"\n{'='*105}\n  Running: {strategy['id']}\n{'='*105}")
         run_batch(strategy)
 
-    _strategies_batch_path = os.path.join(os.path.dirname(__file__), "strategies_batch.py")
+    _strategies_batch_path = os.path.join(os.path.dirname(__file__), "strategies_files", "strategies_batch.py")
 
     if UPDATE_OUTPUTS:
         save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
