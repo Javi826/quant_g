@@ -50,6 +50,8 @@ from batch_utils import save_drift_reference, save_strategies_e1, compare_and_ge
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import get_best_r2_combination
 from batch_utils import decorrelate_by_dd
+from strategies_files.strategies_batch import STRATEGIES as STRATEGIES_BATCH
+from strategies_files.strategies_loop  import STRATEGIES_LOOP
 
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -109,8 +111,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 100
-N_PATHS_OOS               = 1000
+N_PATHS_IS                = 1
+N_PATHS_OOS               = 1
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
@@ -423,7 +425,7 @@ def run_batch(strategy_config: dict) -> None:
 
     n_baseline = len(trade_log)
     n_regime   = len(trade_log_regime)
-    logger.info(
+    logger.debug(
         f"STAGE 4  ── Filter results         ── "
         f"baseline={n_baseline} | regime={n_regime} | diff={n_baseline - n_regime}"
     )
@@ -914,8 +916,8 @@ def run_portfolio_analysis():
 
         survivors = decorrelate_by_dd(
             trade_logs_oos1     = validated_regime01,
-            trade_logs_oos2     = validated_oos2 if validated_oos2 else [],
-            trade_logs_oos3     = validated_oos3 if validated_oos3 else [],
+            trade_logs_oos2     = [],
+            trade_logs_oos3     = [],
             initial_balance     = INITIAL_BALANCE,
             threshold           = CORRELATION_DD_THRESHOLD,
             precomputed_metrics = r01_metrics,
@@ -941,8 +943,7 @@ def run_portfolio_analysis():
 # =============================================================================
 
 if __name__ == "__main__":
-    from strategies_files.strategies_batch import STRATEGIES as STRATEGIES_BATCH
-    from strategies_files.strategies_loop  import STRATEGIES_LOOP
+
 
     _loop_map  = {s["id"]: s for s in STRATEGIES_LOOP}
     STRATEGIES = []

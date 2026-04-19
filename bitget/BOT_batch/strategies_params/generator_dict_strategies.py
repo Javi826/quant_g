@@ -109,7 +109,7 @@ def generate_loop():
         lines.append("    },")
 
     lines.append("]")
-    #_write(OUTPUT_LOOP, lines)
+    _write(OUTPUT_LOOP, lines)
     print(f"✅ strategies_loop.py generated → {os.path.abspath(OUTPUT_LOOP)}")
 
 
