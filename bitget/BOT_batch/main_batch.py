@@ -109,8 +109,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 200
-N_PATHS_OOS               = 2000
+N_PATHS_IS                = 100
+N_PATHS_OOS               = 1000
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
