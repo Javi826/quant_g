@@ -7,7 +7,7 @@ This file is NOT updated by the batch automatically.
 STRATEGIES_LOOP = [
     {
         "id": "02_reversal_long_4H",
-        "n_symbols": 31,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -33,7 +33,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "04_reversal_short_4H",
-        "n_symbols": 31,
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -85,7 +85,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "09_reversal_short_6Hutc",
-        "n_symbols": 32,
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -124,7 +124,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "12_parity_long_6Hutc",
-        "n_symbols": 15,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -137,7 +137,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "13_orderblocks_short_4H",
-        "n_symbols": 32,
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -150,7 +150,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "16_ranging_short_6Hutc",
-        "n_symbols": 32,
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -177,7 +177,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "19_flag_short_4H",
-        "n_symbols": 23,
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -191,14 +191,14 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "20_flag_short_1H",
-        "n_symbols": 11,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
-            "LOOKBACK": [20],
-            "MA_PERIOD": [25],
-            "IMPULSE": [3],
-            "FLAG": [60],
+            "SELL_AFTER": [0],
+            "LOOKBACK": [30],
+            "MA_PERIOD": [50],
+            "IMPULSE": [5],
+            "FLAG": [40],
             "TP_PCT": [2],
             "SL_PCT": [8],
         },

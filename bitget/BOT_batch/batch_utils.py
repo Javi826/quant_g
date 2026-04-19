@@ -1059,7 +1059,7 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         tl          = df.copy()
         tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
         daily       = tl.groupby("_date")["profit"].sum()
-        daily       = daily.groupby(level=0).sum()
+        daily       = daily.groupby(level=0).sum()  # remove duplicate dates
         date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
         daily       = daily.reindex(date_range, fill_value=0.0)
         equity      = capital + daily.cumsum()

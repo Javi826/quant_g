@@ -124,7 +124,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "12_parity_long_6Hutc",
-        "n_symbols": 15,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -195,12 +195,12 @@ STRATEGIES_LOOP = [
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
-            "LOOKBACK": [10,20,30,40],
+            "LOOKBACK": [20,30,40],
             "MA_PERIOD": [25,50],
-            "IMPULSE": [2,3,4,5],
-            "FLAG": [20,40,60,80],
-            "TP_PCT": [2,3,4,5,6],
-            "SL_PCT": [5,6,7,8,9,10],
+            "IMPULSE": [4,5,6],
+            "FLAG": [20,40,60],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [7,8,9],
         },
     },
 ]
