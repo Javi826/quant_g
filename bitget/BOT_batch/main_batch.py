@@ -109,10 +109,17 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS               = 500
+N_PATHS_IS                = 200
+N_PATHS_OOS               = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
+
+# Regime analysis params
+#------------------------------------------------------------------------------
+FORCE_DIRECTION_FILTER = True
+REGIME_MIN_TRADES      = 2
+REGIME_LOOKBACK_BARS   = 180
+REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
@@ -122,8 +129,8 @@ R1_PROBNEG_ROUND1  = 21
 
 # Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 40
-R2A_RSQUARED_ROUND2 = 0.9
+R2A_NETGAIN_ROUND2  = 15
+R2A_RSQUARED_ROUND2 = 0.8
 
 # Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
@@ -148,14 +155,6 @@ OOS3_FOR_VALIDATION   = True
 #------------------------------------------------------------------------------
 OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
-
-# Regime analysis params
-#------------------------------------------------------------------------------
-FORCE_DIRECTION_FILTER = True
-REGIME_MIN_TRADES      = 2
-REGIME_LOOKBACK_BARS   = 180
-REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
-
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
@@ -163,7 +162,7 @@ UPDATE_OUTPUTS         = True
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.7  # max allowed DD correlation between validated strategies
+CORRELATION_DD_THRESHOLD = 0.69  # max allowed DD correlation between validated strategies
 
 # Strategy selection
 SELECTED_STRATEGIES = [
@@ -792,7 +791,7 @@ def run_batch(strategy_config: dict) -> None:
     _changes     = ["symbols"] if _symbols_result and _symbols_result.get("symbols_changed") else []
     _changes_str = " | ".join(_changes) if _changes else "no changes"
     _icon        = "🔵" if _changes else "⚪"
-    logger.info(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
+    logger.debug(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
     _drift_results.append({
         "strategy_id":  STRATEGY_ID,
