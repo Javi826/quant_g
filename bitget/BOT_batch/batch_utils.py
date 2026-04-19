@@ -1032,3 +1032,113 @@ def get_best_r2_combination(trade_logs, initial_balance, precomputed_metrics=Non
         return trade_logs
     
     return [(sid, named[sid]) for sid in best_combo]
+
+def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, threshold=0.7, precomputed_metrics=None):
+    """
+    Greedy DD-correlation filter on validated strategies.
+    Combines OOS1 + OOS2 daily DD series per strategy.
+    Keeps the best NetGain strategy from each correlated pair.
+
+    Args:
+        trade_logs_oos1     : list of (strategy_id, trade_log_df) — OOS1 regime
+        trade_logs_oos2     : list of (strategy_id, trade_log_df) — OOS2 regime (can be empty)
+        initial_balance     : capital per strategy
+        threshold           : max allowed DD correlation (default 0.7)
+        precomputed_metrics : optional dict {strategy_id: metrics} for OOS1
+
+    Returns:
+        list of (strategy_id, trade_log_df) survivors from trade_logs_oos1
+    """
+    def _num(sid):
+        for part in sid.split("_"):
+            if part.isdigit():
+                return int(part)
+        return 0
+
+    metrics = precomputed_metrics or {
+        sid: compute_metrics(df, capital=initial_balance, name=sid)
+        for sid, df in trade_logs_oos1
+    }
+
+    oos1_map = {sid: df for sid, df in trade_logs_oos1}
+    oos2_map = {sid: df for sid, df in trade_logs_oos2}
+    all_sids = [sid for sid, _ in trade_logs_oos1]
+
+    def _dd_series(df, capital):
+        tl             = df.copy()
+        tl["_date"]    = pd.to_datetime(tl["sell_time"]).dt.normalize()
+        daily          = tl.groupby("_date")["profit"].sum()
+        date_range     = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily          = daily.reindex(date_range, fill_value=0.0)
+        equity         = capital + daily.cumsum()
+        peak           = equity.cummax()
+        dd             = (equity - peak) / peak * 100
+        return dd
+
+    # Build combined DD series (OOS1 + OOS2) per strategy
+    dd_combined = {}
+    for sid in all_sids:
+        parts = []
+        if sid in oos1_map:
+            parts.append(_dd_series(oos1_map[sid], initial_balance))
+        if sid in oos2_map:
+            parts.append(_dd_series(oos2_map[sid], initial_balance))
+        if parts:
+            dd_combined[sid] = pd.concat(parts).sort_index()
+
+    if len(dd_combined) < 2:
+        logger.info("  Not enough strategies for correlation analysis.")
+        return trade_logs_oos1
+
+    # Use strategy number as column label for compact display
+    num_map = {sid: str(_num(sid)) for sid in dd_combined}
+    dd_df   = pd.DataFrame({num_map[sid]: s for sid, s in dd_combined.items()}).fillna(0)
+    corr_mx = dd_df.corr()
+
+    # Print correlation matrix
+    cols  = list(corr_mx.columns)
+    width = 7
+    lines = []
+    lines.append(f"\n  {'':>6} " + " ".join(f"{c:>{width}}" for c in cols))
+    lines.append(f"  {'─' * (8 + width * len(cols))}")
+    for idx in corr_mx.index:
+        row_str = " ".join(
+            f"{'───':>{width}}" if idx == c else f"{corr_mx.loc[idx, c]:>{width}.2f}"
+            for c in cols
+        )
+        lines.append(f"  {idx:>6} | {row_str}")
+    logger.info("\n".join(lines))
+
+    # Sort by NetGain descending — greedy selection
+    ranked = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
+
+    selected  = []
+    discarded = []
+    lines2    = [f"\n  {'Rank':<6} {'Strategy':<30} {'NetGain%':>10} {'Action':<20} {'Reason'}"]
+    lines2.append(f"  {'─'*85}")
+
+    for sid in ranked:
+        ng          = metrics.get(sid, {}).get("Net_Gain_pct", 0)
+        num         = num_map.get(sid, sid)
+        corr_reason = ""
+        correlated  = False
+        for kept in selected:
+            kept_num = num_map.get(kept, kept)
+            val      = corr_mx.loc[num, kept_num] if num in corr_mx.index and kept_num in corr_mx.columns else 0.0
+            if pd.notna(val) and val > threshold:
+                correlated  = True
+                corr_reason = f"corr={val:.2f} with {kept}"
+                discarded.append(sid)
+                break
+        if correlated:
+            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✂️  DISCARDED':<20} {corr_reason}")
+        else:
+            selected.append(sid)
+            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")
+
+    lines2.append(f"  {'─'*85}")
+    lines2.append(f"  Selected  : {[sid for sid in selected]}")
+    lines2.append(f"  Discarded : {discarded}")
+    logger.info("\n".join(lines2))
+
+    return [(sid, oos1_map[sid]) for sid in selected if sid in oos1_map]
