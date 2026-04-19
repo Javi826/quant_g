@@ -269,7 +269,7 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     pd.DataFrame(rows).to_csv(csv_path, index=False)
-    logger.info(f"✅ strategies_params.csv generated → {csv_path}")
+    logger.debug(f"✅ strategies_params.csv generated → {csv_path}")
 
 def _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc_ts, btc_pct, title):
     """
@@ -621,7 +621,6 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
  
     logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
  
-    logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
 
 
 # =============================================================================
@@ -645,7 +644,7 @@ def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, sy
         logger.debug(f"symbols_live saved → {live_path}")
 
     if symbols_changed:
-        logger.info(f"🔵 symbols_live — symbols updated for '{strategy_id}'")
+        logger.debug(f"🔵 symbols_live — symbols updated for '{strategy_id}'")
     else:
         logger.debug(f"⚪ symbols_live — symbols unchanged for '{strategy_id}'")
 
@@ -928,19 +927,16 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
     precomputed_metrics: optional dict {strategy_id: metrics} to avoid recalculation
     """
     from itertools import combinations as _combinations
-
     def _num(sid):
         for part in sid.split("_"):
             if part.isdigit():
                 return int(part)
         return 0
-
     named   = {sid: df for sid, df in trade_logs}
     metrics = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
         for sid, df in named.items()
     }
-
     combo_results = []
     for r in range(1, len(named) + 1):
         for combo in _combinations(named.keys(), r):
@@ -956,12 +952,13 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
                 capital  = initial_balance * len(combo)
                 nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
                 combo_results.append(compute_metrics(combo_tl, capital=capital, name=nums))
+    combo_df    = pd.DataFrame(combo_results)
+    combo_df_3  = combo_df[combo_df["Curve"].str.contains(r"\+.*\+", regex=True)]
 
-    combo_df = pd.DataFrame(combo_results)
-
-    best_ng    = combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
+    best_ng    = combo_df_3.loc[combo_df_3["Net_Gain_pct"].idxmax()] if not combo_df_3.empty else combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
     best_r2    = combo_df.loc[combo_df["R_Squared"].idxmax()]
-    best_pf_df = combo_df[combo_df["Profit_Factor"] != float("inf")]
+    best_pf_df = (combo_df_3 if not combo_df_3.empty else combo_df)
+    best_pf_df = best_pf_df[best_pf_df["Profit_Factor"] != float("inf")]
     best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
 
     rows = [
@@ -969,7 +966,6 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
         ("📈 R²",           best_r2),
         ("💰 ProfitFactor", best_pf),
     ]
-
     lines = []
     lines.append(f"\n{'─'*105}")
     lines.append(f"  BEST COMBINATIONS — {label}")
