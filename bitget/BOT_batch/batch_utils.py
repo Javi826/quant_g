@@ -735,7 +735,7 @@ def print_strategies_summary(validation_results):
     lines.append(f"  STRATEGIES SUMMARY")
     lines.append(f"{'─'*105}")
     lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-    lines.append(f"  {'-'*103}")
+    lines.append(f"  {'-'*105}")
     for v in validation_results:
         lines.append(
             f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<16} "

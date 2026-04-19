@@ -112,13 +112,13 @@ DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS  = 1
-N_PATHS_OOS = 1
+N_PATHS_IS  = 100
+N_PATHS_OOS = 500
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1   = 15
-R1_RSQUARED_ROUND1  = 0.8
+R1_RSQUARED_ROUND1  = 0.9
 R1_PROBNEG_ROUND1   = 21
 
 # Validation thresholds — Round 2 path A
@@ -150,7 +150,7 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # Portfolio analysis flags
 RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = True
+RUN_BEST_COMBINATIONS  = False
 UPDATE_OUTPUTS         = True
 
 # OOS2 analysis flags
@@ -159,27 +159,25 @@ OOS2_FOR_VALIDATION    = True  # whether OOS2 result acts as mandatory additiona
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.7  # max allowed DD correlation between validated strategies
+CORRELATION_DD_THRESHOLD = 0.75  # max allowed DD correlation between validated strategies
 
 # Strategy selection
 SELECTED_STRATEGIES = [
     "02_reversal_long_4H",
     "03_parity_long_4H",
-# =============================================================================
-#     "04_reversal_short_4H",
-#     "06_reversal_long_1H",
-#     "07_reversal_short_1H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "10_parity_long_1H",
-#     "11_parity_short_1H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "16_ranging_short_6Hutc",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-# =============================================================================
+    "04_reversal_short_4H",
+    "06_reversal_long_1H",
+    "07_reversal_short_1H",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "10_parity_long_1H",
+    "11_parity_short_1H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "16_ranging_short_6Hutc",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
 ]
 
 # =============================================================================
@@ -510,7 +508,7 @@ def run_batch(strategy_config: dict) -> None:
 
     _validation_results.append({
         "strategy_id":     STRATEGY_ID,
-        "verdict":         "🟢 VALIDATED" if approved else "🔴 REJECTED",
+        "verdict": "⭐ VALIDATED" if (approved and not approved_regime) else ("🟢 VALIDATED" if approved else "🔴 REJECTED"),
         "round":           _round,
         "net_gain_pct":    round(bt_netgain_pct, 2),
         "dd_pct":          round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
@@ -667,7 +665,7 @@ def run_batch(strategy_config: dict) -> None:
         })
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"DONE     ──  🏁 {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+    logger.info(f"DONE  🏁 ──  {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
 
 # =============================================================================
