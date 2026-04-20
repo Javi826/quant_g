@@ -50,7 +50,7 @@ from batch_utils import save_drift_reference, save_strategies_e1, compare_and_ge
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import get_best_r2_combination
 from batch_utils import decorrelate_by_dd
-from strategies_files.strategies_batch import STRATEGIES as STRATEGIES_BATCH
+from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
 from strategies_files.strategies_loop  import STRATEGIES_LOOP
 
 from signals.add_signals_parity      import parity_long, parity_short
@@ -82,8 +82,8 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_params")
-CSV_PARAMS               = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_params.csv")
+STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
+CSV_PARAMS               = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1.csv")
 STRATEGIES_E1_BATCH_PATH = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
 SYMBOLS_LIVE_FOLDER      = os.path.join(os.path.dirname(__file__), "symbols_live")
 DRIFT_MONTECARLO_FOLDER  = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
@@ -111,8 +111,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS               = 1
+N_PATHS_IS                = 10
+N_PATHS_OOS               = 5
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
@@ -125,14 +125,14 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 15
-R1_RSQUARED_ROUND1 = 0.9
-R1_PROBNEG_ROUND1  = 21
+R1_NETGAIN_ROUND1  = 40
+R1_RSQUARED_ROUND1 = 0.8
+R1_PROBNEG_ROUND1  = 2
 
 # Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 15
-R2A_RSQUARED_ROUND2 = 0.8
+R2A_NETGAIN_ROUND2  = 20
+R2A_RSQUARED_ROUND2 = 0.9
 
 # Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
@@ -924,7 +924,7 @@ def run_portfolio_analysis():
         )
 
         if survivors:
-            logger.info(f"  Survivors after decorrelation: {[sid for sid, _ in survivors]}")
+            logger.debug(f"  Survivors after decorrelation: {[sid for sid, _ in survivors]}")
             print_metrics_table(
                 [compute_metrics(df, capital=INITIAL_BALANCE, name=sid) for sid, df in survivors],
                 "  Survivor Strategies — OOS1 Regime Metrics",

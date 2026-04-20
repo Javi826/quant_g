@@ -8,7 +8,7 @@ from config.strategies_E1 import STRATEGIES as PROD_STRATEGIES
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_batch.py")
+OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_BT_batch.py")
 OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_loop.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
@@ -109,7 +109,7 @@ def generate_loop():
         lines.append("    },")
 
     lines.append("]")
-    _write(OUTPUT_LOOP, lines)
+    #_write(OUTPUT_LOOP, lines)
     print(f"✅ strategies_loop.py generated → {os.path.abspath(OUTPUT_LOOP)}")
 
 

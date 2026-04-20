@@ -1056,22 +1056,23 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
     all_sids = [sid for sid, _ in trade_logs_oos1]
 
     def _dd_series(df, capital):
-        tl          = df.copy()
-        tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
-        daily       = tl.groupby("_date")["profit"].sum()
-        daily       = daily.groupby(level=0).sum()
-        date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-        daily       = daily.reindex(date_range, fill_value=0.0)
-        equity      = capital + daily.cumsum()
-        peak        = equity.cummax()
-        dd          = (equity - peak) / peak * 100
-        return dd
-
+            tl          = df.copy()
+            tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+            daily       = tl.groupby("_date")["profit"].sum()
+            daily       = daily.groupby(level=0).sum()
+            date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+            daily       = daily.reindex(date_range, fill_value=0.0)
+            equity      = capital + daily.cumsum()
+            peak        = equity.cummax()
+            dd          = (equity - peak) / peak * 100
+            return dd
+    
     dd_combined = {}
     for sid in all_sids:
         parts = []
         if sid in oos1_map:
-            parts.append(_dd_series(oos1_map[sid], initial_balance))
+            parts.append(_dd_series(oos1_map[sid]
+                                    , initial_balance))
         if sid in oos2_map:
             parts.append(_dd_series(oos2_map[sid], initial_balance))
         if sid in oos3_map:
@@ -1084,22 +1085,10 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
         logger.info("  Not enough strategies for correlation analysis.")
         return trade_logs_oos1
 
-    num_map = {sid: str(_num(sid)) for sid in dd_combined}
+    num_map = {sid: f"{_num(sid):02d}" for sid in dd_combined}
     dd_df   = pd.DataFrame({num_map[sid]: s for sid, s in dd_combined.items()}).fillna(0)
-    corr_mx = dd_df.corr()
-
-    cols  = list(corr_mx.columns)
-    width = 7
-    lines = []
-    lines.append(f"\n  {'':>6} " + " ".join(f"{c:>{width}}" for c in cols))
-    lines.append(f"  {'─' * (8 + width * len(cols))}")
-    for idx in corr_mx.index:
-        row_str = " ".join(
-            f"{'───':>{width}}" if idx == c else f"{corr_mx.loc[idx, c]:>{width}.2f}"
-            for c in cols
-        )
-        lines.append(f"  {idx:>6} | {row_str}")
-    logger.info("\n".join(lines))
+    corr_mx = dd_df.corr().round(2)
+    logger.info(f"\n{corr_mx.to_string()}")
 
     ranked    = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
     selected  = []
@@ -1127,8 +1116,8 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
             lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")
 
     lines2.append(f"  {'─'*85}")
-    lines2.append(f"  Selected  : {[sid for sid in selected]}")
-    lines2.append(f"  Discarded : {discarded}")
+    #lines2.append(f"  Selected  : {[sid for sid in selected]}")
+    #lines2.append(f"  Discarded : {discarded}")
     logger.info("\n".join(lines2))
 
     return [(sid, oos1_map[sid]) for sid in selected if sid in oos1_map]
