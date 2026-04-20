@@ -83,7 +83,6 @@ _validation_results  : list = []
 _drift_results       : list = []
 _best_params_results : dict = {}
 
-
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
@@ -105,12 +104,12 @@ STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRA
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = False
+UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS               = 1
+N_PATHS_IS                = 100
+N_PATHS_OOS               = 1000
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
@@ -121,30 +120,34 @@ REGIME_MIN_TRADES      = 2
 REGIME_LOOKBACK_BARS   = 180
 REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
-# Validation thresholds — Round 1
+# =============================================================================
+# VALIDATON CONFIGURATION
+# =============================================================================
+
+# OOS - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 40
+R1_NETGAIN_ROUND1  = 100
 R1_RSQUARED_ROUND1 = 0.8
-R1_PROBNEG_ROUND1  = 2
+R1_PROBNEG_ROUND1  = 21
 
-# Validation thresholds — Round 2 path A
+# OOS - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 20
-R2A_RSQUARED_ROUND2 = 0.9
+R2A_NETGAIN_ROUND2  = 30
+R2A_RSQUARED_ROUND2 = 0.8
 
-# Validation thresholds — Round 2 path B
+# OOS - Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
 R2B_NETGAIN_ROUND2 = 15
 R2B_MAX_DD_ROUND2  = 15
 
-# Validation thresholds — Round OOS2
+# OOS2 - Validation thresholds — Round OOS2
 #------------------------------------------------------------------------------
 R3A_NETGAIN_ROUNDOOS2 = 15
 R3A_MAX_DD_ROUNDOOS2  = 15
 OOS2_RUN_ANALYSIS     = True  
 OOS2_FOR_VALIDATION   = True
 
-# Validation thresholds — Round OOS3
+# OOS3 - Validation thresholds — Round OOS3
 #------------------------------------------------------------------------------
 R3B_NETGAIN_ROUNDOOS3 = 15
 R3B_MAX_DD_ROUNDOOS3  = 15
@@ -165,21 +168,17 @@ SELECTED_STRATEGIES = [
     "03_parity_long_4H",
     "04_reversal_short_4H",
     "06_reversal_long_1H",
-# =============================================================================
-#     "07_reversal_short_1H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "10_parity_long_1H",
-#     "11_parity_short_1H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-# =============================================================================
-    "16_ranging_short_6Hutc",
-# =============================================================================
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-# =============================================================================
+    "07_reversal_short_1H",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "10_parity_long_1H",
+    "11_parity_short_1H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    #"16_ranging_short_6Hutc",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
 ]
 
 # =============================================================================
@@ -863,7 +862,7 @@ def run_portfolio_analysis():
             title="Portfolio — Validated only",
         )
 
-    if validated_regime01:
+    if RUN_BEST_COMBINATIONS and validated_regime01:
         best_r2_logs = get_best_r2_combination(validated_regime01, INITIAL_BALANCE, precomputed_metrics=r01_metrics)
         plot_portfolio_comparison(
             trade_logs_baseline=best_r2_logs,
