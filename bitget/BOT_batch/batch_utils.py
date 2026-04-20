@@ -754,7 +754,7 @@ def print_strategies_summary(validation_results):
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
-    lines.append(f"  {'─'*105}")
+    lines.append(f" {'─'*105}")
     logger.info("\n".join(lines))
 
 

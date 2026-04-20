@@ -105,12 +105,12 @@ STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRA
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = True
+UPDATE_OUTPUTS         = False
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 100
-N_PATHS_OOS               = 100
+N_PATHS_IS                = 1
+N_PATHS_OOS               = 1
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
@@ -165,17 +165,21 @@ SELECTED_STRATEGIES = [
     "03_parity_long_4H",
     "04_reversal_short_4H",
     "06_reversal_long_1H",
-    "07_reversal_short_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "10_parity_long_1H",
-    "11_parity_short_1H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
+# =============================================================================
+#     "07_reversal_short_1H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "10_parity_long_1H",
+#     "11_parity_short_1H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+# =============================================================================
     "16_ranging_short_6Hutc",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "20_flag_short_1H",
+# =============================================================================
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -823,7 +827,6 @@ def run_portfolio_analysis():
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
                    for sid, df in _trade_logs_regime01}
 
-    logger.info(f"\n{'─'*105}\n  STRATEGIES SUMMARY\n{'─'*105}")
     print_strategies_summary(_validation_results)
 
     if _trade_logs_baseline:
