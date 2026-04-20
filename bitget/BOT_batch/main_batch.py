@@ -50,27 +50,10 @@ from batch_utils import save_drift_reference, save_strategies_e1, compare_and_ge
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import get_best_r2_combination
 from batch_utils import decorrelate_by_dd
+from importlib import import_module
 from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
-from strategies_files.strategies_loop  import STRATEGIES_LOOP
 
-from signals.add_signals_parity      import parity_long, parity_short
-from signals.add_signals_reversal    import reversal_long, reversal_short
-from signals.add_signals_flag        import flag_long, flag_short
-from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
-from signals.add_signals_ranging     import ranging_long, ranging_short
-
-SIGNAL_REGISTRY = {
-    "parity_long":       {"fn": parity_long,       "params": ["lookback", "tolerance", "ma_period"]},
-    "parity_short":      {"fn": parity_short,      "params": ["lookback", "tolerance", "ma_period"]},
-    "reversal_long":     {"fn": reversal_long,     "params": ["lookback", "tolerance", "ma_period"]},
-    "reversal_short":    {"fn": reversal_short,    "params": ["lookback", "tolerance", "ma_period"]},
-    "flag_long":         {"fn": flag_long,         "params": ["lookback", "impulse", "flag", "ma_period"]},
-    "flag_short":        {"fn": flag_short,        "params": ["lookback", "impulse", "flag", "ma_period"]},
-    "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
-    "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
-    "ranging_long":      {"fn": ranging_long,      "params": ["lookback", "tolerance", "ma_period", "ranges"]},
-    "ranging_short":     {"fn": ranging_short,     "params": ["lookback", "tolerance", "ma_period", "ranges"]},
-}
+from batch_utils import SIGNAL_REGISTRY
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -82,12 +65,14 @@ N_JOBS          = -1
 MY_SYMBOLS      = False
 SHOW_PROGRESS   = False
 
-STRATEGIES_PARAMS_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
-CSV_PARAMS               = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1.csv")
-STRATEGIES_E1_BATCH_PATH = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
-SYMBOLS_LIVE_FOLDER      = os.path.join(os.path.dirname(__file__), "symbols_live")
-DRIFT_MONTECARLO_FOLDER  = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
-DRIFT_BATCH_PATH         = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
+STRATEGIES_BT_BATCH_MODULE = "strategies_BT_batch"
+STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", "strategies_BT_batch.py")
+STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), "strategies_E1")
+CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1.csv")
+STRATEGIES_E1_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
+SYMBOLS_LIVE_FOLDER        = os.path.join(os.path.dirname(__file__), "symbols_live")
+DRIFT_MONTECARLO_FOLDER    = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
+DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
 
 # Global accumulators
 _trade_logs_baseline : list = []
@@ -102,6 +87,8 @@ _best_params_results : dict = {}
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
+#DATA
+#------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
@@ -109,10 +96,21 @@ DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
 
+# LOOP
+#------------------------------------------------------------------------------
+STRATEGIES_LOOP_NAME = "strategies_loop_103"
+STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
+
+# BATCH
+#------------------------------------------------------------------------------
+RUN_PORTFOLIO_ANALYSIS = True
+RUN_BEST_COMBINATIONS  = False
+UPDATE_OUTPUTS         = True
+
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 10
-N_PATHS_OOS               = 5
+N_PATHS_IS                = 100
+N_PATHS_OOS               = 100
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
 
@@ -156,11 +154,6 @@ OOS3_FOR_VALIDATION   = True
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
 OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
-
-# Portfolio analysis flags
-RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = True
 
 # Correlation analysis
 #------------------------------------------------------------------------------
@@ -944,7 +937,6 @@ def run_portfolio_analysis():
 
 if __name__ == "__main__":
 
-
     _loop_map  = {s["id"]: s for s in STRATEGIES_LOOP}
     STRATEGIES = []
     for s in STRATEGIES_BATCH:
@@ -960,11 +952,12 @@ if __name__ == "__main__":
     logger.info(f"\n{'='*105}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*105}")
+    logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
-    logger.info(f"  Data IS          : {DATA_FOLDER_IS}")
-    logger.info(f"  Data OOS         : {DATA_FOLDER_OOS}")
-    logger.info(f"  Data OOS2        : {DATA_FOLDER_OOS2}  ({'🟢 validation' if OOS2_FOR_VALIDATION else '⚪ informational'})")
-    logger.info(f"  Data OOS3        : {DATA_FOLDER_OOS3}  ({'🟢 validation' if OOS3_FOR_VALIDATION else '⚪ informational'})")
+    logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
+    logger.info(f"  Data OOS         : 🟢 {DATA_FOLDER_OOS}")
+    logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
+    logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
     logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}")
     logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND2}%  MaxDD<{R2B_MAX_DD_ROUND2}%")
@@ -980,24 +973,24 @@ if __name__ == "__main__":
         logger.info(f"\n{'='*105}\n  Running: {strategy['id']}\n{'='*105}")
         run_batch(strategy)
 
-    _strategies_batch_path = os.path.join(os.path.dirname(__file__), "strategies_files", "strategies_batch.py")
-
     if UPDATE_OUTPUTS:
         save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
         save_strategies_e1(
-            strategies_batch_path=_strategies_batch_path,
+            strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
+            module_name=STRATEGIES_BT_BATCH_MODULE,
             output_path=STRATEGIES_E1_BATCH_PATH,
             validation_results=_validation_results,
             best_params_map=_best_params_results,
             strategy_ids_to_run=[s["id"] for s in strategies_to_run],
         )
         compare_and_generate_csv(
-            strategies_batch_path=_strategies_batch_path,
+            strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
             e1_batch_path=STRATEGIES_E1_BATCH_PATH,
             csv_path=CSV_PARAMS,
         )
 
-    print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
+    if UPDATE_OUTPUTS:
+        print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
     run_portfolio_analysis()
 
     elapsed = int(time.time() - start)

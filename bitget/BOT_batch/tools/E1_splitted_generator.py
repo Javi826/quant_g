@@ -17,8 +17,11 @@ REGIME_BIN_KEYS   = (
     "regime_ranging_uptrend",  "regime_ranging_dwtrend",
     "regime_volatile_uptrend", "regime_volatile_dwtrend",
 )
+
+symbols_live_folder = os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading", "symbols_live")
 DEFAULT_N_SYMBOLS    = 10
 DEFAULT_ORDER_AMOUNT = 80
+USE_SYMBOLS_LIVE_FOR_N = True
 
 
 # =============================================================================
@@ -78,6 +81,7 @@ def generate_batch():
 # =============================================================================
 # GENERATE strategies_loop.py
 # =============================================================================
+
 def generate_loop():
     lines = [
         '"""',
@@ -90,6 +94,13 @@ def generate_loop():
     ]
 
     for s in PROD_STRATEGIES:
+        live_path = os.path.join(symbols_live_folder, f"symbols_live_{s['id']}_{s['timeframe']}.csv")
+        if USE_SYMBOLS_LIVE_FOR_N and os.path.exists(live_path):
+            import pandas as pd
+            n_symbols = len(pd.read_csv(live_path, header=None))
+        else:
+            n_symbols = DEFAULT_N_SYMBOLS
+
         param_grid = {"SELL_AFTER": [s.get("sell_after_ncandles", 0)]}
         for k in SIGNAL_PARAM_KEYS:
             if k in s:
@@ -100,7 +111,7 @@ def generate_loop():
 
         lines.append("    {")
         lines.append(f'        "id": "{s["id"]}",')
-        lines.append(f'        "n_symbols": {DEFAULT_N_SYMBOLS},')
+        lines.append(f'        "n_symbols": {n_symbols},')
         lines.append(f'        "order_amount": {DEFAULT_ORDER_AMOUNT},')
         lines.append(f'        "param_grid": {{')
         for pk, pv in param_grid.items():
@@ -109,7 +120,7 @@ def generate_loop():
         lines.append("    },")
 
     lines.append("]")
-    #_write(OUTPUT_LOOP, lines)
+    _write(OUTPUT_LOOP, lines)
     print(f"✅ strategies_loop.py generated → {os.path.abspath(OUTPUT_LOOP)}")
 
 

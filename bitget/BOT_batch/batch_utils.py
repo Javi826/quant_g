@@ -1,3 +1,4 @@
+#BOT_batch/batch_utils.py
 import logging
 import importlib.util
 import os
@@ -5,22 +6,35 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-from regime_common import (
-     load_btc_for_timeframe,
-     calc_all_metrics_at_time,
-     classify_trade_by_family,
-     get_btc_macro_direction,
- )
+from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time
+from regime_common import classify_trade_by_family, get_btc_macro_direction
 from backtesters.ZX_compute_BT import INITIAL_BALANCE
 from regime_common import calculate_max_dd_pct
 
+from signals.add_signals_parity      import parity_long, parity_short
+from signals.add_signals_reversal    import reversal_long, reversal_short
+from signals.add_signals_flag        import flag_long, flag_short
+from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
+from signals.add_signals_ranging     import ranging_long, ranging_short
 logger = logging.getLogger("BOT_batch.batch_utils")
+SIGNAL_REGISTRY = {
+    "parity_long":       {"fn": parity_long,       "params": ["lookback", "tolerance", "ma_period"]},
+    "parity_short":      {"fn": parity_short,      "params": ["lookback", "tolerance", "ma_period"]},
+    "reversal_long":     {"fn": reversal_long,     "params": ["lookback", "tolerance", "ma_period"]},
+    "reversal_short":    {"fn": reversal_short,    "params": ["lookback", "tolerance", "ma_period"]},
+    "flag_long":         {"fn": flag_long,         "params": ["lookback", "impulse", "flag", "ma_period"]},
+    "flag_short":        {"fn": flag_short,        "params": ["lookback", "impulse", "flag", "ma_period"]},
+    "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
+    "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
+    "ranging_long":      {"fn": ranging_long,      "params": ["lookback", "tolerance", "ma_period", "ranges"]},
+    "ranging_short":     {"fn": ranging_short,     "params": ["lookback", "tolerance", "ma_period", "ranges"]},
+}
 
 # =============================================================================
 # MODULE CONSTANTS
 # =============================================================================
 PARAM_KEYS        = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
-SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
+SIGNAL_PARAM_KEYS = tuple({p for entry in SIGNAL_REGISTRY.values() for p in entry["params"]})
 
 
 # =============================================================================
@@ -528,25 +542,23 @@ def save_drift_reference(drift_results, output_path):
 # =============================================================================
 # HELPER — SAVE STRATEGIES E1 BATCH
 # =============================================================================
-# =============================================================================
-# HELPER — SAVE STRATEGIES E1 BATCH
-# =============================================================================
-def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map, strategy_ids_to_run=None):
+def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map, strategy_ids_to_run=None, module_name="strategies_BT_batch"):
     """
     Generate strategies_E1_batch.py for production deployment.
-    Reads strategies_batch.py (never modified), applies dynamic fields from memory.
- 
-    strategies_batch_path : path to strategies_batch.py (input, never modified)
+    Reads strategies_BT_batch.py (never modified), applies dynamic fields from memory.
+
+    strategies_batch_path : path to strategies_BT_batch.py (input, never modified)
     output_path           : path to write strategies_E1_batch.py
     validation_results    : list of dicts with strategy_id, verdict, bins_to_filter
     best_params_map       : dict {strategy_id: best_params dict}
     strategy_ids_to_run   : list of strategy IDs to include — None = all
+    module_name           : module name to load from strategies_batch_path
     """
     if not os.path.exists(strategies_batch_path):
-        logger.warning(f"⚠️  strategies_batch.py not found — skipping.")
+        logger.warning(f"⚠️  {os.path.basename(strategies_batch_path)} not found — skipping.")
         return
- 
-    strategies = _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES
+
+    strategies = _load_py_module(strategies_batch_path, module_name).STRATEGIES
     if strategy_ids_to_run is not None:
         strategies = [s for s in strategies if s["id"] in strategy_ids_to_run]
  
@@ -1061,7 +1073,7 @@ def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, thresho
             daily       = tl.groupby("_date")["profit"].sum()
             daily       = daily.groupby(level=0).sum()
             date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-            daily       = daily.reindex(date_range, fill_value=0.0)
+            daily = daily.reindex(date_range).ffill().fillna(0.0)
             equity      = capital + daily.cumsum()
             peak        = equity.cummax()
             dd          = (equity - peak) / peak * 100
