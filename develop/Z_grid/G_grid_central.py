@@ -18,7 +18,6 @@ from shared.utils.utils import filter_symbols, save_filtered_symbols
 from signals.add_signals_flag       import flag_long, flag_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
 from signals.add_signals_parity     import parity_long, parity_short
-from signals.add_signals_ranging    import ranging_long, ranging_short
 from signals.add_signals_reversal   import reversal_long, reversal_short
 
 # -----------------------------------------------------------------------------
@@ -45,8 +44,6 @@ SIGNAL_REGISTRY = {
     "orderblocks_short": {"fn": orderblocks_short,  "params": ["lookback", "tolerance", "impulse"]},
     "parity_long":       {"fn": parity_long,        "params": ["lookback", "tolerance", "ma_period"]},
     "parity_short":      {"fn": parity_short,       "params": ["lookback", "tolerance", "ma_period"]},
-    "ranging_long":      {"fn": ranging_long,       "params": ["lookback", "tolerance", "ma_period", "ranges"]},
-    "ranging_short":     {"fn": ranging_short,      "params": ["lookback", "tolerance", "ma_period", "ranges"]},
     "reversal_long":     {"fn": reversal_long,      "params": ["lookback", "tolerance", "ma_period"]},
     "reversal_short":    {"fn": reversal_short,     "params": ["lookback", "tolerance", "ma_period"]},
 }
@@ -70,20 +67,6 @@ STRATEGIES = [
         "ma_period": [50],
         "tolerance": [40],
     },
-# =============================================================================
-#     {
-#         "id":        "02",
-#         "name":      "reversal_long_4H",
-#         "signal":    "reversal_long",
-#         "timeframe": "4H",
-#         "sell_after": [0],
-#         "tp_pct":    [3],
-#         "sl_pct":    [10],
-#         "lookback":  [4],
-#         "ma_period": [50],
-#         "tolerance": [20],
-#     },
-# =============================================================================
     {
         "id":        "03",
         "name":      "parity_long_4H",
@@ -203,19 +186,6 @@ STRATEGIES = [
         "lookback":  [50],
         "impulse":   [0.01],
         "tolerance": [35],
-    },
-    {
-        "id":        "16",
-        "name":      "ranging_short_6Hutc",
-        "signal":    "ranging_short",
-        "timeframe": "6Hutc",
-        "sell_after": [0],
-        "tp_pct":    [4],
-        "sl_pct":    [6],
-        "lookback":  [10],
-        "ma_period": [25],
-        "tolerance": [5],
-        "ranges": [25],
     },
     {
         "id":        "17",

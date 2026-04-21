@@ -10,8 +10,8 @@ from config.strategies_E1 import STRATEGIES as PROD_STRATEGIES
 # =============================================================================
 OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_BT_batch.py")
 OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_loop.py")
-PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag", "ranges"}
-SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag", "ranges")
+PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
+SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS   = (
     "regime_trending_uptrend", "regime_trending_dwtrend",
     "regime_ranging_uptrend",  "regime_ranging_dwtrend",

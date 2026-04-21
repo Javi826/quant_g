@@ -114,7 +114,7 @@ N_PATHS_IS                = 100
 N_PATHS_OOS               = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
-MC_SELECTION_PERCENTILE   = 25  # None = mean | int = percentile e.g. 25, 50
+MC_SELECTION_PERCENTILE   = 1  # None = mean | int = percentile e.g. 25, 50
 
 # Regime analysis params
 #------------------------------------------------------------------------------
@@ -178,7 +178,6 @@ SELECTED_STRATEGIES = [
     "11_parity_short_1H",
     "12_parity_long_6Hutc",
     "13_orderblocks_short_4H",
-    "16_ranging_short_6Hutc",
     "17_flag_long_4H",
     "19_flag_short_4H",
     "20_flag_short_1H",

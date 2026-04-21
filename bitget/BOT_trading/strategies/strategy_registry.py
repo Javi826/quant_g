@@ -36,11 +36,9 @@ if bitget_dir not in sys.path:
 # IMPORTS - Signal generation functions 
 #===========================================================================
 
-from signals.add_signals_double_top import double_top_long
 from signals.add_signals_reversal import reversal_long, reversal_short
 from signals.add_signals_parity import parity_long, parity_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
-from signals.add_signals_ranging import ranging_short
 from signals.add_signals_flag import flag_long, flag_short
 
 
@@ -111,17 +109,7 @@ def detect_signals_for_strategy(
             # ==============================================================
             # STRATEGY IMPLEMENTATIONS - Add elif for each new strategy
             # ==============================================================
-            
-            if strategy_id == '01_double_top_long_4H':
-                signals = double_top_long(
-                    arr,
-                    lookback_minor=strat['lookback'],
-                    price_tolerance=strat['tolerance'],
-                    trend_th=strat['trend_th'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '02_reversal_long_4H':
+            if strategy_id == '02_reversal_long_4H':
                 signals = reversal_long(
                     arr,
                     lookback=strat['lookback'],
@@ -237,15 +225,6 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-                                
-            elif strategy_id == '16_ranging_short_6Hutc':
-                signals = ranging_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ranges=strat['ranges'],
-                    live_trading=True
-                )
                 
             elif strategy_id == '17_flag_long_4H':
                 signals = flag_long(
@@ -337,13 +316,9 @@ def get_implemented_strategies() -> set:
     IMPORTANT: When adding a new strategy, add its ID here!
     """
     strategies = {
-        #'99_reversal_long_2m',
-        #'98_reversal_short_5m',
-        #'01_double_top_long_4H',
         '02_reversal_long_4H',
         '03_parity_long_4H',
         '04_reversal_short_4H',
-        #'05_parity_short_4H',
         '06_reversal_long_1H',
         '07_reversal_short_1H',
         '08_reversal_long_6Hutc',
@@ -352,7 +327,6 @@ def get_implemented_strategies() -> set:
         '11_parity_short_1H',
         '12_parity_long_6Hutc',
         '13_orderblocks_short_4H',
-        '16_ranging_short_6Hutc',
         '17_flag_long_4H',
         #'18_flag_long_1H',
         '19_flag_short_4H',

@@ -149,19 +149,6 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "16_ranging_short_6Hutc",
-        "n_symbols": 30,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [7,8,9,10,11],
-            "TOLERANCE": [5,10,15],
-            "RANGES": [30,35,40,45,50],
-            "TP_PCT": [2,3,4,5,6],
-            "SL_PCT": [7,8,9,10],
-        },
-    },
-    {
         "id": "17_flag_long_4H",
         "n_symbols": 9,
         "order_amount": 80,

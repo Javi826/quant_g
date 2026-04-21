@@ -114,15 +114,12 @@ COMMON_REQUIRED_PARAMS = [
 
 # Strategy-specific required parameters by strategy type
 STRATEGY_TYPE_REQUIRED_PARAMS = {
-    'double_top_long':   ['lookback', 'tolerance', 'trend_th'],
     'reversal_long':     ['lookback', 'tolerance', 'ma_period'],
     'reversal_short':    ['lookback', 'tolerance', 'ma_period'],
     'parity_long':       ['lookback', 'tolerance', 'ma_period'],
     'parity_short':      ['lookback', 'tolerance', 'ma_period'],
     'orderblocks_long':  ['lookback', 'tolerance', 'impulse'],
     'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'ranging_long':      ['lookback', 'tolerance', 'ranges'],
-    'ranging_short':     ['lookback', 'tolerance', 'ranges'],
     'flag_long':         ['lookback', 'impulse', 'flag', 'ma_period'],
     'flag_short':        ['lookback', 'impulse', 'flag', 'ma_period'],
 }
