@@ -541,7 +541,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
                  
     return df_portfolio, mi_series
 
-def report_montecarlo(df_portfolio, param_names, initial_balance):
+def report_montecarlo(df_portfolio, param_names, initial_balance, selection_percentile=None):
     import ast
     
     # -----------------------------
@@ -615,9 +615,11 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
             port_gain_pct          = (port_gain_abs / initial_balance) * 100
             port_net_gain_mean     = port_gain_abs.mean()
             port_net_gain_pct_mean = port_gain_pct.mean()
+            port_gain_pct_series   = port_gain_pct
         else:
-            port_net_gain_mean = np.nan
+            port_net_gain_mean     = np.nan
             port_net_gain_pct_mean = np.nan
+            port_gain_pct_series   = pd.Series(dtype=float)
 
         port_dd_mean        = port_dd.mean() if len(port_dd) > 0 else np.nan
         port_win_ratio_mean = port_win_ratio.mean() if len(port_win_ratio) > 0 else np.nan
@@ -627,6 +629,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance):
             **comb,
             "Net_Gain_m": port_net_gain_mean,
             "Net_Gain_pct_m": port_net_gain_pct_mean,
+            "Net_Gain_pct_pN": float(np.percentile(port_gain_pct_series, selection_percentile)) if selection_percentile is not None and len(port_gain_pct_series) > 0 else np.nan,
             "Win_Ratio_m": port_win_ratio_mean,
             "DD_m": port_dd_mean,
             "Sharpe_m": port_sharpe_mean,

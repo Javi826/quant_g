@@ -90,33 +90,36 @@ _best_params_results : dict = {}
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
+#DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2021-01_2022-01_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop_103"
+STRATEGIES_LOOP_NAME = "strategies_loop_005"
 STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = True
+UPDATE_OUTPUTS         = False
 
 #MONTECARLO
 #------------------------------------------------------------------------------
 N_PATHS_IS                = 100
-N_PATHS_OOS               = 1000
+N_PATHS_OOS               = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 N_SYMBOLS_MCIS            = 6
+MC_SELECTION_PERCENTILE   = 25  # None = mean | int = percentile e.g. 25, 50
 
 # Regime analysis params
 #------------------------------------------------------------------------------
 FORCE_DIRECTION_FILTER = True
-REGIME_MIN_TRADES      = 2
+REGIME_MIN_TRADES      = 10
 REGIME_LOOKBACK_BARS   = 180
 REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
@@ -126,13 +129,13 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # OOS - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 100
-R1_RSQUARED_ROUND1 = 0.8
+R1_NETGAIN_ROUND1  = 20
+R1_RSQUARED_ROUND1 = 0.9
 R1_PROBNEG_ROUND1  = 21
 
 # OOS - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 30
+R2A_NETGAIN_ROUND2  = 15
 R2A_RSQUARED_ROUND2 = 0.8
 
 # OOS - Validation thresholds — Round 2 path B
@@ -160,7 +163,7 @@ OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = 
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.69  # max allowed DD correlation between validated strategies
+CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated strategies
 
 # Strategy selection
 SELECTED_STRATEGIES = [
@@ -175,7 +178,7 @@ SELECTED_STRATEGIES = [
     "11_parity_short_1H",
     "12_parity_long_6Hutc",
     "13_orderblocks_short_4H",
-    #"16_ranging_short_6Hutc",
+    "16_ranging_short_6Hutc",
     "17_flag_long_4H",
     "19_flag_short_4H",
     "20_flag_short_1H",
@@ -274,8 +277,8 @@ def run_batch(strategy_config: dict) -> None:
 
     all_results  = [r for sublist in results_list for r in sublist]
     df_portfolio = pd.DataFrame(all_results)
-    df_summary, _, _ = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE)
-    best_params  = extract_best_params(df_summary, param_names, lists_for_grid)
+    df_summary, _, _ = report_montecarlo(df_portfolio=df_portfolio, param_names=param_names, initial_balance=INITIAL_BALANCE, selection_percentile=MC_SELECTION_PERCENTILE)
+    best_params = extract_best_params(df_summary, param_names, lists_for_grid, selection_percentile=MC_SELECTION_PERCENTILE)
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
     logger.info(f"STAGE 1  ── MC Best params         ── {params_str}")

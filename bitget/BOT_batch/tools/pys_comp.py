@@ -1,5 +1,5 @@
 """
-compare_strategies.py
+BOT_batch/tools/pys_comp.py
 
 Compares production strategies_E1.py against strategies_E1_from_csv.py
 and prints a field-by-field diff to console.
@@ -13,7 +13,7 @@ import importlib.util
 # PATHS
 # =============================================================================
 PRODUCTION_PATH = "/home/javi/projects/quant/quant_g/bitget/BOT_trading/config/strategies_E1.py"
-CANDIDATE_PATH = os.path.join(os.path.dirname(__file__), "strategies_E1_batch.py")
+CANDIDATE_PATH = "/home/javi/projects/quant/quant_g/bitget/BOT_batch/strategies_files/strategies_BT_batch.py"
 
 # =============================================================================
 # LOADER
