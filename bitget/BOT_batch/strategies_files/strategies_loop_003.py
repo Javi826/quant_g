@@ -98,7 +98,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "10_parity_long_1H",
-        "n_symbols": 6,
+        "n_symbols":8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -111,7 +111,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "11_parity_short_1H",
-        "n_symbols": 6,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -150,7 +150,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "17_flag_long_4H",
-        "n_symbols": 9,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],

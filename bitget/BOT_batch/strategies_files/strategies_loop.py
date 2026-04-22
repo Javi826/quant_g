@@ -10,7 +10,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [2],
             "TOLERANCE": [50],
             "MA_PERIOD": [25],
@@ -23,8 +23,8 @@ STRATEGIES_LOOP = [
         "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [100],
+            "SELL_AFTER": [50],
+            "LOOKBACK": [150],
             "TOLERANCE": [40],
             "MA_PERIOD": [10],
             "TP_PCT": [3],
@@ -36,7 +36,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [3],
             "TOLERANCE": [30],
             "MA_PERIOD": [10],
@@ -75,7 +75,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [2],
             "TOLERANCE": [5],
             "MA_PERIOD": [25],
@@ -88,9 +88,9 @@ STRATEGIES_LOOP = [
         "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [3],
-            "TOLERANCE": [50],
+            "SELL_AFTER": [50],
+            "LOOKBACK": [4],
+            "TOLERANCE": [40],
             "MA_PERIOD": [10],
             "TP_PCT": [4],
             "SL_PCT": [3],
@@ -98,12 +98,12 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "10_parity_long_1H",
-        "n_symbols": 6,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
             "LOOKBACK": [150],
-            "TOLERANCE": [6],
+            "TOLERANCE": [10],
             "MA_PERIOD": [10],
             "TP_PCT": [2],
             "SL_PCT": [4],
@@ -111,12 +111,12 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "11_parity_short_1H",
-        "n_symbols": 6,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [100],
-            "TOLERANCE": [4],
+            "TOLERANCE": [10],
             "MA_PERIOD": [10],
             "TP_PCT": [2],
             "SL_PCT": [3],
@@ -124,15 +124,15 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "12_parity_long_6Hutc",
-        "n_symbols": 10,
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [10],
+            "SELL_AFTER": [50],
+            "LOOKBACK": [50],
             "TOLERANCE": [10],
             "MA_PERIOD": [10],
             "TP_PCT": [4],
-            "SL_PCT": [2],
+            "SL_PCT": [3],
         },
     },
     {
@@ -140,7 +140,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [100],
             "TOLERANCE": [25],
             "IMPULSE": [0.08],
@@ -150,10 +150,10 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "17_flag_long_4H",
-        "n_symbols": 10,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [40],
             "MA_PERIOD": [10],
             "IMPULSE": [3],
@@ -167,7 +167,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [10],
             "MA_PERIOD": [10],
             "IMPULSE": [1],
@@ -181,7 +181,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [50],
             "LOOKBACK": [20],
             "MA_PERIOD": [10],
             "IMPULSE": [2],

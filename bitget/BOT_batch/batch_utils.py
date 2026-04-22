@@ -15,6 +15,7 @@ from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 from signals.add_signals_flag        import flag_long, flag_short
 from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
+
 logger = logging.getLogger("BOT_batch.batch_utils")
 SIGNAL_REGISTRY = {
     "parity_long":       {"fn": parity_long,       "params": ["lookback", "tolerance", "ma_period"]},
@@ -25,6 +26,7 @@ SIGNAL_REGISTRY = {
     "flag_short":        {"fn": flag_short,        "params": ["lookback", "impulse", "flag", "ma_period"]},
     "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
     "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
+
 }
 
 # =============================================================================
@@ -255,7 +257,7 @@ def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
             "active":              new_active,
             "direction":           new["direction"],
             "sell_after_ncandles": new.get("sell_after_ncandles", 0),
-            "order_amount":        new.get("order_amount", 200),
+            "order_amount":        new.get("order_amount", 240),
             "lookback":            new.get("lookback"),
             "tolerance":           new.get("tolerance"),
             "ma_period":           new.get("ma_period"),
@@ -1044,91 +1046,130 @@ def get_best_r2_combination(trade_logs, initial_balance, precomputed_metrics=Non
     
     return [(sid, named[sid]) for sid in best_combo]
 
-def decorrelate_by_dd(trade_logs_oos1, trade_logs_oos2, initial_balance, threshold=0.7, precomputed_metrics=None, trade_logs_oos3=None):
-    """
-    Greedy DD-correlation filter on validated strategies.
-    Combines OOS1 + OOS2 + OOS3 daily DD series per strategy.
-    Keeps the best NetGain strategy from each correlated pair.
-    """
+def _decorrelate(
+    trade_logs_oos1: list,
+    trade_logs_oos2: list,
+    initial_balance: float,
+    threshold: float,
+    precomputed_metrics: dict,
+    trade_logs_oos3: list,
+    series_fn,
+    label: str,
+) -> list:
     def _num(sid):
         for part in sid.split("_"):
             if part.isdigit():
                 return int(part)
         return 0
 
-    metrics = precomputed_metrics or {
+    metrics  = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
         for sid, df in trade_logs_oos1
     }
-
     oos1_map = {sid: df for sid, df in trade_logs_oos1}
     oos2_map = {sid: df for sid, df in trade_logs_oos2}
     oos3_map = {sid: df for sid, df in (trade_logs_oos3 or [])}
     all_sids = [sid for sid, _ in trade_logs_oos1]
 
-    def _dd_series(df, capital):
-            tl          = df.copy()
-            tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
-            daily       = tl.groupby("_date")["profit"].sum()
-            daily       = daily.groupby(level=0).sum()
-            date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-            daily = daily.reindex(date_range).ffill().fillna(0.0)
-            equity      = capital + daily.cumsum()
-            peak        = equity.cummax()
-            dd          = (equity - peak) / peak * 100
-            return dd
-    
-    dd_combined = {}
+    series_combined = {}
     for sid in all_sids:
         parts = []
         if sid in oos1_map:
-            parts.append(_dd_series(oos1_map[sid]
-                                    , initial_balance))
+            parts.append(series_fn(oos1_map[sid], initial_balance))
         if sid in oos2_map:
-            parts.append(_dd_series(oos2_map[sid], initial_balance))
+            parts.append(series_fn(oos2_map[sid], initial_balance))
         if sid in oos3_map:
-            parts.append(_dd_series(oos3_map[sid], initial_balance))
+            parts.append(series_fn(oos3_map[sid], initial_balance))
         if parts:
             combined = pd.concat(parts).sort_index()
-            dd_combined[sid] = combined.groupby(level=0).mean()
+            series_combined[sid] = combined.groupby(level=0).mean()
 
-    if len(dd_combined) < 2:
+    if len(series_combined) < 2:
         logger.info("  Not enough strategies for correlation analysis.")
         return trade_logs_oos1
 
-    num_map = {sid: f"{_num(sid):02d}" for sid in dd_combined}
-    dd_df   = pd.DataFrame({num_map[sid]: s for sid, s in dd_combined.items()}).fillna(0)
-    corr_mx = dd_df.corr().round(2)
+    num_map = {sid: f"{_num(sid):02d}" for sid in series_combined}
+    df_     = pd.DataFrame({num_map[sid]: s for sid, s in series_combined.items()}).fillna(0)
+    corr_mx = df_.corr().round(2)
     logger.info(f"\n{corr_mx.to_string()}")
 
     ranked    = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
     selected  = []
     discarded = []
-    lines2    = [f"\n  {'Rank':<6} {'Strategy':<30} {'NetGain%':>10} {'Action':<20} {'Reason'}"]
-    lines2.append(f"  {'─'*85}")
+    lines     = [f"\n  {'Rank':<6} {'Strategy':<30} {'NetGain%':>10} {'Action':<20} {'Reason'}"]
+    lines.append(f"  {'─'*85}")
 
     for sid in ranked:
-        ng          = metrics.get(sid, {}).get("Net_Gain_pct", 0)
-        num         = num_map.get(sid, sid)
-        corr_reason = ""
-        correlated  = False
+        ng         = metrics.get(sid, {}).get("Net_Gain_pct", 0)
+        num        = num_map.get(sid, sid)
+        correlated = False
+        reason     = ""
         for kept in selected:
             kept_num = num_map.get(kept, kept)
             val      = corr_mx.loc[num, kept_num] if num in corr_mx.index and kept_num in corr_mx.columns else 0.0
             if pd.notna(val) and val > threshold:
-                correlated  = True
-                corr_reason = f"corr={val:.2f} with {kept}"
+                correlated = True
+                reason     = f"corr={val:.2f} with {kept}"
                 discarded.append(sid)
                 break
         if correlated:
-            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'❌ DISCARDED':<20} {corr_reason}")
+            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'❌ DISCARDED':<20} {reason}")
         else:
             selected.append(sid)
-            lines2.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")
+            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")
 
-    lines2.append(f"  {'─'*85}")
-    #lines2.append(f"  Selected  : {[sid for sid in selected]}")
-    #lines2.append(f"  Discarded : {discarded}")
-    logger.info("\n".join(lines2))
+    lines.append(f"  {'─'*85}")
+    logger.info("\n".join(lines))
 
     return [(sid, oos1_map[sid]) for sid in selected if sid in oos1_map]
+
+
+def _dd_series(df: pd.DataFrame, capital: float) -> pd.Series:
+    tl          = df.copy()
+    tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+    daily       = tl.groupby("_date")["profit"].sum().groupby(level=0).sum()
+    date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+    daily       = daily.reindex(date_range).ffill().fillna(0.0)
+    equity      = capital + daily.cumsum()
+    peak        = equity.cummax()
+    return (equity - peak) / peak * 100
+
+
+def _profit_series(df: pd.DataFrame, capital: float) -> pd.Series:
+    tl          = df.copy()
+    tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+    daily       = tl.groupby("_date")["profit"].sum().groupby(level=0).sum()
+    date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+    return daily.reindex(date_range).fillna(0.0)
+
+
+def decorrelate_by_dd(
+    trade_logs_oos1: list,
+    trade_logs_oos2: list,
+    initial_balance: float,
+    threshold: float = 0.7,
+    precomputed_metrics: dict = None,
+    trade_logs_oos3: list = None,
+) -> list:
+    """Greedy DD-correlation filter. Keeps best NetGain from each correlated pair."""
+    return _decorrelate(
+        trade_logs_oos1, trade_logs_oos2, initial_balance,
+        threshold, precomputed_metrics, trade_logs_oos3,
+        series_fn=_dd_series, label="DD",
+    )
+
+
+def decorrelate_by_profit(
+    trade_logs_oos1: list,
+    trade_logs_oos2: list,
+    initial_balance: float,
+    threshold: float = 0.7,
+    precomputed_metrics: dict = None,
+    trade_logs_oos3: list = None,
+) -> list:
+    """Greedy profit-correlation filter. Keeps best NetGain from each correlated pair."""
+    return _decorrelate(
+        trade_logs_oos1, trade_logs_oos2, initial_balance,
+        threshold, precomputed_metrics, trade_logs_oos3,
+        series_fn=_profit_series, label="Profit",
+    )

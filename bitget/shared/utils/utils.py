@@ -88,7 +88,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 elif timeframe == "30m":
                     min_bars = 16000
                 elif timeframe == "4H":
-                    min_bars = 2040
+                    min_bars = 2080
                 elif timeframe == "6Hutc":
                     min_bars = 1440
                 elif timeframe == "12Hutc":

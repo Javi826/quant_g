@@ -13,8 +13,9 @@ import importlib.util
 # PATHS
 # =============================================================================
 PRODUCTION_PATH = "/home/javi/projects/quant/quant_g/bitget/BOT_trading/config/strategies_E1.py"
-CANDIDATE_PATH = "/home/javi/projects/quant/quant_g/bitget/BOT_batch/strategies_files/strategies_BT_batch.py"
-
+CANDIDATE_PATH  = "/home/javi/projects/quant/quant_g/bitget/BOT_batch/strategies_files/strategies_BT_batch.py"
+#CANDIDATE_PATH  = "/home/javi/projects/quant/quant_g/bitget/BOT_batch/strategies_E1/strategies_E1_batch.py"
+IGNORE_FIELDS   = {"order_amount", "order_amount_prod"}
 # =============================================================================
 # LOADER
 # =============================================================================
@@ -60,8 +61,10 @@ def compare(prod: dict[str, dict], cand: dict[str, dict]) -> bool:
         c = cand[sid]
         all_keys = set(p.keys()) | set(c.keys())
         field_diffs = []
-
+        IGNORE_FIELDS = {"order_amount", "order_amount_prod"}
         for key in sorted(all_keys):
+            if key in IGNORE_FIELDS:
+                continue
             p_val = p.get(key, "<missing>")
             c_val = c.get(key, "<missing>")
             if p_val != c_val:

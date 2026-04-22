@@ -49,7 +49,7 @@ from batch_utils import print_strategies_summary, print_update_status, print_por
 from batch_utils import save_drift_reference, save_strategies_e1, compare_and_generate_csv
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import get_best_r2_combination
-from batch_utils import decorrelate_by_dd
+from batch_utils import decorrelate_by_dd,decorrelate_by_profit
 from importlib import import_module
 from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
 
@@ -95,26 +95,27 @@ DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+#DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop_005"
+STRATEGIES_LOOP_NAME = "strategies_loop_103"
 STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
 RUN_BEST_COMBINATIONS  = False
-UPDATE_OUTPUTS         = False
+UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 100
-N_PATHS_OOS               = 2000
-FIX_SYMBOLS_MCIS_TRAINING = True
+N_PATHS_IS                = 1000
+N_PATHS_OOS               = 20000
 N_SYMBOLS_MCIS            = 6
-MC_SELECTION_PERCENTILE   = 1  # None = mean | int = percentile e.g. 25, 50
+FIX_SYMBOLS_MCIS_TRAINING = True
+MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
 # Regime analysis params
 #------------------------------------------------------------------------------
@@ -130,8 +131,8 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 # OOS - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1  = 20
-R1_RSQUARED_ROUND1 = 0.9
-R1_PROBNEG_ROUND1  = 21
+R1_RSQUARED_ROUND1 = 0.8
+R1_PROBNEG_ROUND1  = 31
 
 # OOS - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
@@ -203,6 +204,8 @@ def run_batch(strategy_config: dict) -> None:
         sell_after_ncandles: int
         param_grid       : dict  {PARAM_NAME: [values], ...}
     """
+        
+
     start_time = time.time()
 
     STRATEGY_ID       = strategy_config["id"]
@@ -217,7 +220,6 @@ def run_batch(strategy_config: dict) -> None:
     registry           = SIGNAL_REGISTRY[signal_key]
     signal_fn          = registry["fn"]
     signal_params_keys = registry["params"]
-
     param_names     = list(param_grid.keys())
     lists_for_grid  = [param_grid[k] for k in param_names]
     param_dict_list = [dict(zip(param_names, comb)) for comb in product(*lists_for_grid)]
@@ -906,7 +908,7 @@ def run_portfolio_analysis():
             print_best_combinations(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
 
     # -------------------------------------------------------------------------
-    # CORRELATION ANALYSIS — DD decorrelation on validated strategies
+    # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if validated_regime01:
         logger.info(f"\n{'─'*105}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*105}")
@@ -933,6 +935,26 @@ def run_portfolio_analysis():
                 data_folder=DATA_FOLDER_OOS,
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (DD filter)",
+            )
+            
+    if validated_regime01:
+        logger.info(f"\n{'─'*105}\n  CORRELATION ANALYSIS — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*105}")
+        survivors_profit = decorrelate_by_profit(
+            trade_logs_oos1     = validated_regime01,
+            trade_logs_oos2     = [],
+            trade_logs_oos3     = [],
+            initial_balance     = INITIAL_BALANCE,
+            threshold           = CORRELATION_DD_THRESHOLD,
+            precomputed_metrics = r01_metrics,
+        )
+        if survivors_profit:
+            print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
+            plot_portfolio_comparison(
+                trade_logs_baseline=survivors_profit,
+                trade_logs_regime01=survivors_profit,
+                data_folder=DATA_FOLDER_OOS,
+                initial_balance=INITIAL_BALANCE,
+                title="Portfolio — Decorrelated Validated (Profit filter)",
             )
 
 # =============================================================================
