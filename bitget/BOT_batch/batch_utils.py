@@ -1192,3 +1192,119 @@ def decorrelate_by_profit(
         threshold, precomputed_metrics, trade_logs_oos3,
         series_fn=_profit_series, label="Profit",
     )
+
+def print_robustness_table(
+    trade_logs_per_period: list[tuple[str, list[tuple[str, pd.DataFrame]]]],
+    initial_balance: float,
+) -> None:
+    """
+    Print a robustness table with one row per OOS period.
+    Each row shows combined portfolio metrics for validated strategies.
+
+    Args:
+        trade_logs_per_period : list of (period_label, trade_logs)
+                                e.g. [("OOS1", validated_regime01), ("OOS2", validated_oos2), ...]
+        initial_balance       : capital per strategy
+    """
+    def _weekly_returns(trade_logs, capital_per_strategy):
+        if not trade_logs:
+            return pd.Series(dtype=float)
+        all_tl = pd.concat(
+            [df for _, df in trade_logs], ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        total_capital = capital_per_strategy * len(trade_logs)
+        all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
+        daily = all_tl.groupby("_date")["profit"].sum()
+        date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily = daily.reindex(date_range, fill_value=0.0)
+        eq = total_capital + daily.cumsum()
+        eq_series = pd.Series(eq.values, index=date_range)
+        weekly = eq_series.resample("W").last().pct_change().dropna() * 100
+        return weekly
+
+    def _neg_streak_stats(weekly):
+        if len(weekly) == 0:
+            return np.nan, np.nan
+        streaks = []
+        current = 0
+        for val in weekly:
+            if val < 0:
+                current += 1
+            else:
+                if current > 0:
+                    streaks.append(current)
+                current = 0
+        if current > 0:
+            streaks.append(current)
+        if not streaks:
+            return 0.0, 0
+        return round(float(np.mean(streaks)), 2), int(np.max(streaks))
+
+    def _cvar(weekly, pct=10):
+        if len(weekly) == 0:
+            return np.nan
+        threshold = np.percentile(weekly, pct)
+        tail = weekly[weekly <= threshold]
+        return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
+
+    def _r2(trade_logs, capital_per_strategy):
+        if not trade_logs:
+            return np.nan
+        all_tl = pd.concat(
+            [df for _, df in trade_logs], ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        total_capital = capital_per_strategy * len(trade_logs)
+        eq = total_capital + all_tl["profit"].cumsum().values
+        X  = np.arange(len(eq)).reshape(-1, 1)
+        y  = eq.reshape(-1, 1)
+        from sklearn.linear_model import LinearRegression as _LR
+        return round(_LR().fit(X, y).score(X, y), 3)
+
+    rows = []
+    for label, trade_logs in trade_logs_per_period:
+        if not trade_logs:
+            continue
+
+        all_tl = pd.concat(
+            [df for _, df in trade_logs], ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        total_capital = initial_balance * len(trade_logs)
+
+        profits   = all_tl["profit"].values
+        eq        = total_capital + np.cumsum(profits)
+        net_gain  = round((eq[-1] - total_capital) / total_capital * 100, 2)
+        cm        = np.maximum.accumulate(eq)
+        max_dd    = round(float(((eq - cm) / cm * 100).min()), 2)
+        gains     = profits[profits > 0].sum()
+        losses    = -profits[profits < 0].sum()
+        pf        = round(float(gains / losses), 3) if losses > 0 else np.inf
+
+        weekly              = _weekly_returns(trade_logs, initial_balance)
+        cvar10              = _cvar(weekly, pct=10)
+        avg_neg, max_neg    = _neg_streak_stats(weekly)
+        r2                  = _r2(trade_logs, initial_balance)
+
+        rows.append({
+            "Period":       label,
+            "NetGain%":     net_gain,
+            "MaxDD%":       max_dd,
+            "R2":           r2,
+            "ProfitFactor": pf,
+            "CVaR10%":      cvar10,
+            "AvgNegStreak": avg_neg,
+            "MaxNegStreak": max_neg,
+        })
+
+    if not rows:
+        logger.info("  No data for robustness table.")
+        return
+
+    df = pd.DataFrame(rows)
+    lines = [
+        f"\n{'─'*90}",
+        f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
+        f"{'─'*90}",
+        df.to_string(index=False),
+        f"{'─'*90}",
+    ]
+    logger.info("\n".join(lines))

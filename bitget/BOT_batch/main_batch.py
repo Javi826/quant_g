@@ -44,6 +44,7 @@ from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
 from batch_utils import SIGNAL_REGISTRY
 from batch_utils import extract_best_params, select_universe
 from batch_utils import get_best_r2_combination
+from batch_utils import print_robustness_table
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import decorrelate_by_dd, decorrelate_by_profit
 from batch_utils import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
@@ -98,7 +99,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop_103"
+STRATEGIES_LOOP_NAME = "strategies_loop"
 STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
@@ -109,8 +110,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 100
-N_PATHS_OOS               = 2000
+N_PATHS_IS                = 1
+N_PATHS_OOS               = 2
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
@@ -127,13 +128,14 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # OOS - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 20
+R1_NETGAIN_ROUND1  = 60
 R1_RSQUARED_ROUND1 = 0.95
+
 R1_PROBNEG_ROUND1  = 31
 
 # OOS - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 20
+R2A_NETGAIN_ROUND2  = 60
 R2A_RSQUARED_ROUND2 = 0.95
 
 # OOS - Validation thresholds — Round 2 path B
@@ -156,6 +158,7 @@ OOS3_RUN_ANALYSIS     = True
 OOS3_FOR_VALIDATION   = True 
 
 # OOS2/3 symbol selection
+
 #------------------------------------------------------------------------------
 OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
@@ -169,16 +172,18 @@ SELECTED_STRATEGIES = [
     "03_parity_long_4H",
     "04_reversal_short_4H",
     "06_reversal_long_1H",
-    "07_reversal_short_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "10_parity_long_1H",
-    "11_parity_short_1H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "20_flag_short_1H",
+# =============================================================================
+#     "07_reversal_short_1H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "10_parity_long_1H",
+#     "11_parity_short_1H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -291,6 +296,7 @@ def run_batch(strategy_config: dict) -> None:
     ohlcv_data_is_regime = {sym: ohlcv_is[sym] for sym in symbols_oos_final if sym in ohlcv_is}
 
     ohlcv_arr_is_regime  = prepare_ohlcv_arrays(ohlcv_data_is_regime)
+
 
     ohlcv_arrays_is = {}
     for sym, arr in ohlcv_arr_is_regime.items():
@@ -502,7 +508,7 @@ def run_batch(strategy_config: dict) -> None:
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
 
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'✅' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
+        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'⭐' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
 
         approved = approved or approved_regime
 
@@ -517,7 +523,7 @@ def run_batch(strategy_config: dict) -> None:
         _verdict = "⭐ VALIDATED"
     elif approved and approved_regime:
         if round_path == "A":
-            _verdict = "✅ VALIDATED"
+            _verdict = "⭐ VALIDATED"
         else:
             _verdict = "🟢 VALIDATED"
 
@@ -850,6 +856,18 @@ def run_portfolio_analysis():
         print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
+        
+        
+    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2 if sid in validated_ids]    
+    validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3 if sid in validated_ids]
+    print_robustness_table(
+        trade_logs_per_period=[
+            ("OOS1", validated_regime01),
+            ("OOS2", validated_oos2),
+            ("OOS3", validated_oos3),
+        ],
+        initial_balance=INITIAL_BALANCE,
+    )
 
     if _trade_logs_baseline:
         plot_portfolio_comparison(
@@ -879,7 +897,6 @@ def run_portfolio_analysis():
             title="Best R² Combination — Validated Regime 0+1",
         )
 
-    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2 if sid in validated_ids]
     if validated_oos2:
         plot_portfolio_comparison(
             trade_logs_baseline=validated_oos2,
@@ -889,7 +906,6 @@ def run_portfolio_analysis():
             title="Portfolio OOS2 — Validated only",
         )
 
-    validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3 if sid in validated_ids]
     if validated_oos3:
         plot_portfolio_comparison(
             trade_logs_baseline=validated_oos3,
