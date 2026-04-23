@@ -21,6 +21,7 @@ from itertools import product
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
+from importlib import import_module
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -50,10 +51,9 @@ from batch_utils import save_drift_reference, save_strategies_e1, compare_and_ge
 from batch_utils import update_strategies_symbols, analyze_regime_is
 from batch_utils import get_best_r2_combination
 from batch_utils import decorrelate_by_dd,decorrelate_by_profit
-from importlib import import_module
+from batch_utils import SIGNAL_REGISTRY
 from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
 
-from batch_utils import SIGNAL_REGISTRY
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -90,7 +90,6 @@ _best_params_results : dict = {}
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-#DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2023-01_2025-04_IS")
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
@@ -101,12 +100,12 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 # LOOP
 #------------------------------------------------------------------------------
 STRATEGIES_LOOP_NAME = "strategies_loop_103"
-STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
+STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = True
+RUN_BEST_COMBINATIONS  = False
 UPDATE_OUTPUTS         = True
 
 #MONTECARLO
@@ -123,7 +122,6 @@ FORCE_DIRECTION_FILTER = True
 REGIME_MIN_TRADES      = 10
 REGIME_LOOKBACK_BARS   = 180
 REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
-
 # =============================================================================
 # VALIDATON CONFIGURATION
 # =============================================================================
