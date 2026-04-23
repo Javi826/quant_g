@@ -70,8 +70,8 @@ STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies
 STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), "strategies_E1")
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1.csv")
 STRATEGIES_E1_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
-SYMBOLS_LIVE_FOLDER        = os.path.join(os.path.dirname(__file__), "symbols_live")
-DRIFT_MONTECARLO_FOLDER    = os.path.join(os.path.dirname(__file__), "drift_montecarlo")
+SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
+DRIFT_MONTECARLO_FOLDER    = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_montecarlo")
 DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
 
 # Global accumulators
@@ -106,13 +106,13 @@ STRATEGIES_LOOP = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRA
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = False
+RUN_BEST_COMBINATIONS  = True
 UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1000
-N_PATHS_OOS               = 20000
+N_PATHS_IS                = 100
+N_PATHS_OOS               = 2000
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
