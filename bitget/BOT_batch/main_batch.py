@@ -99,7 +99,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop"
+STRATEGIES_LOOP_NAME = "strategies_loop_103"
 STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
@@ -110,8 +110,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS               = 2
+N_PATHS_IS                = 10000
+N_PATHS_OOS               = 2000
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
@@ -172,18 +172,16 @@ SELECTED_STRATEGIES = [
     "03_parity_long_4H",
     "04_reversal_short_4H",
     "06_reversal_long_1H",
-# =============================================================================
-#     "07_reversal_short_1H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "10_parity_long_1H",
-#     "11_parity_short_1H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-# =============================================================================
+    "07_reversal_short_1H",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "10_parity_long_1H",
+    "11_parity_short_1H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
 ]
 
 # =============================================================================
