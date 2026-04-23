@@ -368,17 +368,17 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
     Plot equity curves for a single strategy: baseline vs regime 0+1 vs BTC.
     """
     def _equity_pct(tl, t_start):
-        tl  = tl.sort_values("buy_time").reset_index(drop=True)
+        tl  = tl.sort_values("sell_time").reset_index(drop=True)
         eq  = initial_balance + tl["profit"].cumsum().values
         pct = (eq - initial_balance) / initial_balance * 100
         m   = compute_metrics(tl, capital=initial_balance, name="")
-        ts  = pd.to_datetime(tl["buy_time"]).values
+        ts  = pd.to_datetime(tl["sell_time"]).values
         ts  = np.concatenate([[np.datetime64(t_start)], ts])
         pct = np.concatenate([[0.0], pct])
         return ts, pct, m
 
-    t_start = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).min())
-    t_end   = pd.Timestamp(pd.to_datetime(trade_log_baseline["buy_time"]).max())
+    t_start = pd.Timestamp(pd.to_datetime(trade_log_baseline["sell_time"]).min())
+    t_end   = pd.Timestamp(pd.to_datetime(trade_log_baseline["sell_time"]).max())
 
     ts_base, eq_base, m_base = _equity_pct(trade_log_baseline, t_start)
     ts_r01,  eq_r01,  m_r01  = (

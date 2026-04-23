@@ -128,7 +128,7 @@ STRATEGIES = [
         "id": "09_reversal_short_6Hutc",
         "name": "reversal_short_6Hutc",
         "timeframe": "6Hutc",
-        "active": False,
+        "active": True,
         "direction": "short",
         "regime_trending_uptrend": 0.0,
         "regime_trending_dwtrend": 1.0,

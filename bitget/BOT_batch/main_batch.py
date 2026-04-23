@@ -461,8 +461,11 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 6 — Validation
     # -------------------------------------------------------------------------
     bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
+    #+
     equity_hist    = best_bt_row.get("sim_balance_history", None)
-    r2             = calc_r2_from_equity_hist(equity_hist)
+    eq_from_trades = INITIAL_BALANCE + trade_log.sort_values("sell_time")["profit"].cumsum().values
+    r2             = calc_r2_from_equity_hist({"balance": eq_from_trades.tolist()})
+
 
     path_grouped_oos  = df_portfolio_oos.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
     path_grouped_oos["Net_Gain_pct"] = (path_grouped_oos["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
@@ -480,7 +483,7 @@ def run_batch(strategy_config: dict) -> None:
     round_path      = ""
 
     if not approved and len(trade_log_regime) > 0:
-        df_filt     = trade_log_regime.sort_values("buy_time").reset_index(drop=True)
+        df_filt = trade_log_regime.sort_values("sell_time").reset_index(drop=True)
         equity_filt = INITIAL_BALANCE + df_filt["profit"].cumsum().values
         r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
         m_r2        = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
