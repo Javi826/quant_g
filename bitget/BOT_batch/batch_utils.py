@@ -926,7 +926,10 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     max_len = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    lines = [f"\n📊 ALL CURVES COMBINED — {label}\n", df_out.to_string(index=False)]
+    color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
+    color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
+    reset = "\033[0m" if color else ""
+    lines = [f"\n{color}{'─'*105}\n📊 ALL CURVES COMBINED — {label}\n{'─'*105}{reset}\n", df_out.to_string(index=False)]
     logger.info("\n".join(lines))
 
 
