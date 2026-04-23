@@ -900,7 +900,7 @@ def calc_r2_from_equity_hist(equity_hist):
 # =============================================================================
 def print_all_curves_table(trade_logs, label, initial_balance):
     """
-    Print a metrics table for all curves plus a combined row.
+    Print a metrics table for all curves plus long/short aggregate rows and a combined row.
     trade_logs: list of (strategy_id, trade_log_df)
     """
     named = {sid: df for sid, df in trade_logs}
@@ -908,15 +908,29 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     for sid, df in named.items():
         rows.append(compute_metrics(df, capital=initial_balance, name=sid))
 
+    # Aggregate longs and shorts
+    long_logs  = [(sid, df) for sid, df in named.items() if "_long_"  in sid]
+    short_logs = [(sid, df) for sid, df in named.items() if "_short_" in sid]
+
+    if long_logs:
+        long_tl  = pd.concat([df for _, df in long_logs], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+        long_cap = initial_balance * len(long_logs)
+        rows.append(compute_metrics(long_tl, capital=long_cap, name="── Longs"))
+
+    if short_logs:
+        short_tl  = pd.concat([df for _, df in short_logs], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+        short_cap = initial_balance * len(short_logs)
+        rows.append(compute_metrics(short_tl, capital=short_cap, name="── Shorts"))
+
     all_tl  = pd.concat(list(named.values()), ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
     all_cap = initial_balance * len(named)
     rows.append(compute_metrics(all_tl, capital=all_cap, name="── Combined"))
 
     df_out = pd.DataFrame(rows)
 
-    # Compute Profit_pctT excluding the Combined row
-    strategy_rows  = df_out[df_out["Curve"].str.strip() != "── Combined"]
-    total_profit   = strategy_rows["Profit_abs"].sum()
+    # Compute Profit_pctT excluding aggregate rows
+    strategy_rows = df_out[~df_out["Curve"].str.strip().str.startswith("──")]
+    total_profit  = strategy_rows["Profit_abs"].sum()
     df_out["Profit_pctT"] = df_out["Profit_abs"].apply(
         lambda x: round(x / total_profit * 100, 1) if total_profit != 0 else np.nan
     )
@@ -926,7 +940,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     max_len = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-    color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
+
     color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
     reset = "\033[0m" if color else ""
     lines = [f"\n{color}{'─'*105}\n📊 ALL CURVES COMBINED — {label}\n{'─'*105}{reset}\n", df_out.to_string(index=False)]

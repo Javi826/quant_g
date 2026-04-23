@@ -1,11 +1,11 @@
 #BOT_batch/main_batch.py
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_market_regime")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 
 import matplotlib
 SHOW_PLOTS = True
@@ -32,38 +32,38 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
-from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
-from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
-from utils.st_tools import get_n_obs, save_all_trades_to_csv
-from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from utils.analysis import report_montecarlo, report_backtesting
+from importlib import import_module
 from utils.utils import filter_symbols
-from regime_common import load_btc_for_timeframe,filter_signals_by_regime
-from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
-from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
-from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-from batch_utils import extract_best_params, select_universe
-from batch_utils import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
-from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
-from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
-from batch_utils import save_drift_reference, save_strategies_e1, compare_and_generate_csv
-from batch_utils import update_strategies_symbols, analyze_regime_is
-from batch_utils import get_best_r2_combination
-from batch_utils import decorrelate_by_dd,decorrelate_by_profit
+from utils.analysis import report_montecarlo, report_backtesting
+from regime_common import load_btc_for_timeframe, filter_signals_by_regime
+from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
+from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
+from utils.st_tools import get_n_obs, save_all_trades_to_csv
+from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
+from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
 from batch_utils import SIGNAL_REGISTRY
+from batch_utils import extract_best_params, select_universe
+from batch_utils import get_best_r2_combination
+from batch_utils import update_strategies_symbols, analyze_regime_is
+from batch_utils import decorrelate_by_dd, decorrelate_by_profit
+from batch_utils import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
+from batch_utils import save_drift_reference, save_strategies_e1, compare_and_generate_csv
+from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
+from batch_utils import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
+from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
+from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
+from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
 
 
 # =============================================================================
 # GLOBAL CONFIGURATION
 # =============================================================================
-DTYPE = np.float32
-
-logger = logging.getLogger("BOT_batch.main_batch")
-N_JOBS          = -1
-MY_SYMBOLS      = False
-SHOW_PROGRESS   = False
+DTYPE         = np.float32
+logger        = logging.getLogger("BOT_batch.main_batch")
+N_JOBS        = -1
+MY_SYMBOLS    = False
+SHOW_PROGRESS = False
 
 STRATEGIES_BT_BATCH_MODULE = "strategies_BT_batch"
 STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", "strategies_BT_batch.py")
@@ -96,7 +96,6 @@ DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
-
 # LOOP
 #------------------------------------------------------------------------------
 STRATEGIES_LOOP_NAME = "strategies_loop_103"
@@ -110,8 +109,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS               = 2
+N_PATHS_IS                = 10_000
+N_PATHS_OOS               = 2_000
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
