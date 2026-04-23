@@ -109,8 +109,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 10_000
-N_PATHS_OOS               = 2_000
+N_PATHS_IS                = 100
+N_PATHS_OOS               = 2000
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
@@ -128,13 +128,13 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 # OOS - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1  = 20
-R1_RSQUARED_ROUND1 = 0.8
+R1_RSQUARED_ROUND1 = 0.95
 R1_PROBNEG_ROUND1  = 31
 
 # OOS - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 15
-R2A_RSQUARED_ROUND2 = 0.8
+R2A_NETGAIN_ROUND2  = 20
+R2A_RSQUARED_ROUND2 = 0.95
 
 # OOS - Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
@@ -474,7 +474,7 @@ def run_batch(strategy_config: dict) -> None:
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S R1        ── {'🔴' if not approved else '🟢'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S R1        ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     approved_regime = False
     round_path      = ""
@@ -499,7 +499,7 @@ def run_batch(strategy_config: dict) -> None:
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
 
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
+        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'✅' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
 
         approved = approved or approved_regime
 
@@ -513,7 +513,10 @@ def run_batch(strategy_config: dict) -> None:
     if approved and not approved_regime:
         _verdict = "⭐ VALIDATED"
     elif approved and approved_regime:
-        _verdict = "🟢 VALIDATED"
+        if round_path == "A":
+            _verdict = "✅ VALIDATED"
+        else:
+            _verdict = "🟢 VALIDATED"
 
     _validation_results.append({
         "strategy_id":     STRATEGY_ID,
@@ -835,7 +838,7 @@ def run_portfolio_analysis():
         if _trade_logs_regime01:
             print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
 
-    validated_ids      = {v["strategy_id"] for v in _validation_results if v["verdict"] in ("🟢 VALIDATED", "⭐ VALIDATED")}
+    validated_ids = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
     validated_baseline = [(sid, df) for sid, df in _trade_logs_baseline if sid in validated_ids]
     validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 

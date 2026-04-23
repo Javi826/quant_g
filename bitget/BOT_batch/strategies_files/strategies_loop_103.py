@@ -85,7 +85,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "09_reversal_short_6Hutc",
-        "n_symbols": 30,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],

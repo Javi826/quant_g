@@ -697,6 +697,8 @@ def compute_metrics(trade_log, capital, name="Equity"):
     volatility    = daily_returns.std() * 100
     monthly       = eq_series.resample("ME").last().pct_change().dropna()
     consistency   = (monthly > 0).mean() * 100
+    weekly = eq_series.resample("W").last().pct_change().dropna()
+    weekly_pct = (weekly > 0).mean() * 100
 
     sharpe = (round(float(profits.mean() / profits.std() * np.sqrt(252)), 3)
               if profits.std() > 0 else np.nan)
@@ -723,8 +725,8 @@ def compute_metrics(trade_log, capital, name="Equity"):
         "Profit_abs":     profit_abs,
         "Sharpe":         sharpe,
         "Duration_d":     duration_d,
-        "Volatility_pct": round(float(volatility), 2),
-        "Monthly_pct":    round(float(consistency), 2),
+        "Weekly_pct": round(float(weekly_pct), 2),
+        #"Monthly_pct":    round(float(consistency), 2),
     }
 
 
@@ -935,7 +937,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
         lambda x: round(x / total_profit * 100, 1) if total_profit != 0 else np.nan
     )
 
-    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Volatility_pct", "Monthly_pct"]
+    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Weekly_pct"]
     df_out = df_out[cols].copy()
     max_len = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
