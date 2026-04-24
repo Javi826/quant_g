@@ -41,12 +41,8 @@ from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.st_tools import get_n_obs, save_all_trades_to_csv
 from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
-from batch_utils import SIGNAL_REGISTRY
-from batch_utils import extract_best_params, select_universe
-from batch_utils import get_best_r2_combination
-from batch_utils import print_robustness_table
-from batch_utils import update_strategies_symbols, analyze_regime_is
-from batch_utils import decorrelate_by_dd, decorrelate_by_profit
+from batch_utils import SIGNAL_REGISTRY,extract_best_params, select_universe,get_best_r2_combination,print_robustness_table
+from batch_utils import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit
 from batch_utils import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
 from batch_utils import save_drift_reference, save_strategies_e1, compare_and_generate_csv
 from batch_utils import print_strategies_summary, print_update_status, print_portfolio_metrics_table
@@ -110,8 +106,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 10000
-N_PATHS_OOS               = 2000
+N_PATHS_IS                = 2
+N_PATHS_OOS               = 2
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50

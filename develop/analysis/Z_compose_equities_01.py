@@ -1,4 +1,4 @@
-#devolop/analysis/compose_equities.py
+#devolop/analysis/Z_compose_equities_01.py
 
 import os
 import sys
@@ -17,7 +17,9 @@ FOLDER              = "../brief_equities"
 INITIAL_CAPITAL     = 800
 RESAMPLE_FREQ       = '1D'
 BARS_PER_DAY        = 1
-DATA_FOLDER         = "../../BOT_batch/data/crypto_2026_OOS"
+SPLIT_MODE   = "expanding"
+SPLIT_BASE   = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 
 # =============================================================================
 # DETAILED METRICS CONFIGURATION
@@ -284,12 +286,12 @@ if __name__ == "__main__":
     correlation_data = {}
     
     for file_name in os.listdir(FOLDER):
-        if not file_name.endswith(".xlsx"):
+        if not file_name.endswith(".csv"):
             continue
     
         path = os.path.join(FOLDER, file_name)
         try:
-            df = pd.read_excel(path)
+            df = pd.read_csv(path)
         except Exception as e:
             print(f"⚠️ Could not read {file_name}: {e}")
             continue

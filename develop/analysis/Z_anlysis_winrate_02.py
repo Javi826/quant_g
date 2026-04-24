@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#devolop/analysis/Z_analysis_winrate_02.py
 """
 Clean Trading Analysis - Weekly & Monthly Metrics
 Focused on actionable insights with readable tables
 """
-
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -13,27 +13,29 @@ import matplotlib.pyplot as plt
 
 def load_all_lab_trades():
     """Load and combine all lab trades, return trades and initial capital"""
-
-    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades_2022')
-    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
-
+    
+    lab_folder = Path(os.path.join(os.path.dirname(__file__), "..", "brief_trades"))
+    files = glob(str(lab_folder / 'all_trades_*.csv'))
+    
     if not files:
         print("⚠️  No trade files found in brief_trades/")
         return pd.DataFrame(), 0
-
+    
     all_trades = []
-
+    
     for filepath in files:
-        df = pd.read_excel(filepath)
+        df = pd.read_csv(filepath)
         df['sell_time'] = pd.to_datetime(df['sell_time'])
         all_trades.append(df)
-
+    
     combined = pd.concat(all_trades, ignore_index=True)
+    
+    # Calculate initial capital: 800 per strategy file
     initial_capital = 800 * len(files)
-
+    
     print(f"   Strategies found: {len(files)}")
     print(f"   Initial capital: {initial_capital:,.0f} ({len(files)} × 800)")
-
+    
     return combined.sort_values('sell_time').reset_index(drop=True), initial_capital
 
 

@@ -1,4 +1,4 @@
-#analysis/montecarlo_analysis.py
+#devolop/analysis/Z_compose_equities_02.py
 
 import os
 import sys
@@ -240,12 +240,12 @@ dfs = []
 file_names = []
 
 for file_name in os.listdir(FOLDER):
-    if not file_name.endswith(".xlsx"):
+    if not file_name.endswith(".csv"):
         continue
 
     path = os.path.join(FOLDER, file_name)
     try:
-        df = pd.read_excel(path)
+        df = pd.read_csv(path)
     except Exception as e:
         print(f"⚠️ Could not read {file_name}: {e}")
         continue

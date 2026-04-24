@@ -129,7 +129,6 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
         btc_df       = btc_family_df,
         buy_time     = trade['buy_time'],
         lookback     = LOOKBACK_BARS,
-        ma_period    = BTC_MA_PERIOD,
         hurst_window = HURST_WINDOW,
         er_window    = ER_WINDOW,
         atr_window   = ATR_WINDOW,

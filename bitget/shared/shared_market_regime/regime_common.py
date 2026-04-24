@@ -44,7 +44,7 @@ def load_btc_for_timeframe(ohlc_folder, timeframe, cache):
     return df
 
 
-def calc_all_metrics_at_time(btc_df, buy_time, lookback, ma_period, hurst_window, er_window, atr_window, pe_window, pe_order):
+def calc_all_metrics_at_time(btc_df, buy_time, lookback, hurst_window, er_window, atr_window, pe_window, pe_order):
     """Calculate metrics at specific time - no lookahead"""
     closed_candles = btc_df[btc_df['ts'] < buy_time]
     if len(closed_candles) < lookback:
@@ -62,14 +62,7 @@ def calc_all_metrics_at_time(btc_df, buy_time, lookback, ma_period, hurst_window
     }
     metrics = calc_all_metrics(ohlc, hurst_window=hurst_window, er_window=er_window, 
                                 atr_window=atr_window, pe_window=pe_window, pe_order=pe_order)
-    current_close = float(btc_df.iloc[idx]['close'])
-    if idx >= (ma_period - 1):
-        ma_data = btc_df.iloc[idx - (ma_period - 1):idx + 1]['close'].values
-        metrics['ma_50'] = float(np.mean(ma_data))
-        metrics['price_vs_ma_50'] = current_close / metrics['ma_50']
-    else:
-        metrics['ma_50'] = np.nan
-        metrics['price_vs_ma_50'] = np.nan
+
     return metrics
 
 
@@ -285,7 +278,6 @@ def filter_signals_by_regime(
             btc_df       = btc_tf_df,
             buy_time     = trade_time,
             lookback     = lookback_bars,
-            ma_period    = ma_period,
             hurst_window = hurst_window,
             er_window    = er_window,
             atr_window   = atr_window,
@@ -301,3 +293,59 @@ def filter_signals_by_regime(
             filtered[idx] = 0
 
     return filtered
+
+def build_metrics_cache(
+    btc_df: pd.DataFrame,
+    lookback: int,
+    hurst_window: int,
+    er_window: int,
+    atr_window: int,
+    pe_window: int,
+    pe_order: int,
+) -> dict:
+    """
+    Precalculate regime metrics for all BTC bars.
+    Returns a dict {timestamp: metrics} for fast lookup during signal filtering.
+    Key is the timestamp of the NEXT bar — metrics are valid for any trade
+    occurring at or after that timestamp (no lookahead).
+
+    Args:
+        btc_df       : BTC OHLC DataFrame with 'ts' column
+        lookback     : lookback bars for metric calculation
+        hurst_window : window for Hurst exponent
+        er_window    : window for Efficiency Ratio
+        atr_window   : window for ATR
+        pe_window    : window for Permutation Entropy
+        pe_order     : order for Permutation Entropy
+
+    Returns:
+        dict {pd.Timestamp: metrics_dict}
+    """
+    cache = {}
+    n = len(btc_df)
+
+    for i in range(lookback, n - 1):
+        ts_next   = pd.Timestamp(btc_df.iloc[i + 1]['ts'])
+        start_idx = max(0, i - lookback + 1)
+
+        if i - start_idx < 20:
+            continue
+
+        subset = btc_df.iloc[start_idx:i + 1]
+        ohlc = {
+            'open':  subset['open'].values.astype(np.float64),
+            'high':  subset['high'].values.astype(np.float64),
+            'low':   subset['low'].values.astype(np.float64),
+            'close': subset['close'].values.astype(np.float64),
+        }
+        metrics = calc_all_metrics(
+            ohlc,
+            hurst_window = hurst_window,
+            er_window    = er_window,
+            atr_window   = atr_window,
+            pe_window    = pe_window,
+            pe_order     = pe_order,
+        )
+        cache[ts_next] = metrics
+
+    return cache

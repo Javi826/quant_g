@@ -193,7 +193,7 @@ def save_all_trades_to_csv(grid_results_list, param_names, filename, strategy_na
         print("⚠️ No trades to be saved")
 
 
-def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_name, save_file=False, output_folder=None):
+def save_equity_to_csv(grid_results_list, folder, initial_capital, strategy_name, save_file=False, output_folder=None):
     
     if not save_file:
         return
@@ -219,10 +219,10 @@ def save_equity_to_excel(grid_results_list, folder, initial_capital, strategy_na
 
     if all_dfs:
         final_df  = pd.concat(all_dfs, ignore_index=True)
-        file_name = f"equity_{strategy_name}.xlsx"
+        file_name = f"equity_{strategy_name}.csv"
         save_path = os.path.join(folder, file_name)
-        final_df.to_excel(save_path, index=False)
-        print(f"📂 Excel saved at {save_path}")
+        final_df.to_csv(save_path, index=False)
+        print(f"📂 .csv saved at {save_path}")
     else:
         print("⚠️ No equity data to save")
 

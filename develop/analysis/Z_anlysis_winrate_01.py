@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
+#devolop/analysis/Z_analysis_winrate_01.py
 """
 Clean Trading Analysis - Weekly & Monthly Metrics
 Focused on actionable insights with readable tables
 """
-
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 def load_all_lab_trades():
     """Load and combine all lab trades, return trades and initial capital"""
     
-    lab_folder = Path('/home/javi/projects/quant/quant_g/bitget/development/brief_trades_2022')
-    files = glob(str(lab_folder / 'all_trades_*.xlsx'))
+    lab_folder = Path(os.path.join(os.path.dirname(__file__), "..", "brief_trades"))
+    files = glob(str(lab_folder / 'all_trades_*.csv'))
     
     if not files:
         print("⚠️  No trade files found in brief_trades/")
@@ -24,7 +24,7 @@ def load_all_lab_trades():
     all_trades = []
     
     for filepath in files:
-        df = pd.read_excel(filepath)
+        df = pd.read_csv(filepath)
         df['sell_time'] = pd.to_datetime(df['sell_time'])
         all_trades.append(df)
     
