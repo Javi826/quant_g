@@ -95,7 +95,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop_103"
+STRATEGIES_LOOP_NAME = "strategies_loop"
 STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
@@ -138,19 +138,19 @@ R2A_RSQUARED_ROUND2 = 0.95
 # OOS - Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
 R2B_NETGAIN_ROUND2 = 15
-R2B_MAX_DD_ROUND2  = 15
+R2B_MAX_DD_ROUND2  = 16
 
 # OOS2 - Validation thresholds — Round OOS2
 #------------------------------------------------------------------------------
 R3A_NETGAIN_ROUNDOOS2 = 15
-R3A_MAX_DD_ROUNDOOS2  = 15
+R3A_MAX_DD_ROUNDOOS2  = 16
 OOS2_RUN_ANALYSIS     = True  
 OOS2_FOR_VALIDATION   = True
 
 # OOS3 - Validation thresholds — Round OOS3
 #------------------------------------------------------------------------------
 R3B_NETGAIN_ROUNDOOS3 = 15
-R3B_MAX_DD_ROUNDOOS3  = 15
+R3B_MAX_DD_ROUNDOOS3  = 16
 OOS3_RUN_ANALYSIS     = True   
 OOS3_FOR_VALIDATION   = True 
 

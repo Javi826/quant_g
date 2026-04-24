@@ -8,58 +8,58 @@ boundaries for strategy health evaluation.
 DRIFT_REFERENCE = {
     '02_reversal_long_4H': {
         'p5_winrate':  50.7,
-        'p50_winrate': 51.0,
+        'p50_winrate': 50.7,
     },
     '03_parity_long_4H': {
-        'p5_winrate':  45.2,
-        'p50_winrate': 47.1,
+        'p5_winrate':  44.9,
+        'p50_winrate': 44.9,
     },
     '04_reversal_short_4H': {
-        'p5_winrate':  48.5,
-        'p50_winrate': 48.9,
+        'p5_winrate':  48.4,
+        'p50_winrate': 48.4,
     },
     '06_reversal_long_1H': {
-        'p5_winrate':  52.4,
-        'p50_winrate': 54.1,
+        'p5_winrate':  55.9,
+        'p50_winrate': 55.9,
     },
     '07_reversal_short_1H': {
-        'p5_winrate':  71.0,
-        'p50_winrate': 73.9,
+        'p5_winrate':  70.7,
+        'p50_winrate': 70.7,
     },
     '08_reversal_long_6Hutc': {
-        'p5_winrate':  46.5,
-        'p50_winrate': 51.5,
+        'p5_winrate':  57.0,
+        'p50_winrate': 57.0,
     },
     '09_reversal_short_6Hutc': {
-        'p5_winrate':  36.0,
-        'p50_winrate': 39.6,
+        'p5_winrate':  43.6,
+        'p50_winrate': 43.6,
     },
     '10_parity_long_1H': {
-        'p5_winrate':  72.0,
-        'p50_winrate': 73.4,
+        'p5_winrate':  75.0,
+        'p50_winrate': 75.0,
     },
     '11_parity_short_1H': {
-        'p5_winrate':  65.0,
-        'p50_winrate': 66.4,
+        'p5_winrate':  65.3,
+        'p50_winrate': 65.3,
     },
     '12_parity_long_6Hutc': {
-        'p5_winrate':  45.7,
-        'p50_winrate': 45.8,
+        'p5_winrate':  45.6,
+        'p50_winrate': 45.6,
     },
     '13_orderblocks_short_4H': {
-        'p5_winrate':  41.3,
-        'p50_winrate': 42.8,
+        'p5_winrate':  41.1,
+        'p50_winrate': 41.1,
     },
     '17_flag_long_4H': {
-        'p5_winrate':  46.6,
-        'p50_winrate': 49.1,
+        'p5_winrate':  51.9,
+        'p50_winrate': 51.9,
     },
     '19_flag_short_4H': {
-        'p5_winrate':  58.2,
-        'p50_winrate': 63.2,
+        'p5_winrate':  68.6,
+        'p50_winrate': 68.6,
     },
     '20_flag_short_1H': {
-        'p5_winrate':  65.7,
-        'p50_winrate': 68.8,
+        'p5_winrate':  65.4,
+        'p50_winrate': 65.4,
     },
 }

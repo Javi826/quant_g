@@ -636,7 +636,7 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
     with open(output_path, "w") as f:
         f.write("\n".join(e1_lines) + "\n")
  
-    logger.info(f"✅ strategies_E1_batch.py generated → {output_path}")
+    logger.info(f"\n{'─'*105}\n  ✅ strategies_E1_batch.py generated → {output_path}\n{'─'*105}")
  
 
 
@@ -946,6 +946,16 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     max_len = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+    # Insert separator row before aggregate rows
+    agg_mask = df_out["Curve"].str.strip().str.startswith("──")
+    if agg_mask.any():
+        agg_idx = agg_mask.idxmax()
+        sep_row = pd.DataFrame(
+            {col: ["─" * max(len(str(df_out[col].iloc[0])), 9)] for col in cols},
+        )
+        sep_row["Curve"] = "─" * max_len
+        df_out = pd.concat([df_out.iloc[:agg_idx], sep_row, df_out.iloc[agg_idx:]], ignore_index=True)
 
     color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
     reset = "\033[0m" if color else ""
@@ -1305,10 +1315,10 @@ def print_robustness_table(
 
     df = pd.DataFrame(rows)
     lines = [
-        f"\n{'─'*90}",
+        f"\n\033[94m{'─'*105}",
         f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
-        f"{'─'*90}",
+        f"{'─'*105}\033[0m",
         df.to_string(index=False),
-        f"{'─'*90}",
+        f"{'─'*105}",
     ]
     logger.info("\n".join(lines))
