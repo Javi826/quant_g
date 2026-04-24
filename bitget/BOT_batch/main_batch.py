@@ -88,14 +88,14 @@ _best_params_results : dict = {}
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
-DATA_FOLDER_OOS  = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop"
+STRATEGIES_LOOP_NAME = "strategies_loop_103"
 STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
@@ -106,8 +106,8 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1000
-N_PATHS_OOS               = 1
+N_PATHS_IS                = 10000
+N_PATHS_OOS1              = 2
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
@@ -155,7 +155,6 @@ OOS3_RUN_ANALYSIS     = True
 OOS3_FOR_VALIDATION   = True 
 
 # OOS2/3 symbol selection
-
 #------------------------------------------------------------------------------
 OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
@@ -229,7 +228,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos = select_universe(
         data_folder_is=DATA_FOLDER_IS,
-        data_folder_oos=DATA_FOLDER_OOS,
+        data_folder_oos=DATA_FOLDER_OOS1,
         timeframe=TIMEFRAME,
         n_symbols=N_SYMBOLS,
         min_price=MIN_PRICE,
@@ -356,11 +355,11 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 3  ── Backtest OOS Baseline  ── {len(symbols_oos_final)} symbols")
 
-    ohlcv_data_oos = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
-    ohlcv_arr_oos  = prepare_ohlcv_arrays(ohlcv_data_oos)
+    ohlcv_data_oos1 = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
+    ohlcv_arr_oos1  = prepare_ohlcv_arrays(ohlcv_data_oos1)
 
     ohlcv_arrays_oos_baseline = {}
-    for sym, arr in ohlcv_arr_oos.items():
+    for sym, arr in ohlcv_arr_oos1.items():
         signals = signal_fn(arr, **bt_signal_params, live_trading=False)
         ohlcv_arrays_oos_baseline[sym] = {**arr, "signal": signals}
 
@@ -377,7 +376,7 @@ def run_batch(strategy_config: dict) -> None:
 
     _, _ = report_backtesting(
         df=oos_df, parameters=param_names,
-        data_folder=DATA_FOLDER_OOS, initial_capital=INITIAL_BALANCE,
+        data_folder=DATA_FOLDER_OOS1, initial_capital=INITIAL_BALANCE,
         strategy_id=STRATEGY_ID,
     )
 
@@ -402,8 +401,8 @@ def run_batch(strategy_config: dict) -> None:
     logger.info(f"STAGE 4  ── Backtest OOS Regime    ── bins: {bins_to_filter if bins_to_filter else 'none'}")
 
     btc_cache_oos = {}
-    btc_1d_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS, '1Dutc', btc_cache_oos)
-    btc_tf_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS, TIMEFRAME, btc_cache_oos) \
+    btc_1d_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS1, '1Dutc', btc_cache_oos)
+    btc_tf_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS1, TIMEFRAME, btc_cache_oos) \
                     if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos
 
     metrics_cache_oos = build_metrics_cache(
@@ -417,7 +416,7 @@ def run_batch(strategy_config: dict) -> None:
     )
 
     ohlcv_arrays_oos_regime = {}
-    for sym, arr in ohlcv_arr_oos.items():
+    for sym, arr in ohlcv_arr_oos1.items():
         signals = signal_fn(arr, **bt_signal_params, live_trading=False)
         if bins_to_filter:
             signals = filter_signals_by_regime(
@@ -470,18 +469,18 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 5 — Monte Carlo OOS
     # -------------------------------------------------------------------------
-    logger.info(f"STAGE 5  ── Monte Carlo OOS        ── {N_PATHS_OOS} paths")
+    logger.info(f"STAGE 5  ── Monte Carlo OOS        ── {N_PATHS_OOS1} paths")
 
     n_obs_oos        = get_n_obs(TIMEFRAME)
     paths_oos        = generate_paths_for_all_symbols_functional(
-        ohlcv_data_oos, n_paths=N_PATHS_OOS, n_obs=n_obs_oos, raw_columns=[],
+        ohlcv_data_oos1, n_paths=N_PATHS_OOS1, n_obs=n_obs_oos, raw_columns=[],
     )
     best_params_list = [best_params]
 
-    with (tqdm_joblib(tqdm(total=N_PATHS_OOS, desc="🔄 Evaluating MC OOS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
+    with (tqdm_joblib(tqdm(total=N_PATHS_OOS1, desc="🔄 Evaluating MC OOS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
         results_oos = Parallel(n_jobs=N_JOBS)(
             delayed(_process_path)(i, paths_oos, best_params_list)
-            for i in range(N_PATHS_OOS)
+            for i in range(N_PATHS_OOS1)
         )
 
     all_results_oos  = [r for sublist in results_oos for r in sublist]
@@ -837,7 +836,7 @@ def run_batch(strategy_config: dict) -> None:
         strategy_id=STRATEGY_ID,
         trade_log_baseline=trade_log,
         trade_log_r01=trade_log_regime if len(trade_log_regime) > 0 else None,
-        data_folder=DATA_FOLDER_OOS,
+        data_folder=DATA_FOLDER_OOS1,
         initial_balance=INITIAL_BALANCE,
     )
 
@@ -923,7 +922,7 @@ def run_portfolio_analysis():
         plot_portfolio_comparison(
             trade_logs_baseline=_trade_logs_baseline,
             trade_logs_regime01=_trade_logs_regime01,
-            data_folder=DATA_FOLDER_OOS,
+            data_folder=DATA_FOLDER_OOS1,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio — All strategies",
         )
@@ -932,7 +931,7 @@ def run_portfolio_analysis():
         plot_portfolio_comparison(
             trade_logs_baseline=validated_baseline,
             trade_logs_regime01=validated_regime01,
-            data_folder=DATA_FOLDER_OOS,
+            data_folder=DATA_FOLDER_OOS1,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio — Validated only",
         )
@@ -942,7 +941,7 @@ def run_portfolio_analysis():
         plot_portfolio_comparison(
             trade_logs_baseline=best_r2_logs,
             trade_logs_regime01=best_r2_logs,
-            data_folder=DATA_FOLDER_OOS,
+            data_folder=DATA_FOLDER_OOS1,
             initial_balance=INITIAL_BALANCE,
             title="Best R² Combination — Validated Regime 0+1",
         )
@@ -1001,7 +1000,7 @@ def run_portfolio_analysis():
             plot_portfolio_comparison(
                 trade_logs_baseline=survivors,
                 trade_logs_regime01=survivors,
-                data_folder=DATA_FOLDER_OOS,
+                data_folder=DATA_FOLDER_OOS1,
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (DD filter)",
             )
@@ -1021,7 +1020,7 @@ def run_portfolio_analysis():
             plot_portfolio_comparison(
                 trade_logs_baseline=survivors_profit,
                 trade_logs_regime01=survivors_profit,
-                data_folder=DATA_FOLDER_OOS,
+                data_folder=DATA_FOLDER_OOS1,
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (Profit filter)",
             )
@@ -1050,7 +1049,7 @@ if __name__ == "__main__":
     logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
-    logger.info(f"  Data OOS         : 🟢 {DATA_FOLDER_OOS}")
+    logger.info(f"  Data OOS         : 🟢 {DATA_FOLDER_OOS1}")
     logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
     logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
