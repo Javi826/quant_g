@@ -90,7 +90,8 @@ def df_to_arrays_live(df: pd.DataFrame) -> dict:
 def load_final_symbols(
     all_symbols: list,
     strategy: str = "_",
-    timeframe: str = "4H"
+    timeframe: str = "4H",
+    account_number: str = None
 ) -> list:
     """
     Load filtered symbols for a specific strategy and timeframe.
@@ -110,7 +111,7 @@ def load_final_symbols(
         FileNotFoundError: If symbol file doesn't exist
         ValueError: If file is empty or invalid
     """
-    folder = os.path.join(os.path.dirname(__file__), "..", "symbols_live")
+    folder = os.path.join(os.path.dirname(__file__), "..", "symbols_live", account_number)
     folder = os.path.abspath(folder)
     path_live = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.csv")
     

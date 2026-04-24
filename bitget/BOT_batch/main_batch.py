@@ -95,7 +95,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 
 # LOOP
 #------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop_103"
+STRATEGIES_LOOP_NAME = "strategies_loop"
 STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 
 # BATCH
@@ -106,7 +106,7 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 10000
+N_PATHS_IS                = 1
 N_PATHS_OOS1              = 2
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
@@ -166,17 +166,17 @@ CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated 
 SELECTED_STRATEGIES = [
     "02_reversal_long_4H",
     "03_parity_long_4H",
-    "04_reversal_short_4H",
+    #"04_reversal_short_4H",
     "06_reversal_long_1H",
     "07_reversal_short_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
+    #"08_reversal_long_6Hutc",
+    #"09_reversal_short_6Hutc",
     "10_parity_long_1H",
     "11_parity_short_1H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
+    #"12_parity_long_6Hutc",
+    #"13_orderblocks_short_4H",
+    #"17_flag_long_4H",
+    #"19_flag_short_4H",
     "20_flag_short_1H",
 ]
 
@@ -1049,7 +1049,7 @@ if __name__ == "__main__":
     logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
-    logger.info(f"  Data OOS         : 🟢 {DATA_FOLDER_OOS1}")
+    logger.info(f"  Data OOS1        : 🟢 {DATA_FOLDER_OOS1}")
     logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
     logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")

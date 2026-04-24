@@ -356,7 +356,8 @@ class BotOrchestrator:
             self.final_by_strat[strat['id']] = load_final_symbols(
                 self.all_symbols,
                 strategy=strat['id'],
-                timeframe=strat['timeframe']
+                timeframe=strat['timeframe'],
+                account_number=self.account_number
             )
             self.logger.debug(
                 f"{strat['id']:<24} : {len(self.final_by_strat[strat['id']]):>2} symbols"
