@@ -6,10 +6,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-from regime_common import load_btc_for_timeframe, calc_all_metrics_at_time
-from regime_common import classify_trade_by_family, get_btc_macro_direction
+from shared_market_regime.regime_common import load_btc_for_timeframe, calc_all_metrics_at_time,calculate_max_dd_pct
+from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction
 from backtesters.ZX_compute_BT import INITIAL_BALANCE
-from regime_common import calculate_max_dd_pct
 
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -58,12 +57,13 @@ def analyze_regime_is(
     short_th: float = 1.0,
     strategy_direction: str = 'long',
     force_direction_filter: bool = False,
+    metrics_cache: dict = None,
 ) -> set:
     """
     Analyze regime on IS trades to determine bins to filter for OOS.
     Evaluates all 6 bins (3 families x 2 directions).
     Flags a bin if trades >= regime_min_trades and total profit < 0.
- 
+
     Args:
         trade_log_is      : IS trades DataFrame with 'buy_time' and 'profit' columns
         timeframe         : strategy timeframe e.g. '4H', '1H', '6Hutc'
@@ -80,7 +80,10 @@ def analyze_regime_is(
         ma_period         : MA period for macro direction
         long_th           : multiplier threshold for uptrend
         short_th          : multiplier threshold for dwtrend
- 
+        strategy_direction: 'long' | 'short'
+        force_direction_filter: if True, force filter by direction regardless of profit
+        metrics_cache     : optional precomputed {timestamp: metrics} dict from build_metrics_cache
+
     Returns:
         bins_to_filter : set of bin keys to block e.g. {'trending_dwtrend', 'ranging_uptrend'}
     """
@@ -88,18 +91,19 @@ def analyze_regime_is(
     btc_1d_df = load_btc_for_timeframe(data_folder_is, '1Dutc', btc_cache)
     btc_tf_df = load_btc_for_timeframe(data_folder_is, timeframe, btc_cache) \
                 if family_source == 'strategy' else btc_1d_df
- 
+
     directions = []
     families_  = []
-    
+
     # DEBUG no-lookahead check — remove after validation
 # =============================================================================
 #     first_trade = trade_log_is.iloc[0]
 #     closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
 #     closed_tf = btc_tf_df[btc_tf_df['ts'] < first_trade['buy_time']]
 #     logger.info(f"DEBUG lookahead | buy_time={first_trade['buy_time']} | last 1D bar={closed_1d.iloc[-1]['ts']} | last {timeframe} bar={closed_tf.iloc[-1]['ts']}")
-#      
+#
 # =============================================================================
+
     for _, trade in trade_log_is.iterrows():
         direction = get_btc_macro_direction(
             btc_1d_df  = btc_1d_df,
@@ -108,31 +112,36 @@ def analyze_regime_is(
             long_th    = long_th,
             short_th   = short_th,
         )
-        metrics = calc_all_metrics_at_time(
-            btc_df       = btc_tf_df,
-            buy_time     = trade['buy_time'],
-            lookback     = regime_lookback,
-            hurst_window = hurst_window,
-            er_window    = er_window,
-            atr_window   = atr_window,
-            pe_window    = pe_window,
-            pe_order     = pe_order,
-        )
+
+        if metrics_cache is not None:
+            metrics = metrics_cache.get(pd.Timestamp(trade['buy_time']))
+        else:
+            metrics = calc_all_metrics_at_time(
+                btc_df       = btc_tf_df,
+                buy_time     = trade['buy_time'],
+                lookback     = regime_lookback,
+                hurst_window = hurst_window,
+                er_window    = er_window,
+                atr_window   = atr_window,
+                pe_window    = pe_window,
+                pe_order     = pe_order,
+            )
+
         family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
         directions.append(direction)
         families_.append(family)
- 
+
     df = trade_log_is.copy()
     df['direction'] = directions
     df['family']    = families_
- 
+
     df_valid = df[
         (df['family'] != 'unknown') &
         (df['direction'].isin(['uptrend', 'dwtrend']))
     ].copy()
- 
+
     bins_to_filter = set()
- 
+
     for family in ['trending', 'ranging', 'volatile']:
         for direction in ['uptrend', 'dwtrend']:
             subset = df_valid[(df_valid['family'] == family) & (df_valid['direction'] == direction)]
@@ -140,19 +149,19 @@ def analyze_regime_is(
             profit = subset['profit'].sum() if n > 0 else 0.0
             if n >= regime_min_trades and profit < 0:
                 bins_to_filter.add(f"{family}_{direction}")
- 
+
     n_total    = len(trade_log_is)
     n_valid    = len(df_valid)
     n_filtered = df_valid[
         df_valid.apply(lambda r: f"{r['family']}_{r['direction']}" in bins_to_filter, axis=1)
     ].shape[0]
     pct_remain = round((n_valid - n_filtered) / n_valid * 100, 1) if n_valid > 0 else 0.0
- 
+
     logger.info(
         f"STAGE 2  ── Regime IS Analysis     ── "
         f"total={n_total} | remaining={pct_remain}%"
     )
-    
+
     if logger.isEnabledFor(logging.DEBUG):
         lines = []
         lines.append(f"\n  {'BIN':<30} {'CONF':>5} {'TRADES':>8} {'PROFIT':>12} {'WIN%':>8} {'DD%':>8} {'FILTER':>8}")
@@ -171,12 +180,12 @@ def analyze_regime_is(
                 lines.append(f"  {bin_key:<30} {conf:>5} {n:>8} {profit:>12.2f} {wr:>7.1f}% {dd:>7.2f}% {flag}")
         lines.append("  " + "-" * 88)
         logger.debug("\n".join(lines))
-    
+
     if force_direction_filter:
         forced = 'dwtrend' if strategy_direction == 'long' else 'uptrend'
         for fam in ['trending', 'ranging', 'volatile']:
             bins_to_filter.add(f"{fam}_{forced}")
- 
+
     return bins_to_filter
 
 def _fmt_py_val(val):

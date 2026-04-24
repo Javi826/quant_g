@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_batch/main_batch.py', 'bitget/data_pipeline/main_data.py', 'develop/Z_grid/G_grid_ranging.py', 'develop/Z_WFO/W_WFO_orderblocks.py']
+recent_files = ['bitget/BOT_batch/main_batch.py', 'bitget/BOT_batch/utils_batch.py']
 
 [main]
 version = 0.2.0

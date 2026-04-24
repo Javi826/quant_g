@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from regime_metrics import calc_all_metrics
+from shared_market_regime.regime_metrics import calc_all_metrics
 
 
 def extract_timeframe(df):
@@ -232,6 +232,7 @@ def filter_signals_by_regime(
     atr_window: int = 14,
     pe_window: int = 50,
     pe_order: int = 3,
+    metrics_cache: dict = None,
 ) -> np.ndarray:
     """
     Filters signal array by market regime — sets signal to 0 where bin is blocked.
@@ -253,6 +254,7 @@ def filter_signals_by_regime(
         atr_window     : window for ATR
         pe_window      : window for Permutation Entropy
         pe_order       : order for Permutation Entropy
+        metrics_cache  : optional precomputed {timestamp: metrics} dict from build_metrics_cache
 
     Returns:
         Filtered signals array (same shape, 0 where bin is blocked)
@@ -274,16 +276,20 @@ def filter_signals_by_regime(
             short_th   = short_th,
         )
 
-        metrics = calc_all_metrics_at_time(
-            btc_df       = btc_tf_df,
-            buy_time     = trade_time,
-            lookback     = lookback_bars,
-            hurst_window = hurst_window,
-            er_window    = er_window,
-            atr_window   = atr_window,
-            pe_window    = pe_window,
-            pe_order     = pe_order,
-        )
+        if metrics_cache is not None:
+            metrics = metrics_cache.get(trade_time)
+        else:
+            metrics = calc_all_metrics_at_time(
+                btc_df       = btc_tf_df,
+                buy_time     = trade_time,
+                lookback     = lookback_bars,
+                hurst_window = hurst_window,
+                er_window    = er_window,
+                atr_window   = atr_window,
+                pe_window    = pe_window,
+                pe_order     = pe_order,
+            )
+
         family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
 
         if family == 'unknown':
