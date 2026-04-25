@@ -633,7 +633,7 @@ def save_strategies_pr(strategies_batch_path, output_path, validation_results, b
     with open(output_path, "w") as f:
         f.write("\n".join(pr_lines) + "\n")
  
-    logger.info(f"\n{'─'*105}\n  ✅ strategies_NN_batch.py generated → {output_path}\n{'─'*105}")
+    logger.info(f"\n{'─'*110}\n  ✅ strategies_NN_batch.py generated → {output_path}\n{'─'*110}")
  
 
 
@@ -747,18 +747,18 @@ def print_strategies_summary(validation_results):
     if not validation_results:
         return
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  STRATEGIES SUMMARY")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-    lines.append(f"  {'-'*105}")
+    lines.append(f"  {'-'*110}")
     for v in validation_results:
         lines.append(
             f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
-    lines.append(f" {'─'*105}")
+    lines.append(f" {'─'*110}")
     logger.info("\n".join(lines))
 
 
@@ -804,9 +804,9 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     # Table 1 — Active
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  ACTIVE")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Strategy':<25} {'Status':<16} {'Changes':<35}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
@@ -819,9 +819,9 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     # Table 2 — Params
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  PARAMS")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Strategy':<25} {'Changes':<50}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
@@ -834,9 +834,9 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     # Table 3 — Market Regime
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  MARKET REGIME")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Strategy':<25} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
@@ -847,16 +847,16 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
         lines.append(
             f"  {sid:<25} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
         )
-    lines.append(f"  {'─'*105}")
+    lines.append(f"  {'─'*110}")
     logger.info("\n".join(lines))
 
     # -------------------------------------------------------------------------
     # Table 4 — Symbols
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  SYMBOLS")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Strategy':<25} {'Status':<16}")
     lines.append(f"  {'-'*103}")
     for v in validation_results:
@@ -956,7 +956,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
 
     color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
     reset = "\033[0m" if color else ""
-    lines = [f"\n{color}{'─'*105}\n📊 ALL CURVES COMBINED — {label}\n{'─'*105}{reset}\n", df_out.to_string(index=False)]
+    lines = [f"\n{color}{'─'*110}\n📊 ALL CURVES COMBINED — {label}\n{'─'*110}{reset}\n", df_out.to_string(index=False)]
     logger.info("\n".join(lines))
 
 
@@ -1010,9 +1010,9 @@ def print_best_combinations(trade_logs, label, initial_balance, precomputed_metr
         ("💰 ProfitFactor", best_pf),
     ]
     lines = []
-    lines.append(f"\n{'─'*105}")
+    lines.append(f"\n{'─'*110}")
     lines.append(f"  BEST COMBINATIONS — {label}")
-    lines.append(f"{'─'*105}")
+    lines.append(f"{'─'*110}")
     lines.append(f"  {'Metric':<16} {'Combo':<20} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
     lines.append(f"  {'-'*103}")
     for lbl, row in rows:
@@ -1312,10 +1312,10 @@ def print_robustness_table(
 
     df = pd.DataFrame(rows)
     lines = [
-        f"\n\033[94m{'─'*105}",
+        f"\n\033[94m{'─'*110}",
         f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
-        f"{'─'*105}\033[0m",
+        f"{'─'*110}\033[0m",
         df.to_string(index=False),
-        f"{'─'*105}",
+        f"{'─'*110}",
     ]
     logger.info("\n".join(lines))

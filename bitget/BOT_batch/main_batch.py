@@ -73,11 +73,11 @@ SHOW_PROGRESS = False
 
 # RUN + MC + THs
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME   = "E1"  
+STRATEGIES_SET_NAME   = "00"  
 STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS            = 10000
-N_SYMBOLS_MCIS        = 3
-OOS_NETGAIN_TH        = 20
+N_PATHS_IS            = 1000
+N_SYMBOLS_MCIS        = 6
+OOS_NETGAIN_TH        = 15
 OOS_MAX_DD_TH         = 16
 
 # FILES
@@ -111,7 +111,7 @@ RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_OOS1 = 2
+N_PATHS_OOS1              = 2
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
@@ -169,19 +169,17 @@ SELECTED_STRATEGIES = [
     "02_reversal_long_4H",
     "03_parity_long_4H",
     "04_reversal_short_4H",
-# =============================================================================
-#     "06_reversal_long_1H",
-#     "07_reversal_short_1H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "10_parity_long_1H",
-#     "11_parity_short_1H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-# =============================================================================
+    "06_reversal_long_1H",
+    "07_reversal_short_1H",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "10_parity_long_1H",
+    "11_parity_short_1H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
 ]
 
 # =============================================================================
@@ -895,7 +893,7 @@ def run_portfolio_analysis():
     print_strategies_summary(_validation_results)
 
     if _trade_logs_baseline:
-        logger.info(f"\n{'─'*105}\n  PORTFOLIO ANALYSIS\n{'─'*105}")
+        logger.info(f"\n{'─'*110}\n  PORTFOLIO ANALYSIS\n{'─'*110}")
         print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
         if _trade_logs_regime01:
             print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
@@ -905,7 +903,7 @@ def run_portfolio_analysis():
     validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 
     if validated_baseline:
-        logger.info(f"\n{'─'*105}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*105}")
+        logger.info(f"\n{'─'*110}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*110}")
         print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
@@ -969,7 +967,7 @@ def run_portfolio_analysis():
         )
 
     if RUN_BEST_COMBINATIONS:
-        logger.info(f"\n{'─'*105}\n  BEST COMBINATIONS\n{'─'*105}")
+        logger.info(f"\n{'─'*110}\n  BEST COMBINATIONS\n{'─'*110}")
         if _trade_logs_baseline:
             print_best_combinations(_trade_logs_baseline, "Baseline — All", INITIAL_BALANCE)
         if _trade_logs_regime01:
@@ -983,7 +981,7 @@ def run_portfolio_analysis():
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if validated_regime01:
-        logger.info(f"\n{'─'*105}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*105}")
+        logger.info(f"\n{'─'*110}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*110}")
 
         survivors = decorrelate_by_dd(
             trade_logs_oos1     = validated_regime01,
@@ -1010,7 +1008,7 @@ def run_portfolio_analysis():
             )
             
     if validated_regime01:
-        logger.info(f"\n{'─'*105}\n  CORRELATION ANALYSIS — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*105}")
+        logger.info(f"\n{'─'*110}\n  CORRELATION ANALYSIS — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*110}")
         survivors_profit = decorrelate_by_profit(
             trade_logs_oos1     = validated_regime01,
             trade_logs_oos2     = [],
@@ -1047,9 +1045,9 @@ if __name__ == "__main__":
     start  = time.time()
     logger = logging.getLogger("BOT_batch.main_batch")
 
-    logger.info(f"\n{'='*105}")
+    logger.info(f"\n{'='*110}")
     logger.info(f"  BATCH START")
-    logger.info(f"{'='*105}")
+    logger.info(f"{'='*110}")
     logger.info(f"  Strategies set   : {STRATEGIES_SET_NAME}")
     logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
@@ -1061,7 +1059,7 @@ if __name__ == "__main__":
     logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}")
     logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND2}%  MaxDD<{R2B_MAX_DD_ROUND2}%")
     logger.info(f"  Regime           : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
-    logger.info(f"{'='*105}\n")
+    logger.info(f"{'='*110}\n")
 
     strategies_to_run = (
         [s for s in STRATEGIES if s["id"] in SELECTED_STRATEGIES]
@@ -1069,7 +1067,7 @@ if __name__ == "__main__":
     )
 
     for strategy in strategies_to_run:
-        logger.info(f"\n{'='*105}\n  Running: {strategy['id']}\n{'='*105}")
+        logger.info(f"\n{'='*110}\n  Running: {strategy['id']}\n{'='*110}")
         run_batch(strategy)
 
     if UPDATE_OUTPUTS:
