@@ -9,7 +9,6 @@ from sklearn.linear_model import LinearRegression
 from shared_market_regime.regime_common import load_btc_for_timeframe, calc_all_metrics_at_time,calculate_max_dd_pct
 from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction
 from backtesters.ZX_compute_BT import INITIAL_BALANCE
-
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 from signals.add_signals_flag        import flag_long, flag_short
@@ -25,9 +24,7 @@ SIGNAL_REGISTRY = {
     "flag_short":        {"fn": flag_short,        "params": ["lookback", "impulse", "flag", "ma_period"]},
     "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
     "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
-
 }
-
 # =============================================================================
 # MODULE CONSTANTS
 # =============================================================================
@@ -1124,7 +1121,7 @@ def _decorrelate(
     num_map = {sid: f"{_num(sid):02d}" for sid in series_combined}
     df_     = pd.DataFrame({num_map[sid]: s for sid, s in series_combined.items()}).fillna(0)
     corr_mx = df_.corr().round(2)
-    logger.info(f"\n{corr_mx.to_string()}")
+    logger.debug(f"\n{corr_mx.to_string()}")
 
     ranked    = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
     selected  = []

@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGIES_SET_NAME = "00"  # "E1" | "00"
+STRATEGIES_SET_NAME = "E1"  # "E1" | "00"
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
 OUTPUT_BATCH      = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")

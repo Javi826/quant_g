@@ -5,7 +5,6 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_market_regime")))
 
 import matplotlib
 SHOW_PLOTS = True
@@ -34,7 +33,7 @@ logging.getLogger("PIL").setLevel(logging.WARNING)
 
 from utils.utils import filter_symbols
 from utils.analysis import report_montecarlo, report_backtesting
-from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime, build_metrics_cache
+from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.st_tools import get_n_obs, save_all_trades_to_csv
@@ -74,11 +73,11 @@ SHOW_PROGRESS = False
 
 # RUN + MC + THs
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME   = "00"  
+STRATEGIES_SET_NAME   = "E1"  
 STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS            = 1000
-N_SYMBOLS_MCIS        = 6
-OOS_NETGAIN_TH        = 15
+N_PATHS_IS            = 10000
+N_SYMBOLS_MCIS        = 3
+OOS_NETGAIN_TH        = 20
 OOS_MAX_DD_TH         = 16
 
 # FILES
@@ -107,8 +106,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-RUN_BEST_COMBINATIONS  = False
 UPDATE_OUTPUTS         = True
+RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
 #------------------------------------------------------------------------------
@@ -170,17 +169,19 @@ SELECTED_STRATEGIES = [
     "02_reversal_long_4H",
     "03_parity_long_4H",
     "04_reversal_short_4H",
-    "06_reversal_long_1H",
-    "07_reversal_short_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "10_parity_long_1H",
-    "11_parity_short_1H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "20_flag_short_1H",
+# =============================================================================
+#     "06_reversal_long_1H",
+#     "07_reversal_short_1H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "10_parity_long_1H",
+#     "11_parity_short_1H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -356,7 +357,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 3 — Backtest OOS Baseline
     # -------------------------------------------------------------------------
-    logger.info(f"STAGE 3  ── Backtest OOS Baseline  ── {len(symbols_oos_final)} symbols")
+    logger.info(f"STAGE 3  ── Backtest OOS1 Baseline ── {len(symbols_oos_final)} symbols")
 
     ohlcv_data_oos1 = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
     ohlcv_arr_oos1  = prepare_ohlcv_arrays(ohlcv_data_oos1)
@@ -401,7 +402,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 4 — Backtest OOS Regime 0+1
     # -------------------------------------------------------------------------
-    logger.info(f"STAGE 4  ── Backtest OOS Regime    ── bins: {bins_to_filter if bins_to_filter else 'none'}")
+    logger.info(f"STAGE 4  ── Backtest OOS1 Regime   ── bins: {bins_to_filter if bins_to_filter else 'none'}")
 
     btc_cache_oos = {}
     btc_1d_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS1, '1Dutc', btc_cache_oos)
@@ -470,9 +471,9 @@ def run_batch(strategy_config: dict) -> None:
         logger.debug(f"Regime 0+1 trades saved → {r01_trades_path}")
 
     # -------------------------------------------------------------------------
-    # BLOCK 5 — Monte Carlo OOS
+    # BLOCK 5 — Monte Carlo OOS1
     # -------------------------------------------------------------------------
-    logger.info(f"STAGE 5  ── Monte Carlo OOS        ── {N_PATHS_OOS1} paths")
+    logger.info(f"STAGE 5  ── Monte Carlo OOS1       ── {N_PATHS_OOS1} paths")
 
     n_obs_oos        = get_n_obs(TIMEFRAME)
     paths_oos        = generate_paths_for_all_symbols_functional(
@@ -512,7 +513,7 @@ def run_batch(strategy_config: dict) -> None:
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S R1        ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     approved_regime = False
     round_path      = ""
@@ -537,7 +538,7 @@ def run_batch(strategy_config: dict) -> None:
         round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
 
         _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S R2        ── {'⭐' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
+        logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'⭐' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
 
         approved = approved or approved_regime
 
@@ -1086,9 +1087,8 @@ if __name__ == "__main__":
             pr_batch_path=STRATEGIES_PR_BATCH_PATH,
             csv_path=CSV_PARAMS,
         )
-
-    if UPDATE_OUTPUTS:
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
+    
     run_portfolio_analysis()
 
     elapsed = int(time.time() - start)
