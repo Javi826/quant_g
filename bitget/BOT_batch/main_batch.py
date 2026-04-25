@@ -74,8 +74,8 @@ SHOW_PROGRESS = False
 # RUN + MC + THs
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME   = "00"  
-STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}"
-N_PATHS_IS            = 1
+STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS            = 100
 N_SYMBOLS_MCIS        = 6
 OOS_NETGAIN_TH        = 21
 OOS_MAX_DD_TH         = 16

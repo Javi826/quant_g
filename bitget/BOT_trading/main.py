@@ -16,14 +16,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from execution import BitgetClient
 from bot_utils.logger import setup_logger
 from core import BotOrchestrator
-from config.utils import get_account_config
 
-# Credentials
-from config.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
-from config.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
-from config.connect_pass import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
-from config.connect_pass import connect_bitget_00, connect_bitget_01, connect_bitget_E1
-
+from config.utils.utils import get_account_config
+from config.utils.connect_pass import BITGET_API_KEY_00, BITGET_API_SECRET_00, BITGET_API_PASS_00
+from config.utils.connect_pass import BITGET_API_KEY_01, BITGET_API_SECRET_01, BITGET_API_PASS_01
+from config.utils.connect_pass import BITGET_API_KEY_E1, BITGET_API_SECRET_E1, BITGET_API_PASS_E1
+from config.utils.connect_pass import connect_bitget_00, connect_bitget_01, connect_bitget_E1
 from core.demo_operative import DemoOperative
 from core.production_operative import ProductionOperative
 

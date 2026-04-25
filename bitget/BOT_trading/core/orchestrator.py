@@ -35,7 +35,7 @@ from bot_utils import get_unique_timeframes
 
 from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 
-from config.utils import get_account_config
+from config.utils.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
 from config.settings import LEVERAGE
 from core.split_brain_checker import check_split_brain

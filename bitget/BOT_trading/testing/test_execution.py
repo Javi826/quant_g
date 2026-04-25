@@ -78,7 +78,7 @@ def setup_websocket():
     
     try:
         from execution import BitgetClient
-        from config.connect_pass import (
+        from config.utils.connect_pass import (
             BITGET_API_KEY_00,
             BITGET_API_SECRET_00,
             BITGET_API_PASS_00

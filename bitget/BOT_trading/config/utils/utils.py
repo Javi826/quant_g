@@ -3,7 +3,7 @@ Configuration utility functions
 """
 import os
 from typing import Dict
-from .settings import ACCOUNTS, PERSISTENCE_DIR
+from config.settings import ACCOUNTS, PERSISTENCE_DIR
 
 
 def get_account_paths(account_number: str) -> dict:
