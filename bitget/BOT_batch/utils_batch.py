@@ -205,22 +205,22 @@ def _load_py_module(path, module_name):
     return mod
 
 # =============================================================================
-# HELPER — COMPARE BATCH VS E1_BATCH AND GENERATE CSV
+# HELPER — COMPARE BATCH VS PR_BATCH AND GENERATE CSV
 # =============================================================================
-def compare_and_generate_csv(strategies_batch_path, e1_batch_path, csv_path):
+def compare_and_generate_csv(strategies_batch_path, pr_batch_path, csv_path):
     """
-    Compare strategies_batch.py (previous state) vs strategies_E1_batch.py (new state).
+    Compare strategies_batch.py (previous state) vs strategies_NN_batch.py (new state).
     Generate strategies_params.csv with change columns for diagnostics.
     """
     if not os.path.exists(strategies_batch_path):
         logger.warning(f"⚠️  strategies_batch.py not found — skipping CSV generation.")
         return
-    if not os.path.exists(e1_batch_path):
-        logger.warning(f"⚠️  strategies_E1_batch.py not found — skipping CSV generation.")
+    if not os.path.exists(pr_batch_path):
+        logger.warning(f"⚠️  strategies_NN_batch.py not found — skipping CSV generation.")
         return
 
     prev_map = {s["id"]: s for s in _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES}
-    new_map  = {s["id"]: s for s in _load_py_module(e1_batch_path, "strategies_e1_batch").STRATEGIES}
+    new_map  = {s["id"]: s for s in _load_py_module(pr_batch_path, "strategies_pr_batch").STRATEGIES}
 
     regime_bin_keys = (
         "regime_trending_uptrend", "regime_trending_dwtrend",
@@ -545,15 +545,15 @@ def save_drift_reference(drift_results, output_path):
 
 
 # =============================================================================
-# HELPER — SAVE STRATEGIES E1 BATCH
+# HELPER — SAVE STRATEGIES PR BATCH
 # =============================================================================
-def save_strategies_e1(strategies_batch_path, output_path, validation_results, best_params_map, strategy_ids_to_run=None, module_name="strategies_BT_batch"):
+def save_strategies_pr(strategies_batch_path, output_path, validation_results, best_params_map, strategy_ids_to_run=None, module_name="strategies_BT_batch"):
     """
-    Generate strategies_E1_batch.py for production deployment.
+    Generate strategies_PR_batch.py for production deployment.
     Reads strategies_BT_batch.py (never modified), applies dynamic fields from memory.
 
     strategies_batch_path : path to strategies_BT_batch.py (input, never modified)
-    output_path           : path to write strategies_E1_batch.py
+    output_path           : path to write strategies_NN_batch.py
     validation_results    : list of dicts with strategy_id, verdict, bins_to_filter
     best_params_map       : dict {strategy_id: best_params dict}
     strategy_ids_to_run   : list of strategy IDs to include — None = all
@@ -578,7 +578,7 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
         "regime_volatile_dwtrend",
     ]
  
-    e1_lines = [
+    pr_lines = [
         '"""',
         'Trading Strategies Configuration',
         '',
@@ -605,38 +605,38 @@ def save_strategies_e1(strategies_batch_path, output_path, validation_results, b
             for k, val in bp.items():
                 updated[k.lower()] = val
  
-        e1_lines.append("    {")
-        e1_lines.append(f'        "id": "{sid}",')
-        e1_lines.append(f'        "name": "{updated["name"]}",')
-        e1_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
-        e1_lines.append(f'        "active": {updated.get("active", False)},')
-        e1_lines.append(f'        "direction": "{updated["direction"]}",')
+        pr_lines.append("    {")
+        pr_lines.append(f'        "id": "{sid}",')
+        pr_lines.append(f'        "name": "{updated["name"]}",')
+        pr_lines.append(f'        "timeframe": "{updated["timeframe"]}",')
+        pr_lines.append(f'        "active": {updated.get("active", False)},')
+        pr_lines.append(f'        "direction": "{updated["direction"]}",')
  
         for bin_key in all_bins:
             family, direction = bin_key.replace("regime_", "").rsplit("_", 1)
             blocked = f"{family}_{direction}" in bins_to_filter
-            e1_lines.append(f'        "{bin_key}": {0 if blocked else 1},')
+            pr_lines.append(f'        "{bin_key}": {0 if blocked else 1},')
  
-        e1_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
-        e1_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
+        pr_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
+        pr_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
  
         for k in SIGNAL_PARAM_KEYS:
             if k in updated:
-                e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
+                pr_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
  
         for k in ("tp_pct", "sl_pct"):
             if k in updated:
-                e1_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
+                pr_lines.append(f'        "{k}": {_fmt_py_val(updated[k])},')
  
-        e1_lines.append("    },")
+        pr_lines.append("    },")
  
-    e1_lines.append("]")
+    pr_lines.append("]")
  
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w") as f:
-        f.write("\n".join(e1_lines) + "\n")
+        f.write("\n".join(pr_lines) + "\n")
  
-    logger.info(f"\n{'─'*105}\n  ✅ strategies_E1_batch.py generated → {output_path}\n{'─'*105}")
+    logger.info(f"\n{'─'*105}\n  ✅ strategies_NN_batch.py generated → {output_path}\n{'─'*105}")
  
 
 

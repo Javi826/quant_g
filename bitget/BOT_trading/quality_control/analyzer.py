@@ -21,7 +21,19 @@ from config.settings import DRIFT_WINDOW_SIZE, DRIFT_CHECK_INTERVAL
 from config.settings import EXECUTION_WINDOW_SIZE
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT, LATENCY_WARNING_SEC, LATENCY_CRITICAL_SEC
 
-from .drift_montecarlo import DRIFT_REFERENCE
+
+DRIFT_REFERENCE = {}  # overridden at runtime by configure_account()
+
+def configure_account(account_number: str) -> None:
+    global DRIFT_REFERENCE
+    try:
+        module = __import__(
+            f'quality_control.drift_montecarlo_{account_number}',
+            fromlist=['DRIFT_REFERENCE']
+        )
+        DRIFT_REFERENCE = module.DRIFT_REFERENCE
+    except ModuleNotFoundError:
+        pass  # keep default
 
 logger = logging.getLogger('BOT_trading.quality_control.analyzer')
 
@@ -458,7 +470,6 @@ def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict
         }
     """
     from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT_P50, DRIFT_CHECK_INTERVAL
-    from .drift_montecarlo import DRIFT_REFERENCE
     import math
     
     results = {}

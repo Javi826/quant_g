@@ -7,7 +7,7 @@ This file is NOT updated by the batch automatically.
 STRATEGIES_LOOP = [
     {
         "id": "02_reversal_long_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -20,7 +20,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "03_parity_long_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -33,7 +33,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "04_reversal_short_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -46,7 +46,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "06_reversal_long_1H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -59,7 +59,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "07_reversal_short_1H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -67,12 +67,12 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [5,10,15],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
         "id": "08_reversal_long_6Hutc",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -85,7 +85,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "09_reversal_short_6Hutc",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -98,7 +98,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "10_parity_long_1H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -106,12 +106,12 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [4,6,8,10],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
         "id": "11_parity_short_1H",
-        "n_symbols":2,
+        "n_symbols":3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -124,7 +124,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "12_parity_long_6Hutc",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -137,7 +137,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "13_orderblocks_short_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -150,7 +150,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "17_flag_long_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -164,7 +164,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "19_flag_short_4H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -173,12 +173,12 @@ STRATEGIES_LOOP = [
             "IMPULSE": [1,2,3],
             "FLAG": [30,40,50],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
         "id": "20_flag_short_1H",
-        "n_symbols": 2,
+        "n_symbols": 3,
         "order_amount": 80,
         "param_grid": { 
             "SELL_AFTER": [0],

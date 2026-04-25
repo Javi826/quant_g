@@ -32,7 +32,6 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
-from importlib import import_module
 from utils.utils import filter_symbols
 from utils.analysis import report_montecarlo, report_backtesting
 from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime, build_metrics_cache
@@ -44,32 +43,12 @@ from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
 from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,get_best_r2_combination,print_robustness_table
 from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit
 from utils_batch import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
-from utils_batch import save_drift_reference, save_strategies_e1, compare_and_generate_csv
+from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv
 from utils_batch import print_strategies_summary, print_update_status, print_portfolio_metrics_table
 from utils_batch import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-from strategies_files.strategies_BT_batch import STRATEGIES as STRATEGIES_BATCH
-
-
-# =============================================================================
-# GLOBAL CONFIGURATION
-# =============================================================================
-DTYPE         = np.float32
-logger        = logging.getLogger("BOT_batch.main_batch")
-N_JOBS        = -1
-MY_SYMBOLS    = False
-SHOW_PROGRESS = False
-
-STRATEGIES_BT_BATCH_MODULE = "strategies_BT_batch"
-STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", "strategies_BT_batch.py")
-STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), "strategies_E1")
-CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1.csv")
-STRATEGIES_E1_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, "strategies_E1_batch.py")
-SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
-DRIFT_MONTECARLO_FOLDER    = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_montecarlo")
-DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, "drift_montecarlo_batch.py")
 
 # Global accumulators
 _trade_logs_baseline : list = []
@@ -81,9 +60,41 @@ _drift_results       : list = []
 _best_params_results : dict = {}
 
 # =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+DTYPE         = np.float32
+logger        = logging.getLogger("BOT_batch.main_batch")
+N_JOBS        = -1
+MY_SYMBOLS    = False
+SHOW_PROGRESS = False
+
+# =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
-#DATA
+
+# RUN + MC + THs
+#------------------------------------------------------------------------------
+STRATEGIES_SET_NAME   = "00"  
+STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS            = 1000
+N_SYMBOLS_MCIS        = 6
+OOS_NETGAIN_TH        = 15
+OOS_MAX_DD_TH         = 16
+
+# FILES
+#------------------------------------------------------------------------------
+STRATEGIES_BATCH           = import_module(f"strategies_files.strategies_BT_{STRATEGIES_SET_NAME}_batch").STRATEGIES
+STRATEGIES_BT_BATCH_MODULE = f"strategies_BT_{STRATEGIES_SET_NAME}_batch"
+STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategies_{STRATEGIES_SET_NAME}")
+CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
+STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
+SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
+DRIFT_MONTECARLO_FOLDER    = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_montecarlo")
+DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_montecarlo_{STRATEGIES_SET_NAME}_batch.py")
+STRATEGIES_LOOP            = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
+
+# DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
@@ -93,11 +104,6 @@ DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
-# LOOP
-#------------------------------------------------------------------------------
-STRATEGIES_LOOP_NAME = "strategies_loop"
-STRATEGIES_LOOP      = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
-
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
@@ -106,9 +112,7 @@ UPDATE_OUTPUTS         = True
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_IS                = 1
-N_PATHS_OOS1              = 2
-N_SYMBOLS_MCIS            = 6
+N_PATHS_OOS1 = 2
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
@@ -123,36 +127,35 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 # VALIDATON CONFIGURATION
 # =============================================================================
 
-# OOS - Validation thresholds — Round 1
+# OOS1 - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 60
+R1_NETGAIN_ROUND1  = 40
 R1_RSQUARED_ROUND1 = 0.95
-
 R1_PROBNEG_ROUND1  = 31
 
-# OOS - Validation thresholds — Round 2 path A
+# OOS1 - Validation thresholds — Round 2 path A
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 60
+R2A_NETGAIN_ROUND2  = 40
 R2A_RSQUARED_ROUND2 = 0.95
 
-# OOS - Validation thresholds — Round 2 path B
+# OOS1 - Validation thresholds — Round 2 path B
 #------------------------------------------------------------------------------
-R2B_NETGAIN_ROUND2 = 15
-R2B_MAX_DD_ROUND2  = 16
+R2B_NETGAIN_ROUND2 = OOS_NETGAIN_TH
+R2B_MAX_DD_ROUND2  = OOS_MAX_DD_TH
 
 # OOS2 - Validation thresholds — Round OOS2
 #------------------------------------------------------------------------------
-R3A_NETGAIN_ROUNDOOS2 = 15
-R3A_MAX_DD_ROUNDOOS2  = 16
-OOS2_RUN_ANALYSIS     = True  
+R3A_NETGAIN_ROUNDOOS2 = OOS_NETGAIN_TH
+R3A_MAX_DD_ROUNDOOS2  = OOS_MAX_DD_TH
+OOS2_RUN_ANALYSIS     = True
 OOS2_FOR_VALIDATION   = True
 
 # OOS3 - Validation thresholds — Round OOS3
 #------------------------------------------------------------------------------
-R3B_NETGAIN_ROUNDOOS3 = 15
-R3B_MAX_DD_ROUNDOOS3  = 16
-OOS3_RUN_ANALYSIS     = True   
-OOS3_FOR_VALIDATION   = True 
+R3B_NETGAIN_ROUNDOOS3 = OOS_NETGAIN_TH
+R3B_MAX_DD_ROUNDOOS3  = OOS_MAX_DD_TH
+OOS3_RUN_ANALYSIS     = True
+OOS3_FOR_VALIDATION   = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -166,17 +169,17 @@ CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated 
 SELECTED_STRATEGIES = [
     "02_reversal_long_4H",
     "03_parity_long_4H",
-    #"04_reversal_short_4H",
+    "04_reversal_short_4H",
     "06_reversal_long_1H",
     "07_reversal_short_1H",
-    #"08_reversal_long_6Hutc",
-    #"09_reversal_short_6Hutc",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
     "10_parity_long_1H",
     "11_parity_short_1H",
-    #"12_parity_long_6Hutc",
-    #"13_orderblocks_short_4H",
-    #"17_flag_long_4H",
-    #"19_flag_short_4H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
     "20_flag_short_1H",
 ]
 
@@ -1046,6 +1049,7 @@ if __name__ == "__main__":
     logger.info(f"\n{'='*105}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*105}")
+    logger.info(f"  Strategies set   : {STRATEGIES_SET_NAME}")
     logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
@@ -1069,17 +1073,17 @@ if __name__ == "__main__":
 
     if UPDATE_OUTPUTS:
         save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
-        save_strategies_e1(
+        save_strategies_pr(
             strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
             module_name=STRATEGIES_BT_BATCH_MODULE,
-            output_path=STRATEGIES_E1_BATCH_PATH,
+            output_path=STRATEGIES_PR_BATCH_PATH,
             validation_results=_validation_results,
             best_params_map=_best_params_results,
             strategy_ids_to_run=[s["id"] for s in strategies_to_run],
         )
         compare_and_generate_csv(
             strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
-            e1_batch_path=STRATEGIES_E1_BATCH_PATH,
+            pr_batch_path=STRATEGIES_PR_BATCH_PATH,
             csv_path=CSV_PARAMS,
         )
 

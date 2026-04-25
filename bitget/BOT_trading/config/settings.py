@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 36000,
+        "initial_capital": 800,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -27,11 +27,11 @@ ACCOUNTS = {
         "initial_capital": 36000,
         "dashboard_port": 5000,
         "description": "Main Account",
-        "type": "demo",
+        "type": "production",
         "regime0_enabled": True,  # reserved — structure placeholder for future use
         "regime01_enabled": True,
         "risk_control_enabled": True,
-        "postgresql_enabled": False,
+        "postgresql_enabled": True,
     },
     "01": {
         "initial_capital": 12000,

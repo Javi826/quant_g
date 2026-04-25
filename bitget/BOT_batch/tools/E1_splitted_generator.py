@@ -1,15 +1,17 @@
 #BOT_batch/strategies_params/generator_dict_strategies.py
 import os
 import sys
+from importlib import import_module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading")))
-
-from config.strategies_E1 import STRATEGIES as PROD_STRATEGIES
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_BT_batch.py")
-OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", "strategies_loop.py")
+STRATEGIES_SET_NAME = "00"  # "E1" | "00"
+
+PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
+OUTPUT_BATCH      = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+OUTPUT_LOOP       = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS   = (
@@ -18,9 +20,9 @@ REGIME_BIN_KEYS   = (
     "regime_volatile_uptrend", "regime_volatile_dwtrend",
 )
 
-symbols_live_folder = os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading", "symbols_live")
-DEFAULT_N_SYMBOLS    = 10
-DEFAULT_ORDER_AMOUNT = 80
+symbols_live_folder = os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading", "symbols_live", STRATEGIES_SET_NAME)
+DEFAULT_N_SYMBOLS      = 10
+DEFAULT_ORDER_AMOUNT   = 80
 USE_SYMBOLS_LIVE_FOR_N = True
 
 
@@ -42,13 +44,13 @@ def _write(path, lines):
 
 
 # =============================================================================
-# GENERATE strategies_batch.py
+# GENERATE strategies_BT_{SET}_batch.py
 # =============================================================================
 def generate_batch():
     lines = [
         '"""',
-        'strategies_batch.py — Input for BOT_batch. Do not edit manually.',
-        'Generated from strategies_E1.py. Re-run this script after each production deploy.',
+        f'strategies_BT_{STRATEGIES_SET_NAME}_batch.py — Input for BOT_batch. Do not edit manually.',
+        f'Generated from strategies_{STRATEGIES_SET_NAME}.py. Re-run this script after each production deploy.',
         '"""',
         '',
         'STRATEGIES = [',
@@ -75,17 +77,16 @@ def generate_batch():
 
     lines.append("]")
     _write(OUTPUT_BATCH, lines)
-    print(f"✅ strategies_batch.py generated → {os.path.abspath(OUTPUT_BATCH)}")
+    print(f"✅ strategies_BT_{STRATEGIES_SET_NAME}_batch.py generated → {os.path.abspath(OUTPUT_BATCH)}")
 
 
 # =============================================================================
-# GENERATE strategies_loop.py
+# GENERATE strategies_loop_{SET}.py
 # =============================================================================
-
 def generate_loop():
     lines = [
         '"""',
-        'strategies_loop.py — Batch loop configuration.',
+        f'strategies_loop_{STRATEGIES_SET_NAME}.py — Batch loop configuration.',
         'Edit param_grid, n_symbols and order_amount before each run.',
         'This file is NOT updated by the batch automatically.',
         '"""',
@@ -121,7 +122,7 @@ def generate_loop():
 
     lines.append("]")
     _write(OUTPUT_LOOP, lines)
-    print(f"✅ strategies_loop.py generated → {os.path.abspath(OUTPUT_LOOP)}")
+    print(f"✅ strategies_loop_{STRATEGIES_SET_NAME}.py generated → {os.path.abspath(OUTPUT_LOOP)}")
 
 
 # =============================================================================

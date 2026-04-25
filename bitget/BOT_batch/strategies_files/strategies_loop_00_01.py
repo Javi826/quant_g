@@ -67,7 +67,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [5,10,15],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
@@ -106,7 +106,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [4,6,8,10],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
@@ -173,7 +173,7 @@ STRATEGIES_LOOP = [
             "IMPULSE": [1,2,3],
             "FLAG": [30,40,50],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [3,4],
+            "SL_PCT": [2,3],
         },
     },
     {
