@@ -374,13 +374,13 @@ def run_batch(strategy_config: dict) -> None:
     ohlcv_data_oos1 = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
     ohlcv_arr_oos1  = prepare_ohlcv_arrays(ohlcv_data_oos1)
 
-    ohlcv_arrays_oos_baseline = {}
+    ohlcv_arrays_oos1_baseline = {}
     for sym, arr in ohlcv_arr_oos1.items():
         signals = signal_fn(arr, **bt_signal_params, live_trading=False)
-        ohlcv_arrays_oos_baseline[sym] = {**arr, "signal": signals}
+        ohlcv_arrays_oos1_baseline[sym] = {**arr, "signal": signals}
 
-    oos_result_baseline = run_grid_backtest(
-        ohlcv_arrays_oos_baseline,
+    oos1_result_baseline = run_grid_backtest(
+        ohlcv_arrays_oos1_baseline,
         sell_after=best_params["SELL_AFTER"],
         tp_pct=best_params["TP_PCT"],
         sl_pct=best_params["SL_PCT"],
@@ -388,7 +388,7 @@ def run_batch(strategy_config: dict) -> None:
     )
 
     best_comb = tuple(best_params[p] for p in param_names)
-    oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos_result_baseline)], param_names, INITIAL_BALANCE))
+    oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos1_result_baseline)], param_names, INITIAL_BALANCE))
 
     _, _ = report_backtesting(
         df=oos_df, parameters=param_names,
@@ -397,12 +397,12 @@ def run_batch(strategy_config: dict) -> None:
     )
 
     best_bt_row = oos_df.loc[oos_df["Net_Gain"].idxmax()]
-    trade_log   = oos_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
+    trade_log   = oos1_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
     trade_log.columns = trade_log.columns.str.lower().str.strip()
     trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
 
     save_all_trades_to_csv(
-        [(best_comb, oos_result_baseline)], param_names,
+        [(best_comb, oos1_result_baseline)], param_names,
         f"all_trades_{STRATEGY_ID}.csv",
         strategy_name=STRATEGY_ID, save=True,
         output_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
@@ -416,13 +416,13 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 4  ── Backtest OOS1 Regime   ── bins: {bins_to_filter if bins_to_filter else 'none'}")
 
-    btc_cache_oos = {}
-    btc_1d_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS1, '1Dutc', btc_cache_oos)
-    btc_tf_df_oos = load_btc_for_timeframe(DATA_FOLDER_OOS1, TIMEFRAME, btc_cache_oos) \
-                    if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos
+    btc_cache_oos1 = {}
+    btc_1d_df_oos1 = load_btc_for_timeframe(DATA_FOLDER_OOS1, '1Dutc', btc_cache_oos1)
+    btc_tf_df_oos1 = load_btc_for_timeframe(DATA_FOLDER_OOS1, TIMEFRAME, btc_cache_oos1) \
+                    if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos1
 
-    metrics_cache_oos = build_metrics_cache(
-        btc_df       = btc_tf_df_oos,
+    metrics_cache_oos1 = build_metrics_cache(
+        btc_df       = btc_tf_df_oos1,
         lookback     = REGIME_LOOKBACK_BARS,
         hurst_window = HURST_WINDOW,
         er_window    = ER_WINDOW,
@@ -431,15 +431,15 @@ def run_batch(strategy_config: dict) -> None:
         pe_order     = PE_ORDER,
     )
 
-    ohlcv_arrays_oos_regime = {}
+    ohlcv_arrays_oos1_regime = {}
     for sym, arr in ohlcv_arr_oos1.items():
         signals = signal_fn(arr, **bt_signal_params, live_trading=False)
         if bins_to_filter:
             signals = filter_signals_by_regime(
                 signals        = signals,
                 ts             = arr['ts'],
-                btc_1d_df      = btc_1d_df_oos,
-                btc_tf_df      = btc_tf_df_oos,
+                btc_1d_df      = btc_1d_df_oos1,
+                btc_tf_df      = btc_tf_df_oos1,
                 bins_to_filter = bins_to_filter,
                 ma_period      = R0_MA_PERIOD,
                 long_th        = R0_LONG_TH,
@@ -451,20 +451,20 @@ def run_batch(strategy_config: dict) -> None:
                 atr_window     = ATR_WINDOW,
                 pe_window      = PE_WINDOW,
                 pe_order       = PE_ORDER,
-                metrics_cache  = metrics_cache_oos,
+                metrics_cache  = metrics_cache_oos1,
             )
-        ohlcv_arrays_oos_regime[sym] = {k: v.copy() if hasattr(v, "copy") else v for k, v in arr.items()}
-        ohlcv_arrays_oos_regime[sym]["signal"] = signals
+        ohlcv_arrays_oos1_regime[sym] = {k: v.copy() if hasattr(v, "copy") else v for k, v in arr.items()}
+        ohlcv_arrays_oos1_regime[sym]["signal"] = signals
 
-    oos_result_regime = run_grid_backtest(
-        ohlcv_arrays_oos_regime,
+    oos1_result_regime = run_grid_backtest(
+        ohlcv_arrays_oos1_regime,
         sell_after=best_params["SELL_AFTER"],
         tp_pct=best_params["TP_PCT"],
         sl_pct=best_params["SL_PCT"],
         order_amount=ORDER_AMOUNT,
     )
 
-    trade_log_regime = oos_result_regime["__PORTFOLIO__"]["trade_log"].copy()
+    trade_log_regime = oos1_result_regime["__PORTFOLIO__"]["trade_log"].copy()
     trade_log_regime.columns = trade_log_regime.columns.str.lower().str.strip()
     trade_log_regime["buy_time"] = pd.to_datetime(trade_log_regime["buy_time"])
 
@@ -487,68 +487,68 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 5  ── Monte Carlo OOS1       ── {N_PATHS_OOS1} paths")
 
-    n_obs_oos        = get_n_obs(TIMEFRAME)
-    paths_oos        = generate_paths_for_all_symbols_functional(
-        ohlcv_data_oos1, n_paths=N_PATHS_OOS1, n_obs=n_obs_oos, raw_columns=[],
+    n_obs_oos1        = get_n_obs(TIMEFRAME)
+    paths_oos1        = generate_paths_for_all_symbols_functional(
+        ohlcv_data_oos1, n_paths=N_PATHS_OOS1, n_obs=n_obs_oos1, raw_columns=[],
     )
     best_params_list = [best_params]
 
     with (tqdm_joblib(tqdm(total=N_PATHS_OOS1, desc="🔄 Evaluating MC OOS paths")) if SHOW_PROGRESS else contextlib.nullcontext()):
-        results_oos = Parallel(n_jobs=N_JOBS)(
-            delayed(_process_path)(i, paths_oos, best_params_list)
+        results_oos1 = Parallel(n_jobs=N_JOBS)(
+            delayed(_process_path)(i, paths_oos1, best_params_list)
             for i in range(N_PATHS_OOS1)
         )
 
-    all_results_oos  = [r for sublist in results_oos for r in sublist]
-    df_portfolio_oos = pd.DataFrame(all_results_oos)
-    _, p5_winrate_oos, p50_winrate_oos = report_montecarlo(
-        df_portfolio=df_portfolio_oos, param_names=param_names, initial_balance=INITIAL_BALANCE,
+    all_results_oos1  = [r for sublist in results_oos1 for r in sublist]
+    df_portfolio_oos1 = pd.DataFrame(all_results_oos1)
+    _, p5_winrate_oos1, p50_winrate_oos1 = report_montecarlo(
+        df_portfolio=df_portfolio_oos1, param_names=param_names, initial_balance=INITIAL_BALANCE,
     )
 
     # -------------------------------------------------------------------------
     # BLOCK 6 — Validation
     # -------------------------------------------------------------------------
     # prob_negative from MC OOS baseline (always from baseline)
-    path_grouped_oos  = df_portfolio_oos.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
-    path_grouped_oos["Net_Gain_pct"] = (path_grouped_oos["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
-    prob_negative_oos = (path_grouped_oos["Net_Gain_pct"] < 0).mean() * 100
+    path_grouped_oos1  = df_portfolio_oos1.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
+    path_grouped_oos1["Net_Gain_pct"] = (path_grouped_oos1["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
+    prob_negative_oos1 = (path_grouped_oos1["Net_Gain_pct"] < 0).mean() * 100
 
     # Round 1 — evaluated on regime-filtered trades
     if len(trade_log_regime) > 0:
-        m_r1           = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
-        bt_netgain_pct = m_r1["Net_Gain_pct"]
-        r2             = m_r1["R_Squared"]
-        dd_r1          = m_r1["Max_DD_pct"]
+        metrics_oos1           = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
+        netgain_oos1 = metrics_oos1["Net_Gain_pct"]
+        r2             = metrics_oos1["R_Squared"]
+        dd_oos1          = metrics_oos1["Max_DD_pct"]
     else:
-        m_r1           = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
-        bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
-        r2             = m_r1["R_Squared"]
-        dd_r1          = m_r1["Max_DD_pct"]
+        metrics_oos1           = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
+        netgain_oos1 = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
+        r2             = metrics_oos1["R_Squared"]
+        dd_oos1          = metrics_oos1["Max_DD_pct"]
 
-    ok_netgain  = bt_netgain_pct    > R1_NETGAIN_ROUND1
+    ok_netgain  = netgain_oos1    > R1_NETGAIN_ROUND1
     ok_r2       = r2                > R1_RSQUARED_ROUND1
-    ok_prob_neg = prob_negative_oos < R1_PROBNEG_ROUND1
-    ok_max_dd   = abs(dd_r1) < R1_MAX_DD_ROUND1
+    ok_prob_neg = prob_negative_oos1 < R1_PROBNEG_ROUND1
+    ok_max_dd   = abs(dd_oos1) < R1_MAX_DD_ROUND1
     approved    = ok_netgain and ok_r2 and ok_prob_neg and ok_max_dd
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(dd_r1, 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={netgain_oos1:.2f}% DD={round(dd_oos1, 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos1:.1f}%")
 
     approved_regime = False
 
     if not approved and len(trade_log_regime) > 0:
-        m_r2        = m_r1  # already computed above
-        netgain_r2  = m_r2["Net_Gain_pct"]
-        dd_r2       = m_r2["Max_DD_pct"]
-        r2_filtered = m_r2["R_Squared"]
+        metrics_oos1        = metrics_oos1  # already computed above
+        netgain_oos1  = metrics_oos1["Net_Gain_pct"]
+        dd_oos1       = metrics_oos1["Max_DD_pct"]
+        r2_oos1 = metrics_oos1["R_Squared"]
 
-        ok_netgain_r2   = netgain_r2  > R2_NETGAIN_ROUND2
-        ok_max_dd_r2    = abs(dd_r2)  < R2_MAX_DD_ROUND2
-        ok_r2_r2        = r2_filtered > R2_R2_ROUND2
+        ok_netgain_r2   = netgain_oos1  > R2_NETGAIN_ROUND2
+        ok_max_dd_r2    = abs(dd_oos1)  < R2_MAX_DD_ROUND2
+        ok_r2_r2        = r2_oos1 > R2_R2_ROUND2
         approved_regime = ok_netgain_r2 and ok_max_dd_r2 and ok_r2_r2
 
         _v2 = ("VALIDATED" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
+        logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_oos1:.2f}% DD={dd_oos1:.2f}% R2={r2_oos1:.2f}")
         approved = approved or approved_regime
 
     _round = "—"
@@ -567,11 +567,11 @@ def run_batch(strategy_config: dict) -> None:
         "strategy_id":     STRATEGY_ID,
         "verdict":         _verdict,
         "round":           _round,
-        "net_gain_pct":    round(bt_netgain_pct, 2),
-        "dd_pct":          round(dd_r1, 2),
-        "win_ratio":       round(m_r1["Win_Rate"], 1),
+        "net_gain_pct":    round(netgain_oos1, 2),
+        "dd_pct":          round(dd_oos1, 2),
+        "win_ratio":       round(metrics_oos1["Win_Rate"], 1),
         "r2":              r2,
-        "prob_neg_pct":    round(prob_negative_oos, 2),
+        "prob_neg_pct":    round(prob_negative_oos1, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
     })
@@ -579,10 +579,10 @@ def run_batch(strategy_config: dict) -> None:
     # If validated in Round 2, overwrite display metrics (same as Round 1 here since both use regime)
     if approved_regime:
         _validation_results[-1].update({
-            "net_gain_pct": round(m_r2["Net_Gain_pct"], 2),
-            "dd_pct":       round(m_r2["Max_DD_pct"], 2),
-            "win_ratio":    round(m_r2["Win_Rate"], 1),
-            "r2":           r2_filtered,
+            "net_gain_pct": round(metrics_oos1["Net_Gain_pct"], 2),
+            "dd_pct":       round(metrics_oos1["Max_DD_pct"], 2),
+            "win_ratio":    round(metrics_oos1["Win_Rate"], 1),
+            "r2":           r2_oos1,
         })
 
 # -------------------------------------------------------------------------
@@ -867,8 +867,8 @@ def run_batch(strategy_config: dict) -> None:
 
     _drift_results.append({
         "strategy_id":  STRATEGY_ID,
-        "p5_winrate":   round(float(p5_winrate_oos) * 100, 1),
-        "p50_winrate":  round(float(p50_winrate_oos) * 100, 1),
+        "p5_winrate":   round(float(p5_winrate_oos1) * 100, 1),
+        "p50_winrate":  round(float(p50_winrate_oos1) * 100, 1),
     })
     _best_params_results[STRATEGY_ID] = best_params
 
