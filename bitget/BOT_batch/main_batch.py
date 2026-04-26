@@ -73,15 +73,14 @@ SHOW_PROGRESS = False
 
 # RUN + MC 
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME   = "00"  
-STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS            = 10
-N_SYMBOLS_MCIS        = 6
+STRATEGIES_SET_NAME  = "00"  
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 1000
+N_SYMBOLS_MCIS       = 6
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH        = 20
-OOS_MAX_DD_TH         = 10
-OOS_R2_TH             = 0.80  # 0.0 = no filter
-
+OOS_NETGAIN_TH       = 30
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.84  # 0.0 = no filter
 
 # FILES
 #------------------------------------------------------------------------------
@@ -102,14 +101,14 @@ SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = False
+UPDATE_OUTPUTS         = True
 RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
@@ -131,9 +130,9 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # OOS1 - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1    = 20
-R1_RSQUARED_ROUND1   = 0.90
-R1_MAX_DD_ROUND1     = 10  
+R1_NETGAIN_ROUND1    = 40
+R1_RSQUARED_ROUND1   = 0.95
+R1_MAX_DD_ROUND1     = 5  
 R1_PROBNEG_ROUND1    = 60
 
 # OOS1 - Validation thresholds — Round 2
@@ -168,26 +167,26 @@ CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated 
 
 # Strategy selection
 SELECTED_STRATEGIES = [
-    "02_reversal_long_4H",
     "03_parity_long_4H",
-    "04_reversal_short_4H",
     "06_reversal_long_1H",
     "07_reversal_short_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
     "10_parity_long_1H",
+    "11_parity_short_1H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
+    "21_parity_short_4H",
+    "23_flag_long_1H",
 # =============================================================================
-#     "11_parity_short_1H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-#     "21_parity_short_4H",
+#     "02_reversal_long_4H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
 #     "22_parity_short_6Hutc",
-#     "23_flag_long_1H",
+#     "04_reversal_short_4H",
 #     "24_flag_long_6Hutc",
 #     "25_flag_short_6Hutc",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
 #     "26_orderblocks_long_4H",
 #     "27_orderblocks_short_1H",
 #     "28_orderblocks_long_1H",
@@ -242,7 +241,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 0 — Universe Selection
     # -------------------------------------------------------------------------
-    symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos = select_universe(
+    symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos1 = select_universe(
         data_folder_is=DATA_FOLDER_IS,
         data_folder_oos=DATA_FOLDER_OOS1,
         timeframe=TIMEFRAME,
@@ -371,7 +370,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 3  ── Backtest OOS1 Baseline ── {len(symbols_oos_final)} symbols")
 
-    ohlcv_data_oos1 = {sym: ohlcv_oos[sym] for sym in symbols_oos_final}
+    ohlcv_data_oos1 = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
     ohlcv_arr_oos1  = prepare_ohlcv_arrays(ohlcv_data_oos1)
 
     ohlcv_arrays_oos1_baseline = {}
@@ -515,24 +514,24 @@ def run_batch(strategy_config: dict) -> None:
 
     # Round 1 — evaluated on regime-filtered trades
     if len(trade_log_regime) > 0:
-        metrics_oos1           = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
+        metrics_oos1 = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
         netgain_oos1 = metrics_oos1["Net_Gain_pct"]
-        r2             = metrics_oos1["R_Squared"]
-        dd_oos1          = metrics_oos1["Max_DD_pct"]
+        r2_oos1      = metrics_oos1["R_Squared"]
+        dd_oos1      = metrics_oos1["Max_DD_pct"]
     else:
-        metrics_oos1           = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
+        metrics_oos1 = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
         netgain_oos1 = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
-        r2             = metrics_oos1["R_Squared"]
-        dd_oos1          = metrics_oos1["Max_DD_pct"]
+        r2_oos1      = metrics_oos1["R_Squared"]
+        dd_oos1      = metrics_oos1["Max_DD_pct"]
 
-    ok_netgain  = netgain_oos1    > R1_NETGAIN_ROUND1
-    ok_r2       = r2                > R1_RSQUARED_ROUND1
-    ok_prob_neg = prob_negative_oos1 < R1_PROBNEG_ROUND1
-    ok_max_dd   = abs(dd_oos1) < R1_MAX_DD_ROUND1
-    approved    = ok_netgain and ok_r2 and ok_prob_neg and ok_max_dd
+    ok_oos1_netgain  = netgain_oos1    > R1_NETGAIN_ROUND1
+    ok_oos1_r2       = r2_oos1                > R1_RSQUARED_ROUND1
+    ok_oos1_prob_neg = prob_negative_oos1 < R1_PROBNEG_ROUND1
+    ok_oos1_max_dd   = abs(dd_oos1) < R1_MAX_DD_ROUND1
+    approved    = ok_oos1_netgain and ok_oos1_r2 and ok_oos1_prob_neg and ok_oos1_max_dd
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={netgain_oos1:.2f}% DD={round(dd_oos1, 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos1:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={netgain_oos1:.2f}% DD={round(dd_oos1, 2)}% R2={r2_oos1:.2f} ProbNeg={prob_negative_oos1:.1f}%")
 
     approved_regime = False
 
@@ -542,10 +541,10 @@ def run_batch(strategy_config: dict) -> None:
         dd_oos1       = metrics_oos1["Max_DD_pct"]
         r2_oos1 = metrics_oos1["R_Squared"]
 
-        ok_netgain_r2   = netgain_oos1  > R2_NETGAIN_ROUND2
-        ok_max_dd_r2    = abs(dd_oos1)  < R2_MAX_DD_ROUND2
-        ok_r2_r2        = r2_oos1 > R2_R2_ROUND2
-        approved_regime = ok_netgain_r2 and ok_max_dd_r2 and ok_r2_r2
+        ok_oos1_r2_netgain   = netgain_oos1  > R2_NETGAIN_ROUND2
+        ok_oos1_r2_max_dd    = abs(dd_oos1)  < R2_MAX_DD_ROUND2
+        ok_oos1_r2_r2        = r2_oos1 > R2_R2_ROUND2
+        approved_regime = ok_oos1_r2_netgain and ok_oos1_r2_max_dd and ok_oos1_r2_r2
 
         _v2 = ("VALIDATED" if approved_regime else "REJECTED").ljust(13)
         logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_oos1:.2f}% DD={dd_oos1:.2f}% R2={r2_oos1:.2f}")
@@ -570,7 +569,7 @@ def run_batch(strategy_config: dict) -> None:
         "net_gain_pct":    round(netgain_oos1, 2),
         "dd_pct":          round(dd_oos1, 2),
         "win_ratio":       round(metrics_oos1["Win_Rate"], 1),
-        "r2":              r2,
+        "r2":              r2_oos1,
         "prob_neg_pct":    round(prob_negative_oos1, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
@@ -1059,17 +1058,17 @@ if __name__ == "__main__":
     logger.info(f"\n{'='*110}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*110}")
-    logger.info(f"  Strategies set   : {STRATEGIES_SET_NAME}")
-    logger.info(f"  N_SYMBOLS_MCIS   : {N_SYMBOLS_MCIS}")
-    logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
-    logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
-    logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
-    logger.info(f"  Data OOS1        : 🟢 {DATA_FOLDER_OOS1}")
-    logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
-    logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
-    logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  MaxDD<{R1_MAX_DD_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
-    logger.info(f"  Round 2          : NetGain>{R2_NETGAIN_ROUND2}%  MaxDD<{R2_MAX_DD_ROUND2}%  R2>{R2_R2_ROUND2}")
-    logger.info(f"  Regime           : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
+    logger.info(f"  Strategies set     : {STRATEGIES_SET_NAME}")
+    logger.info(f"  N_SYMBOLS_MCIS     : {N_SYMBOLS_MCIS}")
+    logger.info(f"  Loop config        : {STRATEGIES_LOOP_NAME}")
+    logger.info(f"  Outputs update     : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
+    logger.info(f"  Data IS            : 🟢 {DATA_FOLDER_IS}")
+    logger.info(f"  Data OOS1          : 🟢 {DATA_FOLDER_OOS1}")
+    logger.info(f"  Data OOS2          : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
+    logger.info(f"  Data OOS3          : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
+    logger.info(f"  Round 1 OOS1       : NetGain>{R1_NETGAIN_ROUND1}%  MaxDD<{R1_MAX_DD_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
+    logger.info(f"  Round 2 + All OOSs : NetGain>{R2_NETGAIN_ROUND2}%  MaxDD<{R2_MAX_DD_ROUND2}%  R2>{R2_R2_ROUND2}")
+    logger.info(f"  Regime             : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*110}\n")
 
     strategies_to_run = (

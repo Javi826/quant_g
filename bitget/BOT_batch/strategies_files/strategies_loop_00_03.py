@@ -192,7 +192,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "21_parity_short_4H",
-        "n_symbols": 20,
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -205,7 +205,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "22_parity_short_6Hutc",
-        "n_symbols": 20,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -260,7 +260,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "26_orderblocks_long_4H",
-        "n_symbols": 20,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -273,7 +273,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "27_orderblocks_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -286,7 +286,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "28_orderblocks_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
