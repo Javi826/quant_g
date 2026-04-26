@@ -807,11 +807,11 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     lines.append(f"\n{'─'*110}")
     lines.append(f"  ACTIVE")
     lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Status':<16} {'Changes':<35}")
+    lines.append(f"  {'Strategy':<27} {'Status':<16} {'Changes':<35}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
         change = _get(sid, "last_change_active")
-        lines.append(f"  {sid:<25} {_active_icon(sid):<16} {_change_icon(change):<35}")
+        lines.append(f"  {sid:<27} {_active_icon(sid):<16} {_change_icon(change):<35}")
     lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
 
@@ -822,11 +822,11 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     lines.append(f"\n{'─'*110}")
     lines.append(f"  PARAMS")
     lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Changes':<50}")
+    lines.append(f"  {'Strategy':<27} {'Changes':<50}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
         change = _get(sid, "last_change_params")
-        lines.append(f"  {sid:<25} {_change_icon(change):<50}")
+        lines.append(f"  {sid:<27} {_change_icon(change):<50}")
     lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
 
@@ -837,7 +837,7 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     lines.append(f"\n{'─'*110}")
     lines.append(f"  MARKET REGIME")
     lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}")
+    lines.append(f"  {'Strategy':<27} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
         trending = _get(sid, "regime_trending")
@@ -845,7 +845,7 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
         volatile = _get(sid, "regime_volatile")
         change   = _get(sid, "last_change_regime")
         lines.append(
-            f"  {sid:<25} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
+            f"  {sid:<27} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
         )
     lines.append(f"  {'─'*110}")
     logger.info("\n".join(lines))
@@ -857,12 +857,12 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     lines.append(f"\n{'─'*110}")
     lines.append(f"  SYMBOLS")
     lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Status':<16}")
+    lines.append(f"  {'Strategy':<27} {'Status':<16}")
     lines.append(f"  {'-'*103}")
     for v in validation_results:
         sid  = v["strategy_id"]
         icon = "🔵 updated" if v.get("symbols_changed") else "⚪ no change"
-        lines.append(f"  {sid:<25} {icon:<16}")
+        lines.append(f"  {sid:<27} {icon:<16}")
     lines.append(f"  {'─'*103}")
     logger.info("\n".join(lines))
 

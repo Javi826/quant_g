@@ -76,11 +76,15 @@ SHOW_PROGRESS = False
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
 N_PATHS_IS           = 1000
-N_SYMBOLS_MCIS       = 6
+N_SYMBOLS_MCIS       = 3
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 30
-OOS_MAX_DD_TH        = 11
+OOS_NETGAIN_TH       = 25
+OOS_MAX_DD_TH        = 8
 OOS_R2_TH            = 0.84  # 0.0 = no filter
+
+# =============================================================================
+# -----------------------------------------------------------------------------
+# =============================================================================
 
 # FILES
 #------------------------------------------------------------------------------
@@ -108,7 +112,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = True
+UPDATE_OUTPUTS         = False
 RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
@@ -167,32 +171,32 @@ CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated 
 
 # Strategy selection
 SELECTED_STRATEGIES = [
-    "03_parity_long_4H",
     "06_reversal_long_1H",
     "07_reversal_short_1H",
     "10_parity_long_1H",
+    "20_flag_short_1H",
+    "23_flag_long_1H",
+    "21_parity_short_4H",
+    # -----------------------------------------------------------------------------
     "11_parity_short_1H",
+    "27_orderblocks_short_1H",
+    "28_orderblocks_long_1H",
+    "03_parity_long_4H",
     "17_flag_long_4H",
     "19_flag_short_4H",
-    "20_flag_short_1H",
     "21_parity_short_4H",
-    "23_flag_long_1H",
-# =============================================================================
-#     "02_reversal_long_4H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "22_parity_short_6Hutc",
-#     "04_reversal_short_4H",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "26_orderblocks_long_4H",
-#     "27_orderblocks_short_1H",
-#     "28_orderblocks_long_1H",
-#     "29_orderblocks_short_6Hutc",
-#     "30_orderblocks_long_6Hutc",
-# =============================================================================
+    "02_reversal_long_4H",
+    "04_reversal_short_4H",
+    "13_orderblocks_short_4H",
+    "26_orderblocks_long_4H",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
+    "12_parity_long_6Hutc",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "22_parity_short_6Hutc",
+    "29_orderblocks_short_6Hutc",
+    "30_orderblocks_long_6Hutc",
 ]
 
 # =============================================================================
