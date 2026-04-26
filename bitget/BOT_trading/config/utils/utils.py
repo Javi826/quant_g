@@ -9,7 +9,7 @@ from config.settings import ACCOUNTS, PERSISTENCE_DIR
 def get_account_paths(account_number: str) -> dict:
     """Get all file paths for a specific account."""
     base_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         PERSISTENCE_DIR,
         f'bot_files_{account_number}'
     )
@@ -70,7 +70,7 @@ def get_strategies_yaml_path(account_number: str) -> str:
         )
     
     # Get config directory (same directory as this file)
-    config_dir = os.path.dirname(os.path.abspath(__file__))
+    config_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     # Build path to account-specific YAML
     yaml_filename = f"strategies_{account_number}.yaml"

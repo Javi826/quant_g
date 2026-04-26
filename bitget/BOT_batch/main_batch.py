@@ -76,10 +76,10 @@ SHOW_PROGRESS = False
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
 N_PATHS_IS           = 1000
-N_SYMBOLS_MCIS       = 3
+N_SYMBOLS_MCIS       = 6
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 25
-OOS_MAX_DD_TH        = 8
+OOS_NETGAIN_TH       = 30
+OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.84  # 0.0 = no filter
 
 # =============================================================================
@@ -112,7 +112,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = False
+UPDATE_OUTPUTS         = True
 RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
