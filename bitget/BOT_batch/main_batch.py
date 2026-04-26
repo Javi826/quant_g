@@ -75,11 +75,11 @@ SHOW_PROGRESS = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME   = "00"  
 STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS            = 100
+N_PATHS_IS            = 10
 N_SYMBOLS_MCIS        = 6
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH        = 20
-OOS_MAX_DD_TH         = 16
+OOS_MAX_DD_TH         = 10
 OOS_R2_TH             = 0.80  # 0.0 = no filter
 
 
@@ -133,6 +133,7 @@ REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 #------------------------------------------------------------------------------
 R1_NETGAIN_ROUND1    = 20
 R1_RSQUARED_ROUND1   = 0.90
+R1_MAX_DD_ROUND1     = 10  
 R1_PROBNEG_ROUND1    = 60
 
 # OOS1 - Validation thresholds — Round 2
@@ -175,22 +176,24 @@ SELECTED_STRATEGIES = [
     "08_reversal_long_6Hutc",
     "09_reversal_short_6Hutc",
     "10_parity_long_1H",
-    "11_parity_short_1H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "20_flag_short_1H",
-    "21_parity_short_4H",
-    "22_parity_short_6Hutc",
-    "23_flag_long_1H",
-    "24_flag_long_6Hutc",
-    "25_flag_short_6Hutc",
-    "26_orderblocks_long_4H",
-    "27_orderblocks_short_1H",
-    "28_orderblocks_long_1H",
-    "29_orderblocks_short_6Hutc",
-    "30_orderblocks_long_6Hutc",
+# =============================================================================
+#     "11_parity_short_1H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+#     "21_parity_short_4H",
+#     "22_parity_short_6Hutc",
+#     "23_flag_long_1H",
+#     "24_flag_long_6Hutc",
+#     "25_flag_short_6Hutc",
+#     "26_orderblocks_long_4H",
+#     "27_orderblocks_short_1H",
+#     "28_orderblocks_long_1H",
+#     "29_orderblocks_short_6Hutc",
+#     "30_orderblocks_long_6Hutc",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -525,7 +528,8 @@ def run_batch(strategy_config: dict) -> None:
     ok_netgain  = bt_netgain_pct    > R1_NETGAIN_ROUND1
     ok_r2       = r2                > R1_RSQUARED_ROUND1
     ok_prob_neg = prob_negative_oos < R1_PROBNEG_ROUND1
-    approved    = ok_netgain and ok_r2 and ok_prob_neg
+    ok_max_dd   = abs(dd_r1) < R1_MAX_DD_ROUND1
+    approved    = ok_netgain and ok_r2 and ok_prob_neg and ok_max_dd
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
     logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(dd_r1, 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
@@ -900,22 +904,23 @@ def run_portfolio_analysis():
 
     if _trade_logs_baseline:
         logger.info(f"\n{'─'*110}\n  PORTFOLIO ANALYSIS\n{'─'*110}")
-        print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
+        if logger.isEnabledFor(logging.DEBUG):
+            print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
         if _trade_logs_regime01:
             print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
 
-    validated_ids = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
+    validated_ids      = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
     validated_baseline = [(sid, df) for sid, df in _trade_logs_baseline if sid in validated_ids]
     validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
 
     if validated_baseline:
         logger.info(f"\n{'─'*110}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*110}")
-        print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
+        if logger.isEnabledFor(logging.DEBUG):
+            print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
-        
-        
-    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2 if sid in validated_ids]    
+
+    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2 if sid in validated_ids]
     validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3 if sid in validated_ids]
     print_robustness_table(
         trade_logs_per_period=[
@@ -1062,8 +1067,8 @@ if __name__ == "__main__":
     logger.info(f"  Data OOS1        : 🟢 {DATA_FOLDER_OOS1}")
     logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
     logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
-    logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
-    logger.info(f"  Round 2          : NetGain>{OOS_NETGAIN_TH}%  MaxDD<{OOS_MAX_DD_TH}%  R2>{OOS_R2_TH}")
+    logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  MaxDD<{R1_MAX_DD_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
+    logger.info(f"  Round 2          : NetGain>{R2_NETGAIN_ROUND2}%  MaxDD<{R2_MAX_DD_ROUND2}%  R2>{R2_R2_ROUND2}")
     logger.info(f"  Regime           : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*110}\n")
 

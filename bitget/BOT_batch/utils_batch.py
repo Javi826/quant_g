@@ -750,11 +750,11 @@ def print_strategies_summary(validation_results):
     lines.append(f"\n{'─'*110}")
     lines.append(f"  STRATEGIES SUMMARY")
     lines.append(f"{'─'*110}")
-    lines.append(f"  {'Strategy':<25} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
+    lines.append(f"  {'Strategy':<27} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
     lines.append(f"  {'-'*110}")
     for v in validation_results:
         lines.append(
-            f"  {v['strategy_id']:<25} {v['verdict']:<14} {v['round']:<16} "
+            f"  {v['strategy_id']:<27} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
@@ -1151,7 +1151,7 @@ def _decorrelate(
     lines.append(f"  {'─'*85}")
     logger.info("\n".join(lines))
 
-    return [(sid, oos1_map[sid]) for sid in selected if sid in oos1_map]
+    return [(sid, oos1_map[sid]) for sid in sorted(selected, key=_num) if sid in oos1_map]
 
 
 def _dd_series(df: pd.DataFrame, capital: float) -> pd.Series:
