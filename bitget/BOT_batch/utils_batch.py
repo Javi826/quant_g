@@ -1258,48 +1258,28 @@ def print_robustness_table(
         tail = weekly[weekly <= threshold]
         return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
 
-    def _r2(trade_logs, capital_per_strategy):
-        if not trade_logs:
-            return np.nan
-        all_tl = pd.concat(
-            [df for _, df in trade_logs], ignore_index=True
-        ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(trade_logs)
-        eq = total_capital + all_tl["profit"].cumsum().values
-        X  = np.arange(len(eq)).reshape(-1, 1)
-        y  = eq.reshape(-1, 1)
-        from sklearn.linear_model import LinearRegression as _LR
-        return round(_LR().fit(X, y).score(X, y), 3)
-
     rows = []
     for label, trade_logs in trade_logs_per_period:
         if not trade_logs:
             continue
 
-        all_tl = pd.concat(
+        all_tl        = pd.concat(
             [df for _, df in trade_logs], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
         total_capital = initial_balance * len(trade_logs)
 
-        profits   = all_tl["profit"].values
-        eq        = total_capital + np.cumsum(profits)
-        net_gain  = round((eq[-1] - total_capital) / total_capital * 100, 2)
-        cm        = np.maximum.accumulate(eq)
-        max_dd    = round(float(((eq - cm) / cm * 100).min()), 2)
-        gains     = profits[profits > 0].sum()
-        losses    = -profits[profits < 0].sum()
-        pf        = round(float(gains / losses), 3) if losses > 0 else np.inf
+        m  = compute_metrics(all_tl, capital=total_capital, name="")
+        pf = m["Profit_Factor"]
 
-        weekly              = _weekly_returns(trade_logs, initial_balance)
-        cvar10              = _cvar(weekly, pct=10)
-        avg_neg, max_neg    = _neg_streak_stats(weekly)
-        r2                  = _r2(trade_logs, initial_balance)
+        weekly           = _weekly_returns(trade_logs, initial_balance)
+        cvar10           = _cvar(weekly, pct=10)
+        avg_neg, max_neg = _neg_streak_stats(weekly)
 
         rows.append({
             "Period":       label,
-            "NetGain%":     net_gain,
-            "MaxDD%":       max_dd,
-            "R2":           r2,
+            "NetGain%":     m["Net_Gain_pct"],
+            "MaxDD%":       m["Max_DD_pct"],
+            "R2":           m["R_Squared"],
             "ProfitFactor": pf,
             "CVaR10%":      cvar10,
             "AvgNegStreak": avg_neg,

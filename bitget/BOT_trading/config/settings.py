@@ -24,7 +24,7 @@ ACCOUNTS = {
         "postgresql_enabled": True,
     },
     "00": {
-        "initial_capital": 7200,
+        "initial_capital": 10400,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "production",

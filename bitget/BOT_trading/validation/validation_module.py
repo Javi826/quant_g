@@ -391,7 +391,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     # Val Y1: Strategy IDs have implementations
     # ========================================================================
     if missing_implementation:
-        errors.append(f"Strategies WITHOUT implementation: {missing_implementation}")
+        warnings.append(f"Strategies WITHOUT implementation (will be skipped): {missing_implementation}")
     
     if unused_implementation:
         warnings.append(f"Implemented but NOT declared: {unused_implementation}")

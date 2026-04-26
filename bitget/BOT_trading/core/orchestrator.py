@@ -249,6 +249,7 @@ class BotOrchestrator:
         """
         self.logger.info("Reloading strategies...")
         self.strategies = load_strategies(self.account_number)
+        self.strategies = [s for s in self.strategies if s['id'] in IMPLEMENTED_STRATEGIES]
         
         if self.active_strategy_ids:
             from strategies.strategy_loader import apply_set_active_argument
@@ -295,6 +296,7 @@ class BotOrchestrator:
     def _load_and_validate_strategies(self) -> None:
         # Load strategies
         self.strategies = load_strategies(self.account_number)
+        self.strategies = [s for s in self.strategies if s['id'] in IMPLEMENTED_STRATEGIES]
         
         # Apply --set-active
         if self.active_strategy_ids:

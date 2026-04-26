@@ -22,9 +22,8 @@ from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from importlib import import_module
 
-# =============================================================================
 # LOGGING CONFIGURATION
-# =============================================================================
+#------------------------------------------------------------------------------
 LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -74,14 +73,59 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 1000
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 100
 N_SYMBOLS_MCIS       = 6
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 30
-OOS_MAX_DD_TH        = 11
-OOS_R2_TH            = 0.84  # 0.0 = no filter
+OOS_NETGAIN_TH       = 40
+OOS_MAX_DD_TH        = 5
+OOS_R2_TH            = 0.9  # 0.0 = no filter
 
+# ELITE
+# =============================================================================
+# OOS_NETGAIN_TH       = 40
+# OOS_MAX_DD_TH        = 10
+# OOS_R2_TH            = 0.84  # 0.0 = no filter
+# =============================================================================
+
+# BATCH
+#------------------------------------------------------------------------------
+RUN_PORTFOLIO_ANALYSIS = True
+UPDATE_OUTPUTS         = False
+RUN_BEST_COMBINATIONS  = False
+
+# STRATEGY SELECTION
+#------------------------------------------------------------------------------
+SELECTED_STRATEGIES = [
+    "06_reversal_long_1H",
+    "07_reversal_short_1H",
+    "10_parity_long_1H",
+    "20_flag_short_1H",
+    "21_parity_short_4H",
+    "23_flag_long_1H",
+    # -----------------------------------------------------------------------------
+    "03_parity_long_4H",
+    "04_reversal_short_4H",
+    "11_parity_short_1H",
+    "19_flag_short_4H",
+    "22_parity_short_6Hutc",
+    "27_orderblocks_short_1H",
+    "28_orderblocks_long_1H",
+    # -----------------------------------------------------------------------------
+# =============================================================================
+#     "02_reversal_long_4H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "17_flag_long_4H",
+#     "24_flag_long_6Hutc",
+#     "25_flag_short_6Hutc",
+#     "26_orderblocks_long_4H",
+#     "29_orderblocks_short_6Hutc",
+#     "30_orderblocks_long_6Hutc",
+# =============================================================================
+]
 # =============================================================================
 # -----------------------------------------------------------------------------
 # =============================================================================
@@ -108,12 +152,6 @@ DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
-
-# BATCH
-#------------------------------------------------------------------------------
-RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = True
-RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
 #------------------------------------------------------------------------------
@@ -168,36 +206,6 @@ OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = 
 # Correlation analysis
 #------------------------------------------------------------------------------
 CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated strategies
-
-# Strategy selection
-SELECTED_STRATEGIES = [
-    "06_reversal_long_1H",
-    "07_reversal_short_1H",
-    "10_parity_long_1H",
-    "20_flag_short_1H",
-    "23_flag_long_1H",
-    "21_parity_short_4H",
-    # -----------------------------------------------------------------------------
-    "11_parity_short_1H",
-    "27_orderblocks_short_1H",
-    "28_orderblocks_long_1H",
-    "03_parity_long_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "21_parity_short_4H",
-    "02_reversal_long_4H",
-    "04_reversal_short_4H",
-    "13_orderblocks_short_4H",
-    "26_orderblocks_long_4H",
-    "24_flag_long_6Hutc",
-    "25_flag_short_6Hutc",
-    "12_parity_long_6Hutc",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "22_parity_short_6Hutc",
-    "29_orderblocks_short_6Hutc",
-    "30_orderblocks_long_6Hutc",
-]
 
 # =============================================================================
 # MAIN FUNCTION
