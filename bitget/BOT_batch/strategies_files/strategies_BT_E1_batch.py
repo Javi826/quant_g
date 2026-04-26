@@ -1,6 +1,6 @@
 """
 strategies_BT_E1_batch.py — Input for BOT_batch. Do not edit manually.
-Generated from strategies_E1.py. Re-run this script after each production deploy.
+Generated from strategies_NN.py. Re-run this script after each production deploy.
 """
 
 STRATEGIES = [

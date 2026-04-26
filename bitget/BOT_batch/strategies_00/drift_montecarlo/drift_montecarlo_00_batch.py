@@ -19,8 +19,8 @@ DRIFT_REFERENCE = {
         'p50_winrate': 48.9,
     },
     '06_reversal_long_1H': {
-        'p5_winrate':  52.4,
-        'p50_winrate': 54.1,
+        'p5_winrate':  64.4,
+        'p50_winrate': 64.8,
     },
     '07_reversal_short_1H': {
         'p5_winrate':  64.1,
@@ -39,7 +39,7 @@ DRIFT_REFERENCE = {
         'p50_winrate': 66.3,
     },
     '11_parity_short_1H': {
-        'p5_winrate':  65.4,
+        'p5_winrate':  65.0,
         'p50_winrate': 66.4,
     },
     '12_parity_long_6Hutc': {
@@ -48,15 +48,15 @@ DRIFT_REFERENCE = {
     },
     '13_orderblocks_short_4H': {
         'p5_winrate':  41.3,
-        'p50_winrate': 42.9,
+        'p50_winrate': 42.8,
     },
     '17_flag_long_4H': {
         'p5_winrate':  46.6,
         'p50_winrate': 49.1,
     },
     '19_flag_short_4H': {
-        'p5_winrate':  57.6,
-        'p50_winrate': 60.0,
+        'p5_winrate':  57.7,
+        'p50_winrate': 60.2,
     },
     '20_flag_short_1H': {
         'p5_winrate':  65.7,

@@ -71,14 +71,17 @@ SHOW_PROGRESS = False
 # RUN CONFIGURATION
 # =============================================================================
 
-# RUN + MC + THs
+# RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME   = "00"  
 STRATEGIES_LOOP_NAME  = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
 N_PATHS_IS            = 100
 N_SYMBOLS_MCIS        = 6
-OOS_NETGAIN_TH        = 21
+#------------------------------------------------------------------------------
+OOS_NETGAIN_TH        = 20
 OOS_MAX_DD_TH         = 16
+OOS_R2_TH             = 0.80  # 0.0 = no filter
+
 
 # FILES
 #------------------------------------------------------------------------------
@@ -106,7 +109,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = True
+UPDATE_OUTPUTS         = False
 RUN_BEST_COMBINATIONS  = False
 
 #MONTECARLO
@@ -123,38 +126,36 @@ REGIME_LOOKBACK_BARS   = 180
 REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # =============================================================================
-# VALIDATON CONFIGURATION
+# VALIDATION CONFIGURATION
 # =============================================================================
 
 # OOS1 - Validation thresholds — Round 1
 #------------------------------------------------------------------------------
-R1_NETGAIN_ROUND1  = 40
-R1_RSQUARED_ROUND1 = 0.95
-R1_PROBNEG_ROUND1  = 31
+R1_NETGAIN_ROUND1    = 20
+R1_RSQUARED_ROUND1   = 0.90
+R1_PROBNEG_ROUND1    = 60
 
-# OOS1 - Validation thresholds — Round 2 path A
+# OOS1 - Validation thresholds — Round 2
 #------------------------------------------------------------------------------
-R2A_NETGAIN_ROUND2  = 40
-R2A_RSQUARED_ROUND2 = 0.95
+R2_NETGAIN_ROUND2   = OOS_NETGAIN_TH
+R2_MAX_DD_ROUND2    = OOS_MAX_DD_TH
+R2_R2_ROUND2        = OOS_R2_TH
 
-# OOS1 - Validation thresholds — Round 2 path B
+# OOS2
 #------------------------------------------------------------------------------
-R2B_NETGAIN_ROUND2 = OOS_NETGAIN_TH
-R2B_MAX_DD_ROUND2  = OOS_MAX_DD_TH
+R_NETGAIN_OOS2      = OOS_NETGAIN_TH
+R_MAX_DD_OOS2       = OOS_MAX_DD_TH
+R_R2_OOS2           = OOS_R2_TH
+OOS2_RUN_ANALYSIS   = True
+OOS2_FOR_VALIDATION = True
 
-# OOS2 - Validation thresholds — Round OOS2
+# OOS3
 #------------------------------------------------------------------------------
-R3A_NETGAIN_ROUNDOOS2 = OOS_NETGAIN_TH
-R3A_MAX_DD_ROUNDOOS2  = OOS_MAX_DD_TH
-OOS2_RUN_ANALYSIS     = True
-OOS2_FOR_VALIDATION   = True
-
-# OOS3 - Validation thresholds — Round OOS3
-#------------------------------------------------------------------------------
-R3B_NETGAIN_ROUNDOOS3 = OOS_NETGAIN_TH
-R3B_MAX_DD_ROUNDOOS3  = OOS_MAX_DD_TH
-OOS3_RUN_ANALYSIS     = True
-OOS3_FOR_VALIDATION   = True
+R_NETGAIN_OOS3      = OOS_NETGAIN_TH
+R_MAX_DD_OOS3       = OOS_MAX_DD_TH
+R_R2_OOS3           = OOS_R2_TH
+OOS3_RUN_ANALYSIS   = True
+OOS3_FOR_VALIDATION = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -180,6 +181,16 @@ SELECTED_STRATEGIES = [
     "17_flag_long_4H",
     "19_flag_short_4H",
     "20_flag_short_1H",
+    "21_parity_short_4H",
+    "22_parity_short_6Hutc",
+    "23_flag_long_1H",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
+    "26_orderblocks_long_4H",
+    "27_orderblocks_short_1H",
+    "28_orderblocks_long_1H",
+    "29_orderblocks_short_6Hutc",
+    "30_orderblocks_long_6Hutc",
 ]
 
 # =============================================================================
@@ -494,16 +505,22 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 6 — Validation
     # -------------------------------------------------------------------------
-    bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
-    #+
-    equity_hist    = best_bt_row.get("sim_balance_history", None)
-    eq_from_trades = INITIAL_BALANCE + trade_log.sort_values("sell_time")["profit"].cumsum().values
-    r2             = calc_r2_from_equity_hist({"balance": eq_from_trades.tolist()})
-
-
+    # prob_negative from MC OOS baseline (always from baseline)
     path_grouped_oos  = df_portfolio_oos.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
     path_grouped_oos["Net_Gain_pct"] = (path_grouped_oos["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
     prob_negative_oos = (path_grouped_oos["Net_Gain_pct"] < 0).mean() * 100
+
+    # Round 1 — evaluated on regime-filtered trades
+    if len(trade_log_regime) > 0:
+        m_r1           = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
+        bt_netgain_pct = m_r1["Net_Gain_pct"]
+        r2             = m_r1["R_Squared"]
+        dd_r1          = m_r1["Max_DD_pct"]
+    else:
+        m_r1           = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
+        bt_netgain_pct = best_bt_row["Net_Gain"] / INITIAL_BALANCE * 100
+        r2             = m_r1["R_Squared"]
+        dd_r1          = m_r1["Max_DD_pct"]
 
     ok_netgain  = bt_netgain_pct    > R1_NETGAIN_ROUND1
     ok_r2       = r2                > R1_RSQUARED_ROUND1
@@ -511,64 +528,51 @@ def run_batch(strategy_config: dict) -> None:
     approved    = ok_netgain and ok_r2 and ok_prob_neg
 
     _v1 = ("REJECTED" if not approved else "VALIDATED").ljust(13)
-    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(-abs(float(best_bt_row.get('DD_pct', np.nan))), 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
+    logger.info(f"STAGE 6  ── Backtest 00S1 R1       ── {'🔴' if not approved else '⭐'} {_v1} NetGain={bt_netgain_pct:.2f}% DD={round(dd_r1, 2)}% R2={r2:.2f} ProbNeg={prob_negative_oos:.1f}%")
 
     approved_regime = False
-    round_path      = ""
 
     if not approved and len(trade_log_regime) > 0:
-        df_filt = trade_log_regime.sort_values("sell_time").reset_index(drop=True)
-        equity_filt = INITIAL_BALANCE + df_filt["profit"].cumsum().values
-        r2_filtered = calc_r2_from_equity_hist({"balance": equity_filt.tolist()})
-        m_r2        = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name="")
+        m_r2        = m_r1  # already computed above
         netgain_r2  = m_r2["Net_Gain_pct"]
         dd_r2       = m_r2["Max_DD_pct"]
+        r2_filtered = m_r2["R_Squared"]
 
-        ok_netgain_a    = netgain_r2  > R2A_NETGAIN_ROUND2
-        ok_r2_a         = r2_filtered > R2A_RSQUARED_ROUND2
-        approved_path_a = ok_netgain_a and ok_r2_a
+        ok_netgain_r2   = netgain_r2  > R2_NETGAIN_ROUND2
+        ok_max_dd_r2    = abs(dd_r2)  < R2_MAX_DD_ROUND2
+        ok_r2_r2        = r2_filtered > R2_R2_ROUND2
+        approved_regime = ok_netgain_r2 and ok_max_dd_r2 and ok_r2_r2
 
-        ok_netgain_b    = netgain_r2  > R2B_NETGAIN_ROUND2
-        ok_max_dd_b     = abs(dd_r2)  < R2B_MAX_DD_ROUND2
-        approved_path_b = ok_netgain_b and ok_max_dd_b
-
-        approved_regime = approved_path_a or approved_path_b
-        round_path      = "A" if approved_path_a else ("B" if approved_path_b else "")
-
-        _v2 = (f"VALIDATED ({round_path})" if approved_regime else "REJECTED").ljust(13)
-        logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'⭐' if approved_path_a else '🟢' if approved_path_b else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
-
+        _v2 = ("VALIDATED" if approved_regime else "REJECTED").ljust(13)
+        logger.info(f"STAGE 6  ── Backtest 00S1 R2       ── {'🟢' if approved_regime else '🔴'} {_v2} NetGain={netgain_r2:.2f}% DD={dd_r2:.2f}% R2={r2_filtered:.2f}")
         approved = approved or approved_regime
 
     _round = "—"
     if approved and not approved_regime:
         _round = "Round 1"
     elif approved and approved_regime:
-        _round = f"Round 2 ({round_path})"
+        _round = "Round 2"
 
     _verdict = "🔴 REJECTED"
     if approved and not approved_regime:
         _verdict = "⭐ VALIDATED"
     elif approved and approved_regime:
-        if round_path == "A":
-            _verdict = "⭐ VALIDATED"
-        else:
-            _verdict = "🟢 VALIDATED"
+        _verdict = "🟢 VALIDATED"
 
     _validation_results.append({
         "strategy_id":     STRATEGY_ID,
         "verdict":         _verdict,
         "round":           _round,
         "net_gain_pct":    round(bt_netgain_pct, 2),
-        "dd_pct":          round(-abs(float(best_bt_row.get("DD_pct", np.nan))), 2),
-        "win_ratio":       round(float(best_bt_row.get("Win_Ratio", np.nan)) * 100, 1),
+        "dd_pct":          round(dd_r1, 2),
+        "win_ratio":       round(m_r1["Win_Rate"], 1),
         "r2":              r2,
         "prob_neg_pct":    round(prob_negative_oos, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
     })
 
-    # If validated in Round 2, overwrite display metrics with regime trade log values
+    # If validated in Round 2, overwrite display metrics (same as Round 1 here since both use regime)
     if approved_regime:
         _validation_results[-1].update({
             "net_gain_pct": round(m_r2["Net_Gain_pct"], 2),
@@ -577,7 +581,7 @@ def run_batch(strategy_config: dict) -> None:
             "r2":           r2_filtered,
         })
 
-    # -------------------------------------------------------------------------
+# -------------------------------------------------------------------------
     # BLOCK 6b — OOS2 Analysis (informational + optional validation filter)
     # -------------------------------------------------------------------------
     approved_oos2  = False
@@ -668,9 +672,10 @@ def run_batch(strategy_config: dict) -> None:
             metrics_oos2 = compute_metrics(trade_log_oos2, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_oos2")
             print_metrics_table([metrics_oos2], f"  Metrics — {STRATEGY_ID} (OOS2 Regime)")
 
-            ok_oos2_netgain = metrics_oos2["Net_Gain_pct"] > R3A_NETGAIN_ROUNDOOS2
-            ok_oos2_dd      = abs(metrics_oos2["Max_DD_pct"]) < R3A_MAX_DD_ROUNDOOS2
-            approved_oos2   = ok_oos2_netgain and ok_oos2_dd
+            ok_oos2_netgain = metrics_oos2["Net_Gain_pct"] > R_NETGAIN_OOS2
+            ok_oos2_dd      = abs(metrics_oos2["Max_DD_pct"]) < R_MAX_DD_OOS2
+            ok_oos2_r2      = metrics_oos2["R_Squared"] > R_R2_OOS2
+            approved_oos2   = ok_oos2_netgain and ok_oos2_dd and ok_oos2_r2
 
             _v_oos2 = ("VALIDATED" if approved_oos2 else "REJECTED").ljust(13)
             logger.info(
@@ -793,9 +798,10 @@ def run_batch(strategy_config: dict) -> None:
             metrics_oos3 = compute_metrics(trade_log_oos3, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_oos3")
             print_metrics_table([metrics_oos3], f"  Metrics — {STRATEGY_ID} (OOS3 Regime)")
 
-            ok_oos3_netgain = metrics_oos3["Net_Gain_pct"] > R3B_NETGAIN_ROUNDOOS3
-            ok_oos3_dd      = abs(metrics_oos3["Max_DD_pct"]) < R3B_MAX_DD_ROUNDOOS3
-            approved_oos3   = ok_oos3_netgain and ok_oos3_dd
+            ok_oos3_netgain = metrics_oos3["Net_Gain_pct"] > R_NETGAIN_OOS3
+            ok_oos3_dd      = abs(metrics_oos3["Max_DD_pct"]) < R_MAX_DD_OOS3
+            ok_oos3_r2      = metrics_oos3["R_Squared"] > R_R2_OOS3
+            approved_oos3   = ok_oos3_netgain and ok_oos3_dd and ok_oos3_r2
 
             _v_oos3 = ("VALIDATED" if approved_oos3 else "REJECTED").ljust(13)
             logger.info(
@@ -1049,6 +1055,7 @@ if __name__ == "__main__":
     logger.info(f"  BATCH START")
     logger.info(f"{'='*110}")
     logger.info(f"  Strategies set   : {STRATEGIES_SET_NAME}")
+    logger.info(f"  N_SYMBOLS_MCIS   : {N_SYMBOLS_MCIS}")
     logger.info(f"  Loop config      : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update   : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS          : 🟢 {DATA_FOLDER_IS}")
@@ -1056,8 +1063,7 @@ if __name__ == "__main__":
     logger.info(f"  Data OOS2        : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
     logger.info(f"  Data OOS3        : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
     logger.info(f"  Round 1          : NetGain>{R1_NETGAIN_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
-    logger.info(f"  Round 2 (A)      : NetGain>{R2A_NETGAIN_ROUND2}%  R2>{R2A_RSQUARED_ROUND2}")
-    logger.info(f"  Round 2 (B)      : NetGain>{R2B_NETGAIN_ROUND2}%  MaxDD<{R2B_MAX_DD_ROUND2}%")
+    logger.info(f"  Round 2          : NetGain>{OOS_NETGAIN_TH}%  MaxDD<{OOS_MAX_DD_TH}%  R2>{OOS_R2_TH}")
     logger.info(f"  Regime           : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*110}\n")
 
