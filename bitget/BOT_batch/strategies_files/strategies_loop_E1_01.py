@@ -7,7 +7,7 @@ This file is NOT updated by the batch automatically.
 STRATEGIES_LOOP = [
     {
         "id": "07_reversal_short_1H",
-        "n_symbols": 3,
+        "n_symbols": 5,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -20,7 +20,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "10_parity_long_1H",
-        "n_symbols": 3,
+        "n_symbols": 5,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -28,32 +28,6 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10],
             "MA_PERIOD": [10],
             "TP_PCT": [2],
-            "SL_PCT": [3],
-        },
-    },
-    {
-        "id": "27_orderblocks_short_1H",
-        "n_symbols": 3,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [75],
-            "LOOKBACK": [75],
-            "TOLERANCE": [25],
-            "IMPULSE": [0.05],
-            "TP_PCT": [2],
-            "SL_PCT": [3],
-        },
-    },
-    {
-        "id": "28_orderblocks_long_1H",
-        "n_symbols": 3,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [75],
-            "LOOKBACK": [50],
-            "TOLERANCE": [45],
-            "IMPULSE": [0.02],
-            "TP_PCT": [3],
             "SL_PCT": [3],
         },
     },

@@ -275,15 +275,6 @@ def detect_signals_for_strategy(
                     live_trading=True
                 )
                 
-            elif strategy_id == '22_parity_short_6Hutc':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-                
             elif strategy_id == '23_flag_long_1H':
                 signals = flag_long(
                     arr,
@@ -377,7 +368,7 @@ def get_implemented_strategies() -> set:
         '19_flag_short_4H',
         '20_flag_short_1H',
         '21_parity_short_4H',
-        '22_parity_short_6Hutc',
+        #'22_parity_short_6Hutc',
         "23_flag_long_1H",
         '27_orderblocks_short_1H',
         '28_orderblocks_long_1H',

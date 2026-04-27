@@ -297,30 +297,4 @@ STRATEGIES_LOOP = [
             "SL_PCT": [2,3],
         },
     },
-    {
-        "id": "29_orderblocks_short_6Hutc",
-        "n_symbols": 20,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [50,100,150],
-            "TOLERANCE": [25,35,45],
-            "IMPULSE": [0.02,0.05,0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    {
-        "id": "30_orderblocks_long_6Hutc",
-        "n_symbols": 20,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [50,100,150],
-            "TOLERANCE": [25,35,45],
-            "IMPULSE": [0.02,0.05,0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
 ]
