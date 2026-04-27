@@ -534,11 +534,17 @@ class BotOrchestrator:
         # TIMEOUT CHECK: Increment candles and close expired positions
         # ========================================================================
         self._process_candle_timeouts(strategies_to_process)
+    
+
+        # ========================================================================
+        # SIGNAL SEARCH: + BTC WINDOW Look for new entries in strategies without positions
+        # ========================================================================
+        btc_consolidation = datetime.now(HOUR_ZONE).hour < 3
+        if not btc_consolidation:
+            self._search_signals(strategies_to_process)
+        else:
+            self.logger.info("[REGIME0] BTC 1D consolidation window (00-03 UTC) - skipping signal search")
         
-        # ========================================================================
-        # SIGNAL SEARCH: Look for new entries in strategies without positions
-        # ========================================================================
-        self._search_signals(strategies_to_process)
         
         self.logger.info("Signal cycle completed")
         self.logger.info(f"{'=' * 48}\n")

@@ -73,13 +73,13 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 100
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 10000
 N_SYMBOLS_MCIS       = 6
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 40
-OOS_MAX_DD_TH        = 5
-OOS_R2_TH            = 0.9  # 0.0 = no filter
+OOS_MAX_DD_TH        = 15
+OOS_R2_TH            = 0.84  # 0.0 = no filter
 
 # ELITE
 # =============================================================================
