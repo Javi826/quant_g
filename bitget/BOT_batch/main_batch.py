@@ -38,17 +38,18 @@ from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.st_tools import get_n_obs, save_all_trades_to_csv
 from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
-from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,get_best_r2_combination,print_robustness_table
+from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,print_best_r2_robustness_table,print_robustness_table
 from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit
-from utils_batch import compute_metrics, print_metrics_table, calc_r2_from_equity_hist
+from utils_batch import compute_metrics, print_metrics_table
 from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv
 from utils_batch import print_strategies_summary, print_update_status, print_portfolio_metrics_table
-from utils_batch import print_all_curves_table, print_best_combinations, plot_filter_comparison, plot_portfolio_comparison
+from utils_batch import print_all_curves_table, find_best_r2_combination_ids, plot_filter_comparison, plot_portfolio_comparison
 from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
 from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
+_trade_logs_is_regime: list = []
 _trade_logs_baseline : list = []
 _trade_logs_regime01 : list = []
 _trade_logs_oos2     : list = []
@@ -86,16 +87,16 @@ OOS_R2_TH            = 0.80  # 0.0 = no filter
 # =============================================================================
 # # ELITE
 # #----------------------------------------------------------------------------
-# OOS_NETGAIN_TH       = 30
+# OOS_NETGAIN_TH       = 60
 # OOS_MAX_DD_TH        = 5
-# OOS_R2_TH            = 0.95  # 0.0 = no filter
+# OOS_R2_TH            = 0.94  
 # =============================================================================
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = False
-RUN_BEST_COMBINATIONS  = False
+UPDATE_OUTPUTS         = True
+RUN_BEST_COMBINATIONS  = True
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -357,6 +358,7 @@ def run_batch(strategy_config: dict) -> None:
     is_trade_log.columns = is_trade_log.columns.str.lower().str.strip()
     is_trade_log["buy_time"] = pd.to_datetime(is_trade_log["buy_time"])
 
+
     bins_to_filter = analyze_regime_is(
         trade_log_is     = is_trade_log,
         timeframe        = TIMEFRAME,
@@ -377,6 +379,55 @@ def run_batch(strategy_config: dict) -> None:
         force_direction_filter= FORCE_DIRECTION_FILTER,
         metrics_cache         = metrics_cache_is,
     )
+    
+    # -------------------------------------------------------------------------
+    # BLOCK 2b — Backtest IS with regime filter (for best R² combination)
+    # -------------------------------------------------------------------------
+    if RUN_BEST_COMBINATIONS:
+        btc_cache_is_r = {}
+        btc_1d_df_is   = load_btc_for_timeframe(DATA_FOLDER_IS, '1Dutc', btc_cache_is_r)
+        btc_tf_df_is   = load_btc_for_timeframe(DATA_FOLDER_IS, TIMEFRAME, btc_cache_is_r) \
+                         if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_is
+
+        ohlcv_arrays_is_regime = {}
+        for sym, arr in ohlcv_arr_is_regime.items():
+            signals = signal_fn(arr, **bt_signal_params, live_trading=False)
+            if bins_to_filter:
+                signals = filter_signals_by_regime(
+                    signals        = signals,
+                    ts             = arr['ts'],
+                    btc_1d_df      = btc_1d_df_is,
+                    btc_tf_df      = btc_tf_df_is,
+                    bins_to_filter = bins_to_filter,
+                    ma_period      = R0_MA_PERIOD,
+                    long_th        = R0_LONG_TH,
+                    short_th       = R0_SHORT_TH,
+                    families       = FAMILIES,
+                    lookback_bars  = REGIME_LOOKBACK_BARS,
+                    hurst_window   = HURST_WINDOW,
+                    er_window      = ER_WINDOW,
+                    atr_window     = ATR_WINDOW,
+                    pe_window      = PE_WINDOW,
+                    pe_order       = PE_ORDER,
+                    metrics_cache  = metrics_cache_is,
+                )
+            ohlcv_arrays_is_regime[sym] = {k: v.copy() if hasattr(v, "copy") else v for k, v in arr.items()}
+            ohlcv_arrays_is_regime[sym]["signal"] = signals
+
+        is_result_regime = run_grid_backtest(
+            ohlcv_arrays_is_regime,
+            sell_after=best_params["SELL_AFTER"],
+            tp_pct=best_params["TP_PCT"],
+            sl_pct=best_params["SL_PCT"],
+            order_amount=ORDER_AMOUNT,
+        )
+
+        is_trade_log_regime = is_result_regime["__PORTFOLIO__"]["trade_log"].copy()
+        is_trade_log_regime.columns = is_trade_log_regime.columns.str.lower().str.strip()
+        is_trade_log_regime["buy_time"] = pd.to_datetime(is_trade_log_regime["buy_time"])
+
+        if len(is_trade_log_regime) > 0:
+            _trade_logs_is_regime.append((STRATEGY_ID, is_trade_log_regime.copy()))
 
     # -------------------------------------------------------------------------
     # BLOCK 3 — Backtest OOS Baseline
@@ -915,7 +966,7 @@ def run_portfolio_analysis():
     print_strategies_summary(_validation_results)
 
     if _trade_logs_baseline:
-        logger.info(f"\n{'─'*110}\n  PORTFOLIO ANALYSIS\n{'─'*110}")
+        logger.info(f"\n{'-'*110}\n  PORTFOLIO ANALYSIS\n{'-'*110}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
         if _trade_logs_regime01:
@@ -961,16 +1012,6 @@ def run_portfolio_analysis():
             title="Portfolio — Validated only",
         )
 
-    if RUN_BEST_COMBINATIONS and validated_regime01:
-        best_r2_logs = get_best_r2_combination(validated_regime01, INITIAL_BALANCE, precomputed_metrics=r01_metrics)
-        plot_portfolio_comparison(
-            trade_logs_baseline=best_r2_logs,
-            trade_logs_regime01=best_r2_logs,
-            data_folder=DATA_FOLDER_OOS1,
-            initial_balance=INITIAL_BALANCE,
-            title="Best R² Combination — Validated Regime 0+1",
-        )
-
     if validated_oos2:
         plot_portfolio_comparison(
             trade_logs_baseline=validated_oos2,
@@ -989,22 +1030,35 @@ def run_portfolio_analysis():
             title="Portfolio OOS3 — Validated only",
         )
 
-    if RUN_BEST_COMBINATIONS:
-        logger.info(f"\n{'─'*110}\n  BEST COMBINATIONS\n{'─'*110}")
-        if _trade_logs_baseline:
-            print_best_combinations(_trade_logs_baseline, "Baseline — All", INITIAL_BALANCE)
-        if _trade_logs_regime01:
-            print_best_combinations(_trade_logs_regime01, "Regime 0+1 — All", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
-        if validated_baseline:
-            print_best_combinations(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
-        if validated_regime01:
-            print_best_combinations(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE, precomputed_metrics=r01_metrics)
+    if RUN_BEST_COMBINATIONS and validated_regime01:
+        best_r2_combo_ids = find_best_r2_combination_ids(
+            trade_logs_is = [(sid, df) for sid, df in _trade_logs_is_regime if sid in validated_ids],
+            initial_balance = INITIAL_BALANCE,
+        )
+        is_combined = pd.concat(
+            [df for sid, df in _trade_logs_is_regime if sid in best_r2_combo_ids],
+            ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        is_r2 = compute_metrics(is_combined, capital=INITIAL_BALANCE * len(best_r2_combo_ids), name="")["R_Squared"]
 
+        strategies_str = "\n".join(f"    · {sid}" for sid in best_r2_combo_ids)
+        logger.info(
+            f"\n{'-'*110}\n  BEST R² COMBINATION (selected on IS) — R²={is_r2:.3f}\n{'-'*110}\n{strategies_str}\n{'-'*110}"
+        )
+        print_best_r2_robustness_table(
+            combo_ids            = best_r2_combo_ids,
+            trade_logs_per_period= [
+                ("OOS1", validated_regime01),
+                ("OOS2", validated_oos2),
+                ("OOS3", validated_oos3),
+            ],
+            initial_balance      = INITIAL_BALANCE,
+        )
     # -------------------------------------------------------------------------
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if validated_regime01:
-        logger.info(f"\n{'─'*110}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*110}")
+        logger.info(f"\n{'='*110}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'='*110}")
 
         survivors = decorrelate_by_dd(
             trade_logs_oos1     = validated_regime01,
@@ -1053,8 +1107,16 @@ def run_portfolio_analysis():
 # =============================================================================
 # MAIN
 # =============================================================================
+from pathlib import Path
+
+def _short_path(full_path: str, from_part: str = "expanding") -> str:
+    parts = Path(full_path).parts
+    idx = next((i for i, p in enumerate(parts) if p == from_part), None)
+    return str(Path(*parts[idx:])) if idx is not None else full_path
 
 if __name__ == "__main__":
+    logger = logging.getLogger("BOT_batch.main_batch")
+    start  = time.time()
 
     _loop_map  = {s["id"]: s for s in STRATEGIES_LOOP}
     STRATEGIES = []
@@ -1065,9 +1127,6 @@ if __name__ == "__main__":
             continue
         STRATEGIES.append({**s, **loop})
 
-    start  = time.time()
-    logger = logging.getLogger("BOT_batch.main_batch")
-
     logger.info(f"\n{'='*110}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*110}")
@@ -1075,15 +1134,14 @@ if __name__ == "__main__":
     logger.info(f"  N_SYMBOLS_MCIS     : {N_SYMBOLS_MCIS}")
     logger.info(f"  Loop config        : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update     : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
-    logger.info(f"  Data IS            : 🟢 {DATA_FOLDER_IS}")
-    logger.info(f"  Data OOS1          : 🟢 {DATA_FOLDER_OOS1}")
-    logger.info(f"  Data OOS2          : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS2}")
-    logger.info(f"  Data OOS3          : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {DATA_FOLDER_OOS3}")
+    logger.info(f"  Data IS            : 🟢 {_short_path(DATA_FOLDER_IS)}")
+    logger.info(f"  Data OOS1          : 🟢 {_short_path(DATA_FOLDER_OOS1)}")
+    logger.info(f"  Data OOS2          : {'🟢' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
+    logger.info(f"  Data OOS3          : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS3)}")
     logger.info(f"  Round 1 OOS1       : NetGain>{R1_NETGAIN_ROUND1}%  MaxDD<{R1_MAX_DD_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
     logger.info(f"  Round 2 + All OOSs : NetGain>{R2_NETGAIN_ROUND2}%  MaxDD<{R2_MAX_DD_ROUND2}%  R2>{R2_R2_ROUND2}")
     logger.info(f"  Regime             : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*110}\n")
-
     strategies_to_run = (
         [s for s in STRATEGIES if s["id"] in SELECTED_STRATEGIES]
         if SELECTED_STRATEGIES else STRATEGIES

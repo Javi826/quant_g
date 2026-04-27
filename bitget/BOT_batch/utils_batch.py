@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from shared_market_regime.regime_common import load_btc_for_timeframe, calc_all_metrics_at_time,calculate_max_dd_pct
 from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction
+from itertools import combinations as _combinations
 from backtesters.ZX_compute_BT import INITIAL_BALANCE
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
@@ -92,13 +93,13 @@ def analyze_regime_is(
     directions = []
     families_  = []
 
-    # DEBUG no-lookahead check — remove after validation
 # =============================================================================
+#     # DEBUG no-lookahead check — remove after validation
 #     first_trade = trade_log_is.iloc[0]
 #     closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
 #     closed_tf = btc_tf_df[btc_tf_df['ts'] < first_trade['buy_time']]
 #     logger.info(f"DEBUG lookahead | buy_time={first_trade['buy_time']} | last 1D bar={closed_1d.iloc[-1]['ts']} | last {timeframe} bar={closed_tf.iloc[-1]['ts']}")
-#
+# 
 # =============================================================================
 
     for _, trade in trade_log_is.iterrows():
@@ -633,7 +634,7 @@ def save_strategies_pr(strategies_batch_path, output_path, validation_results, b
     with open(output_path, "w") as f:
         f.write("\n".join(pr_lines) + "\n")
  
-    logger.info(f"\n{'─'*110}\n  ✅ strategies_NN_batch.py generated → {output_path}\n{'─'*110}")
+    logger.info(f"\n{'─'*110}\n  ✅ strategies_OO/E1_batch.py generated\n{'─'*110}")
  
 
 
@@ -963,118 +964,150 @@ def print_all_curves_table(trade_logs, label, initial_balance):
 # =============================================================================
 # HELPER — PRINT BEST COMBINATIONS
 # =============================================================================
-def print_best_combinations(trade_logs, label, initial_balance, precomputed_metrics=None):
+def find_best_r2_combination_ids(
+    trade_logs_is: list,
+    initial_balance: float,
+    precomputed_metrics: dict = None,
+) -> list:
     """
-    Compute and print best strategy combinations by Net Gain, R² and Profit Factor.
-    trade_logs         : list of (strategy_id, trade_log_df)
-    precomputed_metrics: optional dict {strategy_id: metrics} to avoid recalculation
-    """
-    from itertools import combinations as _combinations
-    def _num(sid):
-        for part in sid.split("_"):
-            if part.isdigit():
-                return int(part)
-        return 0
-    named   = {sid: df for sid, df in trade_logs}
-    metrics = precomputed_metrics or {
-        sid: compute_metrics(df, capital=initial_balance, name=sid)
-        for sid, df in named.items()
-    }
-    combo_results = []
-    for r in range(1, len(named) + 1):
-        for combo in _combinations(named.keys(), r):
-            if len(combo) == 1:
-                sid = combo[0]
-                m   = metrics.get(sid)
-                if m:
-                    combo_results.append({**m, "Curve": str(_num(sid))})
-            else:
-                combo_tl = pd.concat(
-                    [named[sid] for sid in combo], ignore_index=True
-                ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-                capital  = initial_balance * len(combo)
-                nums     = "+".join(str(_num(sid)) for sid in sorted(combo, key=_num))
-                combo_results.append(compute_metrics(combo_tl, capital=capital, name=nums))
-    combo_df    = pd.DataFrame(combo_results)
-    combo_df_3  = combo_df[combo_df["Curve"].str.contains(r"\+.*\+", regex=True)]
+    Find the strategy combination with highest R² on IS trade logs.
+    Returns list of strategy IDs (not trade logs).
 
-    best_ng    = combo_df_3.loc[combo_df_3["Net_Gain_pct"].idxmax()] if not combo_df_3.empty else combo_df.loc[combo_df["Net_Gain_pct"].idxmax()]
-    best_r2    = combo_df.loc[combo_df["R_Squared"].idxmax()]
-    best_pf_df = (combo_df_3 if not combo_df_3.empty else combo_df)
-    best_pf_df = best_pf_df[best_pf_df["Profit_Factor"] != float("inf")]
-    best_pf    = best_pf_df.loc[best_pf_df["Profit_Factor"].idxmax()] if not best_pf_df.empty else best_ng
-
-    rows = [
-        ("💵 Net Gain",     best_ng),
-        ("📈 R²",           best_r2),
-        ("💰 ProfitFactor", best_pf),
-    ]
-    lines = []
-    lines.append(f"\n{'─'*110}")
-    lines.append(f"  BEST COMBINATIONS — {label}")
-    lines.append(f"{'─'*110}")
-    lines.append(f"  {'Metric':<16} {'Combo':<20} {'NetGain%':>10} {'DD%':>8} {'Win%':>7} {'R2':>7} {'ProfFactor':>12}")
-    lines.append(f"  {'-'*103}")
-    for lbl, row in rows:
-        pf_str = f"{row['Profit_Factor']:>11.3f}" if row['Profit_Factor'] != float("inf") else f"{'∞':>12}"
-        lines.append(
-            f"  {lbl:<16} {str(row['Curve']):<20} {row['Net_Gain_pct']:>9.2f}% "
-            f"{row['Max_DD_pct']:>7.2f}% {row['Win_Rate']:>6.1f}% {row['R_Squared']:>7.3f} {pf_str}"
-        )
-    lines.append(f"  {'─'*103}")
-    logger.info("\n".join(lines))
-    
-def get_best_r2_combination(trade_logs, initial_balance, precomputed_metrics=None):
-    """
-    Find the strategy combination with highest R² and return its trade logs.
-    
     Args:
-        trade_logs          : list of (strategy_id, trade_log_df)
+        trade_logs_is       : list of (strategy_id, trade_log_df) from IS period
         initial_balance     : capital per strategy
         precomputed_metrics : optional dict {strategy_id: metrics}
-    
+
     Returns:
-        list of (strategy_id, trade_log_df) for the best R² combination
+        list of strategy_ids forming the best R² combination
     """
-    from itertools import combinations as _combinations
-    
-    def _num(sid):
-        for part in sid.split("_"):
-            if part.isdigit():
-                return int(part)
-        return 0
-    
-    named   = {sid: df for sid, df in trade_logs}
+    named   = {sid: df for sid, df in trade_logs_is}
     metrics = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
         for sid, df in named.items()
     }
-    
+
     best_r2    = -1.0
-    best_combo = None
-    
+    best_combo = list(named.keys())
+
     for r in range(1, len(named) + 1):
         for combo in _combinations(named.keys(), r):
             if len(combo) == 1:
-                sid = combo[0]
-                m   = metrics.get(sid)
-                r2  = m["R_Squared"] if m else -1.0
+                r2 = metrics.get(combo[0], {}).get("R_Squared", -1.0)
             else:
                 combo_tl = pd.concat(
                     [named[sid] for sid in combo], ignore_index=True
-                ).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-                capital  = initial_balance * len(combo)
-                m        = compute_metrics(combo_tl, capital=capital, name="")
-                r2       = m["R_Squared"]
-    
+                ).sort_values("sell_time").reset_index(drop=True)
+                r2 = compute_metrics(combo_tl, capital=initial_balance * len(combo), name="")["R_Squared"]
+
             if r2 > best_r2:
                 best_r2    = r2
-                best_combo = combo
-    
-    if best_combo is None:
-        return trade_logs
-    
-    return [(sid, named[sid]) for sid in best_combo]
+                best_combo = list(combo)
+
+    logger.debug(f"Best R² combination on IS: {best_combo} — R²={best_r2:.3f}")
+    return best_combo
+
+
+def print_best_r2_robustness_table(
+    combo_ids: list,
+    trade_logs_per_period: list,
+    initial_balance: float,
+) -> None:
+    """
+    Evaluate a fixed strategy combination (selected on IS) across OOS periods.
+    Prints robustness table with combined portfolio metrics per period.
+
+    Args:
+        combo_ids            : list of strategy IDs forming the fixed combination
+        trade_logs_per_period: list of (period_label, trade_logs)
+                               e.g. [("OOS1", validated_regime01), ("OOS2", ...), ...]
+        initial_balance      : capital per strategy
+    """
+    def _weekly_returns(trade_logs, capital_per_strategy):
+        if not trade_logs:
+            return pd.Series(dtype=float)
+        all_tl = pd.concat(
+            [df for _, df in trade_logs], ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        total_capital = capital_per_strategy * len(trade_logs)
+        all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
+        daily = all_tl.groupby("_date")["profit"].sum()
+        date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily = daily.reindex(date_range, fill_value=0.0)
+        eq = total_capital + daily.cumsum()
+        eq_series = pd.Series(eq.values, index=date_range)
+        return eq_series.resample("W").last().pct_change().dropna() * 100
+
+    def _neg_streak_stats(weekly):
+        if len(weekly) == 0:
+            return np.nan, np.nan
+        streaks, current = [], 0
+        for val in weekly:
+            if val < 0:
+                current += 1
+            else:
+                if current > 0:
+                    streaks.append(current)
+                current = 0
+        if current > 0:
+            streaks.append(current)
+        if not streaks:
+            return 0.0, 0
+        return round(float(np.mean(streaks)), 2), int(np.max(streaks))
+
+    def _cvar(weekly, pct=10):
+        if len(weekly) == 0:
+            return np.nan
+        threshold = np.percentile(weekly, pct)
+        tail = weekly[weekly <= threshold]
+        return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
+
+    rows = []
+    for label, trade_logs in trade_logs_per_period:
+        filtered = [(sid, df) for sid, df in trade_logs if sid in combo_ids]
+        if not filtered:
+            continue
+
+        all_tl        = pd.concat(
+            [df for _, df in filtered], ignore_index=True
+        ).sort_values("sell_time").reset_index(drop=True)
+        total_capital = initial_balance * len(filtered)
+
+        m              = compute_metrics(all_tl, capital=total_capital, name="")
+        pf             = m["Profit_Factor"]
+        weekly         = _weekly_returns(filtered, initial_balance)
+        cvar10         = _cvar(weekly, pct=10)
+        avg_neg, max_neg = _neg_streak_stats(weekly)
+
+        rows.append({
+            "Period":        label,
+            "NetGain%":      m["Net_Gain_pct"],
+            "MaxDD%":        m["Max_DD_pct"],
+            "R2":            m["R_Squared"],
+            "ProfitFactor":  pf if pf != float("inf") else np.nan,
+            "CVaR10%":       cvar10,
+            "AvgNegStreak":  avg_neg,
+            "MaxNegStreak":  max_neg,
+        })
+
+    if not rows:
+        logger.info("  No data for best R² robustness table.")
+        return
+
+    df = pd.DataFrame(rows)
+    sep_row = {col: "─" * 8 for col in df.columns}
+    sep_row["Period"] = "─" * 6
+    mean_row = df.drop(columns="Period").mean().round(3).to_dict()
+    mean_row["Period"] = "MEAN"
+    df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
+    lines = [
+        f"\n\033[94m{'─'*110}",
+        f"  BEST R² COMBINATION — Robustness across OOS periods",
+        f"{'─'*110}\033[0m",
+        df.to_string(index=False),
+        f"{'─'*110}",
+    ]
+    logger.info("\n".join(lines))
 
 def _decorrelate(
     trade_logs_oos1: list,
@@ -1291,6 +1324,11 @@ def print_robustness_table(
         return
 
     df = pd.DataFrame(rows)
+    sep_row = {col: "─" * 8 for col in df.columns}
+    sep_row["Period"] = "─" * 6
+    mean_row = df.drop(columns="Period").mean().round(3).to_dict()
+    mean_row["Period"] = "MEAN"
+    df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [
         f"\n\033[94m{'─'*110}",
         f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
