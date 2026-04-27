@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 14400,
+        "initial_capital": 4800,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",

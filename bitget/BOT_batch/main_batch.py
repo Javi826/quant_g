@@ -72,20 +72,23 @@ SHOW_PROGRESS = False
 
 # RUN + MC 
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 10000
-N_SYMBOLS_MCIS       = 6
-#------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 40
-OOS_MAX_DD_TH        = 15
-OOS_R2_TH            = 0.84  # 0.0 = no filter
+STRATEGIES_SET_NAME  = "E1"  
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
+N_SYMBOLS_MCIS       = 3
 
-# ELITE
+# REGULAR
+#------------------------------------------------------------------------------
+OOS_NETGAIN_TH       = 25
+OOS_MAX_DD_TH        = 10
+OOS_R2_TH            = 0.80  # 0.0 = no filter
+
 # =============================================================================
-# OOS_NETGAIN_TH       = 40
-# OOS_MAX_DD_TH        = 10
-# OOS_R2_TH            = 0.84  # 0.0 = no filter
+# # ELITE
+# #----------------------------------------------------------------------------
+# OOS_NETGAIN_TH       = 25
+# OOS_MAX_DD_TH        = 5
+# OOS_R2_TH            = 0.95  # 0.0 = no filter
 # =============================================================================
 
 # BATCH
@@ -97,21 +100,23 @@ RUN_BEST_COMBINATIONS  = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "06_reversal_long_1H",
     "07_reversal_short_1H",
     "10_parity_long_1H",
-    "20_flag_short_1H",
-    "21_parity_short_4H",
-    "23_flag_long_1H",
-    # -----------------------------------------------------------------------------
-    "03_parity_long_4H",
-    "04_reversal_short_4H",
-    "11_parity_short_1H",
-    "19_flag_short_4H",
-    "22_parity_short_6Hutc",
+    # -------------------------------------------------------------------------
+# =============================================================================
+#     "20_flag_short_1H",
+#     "23_flag_long_1H",
+#     "03_parity_long_4H",
+#     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
+#     "11_parity_short_1H",
+#     "19_flag_short_4H",
+#     "21_parity_short_4H",
+#     "22_parity_short_6Hutc",
+# =============================================================================
     "27_orderblocks_short_1H",
     "28_orderblocks_long_1H",
-    # -----------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 # =============================================================================
 #     "02_reversal_long_4H",
 #     "08_reversal_long_6Hutc",
