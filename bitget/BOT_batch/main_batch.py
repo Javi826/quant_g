@@ -74,8 +74,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 1000
 
 # REGULAR
 #------------------------------------------------------------------------------
@@ -1103,7 +1103,10 @@ def run_portfolio_analysis():
                 title="Portfolio — Decorrelated Validated (Profit filter)",
             )
             
-        combined_survivors = [(sid, df) for sid, df in survivors if sid in {s for s, _ in survivors_profit}]
+        discarded_dd     = {sid for sid, _ in validated_regime01 if sid not in {s for s, _ in survivors}}
+        discarded_profit = {sid for sid, _ in validated_regime01 if sid not in {s for s, _ in survivors_profit}}
+        discarded_both   = discarded_dd & discarded_profit
+        combined_survivors = [(sid, df) for sid, df in validated_regime01 if sid not in discarded_both]
         if combined_survivors:
             logger.info(f"\n{'═'*110}\n  CORRELATION ANALYSIS OOS1 — DD + Profit combined (threshold={CORRELATION_DD_THRESHOLD})\n{'═'*110}")
             print_all_curves_table(combined_survivors, "Decorrelated DD + Profit — Validated only", INITIAL_BALANCE)
@@ -1142,7 +1145,7 @@ if __name__ == "__main__":
     logger.info(f"  BATCH START")
     logger.info(f"{'='*110}")
     logger.info(f"  Strategies set     : {STRATEGIES_SET_NAME}")
-    logger.info(f"  N_SYMBOLS_MCIS     : {N_SYMBOLS_MCIS}")
+    #logger.info(f"  N_SYMBOLS_MCIS     : {N_SYMBOLS_MCIS}")
     logger.info(f"  Loop config        : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update     : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     logger.info(f"  Data IS            : 🟢 {_short_path(DATA_FOLDER_IS)}")
