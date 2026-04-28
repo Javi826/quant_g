@@ -6,12 +6,20 @@ These values come from Montecarlo simulations and represent the statistical
 boundaries for strategy health evaluation.
 """
 DRIFT_REFERENCE = {
-    '07_reversal_short_1H': {
-        'p5_winrate':  64.1,
-        'p50_winrate': 66.7,
-    },
     '10_parity_long_1H': {
-        'p5_winrate':  65.0,
-        'p50_winrate': 66.3,
+        'p5_winrate':  60.3,
+        'p50_winrate': 65.8,
+    },
+    '11_parity_short_1H': {
+        'p5_winrate':  64.3,
+        'p50_winrate': 69.2,
+    },
+    '23_flag_long_1H': {
+        'p5_winrate':  56.4,
+        'p50_winrate': 63.2,
+    },
+    '27_orderblocks_short_1H': {
+        'p5_winrate':  63.6,
+        'p50_winrate': 69.4,
     },
 }

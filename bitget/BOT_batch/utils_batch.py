@@ -957,7 +957,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
 
     color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
     reset = "\033[0m" if color else ""
-    lines = [f"\n{color}{'─'*110}\n📊 ALL CURVES COMBINED — {label}\n{'─'*110}{reset}\n", df_out.to_string(index=False)]
+    lines = [f"\n{color}{'─'*110}\n📊 ALL CURVES COMBINED OOS1 — {label}\n{'─'*110}{reset}\n", df_out.to_string(index=False)]
     logger.info("\n".join(lines))
 
 
@@ -1088,6 +1088,7 @@ def print_best_r2_robustness_table(
             "CVaR10%":       cvar10,
             "AvgNegStreak":  avg_neg,
             "MaxNegStreak":  max_neg,
+            "Weekly_pct": round(float((weekly > 0).mean() * 100), 2),
         })
 
     if not rows:
@@ -1317,6 +1318,7 @@ def print_robustness_table(
             "CVaR10%":      cvar10,
             "AvgNegStreak": avg_neg,
             "MaxNegStreak": max_neg,
+            "Weekly_pct": round(float((weekly > 0).mean() * 100), 2),
         })
 
     if not rows:

@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = True
+SHOW_PLOTS = False
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -76,7 +76,6 @@ SHOW_PROGRESS = False
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
-N_SYMBOLS_MCIS       = 6
 
 # REGULAR
 #------------------------------------------------------------------------------
@@ -84,38 +83,42 @@ OOS_NETGAIN_TH       = 25
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.80  # 0.0 = no filter
 
+# ELITE
+#----------------------------------------------------------------------------
 # =============================================================================
-# # ELITE
-# #----------------------------------------------------------------------------
-# OOS_NETGAIN_TH       = 60
+# OOS_NETGAIN_TH       = 40
 # OOS_MAX_DD_TH        = 5
-# OOS_R2_TH            = 0.94  
+# OOS_R2_TH            = 0.85  
 # =============================================================================
 
 # BATCH
 #------------------------------------------------------------------------------
-RUN_PORTFOLIO_ANALYSIS = True
-UPDATE_OUTPUTS         = True
-RUN_BEST_COMBINATIONS  = True
+RUN_PORTFOLIO_ANALYSIS   = True
+UPDATE_OUTPUTS           = True
+RUN_BEST_COMBINATIONS    = False
+RUN_CORRELATION_ANALYSIS = False
+
+
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
     "07_reversal_short_1H",
     "10_parity_long_1H",
-    # -------------------------------------------------------------------------
-    "20_flag_short_1H",
     "23_flag_long_1H",
-    "03_parity_long_4H",
-    "04_reversal_short_4H",
-    "06_reversal_long_1H",
-    "11_parity_short_1H",
-    "19_flag_short_4H",
-    "21_parity_short_4H",
     "27_orderblocks_short_1H",
-    "28_orderblocks_long_1H",
+    "11_parity_short_1H",
     # -------------------------------------------------------------------------
 # =============================================================================
+#     "20_flag_short_1H",
+#     "03_parity_long_4H",
+#     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
+#     "11_parity_short_1H",
+#     "19_flag_short_4H",
+#     "21_parity_short_4H",
+#     "28_orderblocks_long_1H",
+#     # -------------------------------------------------------------------------
 #     "02_reversal_long_4H",
 #     "13_orderblocks_short_4H",
 #     "17_flag_long_4H",
@@ -157,7 +160,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
-N_PATHS_OOS1              = 2
+N_SYMBOLS_MCIS            = 6
+N_PATHS_OOS1              = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
@@ -1057,9 +1061,8 @@ def run_portfolio_analysis():
     # -------------------------------------------------------------------------
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
-    if validated_regime01:
-        logger.info(f"\n{'='*110}\n  CORRELATION ANALYSIS — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'='*110}")
-
+    if RUN_CORRELATION_ANALYSIS and validated_regime01:
+        logger.info(f"\n{'═'*110}\n  CORRELATION ANALYSIS OOS1 — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'═'*110}")
         survivors = decorrelate_by_dd(
             trade_logs_oos1     = validated_regime01,
             trade_logs_oos2     = [],
@@ -1068,7 +1071,6 @@ def run_portfolio_analysis():
             threshold           = CORRELATION_DD_THRESHOLD,
             precomputed_metrics = r01_metrics,
         )
-
         if survivors:
             logger.debug(f"  Survivors after decorrelation: {[sid for sid, _ in survivors]}")
             print_metrics_table(
@@ -1083,9 +1085,8 @@ def run_portfolio_analysis():
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (DD filter)",
             )
-            
-    if validated_regime01:
-        logger.info(f"\n{'─'*110}\n  CORRELATION ANALYSIS — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*110}")
+
+        logger.info(f"\n{'═'*110}\n  CORRELATION ANALYSIS OOS1 — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'═'*110}")
         survivors_profit = decorrelate_by_profit(
             trade_logs_oos1     = validated_regime01,
             trade_logs_oos2     = [],
