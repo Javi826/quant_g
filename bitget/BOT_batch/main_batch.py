@@ -98,8 +98,6 @@ UPDATE_OUTPUTS           = True
 RUN_BEST_COMBINATIONS    = False
 RUN_CORRELATION_ANALYSIS = False
 
-
-
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
@@ -109,16 +107,16 @@ SELECTED_STRATEGIES = [
     "27_orderblocks_short_1H",
     "11_parity_short_1H",
     # -------------------------------------------------------------------------
+    "20_flag_short_1H",
+    "03_parity_long_4H",
+    "04_reversal_short_4H",
+    "06_reversal_long_1H",
+    "11_parity_short_1H",
+    "19_flag_short_4H",
+    "21_parity_short_4H",
+    "28_orderblocks_long_1H",
+    # -------------------------------------------------------------------------
 # =============================================================================
-#     "20_flag_short_1H",
-#     "03_parity_long_4H",
-#     "04_reversal_short_4H",
-#     "06_reversal_long_1H",
-#     "11_parity_short_1H",
-#     "19_flag_short_4H",
-#     "21_parity_short_4H",
-#     "28_orderblocks_long_1H",
-#     # -------------------------------------------------------------------------
 #     "02_reversal_long_4H",
 #     "13_orderblocks_short_4H",
 #     "17_flag_long_4H",
@@ -161,7 +159,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #MONTECARLO
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
-N_PATHS_OOS1              = 2000
+N_PATHS_OOS1              = 2
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
@@ -1103,6 +1101,18 @@ def run_portfolio_analysis():
                 data_folder=DATA_FOLDER_OOS1,
                 initial_balance=INITIAL_BALANCE,
                 title="Portfolio — Decorrelated Validated (Profit filter)",
+            )
+            
+        combined_survivors = [(sid, df) for sid, df in survivors if sid in {s for s, _ in survivors_profit}]
+        if combined_survivors:
+            logger.info(f"\n{'═'*110}\n  CORRELATION ANALYSIS OOS1 — DD + Profit combined (threshold={CORRELATION_DD_THRESHOLD})\n{'═'*110}")
+            print_all_curves_table(combined_survivors, "Decorrelated DD + Profit — Validated only", INITIAL_BALANCE)
+            plot_portfolio_comparison(
+                trade_logs_baseline=combined_survivors,
+                trade_logs_regime01=combined_survivors,
+                data_folder=DATA_FOLDER_OOS1,
+                initial_balance=INITIAL_BALANCE,
+                title="Portfolio — Decorrelated Validated (DD + Profit filter)",
             )
 
 # =============================================================================
