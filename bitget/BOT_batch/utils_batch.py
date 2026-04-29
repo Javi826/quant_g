@@ -38,7 +38,7 @@ SIGNAL_PARAM_KEYS = tuple({p for entry in SIGNAL_REGISTRY.values() for p in entr
 # =============================================================================
 
 def analyze_regime_is(
-    trade_log_is: pd.DataFrame,
+    trades_df_is: pd.DataFrame,
     timeframe: str,
     data_folder_is: str,
     families: dict,
@@ -63,7 +63,7 @@ def analyze_regime_is(
     Flags a bin if trades >= regime_min_trades and total profit < 0.
 
     Args:
-        trade_log_is      : IS trades DataFrame with 'buy_time' and 'profit' columns
+        trades_df_is      : IS trades DataFrame with 'buy_time' and 'profit' columns
         timeframe         : strategy timeframe e.g. '4H', '1H', '6Hutc'
         data_folder_is    : path to IS data folder containing BTC parquets
         families          : family classification rules dict
@@ -95,14 +95,14 @@ def analyze_regime_is(
 
 # =============================================================================
 #     # DEBUG no-lookahead check — remove after validation
-#     first_trade = trade_log_is.iloc[0]
+#     first_trade = trades_df_is.iloc[0]
 #     closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
 #     closed_tf = btc_tf_df[btc_tf_df['ts'] < first_trade['buy_time']]
 #     logger.info(f"DEBUG lookahead | buy_time={first_trade['buy_time']} | last 1D bar={closed_1d.iloc[-1]['ts']} | last {timeframe} bar={closed_tf.iloc[-1]['ts']}")
 # 
 # =============================================================================
 
-    for _, trade in trade_log_is.iterrows():
+    for _, trade in trades_df_is.iterrows():
         direction = get_btc_macro_direction(
             btc_1d_df  = btc_1d_df,
             trade_time = trade['buy_time'],
@@ -129,7 +129,7 @@ def analyze_regime_is(
         directions.append(direction)
         families_.append(family)
 
-    df = trade_log_is.copy()
+    df = trades_df_is.copy()
     df['direction'] = directions
     df['family']    = families_
 
@@ -148,7 +148,7 @@ def analyze_regime_is(
             if n >= regime_min_trades and profit < 0:
                 bins_to_filter.add(f"{family}_{direction}")
 
-    n_total    = len(trade_log_is)
+    n_total    = len(trades_df_is)
     n_valid    = len(df_valid)
     n_filtered = df_valid[
         df_valid.apply(lambda r: f"{r['family']}_{r['direction']}" in bins_to_filter, axis=1)
@@ -365,7 +365,7 @@ def _load_btc(data_folder, t_start, t_end):
     return None, None
 
 
-def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_folder, initial_balance):
+def plot_filter_comparison(strategy_id, trades_df_baseline, trades_df_r01, data_folder, initial_balance):
     """
     Plot equity curves for a single strategy: baseline vs regime 0+1 vs BTC.
     """
@@ -379,13 +379,13 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
         pct = np.concatenate([[0.0], pct])
         return ts, pct, m
 
-    t_start = pd.Timestamp(pd.to_datetime(trade_log_baseline["sell_time"]).min())
-    t_end   = pd.Timestamp(pd.to_datetime(trade_log_baseline["sell_time"]).max())
+    t_start = pd.Timestamp(pd.to_datetime(trades_df_baseline["sell_time"]).min())
+    t_end   = pd.Timestamp(pd.to_datetime(trades_df_baseline["sell_time"]).max())
 
-    ts_base, eq_base, m_base = _equity_pct(trade_log_baseline, t_start)
+    ts_base, eq_base, m_base = _equity_pct(trades_df_baseline, t_start)
     ts_r01,  eq_r01,  m_r01  = (
-        _equity_pct(trade_log_r01, t_start)
-        if trade_log_r01 is not None and len(trade_log_r01) > 0
+        _equity_pct(trades_df_r01, t_start)
+        if trades_df_r01 is not None and len(trades_df_r01) > 0
         else (None, None, None)
     )
     btc_ts, btc_pct = _load_btc(data_folder, t_start, t_end)
@@ -393,18 +393,18 @@ def plot_filter_comparison(strategy_id, trade_log_baseline, trade_log_r01, data_
     _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc_ts, btc_pct, strategy_id)
 
 
-def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_folder, initial_balance, title="Portfolio"):
+def plot_portfolio_comparison(strategy_trades_baseline, strategy_trades_regime01, data_folder, initial_balance, title="Portfolio"):
     """
     Plot combined portfolio equity curves: baseline vs regime 0+1 vs BTC.
     """
-    if not trade_logs_baseline:
+    if not strategy_trades_baseline:
         return
 
-    def _combined_equity_pct(trade_logs, capital_per_strategy):
+    def _combined_equity_pct(strategy_trades, capital_per_strategy):
         all_tl = pd.concat(
-            [df for _, df in trade_logs], ignore_index=True
+            [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("buy_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(trade_logs)
+        total_capital = capital_per_strategy * len(strategy_trades)
         eq  = total_capital + all_tl["profit"].cumsum().values
         pct = (eq - total_capital) / total_capital * 100
         ts  = pd.to_datetime(all_tl["buy_time"]).values
@@ -414,10 +414,10 @@ def plot_portfolio_comparison(trade_logs_baseline, trade_logs_regime01, data_fol
         pct = np.concatenate([[0.0], pct])
         return ts, pct, m, t_start
 
-    ts_base, eq_base, m_base, t_start_base = _combined_equity_pct(trade_logs_baseline, initial_balance)
+    ts_base, eq_base, m_base, t_start_base = _combined_equity_pct(strategy_trades_baseline, initial_balance)
     ts_r01, eq_r01, m_r01, t_start_r01 = (
-        _combined_equity_pct(trade_logs_regime01, initial_balance)
-        if trade_logs_regime01 else (None, None, None, None)
+        _combined_equity_pct(strategy_trades_regime01, initial_balance)
+        if strategy_trades_regime01 else (None, None, None, None)
     )
 
     t_start = min(t_start_base, t_start_r01) if t_start_r01 else t_start_base
@@ -665,7 +665,7 @@ def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, sy
 
     return {"symbols_changed": symbols_changed}
 
-def accumulate_trade_log(registry, strategy_id, trade_log, csv_folder=None, label=""):
+def accumulate_strategy_trades(registry, strategy_id, trade_log, csv_folder=None, label=""):
     registry.append((strategy_id, trade_log.copy()))
     if csv_folder and label:
         os.makedirs(csv_folder, exist_ok=True)
@@ -880,9 +880,9 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
 # =============================================================================
 # HELPER — PRINT PORTFOLIO METRICS TABLE
 # =============================================================================
-def print_portfolio_metrics_table(trade_logs, label, initial_balance):
-    """Print individual + combined metrics table for a list of trade_logs."""
-    named_logs = {sid: df for sid, df in trade_logs}
+def print_portfolio_metrics_table(strategy_trades, label, initial_balance):
+    """Print individual + combined metrics table for a list of strategy_trades."""
+    named_logs = {sid: df for sid, df in strategy_trades}
     metrics_list = []
     for sid, df in named_logs.items():
         metrics_list.append(compute_metrics(df, capital=initial_balance, name=sid))
@@ -911,28 +911,28 @@ def calc_r2_from_equity_hist(equity_hist):
 # =============================================================================
 # HELPER — PRINT ALL CURVES TABLE
 # =============================================================================
-def print_all_curves_table(trade_logs, label, initial_balance):
+def print_all_curves_table(strategy_trades, label, initial_balance):
     """
     Print a metrics table for all curves plus long/short aggregate rows and a combined row.
-    trade_logs: list of (strategy_id, trade_log_df)
+    strategy_trades: list of (strategy_id, trade_log_df)
     """
-    named = {sid: df for sid, df in trade_logs}
+    named = {sid: df for sid, df in strategy_trades}
     rows  = []
     for sid, df in named.items():
         rows.append(compute_metrics(df, capital=initial_balance, name=sid))
 
     # Aggregate longs and shorts
-    long_logs  = [(sid, df) for sid, df in named.items() if "_long_"  in sid]
-    short_logs = [(sid, df) for sid, df in named.items() if "_short_" in sid]
+    long_strategy_trades  = [(sid, df) for sid, df in named.items() if "_long_"  in sid]
+    short_strategy_trades = [(sid, df) for sid, df in named.items() if "_short_" in sid]
 
-    if long_logs:
-        long_tl  = pd.concat([df for _, df in long_logs], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-        long_cap = initial_balance * len(long_logs)
+    if long_strategy_trades:
+        long_tl  = pd.concat([df for _, df in long_strategy_trades], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+        long_cap = initial_balance * len(long_strategy_trades)
         rows.append(compute_metrics(long_tl, capital=long_cap, name="── Longs"))
 
-    if short_logs:
-        short_tl  = pd.concat([df for _, df in short_logs], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
-        short_cap = initial_balance * len(short_logs)
+    if short_strategy_trades:
+        short_tl  = pd.concat([df for _, df in short_strategy_trades], ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
+        short_cap = initial_balance * len(short_strategy_trades)
         rows.append(compute_metrics(short_tl, capital=short_cap, name="── Shorts"))
 
     all_tl  = pd.concat(list(named.values()), ignore_index=True).sort_values(["buy_time", "symbol"]).reset_index(drop=True)
@@ -971,7 +971,7 @@ def print_all_curves_table(trade_logs, label, initial_balance):
 # HELPER — PRINT BEST COMBINATIONS
 # =============================================================================
 def find_best_r2_combination_ids(
-    trade_logs_is: list,
+    strategy_trades_is: list,
     initial_balance: float,
     precomputed_metrics: dict = None,
 ) -> list:
@@ -980,14 +980,14 @@ def find_best_r2_combination_ids(
     Returns list of strategy IDs (not trade logs).
 
     Args:
-        trade_logs_is       : list of (strategy_id, trade_log_df) from IS period
+        strategy_trades_is       : list of (strategy_id, trade_log_df) from IS period
         initial_balance     : capital per strategy
         precomputed_metrics : optional dict {strategy_id: metrics}
 
     Returns:
         list of strategy_ids forming the best R² combination
     """
-    named   = {sid: df for sid, df in trade_logs_is}
+    named   = {sid: df for sid, df in strategy_trades_is}
     metrics = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
         for sid, df in named.items()
@@ -1016,7 +1016,7 @@ def find_best_r2_combination_ids(
 
 def print_best_r2_robustness_table(
     combo_ids: list,
-    trade_logs_per_period: list,
+    strategy_trades_per_period: list,
     initial_balance: float,
 ) -> None:
     """
@@ -1025,17 +1025,17 @@ def print_best_r2_robustness_table(
 
     Args:
         combo_ids            : list of strategy IDs forming the fixed combination
-        trade_logs_per_period: list of (period_label, trade_logs)
+        strategy_trades_per_period: list of (period_label, strategy_trades)
                                e.g. [("OOS1", validated_regime01), ("OOS2", ...), ...]
         initial_balance      : capital per strategy
     """
-    def _weekly_returns(trade_logs, capital_per_strategy):
-        if not trade_logs:
+    def _weekly_returns(strategy_trades, capital_per_strategy):
+        if not strategy_trades:
             return pd.Series(dtype=float)
         all_tl = pd.concat(
-            [df for _, df in trade_logs], ignore_index=True
+            [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(trade_logs)
+        total_capital = capital_per_strategy * len(strategy_trades)
         all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
         daily = all_tl.groupby("_date")["profit"].sum()
         date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
@@ -1069,8 +1069,8 @@ def print_best_r2_robustness_table(
         return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
 
     rows = []
-    for label, trade_logs in trade_logs_per_period:
-        filtered = [(sid, df) for sid, df in trade_logs if sid in combo_ids]
+    for label, strategy_trades in strategy_trades_per_period:
+        filtered = [(sid, df) for sid, df in strategy_trades if sid in combo_ids]
         if not filtered:
             continue
 
@@ -1117,12 +1117,12 @@ def print_best_r2_robustness_table(
     logger.info("\n".join(lines))
 
 def _decorrelate(
-    trade_logs_oos1: list,
-    trade_logs_oos2: list,
+    strategy_trades_oos1: list,
+    strategy_trades_oos2: list,
     initial_balance: float,
     threshold: float,
     precomputed_metrics: dict,
-    trade_logs_oos3: list,
+    strategy_trades_oos3: list,
     series_fn,
     label: str,
 ) -> list:
@@ -1134,12 +1134,12 @@ def _decorrelate(
 
     metrics  = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
-        for sid, df in trade_logs_oos1
+        for sid, df in strategy_trades_oos1
     }
-    oos1_map = {sid: df for sid, df in trade_logs_oos1}
-    oos2_map = {sid: df for sid, df in trade_logs_oos2}
-    oos3_map = {sid: df for sid, df in (trade_logs_oos3 or [])}
-    all_sids = [sid for sid, _ in trade_logs_oos1]
+    oos1_map = {sid: df for sid, df in strategy_trades_oos1}
+    oos2_map = {sid: df for sid, df in strategy_trades_oos2}
+    oos3_map = {sid: df for sid, df in (strategy_trades_oos3 or [])}
+    all_sids = [sid for sid, _ in strategy_trades_oos1]
 
     series_combined = {}
     for sid in all_sids:
@@ -1156,7 +1156,7 @@ def _decorrelate(
 
     if len(series_combined) < 2:
         logger.info("  Not enough strategies for correlation analysis.")
-        return trade_logs_oos1
+        return strategy_trades_oos1
 
     num_map = {sid: f"{_num(sid):02d}" for sid in series_combined}
     df_     = pd.DataFrame({num_map[sid]: s for sid, s in series_combined.items()}).fillna(0)
@@ -1214,38 +1214,38 @@ def _profit_series(df: pd.DataFrame, capital: float) -> pd.Series:
 
 
 def decorrelate_by_dd(
-    trade_logs_oos1: list,
-    trade_logs_oos2: list,
+    strategy_trades_oos1: list,
+    strategy_trades_oos2: list,
     initial_balance: float,
     threshold: float = 0.7,
     precomputed_metrics: dict = None,
-    trade_logs_oos3: list = None,
+    strategy_trades_oos3: list = None,
 ) -> list:
     """Greedy DD-correlation filter. Keeps best NetGain from each correlated pair."""
     return _decorrelate(
-        trade_logs_oos1, trade_logs_oos2, initial_balance,
-        threshold, precomputed_metrics, trade_logs_oos3,
+        strategy_trades_oos1, strategy_trades_oos2, initial_balance,
+        threshold, precomputed_metrics, strategy_trades_oos3,
         series_fn=_dd_series, label="DD",
     )
 
 
 def decorrelate_by_profit(
-    trade_logs_oos1: list,
-    trade_logs_oos2: list,
+    strategy_trades_oos1: list,
+    strategy_trades_oos2: list,
     initial_balance: float,
     threshold: float = 0.7,
     precomputed_metrics: dict = None,
-    trade_logs_oos3: list = None,
+    strategy_trades_oos3: list = None,
 ) -> list:
     """Greedy profit-correlation filter. Keeps best NetGain from each correlated pair."""
     return _decorrelate(
-        trade_logs_oos1, trade_logs_oos2, initial_balance,
-        threshold, precomputed_metrics, trade_logs_oos3,
+        strategy_trades_oos1, strategy_trades_oos2, initial_balance,
+        threshold, precomputed_metrics, strategy_trades_oos3,
         series_fn=_profit_series, label="Profit",
     )
 
 def print_robustness_table(
-    trade_logs_per_period: list[tuple[str, list[tuple[str, pd.DataFrame]]]],
+    strategy_trades_per_period: list[tuple[str, list[tuple[str, pd.DataFrame]]]],
     initial_balance: float,
 ) -> None:
     """
@@ -1253,17 +1253,17 @@ def print_robustness_table(
     Each row shows combined portfolio metrics for validated strategies.
 
     Args:
-        trade_logs_per_period : list of (period_label, trade_logs)
+        strategy_trades_per_period : list of (period_label, strategy_trades)
                                 e.g. [("OOS1", validated_regime01), ("OOS2", validated_oos2), ...]
         initial_balance       : capital per strategy
     """
-    def _weekly_returns(trade_logs, capital_per_strategy):
-        if not trade_logs:
+    def _weekly_returns(strategy_trades, capital_per_strategy):
+        if not strategy_trades:
             return pd.Series(dtype=float)
         all_tl = pd.concat(
-            [df for _, df in trade_logs], ignore_index=True
+            [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(trade_logs)
+        total_capital = capital_per_strategy * len(strategy_trades)
         all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
         daily = all_tl.groupby("_date")["profit"].sum()
         date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
@@ -1299,19 +1299,19 @@ def print_robustness_table(
         return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
 
     rows = []
-    for label, trade_logs in trade_logs_per_period:
-        if not trade_logs:
+    for label, strategy_trades in strategy_trades_per_period:
+        if not strategy_trades:
             continue
 
         all_tl        = pd.concat(
-            [df for _, df in trade_logs], ignore_index=True
+            [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = initial_balance * len(trade_logs)
+        total_capital = initial_balance * len(strategy_trades)
 
         m  = compute_metrics(all_tl, capital=total_capital, name="")
         pf = m["Profit_Factor"]
 
-        weekly           = _weekly_returns(trade_logs, initial_balance)
+        weekly           = _weekly_returns(strategy_trades, initial_balance)
         cvar10           = _cvar(weekly, pct=10)
         avg_neg, max_neg = _neg_streak_stats(weekly)
 

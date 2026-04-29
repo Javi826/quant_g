@@ -166,6 +166,28 @@ def print_period_summary(period_results: dict, best_combo: dict):
     print(f"  {'═'*110}")
 
 
+def print_direction_distribution(df: pd.DataFrame, btc_df: pd.DataFrame,
+                                  ma_period: int, long_th: float, short_th: float,
+                                  period_name: str) -> None:
+    """Print distribution of BTC macro direction for all trades in a period."""
+    directions = []
+    for _, trade in df.iterrows():
+        direction = get_btc_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
+        directions.append({'direction': direction, 'position_type': trade['position_type']})
+
+    df_dir = pd.DataFrame(directions)
+    print(f"\n  Direction distribution — {period_name} (MA{ma_period}  LONG_TH={long_th}  SHORT_TH={short_th})")
+    print(f"  {'─'*60}")
+    for side in ['LONG', 'SHORT']:
+        subset = df_dir[df_dir['position_type'] == side]
+        total  = len(subset)
+        for d in ['uptrend', 'dwtrend', 'neutral', 'unknown']:
+            n   = (subset['direction'] == d).sum()
+            pct = round(n / total * 100, 1) if total > 0 else 0.0
+            print(f"  {side:<6} {d:<10} {n:>6}  ({pct:.1f}%)")
+    print(f"  {'─'*60}")
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -192,6 +214,17 @@ def main():
             print(f"\n  No files for {label} — skipping.")
             continue
         print(f"\n  [{period_name}] {len(df)} trades ({label}) — running grid search...")
+        print_direction_distribution(df, btc_df, MA_TYPES[0], 1.00, 1.00, period_name)
+
+        # DEBUG — check SHORT direction for different short_th values
+        sample_short = df[df['position_type'] == 'SHORT']
+        if not sample_short.empty:
+            sample = sample_short.iloc[0]
+            print(f"\n  DEBUG SHORT sample — buy_time={sample['buy_time']}")
+            for st in [0.95, 0.98, 1.00, 1.02, 1.05]:
+                d = get_btc_macro_direction(btc_df, sample['buy_time'], 5, 1.00, st)
+                print(f"    SHORT_TH={st} → direction={d}")
+
         results = run_grid(df, btc_df)
         period_results[period_name] = results
         all_trades_list.append(df)
