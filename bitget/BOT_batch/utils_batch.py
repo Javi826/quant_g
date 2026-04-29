@@ -665,6 +665,15 @@ def update_strategies_symbols(strategy_id, symbols_oos_final, timeframe=None, sy
 
     return {"symbols_changed": symbols_changed}
 
+def accumulate_trade_log(registry, strategy_id, trade_log, csv_folder=None, label=""):
+    registry.append((strategy_id, trade_log.copy()))
+    if csv_folder and label:
+        os.makedirs(csv_folder, exist_ok=True)
+        path               = os.path.join(csv_folder, f"trades_{label}_{strategy_id}.csv")
+        df_out             = trade_log.copy()
+        df_out["strategy"] = strategy_id
+        df_out.to_csv(path, index=False)
+        logger.debug(f"trades saved → {path}")
 # =============================================================================
 # PORTFOLIO ANALYSIS — EQUITY METRICS
 # =============================================================================

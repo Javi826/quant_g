@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -35,12 +35,11 @@ from utils.analysis import report_montecarlo, report_backtesting
 from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from utils.st_tools import get_n_obs, save_all_trades_to_csv
-from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays
+from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays,get_n_obs
 from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
 from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,print_best_r2_robustness_table,print_robustness_table
 from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit
-from utils_batch import compute_metrics, print_metrics_table
+from utils_batch import compute_metrics, print_metrics_table,accumulate_trade_log
 from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv
 from utils_batch import print_strategies_summary, print_update_status, print_portfolio_metrics_table
 from utils_batch import print_all_curves_table, find_best_r2_combination_ids, plot_filter_comparison, plot_portfolio_comparison
@@ -49,14 +48,17 @@ from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HU
 from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
-_trade_logs_is_regime: list = []
-_trade_logs_baseline : list = []
-_trade_logs_regime01 : list = []
-_trade_logs_oos2     : list = []
-_trade_logs_oos3     : list = []
-_validation_results  : list = []
-_drift_results       : list = []
-_best_params_results : dict = {}
+_trade_logs_is_baseline      : list = []
+_trade_logs_is_regime        : list = []
+_trade_logs_oos1_baseline    : list = []
+_trade_logs_oos1_regime      : list = []
+_trade_logs_oos2_baseline    : list = []
+_trade_logs_oos2_regime      : list = []
+_trade_logs_oos3_baseline    : list = []
+_trade_logs_oos3_regime      : list = []
+_validation_results          : list = []
+_drift_results               : list = []
+_best_params_results         : dict = {}
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -94,9 +96,10 @@ OOS_R2_TH            = 0.85
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-UPDATE_OUTPUTS           = True
+UPDATE_OUTPUTS           = False
 RUN_BEST_COMBINATIONS    = True
 RUN_CORRELATION_ANALYSIS = True
+SAVE_TRADES              = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -160,7 +163,7 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #MONTECARLO
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
-N_PATHS_OOS1              = 100
+N_PATHS_OOS1              = 1
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
 
@@ -382,6 +385,12 @@ def run_batch(strategy_config: dict) -> None:
         force_direction_filter= FORCE_DIRECTION_FILTER,
         metrics_cache         = metrics_cache_is,
     )
+    if SAVE_TRADES:
+        accumulate_trade_log(
+            _trade_logs_is_baseline, STRATEGY_ID, is_trade_log,
+            csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+            label="is_baseline",
+        )
     
     # -------------------------------------------------------------------------
     # BLOCK 2b — Backtest IS with regime filter (for best R² combination)
@@ -430,7 +439,14 @@ def run_batch(strategy_config: dict) -> None:
         is_trade_log_regime["buy_time"] = pd.to_datetime(is_trade_log_regime["buy_time"])
 
         if len(is_trade_log_regime) > 0:
-            _trade_logs_is_regime.append((STRATEGY_ID, is_trade_log_regime.copy()))
+            if SAVE_TRADES:
+                accumulate_trade_log(
+                    _trade_logs_is_regime, STRATEGY_ID, is_trade_log_regime,
+                    csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                    label="is_regime",
+                )
+            else:
+                _trade_logs_is_regime.append((STRATEGY_ID, is_trade_log_regime.copy()))
 
     # -------------------------------------------------------------------------
     # BLOCK 3 — Backtest OOS Baseline
@@ -467,12 +483,14 @@ def run_batch(strategy_config: dict) -> None:
     trade_log.columns = trade_log.columns.str.lower().str.strip()
     trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
 
-    save_all_trades_to_csv(
-        [(best_comb, oos1_result_baseline)], param_names,
-        f"all_trades_{STRATEGY_ID}.csv",
-        strategy_name=STRATEGY_ID, save=True,
-        output_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
-    )
+    if SAVE_TRADES:
+        accumulate_trade_log(
+            _trade_logs_oos1_baseline, STRATEGY_ID, trade_log,
+            csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+            label="oos1_baseline",
+        )
+    else:
+        _trade_logs_oos1_baseline.append((STRATEGY_ID, trade_log.copy()))
 
     metrics_baseline = compute_metrics(trade_log, capital=INITIAL_BALANCE, name=STRATEGY_ID)
     print_metrics_table([metrics_baseline], f"  Metrics — {STRATEGY_ID} (Baseline)")
@@ -544,9 +562,14 @@ def run_batch(strategy_config: dict) -> None:
     if len(trade_log_regime) > 0:
         metrics_regime = compute_metrics(trade_log_regime, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_regime01")
         print_metrics_table([metrics_regime], f"  Metrics — {STRATEGY_ID} (Regime 0+1)")
-        r01_trades_path = os.path.join(os.path.dirname(__file__), "brief_trades", f"all_trades_{STRATEGY_ID}_regime01.csv")
-        trade_log_regime.to_csv(r01_trades_path, index=False)
-        logger.debug(f"Regime 0+1 trades saved → {r01_trades_path}")
+        if SAVE_TRADES:
+            accumulate_trade_log(
+                _trade_logs_oos1_regime, STRATEGY_ID, trade_log_regime,
+                csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                label="oos1_regime",
+            )
+        else:
+            _trade_logs_oos1_regime.append((STRATEGY_ID, trade_log_regime.copy()))
 
     # -------------------------------------------------------------------------
     # BLOCK 5 — Monte Carlo OOS1
@@ -774,7 +797,36 @@ def run_batch(strategy_config: dict) -> None:
                 _validation_results[-1]["round"]   = "—"
 
         if len(trade_log_oos2) > 0:
-            _trade_logs_oos2.append((STRATEGY_ID, trade_log_oos2.copy()))
+            if SAVE_TRADES:
+                accumulate_trade_log(
+                    _trade_logs_oos2_regime, STRATEGY_ID, trade_log_oos2,
+                    csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                    label="oos2_regime",
+                )
+            else:
+                _trade_logs_oos2_regime.append((STRATEGY_ID, trade_log_oos2.copy()))
+                
+        if SAVE_TRADES:
+            ohlcv_arrays_oos2_baseline = {}
+            for sym, arr in ohlcv_oos2.items():
+                signals = signal_fn(arr, **bt_signal_params, live_trading=False)
+                ohlcv_arrays_oos2_baseline[sym] = {**arr, "signal": signals}
+            oos2_result_baseline = run_grid_backtest(
+                ohlcv_arrays_oos2_baseline,
+                sell_after=best_params["SELL_AFTER"],
+                tp_pct=best_params["TP_PCT"],
+                sl_pct=best_params["SL_PCT"],
+                order_amount=ORDER_AMOUNT,
+            )
+            trade_log_oos2_baseline = oos2_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
+            trade_log_oos2_baseline.columns = trade_log_oos2_baseline.columns.str.lower().str.strip()
+            trade_log_oos2_baseline["buy_time"] = pd.to_datetime(trade_log_oos2_baseline["buy_time"])
+            if len(trade_log_oos2_baseline) > 0:
+                accumulate_trade_log(
+                    _trade_logs_oos2_baseline, STRATEGY_ID, trade_log_oos2_baseline,
+                    csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                    label="oos2_baseline",
+                )
 
     # -------------------------------------------------------------------------
     # BLOCK 6c — OOS3 Analysis (informational + optional validation filter)
@@ -898,16 +950,40 @@ def run_batch(strategy_config: dict) -> None:
                 _validation_results[-1]["round"]   = "—"
 
         if len(trade_log_oos3) > 0:
-            _trade_logs_oos3.append((STRATEGY_ID, trade_log_oos3.copy()))
+            if SAVE_TRADES:
+                accumulate_trade_log(
+                    _trade_logs_oos3_regime, STRATEGY_ID, trade_log_oos3,
+                    csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                    label="oos3_regime",
+                )
+            else:
+                _trade_logs_oos3_regime.append((STRATEGY_ID, trade_log_oos3.copy()))
+
+        if SAVE_TRADES:
+            ohlcv_arrays_oos3_baseline = {}
+            for sym, arr in ohlcv_oos3.items():
+                signals = signal_fn(arr, **bt_signal_params, live_trading=False)
+                ohlcv_arrays_oos3_baseline[sym] = {**arr, "signal": signals}
+            oos3_result_baseline = run_grid_backtest(
+                ohlcv_arrays_oos3_baseline,
+                sell_after=best_params["SELL_AFTER"],
+                tp_pct=best_params["TP_PCT"],
+                sl_pct=best_params["SL_PCT"],
+                order_amount=ORDER_AMOUNT,
+            )
+            trade_log_oos3_baseline = oos3_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
+            trade_log_oos3_baseline.columns = trade_log_oos3_baseline.columns.str.lower().str.strip()
+            trade_log_oos3_baseline["buy_time"] = pd.to_datetime(trade_log_oos3_baseline["buy_time"])
+            if len(trade_log_oos3_baseline) > 0:
+                accumulate_trade_log(
+                    _trade_logs_oos3_baseline, STRATEGY_ID, trade_log_oos3_baseline,
+                    csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
+                    label="oos3_baseline",
+                )
 
     # -------------------------------------------------------------------------
     # BLOCK 7 — Equity Curves + Plot
     # -------------------------------------------------------------------------
-    _trade_logs_baseline.append((STRATEGY_ID, trade_log.copy()))
-
-    if len(trade_log_regime) > 0:
-        _trade_logs_regime01.append((STRATEGY_ID, trade_log_regime.copy()))
-
     plot_filter_comparison(
         strategy_id=STRATEGY_ID,
         trade_log_baseline=trade_log,
@@ -956,26 +1032,26 @@ def run_portfolio_analysis():
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
         return
 
-    for label, trade_logs in [("Baseline", _trade_logs_baseline), ("Regime 0+1", _trade_logs_regime01)]:
+    for label, trade_logs in [("Baseline", _trade_logs_oos1_baseline), ("Regime 0+1", _trade_logs_oos1_regime)]:
         if not trade_logs:
             continue
         print_portfolio_metrics_table(trade_logs, label, INITIAL_BALANCE)
 
     r01_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                   for sid, df in _trade_logs_regime01}
+                   for sid, df in _trade_logs_oos1_regime}
 
     print_strategies_summary(_validation_results)
 
-    if _trade_logs_baseline:
+    if _trade_logs_oos1_baseline:
         logger.info(f"\n{'-'*115}\n  PORTFOLIO ANALYSIS\n{'-'*115}")
         if logger.isEnabledFor(logging.DEBUG):
-            print_all_curves_table(_trade_logs_baseline, "Baseline", INITIAL_BALANCE)
-        if _trade_logs_regime01:
-            print_all_curves_table(_trade_logs_regime01, "Regime 0+1", INITIAL_BALANCE)
+            print_all_curves_table(_trade_logs_oos1_baseline, "Baseline", INITIAL_BALANCE)
+        if _trade_logs_oos1_regime:
+            print_all_curves_table(_trade_logs_oos1_regime, "Regime 0+1", INITIAL_BALANCE)
 
     validated_ids      = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
-    validated_baseline = [(sid, df) for sid, df in _trade_logs_baseline if sid in validated_ids]
-    validated_regime01 = [(sid, df) for sid, df in _trade_logs_regime01 if sid in validated_ids]
+    validated_baseline = [(sid, df) for sid, df in _trade_logs_oos1_baseline if sid in validated_ids]
+    validated_regime01 = [(sid, df) for sid, df in _trade_logs_oos1_regime if sid in validated_ids]
 
     if validated_baseline:
         logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*115}")
@@ -984,8 +1060,8 @@ def run_portfolio_analysis():
     if validated_regime01:
         print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
 
-    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2 if sid in validated_ids]
-    validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3 if sid in validated_ids]
+    validated_oos2 = [(sid, df) for sid, df in _trade_logs_oos2_regime if sid in validated_ids]
+    validated_oos3 = [(sid, df) for sid, df in _trade_logs_oos3_regime if sid in validated_ids]
     print_robustness_table(
         trade_logs_per_period=[
             ("OOS1", validated_regime01),
@@ -995,10 +1071,10 @@ def run_portfolio_analysis():
         initial_balance=INITIAL_BALANCE,
     )
 
-    if _trade_logs_baseline:
+    if _trade_logs_oos1_baseline:
         plot_portfolio_comparison(
-            trade_logs_baseline=_trade_logs_baseline,
-            trade_logs_regime01=_trade_logs_regime01,
+            trade_logs_baseline=_trade_logs_oos1_baseline,
+            trade_logs_regime01=_trade_logs_oos1_regime,
             data_folder=DATA_FOLDER_OOS1,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio — All strategies",

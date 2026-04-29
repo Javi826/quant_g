@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-develop/market_regime/regime01_performance.py
+develop/market_regime/regime01_performance_wr.py
 
-Unified regime analysis combining:
-  - Macro BTC direction (regime0): uptrend / downtrend based on BTC 1D MA + thresholds
-  - Market family (regime1): trending / volatile / ranging based on Hurst, ER, ATR, PE
+Clone of regime01_performance.py with an additional win rate gap filter.
 
-Evaluates 6 cross combinations (family x direction) per strategy.
-Automatically flags bins to filter: trades > MIN_TRADES and profit < 0.
+Extra filter logic:
+    After flagging bins with profit < 0 (original logic),
+    also flag bins with profit > 0 whose win rate is more than
+    WR_GAP_THRESHOLD percentage points below the best valid bin win rate
+    of that strategy.
 
-Thresholds (LONG_TH, SHORT_TH) must be obtained from regime0_exhaustive.py first.
+    If WR_GAP_THRESHOLD = 0, output is identical to regime01_performance.py.
 
 Usage:
-    python regime_unified_analyzer.py
+    python regime01_performance_wr.py
 """
 
 import os
@@ -31,71 +32,57 @@ from regime_common import permutation_test, format_significance, get_btc_macro_d
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
+TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
+TRADES_LABEL  = "is_baseline"  # "is_baseline" | "oos1_baseline" | "oos2_baseline" | "oos3_baseline"
 
-TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
-TRADES_LABEL  = "is_baseline" 
+SPLIT_MODE    = "expanding"
+SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+BTC_FOLDER    = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
-SPLIT_MODE      = "expanding"
-SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_full_IS")
+BTC_MA_PERIOD = 5
+LONG_TH       = 1.00
+SHORT_TH      = 1.00
 
-# regime0 params — obtain from regime0_exhaustive.py
-BTC_MA_PERIOD   = 5
-LONG_TH         = 1.00
-SHORT_TH        = 1.00
-
-# regime1 params
 FAMILIES = {
     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging':  {}
 }
 
-HURST_WINDOW    = 100
-ER_WINDOW       = 14
-ATR_WINDOW      = 14
-PE_WINDOW       = 50
-PE_ORDER        = 3
-LOOKBACK_BARS   = 100
+HURST_WINDOW  = 100
+ER_WINDOW     = 14
+ATR_WINDOW    = 14
+PE_WINDOW     = 50
+PE_ORDER      = 3
+LOOKBACK_BARS = 100
+FAMILY_SOURCE = 'strategy'
+ANALYSIS_MODE = 'combined'
+INITIAL_CAPITAL = 800
+MIN_TRADES      = 10
 
-# Family source: 'strategy' = BTC at strategy timeframe | 'macro' = BTC 1D
-FAMILY_SOURCE   = 'strategy'
-#FAMILY_SOURCE   = 'macro'
-
-# Analysis mode: 'family' = 3 bins | 'direction' = 2 bins | 'combined' = 6 bins
-ANALYSIS_MODE   = 'combined'
-#ANALYSIS_MODE   = 'family'
-
-INITIAL_CAPITAL     = 800
-MIN_TRADES          = 2   # minimum trades to trust a bin result
+# Win rate gap filter — set to 0 to disable (identical to original)
+WR_GAP_THRESHOLD = 1   # pp below best bin win rate to also filter positive-profit bins
 
 # =============================================================================
 # CACHE
 # =============================================================================
-
 _btc_cache = {}
 
 
 # =============================================================================
 # DATA LOADING
 # =============================================================================
-
 def load_btc_1d() -> pd.DataFrame:
-    """Load BTC 1D OHLC for macro direction calculation"""
     filepath = Path(BTC_FOLDER) / "BTCUSDT_1Dutc.parquet"
-
     if not filepath.exists():
         raise FileNotFoundError(f"BTC 1D file not found: {filepath}")
-
     df = pd.read_parquet(filepath)
     df.columns = df.columns.str.lower()
     df['ts'] = pd.to_datetime(df['timestamp'] if 'timestamp' in df.columns else df.index)
-    df = df.sort_values('ts').reset_index(drop=True)
-    return df
+    return df.sort_values('ts').reset_index(drop=True)
 
 
 def load_btc_for_family(timeframe: str) -> pd.DataFrame:
-    """Load BTC OHLC for family metrics based on FAMILY_SOURCE setting"""
     if FAMILY_SOURCE == 'macro':
         return load_btc_1d()
     return load_btc_for_timeframe(BTC_FOLDER, timeframe, _btc_cache)
@@ -104,14 +91,7 @@ def load_btc_for_family(timeframe: str) -> pd.DataFrame:
 # =============================================================================
 # TRADE CLASSIFICATION
 # =============================================================================
-
 def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.DataFrame) -> dict:
-    """
-    Classify a single trade by macro direction and family.
-    Uses only closed candles — no lookahead bias.
-
-    Returns dict with 'direction' and 'family' keys.
-    """
     direction = get_btc_macro_direction(
         btc_1d_df  = btc_1d_df,
         trade_time = trade['buy_time'],
@@ -119,7 +99,6 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
         long_th    = LONG_TH,
         short_th   = SHORT_TH,
     )
-
     metrics = calc_all_metrics_at_time(
         btc_df       = btc_family_df,
         buy_time     = trade['buy_time'],
@@ -130,30 +109,18 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
         pe_window    = PE_WINDOW,
         pe_order     = PE_ORDER,
     )
-
     family = classify_trade_by_family(metrics, FAMILIES) if metrics else 'unknown'
-
     return {'direction': direction, 'family': family}
 
 
 # =============================================================================
 # BIN METRICS
 # =============================================================================
-
 def calc_bin_metrics(trades: pd.DataFrame) -> dict:
-    """Calculate performance metrics for a subset of trades"""
     if len(trades) == 0:
-        return {
-            'num_trades': 0,
-            'profit':     0.0,
-            'win_rate':   0.0,
-            'dd_pct':     0.0,
-            'profits_list': [],
-        }
-
+        return {'num_trades': 0, 'profit': 0.0, 'win_rate': 0.0, 'dd_pct': 0.0, 'profits_list': []}
     trades = trades.sort_values('buy_time').reset_index(drop=True)
     trades['equity'] = INITIAL_CAPITAL + trades['profit'].cumsum()
-
     return {
         'num_trades':   len(trades),
         'profit':       trades['profit'].sum(),
@@ -166,34 +133,19 @@ def calc_bin_metrics(trades: pd.DataFrame) -> dict:
 # =============================================================================
 # STRATEGY ANALYSIS
 # =============================================================================
-
 def analyze_strategy(filepath: str, btc_1d_df: pd.DataFrame) -> dict:
-    """
-    Full regime analysis for a single strategy.
-    Classifies each trade by direction x family and evaluates all 6 bins.
-    """
-    df         = load_trades(filepath)
-    strategy   = df['strategy'].iloc[0]
-    timeframe  = extract_timeframe(df)
-
+    df        = load_trades(filepath)
+    strategy  = df['strategy'].iloc[0]
+    timeframe = extract_timeframe(df)
     btc_family_df = load_btc_for_family(timeframe)
 
     unknown_count = 0
-
-    directions = []
-    families   = []
-    
-    first_trade = df.iloc[0]
-    closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
-    closed_tf = btc_family_df[btc_family_df['ts'] < first_trade['buy_time']]
-    #print(f"DEBUG | buy_time={first_trade['buy_time']} | last 1D={closed_1d.iloc[-1]['ts']} | last {timeframe}={closed_tf.iloc[-1]['ts']}")
+    directions, families = [], []
 
     for _, trade in df.iterrows():
         result = classify_trade(trade, btc_1d_df, btc_family_df)
-
         if result['direction'] == 'unknown':
             unknown_count += 1
-
         directions.append(result['direction'])
         families.append(result['family'])
 
@@ -203,13 +155,11 @@ def analyze_strategy(filepath: str, btc_1d_df: pd.DataFrame) -> dict:
     if unknown_count > 0:
         print(f"   ⚠️  {strategy}: {unknown_count} trades with unknown direction (excluded)")
 
-    # Exclude based on mode: family needs valid family, direction needs valid direction
     if ANALYSIS_MODE in ('family', 'combined'):
         df = df[df['family'] != 'unknown'].copy()
     if ANALYSIS_MODE in ('direction', 'combined'):
         df = df[df['direction'].isin(['uptrend', 'dwtrend'])].copy()
 
-    # Build bins according to ANALYSIS_MODE
     all_families   = list(FAMILIES.keys())
     all_directions = ['uptrend', 'dwtrend']
 
@@ -220,17 +170,10 @@ def analyze_strategy(filepath: str, btc_1d_df: pd.DataFrame) -> dict:
                 key    = f"{family}_{direction}"
                 subset = df[(df['family'] == family) & (df['direction'] == direction)]
                 bins[key] = calc_bin_metrics(subset)
-    elif ANALYSIS_MODE == 'family':
-        for family in all_families:
-            bins[family] = calc_bin_metrics(df[df['family'] == family])
-    elif ANALYSIS_MODE == 'direction':
-        for direction in all_directions:
-            bins[direction] = calc_bin_metrics(df[df['direction'] == direction])
 
-    # Total metrics (all valid trades)
+    # Total metrics
     df_sorted = df.sort_values('buy_time').reset_index(drop=True)
     df_sorted['equity'] = INITIAL_CAPITAL + df_sorted['profit'].cumsum()
-
     total_metrics = {
         'num_trades': len(df_sorted),
         'profit':     df_sorted['profit'].sum(),
@@ -238,53 +181,61 @@ def analyze_strategy(filepath: str, btc_1d_df: pd.DataFrame) -> dict:
         'dd_pct':     calculate_max_dd_pct(df_sorted['equity']),
     }
 
-    # Auto-flag bins to filter: enough trades AND negative profit
+    # --- Original filter: profit < 0 ---
     filter_rules = []
-    for bin_key, bin_metrics in bins.items():
-        if bin_metrics['num_trades'] >= MIN_TRADES and bin_metrics['profit'] < 0:
+    for bin_key, m in bins.items():
+        if m['num_trades'] >= MIN_TRADES and m['profit'] < 0:
             filter_rules.append(bin_key)
 
-    # Filtered metrics: trades that survive the filter
-    if filter_rules:
+    # --- Additional filter: positive profit but low win rate ---
+    wr_filter_rules = []
+    if WR_GAP_THRESHOLD > 0:
+        valid_bins = {k: m for k, m in bins.items() if m['num_trades'] >= MIN_TRADES}
+        if valid_bins:
+            best_wr = max(m['win_rate'] for m in valid_bins.values())
+            for bin_key, m in valid_bins.items():
+                if bin_key not in filter_rules and m['profit'] > 0:
+                    if best_wr - m['win_rate'] > WR_GAP_THRESHOLD:
+                        wr_filter_rules.append(bin_key)
+
+    all_filter_rules = filter_rules + wr_filter_rules
+
+    # Filtered metrics
+    if all_filter_rules:
         df_filtered = df.copy()
-        for bin_key in filter_rules:
-            if ANALYSIS_MODE == 'combined':
-                family, direction = bin_key.rsplit('_', 1)
-                mask = (df_filtered['family'] == family) & (df_filtered['direction'] == direction)
-            elif ANALYSIS_MODE == 'family':
-                mask = df_filtered['family'] == bin_key
-            elif ANALYSIS_MODE == 'direction':
-                mask = df_filtered['direction'] == bin_key
+        for bin_key in all_filter_rules:
+            family, direction = bin_key.rsplit('_', 1)
+            mask = (df_filtered['family'] == family) & (df_filtered['direction'] == direction)
             df_filtered = df_filtered[~mask]
     else:
         df_filtered = df.copy()
 
     df_filtered = df_filtered.sort_values('buy_time').reset_index(drop=True)
     df_filtered['equity'] = INITIAL_CAPITAL + df_filtered['profit'].cumsum()
-
     filtered_metrics = {
         'num_trades': len(df_filtered),
         'profit':     df_filtered['profit'].sum() if len(df_filtered) > 0 else 0.0,
         'dd_pct':     calculate_max_dd_pct(df_filtered['equity']) if len(df_filtered) > 0 else 0.0,
+        'win_rate':   (df_filtered['profit'] > 0).mean() * 100 if len(df_filtered) > 0 else 0.0,
     }
 
     return {
-        'strategy':     strategy,
-        'filepath':     filepath,
-        'timeframe':    timeframe,
-        'bins':         bins,
-        'total':        total_metrics,
-        'filtered':     filtered_metrics,
-        'filter_rules': filter_rules,
+        'strategy':        strategy,
+        'filepath':        filepath,
+        'timeframe':       timeframe,
+        'bins':            bins,
+        'total':           total_metrics,
+        'filtered':        filtered_metrics,
+        'filter_rules':    filter_rules,
+        'wr_filter_rules': wr_filter_rules,
+        'all_filter_rules':all_filter_rules,
     }
 
 
 # =============================================================================
 # PRINTING
 # =============================================================================
-
 def print_strategy_result(r: dict):
-    """Print detailed bin table for a strategy"""
     t = r['total']
     print(f"\n\033[93m{'='*130}\033[0m")
     print(f"\033[93mSTRATEGY: {r['strategy']}  [{r['timeframe']}]  |  "
@@ -292,38 +243,46 @@ def print_strategy_result(r: dict):
           f"dd={t['dd_pct']:.2f}%  wr={t['win_rate']:.1f}%\033[0m")
     print(f"\033[93m{'='*130}\033[0m")
 
-    header = f"{'BIN':<30} {'CONF':>5} {'TRADES':>8} {'PROFIT':>12} {'WIN%':>8} {'DD%':>8} {'FILTER':>8}"
+    valid_wrs = [m['win_rate'] for m in r['bins'].values() if m['num_trades'] >= MIN_TRADES]
+    best_wr   = max(valid_wrs) if valid_wrs else 0.0
+
+    header = f"{'BIN':<30} {'CONF':>5} {'TRADES':>8} {'PROFIT':>12} {'WIN%':>8} {'DD%':>8} {'GAP_WR':>8} {'FILTER'}"
     print(f"\n{header}")
-    print("-" * 90)
+    print("-" * 100)
 
     sorted_bins = sorted(r['bins'].items(), key=lambda x: x[1]['profit'], reverse=True)
-
     for bin_key, m in sorted_bins:
-        conf       = "✓" if m['num_trades'] >= MIN_TRADES else "✗"
-        flag       = "🚫 FILTER" if bin_key in r['filter_rules'] else ""
+        conf    = "✓" if m['num_trades'] >= MIN_TRADES else "✗"
+        gap_wr  = f"{best_wr - m['win_rate']:+.1f}pp" if m['num_trades'] >= MIN_TRADES else "—"
+        if bin_key in r['filter_rules']:
+            flag = "🚫 FILTER"
+        elif bin_key in r['wr_filter_rules']:
+            flag = "⚠️  WR_FILTER"
+        else:
+            flag = ""
         print(f"{bin_key:<30} {conf:>5} {m['num_trades']:>8} {m['profit']:>12.2f} "
-              f"{m['win_rate']:>7.1f}% {m['dd_pct']:>7.2f}% {flag}")
+              f"{m['win_rate']:>7.1f}% {m['dd_pct']:>7.2f}% {gap_wr:>8} {flag}")
 
-    print("-" * 90)
+    print("-" * 100)
     print(f"{'TOTAL':<30} {'':>5} {t['num_trades']:>8} {t['profit']:>12.2f} "
-          f"{t['win_rate']:>7.1f}% {t['dd_pct']:>7.2f}%")
+          f"{t['win_rate']:>7.1f}% {t['dd_pct']:>7.2f}%  best_wr={best_wr:.1f}%")
 
-    if r['filter_rules']:
-        print(f"\n  → Filter rules: {', '.join(r['filter_rules'])}")
+    if r['all_filter_rules']:
+        print(f"\n  → Profit filter : {', '.join(r['filter_rules']) if r['filter_rules'] else 'none'}")
+        print(f"  → WR filter     : {', '.join(r['wr_filter_rules']) if r['wr_filter_rules'] else 'none'}")
     else:
         print(f"\n  → No bins to filter")
 
 
 def print_summary(results: list):
-    """Print summary table — one row per strategy with total vs filtered comparison"""
-    print(f"\n{'='*150}")
-    print("SUMMARY — TOTAL vs FILTERED PER STRATEGY")
-    print(f"{'='*150}")
-
-    header = (f"{'STRATEGY':<35} {'TR_TOT':>8} {'PF_TOT':>10} "
-              f"{'TR_FILT':>8} {'PF_FILT':>10} {'Δ_PROFIT':>10} {'FILTER RULES'}")
+    print(f"\n{'='*175}")
+    print(f"SUMMARY — TOTAL vs FILTERED  (WR_GAP_THRESHOLD={WR_GAP_THRESHOLD}pp)")
+    print(f"{'='*175}")
+    header = (f"{'STRATEGY':<35} {'TR_TOT':>8} {'TR_FILT':>8} {'%TR_ELIM':>10} "
+              f"{'WR_TOT':>8} {'WR_FILT':>8} "
+              f"{'PF_TOT':>10} {'PF_FILT':>10} {'Δ_PROFIT':>10} {'FILTER RULES'}")
     print(f"\n{header}")
-    print("-" * 150)
+    print("-" * 175)
 
     sys_trades_total    = 0
     sys_profit_total    = 0.0
@@ -331,92 +290,76 @@ def print_summary(results: list):
     sys_profit_filtered = 0.0
 
     for r in results:
-        t     = r['total']
-        f     = r['filtered']
-        delta = f['profit'] - t['profit']
-        rules = ', '.join(r['filter_rules']) if r['filter_rules'] else 'none'
-
-        delta_str = f"{delta:+.2f}"
-        color     = "\033[92m" if delta > 0 else "\033[91m" if delta < 0 else ""
-        reset     = "\033[0m" if color else ""
-
-        print(f"{r['strategy']:<35} {t['num_trades']:>8} {t['profit']:>10.2f} "
-              f"{f['num_trades']:>8} {f['profit']:>10.2f} "
-              f"{color}{delta_str:>10}{reset}   {rules}")
-
+        t           = r['total']
+        f           = r['filtered']
+        rules       = ', '.join(r['all_filter_rules']) if r['all_filter_rules'] else 'none'
+        pct_tr_elim = round((1 - f['num_trades'] / t['num_trades']) * 100, 1) if t['num_trades'] > 0 else 0.0
+        delta       = f['profit'] - t['profit']
+        color = "\033[92m" if f['win_rate'] > t['win_rate'] else ""
+        reset = "\033[0m" if color else ""
+        print(f"{r['strategy']:<35} {t['num_trades']:>8} {f['num_trades']:>8} {pct_tr_elim:>9.1f}% "
+              f"{t['win_rate']:>7.1f}% {color}{f['win_rate']:>7.1f}%{reset} "
+              f"{t['profit']:>10.2f} {f['profit']:>10.2f} {delta:>+10.2f}   {rules}")
         sys_trades_total    += t['num_trades']
         sys_profit_total    += t['profit']
         sys_trades_filtered += f['num_trades']
         sys_profit_filtered += f['profit']
 
+    sys_wr_tot  = sum(r['total']['win_rate']    * r['total']['num_trades']    for r in results) / sys_trades_total if sys_trades_total else 0
+    sys_wr_filt = sum(r['filtered']['win_rate'] * r['filtered']['num_trades'] for r in results) / sys_trades_filtered if sys_trades_filtered else 0
+    sys_pct_tr  = round((1 - sys_trades_filtered / sys_trades_total) * 100, 1) if sys_trades_total else 0
+    sys_pct_pf  = round(sys_profit_filtered / sys_profit_total * 100, 1) if sys_profit_total else 0
     sys_delta = sys_profit_filtered - sys_profit_total
-    sys_delta_str = f"{sys_delta:+.2f}"
-    sys_color = "\033[92m" if sys_delta > 0 else "\033[91m" if sys_delta < 0 else ""
-    reset = "\033[0m"
-
-    print("-" * 150)
-    print(f"{'SYSTEM TOTAL':<35} {sys_trades_total:>8} {sys_profit_total:>10.2f} "
-          f"{sys_trades_filtered:>8} {sys_profit_filtered:>10.2f} "
-          f"{sys_color}{sys_delta_str:>10}{reset}")
-    print("-" * 150)
-
-    n_filtered = sum(1 for r in results if r['filter_rules'])
+    print("-" * 175)
+    print(f"{'SYSTEM TOTAL':<35} {sys_trades_total:>8} {sys_trades_filtered:>8} {sys_pct_tr:>9.1f}% "
+          f"{sys_wr_tot:>7.1f}% {sys_wr_filt:>7.1f}% "
+          f"{sys_profit_total:>10.2f} {sys_profit_filtered:>10.2f} {sys_delta:>+10.2f}")
+    print("-" * 175)
+    n_filtered = sum(1 for r in results if r['all_filter_rules'])
     print(f"\nStrategies with filter rules: {n_filtered}/{len(results)}")
 
 
 # =============================================================================
 # MAIN
 # =============================================================================
-
 def main():
     print("=" * 80)
-    print("REGIME UNIFIED ANALYZER — direction x family per strategy")
+    print("REGIME ANALYZER — profit filter + win rate gap filter")
     print("=" * 80)
+    print(f"\n  Trades folder     : {TRADES_FOLDER}")
+    print(f"  Trades label      : {TRADES_LABEL}")
+    print(f"  BTC folder        : {BTC_FOLDER}")
+    print(f"  Min trades        : {MIN_TRADES}")
+    print(f"  WR gap threshold  : {WR_GAP_THRESHOLD}pp  {'(disabled)' if WR_GAP_THRESHOLD == 0 else ''}")
 
-    print(f"\nConfiguration:")
-    print(f"  Trades folder  : {TRADES_FOLDER}")
-    print(f"  BTC folder     : {BTC_FOLDER}")
-    print(f"  BTC MA period  : {BTC_MA_PERIOD}")
-    print(f"  Long threshold : {LONG_TH}")
-    print(f"  Short threshold: {SHORT_TH}")
-    print(f"  Family source  : {FAMILY_SOURCE}")
-    print(f"  Min trades     : {MIN_TRADES}")
-    print(f"  Capital        : ${INITIAL_CAPITAL}")
-
-    # Load BTC 1D (macro direction — always needed)
-    print("\n📂 Loading BTC 1D data...")
+    print("\n  Loading BTC 1D data...")
     btc_1d_df = load_btc_1d()
-    print(f"✅ {len(btc_1d_df)} daily bars loaded")
+    print(f"  {len(btc_1d_df)} daily bars loaded")
 
-    # Find trades files
     files = sorted(glob(str(Path(TRADES_FOLDER) / f"trades_{TRADES_LABEL}_*.csv")))
     if not files:
-        print(f"\n❌ No CSV files found in {TRADES_FOLDER}")
+        print(f"\n  No CSV files found for label '{TRADES_LABEL}'")
         return
+    print(f"\n  Found {len(files)} strategy files")
 
-    print(f"\n📂 Found {len(files)} strategy files")
-
-    # Analyze each strategy
-    print("\n🔍 Analyzing strategies...")
+    print("\n  Analyzing strategies...")
     results = []
     for filepath in files:
-        result = analyze_strategy(filepath, btc_1d_df)
+        result    = analyze_strategy(filepath, btc_1d_df)
         results.append(result)
-        rules_str = ', '.join(result['filter_rules']) if result['filter_rules'] else 'none'
+        rules_str = ', '.join(result['all_filter_rules']) if result['all_filter_rules'] else 'none'
         print(f"   ✅ {result['strategy']}  →  filter: {rules_str}")
 
-    # Print detailed results
     for r in results:
         print_strategy_result(r)
 
-    # Print summary
     print_summary(results)
 
     print(f"\n{'='*80}")
-    print("INTERPRETATION:")
-    print("  ✓ = reliable bin (>= 50 trades)")
-    print("  ✗ = unreliable bin (< 50 trades)")
-    print("  🚫 FILTER = bin flagged for filtering (trades >= 50 AND profit < 0)")
+    print(f"  ✓ = reliable bin (>= {MIN_TRADES} trades)")
+    print(f"  ✗ = unreliable bin (< {MIN_TRADES} trades)")
+    print(f"  🚫 FILTER     = profit < 0")
+    print(f"  ⚠️  WR_FILTER  = profit > 0 but WR gap > {WR_GAP_THRESHOLD}pp vs best bin")
     print(f"{'='*80}")
 
 
