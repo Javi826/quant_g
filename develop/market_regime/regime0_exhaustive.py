@@ -22,11 +22,11 @@ from regime_common import get_btc_macro_direction
 # CONFIGURATION
 # =============================================================================
 
-TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades_22")
+TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
 
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-04_IS")
+BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_full_IS")
 
 MA_TYPES   = [5, 10, 20, 50]
 THRESHOLDS = [0.95, 0.98, 1.00, 1.02, 1.05]

@@ -354,8 +354,8 @@ def main():
         # Sample of discarded trades with BTC values
         if len(discarded) > 0:
             sample = discarded.tail(5)[["buy_time", "btc_close", "ma", "direction"]]
-            print(f"\n  Last discarded trades (BTC close vs MA{MA_PERIOD}):")
-            print(sample.to_string(index=False))
+            #print(f"\n  Last discarded trades (BTC close vs MA{MA_PERIOD}):")
+           # print(sample.to_string(index=False))
 
         # Days in uptrend vs downtrend over full BTC period
         start_d = df_all["buy_time"].min()

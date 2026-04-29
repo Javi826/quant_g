@@ -634,7 +634,7 @@ def save_strategies_pr(strategies_batch_path, output_path, validation_results, b
     with open(output_path, "w") as f:
         f.write("\n".join(pr_lines) + "\n")
  
-    logger.info(f"\n{'─'*110}\n  ✅ strategies_OO/E1_batch.py generated\n{'─'*110}")
+    logger.info(f"\n{'─'*115}\n  ✅ strategies_OO/E1_batch.py generated\n{'─'*115}")
  
 
 
@@ -748,18 +748,18 @@ def print_strategies_summary(validation_results):
     if not validation_results:
         return
     lines = []
-    lines.append(f"\n{'─'*110}")
+    lines.append(f"\n{'─'*115}")
     lines.append(f"  STRATEGIES SUMMARY")
-    lines.append(f"{'─'*110}")
+    lines.append(f"{'─'*115}")
     lines.append(f"  {'Strategy':<27} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}")
-    lines.append(f"  {'-'*110}")
+    lines.append(f"  {'-'*115}")
     for v in validation_results:
         lines.append(
             f"  {v['strategy_id']:<27} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
             f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
         )
-    lines.append(f" {'─'*110}")
+    lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
 
 
@@ -805,24 +805,24 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     # Table 1 — Active
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*110}")
+    lines.append(f"\n{'─'*115}")
     lines.append(f"  ACTIVE")
-    lines.append(f"{'─'*110}")
+    lines.append(f"{'─'*115}")
     lines.append(f"  {'Strategy':<27} {'Status':<16} {'Changes':<35}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
         change = _get(sid, "last_change_active")
         lines.append(f"  {sid:<27} {_active_icon(sid):<16} {_change_icon(change):<35}")
-    lines.append(f"  {'─'*103}")
+    lines.append(f"  {'─'*115}")
     logger.info("\n".join(lines))
 
     # -------------------------------------------------------------------------
     # Table 2 — Params
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*110}")
+    lines.append(f"\n{'─'*115}")
     lines.append(f"  PARAMS")
-    lines.append(f"{'─'*110}")
+    lines.append(f"{'─'*115}")
     lines.append(f"  {'Strategy':<27} {'Changes':<50}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
@@ -835,9 +835,9 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
     # Table 3 — Market Regime
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*110}")
+    lines.append(f"\n{'─'*115}")
     lines.append(f"  MARKET REGIME")
-    lines.append(f"{'─'*110}")
+    lines.append(f"{'─'*115}")
     lines.append(f"  {'Strategy':<27} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}")
     lines.append(f"  {'-'*103}")
     for sid in strategy_ids:
@@ -848,16 +848,16 @@ def print_update_status(csv_path, symbols_live_folder, validation_results):
         lines.append(
             f"  {sid:<27} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
         )
-    lines.append(f"  {'─'*110}")
+    lines.append(f"  {'─'*115}")
     logger.info("\n".join(lines))
 
     # -------------------------------------------------------------------------
     # Table 4 — Symbols
     # -------------------------------------------------------------------------
     lines = []
-    lines.append(f"\n{'─'*110}")
+    lines.append(f"\n{'─'*115}")
     lines.append(f"  SYMBOLS")
-    lines.append(f"{'─'*110}")
+    lines.append(f"{'─'*115}")
     lines.append(f"  {'Strategy':<27} {'Status':<16}")
     lines.append(f"  {'-'*103}")
     for v in validation_results:
@@ -933,31 +933,28 @@ def print_all_curves_table(trade_logs, label, initial_balance):
     df_out = pd.DataFrame(rows)
 
     # Compute Profit_pctT excluding aggregate rows
-    strategy_rows = df_out[~df_out["Curve"].str.strip().str.startswith("──")]
-    total_profit  = strategy_rows["Profit_abs"].sum()
+    strategy_rows         = df_out[~df_out["Curve"].str.strip().str.startswith("──")]
+    total_profit          = strategy_rows["Profit_abs"].sum()
     df_out["Profit_pctT"] = df_out["Profit_abs"].apply(
         lambda x: round(x / total_profit * 100, 1) if total_profit != 0 else np.nan
     )
 
-    cols   = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Weekly_pct"]
-    df_out = df_out[cols].copy()
-    max_len = df_out["Curve"].str.len().max()
+    cols                 = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Weekly_pct"]
+    df_out               = df_out[cols].copy()
+    max_len              = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
     # Insert separator row before aggregate rows
-    agg_mask = df_out["Curve"].str.strip().str.startswith("──")
-    if agg_mask.any():
-        agg_idx = agg_mask.idxmax()
-        sep_row = pd.DataFrame(
-            {col: ["─" * max(len(str(df_out[col].iloc[0])), 9)] for col in cols},
-        )
-        sep_row["Curve"] = "─" * max_len
-        df_out = pd.concat([df_out.iloc[:agg_idx], sep_row, df_out.iloc[agg_idx:]], ignore_index=True)
+    combined_idx     = df_out[df_out["Curve"].str.strip() == "── Combined"].index[0]
+    sep_row          = pd.DataFrame({col: ["─" * max(len(str(df_out[col].iloc[0])), 9)] for col in cols})
+    sep_row["Curve"] = "─" * max_len
+    df_out           = pd.concat([df_out.iloc[:combined_idx], sep_row, df_out.iloc[combined_idx:]], ignore_index=True)
 
     color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
     reset = "\033[0m" if color else ""
-    lines = [f"\n{color}{'─'*110}\n📊 ALL CURVES COMBINED OOS1 — {label}\n{'─'*110}{reset}\n", df_out.to_string(index=False)]
+    n = len(named)
+    lines = [f"\n{color}{'─'*115}\n📊 ALL CURVES COMBINED OOS1 ({n}) — {label}\n{'─'*115}{reset}\n", df_out.to_string(index=False)]
     logger.info("\n".join(lines))
 
 
@@ -1102,11 +1099,11 @@ def print_best_r2_robustness_table(
     mean_row["Period"] = "MEAN"
     df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [
-        f"\n\033[94m{'─'*110}",
+        f"\n\033[94m{'─'*115}",
         f"  BEST R² COMBINATION — Robustness across OOS periods",
-        f"{'─'*110}\033[0m",
+        f"{'─'*115}\033[0m",
         df.to_string(index=False),
-        f"{'─'*110}",
+        f"{'─'*115}",
     ]
     logger.info("\n".join(lines))
 
@@ -1332,10 +1329,10 @@ def print_robustness_table(
     mean_row["Period"] = "MEAN"
     df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [
-        f"\n\033[94m{'─'*110}",
+        f"\n\033[94m{'─'*115}",
         f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
-        f"{'─'*110}\033[0m",
+        f"{'─'*115}\033[0m",
         df.to_string(index=False),
-        f"{'─'*110}",
+        f"{'─'*115}",
     ]
     logger.info("\n".join(lines))

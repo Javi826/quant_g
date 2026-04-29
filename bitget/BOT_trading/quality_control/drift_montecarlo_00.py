@@ -50,9 +50,17 @@ DRIFT_REFERENCE = {
         'p5_winrate':  41.3,
         'p50_winrate': 42.8,
     },
+    '14_orderblocks_long_4H': {
+        'p5_winrate':  40.8,
+        'p50_winrate': 43.6,
+    },
     '17_flag_long_4H': {
-        'p5_winrate':  46.6,
-        'p50_winrate': 49.1,
+        'p5_winrate':  60.0,
+        'p50_winrate': 62.9,
+    },
+    '18_flag_long_1H': {
+        'p5_winrate':  61.3,
+        'p50_winrate': 65.1,
     },
     '19_flag_short_4H': {
         'p5_winrate':  57.6,
@@ -87,19 +95,11 @@ DRIFT_REFERENCE = {
         'p50_winrate': 43.6,
     },
     '27_orderblocks_short_1H': {
-        'p5_winrate':  63.8,
-        'p50_winrate': 65.3,
+        'p5_winrate':  63.5,
+        'p50_winrate': 66.0,
     },
     '28_orderblocks_long_1H': {
-        'p5_winrate':  50.7,
-        'p50_winrate': 51.6,
-    },
-    '29_orderblocks_short_6Hutc': {
-        'p5_winrate':  43.4,
-        'p50_winrate': 43.5,
-    },
-    '30_orderblocks_long_6Hutc': {
-        'p5_winrate':  47.4,
-        'p50_winrate': 50.9,
+        'p5_winrate':  51.2,
+        'p50_winrate': 54.4,
     },
 }

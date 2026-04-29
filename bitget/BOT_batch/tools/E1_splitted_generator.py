@@ -10,8 +10,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 STRATEGIES_SET_NAME = "00"  # "E1" | "00"
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
-OUTPUT_BATCH      = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
-OUTPUT_LOOP       = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
+OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS   = (
@@ -41,6 +41,12 @@ def _write(path, lines):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
+        
+def _write_init(folder):
+    init_path = os.path.join(folder, "__init__.py")
+    if not os.path.exists(init_path):
+        open(init_path, "w").close()        
+
 
 
 # =============================================================================
@@ -77,6 +83,7 @@ def generate_batch():
 
     lines.append("]")
     _write(OUTPUT_BATCH, lines)
+    _write_init(os.path.dirname(os.path.abspath(OUTPUT_BATCH)))
     print(f"✅ strategies_BT_{STRATEGIES_SET_NAME}_batch.py generated → {os.path.abspath(OUTPUT_BATCH)}")
 
 

@@ -23,27 +23,20 @@ from pathlib import Path
 from glob import glob
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
-from regime_common import (
-    extract_timeframe,
-    load_btc_for_timeframe,
-    calc_all_metrics_at_time,
-    classify_trade_by_family,
-    load_trades,
-    calculate_max_dd_pct,
-    permutation_test,
-    format_significance,
-    get_btc_macro_direction,
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
+from regime_common import extract_timeframe, load_btc_for_timeframe, calc_all_metrics_at_time
+from regime_common import classify_trade_by_family, load_trades, calculate_max_dd_pct
+from regime_common import permutation_test, format_significance, get_btc_macro_direction
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
-TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "brief_trades_02")
+TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
 
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_2021-01_2026-04_IS")
+BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
 BTC_MA_PERIOD   = 5
@@ -56,6 +49,7 @@ FAMILIES = {
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging':  {}
 }
+
 HURST_WINDOW    = 100
 ER_WINDOW       = 14
 ATR_WINDOW      = 14
@@ -191,7 +185,7 @@ def analyze_strategy(filepath: str, btc_1d_df: pd.DataFrame) -> dict:
     first_trade = df.iloc[0]
     closed_1d = btc_1d_df[btc_1d_df['ts'] < first_trade['buy_time']]
     closed_tf = btc_family_df[btc_family_df['ts'] < first_trade['buy_time']]
-    print(f"DEBUG | buy_time={first_trade['buy_time']} | last 1D={closed_1d.iloc[-1]['ts']} | last {timeframe}={closed_tf.iloc[-1]['ts']}")
+    #print(f"DEBUG | buy_time={first_trade['buy_time']} | last 1D={closed_1d.iloc[-1]['ts']} | last {timeframe}={closed_tf.iloc[-1]['ts']}")
 
     for _, trade in df.iterrows():
         result = classify_trade(trade, btc_1d_df, btc_family_df)
