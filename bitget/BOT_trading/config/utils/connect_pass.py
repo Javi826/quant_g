@@ -2,8 +2,6 @@
 
 import ccxt
 
-BASE_URL = "https://api.bitget.com"
-
 # -----------------------------
 # BITGET CONFIG
 # -----------------------------

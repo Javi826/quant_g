@@ -7,7 +7,6 @@ import logging
 import os
 import sys
 import pandas as pd
-import numpy as np
 from typing import Dict, Optional, Tuple
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_market_regime")))
@@ -178,26 +177,6 @@ def get_current_regime(timeframe: str) -> Tuple[str, Optional[Dict[str, float]]]
     )
 
     return family, metrics
-
-
-def get_regime_multiplier(symbol: str, timeframe: str) -> float:
-    """
-    Get position sizing multiplier based on current regime.
-
-    Args:
-        symbol: Trading symbol (currently unused, kept for future symbol-specific logic)
-        timeframe: Timeframe being traded
-
-    Returns:
-        Multiplier to apply to base order_amount
-    """
-    try:
-        family, _ = get_current_regime(timeframe)
-        return REGIME_GENERAL.get(family, 1.0)
-    except Exception as e:
-        logger.error(f"Error getting regime multiplier: {e}", exc_info=True)
-        return 1.0
-
 
 def get_regime_info(timeframe: str) -> Dict:
     """

@@ -7,11 +7,6 @@ Calculates adjusted order amounts by applying multipliers from:
 """
 
 import logging
-from typing import Dict, Tuple, Optional
-
-from config.settings import (
-    REGIME_GENERAL
-)
 
 class PositionSizer:
     """

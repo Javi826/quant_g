@@ -25,8 +25,8 @@ SPLIT_MODE    = "expanding"
 SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 BTC_FOLDER    = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
-MA_TYPES   = [5, 10, 20, 50]
-THRESHOLDS = [0.95, 0.98, 1.00, 1.02, 1.05]
+MA_TYPES   = [2,5]
+THRESHOLDS = [0.99,1.00,1.01]
 
 PERIOD_LABELS = [
     ("IS",   "is_baseline"),
@@ -34,7 +34,7 @@ PERIOD_LABELS = [
     ("OOS2", "oos2_baseline"),
     ("OOS3", "oos3_baseline"),
 ]
-TOP_N = 5
+TOP_N = 2
 
 
 # =============================================================================

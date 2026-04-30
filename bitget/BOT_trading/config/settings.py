@@ -5,6 +5,7 @@ Centralizes all bot configuration including exchange settings,
 validation limits, paths, and account-specific settings.
 """
 import sys, os
+import socket
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
 from zoneinfo import ZoneInfo
 
@@ -51,15 +52,9 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared_config import (
-    REGIME_REFERENCE_SYMBOL,
-    REGIME_HURST_WINDOW,
-    REGIME_ER_WINDOW,
-    REGIME_ATR_WINDOW,
-    REGIME_PE_WINDOW,
-    REGIME_PE_ORDER,
-    REGIME_FAMILIES,
-)
+from shared_config import REGIME_REFERENCE_SYMBOL, REGIME_HURST_WINDOW, REGIME_ER_WINDOW
+from shared_config import REGIME_ATR_WINDOW, REGIME_PE_WINDOW, REGIME_PE_ORDER,REGIME_FAMILIES
+
 
 REGIME_GENERAL = {
     'trending': 1.0,
@@ -88,8 +83,10 @@ LEVERAGE = 10
 
 # Drift detection
 DRIFT_WINDOW_SIZE          = 100
-DRIFT_CHECK_INTERVAL       = 15
+
 DRIFT_BINOMIAL_WINDOW      = 50
+DRIFT_CHECK_INTERVAL       = 15
+
 DRIFT_BINOMIAL_DEFAULT_P50 = 0.55
 
 # Execution quality
@@ -144,7 +141,6 @@ VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
 # ==========================================================================
 # POSTGRESQL CONFIGURATION
 # ==========================================================================
-import socket
 
 # Environment detection
 HOSTNAME      = socket.gethostname()
@@ -172,8 +168,7 @@ VPS_CHECK_CONFIG = {
 # ==========================================================================
 # EXCHANGE SETTINGS
 # ==========================================================================
-BASE_URL        = "https://api.bitget.com"
-PRODUCT_TYPE    = "USDT-FUTURES"
+from shared_config import BASE_URL, PRODUCT_TYPE
 MARGIN_MODE     = "crossed"
 MARGIN_COIN     = "USDT"
 API_LIMIT_DATA  = 180

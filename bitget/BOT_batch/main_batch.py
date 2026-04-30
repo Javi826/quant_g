@@ -87,16 +87,18 @@ OOS_R2_TH            = 0.85
 
 # ELITE
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 40
-OOS_MAX_DD_TH        = 5
-OOS_R2_TH            = 0.85  
+# =============================================================================
+# OOS_NETGAIN_TH       = 40
+# OOS_MAX_DD_TH        = 5
+# OOS_R2_TH            = 0.85  
+# =============================================================================
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
 UPDATE_OUTPUTS           = False
-RUN_BEST_COMBINATIONS    = False
-RUN_CORRELATION_ANALYSIS = False
+RUN_BEST_COMBINATIONS    = True
+RUN_CORRELATION_ANALYSIS = True
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
