@@ -96,9 +96,9 @@ OOS_R2_TH            = 0.85
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-UPDATE_OUTPUTS           = False
-RUN_BEST_COMBINATIONS    = True
 RUN_CORRELATION_ANALYSIS = True
+UPDATE_OUTPUTS           = False
+RUN_BEST_COMBINATIONS    = False
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
@@ -1051,22 +1051,22 @@ def run_portfolio_analysis():
 
     validated_ids      = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
     validated_baseline = [(sid, df) for sid, df in _strategy_trades_oos1_baseline if sid in validated_ids]
-    validated_regime01 = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
+    validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
 
     if validated_baseline:
         logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*115}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
-    if validated_regime01:
-        print_all_curves_table(validated_regime01, "Regime 0+1 — Validated only", INITIAL_BALANCE)
+    if validated_oos1_regime:
+        print_all_curves_table(validated_oos1_regime, "Regime 0+1 — Validated only", INITIAL_BALANCE)
 
-    validated_oos2 = [(sid, df) for sid, df in _strategy_trades_oos2_regime if sid in validated_ids]
-    validated_oos3 = [(sid, df) for sid, df in _strategy_trades_oos3_regime if sid in validated_ids]
+    validated_oos2_regime = [(sid, df) for sid, df in _strategy_trades_oos2_regime if sid in validated_ids]
+    validated_oos3_regime = [(sid, df) for sid, df in _strategy_trades_oos3_regime if sid in validated_ids]
     print_robustness_table(
         strategy_trades_per_period=[
-            ("OOS1", validated_regime01),
-            ("OOS2", validated_oos2),
-            ("OOS3", validated_oos3),
+            ("OOS1", validated_oos1_regime),
+            ("OOS2", validated_oos2_regime),
+            ("OOS3", validated_oos3_regime),
         ],
         initial_balance=INITIAL_BALANCE,
     )
@@ -1083,31 +1083,31 @@ def run_portfolio_analysis():
     if validated_baseline:
         plot_portfolio_comparison(
             strategy_trades_baseline=validated_baseline,
-            strategy_trades_regime01=validated_regime01,
+            strategy_trades_regime01=validated_oos1_regime,
             data_folder=DATA_FOLDER_OOS1,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio — Validated only",
         )
 
-    if validated_oos2:
+    if validated_oos2_regime:
         plot_portfolio_comparison(
-            strategy_trades_baseline=validated_oos2,
-            strategy_trades_regime01=validated_oos2,
+            strategy_trades_baseline=validated_oos2_regime,
+            strategy_trades_regime01=validated_oos2_regime,
             data_folder=DATA_FOLDER_OOS2,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio OOS2 — Validated only",
         )
 
-    if validated_oos3:
+    if validated_oos3_regime:
         plot_portfolio_comparison(
-            strategy_trades_baseline=validated_oos3,
-            strategy_trades_regime01=validated_oos3,
+            strategy_trades_baseline=validated_oos3_regime,
+            strategy_trades_regime01=validated_oos3_regime,
             data_folder=DATA_FOLDER_OOS3,
             initial_balance=INITIAL_BALANCE,
             title="Portfolio OOS3 — Validated only",
         )
 
-    if RUN_BEST_COMBINATIONS and validated_regime01:
+    if RUN_BEST_COMBINATIONS and validated_oos1_regime:
         best_r2_combo_ids = find_best_r2_combination_ids(
             strategy_trades_is = [(sid, df) for sid, df in _strategy_trades_is_regime if sid in validated_ids],
             initial_balance = INITIAL_BALANCE,
@@ -1125,21 +1125,25 @@ def run_portfolio_analysis():
         print_best_r2_robustness_table(
             combo_ids            = best_r2_combo_ids,
             strategy_trades_per_period= [
-                ("OOS1", validated_regime01),
-                ("OOS2", validated_oos2),
-                ("OOS3", validated_oos3),
+                ("OOS1", validated_oos1_regime),
+                ("OOS2", validated_oos2_regime),
+                ("OOS3", validated_oos3_regime),
             ],
             initial_balance      = INITIAL_BALANCE,
         )
     # -------------------------------------------------------------------------
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
-    if RUN_CORRELATION_ANALYSIS and validated_regime01:
+    if RUN_CORRELATION_ANALYSIS and validated_oos1_regime:
         logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOS1 — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
         survivors = decorrelate_by_dd(
-            strategy_trades_oos1     = validated_regime01,
-            strategy_trades_oos2     = [],
-            strategy_trades_oos3     = [],
+            strategy_trades_oos1     = validated_oos1_regime,
+# =============================================================================
+#             strategy_trades_oos2     = [],
+#             strategy_trades_oos3     = [],
+# =============================================================================
+            strategy_trades_oos2     = validated_oos2_regime,
+            strategy_trades_oos3     = validated_oos3_regime,
             initial_balance     = INITIAL_BALANCE,
             threshold           = CORRELATION_DD_THRESHOLD,
             precomputed_metrics = r01_metrics,
@@ -1161,9 +1165,13 @@ def run_portfolio_analysis():
 
         logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOS1 — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'-'*115}")
         survivors_profit = decorrelate_by_profit(
-            strategy_trades_oos1     = validated_regime01,
-            strategy_trades_oos2     = [],
-            strategy_trades_oos3     = [],
+            strategy_trades_oos1     = validated_oos1_regime,
+# =============================================================================
+#             strategy_trades_oos2     = [],
+#             strategy_trades_oos3     = [],
+# =============================================================================
+            strategy_trades_oos2     = validated_oos2_regime,
+            strategy_trades_oos3     = validated_oos3_regime,
             initial_balance     = INITIAL_BALANCE,
             threshold           = CORRELATION_DD_THRESHOLD,
             precomputed_metrics = r01_metrics,
@@ -1178,10 +1186,10 @@ def run_portfolio_analysis():
                 title="Portfolio — Decorrelated Validated (Profit filter)",
             )
             
-        discarded_dd     = {sid for sid, _ in validated_regime01 if sid not in {s for s, _ in survivors}}
-        discarded_profit = {sid for sid, _ in validated_regime01 if sid not in {s for s, _ in survivors_profit}}
+        discarded_dd     = {sid for sid, _ in validated_oos1_regime if sid not in {s for s, _ in survivors}}
+        discarded_profit = {sid for sid, _ in validated_oos1_regime if sid not in {s for s, _ in survivors_profit}}
         discarded_both   = discarded_dd & discarded_profit
-        combined_survivors = [(sid, df) for sid, df in validated_regime01 if sid not in discarded_both]
+        combined_survivors = [(sid, df) for sid, df in validated_oos1_regime if sid not in discarded_both]
         if combined_survivors:
             logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOS1 — DD + Profit combined (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
             print_all_curves_table(combined_survivors, "Decorrelated DD + Profit — Validated only", INITIAL_BALANCE)

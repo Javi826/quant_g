@@ -40,7 +40,7 @@ SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", 
 BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
-BTC_MA_PERIOD   = 2
+BTC_MA_PERIOD   = 5
 LONG_TH         = 1.00
 SHORT_TH        = 1.00
 

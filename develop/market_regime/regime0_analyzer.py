@@ -25,8 +25,8 @@ from glob import glob
 # =============================================================================
 
 TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch", "brief_trades")
-TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "..", "develop", "brief_trades")
-BTC_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS", "BTCUSDT_1Dutc.parquet")
+TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "..", "develop", "brief_trades")
+BTC_FILE        = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", "expanding", "OOS", "crypto_2025-04_2026-04_OOS", "BTCUSDT_1Dutc.parquet")
 MA_PERIOD       = 5  # Options: 5, 10, 20, 50, 200
 LONG_TH         = 1.00  # Threshold for LONG: BTC > MA * LONG_TH
 SHORT_TH        = 1.00  # Threshold for SHORT: BTC < MA * SHORT_TH

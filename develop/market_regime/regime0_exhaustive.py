@@ -25,8 +25,13 @@ SPLIT_MODE    = "expanding"
 SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 BTC_FOLDER    = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
-MA_TYPES   = [2,5]
-THRESHOLDS = [0.99,1.00,1.01]
+THRESHOLDS    = [0.98,0.99,1.00,1.01,1.02]
+
+MA_TYPES      = [2,3,4,5]
+BTC_TIMEFRAME = '1Dutc'
+
+MA_TYPES      = [30,60,120,300]
+BTC_TIMEFRAME = '4H'                            
 
 PERIOD_LABELS = [
     ("IS",   "is_baseline"),
@@ -40,10 +45,10 @@ TOP_N = 2
 # =============================================================================
 # DATA LOADING
 # =============================================================================
-def load_btc_1d() -> pd.DataFrame:
-    filepath = Path(BTC_FOLDER) / "BTCUSDT_1Dutc.parquet"
+def load_btc() -> pd.DataFrame:
+    filepath = Path(BTC_FOLDER) / f"BTCUSDT_{BTC_TIMEFRAME}.parquet"
     if not filepath.exists():
-        raise FileNotFoundError(f"BTC 1D file not found: {filepath}")
+        raise FileNotFoundError(f"BTC file not found: {filepath}")
     df = pd.read_parquet(filepath)
     df.columns = df.columns.str.lower()
     df['ts'] = pd.to_datetime(df['timestamp'] if 'timestamp' in df.columns else df.index)
@@ -100,7 +105,6 @@ def evaluate_combination(df_trades: pd.DataFrame, btc_df: pd.DataFrame,
 
 
 def run_grid(df_trades: pd.DataFrame, btc_df: pd.DataFrame) -> list:
-    #combos = [(ma, lt, st) for ma in MA_TYPES for lt in THRESHOLDS for st in THRESHOLDS]
     combos = [(ma, lt, st) for ma in MA_TYPES for lt in THRESHOLDS for st in THRESHOLDS if st <= lt]
     results = []
     for ma_period, long_th, short_th in combos:
@@ -166,6 +170,28 @@ def print_period_summary(period_results: dict, best_combo: dict):
     print(f"  {'═'*110}")
 
 
+def print_direction_distribution(df: pd.DataFrame, btc_df: pd.DataFrame,
+                                  ma_period: int, long_th: float, short_th: float,
+                                  period_name: str) -> None:
+    """Print distribution of BTC macro direction for all trades in a period."""
+    directions = []
+    for _, trade in df.iterrows():
+        direction = get_btc_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
+        directions.append({'direction': direction, 'position_type': trade['position_type']})
+
+    df_dir = pd.DataFrame(directions)
+    print(f"\n  Direction distribution — {period_name} (MA{ma_period}  LONG_TH={long_th}  SHORT_TH={short_th})")
+    print(f"  {'─'*60}")
+    for side in ['LONG', 'SHORT']:
+        subset = df_dir[df_dir['position_type'] == side]
+        total  = len(subset)
+        for d in ['uptrend', 'dwtrend', 'neutral', 'unknown']:
+            n   = (subset['direction'] == d).sum()
+            pct = round(n / total * 100, 1) if total > 0 else 0.0
+            print(f"  {side:<6} {d:<10} {n:>6}  ({pct:.1f}%)")
+    print(f"  {'─'*60}")
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -177,11 +203,13 @@ def main():
     print(f"  BTC folder    : {BTC_FOLDER}")
     print(f"  MA types      : {MA_TYPES}")
     print(f"  Thresholds    : {THRESHOLDS}")
-    print(f"  Combinations  : {len(MA_TYPES) * len(THRESHOLDS) ** 2}")
+    print(f"  BTC timeframe : {BTC_TIMEFRAME}")
+    n_combos = sum(1 for ma in MA_TYPES for lt in THRESHOLDS for st in THRESHOLDS if st <= lt)
+    print(f"  Combinations  : {n_combos} (filtered st<=lt)")
 
-    print("\n  Loading BTC 1D data...")
-    btc_df = load_btc_1d()
-    print(f"  {len(btc_df)} daily bars loaded")
+    print("\n  Loading BTC data...")
+    btc_df = load_btc()
+    print(f"  {len(btc_df)} bars loaded ({BTC_TIMEFRAME})")
 
     period_results = {}
     all_trades_list = []
