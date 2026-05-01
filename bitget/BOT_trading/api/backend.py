@@ -1665,57 +1665,54 @@ class DashboardServer:
         
         @self.app.route('/api/regime0/current')
         def get_regime0_current():
-            """
-            Get REGIME 0 (BTC 1D filter) current status for LONG and SHORT.
-            
-            Returns:
-                JSON with LONG/SHORT allow/block status, BTC price, MA5, thresholds
-            """
             try:
                 from market_regime.regime_classifier import fetch_btc_ohlcv
+                from config.utils.utils import get_account_config
                 import pandas as pd
-                
+        
+                # Get account-specific thresholds
+                account_config = get_account_config(self.account_number)
+                ma_period    = account_config.get('regime01_ma_period', 5)
+                long_th      = account_config.get('regime01_long_th',   1.02)
+                short_th     = account_config.get('regime01_short_th',  1.00)
+        
                 # Fetch BTC 1D data
                 df = fetch_btc_ohlcv('1Dutc')
-                
-                if df is None or df.empty or len(df) < 5:
+        
+                if df is None or df.empty or len(df) < ma_period:
                     return jsonify({
                         'success': False,
                         'error': 'Insufficient BTC 1D data',
                         'long_allowed': None,
                         'short_allowed': None
                     }), 500
-                
-                # Get BTC close and MA5
-                btc_close = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
-                ma5 = float(pd.to_numeric(df['close'], errors='coerce').tail(5).mean())
-                
-                # Calculate thresholds using settings
-                long_threshold = ma5 * GLOBAL_SYSTEM_REGIME_TH2
-                short_threshold = ma5 * GLOBAL_SYSTEM_REGIME_TH1
-                
-                # Determine allow/block
-                long_allowed = btc_close > long_threshold
+        
+                btc_close       = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
+                ma              = float(pd.to_numeric(df['close'], errors='coerce').tail(ma_period).mean())
+                long_threshold  = ma * long_th
+                short_threshold = ma * short_th
+        
+                long_allowed  = btc_close > long_threshold
                 short_allowed = btc_close < short_threshold
-                
+        
                 return jsonify({
                     'success': True,
                     'btc_close': btc_close,
-                    'ma5': ma5,
+                    'ma5': ma,
                     'long': {
                         'allowed': long_allowed,
                         'threshold': long_threshold,
-                        'multiplier': GLOBAL_SYSTEM_REGIME_TH2,
-                        'rule': f'BTC > MA5*{GLOBAL_SYSTEM_REGIME_TH2}'
+                        'multiplier': long_th,
+                        'rule': f'BTC > MA{ma_period}*{long_th}'
                     },
                     'short': {
                         'allowed': short_allowed,
                         'threshold': short_threshold,
-                        'multiplier': GLOBAL_SYSTEM_REGIME_TH1,
-                        'rule': f'BTC < MA5*{GLOBAL_SYSTEM_REGIME_TH1}'
+                        'multiplier': short_th,
+                        'rule': f'BTC < MA{ma_period}*{short_th}'
                     }
                 })
-                
+        
             except Exception as e:
                 logger.error(f"Error getting REGIME 0: {e}")
                 return jsonify({

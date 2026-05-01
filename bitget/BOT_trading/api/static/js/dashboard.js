@@ -834,7 +834,12 @@ function updateRegime0UI(data) {
             regimeCard.style.border = '2px solid #d29922';  // Naranja (INACTIVE)
         }
     }
+    const shortRule = document.getElementById('regime0-short-rule');
+    const longRule  = document.getElementById('regime0-long-rule');
+    if (shortRule && shortData.rule) shortRule.textContent = shortData.rule;
+    if (longRule  && longData.rule)  longRule.textContent  = longData.rule;
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // END MARKET REGIME FUNCTIONS
