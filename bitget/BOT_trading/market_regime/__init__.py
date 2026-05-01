@@ -12,12 +12,13 @@ from .regime_classifier import (
     get_current_regime,
     get_btc_1d_direction,
     get_regime_info,
+    configure_regime,
 )
 from .position_sizer import PositionSizer
-
 __all__ = [
     'get_current_regime',
     'get_btc_1d_direction',
     'get_regime_info',
+    'configure_regime',
     'PositionSizer',
 ]

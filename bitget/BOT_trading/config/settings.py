@@ -19,30 +19,36 @@ ACCOUNTS = {
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime0_enabled": True,   # reserved — structure placeholder for future use
         "regime01_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
+        "regime01_ma_period": 3,
+        "regime01_long_th":   1.00,
+        "regime01_short_th":  1.00,
     },
     "00": {
         "initial_capital": 8800,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "production",
-        "regime0_enabled": True,  # reserved — structure placeholder for future use
         "regime01_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
+        "regime01_ma_period": 5,
+        "regime01_long_th":   1.00,
+        "regime01_short_th":  1.00,
     },
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,
         "description": "Testing Account",
         "type": "demo",
-        "regime0_enabled": False,  # reserved — structure placeholder for future use
         "regime01_enabled": False,
         "risk_control_enabled": False,
         "postgresql_enabled": False,
+        "regime01_ma_period": 5,
+        "regime01_long_th":   1.00,
+        "regime01_short_th":  1.00,
     }
 }
 

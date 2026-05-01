@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime import get_current_regime, get_btc_1d_direction, PositionSizer
+from market_regime import get_current_regime, get_btc_1d_direction, PositionSizer,configure_regime
 from risk_control import RiskLimiter, ExposureCalculator
 from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
@@ -96,6 +96,7 @@ class BotOrchestrator:
         sm_configure_demo(self.account_number)
         tl_configure_postgres(self.account_number)
         qc_configure_account(self.account_number)
+        configure_regime(self.account_number)
         
         # API clients
         self.bitget_client = bitget_client
@@ -267,13 +268,16 @@ class BotOrchestrator:
         regime01    = self.account_flags.get('regime01_enabled', True)
         risk        = self.account_flags.get('risk_control_enabled', True)
         pg          = self.account_flags.get('postgresql_enabled', True)
-
+        ma_period   = self.account_flags.get('regime01_ma_period', 5)
+        long_th     = self.account_flags.get('regime01_long_th', 1.02)
+        short_th    = self.account_flags.get('regime01_short_th', 1.00)
         self.logger.info(f"[{self.account_number}] ════ Account Configuration ════")
         self.logger.info(f"[{self.account_number}] Initial capital:  {capital_str}")
         self.logger.info(f"[{self.account_number}] Regime01:         {'✅ enabled' if regime01 else '❌ disabled'}")
         self.logger.info(f"[{self.account_number}] Risk control:     {'✅ enabled' if risk else '❌ disabled'}")
         self.logger.info(f"[{self.account_number}] PostgreSQL:       {'✅ enabled' if pg else '❌ disabled'}")
-   
+        self.logger.info(f"[{self.account_number}] BTC MA period:    {ma_period} | Long TH: {long_th} | Short TH: {short_th}")  
+        
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
         os.makedirs(self.base_dir, exist_ok=True)

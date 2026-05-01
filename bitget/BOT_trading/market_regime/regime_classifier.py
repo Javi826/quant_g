@@ -17,10 +17,18 @@ from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GEN
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
 from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2, REGIME0_MA_PERIOD
+from config.settings import ACCOUNTS
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
-
+def configure_regime(account_number: str) -> None:
+    global REGIME0_MA_PERIOD, GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
+    config = ACCOUNTS.get(account_number, {})
+    
+    REGIME0_MA_PERIOD        = config.get('regime01_ma_period', REGIME0_MA_PERIOD)
+    GLOBAL_SYSTEM_REGIME_TH1 = config.get('regime01_short_th',  GLOBAL_SYSTEM_REGIME_TH1)
+    GLOBAL_SYSTEM_REGIME_TH2 = config.get('regime01_long_th',   GLOBAL_SYSTEM_REGIME_TH2)
+    
 def fetch_btc_ohlcv(timeframe: str, limit: int = None) -> Optional[pd.DataFrame]:
     """
     Fetch BTC OHLCV data for regime calculation.
