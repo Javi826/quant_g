@@ -26,12 +26,15 @@ SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "d
 BTC_FOLDER    = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
 THRESHOLDS    = [0.98,0.99,1.00,1.01,1.02]
+THRESHOLDS    = [0.98,0.99,0.995,1.00,1.005,1.01,1.02]
 
 MA_TYPES      = [2,3,4,5]
 BTC_TIMEFRAME = '1Dutc'
 
-MA_TYPES      = [30,60,120,300]
-BTC_TIMEFRAME = '4H'                            
+# =============================================================================
+# MA_TYPES      = [30,60,120,300]
+# BTC_TIMEFRAME = '4H'                            
+# =============================================================================
 
 PERIOD_LABELS = [
     ("IS",   "is_baseline"),
@@ -39,7 +42,7 @@ PERIOD_LABELS = [
     ("OOS2", "oos2_baseline"),
     ("OOS3", "oos3_baseline"),
 ]
-TOP_N = 2
+TOP_N = 1
 
 
 # =============================================================================
