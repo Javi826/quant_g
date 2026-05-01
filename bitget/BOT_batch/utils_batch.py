@@ -10,6 +10,7 @@ from shared_market_regime.regime_common import load_btc_for_timeframe, calc_all_
 from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction
 from itertools import combinations as _combinations
 from backtesters.ZX_compute_BT import INITIAL_BALANCE
+from shared_config import REGIME_REFERENCE_SYMBOL, VOLUME_COL
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 from signals.add_signals_flag        import flag_long, flag_short
@@ -352,7 +353,7 @@ def _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, btc
 
 def _load_btc(data_folder, t_start, t_end):
     """Load and normalize BTC 1D data for a given time range."""
-    btc_file = os.path.join(data_folder, "BTCUSDT_1Dutc.parquet")
+    btc_file = os.path.join(data_folder, f"{REGIME_REFERENCE_SYMBOL}_1Dutc.parquet")
     btc_df   = pd.read_parquet(btc_file)
     btc_df.columns = btc_df.columns.str.lower()
     btc_df["ts"] = pd.to_datetime(btc_df["timestamp"] if "timestamp" in btc_df.columns else btc_df.index)
@@ -465,8 +466,8 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
         path = os.path.join(folder, f"{sym}_1Dutc.parquet")
         if not os.path.exists(path):
             return 0.0
-        df = pd.read_parquet(path, columns=["volume_quote"])
-        return float(df["volume_quote"].tail(180).mean())
+        df = pd.read_parquet(path, columns=[VOLUME_COL])
+        return float(df[VOLUME_COL].tail(180).mean())
 
     vol_oos           = {sym: _vol_1d(sym, data_folder_oos) for sym in filtered_oos}
     oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
@@ -506,9 +507,6 @@ def select_universe(data_folder_is, data_folder_oos, timeframe, n_symbols, min_p
             logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
 
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
-
-
-
 
 # =============================================================================
 # HELPER — SAVE DRIFT REFERENCE

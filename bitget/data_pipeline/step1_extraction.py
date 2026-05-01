@@ -9,6 +9,7 @@ import re
 import sys
 import time
 from datetime import datetime, timezone
+from shared_config import  VOLUME_COL
 
 import pandas as pd
 
@@ -256,7 +257,7 @@ def _process_symbol(
 
     df_final = _merge_and_deduplicate(df_existing, df_new)
 
-    for col in ["open", "high", "low", "close", "volume_base", "volume_quote"]:
+    for col in ["open", "high", "low", "close", "volume_base", VOLUME_COL]:
         df_final[col] = pd.to_numeric(df_final[col], errors="coerce")
 
     detect_gaps(df_final, gran_ms, sym)

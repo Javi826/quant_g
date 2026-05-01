@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
+from shared_config import REGIME_REFERENCE_SYMBOL
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_rows', None)
@@ -125,7 +126,7 @@ def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain %
     fig, ax1 = plt.subplots(figsize=(12,6))
 
     # Load and process BTC data
-    btc_file = os.path.join(data_folder, "BTCUSDT_4H.parquet")
+    btc_file = os.path.join(data_folder, f"{REGIME_REFERENCE_SYMBOL}_4H.parquet")
     btc_df = pd.read_parquet(btc_file)
 
     if 'timestamp' not in btc_df.columns:

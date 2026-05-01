@@ -5,6 +5,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib 
 from collections import Counter 
+from shared_config import VOLUME_COL
 
 
 def walk_forward_optimization(ohlcv_arr, param_ranges,
@@ -88,7 +89,7 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
                 'high': arr_dict['high'][t0_sym:t1_sym],
                 'low': arr_dict['low'][t0_sym:t1_sym],
                 'close': arr_dict['close'][t0_sym:t1_sym],
-                'volume_quote': arr_dict.get('volume_quote', arr_dict['close']*0)[t0_sym:t1_sym],
+                VOLUME_COL: arr_dict.get(VOLUME_COL, arr_dict['close']*0)[t0_sym:t1_sym],
                 'low_time': arr_dict['low_time'][t0_sym:t1_sym],
                 'high_time': arr_dict['high_time'][t0_sym:t1_sym],
             }

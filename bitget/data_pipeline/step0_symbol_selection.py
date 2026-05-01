@@ -77,7 +77,7 @@ def select_symbols(config: dict) -> list[str]:
     for i, sym in enumerate(all_symbols, start=1):
         avg_vol = _fetch_avg_volume(sym)
         if avg_vol is not None:
-            volume_data.append({"symbol": sym, "avg_volume_quote": avg_vol})
+            volume_data.append({"symbol": sym, "avg_volume_usdt": avg_vol})
         if i % 50 == 0:
             logger.info(f"  Progress: {i}/{len(all_symbols)}")
 
@@ -85,7 +85,7 @@ def select_symbols(config: dict) -> list[str]:
         logger.warning("⚠ Could not fetch volume data. Falling back to SELECTED_SYMBOLS.")
         return selected_symbols
 
-    df          = pd.DataFrame(volume_data).sort_values("avg_volume_quote", ascending=False)
+    df          = pd.DataFrame(volume_data).sort_values("avg_volume_usdt", ascending=False)
     top_symbols = df.head(n_symbols)["symbol"].tolist()
 
     os.makedirs(output_dir, exist_ok=True)

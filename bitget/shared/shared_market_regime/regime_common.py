@@ -11,7 +11,7 @@ Contains all common functions used across:
 import numpy as np
 import pandas as pd
 from pathlib import Path
-
+from shared_config import REGIME_REFERENCE_SYMBOL
 from shared_market_regime.regime_metrics import calc_all_metrics
 
 
@@ -28,7 +28,7 @@ def load_btc_for_timeframe(ohlc_folder, timeframe, cache):
     if cache_key in cache:
         return cache[cache_key]
     
-    filepath = Path(ohlc_folder) / f"BTCUSDT_{timeframe}.parquet"
+    filepath = Path(ohlc_folder) / f"{REGIME_REFERENCE_SYMBOL}_{timeframe}.parquet"
     if not filepath.exists():
         raise FileNotFoundError(f"BTC OHLC not found: {filepath}")
     

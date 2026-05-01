@@ -4,6 +4,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 from typing import Union
+from shared_config import VOLUME_COL
 import logging
 logger = logging.getLogger("BOT_batch.utils")
 
@@ -12,19 +13,7 @@ random.seed(42)
 
 symbols_to_exclude = {}
 
-symbols_to_include = ['BTCUSDT', 'ETHUSDT','SOLUSDT','XRPUSDT','HYPEUSDT','SUIUSDT']
-# =============================================================================
-# 
-# symbols_to_include = [
-#     'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT',
-#     'HYPEUSDT', 'SUIUSDT', 'ADAUSDT', 'BCHUSDT', 'LINKUSDT',
-#     'BNBUSDT', 'TAOUSDT', 'DOTUSDT', 'AAVEUSDT', 'ENAUSDT',
-#     'NEARUSDT', 'AVAXUSDT', 'ARBUSDT', 'LTCUSDT', 'FARTCOINUSDT',
-#     'APTUSDT', 'HBARUSDT', 'PENGUUSDT', 'HUSDT', 'WLDUSDT',
-#     'WIFUSDT', 'SEIUSDT', 'ONDOUSDT', 'FETUSDT', 'SNXUSDT',
-#     'BGBUSDT'
-# ]
-# =============================================================================
+symbols_to_include = []
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
@@ -77,7 +66,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                     reasons.append("Last close too low")
                     
             if df is not None:
-                avg_vol = df['volume_quote'].tail(vol_window).mean()
+                avg_vol = df[VOLUME_COL].tail(vol_window).mean()
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     

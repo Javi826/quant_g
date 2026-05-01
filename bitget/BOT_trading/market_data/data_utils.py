@@ -12,10 +12,11 @@ import sys
 import logging
 import numpy as np
 import pandas as pd
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "broker_api")))
-
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
+from shared_config import VOLUME_COL
 from api_client import _call_history_candles, to_dataframe_from_api
+
 from pandas.api.types import is_datetime64_any_dtype
 from config.settings import API_LIMIT_DATA
 
@@ -46,7 +47,7 @@ def normalize_live_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
             df.index = pd.to_datetime(df.index)
     
     # Convert OHLCV columns to numeric
-    for col in ['open', 'high', 'low', 'close', 'volume_base', 'volume_quote']:
+    for col in ['open', 'high', 'low', 'close', 'volume_base', VOLUME_COL]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
     
@@ -78,9 +79,9 @@ def df_to_arrays_live(df: pd.DataFrame) -> dict:
         'high': df['high'].to_numpy(dtype=np.float64),
         'low': df['low'].to_numpy(dtype=np.float64),
         'close': df['close'].to_numpy(dtype=np.float64),
-        'volume_quote': (
-            df['volume_quote'].to_numpy(dtype=np.float64)
-            if 'volume_quote' in df
+        VOLUME_COL: (
+            df[VOLUME_COL].to_numpy(dtype=np.float64)
+            if VOLUME_COL in df
             else np.zeros(len(df))
         )
     }

@@ -19,7 +19,7 @@ import requests
 from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
-
+from shared_config import REGIME_REFERENCE_SYMBOL
 import psycopg2
 from api.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info
@@ -473,7 +473,7 @@ class DashboardServer:
                 
                 btc_price = 0
                 try:
-                    btc_price = float(self.get_current_price('BTCUSDT'))
+                    btc_price = float(self.get_current_price(REGIME_REFERENCE_SYMBOL))
                 except:
                     pass
                 
@@ -2339,7 +2339,7 @@ class DashboardServer:
                 
                 # Get current BTC price
                 try:
-                    btc_price = float(self.get_current_price('BTCUSDT'))
+                    btc_price = float(self.get_current_price(REGIME_REFERENCE_SYMBOL))
                 except Exception as e:
                     cursor.close()
                     conn.close()

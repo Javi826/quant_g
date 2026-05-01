@@ -52,9 +52,9 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared_config import REGIME_REFERENCE_SYMBOL, REGIME_HURST_WINDOW, REGIME_ER_WINDOW
-from shared_config import REGIME_ATR_WINDOW, REGIME_PE_WINDOW, REGIME_PE_ORDER,REGIME_FAMILIES
-
+from shared_config import REGIME_REFERENCE_SYMBOL, REGIME_HURST_WINDOW
+from shared_config import REGIME_ER_WINDOW, REGIME_ATR_WINDOW
+from shared_config import REGIME_PE_WINDOW, REGIME_PE_ORDER, REGIME_FAMILIES
 
 REGIME_GENERAL = {
     'trending': 1.0,
@@ -184,11 +184,9 @@ PERSISTENCE_DIR       = "persistence"
 # ==========================================================================
 # API - WEBSOCKET SETTINGS
 # ==========================================================================
-WS_PUBLIC_URL   = "wss://ws.bitget.com/v2/ws/public"
-WS_PRIVATE_URL  = "wss://ws.bitget.com/v2/ws/private"
-API_TIMEOUT     = 10
-API_MAX_RETRIES = 3
-
+from shared_config import BASE_URL, PRODUCT_TYPE
+from shared_config import WS_PUBLIC_URL, WS_PRIVATE_URL
+from shared_config import API_TIMEOUT, API_MAX_RETRIES
 # ==========================================================================
 # LOGGER SETTINGS
 # ==========================================================================

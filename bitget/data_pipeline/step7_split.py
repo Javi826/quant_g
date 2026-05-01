@@ -38,6 +38,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
+from shared_config import REGIME_REFERENCE_SYMBOL
 
 import pandas as pd
 
@@ -158,7 +159,7 @@ def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, 
 
 def _get_data_range(raw_dir: str) -> tuple[str, str] | None:
     """Reads min/max date from BTCUSDT 1Dutc parquet for preview calculation."""
-    filename = f"BTCUSDT_{REFERENCE_SYMBOL_TF}.parquet"
+    filename = f"{REGIME_REFERENCE_SYMBOL}_{REFERENCE_SYMBOL_TF}.parquet"
     # Try clean dir first, then raw
     for folder in [raw_dir.replace("01_raw", "02_clean"), raw_dir]:
         path = os.path.join(folder, filename)

@@ -4,6 +4,8 @@
 # =============================================================================
 
 REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
+SYMBOL_SUFFIX           = "USDT"
+VOLUME_COL              = "volume_quote"
 
 REGIME_HURST_WINDOW = 100
 REGIME_ER_WINDOW    = 14
@@ -17,8 +19,10 @@ REGIME_FAMILIES = {
     'ranging': {}
 }
 # =============================================================================
-# API SETTINGS
+# API SOCKETS SETTINGS
 # =============================================================================
+WS_PUBLIC_URL   = "wss://ws.bitget.com/v2/ws/public"
+WS_PRIVATE_URL  = "wss://ws.bitget.com/v2/ws/private"
 BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
 API_TIMEOUT     = 10

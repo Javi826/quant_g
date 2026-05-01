@@ -2,6 +2,7 @@ import os
 from tqdm.auto import tqdm
 import pandas as pd
 import numpy as np
+from shared_config import VOLUME_COL
 
 import logging
 logger = logging.getLogger("shared.utils.st_tools")
@@ -34,7 +35,7 @@ def prepare_ohlcv_arrays(ohlcv_data):
             'high': df['high'].to_numpy(dtype=np.float64),
             'low': df['low'].to_numpy(dtype=np.float64),
             'close': df['close'].to_numpy(dtype=np.float64),
-            'volume_quote': df['volume_quote'].to_numpy(dtype=np.float64),
+            VOLUME_COL: df[VOLUME_COL].to_numpy(dtype=np.float64),
             'low_time': (pd.to_datetime(df['low_time']).to_numpy(dtype='datetime64[ns]')),
             'high_time': (pd.to_datetime(df['high_time']).to_numpy(dtype='datetime64[ns]'))          
         }
