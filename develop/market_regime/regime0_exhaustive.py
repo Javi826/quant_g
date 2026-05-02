@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 develop/market_regime/regime0_exhaustive.py
 

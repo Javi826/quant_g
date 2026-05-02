@@ -11,7 +11,7 @@ logger = logging.getLogger("BOT_batch.utils")
 np.random.seed(42)
 random.seed(42)
 
-symbols_to_exclude = {}
+symbols_to_exclude = {'XAUTUSDT', 'PAXGUSDT', 'XAGUSDT', 'XAUUSDT'}
 
 symbols_to_include = []
 
@@ -73,17 +73,17 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             if df is not None:
                 n_rows = len(df)
                 if timeframe == "1H":
-                    min_bars = 8640
+                    min_bars = 8000
                 elif timeframe == "30m":
                     min_bars = 16000
                 elif timeframe == "4H":
-                    min_bars = 2080
+                    min_bars = 1800
                 elif timeframe == "6Hutc":
-                    min_bars = 1440
+                    min_bars = 1200
                 elif timeframe == "12Hutc":
-                    min_bars = 720
+                    min_bars = 700
                 elif timeframe == "1Dutc":
-                    min_bars = 360
+                    min_bars = 300
                 else:
                     min_bars = 999999999
                     

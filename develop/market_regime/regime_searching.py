@@ -55,19 +55,19 @@ ATR_WINDOW    = 14
 PE_WINDOW     = 50
 PE_ORDER      = 3
 LOOKBACK_BARS = 100
+
 FAMILY_SOURCE = 'strategy'
 ANALYSIS_MODE = 'combined'
 INITIAL_CAPITAL = 800
-MIN_TRADES      = 10
+MIN_TRADES      = 2
 
 # Win rate gap filter — set to 0 to disable (identical to original)
-WR_GAP_THRESHOLD = 1   # pp below best bin win rate to also filter positive-profit bins
+WR_GAP_THRESHOLD = 15   # pp below best bin win rate to also filter positive-profit bins
 
 # =============================================================================
 # CACHE
 # =============================================================================
 _btc_cache = {}
-
 
 # =============================================================================
 # DATA LOADING

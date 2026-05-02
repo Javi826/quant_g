@@ -7,23 +7,23 @@ boundaries for strategy health evaluation.
 """
 DRIFT_REFERENCE = {
     '07_reversal_short_1H': {
-        'p5_winrate':  64.1,
-        'p50_winrate': 66.7,
+        'p5_winrate':  63.8,
+        'p50_winrate': 63.8,
     },
     '10_parity_long_1H': {
-        'p5_winrate':  65.0,
-        'p50_winrate': 66.3,
+        'p5_winrate':  67.8,
+        'p50_winrate': 67.8,
     },
     '11_parity_short_1H': {
-        'p5_winrate':  65.4,
-        'p50_winrate': 66.4,
+        'p5_winrate':  65.3,
+        'p50_winrate': 65.3,
     },
-    '23_flag_long_1H': {
-        'p5_winrate':  58.4,
-        'p50_winrate': 63.9,
+    '18_flag_long_1H': {
+        'p5_winrate':  70.1,
+        'p50_winrate': 70.1,
     },
     '27_orderblocks_short_1H': {
-        'p5_winrate':  63.5,
-        'p50_winrate': 66.0,
+        'p5_winrate':  63.2,
+        'p50_winrate': 63.2,
     },
 }
