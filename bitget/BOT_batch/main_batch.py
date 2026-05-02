@@ -75,8 +75,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # REGULAR
 #------------------------------------------------------------------------------
@@ -97,7 +97,7 @@ OOS_R2_TH            = 0.85
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = True
+UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
@@ -109,33 +109,33 @@ SELECTED_STRATEGIES = [
     "18_flag_long_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-    "03_parity_long_4H",
-    "06_reversal_long_1H",
-    "19_flag_short_4H",
-    "20_flag_short_1H",
-    "21_parity_short_4H",
-    "22_parity_short_6Hutc",
-    # -------------------------------------------------------------------------
-    "02_reversal_long_4H",
-    "04_reversal_short_4H",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "17_flag_long_4H",
-    "18_flag_long_1H",
-    "14_orderblocks_long_4H",
-    "26_orderblocks_long_4H",
-    "28_orderblocks_long_1H",
-    "24_flag_long_6Hutc",
-    "25_flag_short_6Hutc",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    # -------------------------------------------------------------------------
 # =============================================================================
-#     "29_reversal_long_30m",
-#     "30_reversal_short_30m",
-#     "31_parity_long_30m",
-#     "32_parity_short_30m",
+#     "03_parity_long_4H",
+#     "06_reversal_long_1H",
+#     "19_flag_short_4H",
+#     "20_flag_short_1H",
+#     "21_parity_short_4H",
+#     "22_parity_short_6Hutc",
+#     # -------------------------------------------------------------------------
+#     "02_reversal_long_4H",
+#     "04_reversal_short_4H",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "17_flag_long_4H",
+#     "18_flag_long_1H",
+#     "14_orderblocks_long_4H",
+#     "26_orderblocks_long_4H",
+#     "28_orderblocks_long_1H",
+#     "24_flag_long_6Hutc",
+#     "25_flag_short_6Hutc",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
 # =============================================================================
+    # -------------------------------------------------------------------------
+    "29_reversal_long_30m",
+    "30_reversal_short_30m",
+    "31_parity_long_30m",
+    "32_parity_short_30m",
 ]
 # =============================================================================
 # -----------------------------------------------------------------------------
@@ -158,8 +158,8 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS_new")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-05_OOS_new")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
@@ -200,16 +200,16 @@ R2_R2_ROUND2        = OOS_R2_TH
 R_NETGAIN_OOS2      = OOS_NETGAIN_TH
 R_MAX_DD_OOS2       = OOS_MAX_DD_TH
 R_R2_OOS2           = OOS_R2_TH
-OOS2_RUN_ANALYSIS   = True
-OOS2_FOR_VALIDATION = True
+OOS2_RUN_ANALYSIS   = False
+OOS2_FOR_VALIDATION = False
 
 # OOS3
 #------------------------------------------------------------------------------
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = True
-OOS3_FOR_VALIDATION = True
+OOS3_RUN_ANALYSIS   = False
+OOS3_FOR_VALIDATION = False
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
