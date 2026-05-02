@@ -109,33 +109,26 @@ SELECTED_STRATEGIES = [
     "18_flag_long_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-# =============================================================================
-#     "03_parity_long_4H",
-#     "06_reversal_long_1H",
-#     "19_flag_short_4H",
-#     "20_flag_short_1H",
-#     "21_parity_short_4H",
-#     "22_parity_short_6Hutc",
-#     # -------------------------------------------------------------------------
-#     "02_reversal_long_4H",
-#     "04_reversal_short_4H",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "17_flag_long_4H",
-#     "18_flag_long_1H",
-#     "14_orderblocks_long_4H",
-#     "26_orderblocks_long_4H",
-#     "28_orderblocks_long_1H",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-# =============================================================================
+    "03_parity_long_4H",
+    "06_reversal_long_1H",
+    "19_flag_short_4H",
+    "20_flag_short_1H",
+    "21_parity_short_4H",
+    "22_parity_short_6Hutc",
     # -------------------------------------------------------------------------
-    "29_reversal_long_30m",
-    "30_reversal_short_30m",
-    "31_parity_long_30m",
-    "32_parity_short_30m",
+    "02_reversal_long_4H",
+    "04_reversal_short_4H",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "17_flag_long_4H",
+    "18_flag_long_1H",
+    "14_orderblocks_long_4H",
+    "26_orderblocks_long_4H",
+    "28_orderblocks_long_1H",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
 ]
 # =============================================================================
 # -----------------------------------------------------------------------------
@@ -158,8 +151,8 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS_new")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-05_OOS_new")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
