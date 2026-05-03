@@ -60,7 +60,7 @@ _drift_results                 : list = []
 _best_params_results           : dict = {}
 
 # =============================================================================
-# GLOBAL CONFIGURATIONd
+# GLOBAL CONFIGURATION
 # =============================================================================
 DTYPE         = np.float32
 logger        = logging.getLogger("BOT_batch.main_batch")
