@@ -78,11 +78,20 @@ STRATEGIES_SET_NAME  = "00"
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
 
+
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 30
+OOS_NETGAIN_TH       = 20
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.85  
+
+# REGULAR -- MA4
+#------------------------------------------------------------------------------
+# =============================================================================
+# OOS_NETGAIN_TH       = 30
+# OOS_MAX_DD_TH        = 11
+# OOS_R2_TH            = 0.85  
+# =============================================================================
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -95,10 +104,10 @@ OOS_R2_TH            = 0.85
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = True
-RUN_BEST_COMBINATIONS    = True
-UPDATE_OUTPUTS           = True
-SAVE_TRADES              = True
+RUN_CORRELATION_ANALYSIS = False
+RUN_BEST_COMBINATIONS    = False
+UPDATE_OUTPUTS           = False
+SAVE_TRADES              = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -110,13 +119,13 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-    "04_reversal_short_4H",
-    "06_reversal_long_1H",
-    "19_flag_short_4H",
-    "22_parity_short_6Hutc",
-    "28_orderblocks_long_1H",
-    # -------------------------------------------------------------------------
 # =============================================================================
+#     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
+#     "19_flag_short_4H",
+#     "22_parity_short_6Hutc",
+#     "28_orderblocks_long_1H",
+#     # -------------------------------------------------------------------------
 #     "02_reversal_long_4H",
 #     "03_parity_long_4H",
 #     "04_reversal_short_4H",
@@ -156,10 +165,10 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-#DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-04_OOS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-05_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------

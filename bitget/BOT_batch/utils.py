@@ -70,27 +70,25 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-# =============================================================================
-#             if df is not None:
-#                 n_rows = len(df)
-#                 if timeframe == "1H":
-#                     min_bars = 8000
-#                 elif timeframe == "30m":
-#                     min_bars = 16000
-#                 elif timeframe == "4H":
-#                     min_bars = 1800
-#                 elif timeframe == "6Hutc":
-#                     min_bars = 1200
-#                 elif timeframe == "12Hutc":
-#                     min_bars = 700
-#                 elif timeframe == "1Dutc":
-#                     min_bars = 300
-#                 else:
-#                     min_bars = 999999999
-#                     
-#                 if n_rows < min_bars:
-#                     reasons.append("Not enough bars")
-# =============================================================================
+            if df is not None:
+                n_rows = len(df)
+                if timeframe == "1H":
+                    min_bars = 8000
+                elif timeframe == "30m":
+                    min_bars = 16000
+                elif timeframe == "4H":
+                    min_bars = 1800
+                elif timeframe == "6Hutc":
+                    min_bars = 1200
+                elif timeframe == "12Hutc":
+                    min_bars = 700
+                elif timeframe == "1Dutc":
+                    min_bars = 300
+                else:
+                    min_bars = 999999999
+                    
+                if n_rows < min_bars:
+                    reasons.append("Not enough bars")
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:

@@ -1,4 +1,4 @@
-# main_data.py
+# data_pipline/main_data.py
 # =============================================================================
 # Data Pipeline Orchestrator — single execution mode.
 # Runs all steps sequentially: extraction → highlow → split.
@@ -24,13 +24,13 @@ logger = logging.getLogger("pipeline")
 # =============================================================================
 # FOLDERS
 # =============================================================================
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR    = os.path.join(BASE_DIR, "data")
+BASE_DIR                    = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR                    = os.path.join(BASE_DIR, "data")
 
-RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
-CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
-HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
-SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
+RAW_DIR                     = os.path.join(DATA_DIR, "01_raw")
+CLEAN_DIR                   = os.path.join(DATA_DIR, "02_clean")
+HIGHLOW_DIR                 = os.path.join(DATA_DIR, "03_highlow")
+SPLIT_DIR                   = os.path.join(DATA_DIR, "04_split")
 
 DEBUG_RAW_INTEGRITY_DIR     = os.path.join(DATA_DIR, "debug_02_raw_integrity")
 DEBUG_CLEAN_INTEGRITY_DIR   = os.path.join(DATA_DIR, "debug_04_clean_integrity")
@@ -60,7 +60,7 @@ N_SYMBOLS_DOWNLOAD = 40
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-START_DATE = "2021-01-01"
+START_DATE = "2024-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -99,7 +99,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 12
+WINDOW_OOS_MONTHS    = 4
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     
