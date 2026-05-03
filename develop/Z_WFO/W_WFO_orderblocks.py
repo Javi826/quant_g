@@ -9,7 +9,7 @@ import pandas as pd
 from shared.utils.analysis import report_backtesting
 from shared.utils.utils import filter_symbols, final_prints
 from shared.tools.wfo import walk_forward_optimization
-from shared.utils.st_tools import prepare_ohlcv_arrays, compile_grid_results
+from shared.utils.torque import prepare_ohlcv_arrays, compile_grid_results
 from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from signals.add_signals_orderblocks import orderblocks_long
 from signals.add_signals_orderblocks import orderblocks_short

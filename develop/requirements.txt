@@ -213,9 +213,9 @@ rpyc==5.2.3
 rtree==1.4.1
 ruff==0.14.0
 # Editable install with no version control (rust_backtest==0.1.0)
--e /home/javi/projects/quant/quant_g/scripts
+-e /home/javi/projects/quant/quant_b/scripts
 # Editable install with no version control (rust_backtest_helpers==0.1.0)
--e /home/javi/projects/quant/quant_g/scripts/rust_backtest_helpers
+-e /home/javi/projects/quant/quant_b/scripts/rust_backtest_helpers
 schedule==1.2.0
 scikit-learn==1.7.2
 scipy==1.16.2

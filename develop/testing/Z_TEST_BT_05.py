@@ -10,7 +10,7 @@ import pandas as pd
 # CONFIG
 # =============================================================================
 
-TRADES_FILE  = "/home/javi/projects/quant/quant_g/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
+TRADES_FILE  = "/home/javi/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
 ROUND        = 2
 
 # =============================================================================

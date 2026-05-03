@@ -17,7 +17,7 @@ from joblib import Parallel, delayed
 from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from shared.utils.utils import filter_symbols, save_filtered_symbols, final_prints
 from shared.utils.analysis import report_montecarlo
-from shared.utils.st_tools import extract_ohlcv_from_path, compile_MC_results, get_n_obs
+from shared.utils.torque import extract_ohlcv_from_path, compile_MC_results, get_n_obs
 from shared.tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from signals.add_signals_reversal import reversal_long
 from signals.add_signals_reversal import reversal_short

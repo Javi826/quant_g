@@ -6,9 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 import time
 from utils.utils import filter_symbols, final_prints
 from tools.wfo_mc import walk_forward_optimization_mc
-from utils.st_tools import get_n_obs
+from utils.torque import get_n_obs
 import pandas as pd
-from utils.st_tools import prepare_ohlcv_arrays, compile_grid_results
+from utils.torque import prepare_ohlcv_arrays, compile_grid_results
 from utils.analysis import report_backtesting
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from signals.add_signals_orderblocks import orderblocks_long

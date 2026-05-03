@@ -35,8 +35,8 @@ from utils.analysis import report_montecarlo, report_backtesting
 from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
-from utils.st_tools import compile_grid_results, prepare_ohlcv_arrays,get_n_obs
-from utils.st_tools import extract_ohlcv_from_path, compile_MC_results
+from utils.torque import compile_grid_results, prepare_ohlcv_arrays,get_n_obs
+from utils.torque import extract_ohlcv_from_path, compile_MC_results
 from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,print_best_r2_robustness_table,print_robustness_table
 from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit,print_update_status
 from utils_batch import compute_metrics, print_metrics_table,accumulate_strategy_trades,print_portfolio_metrics_table

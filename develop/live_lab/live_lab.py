@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 LAB_FOLDER     = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "brief_trades")))
 #LIVE_DEMO_FILE = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_trading", "persistence", "bot_files_00", "bot_trades_00.xlsx")))
-LIVE_DEMO_FILE = Path('/home/javi/projects/quant/quant_g/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx')
+LIVE_DEMO_FILE = Path('/home/javi/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx')
 
 DATE_FROM      = '2026-03-25'
 DATE_TO        = '2026-04-30'

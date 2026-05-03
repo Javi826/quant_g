@@ -12,7 +12,7 @@ from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 
 from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from shared.utils.st_tools import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_csv, save_results,save_equity_to_csv
+from shared.utils.torque import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_csv, save_results,save_equity_to_csv
 from shared.utils.utils import filter_symbols, save_filtered_symbols
 
 from signals.add_signals_flag       import flag_long, flag_short

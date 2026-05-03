@@ -5,7 +5,7 @@ import numpy as np
 from shared_config import VOLUME_COL
 
 import logging
-logger = logging.getLogger("shared.utils.st_tools")
+logger = logging.getLogger("shared.utils.torque")
 
 def tf_to_pandas_freq(tf):
     tf = tf.lower().replace("utc", "")
