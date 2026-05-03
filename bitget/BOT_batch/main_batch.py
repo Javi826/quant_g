@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
