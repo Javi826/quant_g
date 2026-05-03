@@ -137,7 +137,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "13_orderblocks_short_4H",
-        "n_symbols": 30,
+        "n_symbols": 29,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [50],
