@@ -33,7 +33,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         if sym in symbols_to_exclude:
             removed_symbols.append(sym)
             continue
-        # --------------------------
         
         # ---- Si my_symbols=True, solo cargar sin filtros ----
         if my_symbols:
@@ -48,7 +47,6 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             else:
                 removed_symbols.append(sym)
             continue
-        # -----------------------------------------------------
         
         df        = None
         reasons   = []

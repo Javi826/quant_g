@@ -678,14 +678,14 @@ def accumulate_strategy_trades(registry, strategy_id, trade_log, csv_folder=None
 def compute_metrics(trade_log, capital, name="Equity"):
     from sklearn.linear_model import LinearRegression as _LR
 
-    tl      = trade_log.sort_values("sell_time").reset_index(drop=True)
-    profits = tl["profit"].values
+    tl       = trade_log.sort_values("sell_time").reset_index(drop=True)
+    profits  = tl["profit"].values
 
     win_rate = round((profits > 0).mean() * 100, 1)
 
-    gains  = profits[profits > 0].sum()
-    losses = -profits[profits < 0].sum()
-    pf     = round(float(gains / losses), 3) if losses > 0 else np.inf
+    gains    = profits[profits > 0].sum()
+    losses   = -profits[profits < 0].sum()
+    pf       = round(float(gains / losses), 3) if losses > 0 else np.inf
 
     tl["_date"]  = pd.to_datetime(tl["sell_time"]).dt.normalize()
     daily_profit = tl.groupby("_date")["profit"].sum()
@@ -1033,13 +1033,13 @@ def print_best_r2_robustness_table(
         all_tl = pd.concat(
             [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(strategy_trades)
+        total_capital   = capital_per_strategy * len(strategy_trades)
         all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
-        daily = all_tl.groupby("_date")["profit"].sum()
-        date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-        daily = daily.reindex(date_range, fill_value=0.0)
-        eq = total_capital + daily.cumsum()
-        eq_series = pd.Series(eq.values, index=date_range)
+        daily           = all_tl.groupby("_date")["profit"].sum()
+        date_range      = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily           = daily.reindex(date_range, fill_value=0.0)
+        eq              = total_capital + daily.cumsum()
+        eq_series       = pd.Series(eq.values, index=date_range)
         return eq_series.resample("W").last().pct_change().dropna() * 100
 
     def _neg_streak_stats(weekly):
@@ -1099,12 +1099,12 @@ def print_best_r2_robustness_table(
         logger.info("  No data for best R² robustness table.")
         return
 
-    df = pd.DataFrame(rows)
+    df      = pd.DataFrame(rows)
     sep_row = {col: "─" * 8 for col in df.columns}
     sep_row["Period"] = "─" * 6
     mean_row = df.drop(columns="Period").mean().round(3).to_dict()
     mean_row["Period"] = "MEAN"
-    df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
+    df       = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [
         f"\n\033[94m{'─'*115}",
         f"  BEST R² COMBINATION — Robustness across OOS periods",
@@ -1261,14 +1261,14 @@ def print_robustness_table(
         all_tl = pd.concat(
             [df for _, df in strategy_trades], ignore_index=True
         ).sort_values("sell_time").reset_index(drop=True)
-        total_capital = capital_per_strategy * len(strategy_trades)
+        total_capital   = capital_per_strategy * len(strategy_trades)
         all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
-        daily = all_tl.groupby("_date")["profit"].sum()
-        date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-        daily = daily.reindex(date_range, fill_value=0.0)
-        eq = total_capital + daily.cumsum()
-        eq_series = pd.Series(eq.values, index=date_range)
-        weekly = eq_series.resample("W").last().pct_change().dropna() * 100
+        daily           = all_tl.groupby("_date")["profit"].sum()
+        date_range      = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily           = daily.reindex(date_range, fill_value=0.0)
+        eq              = total_capital + daily.cumsum()
+        eq_series       = pd.Series(eq.values, index=date_range)
+        weekly          = eq_series.resample("W").last().pct_change().dropna() * 100
         return weekly
 
     def _neg_streak_stats(weekly):
@@ -1314,27 +1314,29 @@ def print_robustness_table(
         avg_neg, max_neg = _neg_streak_stats(weekly)
 
         rows.append({
-            "Period":       label,
-            "NetGain%":     m["Net_Gain_pct"],
-            "MaxDD%":       m["Max_DD_pct"],
-            "R2":           m["R_Squared"],
-            "ProfitFactor": pf,
-            "CVaR10%":      cvar10,
-            "AvgNegStreak": avg_neg,
-            "MaxNegStreak": max_neg,
-            "Weekly_pct": round(float((weekly > 0).mean() * 100), 2),
+            "Period":label,
+            "NetGain%":m["Net_Gain_pct"],
+            "MaxDD%":m["Max_DD_pct"],
+            "R2":m["R_Squared"],
+            "ProfitFactor":pf,
+            "CVaR10%":cvar10,
+            "AvgNegStreak":avg_neg,
+            "MaxNegStreak":max_neg,
+            "Weekly_pct":round(float((weekly > 0).mean() * 100), 2),
+            "MaxWeekly%":round(float(weekly.max()), 2) if len(weekly) > 0 else np.nan,
+            "MinWeekly%":round(float(weekly.min()), 2) if len(weekly) > 0 else np.nan,
         })
 
     if not rows:
         logger.info("  No data for robustness table.")
         return
 
-    df = pd.DataFrame(rows)
-    sep_row = {col: "─" * 8 for col in df.columns}
-    sep_row["Period"] = "─" * 6
-    mean_row = df.drop(columns="Period").mean().round(3).to_dict()
+    df                 = pd.DataFrame(rows)
+    sep_row            = {col: "─" * 8 for col in df.columns}
+    sep_row["Period"]  = "─" * 6
+    mean_row           = df.drop(columns="Period").mean().round(3).to_dict()
     mean_row["Period"] = "MEAN"
-    df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
+    df                 = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [
         f"\n\033[94m{'─'*115}",
         f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
