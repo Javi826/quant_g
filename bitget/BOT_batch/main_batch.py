@@ -81,7 +81,7 @@ N_PATHS_IS           = 1
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 30
-OOS_MAX_DD_TH        = 11
+OOS_MAX_DD_TH        = 10
 OOS_R2_TH            = 0.85  
 
 # ELITE -- MA4
@@ -97,7 +97,7 @@ OOS_R2_TH            = 0.85
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = True
+UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
