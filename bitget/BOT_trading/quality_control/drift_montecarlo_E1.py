@@ -19,8 +19,12 @@ DRIFT_REFERENCE = {
         'p50_winrate': 65.3,
     },
     '18_flag_long_1H': {
-        'p5_winrate':  70.1,
-        'p50_winrate': 70.1,
+        'p5_winrate':  66.1,
+        'p50_winrate': 66.1,
+    },
+    '20_flag_short_1H': {
+        'p5_winrate':  68.2,
+        'p50_winrate': 68.2,
     },
     '27_orderblocks_short_1H': {
         'p5_winrate':  63.2,

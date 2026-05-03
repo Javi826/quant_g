@@ -384,7 +384,7 @@ def get_implemented_strategies() -> set:
         #'25_flag_short_6Hutc',
         #'26_orderblocks_long_4H',
         '27_orderblocks_short_1H',
-        #'28_orderblocks_long_1H',
+        '28_orderblocks_long_1H',
         
     }
     return strategies

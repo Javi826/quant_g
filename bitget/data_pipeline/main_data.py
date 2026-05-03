@@ -59,8 +59,8 @@ N_SYMBOLS_DOWNLOAD = 40
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m"]
-START_DATE = "2024-01-01"
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
+START_DATE = "2021-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -69,7 +69,7 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","15m"]]   # list of [higher_tf, intrabar_tf] pairs
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   # list of [higher_tf, intrabar_tf] pairs
 
 # =============================================================================
 # IS/OOS SPLIT
@@ -99,7 +99,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["3
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 13
+WINDOW_OOS_MONTHS    = 12
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     

@@ -15,14 +15,14 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 14000,
+        "initial_capital": 16800,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
         "regime01_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime01_ma_period": 3,
+        "regime01_ma_period": 4,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
     },
