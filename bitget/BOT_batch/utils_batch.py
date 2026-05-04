@@ -232,8 +232,8 @@ def compare_and_generate_csv(strategies_batch_path, pr_batch_path, csv_path):
         prev = prev_map.get(sid, {})
 
         # Active change
-        prev_active = prev.get("active", False)
-        new_active  = new.get("active", False)
+        prev_active   = prev.get("active", False)
+        new_active    = new.get("active", False)
         change_active = (
             f"{'True' if prev_active else 'False'}→{'True' if new_active else 'False'}"
             if prev_active != new_active else "N/A"

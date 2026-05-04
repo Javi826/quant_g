@@ -43,7 +43,7 @@ START_YEAR    = 2021        # data loaded from this year (warmup for lookback)
 DISPLAY_YEAR  = 2022        # periods shown in table and chart
 
 # Regime0 — macro BTC direction
-BTC_MA_PERIOD = 5
+BTC_MA_PERIOD = 50
 LONG_TH       = 1.00
 SHORT_TH      = 1.00
 

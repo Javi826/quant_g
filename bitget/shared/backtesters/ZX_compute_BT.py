@@ -326,10 +326,10 @@ def update_sim_balance(t_int, open_heap, cash_bank, ts_int_arrays, close_arrays,
     
     # Valor de posiciones SHORT (el valor es negativo del precio actual)
     for sym, qty_sum in symbol_qty_short.items():
-        ts_arr = ts_int_arrays[sym]
+        ts_arr    = ts_int_arrays[sym]
         close_arr = close_arrays[sym]
-        idx = np.searchsorted(ts_arr, t_int, side='right') - 1
-        price = float(close_arr[idx] if idx >= 0 else close_arr[0])
+        idx       = np.searchsorted(ts_arr, t_int, side='right') - 1
+        price     = float(close_arr[idx] if idx >= 0 else close_arr[0])
         # Para SHORT: valor = -(qty * precio_actual)
         total_value -= qty_sum * price
     
@@ -550,9 +550,9 @@ def compute_post_backtest_metrics(symbols, trades, trade_times, all_timestamps_d
 
     final_balance = float(sim_values[-1]) if sim_values.size > 0 else float(initial_balance)
 
-    cummax_portfolio = np.maximum.accumulate(sim_values) if sim_values.size > 0 else np.array([initial_balance])
+    cummax_portfolio    = np.maximum.accumulate(sim_values) if sim_values.size > 0 else np.array([initial_balance])
     drawdowns_portfolio = (cummax_portfolio - sim_values) / np.where(cummax_portfolio == 0, 1, cummax_portfolio)
-    max_dd_portfolio = float(np.max(drawdowns_portfolio)) if drawdowns_portfolio.size > 0 else 0.0
+    max_dd_portfolio    = float(np.max(drawdowns_portfolio)) if drawdowns_portfolio.size > 0 else 0.0
 
     sharpe_portfolio = compute_annualized_sharpe(sim_values, sim_ts_int)
 

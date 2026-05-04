@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = True
+SHOW_PLOTS = False
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -76,7 +76,7 @@ SHOW_PROGRESS = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1000
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -447,7 +447,7 @@ def run_batch(strategy_config: dict) -> None:
                 _strategy_trades_is_regime.append((STRATEGY_ID, trades_df_is_regime.copy()))
 
     # -------------------------------------------------------------------------
-    # BLOCK 3 — Backtest OOS Baseline
+    # BLOCK 3 — Backtest OOS1 Baseline
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 3  ── Backtest OOS1 Baseline ── {len(symbols_oos_final)} symbols")
 
@@ -468,15 +468,15 @@ def run_batch(strategy_config: dict) -> None:
     )
 
     best_comb = tuple(best_params[p] for p in param_names)
-    oos_df    = pd.DataFrame(compile_grid_results([(best_comb, oos1_result_baseline)], param_names, INITIAL_BALANCE))
+    oos1_df    = pd.DataFrame(compile_grid_results([(best_comb, oos1_result_baseline)], param_names, INITIAL_BALANCE))
 
     _, _ = report_backtesting(
-        df=oos_df, parameters=param_names,
+        df=oos1_df, parameters=param_names,
         data_folder=DATA_FOLDER_OOS1, initial_capital=INITIAL_BALANCE,
         strategy_id=STRATEGY_ID,
     )
 
-    best_bt_row           = oos_df.loc[oos_df["Net_Gain"].idxmax()]
+    best_bt_row           = oos1_df.loc[oos1_df["Net_Gain"].idxmax()]
     trades_df             = oos1_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
     trades_df.columns     = trades_df.columns.str.lower().str.strip()
     trades_df["buy_time"] = pd.to_datetime(trades_df["buy_time"])
@@ -494,7 +494,7 @@ def run_batch(strategy_config: dict) -> None:
     print_metrics_table([metrics_baseline], f"  Metrics — {STRATEGY_ID} (Baseline)")
 
     # -------------------------------------------------------------------------
-    # BLOCK 4 — Backtest OOS Regime 0+1
+    # BLOCK 4 — Backtest OOS1 Regime 0+1
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 4  ── Backtest OOS1 Regime   ── bins: {bins_to_filter if bins_to_filter else 'none'}")
 
@@ -753,8 +753,8 @@ def run_batch(strategy_config: dict) -> None:
             order_amount=ORDER_AMOUNT,
         )
 
-        trades_df_oos2 = oos2_result_regime["__PORTFOLIO__"]["trade_log"].copy()
-        trades_df_oos2.columns = trades_df_oos2.columns.str.lower().str.strip()
+        trades_df_oos2             = oos2_result_regime["__PORTFOLIO__"]["trade_log"].copy()
+        trades_df_oos2.columns     = trades_df_oos2.columns.str.lower().str.strip()
         trades_df_oos2["buy_time"] = pd.to_datetime(trades_df_oos2["buy_time"])
 
         logger.debug(f"STAGE 6b ── OOS2 Backtest Regime   ── {len(trades_df_oos2)} trades | bins: {bins_to_filter if bins_to_filter else 'none'}")
@@ -816,8 +816,8 @@ def run_batch(strategy_config: dict) -> None:
                 sl_pct=best_params["SL_PCT"],
                 order_amount=ORDER_AMOUNT,
             )
-            trades_df_oos2_baseline = oos2_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
-            trades_df_oos2_baseline.columns = trades_df_oos2_baseline.columns.str.lower().str.strip()
+            trades_df_oos2_baseline             = oos2_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
+            trades_df_oos2_baseline.columns     = trades_df_oos2_baseline.columns.str.lower().str.strip()
             trades_df_oos2_baseline["buy_time"] = pd.to_datetime(trades_df_oos2_baseline["buy_time"])
             if len(trades_df_oos2_baseline) > 0:
                 accumulate_strategy_trades(

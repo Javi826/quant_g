@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-shared/shared_market_regime/regimm_common.py - Shared functions for regime analysis scripts
+shared/shared_market_regime/regime_common.py - Shared functions for regime analysis scripts
 
 Contains all common functions used across:
 - regime1_performance_IS.py
@@ -234,48 +233,21 @@ def filter_signals_by_regime(
     pe_order: int = 3,
     metrics_cache: dict = None,
 ) -> np.ndarray:
-    """
-    Filters signal array by market regime — sets signal to 0 where bin is blocked.
-    Uses closed candles only — no lookahead bias.
-
-    Args:
-        signals        : numpy array of signals (1=LONG, -1=SHORT, 0=no signal)
-        ts             : numpy array of timestamps (datetime64) matching signals
-        btc_1d_df      : BTC 1D OHLC DataFrame with 'ts' and 'close' columns
-        btc_tf_df      : BTC OHLC at strategy timeframe for family metrics
-        bins_to_filter : set of bin keys to block e.g. {'trending_dwtrend', 'ranging_uptrend'}
-        ma_period      : MA period for macro direction
-        long_th        : multiplier threshold for uptrend
-        short_th       : multiplier threshold for dwtrend
-        families       : family classification rules dict
-        lookback_bars  : lookback for metric calculation
-        hurst_window   : window for Hurst exponent
-        er_window      : window for Efficiency Ratio
-        atr_window     : window for ATR
-        pe_window      : window for Permutation Entropy
-        pe_order       : order for Permutation Entropy
-        metrics_cache  : optional precomputed {timestamp: metrics} dict from build_metrics_cache
-
-    Returns:
-        Filtered signals array (same shape, 0 where bin is blocked)
-    """
     if not bins_to_filter:
         return signals
-
+ 
     filtered    = signals.copy()
     signal_idxs = np.nonzero(signals)[0]
-
+    trade_times = pd.Series(pd.to_datetime(ts[signal_idxs]))
+ 
+    # Build direction cache once for all signal timestamps
+    direction_cache = build_direction_cache(btc_1d_df, ma_period, long_th, short_th, trade_times)
+ 
     for idx in signal_idxs:
         trade_time = pd.Timestamp(ts[idx])
-
-        direction = get_btc_macro_direction(
-            btc_1d_df  = btc_1d_df,
-            trade_time = trade_time,
-            ma_period  = ma_period,
-            long_th    = long_th,
-            short_th   = short_th,
-        )
-
+ 
+        direction = direction_cache.get(trade_time, 'unknown')
+ 
         if metrics_cache is not None:
             metrics = metrics_cache.get(trade_time)
         else:
@@ -289,16 +261,17 @@ def filter_signals_by_regime(
                 pe_window    = pe_window,
                 pe_order     = pe_order,
             )
-
+ 
         family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
-
+ 
         if family == 'unknown':
             continue
-
+ 
         if f"{family}_{direction}" in bins_to_filter:
             filtered[idx] = 0
-
+ 
     return filtered
+
 
 def build_metrics_cache(
     btc_df: pd.DataFrame,
@@ -354,4 +327,63 @@ def build_metrics_cache(
         )
         cache[ts_next] = metrics
 
+    return cache
+
+#UNUSED
+def build_direction_cache(
+    btc_1d_df: pd.DataFrame,
+    ma_period: int,
+    long_th: float,
+    short_th: float,
+    trade_times: pd.Series,
+) -> dict:
+    """
+    Precalculate BTC macro direction for a set of trade timestamps.
+    Replicates exactly get_btc_macro_direction logic but vectorized:
+    for each trade_time, finds the last closed daily bar (ts < trade_time)
+    and computes direction from it. O(n_trades * log(n_bars)) vs O(n_trades * n_bars).
+ 
+    Args:
+        btc_1d_df    : BTC daily OHLC DataFrame with 'ts' and 'close' columns
+        ma_period    : MA period for macro direction
+        long_th      : multiplier threshold for uptrend
+        short_th     : multiplier threshold for dwtrend
+        trade_times  : pd.Series of trade buy_times (datetime)
+ 
+    Returns:
+        dict {pd.Timestamp: 'uptrend' | 'dwtrend' | 'neutral' | 'unknown'}
+    """
+    closes   = btc_1d_df['close'].values.astype(np.float64)
+    ts_int   = btc_1d_df['ts'].values.astype(np.int64)
+    n        = len(btc_1d_df)
+    cache    = {}
+ 
+    # Precompute rolling MA vectorized over all bars
+    ma = np.full(n, np.nan)
+    for i in range(ma_period - 1, n):
+        ma[i] = closes[i - ma_period + 1: i + 1].mean()
+ 
+    unique_times = trade_times.drop_duplicates()
+ 
+    for t in unique_times:
+        t_int = np.int64(pd.Timestamp(t).value)
+        # Last bar with ts < trade_time — matches btc_1d_df[btc_1d_df['ts'] < trade_time].iloc[-1]
+        idx = np.searchsorted(ts_int, t_int, side='left') - 1
+ 
+        if idx < ma_period - 1:
+            cache[pd.Timestamp(t)] = 'unknown'
+            continue
+ 
+        ma_val    = ma[idx]
+        btc_close = closes[idx]
+ 
+        if np.isnan(ma_val) or np.isnan(btc_close):
+            cache[pd.Timestamp(t)] = 'unknown'
+        elif btc_close > ma_val * long_th:
+            cache[pd.Timestamp(t)] = 'uptrend'
+        elif btc_close < ma_val * short_th:
+            cache[pd.Timestamp(t)] = 'dwtrend'
+        else:
+            cache[pd.Timestamp(t)] = 'neutral'
+ 
     return cache
