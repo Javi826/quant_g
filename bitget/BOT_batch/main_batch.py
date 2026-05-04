@@ -75,8 +75,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 10_000
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -97,7 +97,7 @@ OOS_R2_TH            = 0.85
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = False
+UPDATE_OUTPUTS           = True
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
