@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -75,8 +75,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 1000
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -127,10 +127,9 @@ SELECTED_STRATEGIES = [
     "17_flag_long_4H",
     "18_flag_long_1H",
     "21_parity_short_4H",
-    "26_orderblocks_long_4H",
-    "28_orderblocks_long_1H",
     "24_flag_long_6Hutc",
     "25_flag_short_6Hutc",
+    "26_orderblocks_long_4H",
 ]
 # =============================================================================
 # -----------------------------------------------------------------------------

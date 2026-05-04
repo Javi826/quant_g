@@ -38,18 +38,18 @@ BTC_FILE = os.path.join(
 )
 
 PERIOD_MODE   = "year"      # "year" | "semester"
-ANALYSIS_MODE = "direction"    # "direction" | "family" | "regime"
+ANALYSIS_MODE = "family"    # "direction" | "family" | "regime"
 START_YEAR    = 2021        # data loaded from this year (warmup for lookback)
 DISPLAY_YEAR  = 2022        # periods shown in table and chart
 
 # Regime0 — macro BTC direction
-BTC_MA_PERIOD = 50
+BTC_MA_PERIOD = 5
 LONG_TH       = 1.00
 SHORT_TH      = 1.00
 
 # Regime1 — family classification
 FAMILIES = {
-    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.4)},
+    'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.6)},
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging':  {}
 }
