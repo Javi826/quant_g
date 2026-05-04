@@ -114,7 +114,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [100],
             "LOOKBACK": [100],
             "TOLERANCE": [10],
             "MA_PERIOD": [10],
@@ -167,7 +167,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [60],
             "MA_PERIOD": [10],
             "IMPULSE": [2],
