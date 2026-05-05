@@ -35,8 +35,8 @@ DRIFT_REFERENCE = {
         'p50_winrate': 44.3,
     },
     '10_parity_long_1H': {
-        'p5_winrate':  67.8,
-        'p50_winrate': 67.8,
+        'p5_winrate':  59.7,
+        'p50_winrate': 59.7,
     },
     '11_parity_short_1H': {
         'p5_winrate':  64.9,
@@ -55,8 +55,8 @@ DRIFT_REFERENCE = {
         'p50_winrate': 66.0,
     },
     '18_flag_long_1H': {
-        'p5_winrate':  66.1,
-        'p50_winrate': 66.1,
+        'p5_winrate':  65.7,
+        'p50_winrate': 65.7,
     },
     '19_flag_short_4H': {
         'p5_winrate':  58.6,

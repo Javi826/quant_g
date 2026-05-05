@@ -20,7 +20,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "10_parity_long_1H",
-        "n_symbols": 8,
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -36,7 +36,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 8,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [100],
             "LOOKBACK": [100],
             "TOLERANCE": [10],
             "MA_PERIOD": [10],
@@ -46,7 +46,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "18_flag_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [50],
