@@ -38,6 +38,15 @@ PERIOD_LABELS = [
     ("OOS3", "oos3_regime"),
 ]
 
+# =============================================================================
+# PERIOD_LABELS = [
+#     ("IS",   "is_baseline"),
+#     ("OOS1", "oos1_baseline"),
+#     ("OOS2", "oos2_baseline"),
+#     ("OOS3", "oos3_baseline"),
+# ]
+# =============================================================================
+
 BTC_MA_PERIOD   = 4
 INITIAL_CAPITAL = 800
 MIN_TRADES_WEEK = 2       # minimum trades in a week to include it
@@ -45,7 +54,7 @@ MIN_PERIODS     = 8       # minimum weeks needed to compute correlation
 PVALUE_TH       = 0.10    # significance threshold
 GAP_THRESHOLD    = 3.0     # minimum pp gap between two groups to flag as predictive
 MIN_CONSISTENT   = 3       # minimum periods where gap is in same direction
-MIN_OOS_OK       = 2       # minimum OOS periods (of 3) to mark as OK (2 or 3)
+MIN_OOS_OK       = 3       # minimum OOS periods (of 3) to mark as OK (2 or 3)
 
 def _calc_adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> float:
     """Simplified ADX using smoothed directional movement."""
@@ -651,7 +660,7 @@ def run_predictive_analysis():
     ]
 
     print(f"  System average: {pct_pos_all:.1f}% positive weeks")
-    print(f"  Green = above system average | Red = below\n")
+    print(f"  Green = above period average | Red = below period average\n")
     col_w = 8
     print(f"  {'INDICATOR':<20} {'CONDITION':<22} {'N':>5}" +
           "".join(f" {p:>{col_w}}" for p in periods) + f"  {'OK':>4}")
@@ -675,7 +684,7 @@ def run_predictive_analysis():
                 row += f" {'—':>{col_w}}"
             else:
                 pct_p    = (sub['profit'] > 0).mean() * 100
-                is_green = pct_p >= pct_pos_all
+                is_green = pct_p >= period_means[period]
                 color_p  = "\033[92m" if is_green else "\033[91m"
                 row     += f" {color_p}{pct_p:>{col_w-1}.1f}%{reset}"
                 if period != 'IS':
@@ -693,6 +702,106 @@ def run_predictive_analysis():
         print(row)
 
     print(f"\n{'='*85}\n")
+
+    # ==========================================================================
+    # PEARSON CORRELATION — YES indicators vs profit per OOS period
+    # ==========================================================================
+    from scipy import stats as scipy_stats
+
+    yes_indicators = [
+        (col, label, threshold) for col, label, threshold in indicators
+        if col in df.columns and len(df[[col, 'profit', 'period']].dropna()[
+            df[[col, 'profit', 'period']].dropna()[col] >= threshold]) >= 5
+    ]
+
+    # Filter to only YES ones — recompute
+    yes_cols = []
+    for col, label, threshold in indicators:
+        if col not in df.columns:
+            continue
+        valid = df[[col, 'profit', 'period']].dropna()
+        grp   = valid[valid[col] >= threshold]
+        if len(grp) < 5:
+            continue
+        n_green = n_red = n_valid = 0
+        for period in ['OOS1', 'OOS2', 'OOS3']:
+            sub = grp[grp['period'] == period]
+            if len(sub) >= 3:
+                pct_p = (sub['profit'] > 0).mean() * 100
+                n_valid += 1
+                if pct_p >= period_means[period]:
+                    n_green += 1
+                else:
+                    n_red += 1
+        if n_valid >= MIN_OOS_OK and (n_green >= MIN_OOS_OK or n_red >= MIN_OOS_OK):
+            yes_cols.append((col, label, threshold))
+
+    if yes_cols:
+        print(f"\n{'='*90}")
+        print(f"  PEARSON CORRELATION — YES indicators[T] vs profit[T+1] per OOS period")
+        print(f"  (measures linear relationship strength)")
+        print(f"{'='*90}")
+        print(f"  {'INDICATOR':<25} {'CONDITION':<22}" +
+              "".join(f"  {p+' corr':>10}  {p+' p':>8}" for p in ['OOS1', 'OOS2', 'OOS3']))
+        print(f"  {'-'*100}")
+
+        for col, label, threshold in yes_cols:
+            valid = df[[col, 'profit', 'period']].dropna()
+            row   = f"  {col:<25} {label:<22}"
+            for period in ['OOS1', 'OOS2', 'OOS3']:
+                sub = valid[valid['period'] == period]
+                if len(sub) < 5:
+                    row += f"  {'—':>10}  {'—':>8}"
+                else:
+                    corr, pval = scipy_stats.pearsonr(sub[col], sub['profit'])
+                    sig    = "✅" if pval < 0.10 else "  "
+                    color  = "\033[92m" if abs(corr) >= 0.15 and pval < 0.10 else ""
+                    reset  = "\033[0m" if color else ""
+                    row   += f"  {color}{corr:>+9.3f}{reset}  {pval:>6.3f}{sig}"
+            print(row)
+
+        print(f"\n{'='*90}\n")
+
+    # ==========================================================================
+    # MUTUAL INFORMATION — YES indicators vs profit per OOS period
+    # ==========================================================================
+    if yes_cols:
+        from sklearn.feature_selection import mutual_info_regression
+
+        N_PERM = 100
+        rng    = np.random.default_rng(42)
+
+        print(f"\n{'='*90}")
+        print(f"  MUTUAL INFORMATION — YES indicators[T] vs profit[T+1] per OOS period")
+        print(f"  (permutation p-value, {N_PERM} shuffles)")
+        print(f"{'='*90}")
+        print(f"  {'INDICATOR':<25} {'CONDITION':<22}" +
+              "".join(f"  {p+' MI':>8}  {p+' p':>7}" for p in ['OOS1', 'OOS2', 'OOS3']))
+        print(f"  {'-'*100}")
+
+        for col, label, threshold in yes_cols:
+            valid = df[[col, 'profit', 'period']].dropna()
+            row   = f"  {col:<25} {label:<22}"
+            for period in ['OOS1', 'OOS2', 'OOS3']:
+                sub = valid[valid['period'] == period]
+                if len(sub) < 5:
+                    row += f"  {'—':>8}  {'—':>7}"
+                else:
+                    X      = sub[[col]].values
+                    y      = sub['profit'].values
+                    mi_obs = mutual_info_regression(X, y, random_state=42)[0]
+                    mi_perm = np.array([
+                        mutual_info_regression(X, rng.permutation(y), random_state=42)[0]
+                        for _ in range(N_PERM)
+                    ])
+                    pval  = float(np.mean(mi_perm >= mi_obs))
+                    sig   = "✅" if pval < 0.10 else "  "
+                    color = "\033[92m" if pval < 0.10 else ""
+                    reset = "\033[0m" if color else ""
+                    row  += f"  {color}{mi_obs:>8.4f}{reset}  {pval:>6.3f}{sig}"
+            print(row)
+
+        print(f"\n{'='*90}\n")
 
     return df
 
