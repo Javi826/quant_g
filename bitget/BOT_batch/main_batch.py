@@ -81,7 +81,7 @@ N_PATHS_IS           = 1
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 30
-OOS_MAX_DD_TH        = 10
+OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
 # ELITE -- MA4
@@ -110,13 +110,13 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
+    "04_reversal_short_4H",
+    "06_reversal_long_1H",
+    "19_flag_short_4H",
+    "22_parity_short_6Hutc",
+    "28_orderblocks_long_1H",
+    # -------------------------------------------------------------------------
 # =============================================================================
-#     "04_reversal_short_4H",
-#     "06_reversal_long_1H",
-#     "19_flag_short_4H",
-#     "22_parity_short_6Hutc",
-#     "28_orderblocks_long_1H",
-#     # -------------------------------------------------------------------------
 #     "02_reversal_long_4H",
 #     "03_parity_long_4H",
 #     "04_reversal_short_4H",
@@ -778,13 +778,6 @@ def run_batch(strategy_config: dict) -> None:
                 f"R2={metrics_oos2['R_Squared']:.2f}  "
                 f"trades={len(trades_df_oos2)}"
             )
-            plot_filter_comparison(
-                strategy_id=f"{STRATEGY_ID}_oos2",
-                trades_df_baseline=trades_df_oos2,
-                trades_df_r01=trades_df_oos2,
-                data_folder=DATA_FOLDER_OOS2,
-                initial_balance=INITIAL_BALANCE,
-            )
         else:
             logger.info(f"STAGE 6b ── OOS2 Results           ── no trades after regime filter")
 
@@ -805,7 +798,7 @@ def run_batch(strategy_config: dict) -> None:
             else:
                 _strategy_trades_oos2_regime.append((STRATEGY_ID, trades_df_oos2.copy()))
                 
-        if SAVE_TRADES:
+        if SHOW_PLOTS or SAVE_TRADES:
             ohlcv_arrays_oos2_baseline = {}
             for sym, arr in ohlcv_oos2.items():
                 signals = signal_fn(arr, **bt_signal_params, live_trading=False)
@@ -817,15 +810,25 @@ def run_batch(strategy_config: dict) -> None:
                 sl_pct=best_params["SL_PCT"],
                 order_amount=ORDER_AMOUNT,
             )
+
             trades_df_oos2_baseline             = oos2_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
             trades_df_oos2_baseline.columns     = trades_df_oos2_baseline.columns.str.lower().str.strip()
             trades_df_oos2_baseline["buy_time"] = pd.to_datetime(trades_df_oos2_baseline["buy_time"])
-            if len(trades_df_oos2_baseline) > 0:
+            plot_filter_comparison(
+                strategy_id=f"{STRATEGY_ID}_oos2",
+                trades_df_baseline=trades_df_oos2_baseline,
+                trades_df_r01=trades_df_oos2,
+                data_folder=DATA_FOLDER_OOS2,
+                initial_balance=INITIAL_BALANCE,
+            )
+            if SAVE_TRADES and len(trades_df_oos2_baseline) > 0:
                 accumulate_strategy_trades(
                     _strategy_trades_oos2_baseline, STRATEGY_ID, trades_df_oos2_baseline,
                     csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
                     label="oos2_baseline",
                 )
+        else:
+            trades_df_oos2_baseline = trades_df_oos2
 
     # -------------------------------------------------------------------------
     # BLOCK 6c — OOS3 Analysis (informational + optional validation filter)
@@ -931,13 +934,7 @@ def run_batch(strategy_config: dict) -> None:
                 f"R2={metrics_oos3['R_Squared']:.2f}  "
                 f"trades={len(trades_df_oos3)}"
             )
-            plot_filter_comparison(
-                strategy_id=f"{STRATEGY_ID}_oos3",
-                trades_df_baseline=trades_df_oos3,
-                trades_df_r01=trades_df_oos3,
-                data_folder=DATA_FOLDER_OOS3,
-                initial_balance=INITIAL_BALANCE,
-            )
+
         else:
             logger.info(f"STAGE 6c ── OOS3 Results           ── no trades after regime filter")
 
@@ -958,7 +955,7 @@ def run_batch(strategy_config: dict) -> None:
             else:
                 _strategy_trades_oos3_regime.append((STRATEGY_ID, trades_df_oos3.copy()))
 
-        if SAVE_TRADES:
+        if SHOW_PLOTS or SAVE_TRADES:
             ohlcv_arrays_oos3_baseline = {}
             for sym, arr in ohlcv_oos3.items():
                 signals = signal_fn(arr, **bt_signal_params, live_trading=False)
@@ -973,7 +970,14 @@ def run_batch(strategy_config: dict) -> None:
             trades_df_oos3_baseline = oos3_result_baseline["__PORTFOLIO__"]["trade_log"].copy()
             trades_df_oos3_baseline.columns = trades_df_oos3_baseline.columns.str.lower().str.strip()
             trades_df_oos3_baseline["buy_time"] = pd.to_datetime(trades_df_oos3_baseline["buy_time"])
-            if len(trades_df_oos3_baseline) > 0:
+            plot_filter_comparison(
+                strategy_id=f"{STRATEGY_ID}_oos3",
+                trades_df_baseline=trades_df_oos3_baseline,
+                trades_df_r01=trades_df_oos3,
+                data_folder=DATA_FOLDER_OOS3,
+                initial_balance=INITIAL_BALANCE,
+            )
+            if SAVE_TRADES and len(trades_df_oos3_baseline) > 0:
                 accumulate_strategy_trades(
                     _strategy_trades_oos3_baseline, STRATEGY_ID, trades_df_oos3_baseline,
                     csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
