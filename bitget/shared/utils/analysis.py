@@ -124,6 +124,8 @@ def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain %
     r2 = LinearRegression().fit(X, y).score(X, y)
 
     fig, ax1 = plt.subplots(figsize=(12,6))
+    #fig.patch.set_facecolor('#1a1a2e')  # Fondo exterior azul oscuro
+    #ax1.set_facecolor('#F8F9FA')        # Área del plot blanca/gris muy claro
 
     # Load and process BTC data
     btc_file = os.path.join(data_folder, f"{REGIME_REFERENCE_SYMBOL}_4H.parquet")
@@ -532,7 +534,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     # -------------------------------------------------------------------------
     best_row = df.loc[df["Net_Gain_pct"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
-    plot_netgain_dd(equity_hist, initial_capital, data_folder, title=f"{strategy_id} — Net Gain % & DD" if strategy_id else "Net_Gain_pct & DD - Best Net Gain")
+    plot_netgain_dd(equity_hist, initial_capital, data_folder, title=strategy_id if strategy_id else "Net Gain % & DD")
     
     # -------------------------------------------------------------------------
     # Parameter Surface Analysis
@@ -640,8 +642,8 @@ def report_montecarlo(df_portfolio, param_names, initial_balance, selection_perc
 
     df_summary = pd.DataFrame(summary_results).sort_values(by='Net_Gain_pct_m', ascending=False).reset_index(drop=True)
 
-# -----------------------------
-    # HISTOGRAMAS
+    # -----------------------------
+    # HISTOGRAMS
     # -----------------------------
     path_grouped = df_portfolio.groupby('path_index').agg({
         'Portfolio_Final_Balance': 'mean',
@@ -651,31 +653,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance, selection_perc
    
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
    
-    # fig, axes = plt.subplots(2, 1, figsize=(22,10))
-    # data_gain = path_grouped['Net_Gain_pct'].dropna()
-    # n_bins = max(10, min(50, len(data_gain)))
-    # counts, bins, patches = axes[0].hist(data_gain, bins=n_bins, edgecolor='white')
-    # for i, patch in enumerate(patches):
-    #     bin_center = (bins[i] + bins[i+1]) / 2
-    #     patch.set_facecolor('green' if bin_center >= 0 else 'red')
-    # axes[0].set_xlabel('Net Gain pct Portafolio (path_IDX)')
-    # axes[0].set_ylabel('Frequency')
-    # axes[0].set_title('Distribution: Net Gain pct per Path_IDX')
-    # axes[0].grid(True, linestyle='--', alpha=0.5)
-    # axes[0].axvline(x=0, color='black', linestyle='--', linewidth=1, alpha=0.7)
-    # data_dd = path_grouped['DD'].dropna()
-    # axes[1].hist(data_dd, bins=max(10,min(50,len(data_dd))), edgecolor='white', color='lightcoral')
-    # axes[1].set_xlabel('DD pct Portafolio (path_IDX)')
-    # axes[1].set_ylabel('Frequency')
-    # axes[1].set_title('Distribution: Drawdown per Path_IDX')
-    # axes[1].grid(True, linestyle='--', alpha=0.5)
-    # prob_negative_plot = (path_grouped['Net_Gain_pct'] < 0).mean() * 100
-    # textstr = f'Probability of Negative Path: {prob_negative_plot:.2f}%'
-    # fig.text(0.75, 0.90, textstr, fontsize=14, fontfamily='monospace', va='top',
-    #          bbox=dict(boxstyle='round,pad=0.6', facecolor='wheat', alpha=0.9))
-    # plt.tight_layout()
-    # plt.show()
-    # plt.close()
+
        
     # -----------------------------
     # MEJORES COMBOS POR MÉTRICA

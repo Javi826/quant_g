@@ -7,10 +7,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from shared_market_regime.regime_common import load_btc_for_timeframe, calc_all_metrics_at_time,calculate_max_dd_pct
-from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction
+from shared_market_regime.regime_common import classify_trade_by_family, get_btc_macro_direction,calc_all_metrics,filter_signals_by_regime
 from itertools import combinations as _combinations
-from backtesters.ZX_compute_BT import INITIAL_BALANCE
+from backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
 from shared_config import REGIME_REFERENCE_SYMBOL, VOLUME_COL
+from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
+from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
+from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
+
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 from signals.add_signals_flag        import flag_long, flag_short
@@ -27,6 +31,13 @@ SIGNAL_REGISTRY = {
     "orderblocks_long":  {"fn": orderblocks_long,  "params": ["lookback", "tolerance", "impulse"]},
     "orderblocks_short": {"fn": orderblocks_short, "params": ["lookback", "tolerance", "impulse"]},
 }
+
+# Regime analysis params
+#------------------------------------------------------------------------------
+FORCE_DIRECTION_FILTER = True
+REGIME_MIN_TRADES      = 10
+REGIME_LOOKBACK_BARS   = 180
+REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 # =============================================================================
 # MODULE CONSTANTS
 # =============================================================================
@@ -42,54 +53,16 @@ def analyze_regime_is(
     trades_df_is: pd.DataFrame,
     timeframe: str,
     data_folder_is: str,
-    families: dict,
-    regime_min_trades: int = 2,
-    regime_lookback: int = 100,
-    family_source: str = 'strategy',
-    hurst_window: int = 100,
-    er_window: int = 14,
-    atr_window: int = 14,
-    pe_window: int = 50,
-    pe_order: int = 3,
-    ma_period: int = 5,
-    long_th: float = 1.0,
-    short_th: float = 1.0,
-    strategy_direction: str = 'long',
-    force_direction_filter: bool = False,
+    strategy_direction: str,
     metrics_cache: dict = None,
 ) -> set:
     """
-    Analyze regime on IS trades to determine bins to filter for OOS.
-    Evaluates all 6 bins (3 families x 2 directions).
-    Flags a bin if trades >= regime_min_trades and total profit < 0.
-
-    Args:
-        trades_df_is      : IS trades DataFrame with 'buy_time' and 'profit' columns
-        timeframe         : strategy timeframe e.g. '4H', '1H', '6Hutc'
-        data_folder_is    : path to IS data folder containing BTC parquets
-        families          : family classification rules dict
-        regime_min_trades : minimum trades per bin to trust result
-        regime_lookback   : lookback bars for metric calculation
-        family_source     : 'strategy' = BTC at strategy TF | 'macro' = BTC 1D
-        hurst_window      : window for Hurst exponent
-        er_window         : window for Efficiency Ratio
-        atr_window        : window for ATR
-        pe_window         : window for Permutation Entropy
-        pe_order          : order for Permutation Entropy
-        ma_period         : MA period for macro direction
-        long_th           : multiplier threshold for uptrend
-        short_th          : multiplier threshold for dwtrend
-        strategy_direction: 'long' | 'short'
-        force_direction_filter: if True, force filter by direction regardless of profit
-        metrics_cache     : optional precomputed {timestamp: metrics} dict from build_metrics_cache
-
-    Returns:
-        bins_to_filter : set of bin keys to block e.g. {'trending_dwtrend', 'ranging_uptrend'}
+    Uses default config values imported from shared_config.
     """
     btc_cache = {}
     btc_1d_df = load_btc_for_timeframe(data_folder_is, '1Dutc', btc_cache)
     btc_tf_df = load_btc_for_timeframe(data_folder_is, timeframe, btc_cache) \
-                if family_source == 'strategy' else btc_1d_df
+                if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df
 
     directions = []
     families_  = []
@@ -107,9 +80,9 @@ def analyze_regime_is(
         direction = get_btc_macro_direction(
             btc_1d_df  = btc_1d_df,
             trade_time = trade['buy_time'],
-            ma_period  = ma_period,
-            long_th    = long_th,
-            short_th   = short_th,
+            ma_period  = R0_MA_PERIOD,
+            long_th    = R0_LONG_TH,
+            short_th   = R0_SHORT_TH,
         )
 
         if metrics_cache is not None:
@@ -118,15 +91,15 @@ def analyze_regime_is(
             metrics = calc_all_metrics_at_time(
                 btc_df       = btc_tf_df,
                 buy_time     = trade['buy_time'],
-                lookback     = regime_lookback,
-                hurst_window = hurst_window,
-                er_window    = er_window,
-                atr_window   = atr_window,
-                pe_window    = pe_window,
-                pe_order     = pe_order,
+                lookback     = REGIME_LOOKBACK_BARS,
+                hurst_window = HURST_WINDOW,
+                er_window    = ER_WINDOW,
+                atr_window   = ATR_WINDOW,
+                pe_window    = PE_WINDOW,
+                pe_order     = PE_ORDER,
             )
 
-        family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
+        family = classify_trade_by_family(metrics, FAMILIES) if metrics else 'unknown'
         directions.append(direction)
         families_.append(family)
 
@@ -146,7 +119,7 @@ def analyze_regime_is(
             subset = df_valid[(df_valid['family'] == family) & (df_valid['direction'] == direction)]
             n      = len(subset)
             profit = subset['profit'].sum() if n > 0 else 0.0
-            if n >= regime_min_trades and profit < 0:
+            if n >= REGIME_MIN_TRADES and profit < 0:
                 bins_to_filter.add(f"{family}_{direction}")
 
     n_total    = len(trades_df_is)
@@ -174,13 +147,13 @@ def analyze_regime_is(
                 wr      = (subset['profit'] > 0).mean() * 100 if n > 0 else 0.0
                 eq      = INITIAL_BALANCE + subset.sort_values('buy_time')['profit'].cumsum()
                 dd      = calculate_max_dd_pct(eq) if n > 0 else 0.0
-                conf    = "✓" if n >= regime_min_trades else "✗"
+                conf    = "✓" if n >= REGIME_MIN_TRADES else "✗"
                 flag    = "🚫 FILTER" if bin_key in bins_to_filter else ""
                 lines.append(f"  {bin_key:<30} {conf:>5} {n:>8} {profit:>12.2f} {wr:>7.1f}% {dd:>7.2f}% {flag}")
         lines.append("  " + "-" * 88)
         logger.debug("\n".join(lines))
 
-    if force_direction_filter:
+    if FORCE_DIRECTION_FILTER:
         forced = 'dwtrend' if strategy_direction == 'long' else 'uptrend'
         for fam in ['trending', 'ranging', 'volatile']:
             bins_to_filter.add(f"{fam}_{forced}")
@@ -203,6 +176,156 @@ def _load_py_module(path, module_name):
     spec.loader.exec_module(mod)
     return mod
 
+def run_oos_backtest_with_regime(
+    strategy_id: str,
+    ohlcv_arrays: dict,
+    signal_fn: callable,
+    signal_params: dict,
+    best_params: dict,
+    order_amount: int,
+    data_folder: str,
+    timeframe: str,
+    bins_to_filter: list,
+    initial_balance: float,
+) -> tuple:
+    """
+    Run backtest with regime filter.
+    
+    Returns:
+        tuple: (trades_df, metrics_dict)
+    """
+    btc_cache = {}
+    btc_1d_df = load_btc_for_timeframe(data_folder, '1Dutc', btc_cache)
+    btc_tf_df = load_btc_for_timeframe(data_folder, timeframe, btc_cache) \
+                if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df
+
+    metrics_cache = build_metrics_cache(
+        btc_df       = btc_tf_df,
+        lookback     = REGIME_LOOKBACK_BARS,
+        hurst_window = HURST_WINDOW,
+        er_window    = ER_WINDOW,
+        atr_window   = ATR_WINDOW,
+        pe_window    = PE_WINDOW,
+        pe_order     = PE_ORDER,
+    )
+
+    ohlcv_arrays_regime = {}
+    for sym, arr in ohlcv_arrays.items():
+        signals = signal_fn(arr, **signal_params, live_trading=False)
+        if bins_to_filter:
+            signals = filter_signals_by_regime(
+                signals        = signals,
+                ts             = arr['ts'],
+                btc_1d_df      = btc_1d_df,
+                btc_tf_df      = btc_tf_df,
+                bins_to_filter = bins_to_filter,
+                ma_period      = R0_MA_PERIOD,
+                long_th        = R0_LONG_TH,
+                short_th       = R0_SHORT_TH,
+                families       = FAMILIES,
+                lookback_bars  = REGIME_LOOKBACK_BARS,
+                hurst_window   = HURST_WINDOW,
+                er_window      = ER_WINDOW,
+                atr_window     = ATR_WINDOW,
+                pe_window      = PE_WINDOW,
+                pe_order       = PE_ORDER,
+                metrics_cache  = metrics_cache,
+            )
+        ohlcv_arrays_regime[sym] = {**arr, "signal": signals}
+
+    result_regime = run_grid_backtest(
+        ohlcv_arrays_regime,
+        sell_after   = best_params["SELL_AFTER"],
+        tp_pct       = best_params["TP_PCT"],
+        sl_pct       = best_params["SL_PCT"],
+        order_amount = order_amount,
+    )
+
+    trades_df             = result_regime["__PORTFOLIO__"]["trade_log"].copy()
+    trades_df.columns     = trades_df.columns.str.lower().str.strip()
+    trades_df["buy_time"] = pd.to_datetime(trades_df["buy_time"])
+
+    metrics = compute_metrics(trades_df, capital=initial_balance, name=strategy_id) if len(trades_df) > 0 else None
+
+    return trades_df, metrics
+
+# =============================================================================
+# HELPER — METRICS CACHE IS
+# =============================================================================
+def build_metrics_cache(
+    btc_df: pd.DataFrame,
+    lookback: int,
+    hurst_window: int,
+    er_window: int,
+    atr_window: int,
+    pe_window: int,
+    pe_order: int,
+) -> dict:
+    """
+    Precalculate regime metrics for all BTC bars.
+    Returns a dict {timestamp: metrics} for fast lookup during signal filtering.
+    Key is the timestamp of the NEXT bar — metrics are valid for any trade
+    occurring at or after that timestamp (no lookahead).
+
+    Args:
+        btc_df       : BTC OHLC DataFrame with 'ts' column
+        lookback     : lookback bars for metric calculation
+        hurst_window : window for Hurst exponent
+        er_window    : window for Efficiency Ratio
+        atr_window   : window for ATR
+        pe_window    : window for Permutation Entropy
+        pe_order     : order for Permutation Entropy
+
+    Returns:
+        dict {pd.Timestamp: metrics_dict}
+    """
+    cache = {}
+    n = len(btc_df)
+
+    for i in range(lookback, n - 1):
+        ts_next   = pd.Timestamp(btc_df.iloc[i + 1]['ts'])
+        start_idx = max(0, i - lookback + 1)
+
+        if i - start_idx < 20:
+            continue
+
+        subset = btc_df.iloc[start_idx:i + 1]
+        ohlc = {
+            'open':  subset['open'].values.astype(np.float64),
+            'high':  subset['high'].values.astype(np.float64),
+            'low':   subset['low'].values.astype(np.float64),
+            'close': subset['close'].values.astype(np.float64),
+        }
+        metrics = calc_all_metrics(
+            ohlc,
+            hurst_window = hurst_window,
+            er_window    = er_window,
+            atr_window   = atr_window,
+            pe_window    = pe_window,
+            pe_order     = pe_order,
+        )
+        cache[ts_next] = metrics
+
+    return cache
+
+def prepare_regime_metrics_cache_is(data_folder_is: str, timeframe: str) -> dict:
+    """
+    Load BTC data and build metrics cache for IS regime analysis.
+    """
+    btc_cache = {}
+    btc_tf = load_btc_for_timeframe(data_folder_is, timeframe, btc_cache) \
+             if REGIME_FAMILY_SOURCE == 'strategy' \
+             else load_btc_for_timeframe(data_folder_is, '1Dutc', btc_cache)
+    
+    return build_metrics_cache(
+        btc_df       = btc_tf,
+        lookback     = REGIME_LOOKBACK_BARS,
+        hurst_window = HURST_WINDOW,
+        er_window    = ER_WINDOW,
+        atr_window   = ATR_WINDOW,
+        pe_window    = PE_WINDOW,
+        pe_order     = PE_ORDER,
+    )
 # =============================================================================
 # HELPER — COMPARE BATCH VS PR_BATCH AND GENERATE CSV
 # =============================================================================
@@ -948,6 +1071,14 @@ def print_all_curves_table(strategy_trades, label, initial_balance):
 
     cols                 = ["Curve", "Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Profit_abs", "Profit_pctT", "Weekly_pct"]
     df_out               = df_out[cols].copy()
+    # Redondear columnas
+    df_out["Net_Gain_pct"] = df_out["Net_Gain_pct"].round(1)
+    df_out["Max_DD_pct"] = df_out["Max_DD_pct"].round(1)
+    df_out["Win_Rate"] = df_out["Win_Rate"].round(1)
+    df_out["R_Squared"] = df_out["R_Squared"].round(2)
+    df_out["Profit_Factor"] = df_out["Profit_Factor"].round(2)
+    df_out["Profit_pctT"] = df_out["Profit_pctT"].round(0)
+    df_out["Weekly_pct"] = df_out["Weekly_pct"].round(0)
     max_len              = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -1099,15 +1230,20 @@ def print_best_r2_robustness_table(
         logger.info("  No data for best R² robustness table.")
         return
 
-    df      = pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
     sep_row = {col: "─" * 8 for col in df.columns}
     sep_row["Period"] = "─" * 6
-    mean_row = df.drop(columns="Period").mean().round(3).to_dict()
+    
+    mean_row = df.drop(columns="Period").mean().round(1).to_dict()
     mean_row["Period"] = "MEAN"
-    df       = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
+    mean_row["R2"] = round(mean_row["R2"], 2)
+    mean_row["CVaR10%"] = round(mean_row["CVaR10%"], 2)
+    
+    df = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
+    
     lines = [
         f"\n\033[94m{'─'*115}",
-        f"  BEST R² COMBINATION — Robustness across OOS periods",
+        f"  ROBUSTNESS TABLE — Validated Combined Portfolio",
         f"{'─'*115}\033[0m",
         df.to_string(index=False),
         f"{'─'*115}",
@@ -1312,19 +1448,20 @@ def print_robustness_table(
         weekly           = _weekly_returns(strategy_trades, initial_balance)
         cvar10           = _cvar(weekly, pct=10)
         avg_neg, max_neg = _neg_streak_stats(weekly)
+        weekly_avg = round(float(weekly.mean()), 1) if len(weekly) > 0 else np.nan
 
         rows.append({
-            "Period":label,
-            "NetGain%":m["Net_Gain_pct"],
-            "MaxDD%":m["Max_DD_pct"],
-            "R2":m["R_Squared"],
-            "ProfitFactor":pf,
-            "CVaR10%":cvar10,
-            "AvgNegStreak":avg_neg,
-            "MaxNegStreak":max_neg,
-            "Weekly_pct":round(float((weekly > 0).mean() * 100), 2),
-            "MaxWeekly%":round(float(weekly.max()), 2) if len(weekly) > 0 else np.nan,
-            "MinWeekly%":round(float(weekly.min()), 2) if len(weekly) > 0 else np.nan,
+            "Period":        label,
+            "NetGain%":      round(m["Net_Gain_pct"], 1),      # 2 decimales
+            "MaxDD%":        round(m["Max_DD_pct"], 1),        # 2 decimales
+            "R2":            round(m["R_Squared"], 2),          # 3 decimales (mantener)
+            "ProfitFactor":  round(pf if pf != float("inf") else 0, 1),  # 2 decimales
+            "CVaR10%":       round(cvar10, 2),                  # 2 decimales
+            "AvgNegStreak":  round(avg_neg, 1),                 # 1 decimal
+            "MaxNegStreak":  max_neg,                           # sin decimales (int)
+            "Weekly_pct":    round(float((weekly > 0).mean() * 100), 1),  # 1 decimal
+            "Weekly_avg%":   weekly_avg,
+            "MinWeekly%":    round(float(weekly.min()), 1) if len(weekly) > 0 else np.nan,  # 1 decimal
         })
 
     if not rows:
@@ -1334,7 +1471,7 @@ def print_robustness_table(
     df                 = pd.DataFrame(rows)
     sep_row            = {col: "─" * 8 for col in df.columns}
     sep_row["Period"]  = "─" * 6
-    mean_row           = df.drop(columns="Period").mean().round(3).to_dict()
+    mean_row           = df.drop(columns="Period").mean().round(1).to_dict()
     mean_row["Period"] = "MEAN"
     df                 = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [

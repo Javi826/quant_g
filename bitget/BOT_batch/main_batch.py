@@ -32,7 +32,6 @@ logging.getLogger("PIL").setLevel(logging.WARNING)
 
 from utils.utils import filter_symbols
 from utils.analysis import report_montecarlo, report_backtesting
-from shared_market_regime.regime_common import load_btc_for_timeframe, filter_signals_by_regime
 from backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
 from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.torque import compile_grid_results, prepare_ohlcv_arrays,get_n_obs
@@ -40,11 +39,8 @@ from utils.torque import extract_ohlcv_from_path, compile_MC_results
 from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,print_best_r2_robustness_table,print_robustness_table
 from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit,print_update_status
 from utils_batch import compute_metrics, print_metrics_table,accumulate_strategy_trades,print_portfolio_metrics_table
-from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv,print_strategies_summary
-from utils_batch import print_all_curves_table, find_best_r2_combination_ids, plot_filter_comparison, plot_portfolio_comparison
-from shared_config import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
-from shared_config import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
-from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
+from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv,print_strategies_summary,run_oos_backtest_with_regime
+from utils_batch import print_all_curves_table, find_best_r2_combination_ids, plot_filter_comparison, plot_portfolio_comparison,prepare_regime_metrics_cache_is
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -75,8 +71,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 100
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -84,12 +80,17 @@ OOS_NETGAIN_TH       = 35
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
+OOS_NETGAIN_TH       = -100
+OOS_MAX_DD_TH        = +100
+OOS_R2_TH            = 0.0  
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 54
-OOS_MAX_DD_TH        = 7
-OOS_R2_TH            = 0.82  
+# =============================================================================
+# OOS_NETGAIN_TH       = 54
+# OOS_MAX_DD_TH        = 7
+# OOS_R2_TH            = 0.82  
+# =============================================================================
 
 # BATCH
 #------------------------------------------------------------------------------
@@ -109,13 +110,13 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
+    "04_reversal_short_4H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "22_parity_short_6Hutc",
+    "28_orderblocks_long_1H",
+    # -------------------------------------------------------------------------
 # =============================================================================
-#     "04_reversal_short_4H",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "22_parity_short_6Hutc",
-#     "28_orderblocks_long_1H",
-#     # -------------------------------------------------------------------------
 #     "02_reversal_long_4H",
 #     "03_parity_long_4H",
 #     "04_reversal_short_4H",
@@ -154,10 +155,10 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
@@ -165,13 +166,6 @@ N_SYMBOLS_MCIS            = 6
 N_PATHS_OOS1              = 1
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
-
-# Regime analysis params
-#------------------------------------------------------------------------------
-FORCE_DIRECTION_FILTER = True
-REGIME_MIN_TRADES      = 10
-REGIME_LOOKBACK_BARS   = 180
-REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 # =============================================================================
 # VALIDATION CONFIGURATION
@@ -319,22 +313,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 1b — Build metrics cache for regime analysis
     # -------------------------------------------------------------------------
-    from shared_market_regime.regime_common import build_metrics_cache
-    
-    btc_cache_is_regime = {}
-    btc_tf_is = load_btc_for_timeframe(DATA_FOLDER_IS, TIMEFRAME, btc_cache_is_regime) \
-                if REGIME_FAMILY_SOURCE == 'strategy' \
-                else load_btc_for_timeframe(DATA_FOLDER_IS, '1Dutc', btc_cache_is_regime)
-    
-    metrics_cache_is = build_metrics_cache(
-        btc_df       = btc_tf_is,
-        lookback     = REGIME_LOOKBACK_BARS,
-        hurst_window = HURST_WINDOW,
-        er_window    = ER_WINDOW,
-        atr_window   = ATR_WINDOW,
-        pe_window    = PE_WINDOW,
-        pe_order     = PE_ORDER,
-    )
+    metrics_cache_is = prepare_regime_metrics_cache_is(DATA_FOLDER_IS, TIMEFRAME)
 
     # -------------------------------------------------------------------------
     # BLOCK 2 — Backtest IS + Regime Analysis
@@ -364,24 +343,11 @@ def run_batch(strategy_config: dict) -> None:
 
 
     bins_to_filter = analyze_regime_is(
-        trades_df_is     = trades_df_is,
-        timeframe        = TIMEFRAME,
-        data_folder_is   = DATA_FOLDER_IS,
-        families         = FAMILIES,
-        regime_min_trades= REGIME_MIN_TRADES,
-        regime_lookback  = REGIME_LOOKBACK_BARS,
-        family_source    = REGIME_FAMILY_SOURCE,
-        hurst_window     = HURST_WINDOW,
-        er_window        = ER_WINDOW,
-        atr_window       = ATR_WINDOW,
-        pe_window        = PE_WINDOW,
-        pe_order         = PE_ORDER,
-        ma_period        = R0_MA_PERIOD,
-        long_th          = R0_LONG_TH,
-        short_th         = R0_SHORT_TH,
-        strategy_direction    = SIDE,
-        force_direction_filter= FORCE_DIRECTION_FILTER,
-        metrics_cache         = metrics_cache_is,
+        trades_df_is       = trades_df_is,
+        timeframe          = TIMEFRAME,
+        data_folder_is     = DATA_FOLDER_IS,
+        strategy_direction = SIDE,
+        metrics_cache      = metrics_cache_is,
     )
     if SAVE_TRADES:
         accumulate_strategy_trades(
@@ -394,47 +360,18 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 2b — Backtest IS with regime filter (for best R² combination)
     # -------------------------------------------------------------------------
     if RUN_BEST_COMBINATIONS:
-        btc_cache_is_r = {}
-        btc_1d_df_is   = load_btc_for_timeframe(DATA_FOLDER_IS, '1Dutc', btc_cache_is_r)
-        btc_tf_df_is   = load_btc_for_timeframe(DATA_FOLDER_IS, TIMEFRAME, btc_cache_is_r) \
-                         if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_is
-
-        ohlcv_arrays_is_regime = {}
-        for sym, arr in ohlcv_arr_is_regime.items():
-            signals = signal_fn(arr, **bt_signal_params, live_trading=False)
-            if bins_to_filter:
-                signals = filter_signals_by_regime(
-                    signals        = signals,
-                    ts             = arr['ts'],
-                    btc_1d_df      = btc_1d_df_is,
-                    btc_tf_df      = btc_tf_df_is,
-                    bins_to_filter = bins_to_filter,
-                    ma_period      = R0_MA_PERIOD,
-                    long_th        = R0_LONG_TH,
-                    short_th       = R0_SHORT_TH,
-                    families       = FAMILIES,
-                    lookback_bars  = REGIME_LOOKBACK_BARS,
-                    hurst_window   = HURST_WINDOW,
-                    er_window      = ER_WINDOW,
-                    atr_window     = ATR_WINDOW,
-                    pe_window      = PE_WINDOW,
-                    pe_order       = PE_ORDER,
-                    metrics_cache  = metrics_cache_is,
-                )
-            ohlcv_arrays_is_regime[sym] = {k: v.copy() if hasattr(v, "copy") else v for k, v in arr.items()}
-            ohlcv_arrays_is_regime[sym]["signal"] = signals
-
-        is_result_regime = run_grid_backtest(
-            ohlcv_arrays_is_regime,
-            sell_after=best_params["SELL_AFTER"],
-            tp_pct=best_params["TP_PCT"],
-            sl_pct=best_params["SL_PCT"],
-            order_amount=ORDER_AMOUNT,
+        trades_df_is_regime, _ = run_oos_backtest_with_regime(
+            strategy_id          = f"{STRATEGY_ID}_is_regime",
+            ohlcv_arrays         = ohlcv_arr_is_regime,
+            signal_fn            = signal_fn,
+            signal_params        = bt_signal_params,
+            best_params          = best_params,
+            order_amount         = ORDER_AMOUNT,
+            data_folder          = DATA_FOLDER_IS,
+            timeframe            = TIMEFRAME,
+            bins_to_filter       = bins_to_filter,
+            initial_balance      = INITIAL_BALANCE,
         )
-
-        trades_df_is_regime             = is_result_regime["__PORTFOLIO__"]["trade_log"].copy()
-        trades_df_is_regime.columns     = trades_df_is_regime.columns.str.lower().str.strip()
-        trades_df_is_regime["buy_time"] = pd.to_datetime(trades_df_is_regime["buy_time"])
 
         if len(trades_df_is_regime) > 0:
             if SAVE_TRADES:
@@ -497,68 +434,28 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 4 — Backtest OOS1 Regime 0+1
     # -------------------------------------------------------------------------
     logger.info(f"STAGE 4  ── Backtest OOS1 Regime   ── bins: {bins_to_filter if bins_to_filter else 'none'}")
-
-    btc_cache_oos1 = {}
-    btc_1d_df_oos1 = load_btc_for_timeframe(DATA_FOLDER_OOS1, '1Dutc', btc_cache_oos1)
-    btc_tf_df_oos1 = load_btc_for_timeframe(DATA_FOLDER_OOS1, TIMEFRAME, btc_cache_oos1) \
-                    if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos1
-
-    metrics_cache_oos1 = build_metrics_cache(
-        btc_df         = btc_tf_df_oos1,
-        lookback       = REGIME_LOOKBACK_BARS,
-        hurst_window   = HURST_WINDOW,
-        er_window      = ER_WINDOW,
-        atr_window     = ATR_WINDOW,
-        pe_window      = PE_WINDOW,
-        pe_order       = PE_ORDER,
+    
+    trades_df_regime, metrics_regime = run_oos_backtest_with_regime(
+        strategy_id     = f"{STRATEGY_ID}_regime01",
+        ohlcv_arrays    = ohlcv_arr_oos1,
+        signal_fn       = signal_fn,
+        signal_params   = bt_signal_params,
+        best_params     = best_params,
+        order_amount    = ORDER_AMOUNT,
+        data_folder     = DATA_FOLDER_OOS1,
+        timeframe       = TIMEFRAME,
+        bins_to_filter  = bins_to_filter,
+        initial_balance = INITIAL_BALANCE,
     )
-
-    ohlcv_arrays_oos1_regime = {}
-    for sym, arr in ohlcv_arr_oos1.items():
-        signals = signal_fn(arr, **bt_signal_params, live_trading=False)
-        if bins_to_filter:
-            signals = filter_signals_by_regime(
-                signals        = signals,
-                ts             = arr['ts'],
-                btc_1d_df      = btc_1d_df_oos1,
-                btc_tf_df      = btc_tf_df_oos1,
-                bins_to_filter = bins_to_filter,
-                ma_period      = R0_MA_PERIOD,
-                long_th        = R0_LONG_TH,
-                short_th       = R0_SHORT_TH,
-                families       = FAMILIES,
-                lookback_bars  = REGIME_LOOKBACK_BARS,
-                hurst_window   = HURST_WINDOW,
-                er_window      = ER_WINDOW,
-                atr_window     = ATR_WINDOW,
-                pe_window      = PE_WINDOW,
-                pe_order       = PE_ORDER,
-                metrics_cache  = metrics_cache_oos1,
-            )
-        ohlcv_arrays_oos1_regime[sym] = {k: v.copy() if hasattr(v, "copy") else v for k, v in arr.items()}
-        ohlcv_arrays_oos1_regime[sym]["signal"] = signals
-
-    oos1_result_regime = run_grid_backtest(
-        ohlcv_arrays_oos1_regime,
-        sell_after=best_params["SELL_AFTER"],
-        tp_pct=best_params["TP_PCT"],
-        sl_pct=best_params["SL_PCT"],
-        order_amount=ORDER_AMOUNT,
-    )
-
-    trades_df_regime             = oos1_result_regime["__PORTFOLIO__"]["trade_log"].copy()
-    trades_df_regime.columns     = trades_df_regime.columns.str.lower().str.strip()
-    trades_df_regime["buy_time"] = pd.to_datetime(trades_df_regime["buy_time"])
-
+    
     n_baseline = len(trades_df)
     n_regime   = len(trades_df_regime)
     logger.debug(
         f"STAGE 4  ── Filter results         ── "
         f"baseline={n_baseline} | regime={n_regime} | diff={n_baseline - n_regime}"
     )
-
+    
     if len(trades_df_regime) > 0:
-        metrics_regime = compute_metrics(trades_df_regime, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_regime01")
         print_metrics_table([metrics_regime], f"  Metrics — {STRATEGY_ID} (Regime 0+1)")
         if SAVE_TRADES:
             accumulate_strategy_trades(
@@ -568,9 +465,8 @@ def run_batch(strategy_config: dict) -> None:
             )
         else:
             _strategy_trades_oos1_regime.append((STRATEGY_ID, trades_df_regime.copy()))
-            
-    # Plot comparison OOS1
-    if SHOW_PLOTS:
+    
+    if SHOW_PLOTS or SAVE_TRADES:
         plot_filter_comparison(
             strategy_id=f"{STRATEGY_ID}_oos1",
             trades_df_baseline=trades_df,
@@ -716,61 +612,22 @@ def run_batch(strategy_config: dict) -> None:
         ohlcv_oos2 = prepare_ohlcv_arrays(ohlcv_oos2_raw)
         logger.debug(f"STAGE 6b ── OOS2 symbols           ── {sorted(ohlcv_oos2.keys())}")
 
-        btc_cache_oos2 = {}
-        btc_1d_df_oos2 = load_btc_for_timeframe(DATA_FOLDER_OOS2, '1Dutc', btc_cache_oos2)
-        btc_tf_df_oos2 = load_btc_for_timeframe(DATA_FOLDER_OOS2, TIMEFRAME, btc_cache_oos2) \
-                         if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos2
-
-        metrics_cache_oos2 = build_metrics_cache(
-            btc_df       = btc_tf_df_oos2,
-            lookback     = REGIME_LOOKBACK_BARS,
-            hurst_window = HURST_WINDOW,
-            er_window    = ER_WINDOW,
-            atr_window   = ATR_WINDOW,
-            pe_window    = PE_WINDOW,
-            pe_order     = PE_ORDER,
+        trades_df_oos2, metrics_oos2 = run_oos_backtest_with_regime(
+            strategy_id          = f"{STRATEGY_ID}_oos2",
+            ohlcv_arrays         = ohlcv_oos2,
+            signal_fn            = signal_fn,
+            signal_params        = bt_signal_params,
+            best_params          = best_params,
+            order_amount         = ORDER_AMOUNT,
+            data_folder          = DATA_FOLDER_OOS2,
+            timeframe            = TIMEFRAME,
+            bins_to_filter       = bins_to_filter,
+            initial_balance      = INITIAL_BALANCE,
         )
-
-        ohlcv_arrays_oos2_regime = {}
-        for sym, arr in ohlcv_oos2.items():
-            signals = signal_fn(arr, **bt_signal_params, live_trading=False)
-            if bins_to_filter:
-                signals = filter_signals_by_regime(
-                    signals        = signals,
-                    ts             = arr['ts'],
-                    btc_1d_df      = btc_1d_df_oos2,
-                    btc_tf_df      = btc_tf_df_oos2,
-                    bins_to_filter = bins_to_filter,
-                    ma_period      = R0_MA_PERIOD,
-                    long_th        = R0_LONG_TH,
-                    short_th       = R0_SHORT_TH,
-                    families       = FAMILIES,
-                    lookback_bars  = REGIME_LOOKBACK_BARS,
-                    hurst_window   = HURST_WINDOW,
-                    er_window      = ER_WINDOW,
-                    atr_window     = ATR_WINDOW,
-                    pe_window      = PE_WINDOW,
-                    pe_order       = PE_ORDER,
-                    metrics_cache  = metrics_cache_oos2,
-                )
-            ohlcv_arrays_oos2_regime[sym] = {**arr, "signal": signals}
-
-        oos2_result_regime = run_grid_backtest(
-            ohlcv_arrays_oos2_regime,
-            sell_after=best_params["SELL_AFTER"],
-            tp_pct=best_params["TP_PCT"],
-            sl_pct=best_params["SL_PCT"],
-            order_amount=ORDER_AMOUNT,
-        )
-
-        trades_df_oos2             = oos2_result_regime["__PORTFOLIO__"]["trade_log"].copy()
-        trades_df_oos2.columns     = trades_df_oos2.columns.str.lower().str.strip()
-        trades_df_oos2["buy_time"] = pd.to_datetime(trades_df_oos2["buy_time"])
 
         logger.debug(f"STAGE 6b ── OOS2 Backtest Regime   ── {len(trades_df_oos2)} trades | bins: {bins_to_filter if bins_to_filter else 'none'}")
 
         if len(trades_df_oos2) > 0:
-            metrics_oos2 = compute_metrics(trades_df_oos2, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_oos2")
             print_metrics_table([metrics_oos2], f"  Metrics — {STRATEGY_ID} (OOS2 Regime)")
 
             ok_oos2_netgain = metrics_oos2["Net_Gain_pct"]    >= R_NETGAIN_OOS2
@@ -806,7 +663,7 @@ def run_batch(strategy_config: dict) -> None:
                 )
             else:
                 _strategy_trades_oos2_regime.append((STRATEGY_ID, trades_df_oos2.copy()))
-                
+
         if SHOW_PLOTS or SAVE_TRADES:
             ohlcv_arrays_oos2_baseline = {}
             for sym, arr in ohlcv_oos2.items():
@@ -873,61 +730,22 @@ def run_batch(strategy_config: dict) -> None:
         ohlcv_oos3 = prepare_ohlcv_arrays(ohlcv_oos3_raw)
         logger.debug(f"STAGE 6c ── OOS3 symbols           ── {sorted(ohlcv_oos3.keys())}")
 
-        btc_cache_oos3 = {}
-        btc_1d_df_oos3 = load_btc_for_timeframe(DATA_FOLDER_OOS3, '1Dutc', btc_cache_oos3)
-        btc_tf_df_oos3 = load_btc_for_timeframe(DATA_FOLDER_OOS3, TIMEFRAME, btc_cache_oos3) \
-                         if REGIME_FAMILY_SOURCE == 'strategy' else btc_1d_df_oos3
-
-        metrics_cache_oos3 = build_metrics_cache(
-            btc_df       = btc_tf_df_oos3,
-            lookback     = REGIME_LOOKBACK_BARS,
-            hurst_window = HURST_WINDOW,
-            er_window    = ER_WINDOW,
-            atr_window   = ATR_WINDOW,
-            pe_window    = PE_WINDOW,
-            pe_order     = PE_ORDER,
+        trades_df_oos3, metrics_oos3 = run_oos_backtest_with_regime(
+            strategy_id          = f"{STRATEGY_ID}_oos3",
+            ohlcv_arrays         = ohlcv_oos3,
+            signal_fn            = signal_fn,
+            signal_params        = bt_signal_params,
+            best_params          = best_params,
+            order_amount         = ORDER_AMOUNT,
+            data_folder          = DATA_FOLDER_OOS3,
+            timeframe            = TIMEFRAME,
+            bins_to_filter       = bins_to_filter,
+            initial_balance      = INITIAL_BALANCE,
         )
-
-        ohlcv_arrays_oos3_regime = {}
-        for sym, arr in ohlcv_oos3.items():
-            signals = signal_fn(arr, **bt_signal_params, live_trading=False)
-            if bins_to_filter:
-                signals = filter_signals_by_regime(
-                    signals        = signals,
-                    ts             = arr['ts'],
-                    btc_1d_df      = btc_1d_df_oos3,
-                    btc_tf_df      = btc_tf_df_oos3,
-                    bins_to_filter = bins_to_filter,
-                    ma_period      = R0_MA_PERIOD,
-                    long_th        = R0_LONG_TH,
-                    short_th       = R0_SHORT_TH,
-                    families       = FAMILIES,
-                    lookback_bars  = REGIME_LOOKBACK_BARS,
-                    hurst_window   = HURST_WINDOW,
-                    er_window      = ER_WINDOW,
-                    atr_window     = ATR_WINDOW,
-                    pe_window      = PE_WINDOW,
-                    pe_order       = PE_ORDER,
-                    metrics_cache  = metrics_cache_oos3,
-                )
-            ohlcv_arrays_oos3_regime[sym] = {**arr, "signal": signals}
-
-        oos3_result_regime = run_grid_backtest(
-            ohlcv_arrays_oos3_regime,
-            sell_after=best_params["SELL_AFTER"],
-            tp_pct=best_params["TP_PCT"],
-            sl_pct=best_params["SL_PCT"],
-            order_amount=ORDER_AMOUNT,
-        )
-
-        trades_df_oos3 = oos3_result_regime["__PORTFOLIO__"]["trade_log"].copy()
-        trades_df_oos3.columns = trades_df_oos3.columns.str.lower().str.strip()
-        trades_df_oos3["buy_time"] = pd.to_datetime(trades_df_oos3["buy_time"])
 
         logger.debug(f"STAGE 6c ── OOS3 Backtest Regime   ── {len(trades_df_oos3)} trades | bins: {bins_to_filter if bins_to_filter else 'none'}")
 
         if len(trades_df_oos3) > 0:
-            metrics_oos3 = compute_metrics(trades_df_oos3, capital=INITIAL_BALANCE, name=f"{STRATEGY_ID}_oos3")
             print_metrics_table([metrics_oos3], f"  Metrics — {STRATEGY_ID} (OOS3 Regime)")
             ok_oos3_netgain = metrics_oos3["Net_Gain_pct"]    >= R_NETGAIN_OOS3
             ok_oos3_dd      = abs(metrics_oos3["Max_DD_pct"]) <= R_MAX_DD_OOS3
@@ -943,7 +761,6 @@ def run_batch(strategy_config: dict) -> None:
                 f"R2={metrics_oos3['R_Squared']:.2f}  "
                 f"trades={len(trades_df_oos3)}"
             )
-
         else:
             logger.info(f"STAGE 6c ── OOS3 Results           ── no trades after regime filter")
 
@@ -1241,7 +1058,7 @@ if __name__ == "__main__":
     logger.info(f"  Data OOS3          : {'🟢' if OOS3_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS3)}")
     logger.info(f"  Round 1 OOS1       : NetGain>{R1_NETGAIN_ROUND1}%  MaxDD<{R1_MAX_DD_ROUND1}%  R2>{R1_RSQUARED_ROUND1}  ProbNeg<{R1_PROBNEG_ROUND1}%")
     logger.info(f"  Round 2 + All OOSs : NetGain>{R2_NETGAIN_ROUND2}%  MaxDD<{R2_MAX_DD_ROUND2}%  R2>{R2_R2_ROUND2}")
-    logger.info(f"  Regime             : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
+    #logger.info(f"  Regime             : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*115}\n")
     
     for strategy in strategies_to_run:

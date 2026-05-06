@@ -28,13 +28,12 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
         symbols = [s for s in symbols if s in inclusion_list]
     
     for sym in symbols:
-        
-        # ---- Exclusion ----
+        #Exclusion
         if sym in symbols_to_exclude:
             removed_symbols.append(sym)
             continue
         
-        # ---- Si my_symbols=True, solo cargar sin filtros ----
+        #Si my_symbols=True, solo cargar sin filtros
         if my_symbols:
             file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
             if os.path.exists(file_path):
