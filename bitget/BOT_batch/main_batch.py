@@ -75,8 +75,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -84,13 +84,12 @@ OOS_NETGAIN_TH       = 35
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
+
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-# =============================================================================
-# OOS_NETGAIN_TH       = 54
-# OOS_MAX_DD_TH        = 6
-# OOS_R2_TH            = 0.82  
-# =============================================================================
+OOS_NETGAIN_TH       = 54
+OOS_MAX_DD_TH        = 7
+OOS_R2_TH            = 0.82  
 
 # BATCH
 #------------------------------------------------------------------------------
@@ -110,26 +109,28 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-    "04_reversal_short_4H",
-    "17_flag_long_4H",
-    "19_flag_short_4H",
-    "22_parity_short_6Hutc",
-    "28_orderblocks_long_1H",
-    # -------------------------------------------------------------------------
-    "02_reversal_long_4H",
-    "03_parity_long_4H",
-    "04_reversal_short_4H",
-    "06_reversal_long_1H",
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "12_parity_long_6Hutc",
-    "13_orderblocks_short_4H",
-    "14_orderblocks_long_4H",
-    "18_flag_long_1H",
-    "21_parity_short_4H",
-    "24_flag_long_6Hutc",
-    "25_flag_short_6Hutc",
-    "26_orderblocks_long_4H",
+# =============================================================================
+#     "04_reversal_short_4H",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "22_parity_short_6Hutc",
+#     "28_orderblocks_long_1H",
+#     # -------------------------------------------------------------------------
+#     "02_reversal_long_4H",
+#     "03_parity_long_4H",
+#     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "12_parity_long_6Hutc",
+#     "13_orderblocks_short_4H",
+#     "14_orderblocks_long_4H",
+#     "18_flag_long_1H",
+#     "21_parity_short_4H",
+#     "24_flag_long_6Hutc",
+#     "25_flag_short_6Hutc",
+#     "26_orderblocks_long_4H",
+# =============================================================================
 ]
 # =============================================================================
 # -----------------------------------------------------------------------------
@@ -156,7 +157,7 @@ DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-01_2026-05_OOS")
+#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
 
 #MONTECARLO
 #------------------------------------------------------------------------------
@@ -567,6 +568,16 @@ def run_batch(strategy_config: dict) -> None:
             )
         else:
             _strategy_trades_oos1_regime.append((STRATEGY_ID, trades_df_regime.copy()))
+            
+    # Plot comparison OOS1
+    if SHOW_PLOTS:
+        plot_filter_comparison(
+            strategy_id=f"{STRATEGY_ID}_oos1",
+            trades_df_baseline=trades_df,
+            trades_df_r01=trades_df_regime if len(trades_df_regime) > 0 else None,
+            data_folder=DATA_FOLDER_OOS1,
+            initial_balance=INITIAL_BALANCE,
+        )
 
     # -------------------------------------------------------------------------
     # BLOCK 5 — Monte Carlo OOS1
@@ -981,18 +992,6 @@ def run_batch(strategy_config: dict) -> None:
                     csv_folder=os.path.join(os.path.dirname(__file__), "brief_trades"),
                     label="oos3_baseline",
                 )
-
-    # -------------------------------------------------------------------------
-    # BLOCK 7 — Equity Curves + Plot
-    # -------------------------------------------------------------------------
-    plot_filter_comparison(
-        strategy_id=STRATEGY_ID,
-        trades_df_baseline=trades_df,
-        trades_df_r01=trades_df_regime if len(trades_df_regime) > 0 else None,
-        data_folder=DATA_FOLDER_OOS1,
-        initial_balance=INITIAL_BALANCE,
-    )
-
     # -------------------------------------------------------------------------
     # BLOCK 8 — Update & Compare
     # -------------------------------------------------------------------------
