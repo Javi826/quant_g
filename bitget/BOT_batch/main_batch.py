@@ -76,7 +76,7 @@ SHOW_PROGRESS = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+N_PATHS_IS           = 100
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -95,10 +95,10 @@ OOS_R2_TH            = 0.82
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = False
-RUN_BEST_COMBINATIONS    = False
+RUN_CORRELATION_ANALYSIS = True
+RUN_BEST_COMBINATIONS    = True
 UPDATE_OUTPUTS           = False
-SAVE_TRADES              = True
+SAVE_TRADES              = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -110,13 +110,11 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-# =============================================================================
-#     "04_reversal_short_4H",
-#     "17_flag_long_4H",
-#     "19_flag_short_4H",
-#     "22_parity_short_6Hutc",
-#     "28_orderblocks_long_1H",
-# =============================================================================
+    "04_reversal_short_4H",
+    "17_flag_long_4H",
+    "19_flag_short_4H",
+    "22_parity_short_6Hutc",
+    "28_orderblocks_long_1H",
     # -------------------------------------------------------------------------
 # =============================================================================
 #     "02_reversal_long_4H",
