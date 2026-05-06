@@ -1082,7 +1082,13 @@ def print_all_curves_table(strategy_trades, label, initial_balance):
     max_len              = df_out["Curve"].str.len().max()
     df_out["Curve"]      = df_out["Curve"].apply(lambda x: x.ljust(max_len))
     df_out["Profit_abs"] = df_out["Profit_abs"].apply(lambda x: f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-
+    
+    # Insert separator row before Longs/Shorts aggregates
+    longs_idx = df_out[df_out["Curve"].str.strip() == "── Longs"].index
+    if len(longs_idx) > 0:
+        sep_row_agg = pd.DataFrame({col: ["-----"] for col in cols})
+        sep_row_agg["Curve"] = "-" * max_len  # Mismo ancho que la línea continua
+        df_out = pd.concat([df_out.iloc[:longs_idx[0]], sep_row_agg, df_out.iloc[longs_idx[0]:]], ignore_index=True)
     # Insert separator row before aggregate rows
     combined_idx     = df_out[df_out["Curve"].str.strip() == "── Combined"].index[0]
     sep_row          = pd.DataFrame({col: ["─" * max(len(str(df_out[col].iloc[0])), 9)] for col in cols})
@@ -1471,7 +1477,7 @@ def print_robustness_table(
     df                 = pd.DataFrame(rows)
     sep_row            = {col: "─" * 8 for col in df.columns}
     sep_row["Period"]  = "─" * 6
-    mean_row           = df.drop(columns="Period").mean().round(1).to_dict()
+    mean_row           = df.drop(columns="Period").mean().round(2).to_dict()
     mean_row["Period"] = "MEAN"
     df                 = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
     lines = [

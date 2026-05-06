@@ -27,7 +27,7 @@ ACCOUNTS = {
         "regime01_short_th":  1.00,
     },
     "00": {
-        "initial_capital": 8800,
+        "initial_capital": 9600,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "production",
