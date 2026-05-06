@@ -80,14 +80,14 @@ N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 30
+OOS_NETGAIN_TH       = 35
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
 # =============================================================================
-# OOS_NETGAIN_TH       = 40
+# OOS_NETGAIN_TH       = 54
 # OOS_MAX_DD_TH        = 6
 # OOS_R2_TH            = 0.82  
 # =============================================================================
@@ -98,7 +98,7 @@ RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
 UPDATE_OUTPUTS           = False
-SAVE_TRADES              = False
+SAVE_TRADES              = True
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -110,22 +110,24 @@ SELECTED_STRATEGIES = [
     "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
-    "04_reversal_short_4H",
-    "06_reversal_long_1H",
-    "19_flag_short_4H",
-    "22_parity_short_6Hutc",
-    "28_orderblocks_long_1H",
+# =============================================================================
+#     "04_reversal_short_4H",
+#     "17_flag_long_4H",
+#     "19_flag_short_4H",
+#     "22_parity_short_6Hutc",
+#     "28_orderblocks_long_1H",
+# =============================================================================
     # -------------------------------------------------------------------------
 # =============================================================================
 #     "02_reversal_long_4H",
 #     "03_parity_long_4H",
 #     "04_reversal_short_4H",
+#     "06_reversal_long_1H",
 #     "08_reversal_long_6Hutc",
 #     "09_reversal_short_6Hutc",
 #     "12_parity_long_6Hutc",
 #     "13_orderblocks_short_4H",
 #     "14_orderblocks_long_4H",
-#     "17_flag_long_4H",
 #     "18_flag_long_1H",
 #     "21_parity_short_4H",
 #     "24_flag_long_6Hutc",
