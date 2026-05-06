@@ -76,7 +76,7 @@ SHOW_PROGRESS = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 100
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -95,8 +95,8 @@ OOS_R2_TH            = 0.82
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = True
-RUN_BEST_COMBINATIONS    = True
+RUN_CORRELATION_ANALYSIS = False
+RUN_BEST_COMBINATIONS    = False
 UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
 
@@ -116,22 +116,20 @@ SELECTED_STRATEGIES = [
     "22_parity_short_6Hutc",
     "28_orderblocks_long_1H",
     # -------------------------------------------------------------------------
-# =============================================================================
-#     "02_reversal_long_4H",
-#     "03_parity_long_4H",
-#     "04_reversal_short_4H",
-#     "06_reversal_long_1H",
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "13_orderblocks_short_4H",
-#     "14_orderblocks_long_4H",
-#     "18_flag_long_1H",
-#     "21_parity_short_4H",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-#     "26_orderblocks_long_4H",
-# =============================================================================
+    "02_reversal_long_4H",
+    "03_parity_long_4H",
+    "04_reversal_short_4H",
+    "06_reversal_long_1H",
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "12_parity_long_6Hutc",
+    "13_orderblocks_short_4H",
+    "14_orderblocks_long_4H",
+    "18_flag_long_1H",
+    "21_parity_short_4H",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
+    "26_orderblocks_long_4H",
 ]
 # =============================================================================
 # -----------------------------------------------------------------------------
