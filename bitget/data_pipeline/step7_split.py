@@ -138,19 +138,15 @@ def _compute_windows(config: dict, mode_dir: str) -> tuple[str, str, str, str]:
 # FOLDER NAMING
 # =============================================================================
 
-def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, subset: str) -> str:
-    """
-    Builds descriptive folder name.
-    IS  → crypto_2022-01_2026-01_IS
-    OOS → crypto_2026-01_2026-04_OOS
-    """
+def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, subset: str, rwa_mode: str = "crypto_only") -> str:
+    prefix = "crypto" if rwa_mode == "crypto_only" else "rwa"
     if subset == "IS":
         start = is_start[:7]
         end   = is_end[:7]
     else:
         start = oos_start[:7]
         end   = oos_end[:7]
-    return f"crypto_{start}_{end}_{subset}"
+    return f"{prefix}_{start}_{end}_{subset}"
 
 
 # =============================================================================
@@ -211,8 +207,9 @@ def print_split_preview(config: dict) -> bool:
     oos_months = (oos_end_dt.year - oos_start_dt.year) * 12 + (oos_end_dt.month - oos_start_dt.month)
 
     # Folder names
-    is_folder  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS")
-    oos_folder = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS")
+    rwa_mode   = config.get("rwa_mode", "crypto_only")
+    is_folder  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS",  rwa_mode)
+    oos_folder = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS", rwa_mode)
 
     # Data range
     data_range = _get_data_range(raw_dir)
@@ -266,9 +263,10 @@ def get_latest_split_folders(split_dir: str, mode: str = "expanding") -> dict | 
         if not os.path.exists(subset_dir):
             return None
         folders = sorted([
-            f for f in os.listdir(subset_dir)
-            if os.path.isdir(os.path.join(subset_dir, f)) and f.startswith("crypto_")
-        ])
+                    f for f in os.listdir(subset_dir)
+                    if os.path.isdir(os.path.join(subset_dir, f))
+                    and (f.startswith("crypto_") or f.startswith("rwa_"))
+                ])
         if not folders:
             return None
         result[subset] = os.path.join(subset_dir, folders[-1])
@@ -314,9 +312,11 @@ def run(config: dict) -> bool:
     os.makedirs(mode_dir, exist_ok=True)
 
     is_start, is_end, oos_start, oos_end = _compute_windows(config, mode_dir)
-
-    is_folder_name  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS")
-    oos_folder_name = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS")
+    
+    rwa_mode        = config.get("rwa_mode", "crypto_only")
+    is_folder_name  = _make_folder_name(is_start, is_end, oos_start, oos_end, "IS",  rwa_mode)
+    oos_folder_name = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS", rwa_mode)
+    
     is_dir  = os.path.join(mode_dir, "IS",  is_folder_name)
     oos_dir = os.path.join(mode_dir, "OOS", oos_folder_name)
     os.makedirs(is_dir, exist_ok=True)

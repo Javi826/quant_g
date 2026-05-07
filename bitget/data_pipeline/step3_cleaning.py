@@ -64,10 +64,13 @@ def run(config: dict) -> bool:
     export_csv: bool = config.get("export_csv", False)
     os.makedirs(output_dir, exist_ok=True)
 
+    selected_symbols = config.get("selected_symbols") or []
     files = sorted([
         os.path.join(input_dir, f)
         for f in os.listdir(input_dir)
-        if f.endswith(".parquet") and (not timeframe or f.endswith(f"_{timeframe}.parquet"))
+        if f.endswith(".parquet")
+        and (not timeframe or f.endswith(f"_{timeframe}.parquet"))
+        and (not selected_symbols or any(f.startswith(s) for s in selected_symbols))
     ]) if os.path.exists(input_dir) else []
 
     if not files:

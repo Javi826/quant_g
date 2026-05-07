@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 16800,
+        "initial_capital": 21600,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -90,8 +90,8 @@ LEVERAGE = 10
 # Drift detection
 DRIFT_WINDOW_SIZE          = 100
 
-DRIFT_BINOMIAL_WINDOW      = 50
-DRIFT_CHECK_INTERVAL       = 15
+DRIFT_BINOMIAL_WINDOW      = 100
+DRIFT_CHECK_INTERVAL       = 30
 
 DRIFT_BINOMIAL_DEFAULT_P50 = 0.55
 
@@ -129,7 +129,7 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 80
-MAX_ORDER_AMOUNT = 280
+MAX_ORDER_AMOUNT = 360
 
 # TP/SL limits (%)
 MIN_TP_PCT = 1

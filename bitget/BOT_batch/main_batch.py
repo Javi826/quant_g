@@ -37,7 +37,7 @@ from tools.optimize_MCf_tf import generate_paths_for_all_symbols_functional
 from utils.torque import compile_grid_results, prepare_ohlcv_arrays,get_n_obs
 from utils.torque import extract_ohlcv_from_path, compile_MC_results
 from utils_batch import SIGNAL_REGISTRY,extract_best_params, select_universe,print_best_r2_robustness_table,print_robustness_table
-from utils_batch import update_strategies_symbols, analyze_regime_is,decorrelate_by_dd, decorrelate_by_profit,print_update_status
+from utils_batch import update_strategies_symbols, analyze_regime_is, decorrelate_by_profit,print_update_status
 from utils_batch import compute_metrics, print_metrics_table,accumulate_strategy_trades,print_portfolio_metrics_table
 from utils_batch import save_drift_reference, save_strategies_pr, compare_and_generate_csv,print_strategies_summary,run_oos_backtest_with_regime
 from utils_batch import print_all_curves_table, find_best_r2_combination_ids, plot_filter_comparison, plot_portfolio_comparison,prepare_regime_metrics_cache_is
@@ -80,9 +80,6 @@ OOS_NETGAIN_TH       = 30
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
-OOS_NETGAIN_TH       = -100
-OOS_MAX_DD_TH        = +100
-OOS_R2_TH            = 0.0  
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -95,9 +92,9 @@ OOS_R2_TH            = 0.0
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = False
+RUN_CORRELATION_ANALYSIS = True
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = False
+UPDATE_OUTPUTS           = True
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
@@ -116,7 +113,6 @@ SELECTED_STRATEGIES = [
 #     "19_flag_short_4H",
 #     # ------------------------------------------------------------------------
 #     "06_reversal_long_1H",
-#     "18_flag_long_1H",
 #     "28_orderblocks_long_1H",
 #     "04_reversal_short_4H",
 #     "02_reversal_long_4H",
@@ -126,6 +122,8 @@ SELECTED_STRATEGIES = [
 #     "14_orderblocks_long_4H",
 #     "21_parity_short_4H",
 #     "26_orderblocks_long_4H",
+# =============================================================================
+# =============================================================================
 #     "08_reversal_long_6Hutc",
 #     "09_reversal_short_6Hutc",
 #     "12_parity_long_6Hutc",
@@ -154,7 +152,7 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 # DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
@@ -952,73 +950,24 @@ def run_portfolio_analysis():
     # -------------------------------------------------------------------------
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
-    if RUN_CORRELATION_ANALYSIS and validated_oos1_regime:
-        logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOS1 — DD (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
-        survivors = decorrelate_by_dd(
-            strategy_trades_oos1     = validated_oos1_regime,
-# =============================================================================
-#             strategy_trades_oos2     = [],
-#             strategy_trades_oos3     = [],
-# =============================================================================
-            strategy_trades_oos2     = validated_oos2_regime,
-            strategy_trades_oos3     = validated_oos3_regime,
-            initial_balance     = INITIAL_BALANCE,
-            threshold           = CORRELATION_DD_THRESHOLD,
-            precomputed_metrics = r01_metrics,
+    logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'-'*115}")
+    survivors_profit = decorrelate_by_profit(
+        strategy_trades_oos1     = validated_oos1_regime,
+        strategy_trades_oos2     = validated_oos2_regime,
+        strategy_trades_oos3     = validated_oos3_regime,
+        initial_balance     = INITIAL_BALANCE,
+        threshold           = CORRELATION_DD_THRESHOLD,
+        precomputed_metrics = r01_metrics,
+    )
+    if survivors_profit:
+        print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
+        plot_portfolio_comparison(
+            strategy_trades_baseline=survivors_profit,
+            strategy_trades_regime01=survivors_profit,
+            data_folder=DATA_FOLDER_OOS1,
+            initial_balance=INITIAL_BALANCE,
+            title="Portfolio — Decorrelated Validated (Profit filter)",
         )
-        if survivors:
-            logger.debug(f"  Survivors after decorrelation: {[sid for sid, _ in survivors]}")
-            print_metrics_table(
-                [compute_metrics(df, capital=INITIAL_BALANCE, name=sid) for sid, df in survivors],
-                "  Survivor Strategies — OOS1 Regime Metrics",
-            )
-            print_all_curves_table(survivors, "Decorrelated — Validated only", INITIAL_BALANCE)
-            plot_portfolio_comparison(
-                strategy_trades_baseline=survivors,
-                strategy_trades_regime01=survivors,
-                data_folder=DATA_FOLDER_OOS1,
-                initial_balance=INITIAL_BALANCE,
-                title="Portfolio — Decorrelated Validated (DD filter)",
-            )
-
-        logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOS1 — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'-'*115}")
-        survivors_profit = decorrelate_by_profit(
-            strategy_trades_oos1     = validated_oos1_regime,
-# =============================================================================
-#             strategy_trades_oos2     = [],
-#             strategy_trades_oos3     = [],
-# =============================================================================
-            strategy_trades_oos2     = validated_oos2_regime,
-            strategy_trades_oos3     = validated_oos3_regime,
-            initial_balance     = INITIAL_BALANCE,
-            threshold           = CORRELATION_DD_THRESHOLD,
-            precomputed_metrics = r01_metrics,
-        )
-        if survivors_profit:
-            print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
-            plot_portfolio_comparison(
-                strategy_trades_baseline=survivors_profit,
-                strategy_trades_regime01=survivors_profit,
-                data_folder=DATA_FOLDER_OOS1,
-                initial_balance=INITIAL_BALANCE,
-                title="Portfolio — Decorrelated Validated (Profit filter)",
-            )
-            
-        discarded_dd     = {sid for sid, _ in validated_oos1_regime if sid not in {s for s, _ in survivors}}
-        discarded_profit = {sid for sid, _ in validated_oos1_regime if sid not in {s for s, _ in survivors_profit}}
-        discarded_both   = discarded_dd & discarded_profit
-        combined_survivors = [(sid, df) for sid, df in validated_oos1_regime if sid not in discarded_both]
-        if combined_survivors:
-            logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOS1 — DD + Profit combined (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
-            print_all_curves_table(combined_survivors, "Decorrelated DD + Profit — Validated only", INITIAL_BALANCE)
-            plot_portfolio_comparison(
-                strategy_trades_baseline=combined_survivors,
-                strategy_trades_regime01=combined_survivors,
-                data_folder=DATA_FOLDER_OOS1,
-                initial_balance=INITIAL_BALANCE,
-                title="Portfolio — Decorrelated Validated (DD + Profit filter)",
-            )
-
 # =============================================================================
 # MAIN
 # =============================================================================

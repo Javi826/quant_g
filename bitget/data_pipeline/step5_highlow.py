@@ -145,8 +145,12 @@ def run(config: dict) -> bool:
     if tf_pairs and not isinstance(tf_pairs[0], list):
         tf_pairs = [tf_pairs]
 
-    files = [f for f in os.listdir(input_dir) if f.endswith(".parquet")] \
-        if os.path.exists(input_dir) else []
+    selected_symbols = config.get("selected_symbols") or []
+    files = [
+        f for f in os.listdir(input_dir)
+        if f.endswith(".parquet")
+        and (not selected_symbols or any(f.startswith(s) for s in selected_symbols))
+    ] if os.path.exists(input_dir) else []
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")

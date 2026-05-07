@@ -3115,8 +3115,8 @@ function renderBinomialDriftTable(data, windowSize) {
                     <th>Strategy</th>
                     <th>Status</th>
                     <th>Trades</th>
-                    <th>WR 50</th>
-                    <th>WR 50L15</th>
+                    <th>WR th</th>
+                    <th>WR thL_th</th>
                     <th>P Target</th>
                     <th>Warning Limit</th>
                     <th>Danger Limit</th>
@@ -3268,9 +3268,9 @@ function renderDriftTable(data) {
             '<th>Status</th>' +
             '<th>P5_Ref</th>' +
             '<th>P50_Ref</th>' +
-            '<th>WinRate_100</th>' +
-            '<th>WinRate_100_L30</th>' +
-            '<th>Avg_Profit_100</th>' +
+            '<th>WinRate_th</th>' +
+            '<th>WinRate_th_Lth</th>' +
+            '<th>Avg_Profit_th0</th>' +
             '<th>Counter</th>' +
             '<th>Total Trades</th>' +
             '</tr></thead><tbody>';

@@ -8,12 +8,14 @@ import logging
 import os
 import sys
 import time
-
+import requests
 import pandas as pd
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "broker_api")))
-from api_client import _call_history_candles, get_futures_symbols_from_api
 
+from shared_config import BASE_URL, PRODUCT_TYPE, API_TIMEOUT
+from api_client import _call_history_candles, get_futures_symbols_from_api
 logger = logging.getLogger("pipeline.step0")
 
 # =============================================================================
@@ -46,7 +48,17 @@ def _fetch_avg_volume(symbol: str) -> float | None:
         logger.debug(f"  ⚠ [{symbol}] Error fetching volume: {e}")
         return None
 
-
+def _get_rwa_symbols() -> set[str]:
+    """Returns set of RWA symbols from /contracts endpoint."""
+    url = f"{BASE_URL}/api/v2/mix/market/contracts"
+    try:
+        r    = requests.get(url, params={"productType": PRODUCT_TYPE}, timeout=API_TIMEOUT)
+        data = r.json().get("data") or []
+        return {item["symbol"] for item in data if item.get("isRwa") == "YES"}
+    except Exception as e:
+        logger.warning(f"⚠ Could not fetch RWA symbols: {e}")
+        return set()
+    
 def select_symbols(config: dict) -> list[str]:
     """
     Returns sorted list of selected symbols based on SYMBOL_MODE.
@@ -65,8 +77,16 @@ def select_symbols(config: dict) -> list[str]:
 
     # AUTO mode
     logger.info(f"🔎 Symbol mode: AUTO — fetching top {n_symbols} symbols by avg volume [{TIMEFRAME_SYMBOL_SEL}]")
+    
+    all_symbols  = get_futures_symbols_from_api()
+    rwa_mode     = config.get("rwa_mode", "crypto_only")
+    rwa_symbols  = _get_rwa_symbols()
+    if rwa_mode == "crypto_only":
+        all_symbols = [s for s in all_symbols if s not in rwa_symbols]
+    elif rwa_mode == "rwa_only":
+        all_symbols = [s for s in all_symbols if s in rwa_symbols]
+    logger.info(f"  RWA filter [{rwa_mode}]: {len(all_symbols)} symbols after filter")
 
-    all_symbols = get_futures_symbols_from_api()
     if not all_symbols:
         logger.warning("⚠ No symbols retrieved from API. Falling back to SELECTED_SYMBOLS.")
         return selected_symbols

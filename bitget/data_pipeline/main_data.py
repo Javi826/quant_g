@@ -50,9 +50,10 @@ EXPORT_CSV = False
 # only used when SYMBOL_MODE = "manual"
 # only used when SYMBOL_MODE = "auto"
 # and pick top N_SYMBOLS_DOWNLOAD
-SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"] 
-SYMBOL_MODE        = "auto"               
-N_SYMBOLS_DOWNLOAD = 40                                                             
+SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"]
+SYMBOL_MODE        = "auto"
+N_SYMBOLS_DOWNLOAD = 20
+RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 
                                           
 
@@ -60,6 +61,7 @@ N_SYMBOLS_DOWNLOAD = 40
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
+#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
 START_DATE = "2021-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
@@ -69,7 +71,9 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   # list of [higher_tf, intrabar_tf] pairs
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","4H"]]  
 
 # =============================================================================
 # IS/OOS SPLIT
@@ -99,7 +103,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]   
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 2
+WINDOW_OOS_MONTHS    = 13
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     
@@ -157,6 +161,7 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
         "debug_raw_integrity_dir":       DEBUG_RAW_INTEGRITY_DIR,
         "debug_clean_integrity_dir":     DEBUG_CLEAN_INTEGRITY_DIR,
         "debug_highlow_integrity_dir":   DEBUG_HIGHLOW_INTEGRITY_DIR,
+        "rwa_mode": RWA_MODE,
     }
 
 

@@ -1,4 +1,4 @@
-#BOT_batch/batch_utils.py
+#BOT_batch/utils_batch.py
 import logging
 import importlib.util
 import os
@@ -1333,41 +1333,12 @@ def _decorrelate(
 
     return [(sid, oos1_map[sid]) for sid in sorted(selected, key=_num) if sid in oos1_map]
 
-
-def _dd_series(df: pd.DataFrame, capital: float) -> pd.Series:
-    tl          = df.copy()
-    tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
-    daily       = tl.groupby("_date")["profit"].sum().groupby(level=0).sum()
-    date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-    daily       = daily.reindex(date_range).ffill().fillna(0.0)
-    equity      = capital + daily.cumsum()
-    peak        = equity.cummax()
-    return (equity - peak) / peak * 100
-
-
 def _profit_series(df: pd.DataFrame, capital: float) -> pd.Series:
     tl          = df.copy()
     tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
     daily       = tl.groupby("_date")["profit"].sum().groupby(level=0).sum()
     date_range  = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
     return daily.reindex(date_range).fillna(0.0)
-
-
-def decorrelate_by_dd(
-    strategy_trades_oos1: list,
-    strategy_trades_oos2: list,
-    initial_balance: float,
-    threshold: float = 0.7,
-    precomputed_metrics: dict = None,
-    strategy_trades_oos3: list = None,
-) -> list:
-    """Greedy DD-correlation filter. Keeps best NetGain from each correlated pair."""
-    return _decorrelate(
-        strategy_trades_oos1, strategy_trades_oos2, initial_balance,
-        threshold, precomputed_metrics, strategy_trades_oos3,
-        series_fn=_dd_series, label="DD",
-    )
-
 
 def decorrelate_by_profit(
     strategy_trades_oos1: list,
@@ -1488,3 +1459,132 @@ def print_robustness_table(
         f"{'─'*115}",
     ]
     logger.info("\n".join(lines))
+    
+def find_complementary_portfolio(
+    main_portfolio_ids: list,
+    all_strategy_trades_oos1: list,
+    all_strategy_trades_oos2: list,
+    all_strategy_trades_oos3: list,
+    initial_balance: float,
+    max_correlation: float = 0.5,
+    top_n: int = 5,
+) -> list:
+    """
+    Find complementary portfolio with low correlation to main portfolio.
+    """
+    
+    def _equity_series(strategy_trades, capital):
+        """Convert trades to daily equity series."""
+        all_tl = pd.concat([df for _, df in strategy_trades], ignore_index=True) \
+                 if isinstance(strategy_trades, list) else strategy_trades
+        all_tl = all_tl.sort_values("sell_time").reset_index(drop=True)
+        all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
+        daily = all_tl.groupby("_date")["profit"].sum()
+        date_range = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
+        daily = daily.reindex(date_range, fill_value=0.0)
+        equity = capital + daily.cumsum()
+        return pd.Series(equity.values, index=date_range)
+    
+    # Combine all periods
+    oos1_map = {sid: df for sid, df in all_strategy_trades_oos1}
+    oos2_map = {sid: df for sid, df in all_strategy_trades_oos2}
+    oos3_map = {sid: df for sid, df in all_strategy_trades_oos3}
+    
+    all_sids = list(oos1_map.keys())
+    
+    # Calculate main portfolio equity across all periods
+    main_trades_combined = []
+    for sid in main_portfolio_ids:
+        parts = []
+        if sid in oos1_map:
+            parts.append((sid, oos1_map[sid]))
+        if sid in oos2_map:
+            parts.append((sid, oos2_map[sid]))
+        if sid in oos3_map:
+            parts.append((sid, oos3_map[sid]))
+        if parts:
+            combined_df = pd.concat([df for _, df in parts], ignore_index=True)
+            main_trades_combined.append((sid, combined_df))
+    
+    if not main_trades_combined:
+        logger.warning("Main portfolio is empty")
+        return []
+    
+    main_capital = initial_balance * len(main_trades_combined)
+    main_equity = _equity_series(main_trades_combined, main_capital)
+    
+    # Analyze all strategies
+    candidates = []
+    for sid in all_sids:
+        if sid in main_portfolio_ids:
+            continue
+        
+        # Combine trades from all periods
+        parts = []
+        if sid in oos1_map:
+            parts.append((sid, oos1_map[sid]))
+        if sid in oos2_map:
+            parts.append((sid, oos2_map[sid]))
+        if sid in oos3_map:
+            parts.append((sid, oos3_map[sid]))
+        
+        if not parts:
+            continue
+        
+        combined_df = pd.concat([df for _, df in parts], ignore_index=True)
+        strategy_equity = _equity_series([(sid, combined_df)], initial_balance)
+        
+        # Align time series
+        common_dates = main_equity.index.intersection(strategy_equity.index)
+        if len(common_dates) < 10:
+            continue
+        
+        main_aligned = main_equity.loc[common_dates]
+        strategy_aligned = strategy_equity.loc[common_dates]
+        
+        # Calculate correlation
+        corr = np.corrcoef(main_aligned.values, strategy_aligned.values)[0, 1]
+        
+        # Calculate metrics (using OOS1 only for display)
+        metrics = compute_metrics(oos1_map[sid], capital=initial_balance, name=sid)
+        
+        # Anti-correlation score
+        anti_corr = 1 - abs(corr)
+        risk_adj_return = metrics["Net_Gain_pct"] / abs(metrics["Max_DD_pct"]) if metrics["Max_DD_pct"] != 0 else 0
+        score = anti_corr * risk_adj_return
+        
+        candidates.append({
+            "strategy_id": sid,
+            "trades_df": oos1_map[sid],
+            "correlation": round(corr, 2),
+            "anti_corr_score": round(score, 2),
+            "netgain_pct": metrics["Net_Gain_pct"],
+            "maxdd_pct": metrics["Max_DD_pct"],
+            "metrics": metrics,
+        })
+    
+    # Filter and sort
+    filtered = [c for c in candidates if abs(c["correlation"]) < max_correlation]
+    sorted_candidates = sorted(filtered, key=lambda x: x["anti_corr_score"], reverse=True)
+    
+    # Print results
+    logger.info(f"\n{'─'*115}")
+    logger.info(f"  COMPLEMENTARY PORTFOLIO ANALYSIS (vs Main Portfolio)")
+    logger.info(f"{'─'*115}")
+    logger.info(f"  Main Portfolio: {main_portfolio_ids}")
+    logger.info(f"  Correlation threshold: {max_correlation}")
+    logger.info(f"\n  {'Strategy':<30} {'Corr':>6} {'Score':>7} {'NetGain%':>10} {'MaxDD%':>9}")
+    logger.info(f"  {'-'*80}")
+    
+    for c in sorted_candidates[:top_n * 2]:
+        logger.info(
+            f"  {c['strategy_id']:<30} {c['correlation']:>6.2f} {c['anti_corr_score']:>7.2f} "
+            f"{c['netgain_pct']:>9.1f}% {c['maxdd_pct']:>8.2f}%"
+        )
+    
+    logger.info(f"  {'-'*80}\n")
+    
+    # Return top N
+    top_strategies = [(c["strategy_id"], c["trades_df"]) for c in sorted_candidates[:top_n]]
+    
+    return top_strategies
