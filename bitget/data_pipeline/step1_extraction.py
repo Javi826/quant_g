@@ -27,8 +27,21 @@ logger = logging.getLogger("pipeline.step1")
 # =============================================================================
 LIMIT                  = 200
 SLEEP_BETWEEN_REQUESTS = 0.06
-MS_90_DAYS             = 90 * 24 * 60 * 60 * 1000
-
+# =============================================================================
+# API_WINDOW_LIMITS_MS = {
+#     "1m":    90  * 24 * 60 * 60 * 1000,
+#     "3m":    90  * 24 * 60 * 60 * 1000,
+#     "5m":    90  * 24 * 60 * 60 * 1000,
+#     "15m":   90  * 24 * 60 * 60 * 1000,
+#     "30m":   90  * 24 * 60 * 60 * 1000,
+#     "1H":    90  * 24 * 60 * 60 * 1000,
+#     "4H":    90  * 24 * 60 * 60 * 1000,
+#     "6Hutc": 90  * 24 * 60 * 60 * 1000,
+#     "1Dutc": 90  * 24 * 60 * 60 * 1000,
+# }
+# =============================================================================
+API_WINDOW_LIMITS_MS = {}
+DEFAULT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000
 # =============================================================================
 # UTILITIES
 # =============================================================================
@@ -86,27 +99,35 @@ def validate_append_border(df_old: pd.DataFrame, df_new: pd.DataFrame, gran_ms: 
 # DOWNLOAD
 # =============================================================================
 
-def find_earliest_available_timestamp(symbol: str, gran_ms: int, timeframe: str, max_iters: int = 500) -> int | None:
+def find_earliest_available_timestamp(
+    symbol: str,
+    gran_ms: int,
+    timeframe: str,
+    max_iters: int = 5000,
+) -> int | None:
+    window_ms      = API_WINDOW_LIMITS_MS.get(timeframe, DEFAULT_WINDOW_MS)
     end            = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
     earliest_found = None
-    prev_end       = None
+
     for _ in range(max_iters):
-        data = _call_history_candles(symbol, timeframe, limit=LIMIT, endTime=end)
+        start_bound = end - window_ms
+        data        = _call_history_candles(symbol, timeframe, limit=LIMIT,
+                                            startTime=start_bound, endTime=end)
         time.sleep(SLEEP_BETWEEN_REQUESTS)
+
         if not data:
-            return earliest_found
-        timestamps = [int(item[0]) for item in data if item]
-        if not timestamps:
-            return earliest_found
-        min_ts  = min(timestamps)
-        new_end = min_ts - gran_ms
-        if prev_end is not None and new_end == prev_end:
-            return earliest_found or min_ts
-        prev_end       = end
+            break
+
+        timestamps     = [int(r[0]) for r in data if r]
+        min_ts         = min(timestamps)
         earliest_found = min(earliest_found, min_ts) if earliest_found else min_ts
-        if new_end < 0 or new_end >= end:
-            return earliest_found
+        new_end        = min_ts - gran_ms
+
+        if new_end >= end or new_end < 0:
+            break
+
         end = new_end
+
     return earliest_found
 
 
@@ -116,12 +137,12 @@ def download_candles_from_start(
     gran_ms: int,
     timeframe: str,
     end_ms: int | None = None,
-    max_iters: int = 2000,
+    max_iters: int = 5000,
 ) -> pd.DataFrame:
     all_rows      = []
     now_ms        = end_ms or int(datetime.now(tz=timezone.utc).timestamp() * 1000)
     current_start = int(start_ms)
-    window_ms     = min(gran_ms * LIMIT, MS_90_DAYS)
+    window_ms = min(gran_ms * LIMIT, API_WINDOW_LIMITS_MS.get(timeframe, DEFAULT_WINDOW_MS))
     no_progress   = 0
     prev_start    = None
 

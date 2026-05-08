@@ -1,4 +1,4 @@
-# step3_cleaning.py
+# data_pipeline/step3_cleaning.py
 # =============================================================================
 # Step 3 — Cleaning — fixes data quality issues in raw OHLCV files.
 # OHLC zero/NaN → drop row | Volume zero/NaN → ffill

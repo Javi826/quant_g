@@ -52,16 +52,16 @@ EXPORT_CSV = False
 # and pick top N_SYMBOLS_DOWNLOAD
 SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"]
 SYMBOL_MODE        = "auto"
-N_SYMBOLS_DOWNLOAD = 20
-RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
+N_SYMBOLS_DOWNLOAD = 80
+RWA_MODE           = "rwa_only"   # "crypto_only" | "rwa_only"                                                            
 
                                           
 
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
+#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
 START_DATE = "2021-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
@@ -71,8 +71,8 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
-#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
 #TIMEFRAMES_HIGHLOW = [["1Dutc","4H"]]  
 
 # =============================================================================
@@ -103,7 +103,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 13
+WINDOW_OOS_MONTHS    = 0
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     
@@ -192,33 +192,29 @@ def _run_pipeline() -> None:
         logger.info(f"  TIMEFRAME: {tf}")
         logger.info(f"{'#'*60}")
         config = _build_config(timeframe=tf, selected_symbols=selected_symbols)
-
         ok = _run_step(f"STEP 1 — Extraction [{tf}]", step1_extraction.run, config)
         if not ok:
             logger.info(f"❌ Extraction failed for {tf}. Skipping to next timeframe.")
             continue
-
         _run_step(f"STEP 2 — Raw Integrity [{tf}]", integrity.run_raw, config)
-
         ok = _run_step(f"STEP 3 — Cleaning [{tf}]", step3_cleaning.run, config)
         if not ok:
             logger.info(f"❌ Cleaning failed for {tf}. Skipping to next timeframe.")
             continue
-
         ok = _run_step(f"STEP 4 — Clean Integrity [{tf}]", integrity.run_clean, config)
         if not ok:
             logger.info(f"❌ Clean integrity failed for {tf}. Skipping to next timeframe.")
 
+    # Coverage check — runs once after all timeframes are downloaded
+    _run_step("STEP 2b — Coverage Integrity", integrity.run_coverage, _build_config(selected_symbols=selected_symbols))
+
     # Steps 5-7 — High/Low + integrity + IS/OOS split
     config = _build_config(selected_symbols=selected_symbols)
-
     ok = _run_step("STEP 5 — High/Low Timestamps", step5_highlow.run, config)
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 5.")
         return
-
     _run_step("STEP 6 — High/Low Integrity", integrity.run_highlow, config)
-
     ok = _run_step("STEP 7 — IS/OOS Split", step7_split.run, config)
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 7.")

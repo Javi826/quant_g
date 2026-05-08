@@ -1,4 +1,4 @@
-# integrity.py
+# data_pipeline/integrity.py
 # =============================================================================
 # Data Integrity — validates OHLCV data at different pipeline stages.
 #
@@ -170,6 +170,20 @@ def run_raw(config: dict) -> bool:
             logger.warning(f"  ❌ Could not read {os.path.basename(filepath)}: {e}")
             continue
         total += _check_ohlcv(df, _symbol_from_path(filepath), critical=False)
+        
+        # Gap detection
+        if "timestamp" in df.columns:
+            tf = os.path.splitext(os.path.basename(filepath))[0].rsplit("_", 1)[-1]
+            gran_ms = _parse_timeframe_to_ms(tf)
+            ts_ms   = pd.to_datetime(df["timestamp"]).astype("int64") // 10**6
+            diffs   = ts_ms.diff().dropna()
+            gaps    = diffs[diffs > gran_ms * 1.5]
+            for idx, gap_ms in gaps.items():
+                gap_start = pd.to_datetime(df["timestamp"].iloc[idx - 1])
+                gap_end   = pd.to_datetime(df["timestamp"].iloc[idx])
+                gap_days  = gap_ms / (1000 * 86400)
+                total    += 1
+                logger.info(f"  ⚠ [{_symbol_from_path(filepath)}] GAP: {gap_start} → {gap_end} ({gap_days:.1f} days)")
 
     if total == 0:
         logger.info("✅ Raw integrity check passed — no issues found")
@@ -211,8 +225,6 @@ def run_clean(config: dict) -> bool:
 def run_highlow(config: dict) -> bool:
     """Validates high_time/low_time are within bar interval — diagnostic only, never aborts."""
     input_dir: str = config["highlow_dir"]
-    tf_high: str   = config["timeframes_highlow"][0]
-    gran_ms: int   = _parse_timeframe_to_ms(tf_high)
     files          = _list_parquet_files(input_dir)
 
     if not files:
@@ -222,6 +234,8 @@ def run_highlow(config: dict) -> bool:
     logger.info(f"🔍 High/Low integrity check — {len(files)} file(s)")
     total = 0
     for filepath in files:
+        tf      = os.path.splitext(os.path.basename(filepath))[0].rsplit("_", 1)[-1]
+        gran_ms = _parse_timeframe_to_ms(tf)
         try:
             df = pd.read_parquet(filepath)
         except Exception as e:
@@ -233,6 +247,68 @@ def run_highlow(config: dict) -> bool:
         logger.info("✅ High/Low integrity check passed — no violations found")
     else:
         logger.info(f"⚠ High/Low integrity check found {total} violation(s)")
+
+    return True
+
+def run_coverage(config: dict, tolerance_days: int = 30) -> bool:
+    """
+    Validates that all timeframes for each symbol start at roughly the same date.
+    Uses 1Dutc as reference. Alerts if any timeframe starts more than tolerance_days later.
+    Diagnostic only — never aborts pipeline.
+    """
+    input_dir: str = config["raw_dir"]
+    files          = _list_parquet_files(input_dir)
+
+    if not files:
+        logger.warning(f"⚠ No parquet files found in {input_dir}")
+        return True
+
+    # Group files by symbol
+    symbol_files: dict[str, dict[str, str]] = {}
+    for filepath in files:
+        symbol   = _symbol_from_path(filepath)
+        filename = os.path.basename(filepath)
+        tf       = os.path.splitext(filename)[0].replace(f"{symbol}_", "", 1)
+        symbol_files.setdefault(symbol, {})[tf] = filepath
+
+    logger.info(f"🔍 Coverage integrity check — {len(symbol_files)} symbol(s)")
+
+    issues = 0
+    for symbol, tf_files in sorted(symbol_files.items()):
+        ref_path = tf_files.get("1Dutc")
+        if not ref_path:
+            logger.debug(f"  ⚠ [{symbol}] No 1Dutc reference — skipping coverage check")
+            continue
+
+        try:
+            df_ref   = pd.read_parquet(ref_path)
+            ref_min  = pd.to_datetime(df_ref["timestamp"]).min()
+        except Exception as e:
+            logger.warning(f"  ⚠ [{symbol}] Could not read 1Dutc reference: {e}")
+            continue
+
+        for tf, filepath in sorted(tf_files.items()):
+            if tf == "1Dutc":
+                continue
+            try:
+                df      = pd.read_parquet(filepath)
+                tf_min  = pd.to_datetime(df["timestamp"]).min()
+                diff_days = (tf_min - ref_min).days
+                if diff_days > tolerance_days:
+                    issues += 1
+                    logger.info(
+                        f"  ⚠ [{symbol}] {tf} starts {diff_days}d after 1Dutc "
+                        f"({tf_min.date()} vs {ref_min.date()})"
+                    )
+                else:
+                    logger.debug(f"  ✅ [{symbol}] {tf} coverage OK (diff: {diff_days}d)")
+            except Exception as e:
+                logger.warning(f"  ⚠ [{symbol}] Could not read {tf}: {e}")
+
+    if issues == 0:
+        logger.info("✅ Coverage integrity check passed — all timeframes aligned")
+    else:
+        logger.info(f"⚠ Coverage integrity check found {issues} misaligned timeframe(s)")
 
     return True
 

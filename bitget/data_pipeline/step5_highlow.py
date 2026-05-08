@@ -1,4 +1,4 @@
-# step5_highlow.py
+# data_pipeline/step5_highlow.py
 # =============================================================================
 # Step 5 — High/Low Timestamps — finds exact intrabar timestamp of high and low
 # for each bar of the higher timeframe using a lower timeframe as reference.
@@ -65,7 +65,7 @@ def _find_timestamp_extremum(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol
     for i in tqdm(range(len(df) - 1), desc=f"{symbol}", leave=False):
         start    = df.index[i]
         end      = df.index[i + 1]
-        intrabar = df_low.loc[start:end].iloc[:-1]
+        intrabar = df_low[(df_low.index >= start) & (df_low.index < end)]
         if intrabar.empty:
             continue
         try:
