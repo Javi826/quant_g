@@ -532,8 +532,8 @@ def run_portfolio_analysis():
         if _strategy_trades_oos1_regime:
             print_all_curves_table(_strategy_trades_oos1_regime, "Regime 0+1", INITIAL_BALANCE)
 
-    validated_ids      = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
-    validated_baseline = [(sid, df) for sid, df in _strategy_trades_oos1_baseline if sid in validated_ids]
+    validated_ids         = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
+    validated_baseline    = [(sid, df) for sid, df in _strategy_trades_oos1_baseline if sid in validated_ids]
     validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
 
     if validated_baseline:
@@ -622,9 +622,9 @@ def run_portfolio_analysis():
         strategy_trades_oos1     = validated_oos1_regime,
         strategy_trades_oos2     = validated_oos2_regime,
         strategy_trades_oos3     = validated_oos3_regime,
-        initial_balance     = INITIAL_BALANCE,
-        threshold           = CORRELATION_DD_THRESHOLD,
-        precomputed_metrics = r01_metrics,
+        initial_balance          = INITIAL_BALANCE,
+        threshold                = CORRELATION_DD_THRESHOLD,
+        precomputed_metrics      = r01_metrics,
     )
     if survivors_profit:
         print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
