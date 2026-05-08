@@ -1,15 +1,10 @@
-import os
-from tqdm.auto import tqdm
+#shared/torque.py
 import pandas as pd
 import numpy as np
 from shared_config import VOLUME_COL
 
 import logging
 logger = logging.getLogger("shared.utils.torque")
-
-def tf_to_pandas_freq(tf):
-    tf = tf.lower().replace("utc", "")
-    return tf.upper()
 
 def get_n_obs(timeframe: str) -> int:
     mapping = {
@@ -145,98 +140,6 @@ def _calculate_duration_optimized(trade_log):
     
     except Exception:
         return np.nan
-
-def save_all_trades_to_csv(grid_results_list, param_names, filename, strategy_name=None, save=True, output_folder=None):
-    if not save:
-        return
-    if output_folder is None:
-        raise ValueError("output_folder is required")
-    os.makedirs(output_folder, exist_ok=True)
-    folder = output_folder
-    
-    base_filename = os.path.basename(filename)
-    final_path    = os.path.join(folder, base_filename)
-
-    all_trades_records = []
-    
-    for comb, results in grid_results_list:
-        port = results.get("__PORTFOLIO__", None)
-        if port is None:
-            continue
-        
-        trade_log = port.get('trade_log', None)
-        if trade_log is None or (isinstance(trade_log, pd.DataFrame) and trade_log.empty):
-            continue
-        
-        if isinstance(trade_log, pd.DataFrame):
-            tl_df = trade_log.copy()
-        elif isinstance(trade_log, dict):
-            tl_df = pd.DataFrame(trade_log)
-        else:
-            continue
-        
-        for param_name, param_value in zip(param_names, comb):
-            tl_df[param_name] = param_value
-        
-        if strategy_name is not None:
-            tl_df['strategy'] = strategy_name
-                
-        all_trades_records.append(tl_df)
-    
-    if all_trades_records:
-        all_trades_df = pd.concat(all_trades_records, ignore_index=True)
-        param_cols    = param_names
-        trade_cols    = [col for col in all_trades_df.columns if col not in param_names]
-        all_trades_df = all_trades_df[param_cols + trade_cols]
-        all_trades_df.to_csv(final_path, index=False)
-        logger.debug(f"✅ Saved {len(all_trades_df):,} trades en: {final_path}")
-    else:
-        print("⚠️ No trades to be saved")
-
-
-def save_equity_to_csv(grid_results_list, folder, initial_capital, strategy_name, save_file=False, output_folder=None):
-    
-    if not save_file:
-        return
-
-    if output_folder is not None:
-        folder = output_folder
-    
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    all_dfs = []
-
-    for comb, res in grid_results_list:
-        for name, r in res.items():
-            equity_hist = r['sim_balance_history']
-            if equity_hist is None or len(equity_hist['timestamp']) == 0:
-                continue
-            df_eq = pd.DataFrame(equity_hist)
-            df_eq['net_gain_pct'] = (df_eq['balance'] - initial_capital) / initial_capital * 100
-            df_eq['strategy']     = strategy_name
-            df_eq['params']       = str(comb)
-            all_dfs.append(df_eq)
-
-    if all_dfs:
-        final_df  = pd.concat(all_dfs, ignore_index=True)
-        file_name = f"equity_{strategy_name}.csv"
-        save_path = os.path.join(folder, file_name)
-        final_df.to_csv(save_path, index=False)
-        print(f"📂 .csv saved at {save_path}")
-    else:
-        print("⚠️ No equity data to save")
-
-        
-def save_results(grid_results, grid_results_df, filename="grid_backtest.xlsx",save=False):
-    
-    if save:
-        folder = os.path.dirname(filename)
-        if folder and not os.path.exists(folder):
-            os.makedirs(folder, exist_ok=True)
-
-        grid_results_df.to_excel(filename, index=False)
-        print(f"📂 File saved successfully as: {filename}")
 
 def compile_MC_results(result, param_dict, path_idx, initial_balance, dtype=np.float64):
 

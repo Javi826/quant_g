@@ -12,10 +12,10 @@ from tqdm_joblib import tqdm_joblib
 
 from joblib import Parallel, delayed
 from shared.backtesters.ZX_compute_BT import run_grid_backtest, MIN_PRICE, INITIAL_BALANCE
-from shared.utils.torque import prepare_ohlcv_arrays, compile_grid_results, save_all_trades_to_csv, save_results,save_equity_to_excel
+from shared.utils.torque import prepare_ohlcv_arrays, compile_grid_results
 from shared.utils.analysis import report_backtesting
 
-from shared.utils.utils import filter_symbols, save_filtered_symbols, final_prints
+from shared.utils.utils import filter_symbols,final_prints
 from signals.add_signals_reversal import reversal_long
 from signals.add_signals_reversal import reversal_short
 import logging
@@ -120,9 +120,6 @@ grid_results_df = pd.DataFrame(grid_records)
 # -----------------------------------------------------------------------------
 # SAVE RESULTS + EXECUTION TIME
 # -----------------------------------------------------------------------------
-save_results(grid_results_df.to_dict('records'), grid_results_df, f"grid_backtest_{DATA_FOLDER}_{TIMEFRAME_MINOR}.xlsx", save=False)
-save_all_trades_to_csv(grid_results_list, param_names, f"all_trades_{STRATEGY}.xlsx", strategy_name=STRATEGY, save=False)
-save_equity_to_excel(grid_results_list,"../brief_equities", INITIAL_BALANCE,STRATEGY,save_file=False)
 
 final_prints(f" 🥇 Grid_{STRATEGY} 🥇", DATA_FOLDER, f"{TIMEFRAME_MINOR}", MIN_VOL_USDT, ORDER_AMOUNT, param_names, lists_for_grid)
 

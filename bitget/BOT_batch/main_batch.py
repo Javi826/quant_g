@@ -31,16 +31,13 @@ from backtesters.ZX_compute_BT import  MIN_PRICE, INITIAL_BALANCE
 from pipeline.backtest import run_backtest_is
 from pipeline.oos_period import run_oos_period
 from registry.signal_registry import SIGNAL_REGISTRY
-
 from pipeline.universe import select_universe
 from pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
-from utils.metrics import compute_metrics, print_portfolio_metrics_table
+from utils.metrics import compute_metrics, print_portfolio_metrics_table,find_best_r2_combination_ids, print_strategies_summary
 from utils.metrics import print_all_curves_table, print_robustness_table, print_best_r2_robustness_table
-from utils.metrics import find_best_r2_combination_ids, print_strategies_summary
 from utils.plotting import plot_portfolio_comparison
 from utils.io import save_drift_reference, save_strategies_pr
-from utils.io import compare_and_generate_csv, update_strategies_symbols
-from utils.io import print_update_status
+from utils.io import compare_and_generate_csv, update_strategies_symbols,print_update_status
 from utils.regime_utils import prepare_regime_metrics_cache_is
 from utils.portfolio import decorrelate_by_profit
 
@@ -78,20 +75,22 @@ N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 55
-OOS_MAX_DD_TH        = 6
-OOS_R2_TH            = 0.88  
+OOS_NETGAIN_TH       = 30
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.82  
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 28
-OOS_MAX_DD_TH        = 8
-OOS_R2_TH            = 0.82  
+# =============================================================================
+# OOS_NETGAIN_TH       = 28
+# OOS_MAX_DD_TH        = 8
+# OOS_R2_TH            = 0.82  
+# =============================================================================
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = True
+RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
 UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
@@ -101,27 +100,25 @@ SAVE_TRADES              = False
 SELECTED_STRATEGIES = [
     "18_flag_long_1H",
     "19_flag_short_4H",
-# =============================================================================
-#     "10_parity_long_1H",
-#     "20_flag_short_1H",
-#     # ------------------------------------------------------------------------
-#     "07_reversal_short_1H",
-#     "11_parity_short_1H",
-#     "27_orderblocks_short_1H",
-#     # ------------------------------------------------------------------------
-#     "17_flag_long_4H",
-#     # ------------------------------------------------------------------------
-#     "06_reversal_long_1H",
-#     "28_orderblocks_long_1H",
-#     "04_reversal_short_4H",
-#     "02_reversal_long_4H",
-#     "03_parity_long_4H",
-#     "04_reversal_short_4H",
-#     "13_orderblocks_short_4H",
-#     "14_orderblocks_long_4H",
-#     "21_parity_short_4H",
-#     "26_orderblocks_long_4H",
-# =============================================================================
+    "10_parity_long_1H",
+    "20_flag_short_1H",
+    # ------------------------------------------------------------------------
+    "07_reversal_short_1H",
+    "11_parity_short_1H",
+    "27_orderblocks_short_1H",
+    # ------------------------------------------------------------------------
+    "17_flag_long_4H",
+    # ------------------------------------------------------------------------
+    "06_reversal_long_1H",
+    "28_orderblocks_long_1H",
+    "04_reversal_short_4H",
+    "02_reversal_long_4H",
+    "03_parity_long_4H",
+    "04_reversal_short_4H",
+    "13_orderblocks_short_4H",
+    "14_orderblocks_long_4H",
+    "21_parity_short_4H",
+    "26_orderblocks_long_4H",
 # =============================================================================
 #     "08_reversal_long_6Hutc",
 #     "09_reversal_short_6Hutc",
@@ -162,7 +159,7 @@ OOS3_FOR_VALIDATION = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
-OOS23_MATCH_SYMBOLS = False  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
+OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
 
 # Correlation analysis
 #------------------------------------------------------------------------------
@@ -184,9 +181,9 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 # DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")

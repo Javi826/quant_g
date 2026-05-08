@@ -22,13 +22,13 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     removed_symbols    = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
     
-    # ---- Inclusion ----
+    #Inclusion
     if my_symbols:
         inclusion_list = custom_symbols if custom_symbols is not None else symbols_to_include
         symbols = [s for s in symbols if s in inclusion_list]
-    
+        
+    #Exclusion
     for sym in symbols:
-        #Exclusion
         if sym in symbols_to_exclude:
             removed_symbols.append(sym)
             continue
@@ -68,24 +68,26 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                     reasons.append("Avg volume too low")
                     
             if df is not None:
-                n_rows = len(df)
-                if timeframe == "1H":
-                    min_bars = 4600
-                elif timeframe == "30m":
-                    min_bars = 16000
-                elif timeframe == "4H":
-                    min_bars = 1800
+                n_rows = len(df)            
+                if timeframe == "1Dutc":
+                    min_bars = 300
+                elif timeframe == "12Hutc":
+                    min_bars = 600
                 elif timeframe == "6Hutc":
                     min_bars = 1200
-                elif timeframe == "12Hutc":
-                    min_bars = 700
-                elif timeframe == "1Dutc":
-                    min_bars = 300
+                elif timeframe == "4H":
+                    min_bars = 1800
+                elif timeframe == "1H":
+                    min_bars = 7200
+                elif timeframe == "30m":
+                    min_bars = 14400                    
+                elif timeframe == "15m":
+                    min_bars = 28800
                 else:
-                    min_bars = 999999999
-                    
+                    min_bars = 999999999                 
                 if n_rows < min_bars:
                     reasons.append("Not enough bars")
+                    
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:
@@ -100,52 +102,10 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     
     return ohlcv_data, filtered_symbols
 
-        
-def final_prints(strategy, data_folder, timeframe, min_vol_usdt, order_amount, param_names, lists_for_grid):
-
-    def format_number(n):
-        if isinstance(n, (int, float)):
-            # Usa formato con separador de miles y cambia coma por punto
-            return f"{n:,}".replace(",", ".")
-        return str(n)
-
-    print(f'\n== {strategy} ==\n')
-
-    # Diccionario con todas las claves y valores a imprimir
-    info = {
-        "DATA_FOLDER": data_folder,
-        "TIMEFRAME": timeframe,
-        "ORDER_AMOUNT": format_number(order_amount),
-        "MIN_VOL_USDT": format_number(min_vol_usdt),
-    }
-
-    # Añadimos los parámetros dinámicos
-    for name, values_list in zip(param_names, lists_for_grid):
-        info[f"{name}_LIST"] = str(values_list)
-
-    # Calcular la longitud máxima de todas las claves
-    max_key_len = max(len(k) for k in info.keys())
-
-    # Imprimir todo alineado según la longitud máxima
-    for key, value in info.items():
-        print(f"{key:<{max_key_len}} : {value}")
-
-    print()
-
-
 def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: int = 0, mod: int = 100000) -> int:
 
     s = str(getattr(symbol, "name", symbol))
     h = hashlib.md5(s.encode("utf-8")).hexdigest()[:8]
     
     return int(base_seed) + (int(h, 16) % mod) + int(path_idx)
-
-
-def save_filtered_symbols(filtered_symbols, strategy="_", timeframe="10H", save_symbols=False, folder="live_trading/symbols_live"):
-    if save_symbols:
-        os.makedirs(folder, exist_ok=True)  
-        df_symbols   = pd.DataFrame({"Filtered_symbols": filtered_symbols})
-        path_symbols = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.csv")
-        df_symbols.to_csv(path_symbols, index=False, header=False)  # Sin index, sin header
-        print(f"📂 {len(filtered_symbols)} symbols saved in '{path_symbols}'")
 

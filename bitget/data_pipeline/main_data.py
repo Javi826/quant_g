@@ -52,16 +52,16 @@ EXPORT_CSV = False
 # and pick top N_SYMBOLS_DOWNLOAD
 SELECTED_SYMBOLS   = ["BTCUSDT", "ETHUSDT"]
 SYMBOL_MODE        = "auto"
-N_SYMBOLS_DOWNLOAD = 80
-RWA_MODE           = "rwa_only"   # "crypto_only" | "rwa_only"                                                            
+N_SYMBOLS_DOWNLOAD = 40
+RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 
                                           
 
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
+#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
 START_DATE = "2021-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
@@ -71,8 +71,8 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
 #TIMEFRAMES_HIGHLOW = [["1Dutc","4H"]]  
 
 # =============================================================================
