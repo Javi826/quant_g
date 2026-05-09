@@ -62,7 +62,7 @@ RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
 #TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
-START_DATE = "2026-03-01"
+START_DATE = "2021-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)

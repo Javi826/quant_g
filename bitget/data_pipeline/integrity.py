@@ -34,14 +34,15 @@ def _parse_timeframe_to_ms(tf: str) -> int:
     mapping = {'m': 60, 'h': 3600, 'd': 86400, 'w': 604800, 'M': 2592000}
     return n * mapping.get(u, 86400) * 1000
 
-
-def _list_parquet_files(folder: str, timeframe: str = "") -> list[str]:
+def _list_parquet_files(folder: str, timeframe: str = "", selected_symbols: list | None = None) -> list[str]:
     if not os.path.exists(folder):
         return []
     return sorted([
         os.path.join(folder, f)
         for f in os.listdir(folder)
-        if f.endswith(".parquet") and (not timeframe or f.endswith(f"_{timeframe}.parquet"))
+        if f.endswith(".parquet")
+        and (not timeframe or f.endswith(f"_{timeframe}.parquet"))
+        and (not selected_symbols or any(f.startswith(s) for s in selected_symbols))
     ])
 
 
@@ -155,7 +156,10 @@ def run_raw(config: dict) -> bool:
     """Validates raw extracted data — diagnostic only, never aborts pipeline."""
     input_dir: str = config["raw_dir"]
     timeframe: str = config.get("timeframe", "")
-    files          = _list_parquet_files(input_dir, timeframe)
+    
+    # run_raw
+    selected_symbols = config.get("selected_symbols") or []
+    files = _list_parquet_files(input_dir, timeframe, selected_symbols)
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")
@@ -197,7 +201,8 @@ def run_clean(config: dict) -> bool:
     """Validates cleaned data — aborts pipeline if errors found."""
     input_dir: str = config["clean_dir"]
     timeframe: str = config.get("timeframe", "")
-    files          = _list_parquet_files(input_dir, timeframe)
+    selected_symbols = config.get("selected_symbols") or []
+    files = _list_parquet_files(input_dir, timeframe, selected_symbols)
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")
@@ -225,7 +230,9 @@ def run_clean(config: dict) -> bool:
 def run_highlow(config: dict) -> bool:
     """Validates high_time/low_time are within bar interval — diagnostic only, never aborts."""
     input_dir: str = config["highlow_dir"]
-    files          = _list_parquet_files(input_dir)
+    # run_highlow
+    selected_symbols = config.get("selected_symbols") or []
+    files = _list_parquet_files(input_dir, selected_symbols=selected_symbols)
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")
@@ -257,7 +264,9 @@ def run_coverage(config: dict, tolerance_days: int = 30) -> bool:
     Diagnostic only — never aborts pipeline.
     """
     input_dir: str = config["raw_dir"]
-    files          = _list_parquet_files(input_dir)
+    # run_coverage
+    selected_symbols = config.get("selected_symbols") or []
+    files = _list_parquet_files(input_dir, selected_symbols=selected_symbols)
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")

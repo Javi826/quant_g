@@ -27,7 +27,7 @@ def _weekly_returns(strategy_trades: list, capital_per_strategy: float) -> pd.Se
     daily           = daily.reindex(date_range, fill_value=0.0)
     eq              = total_capital + daily.cumsum()
     eq_series       = pd.Series(eq.values, index=date_range)
-    return eq_series.resample("W").last().pct_change().dropna() * 100
+    return eq_series.resample("W").last().diff().dropna() / total_capital * 100
 
 
 def _neg_streak_stats(weekly: pd.Series) -> tuple:
