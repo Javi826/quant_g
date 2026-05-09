@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # CONFIGURATION
 # =============================================================================
 
-TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades00")
+TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
 SPLIT_MODE    = "expanding"
 SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 

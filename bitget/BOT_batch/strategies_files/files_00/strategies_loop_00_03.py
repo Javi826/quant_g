@@ -192,7 +192,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "20_flag_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": { 
             "SELL_AFTER": [100],
