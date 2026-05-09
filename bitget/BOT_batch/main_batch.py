@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 
 import matplotlib
-SHOW_PLOTS = True
+SHOW_PLOTS = False
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -70,14 +70,14 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 30
 OOS_MAX_DD_TH        = 11
-OOS_R2_TH            = 0.82  
+OOS_R2_TH            = 0.80  
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -129,13 +129,17 @@ SELECTED_STRATEGIES = [
 # =============================================================================
 ]
 
-#MONTECARLO
+#MONTECARLOS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
 RUN_MC_OOS                = False
 N_PATHS_OOS1              = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  # None = mean | int = percentile e.g. 25, 50
+
+RUN_MC_REGIME_ROBUSTNESS  = False
+N_PERMUTATIONS_REGIME     = 1000
+REGIME_ROBUSTNESS_TH      = 0  # NetGain > 0
 
 # =============================================================================
 # VALIDATION CONFIGURATION
@@ -159,11 +163,11 @@ OOS3_FOR_VALIDATION = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
-OOS23_MATCH_SYMBOLS = True  # True = top N by volume in OOS2/3 period | False = same symbols as OOS1
+OOS23_MATCH_SYMBOLS = True  
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.70  # max allowed DD correlation between validated strategies
+CORRELATION_DD_THRESHOLD = 0.70
 
 # FILES
 #------------------------------------------------------------------------------
@@ -181,9 +185,9 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 # DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-04_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-04_2026-04_OOS")
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
@@ -316,11 +320,32 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE 3 ── MC OOS1                ── {N_PATHS_OOS1} paths — ProbNeg={prob_negative_oos1:.1f}% P5={float(p5_winrate_oos1)*100:.1f}% P50={float(p50_winrate_oos1)*100:.1f}%")
+        
+    robustness_score = 0.0   
+    if RUN_MC_REGIME_ROBUSTNESS:
+        from pipeline.montecarlo_regime import run_mc_regime_robustness
+        robustness_score, _ = run_mc_regime_robustness(
+            ohlcv_data      = ohlcv_data_oos1,
+            signal_fn       = signal_fn,
+            signal_params   = bt_signal_params,
+            best_params     = best_params,
+            order_amount    = ORDER_AMOUNT,
+            bins_to_filter  = bins_to_filter,
+            data_folder     = DATA_FOLDER_OOS1,
+            timeframe       = TIMEFRAME,
+            n_permutations  = N_PERMUTATIONS_REGIME,
+            netgain_th      = REGIME_ROBUSTNESS_TH,
+            n_jobs          = N_JOBS,
+            show_progress   = SHOW_PROGRESS,
+        )
+        logger.info(f"STAGE M ── MC Regime Robustness   ── Score={robustness_score:.1f}%")
+
+
     # -------------------------------------------------------------------------
     # BLOCK 4  — OOS1 (baseline + regime + validation)
     # -------------------------------------------------------------------------
 
-    approved, trades_df, trades_df_regime, _, _ = run_oos_period(
+    approved, trades_df_oos1_baseline, trades_df_oos1_regime, _, _ = run_oos_period(
         strategy_id            = STRATEGY_ID,
         label                  = "OOS1",
         stage_baseline         = "STAGE 4",
@@ -355,16 +380,17 @@ def run_batch(strategy_config: dict) -> None:
         "strategy_id":     STRATEGY_ID,
         "verdict":         "🟢 VALIDATED" if approved else "🔴 REJECTED",
         "round":           "—",
-        "net_gain_pct":    round(trades_df_regime["profit"].sum() / INITIAL_BALANCE * 100, 2) if len(trades_df_regime) > 0 else round(trades_df["profit"].sum() / INITIAL_BALANCE * 100, 2),
+        "net_gain_pct":    round(trades_df_oos1_regime["profit"].sum() / INITIAL_BALANCE * 100, 2) if len(trades_df_oos1_regime) > 0 else round(trades_df_oos1_baseline["profit"].sum() / INITIAL_BALANCE * 100, 2),
         "dd_pct":          0.0,
         "win_ratio":       0.0,
         "r2":              0.0,
         "prob_neg_pct":    round(prob_negative_oos1, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
+        #"mc_regime_pct": round(robustness_score, 1),
     }
     from utils.metrics import compute_metrics as _cm
-    _m = _cm(trades_df_regime if len(trades_df_regime) > 0 else trades_df, capital=INITIAL_BALANCE, name="")
+    _m = _cm(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
     _val_record.update({
         "net_gain_pct": round(_m["Net_Gain_pct"], 2),
         "dd_pct":       round(_m["Max_DD_pct"], 2),
@@ -372,6 +398,7 @@ def run_batch(strategy_config: dict) -> None:
         "r2":           _m["R_Squared"],
     })
     _validation_results.append(_val_record)
+
 
     # -------------------------------------------------------------------------
     # BLOCK 6 — OOS2

@@ -62,7 +62,7 @@ RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
 #TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
-START_DATE = "2021-01-01"
+START_DATE = "2024-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -73,37 +73,12 @@ END_DATE   = None   # Controls how far data is downloaded (step 1 only).
 # =============================================================================
 TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
 #TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
-#TIMEFRAMES_HIGHLOW = [["1Dutc","4H"]]  
-
-# =============================================================================
-# IS/OOS SPLIT
-# =============================================================================
-# SPLIT_MODE = "expanding"
-#   IS  : from START_DATE until (today - WINDOW_OOS_MONTHS)
-#   OOS : last WINDOW_OOS_MONTHS up to today
-#   Each monthly run the IS grows as more data is available.
-#
-# SPLIT_MODE = "rolling"
-#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
-#   IS ends where OOS starts.
-#   IS_ROLLING_MONTHS controls how much the IS start advances on each consecutive run.
-#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
-#   Run 2: IS start advances by IS_ROLLING_MONTHS
-#   State is persisted in rolling_state.csv so each run knows where to resume.
-#
-# SPLIT_REFERENCE_DATE
-#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
-#   None        → split calculated relative to today (normal monthly production use)
-#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
-#                 Useful for backtesting or reconstructing historical train/test sets.
-#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
-#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 
 # =============================================================================
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 0
+WINDOW_OOS_MONTHS    = 12
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     
@@ -164,7 +139,29 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
         "rwa_mode": RWA_MODE,
     }
 
-
+# =============================================================================
+# IS/OOS SPLIT
+# =============================================================================
+# SPLIT_MODE = "expanding"
+#   IS  : from START_DATE until (today - WINDOW_OOS_MONTHS)
+#   OOS : last WINDOW_OOS_MONTHS up to today
+#   Each monthly run the IS grows as more data is available.
+#
+# SPLIT_MODE = "rolling"
+#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
+#   IS ends where OOS starts.
+#   IS_ROLLING_MONTHS controls how much the IS start advances on each consecutive run.
+#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
+#   Run 2: IS start advances by IS_ROLLING_MONTHS
+#   State is persisted in rolling_state.csv so each run knows where to resume.
+#
+# SPLIT_REFERENCE_DATE
+#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
+#   None        → split calculated relative to today (normal monthly production use)
+#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
+#                 Useful for backtesting or reconstructing historical train/test sets.
+#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
+#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 # =============================================================================
 # PIPELINE
 # =============================================================================
@@ -219,6 +216,29 @@ def _run_pipeline() -> None:
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 7.")
 
+# =============================================================================
+# IS/OOS SPLIT
+# =============================================================================
+# SPLIT_MODE = "expanding"
+#   IS  : from START_DATE until (today - WINDOW_OOS_MONTHS)
+#   OOS : last WINDOW_OOS_MONTHS up to today
+#   Each monthly run the IS grows as more data is available.
+#
+# SPLIT_MODE = "rolling"
+#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
+#   IS ends where OOS starts.
+#   IS_ROLLING_MONTHS controls how much the IS start advances on each consecutive run.
+#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
+#   Run 2: IS start advances by IS_ROLLING_MONTHS
+#   State is persisted in rolling_state.csv so each run knows where to resume.
+#
+# SPLIT_REFERENCE_DATE
+#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
+#   None        → split calculated relative to today (normal monthly production use)
+#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
+#                 Useful for backtesting or reconstructing historical train/test sets.
+#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
+#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
 
 # =============================================================================
 # MAIN

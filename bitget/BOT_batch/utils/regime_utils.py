@@ -54,7 +54,8 @@ def build_metrics_cache(
         ts_next   = pd.Timestamp(btc_df.iloc[i + 1]['ts'])
         start_idx = max(0, i - lookback + 1)
 
-        if i - start_idx < 20:
+        min_bars_required = max(ER_WINDOW, ATR_WINDOW) + 1
+        if i - start_idx < min_bars_required:
             continue
 
         subset = btc_df.iloc[start_idx:i + 1]

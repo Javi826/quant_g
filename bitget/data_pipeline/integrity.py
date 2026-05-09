@@ -309,10 +309,58 @@ def run_coverage(config: dict, tolerance_days: int = 30) -> bool:
         logger.info("✅ Coverage integrity check passed — all timeframes aligned")
     else:
         logger.info(f"⚠ Coverage integrity check found {issues} misaligned timeframe(s)")
-
+        
+# =============================================================================
+#     # DEBUG — remove before production
+#     print(f"\n{'Symbol':<14} {'Coverage by timeframe'}")
+#     print("-" * 80)
+#     for symbol, tf_files in sorted(symbol_files.items()):
+#         ref_path = tf_files.get("1Dutc")
+#         if not ref_path:
+#             continue
+#         try:
+#             df_ref  = pd.read_parquet(ref_path)
+#             ref_min = pd.to_datetime(df_ref["timestamp"]).min()
+#         except Exception:
+#             continue
+#         parts = [f"1Dutc: {ref_min.date()} (ref)"]
+#         for tf, filepath in sorted(tf_files.items()):
+#             if tf == "1Dutc":
+#                 continue
+#             try:
+#                 df        = pd.read_parquet(filepath)
+#                 tf_min    = pd.to_datetime(df["timestamp"]).min()
+#                 diff_days = (tf_min - ref_min).days
+#                 status    = "✅" if diff_days <= tolerance_days else f"⚠(+{diff_days}d)"
+#                 parts.append(f"{tf}: {tf_min.date()} {status}")
+#             except Exception:
+#                 parts.append(f"{tf}: ERROR ❌")
+#         print(f"  {symbol:<14} {' | '.join(parts)}")
+#     print()
+# =============================================================================
+    
     return True
-
-
+# =============================================================================
+# 
+# def debug_highlow(config: dict, symbol: str, n_rows: int = 10) -> None:
+#     files = _list_parquet_files(config["highlow_dir"])
+#     matches = [f for f in files if _symbol_from_path(f) == symbol]
+#     if not matches:
+#         print(f"No files found for symbol: {symbol}")
+#         return
+#     for filepath in matches:
+#         tf      = os.path.splitext(os.path.basename(filepath))[0].rsplit("_", 1)[-1]
+#         gran_ms = _parse_timeframe_to_ms(tf)
+#         df      = pd.read_parquet(filepath)
+#         if "timestamp" not in df.columns:
+#             df = df.reset_index()
+#         df["timestamp"] = pd.to_datetime(df["timestamp"])
+#         df["high_time"] = pd.to_datetime(df["high_time"])
+#         df["low_time"]  = pd.to_datetime(df["low_time"])
+#         df["bar_end"]   = df["timestamp"] + pd.Timedelta(milliseconds=gran_ms)
+#         print(f"\n── {symbol} [{tf}] — first {n_rows} rows ──")
+#         print(df[["timestamp", "bar_end", "high_time", "low_time"]].head(n_rows).to_string(index=False))
+# =============================================================================
 # =============================================================================
 # ENTRY POINT
 # =============================================================================
@@ -330,3 +378,5 @@ if __name__ == "__main__":
     run_raw(_config)
     run_clean(_config)
     run_highlow(_config)
+    run_coverage(_config)
+    #debug_highlow(_config, symbol="BTCUSDT")

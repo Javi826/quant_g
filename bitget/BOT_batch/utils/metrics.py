@@ -387,14 +387,14 @@ def print_strategies_summary(validation_results: list) -> None:
         f"\n{'─'*115}",
         f"  STRATEGIES SUMMARY",
         f"{'─'*115}",
-        f"  {'Strategy':<27} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}",
+        f"  {'Strategy':<27} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10} {'MCRegime%':>11}",
         f"  {'-'*115}",
     ]
     for v in validation_results:
         lines.append(
             f"  {v['strategy_id']:<27} {v['verdict']:<14} {v['round']:<16} "
             f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
-            f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
+            f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}% {v.get('mc_regime_pct', 0.0):>10.1f}%"
         )
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
