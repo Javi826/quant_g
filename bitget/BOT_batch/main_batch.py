@@ -70,8 +70,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_05"
-N_PATHS_IS           = 1000
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -681,10 +681,12 @@ def run_portfolio_analysis():
 # MAIN
 # =============================================================================
 from pathlib import Path
+from utils.regime_utils import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
+from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 def _short_path(full_path: str, from_part: str = "expanding") -> str:
     parts = Path(full_path).parts
-    idx = next((i for i, p in enumerate(parts) if p == from_part), None)
+    idx   = next((i for i, p in enumerate(parts) if p == from_part), None)
     return str(Path(*parts[idx:])) if idx is not None else full_path
 
 if __name__ == "__main__":
@@ -704,8 +706,6 @@ if __name__ == "__main__":
         [s for s in STRATEGIES if s["id"] in SELECTED_STRATEGIES]
         if SELECTED_STRATEGIES else STRATEGIES
     )
-    from utils.regime_utils import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
-    from shared_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
     logger.info(f"\n{'='*115}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*115}")
