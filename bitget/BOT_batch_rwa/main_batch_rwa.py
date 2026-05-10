@@ -88,7 +88,7 @@ OOS_R2_TH            = 0.01
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = True
+UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
@@ -122,7 +122,7 @@ SELECTED_STRATEGIES = [
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
-N_SYMBOLS_MCIS            = 5
+N_SYMBOLS_MCIS            = 11
 RUN_MC_OOS                = False
 N_PATHS_OOS1              = 20000
 FIX_SYMBOLS_MCIS_TRAINING = True

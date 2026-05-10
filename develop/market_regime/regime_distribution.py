@@ -26,8 +26,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from regime_common import get_btc_macro_direction, calc_all_metrics_at_time, classify_trade_by_family
-
+from regime_common import get_macro_direction, calc_all_metrics_at_time, classify_trade_by_family
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -128,7 +127,7 @@ def build_periods(df: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
 
 def classify_bar(row: pd.Series, btc_df: pd.DataFrame) -> str:
     """Classify a single BTC daily bar according to ANALYSIS_MODE."""
-    direction = get_btc_macro_direction(
+    direction = get_macro_direction(
         btc_1d_df  = btc_df,
         trade_time = row['ts'],
         ma_period  = BTC_MA_PERIOD,

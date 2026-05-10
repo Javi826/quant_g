@@ -15,20 +15,22 @@ from glob import glob
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-from regime_common import get_btc_macro_direction
+from regime_common import get_macro_direction
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
-SPLIT_MODE    = "expanding"
-SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-BTC_FOLDER    = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
+REFERENCE_SYMBOL = 'QQQUSDT'
+TRADES_FOLDER    = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
+SPLIT_MODE       = "expanding"
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+#REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
+REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-03_IS")
 
-THRESHOLDS    = [0.99,1.00,1.01]
+THRESHOLDS       = [0.99,1.00,1.01]
 
-MA_TYPES      = [4,5]
-BTC_TIMEFRAME = '1Dutc'
+MA_TYPES         = [2,3,4,5,6]
+BTC_TIMEFRAME    = '1Dutc'
 
 # =============================================================================
 # MA_TYPES      = [30,60,120,300]
@@ -48,7 +50,7 @@ TOP_N = 1
 # DATA LOADING
 # =============================================================================
 def load_btc() -> pd.DataFrame:
-    filepath = Path(BTC_FOLDER) / f"BTCUSDT_{BTC_TIMEFRAME}.parquet"
+    filepath = Path(REF_FOLDER) / f"{REFERENCE_SYMBOL}_{BTC_TIMEFRAME}.parquet"
     if not filepath.exists():
         raise FileNotFoundError(f"BTC file not found: {filepath}")
     df = pd.read_parquet(filepath)
@@ -82,7 +84,7 @@ def evaluate_combination(df_trades: pd.DataFrame, btc_df: pd.DataFrame,
     for _, trade in df_trades.iterrows():
         profit        = trade['profit']
         position_type = trade['position_type']
-        direction     = get_btc_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
+        direction     = get_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
 
         if position_type == 'LONG':
             long_all.append(profit)
@@ -178,7 +180,7 @@ def print_direction_distribution(df: pd.DataFrame, btc_df: pd.DataFrame,
     """Print distribution of BTC macro direction for all trades in a period."""
     directions = []
     for _, trade in df.iterrows():
-        direction = get_btc_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
+        direction = get_macro_direction(btc_df, trade['buy_time'], ma_period, long_th, short_th)
         directions.append({'direction': direction, 'position_type': trade['position_type']})
 
     df_dir = pd.DataFrame(directions)
@@ -202,7 +204,7 @@ def main():
     print("REGIME0 EXHAUSTIVE — Find best MA + threshold combination per period")
     print("=" * 80)
     print(f"\n  Trades folder : {TRADES_FOLDER}")
-    print(f"  BTC folder    : {BTC_FOLDER}")
+    print(f"  REF folder    : {REF_FOLDER}")
     print(f"  MA types      : {MA_TYPES}")
     print(f"  Thresholds    : {THRESHOLDS}")
     print(f"  BTC timeframe : {BTC_TIMEFRAME}")

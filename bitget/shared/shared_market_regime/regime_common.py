@@ -42,16 +42,16 @@ def load_reference_symbol_for_timeframe(ohlc_folder, symbol, timeframe, cache):
     return df
 
 
-def calc_all_metrics_at_time(btc_df, buy_time, lookback, hurst_window, er_window, atr_window, pe_window, pe_order):
+def calc_all_metrics_at_time(ref_df, buy_time, lookback, hurst_window, er_window, atr_window, pe_window, pe_order):
     """Calculate metrics at specific time - no lookahead"""
-    closed_candles = btc_df[btc_df['ts'] < buy_time]
+    closed_candles = ref_df[ref_df['ts'] < buy_time]
     if len(closed_candles) < lookback:
         return None
     idx = closed_candles.index[-1]
     start_idx = max(0, idx - lookback + 1)
     if idx - start_idx < 20:
         return None
-    subset = btc_df.iloc[start_idx:idx + 1]
+    subset = ref_df.iloc[start_idx:idx + 1]
     ohlc = {
         'open': subset['open'].values.astype(np.float64),
         'high': subset['high'].values.astype(np.float64),

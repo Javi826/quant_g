@@ -13,7 +13,6 @@ Easily extensible to OOS periods by adding entries to PERIODS config.
 
 import os
 import sys
-import numpy as np
 import pandas as pd
 from pathlib import Path
 from glob import glob
@@ -23,8 +22,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch")))
 
-from regime_common import extract_timeframe, load_btc_for_timeframe, calc_all_metrics_at_time
-from regime_common import classify_trade_by_family, load_trades, get_btc_macro_direction
+from regime_common import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
+from regime_common import classify_trade_by_family, load_trades
 from regime_common import build_direction_cache
 from utils.regime_utils import build_metrics_cache
 
@@ -215,7 +214,7 @@ def run_grid_search(period_key: str = "IS"):
         strategy  = df['strategy'].iloc[0]
         timeframe = extract_timeframe(df)
 
-        btc_tf_df = load_btc_for_timeframe(btc_folder, timeframe, _btc_cache) \
+        btc_tf_df = load_reference_symbol_for_timeframe(btc_folder, 'BTCUSDT', timeframe, _btc_cache) \
                     if FAMILY_SOURCE == 'strategy' else btc_1d_df
 
         buy_times       = pd.to_datetime(df['buy_time'])
@@ -412,7 +411,7 @@ def run_grid_search_combined(period_keys: list):
             strategy  = df['strategy'].iloc[0]
             timeframe = extract_timeframe(df)
 
-            btc_tf_df     = load_btc_for_timeframe(btc_folder, timeframe, _btc_cache) \
+            btc_tf_df     = load_reference_symbol_for_timeframe(btc_folder, timeframe, _btc_cache) \
                             if FAMILY_SOURCE == 'strategy' else btc_1d_df
             buy_times     = pd.to_datetime(df['buy_time'])
             metrics_cache = precompute_metrics_cache(btc_tf_df)

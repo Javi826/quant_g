@@ -24,20 +24,21 @@ from glob import glob
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-from regime_common import extract_timeframe, load_btc_for_timeframe, calc_all_metrics_at_time
+from regime_common import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
 from regime_common import classify_trade_by_family, load_trades, calculate_max_dd_pct
-from regime_common import permutation_test, format_significance, get_btc_macro_direction
+from regime_common import permutation_test, format_significance, get_macro_direction
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-TRADES_FOLDER   = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
-TRADES_LABEL  = "is_baseline" 
+REFERENCE_SYMBOL = 'QQQUSDT'
+TRADES_FOLDER    = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
+TRADES_LABEL     = "is_baseline" 
 
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-BTC_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "crypto_full_IS")
+REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-03_IS")
+#REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
 BTC_MA_PERIOD   = 4
@@ -82,10 +83,10 @@ _btc_cache = {}
 
 def load_btc_1d() -> pd.DataFrame:
     """Load BTC 1D OHLC for macro direction calculation"""
-    filepath = Path(BTC_FOLDER) / "BTCUSDT_1Dutc.parquet"
+    filepath = Path(REF_FOLDER) / f"{REFERENCE_SYMBOL}_1Dutc.parquet"
 
     if not filepath.exists():
-        raise FileNotFoundError(f"BTC 1D file not found: {filepath}")
+        raise FileNotFoundError(f"Reference symbol 1D file not found: {filepath}")
 
     df = pd.read_parquet(filepath)
     df.columns = df.columns.str.lower()
@@ -98,7 +99,7 @@ def load_btc_for_family(timeframe: str) -> pd.DataFrame:
     """Load BTC OHLC for family metrics based on FAMILY_SOURCE setting"""
     if FAMILY_SOURCE == 'macro':
         return load_btc_1d()
-    return load_btc_for_timeframe(BTC_FOLDER, timeframe, _btc_cache)
+    return load_reference_symbol_for_timeframe(REF_FOLDER, REFERENCE_SYMBOL, timeframe, _btc_cache)
 
 
 # =============================================================================
@@ -112,8 +113,8 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
 
     Returns dict with 'direction' and 'family' keys.
     """
-    direction = get_btc_macro_direction(
-        btc_1d_df  = btc_1d_df,
+    direction = get_macro_direction(
+        ref_1d_df  = btc_1d_df,
         trade_time = trade['buy_time'],
         ma_period  = BTC_MA_PERIOD,
         long_th    = LONG_TH,
@@ -121,7 +122,7 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
     )
 
     metrics = calc_all_metrics_at_time(
-        btc_df       = btc_family_df,
+        ref_df       = btc_family_df,
         buy_time     = trade['buy_time'],
         lookback     = LOOKBACK_BARS,
         hurst_window = HURST_WINDOW,
@@ -375,8 +376,8 @@ def main():
 
     print(f"\nConfiguration:")
     print(f"  Trades folder  : {TRADES_FOLDER}")
-    print(f"  BTC folder     : {BTC_FOLDER}")
-    print(f"  BTC MA period  : {BTC_MA_PERIOD}")
+    print(f"  REF folder     : {REF_FOLDER}")
+    print(f"  REF MA period  : {BTC_MA_PERIOD}")
     print(f"  Long threshold : {LONG_TH}")
     print(f"  Short threshold: {SHORT_TH}")
     print(f"  Family source  : {FAMILY_SOURCE}")

@@ -21,7 +21,7 @@ from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
-from regime_common import load_btc_for_timeframe, filter_signals_by_regime
+from regime_common import load_reference_symbol_for_timeframe, filter_signals_by_regime
 
 # -----------------------------------------------------------------------------
 # GLOBAL CONFIG
@@ -393,7 +393,7 @@ def run_strategy(strategy: dict, btc_1d_df: pd.DataFrame) -> None:
     if REGIME_FAMILY_SOURCE == 'macro':
         btc_tf_df = btc_1d_df  # reuse already-loaded BTC 1D
     else:
-        btc_tf_df = load_btc_for_timeframe(BTC_FOLDER, timeframe, _btc_tf_cache)
+        btc_tf_df = load_reference_symbol_for_timeframe(BTC_FOLDER, timeframe, _btc_tf_cache)
 
     # Load symbols
     custom_symbols = load_custom_symbols(sid, sname, timeframe)

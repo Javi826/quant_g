@@ -10,7 +10,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "30_reversal_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -23,7 +23,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "31_reversal_long_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -36,7 +36,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "32_reversal_long_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -52,7 +52,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "33_reversal_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -65,7 +65,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "34_reversal_short_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -78,7 +78,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "35_reversal_short_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -94,7 +94,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "36_parity_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -107,7 +107,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "37_parity_long_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -120,7 +120,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "38_parity_long_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -136,7 +136,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "39_parity_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -149,7 +149,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "40_parity_short_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -162,7 +162,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "41_parity_short_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [100],
@@ -178,7 +178,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "42_flag_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -192,7 +192,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "43_flag_long_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -206,7 +206,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "44_flag_long_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -223,7 +223,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "45_flag_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -237,7 +237,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "46_flag_short_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -251,7 +251,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "47_flag_short_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -268,7 +268,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "48_orderblocks_long_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -281,7 +281,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "49_orderblocks_long_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -294,7 +294,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "50_orderblocks_long_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -310,7 +310,7 @@ STRATEGIES_LOOP = [
     # =========================================================================
     {
         "id": "51_orderblocks_short_1H",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -323,7 +323,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "52_orderblocks_short_30m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
@@ -336,7 +336,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "53_orderblocks_short_15m",
-        "n_symbols": 10,
+        "n_symbols": 11,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [75],
