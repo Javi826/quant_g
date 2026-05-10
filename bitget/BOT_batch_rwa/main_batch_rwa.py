@@ -38,7 +38,7 @@ from utils.metrics import print_all_curves_table, print_robustness_table, print_
 from utils.plotting import plot_portfolio_comparison
 from utils.io import save_drift_reference, save_strategies_pr
 from utils.io import compare_and_generate_csv, update_strategies_symbols,print_update_status
-from utils.regime_utils import prepare_regime_metrics_cache_is, REGIME_ENABLED
+from utils.regime_utils import prepare_regime_metrics_cache_is
 from utils.portfolio import decorrelate_by_profit
 
 # Global accumulators
