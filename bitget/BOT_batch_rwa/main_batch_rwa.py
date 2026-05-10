@@ -141,8 +141,8 @@ REGIME_ROBUSTNESS_TH      = 0  # NetGain > 0
 R_NETGAIN_OOS2      = OOS_NETGAIN_TH
 R_MAX_DD_OOS2       = OOS_MAX_DD_TH
 R_R2_OOS2           = OOS_R2_TH
-OOS2_RUN_ANALYSIS   = False
-OOS2_FOR_VALIDATION = False
+OOS2_RUN_ANALYSIS   = True
+OOS2_FOR_VALIDATION = True
 
 # OOS3
 #------------------------------------------------------------------------------
@@ -177,9 +177,9 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-03_IS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
 # =============================================================================
