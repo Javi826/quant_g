@@ -13,7 +13,7 @@ random.seed(42)
 
 symbols_to_exclude = {'XAUTUSDT', 'PAXGUSDT', 'XAGUSDT', 'XAUUSDT'}
 
-symbols_to_include = []
+symbols_to_include = ['XAUUSDT']
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):

@@ -21,9 +21,12 @@ from itertools import product
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch")))
+
 from regime_common import extract_timeframe, load_btc_for_timeframe, calc_all_metrics_at_time
 from regime_common import classify_trade_by_family, load_trades, get_btc_macro_direction
 from regime_common import build_direction_cache
+from utils.regime_utils import build_metrics_cache
 
 # =============================================================================
 # CONFIGURATION
@@ -61,7 +64,7 @@ PERIODS = {
 PERIOD_KEYS = ["IS", "OOS1", "OOS2", "OOS3"]
 
 # Fixed params
-BTC_MA_PERIOD   = 5
+BTC_MA_PERIOD   = 4
 LONG_TH         = 1.00
 SHORT_TH        = 1.00
 HURST_WINDOW    = 100
@@ -75,7 +78,7 @@ MIN_TRADES      = 2
 INITIAL_CAPITAL = 800
 
 # Grid search ranges
-MA_PERIODS     = [2, 3, 4, 5]
+MA_PERIODS     = [4]
 ER_THRESHOLDS  = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 ATR_THRESHOLDS = [1.5, 2.0, 2.5]
 
@@ -168,7 +171,7 @@ def pct_improvement(profit_filtered: float, profit_baseline: float) -> float:
 
 def precompute_metrics_cache(btc_tf_df: pd.DataFrame) -> dict:
     """Precompute metrics for all BTC bars — reused across all grid combinations."""
-    from shared_market_regime.regime_common import build_metrics_cache
+
     return build_metrics_cache(
         btc_df=btc_tf_df, lookback=LOOKBACK_BARS,
         hurst_window=HURST_WINDOW, er_window=ER_WINDOW,

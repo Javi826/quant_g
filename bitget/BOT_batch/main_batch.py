@@ -75,28 +75,20 @@ N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 30
-OOS_MAX_DD_TH        = 15
-OOS_R2_TH            = 0.7  
 
-OOS_NETGAIN_TH       = -100
-OOS_MAX_DD_TH        = 100
-OOS_R2_TH            = 0.2 
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-# =============================================================================
-# OOS_NETGAIN_TH       = 80
-# OOS_MAX_DD_TH        = 7
-# OOS_R2_TH            = 0.82  
-# =============================================================================
+OOS_NETGAIN_TH       = 80
+OOS_MAX_DD_TH        = 7
+OOS_R2_TH            = 0.82  
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = False
+UPDATE_OUTPUTS           = True
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
@@ -112,12 +104,10 @@ SELECTED_STRATEGIES = [
 #     "27_orderblocks_short_1H",
 #     "10_parity_long_1H",
 #     "28_orderblocks_long_1H",
+#     "03_parity_long_4H",
 #     "19_flag_short_4H",
-# =============================================================================
-# =============================================================================
 #     "17_flag_long_4H",
 #     "02_reversal_long_4H",
-#     "03_parity_long_4H",
 #     "13_orderblocks_short_4H",
 #     "14_orderblocks_long_4H",
 #     "26_orderblocks_long_4H",
