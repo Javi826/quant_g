@@ -63,7 +63,7 @@ RWA_MODE           = "rwa_only"   # "crypto_only" | "rwa_only"
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
-START_DATE = "2021-01-01"
+START_DATE = "2025-01-01"
 END_DATE   = None   # Controls how far data is downloaded (step 1 only).
                     # None  → download up to today
                     # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
@@ -79,7 +79,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["3
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 0
+WINDOW_OOS_MONTHS    = 2
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     

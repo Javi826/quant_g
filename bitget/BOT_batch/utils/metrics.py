@@ -5,8 +5,6 @@ import pandas as pd
 from itertools import combinations as _combinations
 from sklearn.linear_model import LinearRegression
 
-from backtesters.ZX_compute_BT import INITIAL_BALANCE
-
 logger = logging.getLogger("BOT_batch.utils.metrics")
 
 

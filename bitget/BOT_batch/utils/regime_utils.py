@@ -24,7 +24,7 @@ logger = logging.getLogger("BOT_batch.utils.regime_utils")
 # Regime analysis params
 FORCE_DIRECTION_FILTER = True
 REGIME_MIN_TRADES      = 10
-REGIME_LOOKBACK_BARS   = 180
+REGIME_LOOKBACK_BARS   = 50
 REGIME_FAMILY_SOURCE   = 'strategy'  # 'strategy' | 'macro'
 
 

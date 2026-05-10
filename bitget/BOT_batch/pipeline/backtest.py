@@ -1,14 +1,8 @@
 #BOT_batch/pipeline/backtest.py
 import logging
-import os
-
 import pandas as pd
-
 from backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
-from shared.utils.analysis import report_backtesting
-from shared.utils.torque import compile_grid_results, prepare_ohlcv_arrays
-from utils.metrics import compute_metrics, print_metrics_table
-from utils.plotting import plot_filter_comparison
+from shared.utils.torque import prepare_ohlcv_arrays
 from utils.regime_utils import analyze_regime_is, run_oos_backtest_with_regime
 from utils.io import accumulate_strategy_trades
 
