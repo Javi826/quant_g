@@ -1,4 +1,4 @@
-#BOT_batch/main_batch.py
+#BOT_batch/main_batch_rwa.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -38,7 +38,7 @@ from utils.metrics import print_all_curves_table, print_robustness_table, print_
 from utils.plotting import plot_portfolio_comparison
 from utils.io import save_drift_reference, save_strategies_pr
 from utils.io import compare_and_generate_csv, update_strategies_symbols,print_update_status
-from utils.regime_utils import prepare_regime_metrics_cache_is
+from utils.regime_utils import prepare_regime_metrics_cache_is, REGIME_ENABLED
 from utils.portfolio import decorrelate_by_profit
 
 # Global accumulators
@@ -60,7 +60,7 @@ _best_params_results           : dict = {}
 DTYPE         = np.float32
 logger        = logging.getLogger("BOT_batch.main_batch")
 N_JOBS        = -1
-MY_SYMBOLS    = False
+MY_SYMBOLS    = True
 SHOW_PROGRESS = False
 
 # =============================================================================
@@ -79,9 +79,9 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 80
-OOS_MAX_DD_TH        = 7
-OOS_R2_TH            = 0.82  
+OOS_NETGAIN_TH       = 1
+OOS_MAX_DD_TH        = 5
+OOS_R2_TH            = 0.01  
 
 # BATCH
 #------------------------------------------------------------------------------
@@ -94,38 +94,35 @@ SAVE_TRADES              = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "18_flag_long_1H",
-    "20_flag_short_1H",
-    # ------------------------------------------------------------------------
-    "07_reversal_short_1H",
-    "06_reversal_long_1H",
-    "11_parity_short_1H",
-    "27_orderblocks_short_1H",
-    "10_parity_long_1H",
-    "28_orderblocks_long_1H",
-    "03_parity_long_4H",
-    "19_flag_short_4H",
-    "17_flag_long_4H",
-    "02_reversal_long_4H",
-    "13_orderblocks_short_4H",
-    "14_orderblocks_long_4H",
-    "26_orderblocks_long_4H",
-    "04_reversal_short_4H",
-    # ------------------------------------------------------------------------
-# =============================================================================
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "21_parity_short_4H",
-#     "22_parity_short_6Hutc",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-# =============================================================================
+    "30_reversal_long_1H",
+    "31_reversal_long_30m",
+    "32_reversal_long_15m",
+    "33_reversal_short_1H",
+    "34_reversal_short_30m",
+    "35_reversal_short_15m",
+    "36_parity_long_1H",
+    "37_parity_long_30m",
+    "38_parity_long_15m",
+    "39_parity_short_1H",
+    "40_parity_short_30m",
+    "41_parity_short_15m",
+    "42_flag_long_1H",
+    "43_flag_long_30m",
+    "44_flag_long_15m",
+    "45_flag_short_1H",
+    "46_flag_short_30m",
+    "47_flag_short_15m",
+    "48_orderblocks_long_1H",
+    "49_orderblocks_long_30m",
+    "50_orderblocks_long_15m",
+    "51_orderblocks_short_1H",
+    "52_orderblocks_short_30m",
+    "53_orderblocks_short_15m",
 ]
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
-N_SYMBOLS_MCIS            = 6
+N_SYMBOLS_MCIS            = 5
 RUN_MC_OOS                = False
 N_PATHS_OOS1              = 20000
 FIX_SYMBOLS_MCIS_TRAINING = True
@@ -144,16 +141,16 @@ REGIME_ROBUSTNESS_TH      = 0  # NetGain > 0
 R_NETGAIN_OOS2      = OOS_NETGAIN_TH
 R_MAX_DD_OOS2       = OOS_MAX_DD_TH
 R_R2_OOS2           = OOS_R2_TH
-OOS2_RUN_ANALYSIS   = True
-OOS2_FOR_VALIDATION = True
+OOS2_RUN_ANALYSIS   = False
+OOS2_FOR_VALIDATION = False
 
 # OOS3
 #------------------------------------------------------------------------------
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = True
-OOS3_FOR_VALIDATION = True
+OOS3_RUN_ANALYSIS   = False
+OOS3_FOR_VALIDATION = False
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -180,10 +177,10 @@ DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_monte
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-03_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
 #DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
 # =============================================================================
 # MAIN FUNCTION

@@ -10,7 +10,6 @@ Contains all common functions used across:
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from shared_config import REGIME_REFERENCE_SYMBOL
 from shared_market_regime.regime_metrics import calc_all_metrics
 
 
@@ -21,16 +20,16 @@ def extract_timeframe(df):
     return parts[-1]
 
 
-def load_btc_for_timeframe(ohlc_folder, timeframe, cache):
-    """Load BTC OHLC for specific timeframe with caching"""
-    cache_key = f"{ohlc_folder}_{timeframe}"
+def load_reference_symbol_for_timeframe(ohlc_folder, symbol, timeframe, cache):
+    """Load OHLC for specific reference symbol and timeframe with caching."""
+    cache_key = f"{ohlc_folder}_{symbol}_{timeframe}"
     if cache_key in cache:
         return cache[cache_key]
-    
-    filepath = Path(ohlc_folder) / f"{REGIME_REFERENCE_SYMBOL}_{timeframe}.parquet"
+
+    filepath = Path(ohlc_folder) / f"{symbol}_{timeframe}.parquet"
     if not filepath.exists():
-        raise FileNotFoundError(f"BTC OHLC not found: {filepath}")
-    
+        raise FileNotFoundError(f"Reference symbol OHLC not found: {filepath}")
+
     df = pd.read_parquet(filepath)
     df.columns = df.columns.str.lower()
     if 'timestamp' in df.columns:
@@ -38,7 +37,7 @@ def load_btc_for_timeframe(ohlc_folder, timeframe, cache):
     else:
         df['ts'] = pd.to_datetime(df.index)
     df = df.sort_values('ts').reset_index(drop=True)
-    
+
     cache[cache_key] = df
     return df
 
@@ -171,55 +170,48 @@ def analyze_by_dimension(df, dimension, initial_capital, min_trades_confidence=N
     
     return stats
 #EXTRA
-def get_btc_macro_direction(
-    btc_1d_df: pd.DataFrame,
+def get_macro_direction(
+    ref_1d_df: pd.DataFrame,
     trade_time: pd.Timestamp,
     ma_period: int,
     long_th: float,
-    short_th: float
+    short_th: float,
 ) -> str:
     """
-    Returns BTC macro direction at trade time using closed candles only.
+    Returns macro direction of reference symbol at trade time using closed candles only.
 
     Args:
-        btc_1d_df : BTC daily OHLC DataFrame with 'ts' and 'close' columns
-        trade_time: Entry time of the trade (no lookahead)
-        ma_period : MA period (e.g. 5, 10, 20, 50)
-        long_th   : Multiplier threshold for uptrend  (e.g. 1.02 -> BTC > MA * 1.02)
-        short_th  : Multiplier threshold for dwtrend (e.g. 0.98 -> BTC < MA * 0.98)
+        ref_1d_df  : Daily OHLC DataFrame with 'ts' and 'close' columns
+        trade_time : Entry time of the trade (no lookahead)
+        ma_period  : MA period (e.g. 5, 10, 20, 50)
+        long_th    : Multiplier threshold for uptrend  (e.g. 1.02 -> close > MA * 1.02)
+        short_th   : Multiplier threshold for dwtrend (e.g. 0.98 -> close < MA * 0.98)
 
     Returns:
         'uptrend' | 'dwtrend' | 'neutral' | 'unknown'
     """
-    closed = btc_1d_df[btc_1d_df['ts'] < trade_time]
-
+    closed = ref_1d_df[ref_1d_df['ts'] < trade_time]
     if len(closed) < ma_period:
         return 'unknown'
-
     last      = closed.iloc[-1]
     ma_series = closed['close'].iloc[-ma_period:]
-
     if len(ma_series) < ma_period:
         return 'unknown'
-
     ma_value  = ma_series.mean()
-    btc_close = last['close']
-
-    if pd.isna(ma_value) or pd.isna(btc_close):
+    ref_close = last['close']
+    if pd.isna(ma_value) or pd.isna(ref_close):
         return 'unknown'
-
-    if btc_close > ma_value * long_th:
+    if ref_close > ma_value * long_th:
         return 'uptrend'
-    if btc_close < ma_value * short_th:
+    if ref_close < ma_value * short_th:
         return 'dwtrend'
-
     return 'neutral'
 
 def filter_signals_by_regime(
     signals: np.ndarray,
     ts: np.ndarray,
-    btc_1d_df: pd.DataFrame,
-    btc_tf_df: pd.DataFrame,
+    ref_1d_df: pd.DataFrame,
+    ref_tf_df: pd.DataFrame,
     bins_to_filter: set,
     ma_period: int = 5,
     long_th: float = 1.0,
@@ -235,24 +227,22 @@ def filter_signals_by_regime(
 ) -> np.ndarray:
     if not bins_to_filter:
         return signals
- 
+
     filtered    = signals.copy()
     signal_idxs = np.nonzero(signals)[0]
     trade_times = pd.Series(pd.to_datetime(ts[signal_idxs]))
- 
-    # Build direction cache once for all signal timestamps
-    direction_cache = build_direction_cache(btc_1d_df, ma_period, long_th, short_th, trade_times)
- 
+
+    direction_cache = build_direction_cache(ref_1d_df, ma_period, long_th, short_th, trade_times)
+
     for idx in signal_idxs:
         trade_time = pd.Timestamp(ts[idx])
- 
-        direction = direction_cache.get(trade_time, 'unknown')
- 
+        direction  = direction_cache.get(trade_time, 'unknown')
+
         if metrics_cache is not None:
             metrics = metrics_cache.get(trade_time)
         else:
             metrics = calc_all_metrics_at_time(
-                btc_df       = btc_tf_df,
+                ref_df       = ref_tf_df,
                 buy_time     = trade_time,
                 lookback     = lookback_bars,
                 hurst_window = hurst_window,
@@ -261,73 +251,66 @@ def filter_signals_by_regime(
                 pe_window    = pe_window,
                 pe_order     = pe_order,
             )
- 
+
         family = classify_trade_by_family(metrics, families) if metrics else 'unknown'
- 
+
         if family == 'unknown':
             continue
- 
+
         if f"{family}_{direction}" in bins_to_filter:
             filtered[idx] = 0
- 
+
     return filtered
 
-
-#UNUSED
 def build_direction_cache(
-    btc_1d_df: pd.DataFrame,
+    ref_1d_df: pd.DataFrame,
     ma_period: int,
     long_th: float,
     short_th: float,
     trade_times: pd.Series,
 ) -> dict:
     """
-    Precalculate BTC macro direction for a set of trade timestamps.
-    Replicates exactly get_btc_macro_direction logic but vectorized:
-    for each trade_time, finds the last closed daily bar (ts < trade_time)
-    and computes direction from it. O(n_trades * log(n_bars)) vs O(n_trades * n_bars).
- 
+    Vectorized precomputation of macro direction for a set of trade timestamps.
+    For each trade_time, finds the last closed daily bar (ts < trade_time)
+    and computes direction. O(n_trades * log(n_bars)) vs O(n_trades * n_bars).
+
     Args:
-        btc_1d_df    : BTC daily OHLC DataFrame with 'ts' and 'close' columns
-        ma_period    : MA period for macro direction
-        long_th      : multiplier threshold for uptrend
-        short_th     : multiplier threshold for dwtrend
-        trade_times  : pd.Series of trade buy_times (datetime)
- 
+        ref_1d_df   : Daily OHLC DataFrame with 'ts' and 'close' columns
+        ma_period   : MA period for macro direction
+        long_th     : Multiplier threshold for uptrend
+        short_th    : Multiplier threshold for dwtrend
+        trade_times : pd.Series of trade buy_times (datetime)
+
     Returns:
         dict {pd.Timestamp: 'uptrend' | 'dwtrend' | 'neutral' | 'unknown'}
     """
-    closes   = btc_1d_df['close'].values.astype(np.float64)
-    ts_int   = btc_1d_df['ts'].values.astype(np.int64)
-    n        = len(btc_1d_df)
-    cache    = {}
- 
-    # Precompute rolling MA vectorized over all bars
+    closes  = ref_1d_df['close'].values.astype(np.float64)
+    ts_int  = ref_1d_df['ts'].values.astype(np.int64)
+    n       = len(ref_1d_df)
+    cache   = {}
+
     ma = np.full(n, np.nan)
     for i in range(ma_period - 1, n):
         ma[i] = closes[i - ma_period + 1: i + 1].mean()
- 
-    unique_times = trade_times.drop_duplicates()
- 
-    for t in unique_times:
+
+    for t in trade_times.drop_duplicates():
         t_int = np.int64(pd.Timestamp(t).value)
-        # Last bar with ts < trade_time — matches btc_1d_df[btc_1d_df['ts'] < trade_time].iloc[-1]
-        idx = np.searchsorted(ts_int, t_int, side='left') - 1
- 
+        idx   = np.searchsorted(ts_int, t_int, side='left') - 1
+
         if idx < ma_period - 1:
             cache[pd.Timestamp(t)] = 'unknown'
             continue
- 
+
         ma_val    = ma[idx]
-        btc_close = closes[idx]
- 
-        if np.isnan(ma_val) or np.isnan(btc_close):
+        ref_close = closes[idx]
+
+        if np.isnan(ma_val) or np.isnan(ref_close):
             cache[pd.Timestamp(t)] = 'unknown'
-        elif btc_close > ma_val * long_th:
+        elif ref_close > ma_val * long_th:
             cache[pd.Timestamp(t)] = 'uptrend'
-        elif btc_close < ma_val * short_th:
+        elif ref_close < ma_val * short_th:
             cache[pd.Timestamp(t)] = 'dwtrend'
         else:
             cache[pd.Timestamp(t)] = 'neutral'
- 
+
     return cache

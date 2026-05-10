@@ -29,7 +29,7 @@ logger = logging.getLogger("BOT_batch.utils.regime_utils")
 # Regime configuration
 # -----------------------------------------------------------------------------
 REGIME_ENABLED         = True          # Master switch — set False to bypass all regime filtering
-REGIME_REFERENCE       = 'BTCUSDT'     # Reference symbol for regime calculation
+REGIME_REFERENCE       = 'QQQUSDT'     # Reference symbol for regime calculation
 FORCE_DIRECTION_FILTER = True
 REGIME_MIN_TRADES      = 10
 REGIME_LOOKBACK_BARS   = 50

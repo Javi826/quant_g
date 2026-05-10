@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
-from shared_config import REGIME_REFERENCE_SYMBOL
+from utils.regime_utils import REGIME_REFERENCE
+
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_rows', None)
@@ -108,7 +109,7 @@ def calculate_monthly_metrics(equity_hist, initial_capital):
     return pd.DataFrame(monthly_stats)
 
 
-def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain % y DD"):
+def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain % y DD", reference_symbol=None):
     from sklearn.linear_model import LinearRegression
 
     timestamps = pd.to_datetime(equity_hist['timestamp'])
@@ -118,67 +119,59 @@ def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain %
     cumulative_max = np.maximum.accumulate(balances)
     dd_pct = (balances - cumulative_max) / cumulative_max * 100
 
-    # R² calculation
     X = np.arange(len(balances)).reshape(-1, 1)
     y = balances.reshape(-1, 1)
     r2 = LinearRegression().fit(X, y).score(X, y)
 
-    fig, ax1 = plt.subplots(figsize=(12,6))
-    #fig.patch.set_facecolor('#1a1a2e')  # Fondo exterior azul oscuro
-    #ax1.set_facecolor('#F8F9FA')        # Área del plot blanca/gris muy claro
+    fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    # Load and process BTC data
-    btc_file = os.path.join(data_folder, f"{REGIME_REFERENCE_SYMBOL}_4H.parquet")
-    btc_df = pd.read_parquet(btc_file)
+    if reference_symbol is not None:
+        ref_file = os.path.join(data_folder, f"{reference_symbol}_4H.parquet")
+        ref_df = pd.read_parquet(ref_file)
+        if 'timestamp' not in ref_df.columns:
+            if isinstance(ref_df.index, pd.DatetimeIndex):
+                ref_df = ref_df.reset_index().rename(columns={'index': 'timestamp'})
+            else:
+                raise ValueError("Reference parquet has no 'timestamp' column or datetime index.")
+        ref_df = ref_df[['timestamp', 'close']]
+        ref_df['timestamp'] = pd.to_datetime(ref_df['timestamp'])
+        ref_df['ref_net_gain_pct'] = (ref_df['close'] / ref_df['close'].iloc[0] - 1) * 100
+        ref_aligned = np.interp(
+            timestamps.astype(np.int64) / 10**9,
+            ref_df['timestamp'].astype(np.int64) / 10**9,
+            ref_df['ref_net_gain_pct']
+        )
+        above_ref = net_gain_pct >= ref_aligned
+        below_ref = net_gain_pct < ref_aligned
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=above_ref, alpha=0.2, color='green', interpolate=True)
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=below_ref, alpha=0.2, color='red', interpolate=True)
+        ax1.plot(ref_df['timestamp'], ref_df['ref_net_gain_pct'],
+                 color='darkorange', linewidth=0.6, linestyle='--', label=f'{reference_symbol} %')
+        final_ref = ref_df['ref_net_gain_pct'].iloc[-1]
+    else:
+        above_zero = net_gain_pct >= 0
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=above_zero, alpha=0.2, color='green', interpolate=True)
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=~above_zero, alpha=0.2, color='red', interpolate=True)
+        final_ref = None
 
-    if 'timestamp' not in btc_df.columns:
-        if isinstance(btc_df.index, pd.DatetimeIndex):
-            btc_df = btc_df.reset_index().rename(columns={'index': 'timestamp'})
-        else:
-            raise ValueError("BTC parquet has no 'timestamp' column or datetime index.")
-
-    btc_df = btc_df[['timestamp', 'close']]
-    btc_df['timestamp'] = pd.to_datetime(btc_df['timestamp'])
-    btc_df['btc_net_gain_pct'] = (btc_df['close'] / btc_df['close'].iloc[0] - 1) * 100
-
-    # Align BTC data with strategy timestamps
-    btc_aligned = np.interp(
-        timestamps.astype(np.int64) / 10**9,
-        btc_df['timestamp'].astype(np.int64) / 10**9,
-        btc_df['btc_net_gain_pct']
-    )
-
-    # Color areas based on performance vs BTC
-    above_btc = net_gain_pct >= btc_aligned
-    below_btc = net_gain_pct < btc_aligned
-
-    ax1.fill_between(timestamps, net_gain_pct, 0, where=above_btc, alpha=0.2, color='green', interpolate=True)
-    ax1.fill_between(timestamps, net_gain_pct, 0, where=below_btc, alpha=0.2, color='red', interpolate=True)
     ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
-
     ax1.set_xlabel("Time")
     ax1.set_ylabel("Net_Gain_pct", color='blue')
     ax1.tick_params(axis='y', labelcolor='blue')
 
-    ax1.plot(btc_df['timestamp'], btc_df['btc_net_gain_pct'],
-             color='darkorange', linewidth=0.6, linestyle='--', label='BTC %')
-
-    # Drawdown on secondary axis
     ax2 = ax1.twinx()
     ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
     ax2.set_ylabel("Drawdown", color='red')
     ax2.tick_params(axis='y', labelcolor='red')
 
-    # Statistics text box
     final_net_gain = net_gain_pct[-1]
     max_dd = dd_pct.min()
-    final_btc = btc_df['btc_net_gain_pct'].iloc[-1]
 
     textstr = (
-        f'Net Gain STR: {final_net_gain:.2f}%\n'
-        f'Net Gain BTC: {final_btc:.2f}%\n'
-        f'Max DD         : {max_dd:.2f}%\n'
-        f'R²               : {r2:.3f}'
+        f'Net Gain STR : {final_net_gain:.2f}%\n'
+        + (f'Net Gain REF : {final_ref:.2f}%\n' if final_ref is not None else '')
+        + f'Max DD       : {max_dd:.2f}%\n'
+        + f'R²           : {r2:.3f}'
     )
 
     ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
@@ -534,7 +527,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     # -------------------------------------------------------------------------
     best_row = df.loc[df["Net_Gain_pct"].idxmax()]
     equity_hist = best_row.get("sim_balance_history", None)
-    plot_netgain_dd(equity_hist, initial_capital, data_folder, title=strategy_id if strategy_id else "Net Gain % & DD")
+    plot_netgain_dd(equity_hist, initial_capital, data_folder, title=strategy_id if strategy_id else "Net Gain % & DD", reference_symbol=REGIME_REFERENCE)
     
     # -------------------------------------------------------------------------
     # Parameter Surface Analysis

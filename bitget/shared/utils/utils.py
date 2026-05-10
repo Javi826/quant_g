@@ -1,3 +1,4 @@
+#shared/utils/utils.py
 import os
 import random
 import hashlib
@@ -11,9 +12,22 @@ logger = logging.getLogger("BOT_batch.utils")
 np.random.seed(42)
 random.seed(42)
 
-symbols_to_exclude = {'XAUTUSDT', 'PAXGUSDT', 'XAGUSDT', 'XAUUSDT'}
+symbols_to_exclude = {}
 
-symbols_to_include = ['XAUUSDT']
+symbols_to_include = [
+    "NVDAUSDT",   # NVIDIA        - corr 0.77, 202 rows
+    "PLTRUSDT",   # Palantir      - corr 0.73, 181 rows
+    "HOODUSDT",   # Robinhood     - corr 0.71, 194 rows
+    "ASMLUSDT",   # ASML          - corr 0.70, 182 rows
+    "GOOGLUSDT",  # Alphabet      - corr 0.65, 195 rows
+    "AMZNUSDT",   # Amazon        - corr 0.65, 195 rows
+    "TSLAUSDT",   # Tesla         - corr 0.64, 202 rows
+    "COINUSDT",   # Coinbase      - corr 0.63, 194 rows
+    "MRVLUSDT",   # Marvell       - corr 0.63, 180 rows
+    "METAUSDT",   # Meta          - corr 0.59, 195 rows
+    "MSFTUSDT",   # Microsoft     - corr 0.48, 168 rows
+]
+
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
