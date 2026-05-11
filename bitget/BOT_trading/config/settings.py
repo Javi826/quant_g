@@ -35,7 +35,7 @@ ACCOUNTS = {
         "regime01_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime01_ma_period": 4,
+        "regime01_ma_period": 2,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
         "regime_reference_symbol": "QQQUSDT"

@@ -7,11 +7,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGIES_SET_NAME = "00"  # "E1" | "00"
+STRATEGIES_SET_NAME = "E1"  # "E1" | "00"
+TARGET_BATCH        = "BOT_batch_rwa"  # "BOT_batch" | "BOT_batch_rwa"
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
-OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
-OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
+OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS   = (
@@ -20,7 +21,7 @@ REGIME_BIN_KEYS   = (
     "regime_volatile_uptrend", "regime_volatile_dwtrend",
 )
 
-symbols_live_folder = os.path.join(os.path.dirname(__file__), "..", "..", "BOT_trading", "symbols_live", STRATEGIES_SET_NAME)
+symbols_live_folder = os.path.join(os.path.dirname(__file__), "..", "BOT_trading", "symbols_live", STRATEGIES_SET_NAME)
 DEFAULT_N_SYMBOLS      = 10
 DEFAULT_ORDER_AMOUNT   = 80
 USE_SYMBOLS_LIVE_FOR_N = True

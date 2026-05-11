@@ -71,7 +71,7 @@ SHOW_PROGRESS = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 100
+N_PATHS_IS           = 1000
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------

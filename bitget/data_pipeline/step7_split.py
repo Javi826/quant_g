@@ -38,7 +38,6 @@ import logging
 import os
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
-from shared_config import REGIME_REFERENCE_SYMBOL
 
 import pandas as pd
 
@@ -153,9 +152,9 @@ def _make_folder_name(is_start: str, is_end: str, oos_start: str, oos_end: str, 
 # DATA RANGE READER — for preview
 # =============================================================================
 
-def _get_data_range(raw_dir: str) -> tuple[str, str] | None:
+def _get_data_range(raw_dir: str, reference_symbol: str = 'BTCUSDT') -> tuple[str, str] | None:
     """Reads min/max date from BTCUSDT 1Dutc parquet for preview calculation."""
-    filename = f"{REGIME_REFERENCE_SYMBOL}_{REFERENCE_SYMBOL_TF}.parquet"
+    filename = f"{reference_symbol}_{REFERENCE_SYMBOL_TF}.parquet"
     # Try clean dir first, then raw
     for folder in [raw_dir.replace("01_raw", "02_clean"), raw_dir]:
         path = os.path.join(folder, filename)
@@ -172,7 +171,6 @@ def _get_data_range(raw_dir: str) -> tuple[str, str] | None:
             except Exception:
                 pass
     return None
-
 
 # =============================================================================
 # SPLIT PREVIEW
@@ -212,7 +210,7 @@ def print_split_preview(config: dict) -> bool:
     oos_folder = _make_folder_name(is_start, is_end, oos_start, oos_end, "OOS", rwa_mode)
 
     # Data range
-    data_range = _get_data_range(raw_dir)
+    data_range = _get_data_range(raw_dir, config.get('reference_symbol', 'BTCUSDT'))
 
     ref_label = ref_date_str if ref_date_str else datetime.now(tz=timezone.utc).strftime("%Y-%m-%d") + " (today)"
 
@@ -400,5 +398,6 @@ if __name__ == "__main__":
         "start_date":           "2025-01-01",
         "split_reference_date": None,
         "export_csv":           False,
+        "reference_symbol":     "BTCUSDT", # "BTCUSDT" | "QQQUSDT"
     }
     run(_config)

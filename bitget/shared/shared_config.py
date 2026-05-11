@@ -2,8 +2,6 @@
 # =============================================================================
 # MARKET REGIME SETTINGS
 # =============================================================================
-
-#REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
 SYMBOL_SUFFIX           = "USDT"
 VOLUME_COL              = "volume_quote"
 
