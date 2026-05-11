@@ -70,12 +70,12 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 1000
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 0.1
+OOS_NETGAIN_TH       = 0.2
 OOS_MAX_DD_TH        = 5
 OOS_R2_TH            = 0.00  
 
@@ -115,8 +115,8 @@ SELECTED_STRATEGIES = [
 #     "51_orderblocks_short_1H",
 #     "52_orderblocks_short_30m",
 #     "53_orderblocks_short_15m",
-# =============================================================================
 ]
+# =============================================================================
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
