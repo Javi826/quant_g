@@ -79,7 +79,7 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 80
+OOS_NETGAIN_TH       = 85
 OOS_MAX_DD_TH        = 7
 OOS_R2_TH            = 0.82  
 

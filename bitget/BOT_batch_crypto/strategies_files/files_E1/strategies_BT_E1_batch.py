@@ -1,6 +1,6 @@
 """
-strategies_BT_00_batch.py — Input for BOT_batch. Do not edit manually.
-Generated from strategies_00.py. Re-run this script after each production deploy.
+strategies_BT_E1_batch.py — Input for BOT_batch. Do not edit manually.
+Generated from strategies_E1.py. Re-run this script after each production deploy.
 """
 
 STRATEGIES = [
@@ -174,7 +174,7 @@ STRATEGIES = [
         "regime_trending_dwtrend": 0.0,
         "regime_ranging_uptrend": 1.0,
         "regime_ranging_dwtrend": 0.0,
-        "regime_volatile_uptrend": 0.0,
+        "regime_volatile_uptrend": 1.0,
         "regime_volatile_dwtrend": 0.0,
         "sell_after_ncandles": 50,
         "order_amount_prod": 360,
@@ -210,7 +210,7 @@ STRATEGIES = [
         "id": "19_flag_short_4H",
         "name": "flag_short_4H",
         "timeframe": "4H",
-        "active": True,
+        "active": False,
         "direction": "short",
         "regime_trending_uptrend": 0.0,
         "regime_trending_dwtrend": 1.0,

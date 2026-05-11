@@ -84,7 +84,7 @@ OOS_R2_TH            = 0.00
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = True
+UPDATE_OUTPUTS           = False
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION

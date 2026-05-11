@@ -7,8 +7,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGIES_SET_NAME = "00"  # "E1" | "00"
-TARGET_BATCH        = "BOT_batch_rwa"  # "BOT_batch" | "BOT_batch_rwa"
+STRATEGIES_SET_NAME = "E1"  # "E1" | "00"
+TARGET_BATCH        = "BOT_batch_crypto"  # "BOT_batch" | "BOT_batch_rwa"
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
 OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
@@ -104,9 +104,6 @@ def generate_loop():
 
     for s in PROD_STRATEGIES:
         live_path = os.path.join(symbols_live_folder, f"symbols_live_{s['id']}_{s['timeframe']}.csv")
-        print(f"DEBUG symbols_live_folder: {os.path.abspath(symbols_live_folder)}")
-        print(f"DEBUG live_path: {os.path.abspath(live_path)}")
-        print(f"DEBUG exists: {os.path.exists(live_path)}")
         if USE_SYMBOLS_LIVE_FOR_N and os.path.exists(live_path):
             import pandas as pd
             n_symbols = len(pd.read_csv(live_path, header=None))
