@@ -30,7 +30,7 @@ logger = logging.getLogger("BOT_batch.utils.regime_utils")
 # -----------------------------------------------------------------------------
 REGIME_ENABLED         = True          # Master switch — set False to bypass all regime filtering
 REGIME_REFERENCE       = 'QQQUSDT'     # Reference symbol for regime calculation
-FORCE_DIRECTION_FILTER = False
+FORCE_DIRECTION_FILTER = True
 REGIME_MIN_TRADES      = 10
 REGIME_LOOKBACK_BARS   = 50
 REGIME_FAMILY_SOURCE   = 'strategy'    # 'strategy' | 'macro'
@@ -215,6 +215,8 @@ def analyze_regime_is(
         forced = 'dwtrend' if strategy_direction == 'long' else 'uptrend'
         for fam in ['trending', 'ranging', 'volatile']:
             bins_to_filter.add(f"{fam}_{forced}")
+            
+    logger.debug(f"  Regime IS — total={len(trades_df_is)} | valid={n_valid} | unknown/neutral={len(trades_df_is)-n_valid}")
 
     return bins_to_filter, pct_remain
 

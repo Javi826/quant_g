@@ -6,7 +6,7 @@ import numpy as np
 # CONFIG
 # =============================================================================
 DATA_FOLDER_IS = os.path.expanduser(
-    "~/projects/quant/quant_b/bitget/data_pipeline/data/04_split/expanding/IS/rwa_2025-01_2026-03_IS"
+    "~/projects/quant/quant_b/bitget/data_pipeline/data/04_split/expanding/IS/rwa_2025-11_2026-03_IS"
 )
 
 TIMEFRAME  = "1Dutc"

@@ -3,7 +3,7 @@ import importlib.util
 import logging
 import os
 import pandas as pd
-from registry.signal_registry import SIGNAL_PARAM_KEYS, PARAM_KEYS
+from shared.registry.signal_registry import SIGNAL_PARAM_KEYS, PARAM_KEYS
 
 logger = logging.getLogger("BOT_batch.utils.io")
 

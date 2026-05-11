@@ -25,6 +25,7 @@ ACCOUNTS = {
         "regime01_ma_period": 4,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
+        "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
         "initial_capital": 9600,
@@ -37,6 +38,7 @@ ACCOUNTS = {
         "regime01_ma_period": 4,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
+        "regime_reference_symbol": "QQQUSDT"
     },
     "01": {
         "initial_capital": 12000,
@@ -58,7 +60,7 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared_config import REGIME_REFERENCE_SYMBOL, REGIME_HURST_WINDOW
+from shared_config import  REGIME_HURST_WINDOW
 from shared_config import REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from shared_config import REGIME_PE_WINDOW, REGIME_PE_ORDER, REGIME_FAMILIES
 
@@ -132,10 +134,10 @@ MIN_ORDER_AMOUNT = 80
 MAX_ORDER_AMOUNT = 360
 
 # TP/SL limits (%)
-MIN_TP_PCT = 1
-MAX_TP_PCT = 10
-MIN_SL_PCT = 1
-MAX_SL_PCT = 10
+MIN_TP_PCT = 2
+MAX_TP_PCT = 3
+MIN_SL_PCT = 2
+MAX_SL_PCT = 3
 
 # Candles timeout limits
 MIN_CANDLES = 50
@@ -174,7 +176,6 @@ VPS_CHECK_CONFIG = {
 # ==========================================================================
 # EXCHANGE SETTINGS
 # ==========================================================================
-from shared_config import BASE_URL, PRODUCT_TYPE
 MARGIN_MODE     = "crossed"
 MARGIN_COIN     = "USDT"
 API_LIMIT_DATA  = 180

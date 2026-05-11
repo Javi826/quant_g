@@ -30,7 +30,7 @@ from shared.utils.utils import filter_symbols
 from backtesters.ZX_compute_BT import  MIN_PRICE, INITIAL_BALANCE
 from pipeline.backtest import run_backtest_is
 from pipeline.oos_period import run_oos_period
-from registry.signal_registry import SIGNAL_REGISTRY
+from shared.registry.signal_registry import SIGNAL_REGISTRY
 from pipeline.universe import select_universe
 from pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from utils.metrics import compute_metrics, print_portfolio_metrics_table,find_best_r2_combination_ids, print_strategies_summary
@@ -70,59 +70,57 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
-
-# REGULAR -- MA4
-#------------------------------------------------------------------------------
-
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 1
+OOS_NETGAIN_TH       = 0.1
 OOS_MAX_DD_TH        = 5
-OOS_R2_TH            = 0.01  
+OOS_R2_TH            = 0.00  
 
 # BATCH
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
-UPDATE_OUTPUTS           = False
+UPDATE_OUTPUTS           = True
 SAVE_TRADES              = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "30_reversal_long_1H",
-    "31_reversal_long_30m",
-    "32_reversal_long_15m",
-    "33_reversal_short_1H",
     "34_reversal_short_30m",
-    "35_reversal_short_15m",
-    "36_parity_long_1H",
-    "37_parity_long_30m",
     "38_parity_long_15m",
-    "39_parity_short_1H",
-    "40_parity_short_30m",
-    "41_parity_short_15m",
-    "42_flag_long_1H",
-    "43_flag_long_30m",
-    "44_flag_long_15m",
-    "45_flag_short_1H",
-    "46_flag_short_30m",
-    "47_flag_short_15m",
-    "48_orderblocks_long_1H",
-    "49_orderblocks_long_30m",
-    "50_orderblocks_long_15m",
-    "51_orderblocks_short_1H",
-    "52_orderblocks_short_30m",
-    "53_orderblocks_short_15m",
+# =============================================================================
+#     "30_reversal_long_1H",
+#     "31_reversal_long_30m",
+#     "32_reversal_long_15m",
+#     "33_reversal_short_1H",
+#     #"35_reversal_short_15m",
+#     "36_parity_long_1H",
+#     "37_parity_long_30m",
+#     "39_parity_short_1H",
+#     "40_parity_short_30m",
+#     "41_parity_short_15m",
+#     "42_flag_long_1H",
+#     "43_flag_long_30m",
+#     "44_flag_long_15m",
+#     "45_flag_short_1H",
+#     "46_flag_short_30m",
+#     "47_flag_short_15m",
+#     "48_orderblocks_long_1H",
+#     "49_orderblocks_long_30m",
+#     "50_orderblocks_long_15m",
+#     "51_orderblocks_short_1H",
+#     "52_orderblocks_short_30m",
+#     "53_orderblocks_short_15m",
+# =============================================================================
 ]
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
-N_SYMBOLS_MCIS            = 11
+N_SYMBOLS_MCIS            = 6
 RUN_MC_OOS                = False
 N_PATHS_OOS1              = 20000
 FIX_SYMBOLS_MCIS_TRAINING = True
@@ -130,7 +128,7 @@ MC_SELECTION_PERCENTILE   = None
 
 RUN_MC_REGIME_ROBUSTNESS  = False
 N_PERMUTATIONS_REGIME     = 2000
-REGIME_ROBUSTNESS_TH      = 0  # NetGain > 0
+REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
 # VALIDATION CONFIGURATION

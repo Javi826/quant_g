@@ -30,7 +30,7 @@ from shared.utils.utils import filter_symbols
 from backtesters.ZX_compute_BT import  MIN_PRICE, INITIAL_BALANCE
 from pipeline.backtest import run_backtest_is
 from pipeline.oos_period import run_oos_period
-from registry.signal_registry import SIGNAL_REGISTRY
+from shared.registry.signal_registry import SIGNAL_REGISTRY
 from pipeline.universe import select_universe
 from pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from utils.metrics import compute_metrics, print_portfolio_metrics_table,find_best_r2_combination_ids, print_strategies_summary

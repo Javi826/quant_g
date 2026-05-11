@@ -3,7 +3,7 @@
 # MARKET REGIME SETTINGS
 # =============================================================================
 
-REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
+#REGIME_REFERENCE_SYMBOL = 'BTCUSDT'
 SYMBOL_SUFFIX           = "USDT"
 VOLUME_COL              = "volume_quote"
 
@@ -18,6 +18,13 @@ REGIME_FAMILIES = {
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging': {}
 }
+
+# =============================================================================
+# REGIME0 SETTINGS (REF MA filter)
+# =============================================================================
+REGIME0_MA_PERIOD = 2
+REGIME0_LONG_TH   = 1.00
+REGIME0_SHORT_TH  = 1.00
 # =============================================================================
 # API SOCKETS SETTINGS
 # =============================================================================
@@ -27,11 +34,3 @@ BASE_URL        = "https://api.bitget.com"
 PRODUCT_TYPE    = "USDT-FUTURES"
 API_TIMEOUT     = 10
 API_MAX_RETRIES = 3
-
-
-# =============================================================================
-# REGIME0 SETTINGS (BTC MA filter)
-# =============================================================================
-REGIME0_MA_PERIOD = 2
-REGIME0_LONG_TH   = 1.00
-REGIME0_SHORT_TH  = 1.00

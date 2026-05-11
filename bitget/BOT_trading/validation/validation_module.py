@@ -9,7 +9,7 @@ logger = logging.getLogger('BOT_trading.validation.validation_module')
 from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_TP_PCT
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
 from config.settings import VALID_TIMEFRAMES
-from config.settings import REGIME_FAMILIES, REGIME_GENERAL, REGIME_REFERENCE_SYMBOL
+from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import STRATEGY_TYPE_REQUIRED_PARAMS, COMMON_REQUIRED_PARAMS
 from config.settings import ACCOUNTS, BASE_URL
 from config.settings import POSTGRES_CONFIG
@@ -322,6 +322,7 @@ def validate_settings():
     # ========================================================================
     # Val S14: REGIME reference symbol
     # ========================================================================
+    from market_regime.regime_classifier import REGIME_REFERENCE_SYMBOL
     validation_s14_errors = 0
     
     if not isinstance(REGIME_REFERENCE_SYMBOL, str):

@@ -13,18 +13,19 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from regime_metrics import calc_all_metrics
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from config.settings import REGIME_REFERENCE_SYMBOL, REGIME_FAMILIES, REGIME_GENERAL
+from config.settings import  REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
 from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2, REGIME0_MA_PERIOD
 from config.settings import ACCOUNTS
+REGIME_REFERENCE_SYMBOL = None
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
 def configure_regime(account_number: str) -> None:
-    global REGIME0_MA_PERIOD, GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
+    global REGIME0_MA_PERIOD, GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2, REGIME_REFERENCE_SYMBOL
     config = ACCOUNTS.get(account_number, {})
-    
+    REGIME_REFERENCE_SYMBOL = config.get('regime_reference_symbol')
     REGIME0_MA_PERIOD        = config.get('regime01_ma_period', REGIME0_MA_PERIOD)
     GLOBAL_SYSTEM_REGIME_TH1 = config.get('regime01_short_th',  GLOBAL_SYSTEM_REGIME_TH1)
     GLOBAL_SYSTEM_REGIME_TH2 = config.get('regime01_long_th',   GLOBAL_SYSTEM_REGIME_TH2)

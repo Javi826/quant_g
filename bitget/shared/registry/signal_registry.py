@@ -1,3 +1,4 @@
+#shared/registry/singal_registry.py
 from signals.add_signals_parity      import parity_long, parity_short
 from signals.add_signals_reversal    import reversal_long, reversal_short
 from signals.add_signals_flag        import flag_long, flag_short

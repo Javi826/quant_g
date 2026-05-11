@@ -367,11 +367,11 @@ def get_implemented_strategies() -> set:
        #'03_parity_long_4H',
        #'04_reversal_short_4H',
        #'06_reversal_long_1H',
-        '07_reversal_short_1H',
+       # '07_reversal_short_1H',
        # '08_reversal_long_6Hutc',
        # '09_reversal_short_6Hutc',
-        '10_parity_long_1H',
-        '11_parity_short_1H',
+       # '10_parity_long_1H',
+       # '11_parity_short_1H',
        #'12_parity_long_6Hutc',
        #'13_orderblocks_short_4H',
        #'17_flag_long_4H',
@@ -383,7 +383,7 @@ def get_implemented_strategies() -> set:
         #'24_flag_long_6Hutc',
         #'25_flag_short_6Hutc',
         #'26_orderblocks_long_4H',
-        '27_orderblocks_short_1H',
+        #'27_orderblocks_short_1H',
        #'28_orderblocks_long_1H',
         
     }

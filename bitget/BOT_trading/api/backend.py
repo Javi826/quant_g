@@ -19,7 +19,6 @@ import requests
 from market_data.websocket_manager import get_ws_manager
 logger = logging.getLogger('BOT_trading.api.backend')
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
-from shared_config import REGIME_REFERENCE_SYMBOL
 import psycopg2
 from api.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info
@@ -28,6 +27,7 @@ from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
 from config.settings import HOUR_ZONE
 from config.utils.utils import get_account_config
+from config.settings import ACCOUNTS
 
 class DashboardServer:
     """Servidor web del dashboard para monitoreo en tiempo real del bot"""
@@ -48,6 +48,7 @@ class DashboardServer:
             symbols_by_strategy: Dict con símbolos por estrategiafrom config.utils import get_account_config
         """
         self.account_number = account_number
+        self.regime_reference_symbol = ACCOUNTS.get(account_number, {}).get('regime_reference_symbol')
         self.base_dir = base_dir
         self.get_current_price = get_current_price_func
         self.get_balance = get_balance_func
@@ -473,7 +474,7 @@ class DashboardServer:
                 
                 btc_price = 0
                 try:
-                    btc_price = float(self.get_current_price(REGIME_REFERENCE_SYMBOL))
+                    btc_price = float(self.get_current_price(self.regime_reference_symbol))
                 except:
                     pass
                 
@@ -2336,7 +2337,7 @@ class DashboardServer:
                 
                 # Get current BTC price
                 try:
-                    btc_price = float(self.get_current_price(REGIME_REFERENCE_SYMBOL))
+                    btc_price = float(self.get_current_price(self.regime_reference_symbol))
                 except Exception as e:
                     cursor.close()
                     conn.close()
