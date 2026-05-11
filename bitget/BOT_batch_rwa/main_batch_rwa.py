@@ -70,8 +70,8 @@ SHOW_PROGRESS = False
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -93,28 +93,28 @@ SELECTED_STRATEGIES = [
     "34_reversal_short_30m",
     "38_parity_long_15m",
 # =============================================================================
-#     "30_reversal_long_1H",
-#     "31_reversal_long_30m",
-#     "32_reversal_long_15m",
-#     "33_reversal_short_1H",
-#     #"35_reversal_short_15m",
-#     "36_parity_long_1H",
-#     "37_parity_long_30m",
-#     "39_parity_short_1H",
-#     "40_parity_short_30m",
-#     "41_parity_short_15m",
-#     "42_flag_long_1H",
-#     "43_flag_long_30m",
-#     "44_flag_long_15m",
-#     "45_flag_short_1H",
-#     "46_flag_short_30m",
-#     "47_flag_short_15m",
-#     "48_orderblocks_long_1H",
-#     "49_orderblocks_long_30m",
-#     "50_orderblocks_long_15m",
-#     "51_orderblocks_short_1H",
-#     "52_orderblocks_short_30m",
-#     "53_orderblocks_short_15m",
+     "30_reversal_long_1H",
+     "31_reversal_long_30m",
+     "32_reversal_long_15m",
+     "33_reversal_short_1H",
+     #"35_reversal_short_15m",
+     "36_parity_long_1H",
+     "37_parity_long_30m",
+     "39_parity_short_1H",
+     "40_parity_short_30m",
+     "41_parity_short_15m",
+     "42_flag_long_1H",
+     "43_flag_long_30m",
+     "44_flag_long_15m",
+     "45_flag_short_1H",
+     "46_flag_short_30m",
+     "47_flag_short_15m",
+     "48_orderblocks_long_1H",
+     "49_orderblocks_long_30m",
+     "50_orderblocks_long_15m",
+     "51_orderblocks_short_1H",
+     "52_orderblocks_short_30m",
+     "53_orderblocks_short_15m",
 ]
 # =============================================================================
 

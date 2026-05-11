@@ -69,7 +69,7 @@ SHOW_PROGRESS = False
 
 # RUN + MC 
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME  = "00"  
+STRATEGIES_SET_NAME  = "E1"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
 

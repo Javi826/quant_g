@@ -312,7 +312,23 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-            
+            elif strategy_id == '34_reversal_short_30m':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+                
+            elif strategy_id == '38_parity_long_15m':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
             # ==============================================================
             # STRATEGY NOT IMPLEMENTED
             # ==============================================================
@@ -385,6 +401,8 @@ def get_implemented_strategies() -> set:
         #'26_orderblocks_long_4H',
         #'27_orderblocks_short_1H',
        #'28_orderblocks_long_1H',
+       '34_reversal_short_30m',
+       '38_parity_long_15m',
         
     }
     return strategies

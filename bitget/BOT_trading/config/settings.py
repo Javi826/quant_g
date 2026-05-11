@@ -28,13 +28,13 @@ ACCOUNTS = {
         "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 9600,
+        "initial_capital": 1600,
         "dashboard_port": 5000,
         "description": "Main Account",
-        "type": "production",
+        "type": "demo",
         "regime01_enabled": True,
         "risk_control_enabled": True,
-        "postgresql_enabled": True,
+        "postgresql_enabled": False,
         "regime01_ma_period": 2,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
@@ -144,7 +144,7 @@ MIN_CANDLES = 50
 MAX_CANDLES = 100
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['1H', '4H', '6Hutc']
+VALID_TIMEFRAMES = ['15m','30m','1H']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION

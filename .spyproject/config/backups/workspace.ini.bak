@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = []
+recent_files = ['bitget/BOT_batch_rwa/main_batch_rwa.py', 'bitget/shared/transfers/E1_splitted_generator.py', 'bitget/BOT_batch_rwa/strategies_files/files_00/strategies_loop_00_01py']
 
 [main]
 version = 0.2.0
