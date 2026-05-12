@@ -1,31 +1,15 @@
-#!/usr/bin/env python3
-"""
-develop/market_regime/regime_threshold_search.py
-
-Grid search over efficiency_ratio and atr_pct thresholds in FAMILIES.
-For each (er_th, atr_th) combination, reclassifies all IS trades,
-applies the regime filter, and computes % profit improvement vs baseline.
-
-Output: summary table per strategy + system total row, sorted by system % improvement.
-
-Easily extensible to OOS periods by adding entries to PERIODS config.
-"""
-
 import os
 import sys
 import pandas as pd
 from pathlib import Path
 from glob import glob
 from itertools import product
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch")))
-
-from regime_common import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
-from regime_common import classify_trade_by_family, load_trades
-from regime_common import build_direction_cache
-from utils.regime_utils import build_metrics_cache
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batch")))
+from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
+from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades
+from shared.shared_batch_develop.market_regime.regime_analysis import build_direction_cache
+from shared_batch.regime.regime_filter import build_metrics_cache
 
 # =============================================================================
 # CONFIGURATION

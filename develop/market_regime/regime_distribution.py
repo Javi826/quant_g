@@ -1,20 +1,3 @@
-#!/usr/bin/env python3
-"""
-develop/market_regime/BTC_regime.py
-
-Analyzes BTC market regime distribution across time periods.
-Breaks down each year (or semester) into 6 bins: family x direction.
-
-Bins:
-    trending_uptrend  | trending_dwtrend
-    volatile_uptrend  | volatile_dwtrend
-    ranging_uptrend   | ranging_dwtrend
-
-Usage:
-    python BTC_regime.py
-    Set PERIOD_MODE = 'year' or 'semester' in configuration below.
-"""
-
 import os
 import sys
 import numpy as np
@@ -22,11 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from pathlib import Path
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-
-from regime_common import get_macro_direction, calc_all_metrics_at_time, classify_trade_by_family
+from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_direction, calc_all_metrics_at_time, classify_trade_by_family
 # =============================================================================
 # CONFIGURATION
 # =============================================================================

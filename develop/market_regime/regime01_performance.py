@@ -1,32 +1,13 @@
-#!/usr/bin/env python3
-"""
-develop/market_regime/regime01_performance.py
-
-Unified regime analysis combining:
-  - Macro BTC direction (regime0): uptrend / downtrend based on BTC 1D MA + thresholds
-  - Market family (regime1): trending / volatile / ranging based on Hurst, ER, ATR, PE
-
-Evaluates 6 cross combinations (family x direction) per strategy.
-Automatically flags bins to filter: trades > MIN_TRADES and profit < 0.
-
-Thresholds (LONG_TH, SHORT_TH) must be obtained from regime0_exhaustive.py first.
-
-Usage:
-    python regime_unified_analyzer.py
-"""
-
 import os
 import sys
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from glob import glob
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-from regime_common import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
-from regime_common import classify_trade_by_family, load_trades, calculate_max_dd_pct
-from regime_common import permutation_test, format_significance, get_macro_direction
+from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
+from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades, calculate_max_dd_pct
+from shared.shared_batch_develop.market_regime.regime_analysis import permutation_test, format_significance, get_macro_direction
 
 # =============================================================================
 # CONFIGURATION

@@ -1,5 +1,5 @@
+#BOT_trading/core/orchestator.py
 """
-BOT_trading/core/orchestator.py
 Main orchestration class for the trading bot.
 Encapsulates all bot state and execution logic.
 """
@@ -16,7 +16,7 @@ parent_dir  = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "broker_api")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_trading_data", "broker_api")))
 
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket

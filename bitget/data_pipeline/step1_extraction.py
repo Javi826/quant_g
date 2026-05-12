@@ -1,25 +1,14 @@
 # step1_extraction.py
-# =============================================================================
-# Step 1 — Extraction — downloads OHLCV candles from Bitget API.
-# Supports incremental download: resumes from last saved timestamp.
-# =============================================================================
 import logging
 import os
 import re
 import sys
 import time
 from datetime import datetime, timezone
-from shared_config import  VOLUME_COL
-
 import pandas as pd
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "broker_api")))
-from api_client import (
-    _call_history_candles,
-    to_dataframe_from_api,
-    get_futures_symbols_from_api,
-)
-
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
+from shared_config import VOLUME_COL
+from shared.shared_trading_data.broker_api.api_client import _call_history_candles, to_dataframe_from_api, get_futures_symbols_from_api
 logger = logging.getLogger("pipeline.step1")
 
 # =============================================================================

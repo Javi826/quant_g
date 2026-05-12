@@ -1,22 +1,16 @@
-
 """
 develop/market_regime/regime0_exhaustive.py
-
 Find best LONG + SHORT BTC MA threshold combination by testing all pairs.
 Tests all combinations (MA_TYPES x THRESHOLDS) on all baseline periods.
 Shows results per period and aggregated.
 """
-
 import os
 import sys
 import pandas as pd
 from pathlib import Path
 from glob import glob
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_market_regime")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-from regime_common import get_macro_direction
-
+from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_direction
 # =============================================================================
 # CONFIGURATION
 # =============================================================================

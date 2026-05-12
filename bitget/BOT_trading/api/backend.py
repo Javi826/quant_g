@@ -24,7 +24,6 @@ from api.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
-from config.settings import GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2
 from config.settings import HOUR_ZONE
 from config.utils.utils import get_account_config
 from config.settings import ACCOUNTS

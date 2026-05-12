@@ -12,7 +12,7 @@ import sys
 import logging
 import numpy as np
 import pandas as pd
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "broker_api")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_trading_data", "broker_api")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
 from shared_config import VOLUME_COL
 from api_client import _call_history_candles, to_dataframe_from_api

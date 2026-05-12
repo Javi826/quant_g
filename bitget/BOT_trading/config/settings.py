@@ -6,7 +6,7 @@ validation limits, paths, and account-specific settings.
 """
 import sys, os
 import socket
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from zoneinfo import ZoneInfo
 
 # ==========================================================================
@@ -60,9 +60,9 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared_config import  REGIME_HURST_WINDOW
-from shared_config import REGIME_ER_WINDOW, REGIME_ATR_WINDOW
-from shared_config import REGIME_PE_WINDOW, REGIME_PE_ORDER, REGIME_FAMILIES
+from shared.shared_trading_batch.config_trading_batch import REGIME_HURST_WINDOW
+from shared.shared_trading_batch.config_trading_batch import REGIME_ER_WINDOW, REGIME_ATR_WINDOW
+from shared.shared_trading_batch.config_trading_batch import REGIME_PE_WINDOW, REGIME_PE_ORDER, REGIME_FAMILIES
 
 REGIME_GENERAL = {
     'trending': 1.0,
@@ -70,11 +70,6 @@ REGIME_GENERAL = {
     'volatile': 1.0,
 }
 
-from shared_config import REGIME0_MA_PERIOD, REGIME0_LONG_TH, REGIME0_SHORT_TH
-
-REGIME0_MA_PERIOD        = REGIME0_MA_PERIOD
-GLOBAL_SYSTEM_REGIME_TH1 = REGIME0_SHORT_TH  # SHORT threshold (BTC < MA5 * TH1)
-GLOBAL_SYSTEM_REGIME_TH2 = REGIME0_LONG_TH   # LONG threshold (BTC > MA5 * TH2)
 
 # ==========================================================================
 # RISK CONTROL SETTINGS
@@ -191,9 +186,9 @@ PERSISTENCE_DIR       = "persistence"
 # ==========================================================================
 # API - WEBSOCKET SETTINGS
 # ==========================================================================
-from shared_config import BASE_URL, PRODUCT_TYPE
-from shared_config import WS_PUBLIC_URL, WS_PRIVATE_URL
-from shared_config import API_TIMEOUT, API_MAX_RETRIES
+from shared.shared_trading_data.config_trading_data import API_TIMEOUT, API_MAX_RETRIES
+from shared.shared_trading_data.config_trading_data import BASE_URL, PRODUCT_TYPE
+from shared.shared_trading_data.config_trading_data import WS_PUBLIC_URL, WS_PRIVATE_URL
 # ==========================================================================
 # LOGGER SETTINGS
 # ==========================================================================
