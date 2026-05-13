@@ -1,10 +1,10 @@
 #shared_batch/pipeline/backtest.py
 import logging
 import pandas as pd
-from shared_batch.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
-from shared_batch.utils.torque import prepare_ohlcv_arrays
-from shared_batch.regime.regime_filter import analyze_regime_is, run_oos_backtest_with_regime
-from shared_batch.utils.io import accumulate_strategy_trades
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
+from shared_batchs.utils.torque import prepare_ohlcv_arrays
+from shared_batchs.regime.regime_filter import analyze_regime_is, run_oos_backtest_with_regime
+from shared_batchs.utils.io import accumulate_strategy_trades
 
 logger = logging.getLogger("BOT_batch.pipeline.backtest")
 

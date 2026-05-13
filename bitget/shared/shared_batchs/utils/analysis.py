@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 from scipy.stats import pearsonr
 from sklearn.feature_selection import mutual_info_regression
-from shared_batch.regime.regime_config import REGIME_REFERENCE
+from shared_batchs.regime.regime_config import REGIME_REFERENCE
 
 
 warnings.filterwarnings("ignore")

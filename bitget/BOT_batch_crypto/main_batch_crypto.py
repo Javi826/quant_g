@@ -7,7 +7,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
-
 import matplotlib
 SHOW_PLOTS = True
 if not SHOW_PLOTS:
@@ -27,24 +26,34 @@ logging.basicConfig(level=LOG_LEVEL, format="%(message)s", force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
+logger = logging.getLogger("BOT_batch.main_batch")
 
-from shared_batch.utils.utils import filter_symbols
-from shared_batch.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
-from shared_batch.pipeline.backtest import run_backtest_is
-from shared_batch.pipeline.oos_period import run_oos_period
-from shared_batch.registry.signal_registry import SIGNAL_REGISTRY
-from shared_batch.pipeline.universe import select_universe
-from shared_batch.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
-from shared_batch.utils.metrics import compute_metrics, print_portfolio_metrics_table, find_best_r2_combination_ids, print_strategies_summary
-from shared_batch.utils.metrics import print_all_curves_table, print_robustness_table, print_best_r2_robustness_table
-from shared_batch.utils.plotting import plot_portfolio_comparison
-from shared_batch.utils.io import save_drift_reference, save_strategies_pr
-from shared_batch.utils.io import compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batch.regime.regime_filter import prepare_regime_metrics_cache_is
-from shared_batch.utils.portfolio import decorrelate_by_profit
-from shared_batch.utils.metrics import compute_metrics as _cm
-from shared_batch.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
-from shared_batch.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
+# COMPUTE CONFIGURATION
+#------------------------------------------------------------------------------
+DTYPE         = np.float32
+N_JOBS        = -1
+SHOW_PROGRESS = False
+
+from shared_batchs.utils.utils import filter_symbols
+from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
+from shared_batchs.pipeline.backtest import run_backtest_is
+from shared_batchs.pipeline.oos_period import run_oos_period
+from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
+from shared_batchs.pipeline.universe import select_universe
+from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
+from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batchs.utils.batch_metrics import compute_metrics as _cm
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
+from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table, print_best_r2_robustness_table
+from shared_batchs.utils.plotting import plot_portfolio_comparison
+from shared_batchs.utils.io import save_drift_reference, save_strategies_pr
+from shared_batchs.utils.io import compare_and_generate_csv, update_strategies_symbols, print_update_status
+from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is
+from shared_batchs.runs.run_correlation import decorrelate_by_profit
+from shared_batchs.runs.run_best_combinations import find_best_r2_combination_ids
+from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
+from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
+from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -60,23 +69,21 @@ _drift_results                 : list = []
 _best_params_results           : dict = {}
 
 # =============================================================================
-# GLOBAL CONFIGURATION
+# RUN CONFIGURATION
 # =============================================================================
-DTYPE         = np.float32
-logger        = logging.getLogger("BOT_batch.main_batch")
-N_JOBS        = -1
-MY_SYMBOLS    = False
-SHOW_PROGRESS = False
+# SYMBOLS
+#------------------------------------------------------------------------------
+MY_SYMBOLS           = False
 
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
 
-# RUN + MC 
+# BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 10
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # REGULAR -- MA4
 #------------------------------------------------------------------------------
@@ -88,11 +95,17 @@ OOS_NETGAIN_TH       = 85
 OOS_MAX_DD_TH        = 7
 OOS_R2_TH            = 0.82  
 
-# BATCH
+OOS_NETGAIN_TH       = 30
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.82  
+
+# RUNS
 #------------------------------------------------------------------------------
 RUN_PORTFOLIO_ANALYSIS   = True
 RUN_CORRELATION_ANALYSIS = False
 RUN_BEST_COMBINATIONS    = False
+RUN_BEST_PORTFOLIO       = True
+
 UPDATE_OUTPUTS           = True
 SAVE_TRADES              = False
 
@@ -131,8 +144,8 @@ SELECTED_STRATEGIES = [
 #MONTECARLOS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
-RUN_MC_OOS                = False
-N_PATHS_OOS1              = 20000
+RUN_MC_OOS                = True
+N_PATHS_OOS1              = 2000
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  
 
@@ -534,7 +547,7 @@ def run_batch(strategy_config: dict) -> None:
 # PORTFOLIO ANALYSIS
 # =============================================================================
 
-def run_portfolio_analysis():
+def run_summary():
     """Compute combined portfolio metrics. Call after all run_batch() calls."""
     if not RUN_PORTFOLIO_ANALYSIS:
         print_strategies_summary(_validation_results)
@@ -615,7 +628,13 @@ def run_portfolio_analysis():
             initial_balance=INITIAL_BALANCE,
             title="Portfolio OOS3 — Validated only",
         )
+        
+# =============================================================================
+# RUNS
+# =============================================================================
 
+    # BEST_COMBINATIONS 
+    # -------------------------------------------------------------------------
     if RUN_BEST_COMBINATIONS and validated_oos1_regime:
         best_r2_combo_ids = find_best_r2_combination_ids(
             strategy_trades_is = [(sid, df) for sid, df in _strategy_trades_is_regime if sid in validated_ids],
@@ -640,7 +659,7 @@ def run_portfolio_analysis():
             ],
             initial_balance      = INITIAL_BALANCE,
         )
-    # -------------------------------------------------------------------------
+        
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if RUN_CORRELATION_ANALYSIS:
@@ -675,7 +694,16 @@ def run_portfolio_analysis():
                     ("OOS3", [(sid, df) for sid, df in validated_oos3_regime if sid in survivors_ids]),
                 ],
                 initial_balance=INITIAL_BALANCE,
-            )
+            )   
+    # BEST PORTFOLIO 
+    # -------------------------------------------------------------------------
+    if RUN_BEST_PORTFOLIO:
+        find_best_portfolio_combination(
+            validated_trades_oos1=validated_oos1_regime,
+            validated_trades_oos2=validated_oos2_regime,
+            validated_trades_oos3=validated_oos3_regime,
+            initial_balance=INITIAL_BALANCE,
+        )
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -738,7 +766,7 @@ if __name__ == "__main__":
         )
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
     
-    run_portfolio_analysis()
+    run_summary()
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed//3600} h {(elapsed%3600)//60} min {elapsed%60} s")

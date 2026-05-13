@@ -8,10 +8,10 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 
-from shared_batch.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
-from shared_batch.utils.analysis import report_montecarlo
-from shared_batch.tools.optimize_MC import generate_paths_for_all_symbols_functional
-from shared_batch.utils.torque import get_n_obs, extract_ohlcv_from_path, compile_MC_results
+from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
+from shared_batchs.utils.analysis import report_montecarlo
+from shared_batchs.tools.optimize_MC import generate_paths_for_all_symbols_functional
+from shared_batchs.utils.torque import get_n_obs, extract_ohlcv_from_path, compile_MC_results
 
 logger = logging.getLogger("BOT_batch.pipeline.montecarlo")
 

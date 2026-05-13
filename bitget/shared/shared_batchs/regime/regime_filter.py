@@ -2,17 +2,17 @@
 import logging
 import numpy as np
 import pandas as pd
-from shared_batch.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
-from shared_batch.regime.regime_config import REGIME_ENABLED, REGIME_REFERENCE, FORCE_DIRECTION_FILTER
-from shared_batch.regime.regime_config import REGIME_MIN_TRADES, REGIME_LOOKBACK_BARS, REGIME_FAMILY_SOURCE
-from shared_batch.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
+from shared_batchs.regime.regime_config import REGIME_ENABLED, REGIME_REFERENCE, FORCE_DIRECTION_FILTER
+from shared_batchs.regime.regime_config import REGIME_MIN_TRADES, REGIME_LOOKBACK_BARS, REGIME_FAMILY_SOURCE
+from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 from shared.shared_trading_batch.config_trading_batch import REGIME_ATR_WINDOW as ATR_WINDOW, REGIME_PE_WINDOW as PE_WINDOW, REGIME_PE_ORDER as PE_ORDER
 from shared.shared_trading_batch.config_trading_batch import REGIME_FAMILIES as FAMILIES, REGIME_HURST_WINDOW as HURST_WINDOW, REGIME_ER_WINDOW as ER_WINDOW
 from shared.shared_batch_develop.market_regime.regime_analysis import load_reference_symbol_for_timeframe
 from shared.shared_batch_develop.market_regime.regime_analysis import calc_all_metrics_at_time, calc_all_metrics
 from shared.shared_batch_develop.market_regime.regime_analysis import calculate_max_dd_pct, classify_trade_by_family
 from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_direction, filter_signals_by_regime
-from shared_batch.utils.metrics import compute_metrics
+from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("shared_batch.regime.regime_filter")
 # =============================================================================
 # BUILD METRICS CACHE
