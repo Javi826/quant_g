@@ -15,7 +15,6 @@ if not SHOW_PLOTS:
 import logging
 import time
 import numpy as np
-import pandas as pd
 from itertools import product
 from importlib import import_module
 
@@ -37,19 +36,18 @@ SHOW_PROGRESS = False
 
 from shared_batchs.utils.utils import filter_symbols
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
-from shared_batchs.pipeline.backtest import run_backtest_is
+from shared_batchs.pipeline.is_period import run_backtest_is
 from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.universe import select_universe
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics, compute_metrics as _cm
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
-from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table, print_best_r2_robustness_table
+from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
 from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is, REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
-from shared_batchs.runs.run_best_combinations import find_best_r2_combination_ids
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
@@ -88,13 +86,14 @@ OOS_R2_TH            = 0.15
 
 # RUNS
 #------------------------------------------------------------------------------
-RUN_PORTFOLIO_ANALYSIS   = True
-RUN_CORRELATION_ANALYSIS = False
-RUN_BEST_COMBINATIONS    = False
-RUN_BEST_PORTFOLIO       = True
+RUN_SUMMARY        = True
+RUN_CORRELATION    = False
+RUN_BEST_PORTFOLIO = False
 
-UPDATE_OUTPUTS           = True
-SAVE_TRADES              = False
+# OUTPUTS
+#------------------------------------------------------------------------------
+UPDATE_OUTPUTS     = False
+SAVE_TRADES        = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -286,7 +285,6 @@ def run_batch(strategy_config: dict) -> None:
         strategy_direction    = SIDE,
         metrics_cache_is      = metrics_cache_is,
         save_trades           = SAVE_TRADES,
-        run_best_combinations = RUN_BEST_COMBINATIONS,
         trades_is_baseline    = _strategy_trades_is_baseline,
         trades_is_regime      = _strategy_trades_is_regime,
         brief_trades_folder   = brief_trades_folder,
@@ -534,7 +532,7 @@ def run_batch(strategy_config: dict) -> None:
 
 def run_summary():
     """Compute combined portfolio metrics. Call after all run_batch() calls."""
-    if not RUN_PORTFOLIO_ANALYSIS:
+    if not RUN_SUMMARY:
         print_strategies_summary(_validation_results)
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
         return
@@ -617,37 +615,10 @@ def run_summary():
 # =============================================================================
 # RUNS
 # =============================================================================
-
-    # BEST_COMBINATIONS 
-    # -------------------------------------------------------------------------
-    if RUN_BEST_COMBINATIONS and validated_oos1_regime:
-        best_r2_combo_ids = find_best_r2_combination_ids(
-            strategy_trades_is = [(sid, df) for sid, df in _strategy_trades_is_regime if sid in validated_ids],
-            initial_balance = INITIAL_BALANCE,
-        )
-        is_combined = pd.concat(
-            [df for sid, df in _strategy_trades_is_regime if sid in best_r2_combo_ids],
-            ignore_index=True
-        ).sort_values("sell_time").reset_index(drop=True)
-        is_r2 = compute_metrics(is_combined, capital=INITIAL_BALANCE * len(best_r2_combo_ids), name="")["R_Squared"]
-
-        strategies_str = "\n".join(f"    · {sid}" for sid in best_r2_combo_ids)
-        logger.info(
-            f"\n{'─'*115}\n  BEST R² COMBINATION (selected on IS) — R²={is_r2:.3f}\n{'─'*115}\n{strategies_str}\n{'─'*115}"
-        )
-        print_best_r2_robustness_table(
-            combo_ids            = best_r2_combo_ids,
-            strategy_trades_per_period= [
-                ("OOS1", validated_oos1_regime),
-                ("OOS2", validated_oos2_regime),
-                ("OOS3", validated_oos3_regime),
-            ],
-            initial_balance      = INITIAL_BALANCE,
-        )
         
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
-    if RUN_CORRELATION_ANALYSIS:
+    if RUN_CORRELATION:
         logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'-'*115}")
         survivors_profit = decorrelate_by_profit(
             strategy_trades_oos1     = validated_oos1_regime,

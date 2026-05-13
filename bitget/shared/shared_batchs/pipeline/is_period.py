@@ -1,7 +1,7 @@
 #shared_batch/pipeline/backtest.py
 import logging
 import pandas as pd
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
+from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.torque import prepare_ohlcv_arrays
 from shared_batchs.regime.regime_filter import analyze_regime_is, run_oos_backtest_with_regime
 from shared_batchs.utils.io import accumulate_strategy_trades
@@ -26,7 +26,6 @@ def run_backtest_is(
     strategy_direction: str,
     metrics_cache_is: dict,
     save_trades: bool,
-    run_best_combinations: bool,
     trades_is_baseline: list,
     trades_is_regime: list,
     brief_trades_folder: str,
@@ -71,28 +70,6 @@ def run_backtest_is(
             trades_is_baseline, strategy_id, trades_df_is,
             csv_folder=brief_trades_folder, label="is_baseline",
         )
-
-    if run_best_combinations:
-        trades_df_is_regime, _ = run_oos_backtest_with_regime(
-            strategy_id     = f"{strategy_id}_is_regime",
-            ohlcv_arrays    = ohlcv_arr_is,
-            signal_fn       = signal_fn,
-            signal_params   = signal_params,
-            best_params     = best_params,
-            order_amount    = order_amount,
-            data_folder     = data_folder_is,
-            timeframe       = timeframe,
-            bins_to_filter  = bins_to_filter,
-            initial_balance = INITIAL_BALANCE,
-        )
-        if len(trades_df_is_regime) > 0:
-            if save_trades:
-                accumulate_strategy_trades(
-                    trades_is_regime, strategy_id, trades_df_is_regime,
-                    csv_folder=brief_trades_folder, label="is_regime",
-                )
-            else:
-                trades_is_regime.append((strategy_id, trades_df_is_regime.copy()))
 
     return bins_to_filter, trades_df_is
 
