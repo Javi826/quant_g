@@ -13,7 +13,7 @@ from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_
 
 BTC_FILE = os.path.join(
     os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline",
-    "data", "04_split", "expanding", "IS", "crypto_full_IS", "BTCUSDT_1Dutc.parquet"
+    "data", "04_split", "expanding", "IS", "rwa_2025-01_2026-05_IS", "BTCUSDT_1Dutc.parquet"
 )
 
 PERIOD_MODE   = "year"      # "year" | "semester"

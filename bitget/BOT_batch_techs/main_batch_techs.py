@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_rea.py
+#BOT_batch/main_batch_techs.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -87,42 +87,42 @@ OOS_R2_TH            = 0.15
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
+RUN_BEST_PORTFOLIO = True
 RUN_CORRELATION    = False
-RUN_BEST_PORTFOLIO = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = False
-SAVE_TRADES        = False
+UPDATE_OUTPUTS     = True
+SAVE_TRADES        = True
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
     "34_reversal_short_30m",
     "38_parity_long_15m",
-# =============================================================================
+    "44_flag_long_15m",
+    "46_flag_short_30m",
+# -----------------------------------------------------------------------------
     "30_reversal_long_1H",
     "31_reversal_long_30m",
     "32_reversal_long_15m",
     "33_reversal_short_1H",
-    #"35_reversal_short_15m",
+    "35_reversal_short_15m",
     "36_parity_long_1H",
     "37_parity_long_30m",
     "39_parity_short_1H",
-     "40_parity_short_30m",
-     "41_parity_short_15m",
-     "42_flag_long_1H",
-     "43_flag_long_30m",
-     "44_flag_long_15m",
-     "45_flag_short_1H",
-     "46_flag_short_30m",
-     "47_flag_short_15m",
-     "48_orderblocks_long_1H",
-     "49_orderblocks_long_30m",
-     "50_orderblocks_long_15m",
-     "51_orderblocks_short_1H",
-     "52_orderblocks_short_30m",
-     "53_orderblocks_short_15m",
+    "40_parity_short_30m",
+    "41_parity_short_15m",
+    "42_flag_long_1H",
+    "43_flag_long_30m",
+    "45_flag_short_1H",
+    "47_flag_short_15m",
+    "48_orderblocks_long_1H",
+    "49_orderblocks_long_30m",
+    "50_orderblocks_long_15m",
+    "51_orderblocks_short_1H",
+    "52_orderblocks_short_30m",
+    "53_orderblocks_short_15m",
 ]
 # =============================================================================
 
@@ -176,8 +176,8 @@ STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategie
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
-DRIFT_MONTECARLO_FOLDER    = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_montecarlo")
-DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_montecarlo_{STRATEGIES_SET_NAME}_batch.py")
+DRIFT_REFERENCE_FOLDER     = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_reference")
+DRIFT_BATCH_PATH           = os.path.join(DRIFT_REFERENCE_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
 # DATA
 #------------------------------------------------------------------------------
@@ -510,11 +510,14 @@ def run_batch(strategy_config: dict) -> None:
     _icon        = "🔵" if _changes else "⚪"
     logger.debug(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
+    df_regime = trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline
+    p_target_winrate_oos1 = round((df_regime["profit"] > 0).mean() * 100, 1) if len(df_regime) > 0 else 0.0
+    
     _drift_results.append({
-        "strategy_id": STRATEGY_ID,
-        "p5_winrate":  round(float(p5_winrate_oos1) * 100, 1),
-        "p50_winrate": round(float(p50_winrate_oos1) * 100, 1),
-    })
+        "strategy_id":        STRATEGY_ID,
+        "p_target_winrate":   p_target_winrate_oos1,
+        })
+    
     _best_params_results[STRATEGY_ID] = best_params
 
     if _validation_results:
@@ -524,6 +527,7 @@ def run_batch(strategy_config: dict) -> None:
 
     elapsed = int(time.time() - start_time)
     logger.info(f"DONE  🏁 ──  {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+
 
 
 # =============================================================================

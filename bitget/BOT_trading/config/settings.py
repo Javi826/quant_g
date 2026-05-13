@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 21600,
+        "initial_capital": 14400,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -27,7 +27,7 @@ ACCOUNTS = {
         "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 1600,
+        "initial_capital": 3600,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",

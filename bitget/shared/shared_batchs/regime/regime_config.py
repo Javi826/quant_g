@@ -5,6 +5,7 @@
 # =============================================================================
 REGIME_ENABLED         = True       
 REGIME_REFERENCE       = 'BTCUSDT'   
+#REGIME_REFERENCE       = 'QQQUSDT'
 FORCE_DIRECTION_FILTER = True
 REGIME_MIN_TRADES      = 10
 REGIME_LOOKBACK_BARS   = 50

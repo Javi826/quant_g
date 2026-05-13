@@ -1,15 +1,16 @@
+#bitget/develop/market_regime/regime01_th.py
 import os
 import sys
 import pandas as pd
 from pathlib import Path
 from glob import glob
 from itertools import product
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batch")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
 from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
 from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades
 from shared.shared_batch_develop.market_regime.regime_analysis import build_direction_cache
-from shared_batch.regime.regime_filter import build_metrics_cache
+from shared_batchs.regime.regime_filter import build_metrics_cache
 
 # =============================================================================
 # CONFIGURATION

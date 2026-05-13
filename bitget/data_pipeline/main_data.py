@@ -46,25 +46,20 @@ CLEAN_DIR                   = os.path.join(DATA_DIR, "02_clean")
 HIGHLOW_DIR                 = os.path.join(DATA_DIR, "03_highlow")
 SPLIT_DIR                   = os.path.join(DATA_DIR, "04_split")
 
-DEBUG_RAW_INTEGRITY_DIR     = os.path.join(DATA_DIR, "debug_02_raw_integrity")
-DEBUG_CLEAN_INTEGRITY_DIR   = os.path.join(DATA_DIR, "debug_04_clean_integrity")
-DEBUG_HIGHLOW_INTEGRITY_DIR = os.path.join(DATA_DIR, "debug_06_highlow_integrity")
-
 # =============================================================================
 # PIPELINE CONFIG
 # =============================================================================
-DEBUG_MODE = False
 EXPORT_CSV = False   
 
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = ["SPYUSDT", "SQQQUSDT"]
+SELECTED_SYMBOLS   = []
 SYMBOL_MODE        = "auto"
 
-N_SYMBOLS_DOWNLOAD = 80
-RWA_MODE           = "rwa_only"   # "crypto_only" | "rwa_only"                                                            
-REFERENCE_SYMBOL   = "QQQUSDT"
+N_SYMBOLS_DOWNLOAD = 40
+RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
+REFERENCE_SYMBOL   = "BTCUSDT"
 
                                           
 
@@ -72,15 +67,15 @@ REFERENCE_SYMBOL   = "QQQUSDT"
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
-START_DATE = "2025-01-01"
+#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
+START_DATE = "2021-01-01"
 END_DATE   = None 
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
 TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
 
 # =============================================================================
 # SPLIT DATA
@@ -101,10 +96,6 @@ IS_ROLLING_MONTHS    = 3
 def _make_dirs() -> None:
     for d in [RAW_DIR, CLEAN_DIR, HIGHLOW_DIR, SPLIT_DIR]:
         os.makedirs(d, exist_ok=True)
-    if DEBUG_MODE:
-        for d in [DEBUG_RAW_INTEGRITY_DIR, DEBUG_CLEAN_INTEGRITY_DIR, DEBUG_HIGHLOW_INTEGRITY_DIR]:
-            os.makedirs(d, exist_ok=True)
-
 
 def _run_step(name: str, fn, config: dict) -> bool:
     logger.info(f"\n{'='*60}")
@@ -141,10 +132,6 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
         "clean_dir":                     CLEAN_DIR,
         "highlow_dir":                   HIGHLOW_DIR,
         "split_dir":                     SPLIT_DIR,
-        "debug_mode":                    DEBUG_MODE,
-        "debug_raw_integrity_dir":       DEBUG_RAW_INTEGRITY_DIR,
-        "debug_clean_integrity_dir":     DEBUG_CLEAN_INTEGRITY_DIR,
-        "debug_highlow_integrity_dir":   DEBUG_HIGHLOW_INTEGRITY_DIR,
         "rwa_mode": RWA_MODE,
         "reference_symbol": REFERENCE_SYMBOL,
     }
@@ -154,6 +141,7 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
 # =============================================================================
 
 def _run_pipeline() -> None:
+    collector = integrity.IssueCollector()
 
     # Split preview + confirmation before any work is done
     config_preview = _build_config()
@@ -180,17 +168,17 @@ def _run_pipeline() -> None:
         if not ok:
             logger.info(f"❌ Extraction failed for {tf}. Skipping to next timeframe.")
             continue
-        _run_step(f"STEP 2 — Raw Integrity [{tf}]", integrity.run_raw, config)
+        _run_step(f"STEP 2 — Raw Integrity [{tf}]", lambda c: integrity.run_raw(c, collector), config)
         ok = _run_step(f"STEP 3 — Cleaning [{tf}]", step3_cleaning.run, config)
         if not ok:
             logger.info(f"❌ Cleaning failed for {tf}. Skipping to next timeframe.")
             continue
-        ok = _run_step(f"STEP 4 — Clean Integrity [{tf}]", integrity.run_clean, config)
+        ok = _run_step(f"STEP 4 — Clean Integrity [{tf}]", lambda c: integrity.run_clean(c, collector), config)
         if not ok:
             logger.info(f"❌ Clean integrity failed for {tf}. Skipping to next timeframe.")
 
     # Coverage check — runs once after all timeframes are downloaded
-    _run_step("STEP 2b — Coverage Integrity", integrity.run_coverage, _build_config(selected_symbols=selected_symbols))
+    _run_step("STEP 2b — Coverage Integrity", lambda c: integrity.run_coverage(c, collector), _build_config(selected_symbols=selected_symbols))
 
     # Steps 5-7 — High/Low + integrity + IS/OOS split
     config = _build_config(selected_symbols=selected_symbols)
@@ -198,35 +186,12 @@ def _run_pipeline() -> None:
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 5.")
         return
-    _run_step("STEP 6 — High/Low Integrity", integrity.run_highlow, config)
+    _run_step("STEP 6 — High/Low Integrity", lambda c: integrity.run_highlow(c, collector), config)
     ok = _run_step("STEP 7 — IS/OOS Split", step7_split.run, config)
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 7.")
 
-# =============================================================================
-# IS/OOS SPLIT
-# =============================================================================
-# SPLIT_MODE = "expanding"
-#   IS  : from START_DATE until (today - WINDOW_OOS_MONTHS)
-#   OOS : last WINDOW_OOS_MONTHS up to today
-#   Each monthly run the IS grows as more data is available.
-#
-# SPLIT_MODE = "rolling"
-#   OOS always ends at today and lasts WINDOW_OOS_MONTHS.
-#   IS ends where OOS starts.
-#   IS_ROLLING_MONTHS controls how much the IS start advances on each consecutive run.
-#   Run 1: IS = START_DATE → (today - WINDOW_OOS_MONTHS)
-#   Run 2: IS start advances by IS_ROLLING_MONTHS
-#   State is persisted in rolling_state.csv so each run knows where to resume.
-#
-# SPLIT_REFERENCE_DATE
-#   Controls the IS/OOS cut point calculation (step 7 only) — does NOT affect download.
-#   None        → split calculated relative to today (normal monthly production use)
-#   "YYYY-MM-DD"→ simulate how the split would have looked at that past date.
-#                 Useful for backtesting or reconstructing historical train/test sets.
-#   Example: data downloaded up to 2026-04-14, SPLIT_REFERENCE_DATE = "2025-10-01"
-#            → IS/OOS calculated as if today were 2025-10-01, ignoring later data
-
+    integrity.print_summary(collector)
 # =============================================================================
 # MAIN
 # =============================================================================

@@ -29,6 +29,13 @@ RANKING_CRITERIA = [
     ("NetGain%",   False),
 ]
 
+# =============================================================================
+# RANKING_CRITERIA = [
+#     ("CVaR10%",False),
+#     ("NetGain%",False),
+# ]
+# =============================================================================
+
 TOP_N = 2
 
 
@@ -140,7 +147,7 @@ def _compute_weighted_metrics(
 
 def _print_best_combinations(top: list, period_weights: dict) -> None:
     W = 115
-    logger.info(f"\n{'='*W}\n  BEST PORTFOLIO COMBINATIONS\n{'='*W}")
+    logger.info(f"\n{'─'*W}\n  BEST PORTFOLIO COMBINATIONS\n{'─'*W}")
 
     for rank, entry in enumerate(top, start=1):
         combo          = entry["combo"]
@@ -169,7 +176,7 @@ def _print_best_combinations(top: list, period_weights: dict) -> None:
             })
         _print_robustness_df(rows, f"ROBUSTNESS TABLE — Combination #{rank}")
 
-    logger.info(f"\n{'='*W}")
+    logger.info(f"\n{'─'*W}")
 
 
 # =============================================================================

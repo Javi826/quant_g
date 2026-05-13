@@ -93,7 +93,7 @@ OOS_NETGAIN_TH       = 85
 OOS_MAX_DD_TH        = 7
 OOS_R2_TH            = 0.82  
 
-OOS_NETGAIN_TH       = 30
+OOS_NETGAIN_TH       = 20
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82  
 
@@ -637,7 +637,7 @@ def run_summary():
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if RUN_CORRELATION:
-        logger.info(f"\n{'-'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'-'*115}")
+        logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
         survivors_profit = decorrelate_by_profit(
             strategy_trades_oos1     = validated_oos1_regime,
 # =============================================================================

@@ -1,13 +1,13 @@
+#bitget/develop/market_regime/regime01_performance.py
 import os
 import sys
-import numpy as np
 import pandas as pd
 from pathlib import Path
 from glob import glob
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
 from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades, calculate_max_dd_pct
-from shared.shared_batch_develop.market_regime.regime_analysis import permutation_test, format_significance, get_macro_direction
+from shared.shared_batch_develop.market_regime.regime_analysis import  get_macro_direction
 
 # =============================================================================
 # CONFIGURATION
@@ -18,7 +18,7 @@ TRADES_LABEL     = "is_baseline"
 
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
-REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-03_IS")
+REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-05_IS")
 #REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
