@@ -1,5 +1,5 @@
+#BOT_trading/market_regime/regime_classifier.py
 """
-BOT_trading/market_regime/regime_classifier.py
 Core module for market regime classification and position sizing.
 Integrates with BOT_trading's market_data infrastructure.
 """
@@ -12,11 +12,20 @@ from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
 from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
 from config.settings import ACCOUNTS
+logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 REGIME_REFERENCE_SYMBOL  = None
 REGIME0_MA_PERIOD        = None
 GLOBAL_SYSTEM_REGIME_TH1 = None
 GLOBAL_SYSTEM_REGIME_TH2 = None
-logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
+_cached_direction: str = 'uptrend'
+
+def update_direction_cache(direction: str) -> None:
+    global _cached_direction
+    _cached_direction = direction
+
+def get_cached_direction() -> str:
+    return _cached_direction
+
 def configure_regime(account_number: str) -> None:
     global REGIME0_MA_PERIOD, GLOBAL_SYSTEM_REGIME_TH1, GLOBAL_SYSTEM_REGIME_TH2, REGIME_REFERENCE_SYMBOL
     config = ACCOUNTS.get(account_number, {})
@@ -25,15 +34,14 @@ def configure_regime(account_number: str) -> None:
     GLOBAL_SYSTEM_REGIME_TH1 = config.get('regime01_short_th',  GLOBAL_SYSTEM_REGIME_TH1)
     GLOBAL_SYSTEM_REGIME_TH2 = config.get('regime01_long_th',   GLOBAL_SYSTEM_REGIME_TH2)
     
-def fetch_btc_ohlcv(timeframe: str, limit: int = None) -> Optional[pd.DataFrame]:
+def fetch_ref_ohlcv(timeframe: str) -> Optional[pd.DataFrame]:
     """
-    Fetch BTC OHLCV data for regime calculation.
+    Fetch reference symbol OHLCV data for regime calculation.
 
     Uses the same data fetching logic as trading strategies to ensure consistency.
 
     Args:
         timeframe: Timeframe (e.g., '4H', '1H', '6Hutc')
-        limit: Number of bars to fetch (not used, kept for compatibility)
 
     Returns:
         DataFrame with OHLCV data or None on error
@@ -52,13 +60,13 @@ def fetch_btc_ohlcv(timeframe: str, limit: int = None) -> Optional[pd.DataFrame]
         return df
 
     except Exception as e:
-        logger.error(f"Error fetching BTC OHLCV for regime: {e}")
+        logger.error(f"Error fetching {REGIME_REFERENCE_SYMBOL} OHLCV for regime: {e}")
         return None
 
 
 def calculate_regime_metrics(timeframe: str) -> Optional[Dict[str, float]]:
     """
-    Calculate all regime metrics for current BTC state.
+    Calculate all regime metrics for current REF state.
 
     Args:
         timeframe: Timeframe to analyze
@@ -67,10 +75,10 @@ def calculate_regime_metrics(timeframe: str) -> Optional[Dict[str, float]]:
         Dict with metrics or None on error
     """
     try:
-        df = fetch_btc_ohlcv(timeframe)
+        df = fetch_ref_ohlcv(timeframe)
 
         if df is None or df.empty:
-            logger.error("Cannot calculate regime metrics: no BTC data")
+            logger.error(f"Cannot calculate regime metrics: no {REGIME_REFERENCE_SYMBOL} data")
             return None
 
         df_norm = normalize_live_ohlcv(df)
@@ -150,7 +158,7 @@ def classify_regime(metrics: Dict[str, float]) -> str:
 
 
 def get_regime_metrics(timeframe: str) -> Optional[Dict[str, float]]:
-    """Get current regime metrics for BTC."""
+    """Get current regime metrics for reference symbol."""
     return calculate_regime_metrics(timeframe)
 
 
@@ -190,32 +198,11 @@ def get_regime_info(timeframe: str) -> Dict:
         timeframe: Timeframe to analyze
 
     Returns:
-        Dict with regime info including family, metrics, multiplier, BTC price/MA/trend
+        Dict with regime info including family, metrics, multiplier
     """
     try:
         family, metrics = get_current_regime(timeframe)
         multiplier      = REGIME_GENERAL.get(family, 1.0)
-
-        btc_price = None
-        btc_ma50  = None
-        btc_trend = 'unknown'
-
-        try:
-            df = fetch_btc_ohlcv(timeframe)
-
-            if df is not None and not df.empty and len(df) >= REGIME0_MA_PERIOD:
-                btc_price = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
-                btc_ma50  = float(pd.to_numeric(df['close'], errors='coerce').tail(REGIME0_MA_PERIOD).mean())
-                btc_trend = 'uptrend' if btc_price > btc_ma50 else 'dwtrend'
-
-                logger.debug(
-                    f"BTC trend: {btc_trend} | Price: ${btc_price:.2f} | MA{REGIME0_MA_PERIOD}=${btc_ma50:.2f}"
-                )
-            else:
-                logger.warning("Insufficient BTC data for MA50 calculation")
-
-        except Exception as e:
-            logger.error(f"Error calculating BTC price/MA50: {e}")
 
         return {
             'timeframe':  timeframe,
@@ -223,9 +210,6 @@ def get_regime_info(timeframe: str) -> Dict:
             'multiplier': multiplier,
             'metrics':    metrics or {},
             'thresholds': REGIME_FAMILIES.get(family, {}),
-            'btc_price':  btc_price,
-            'btc_ma50':   btc_ma50,
-            'btc_trend':  btc_trend,
             'success':    True,
         }
 
@@ -237,17 +221,14 @@ def get_regime_info(timeframe: str) -> Dict:
             'multiplier': 1.0,
             'metrics':    {},
             'thresholds': {},
-            'btc_price':  None,
-            'btc_ma50':   None,
-            'btc_trend':  'unknown',
             'success':    False,
             'error':      str(e),
         }
 
 
-def get_btc_1d_direction() -> str:
+def get_ref_1d_direction() -> str:
     """
-    Get current BTC macro direction based on BTC 1D price vs MA.
+    Get current BTC macro direction based on REF 1D price vs MA.
 
     Uses REGIME0_MA_PERIOD and thresholds from settings (shared_config).
 
@@ -255,29 +236,29 @@ def get_btc_1d_direction() -> str:
         'uptrend' | 'dwtrend'
     """
     try:
-        df = fetch_btc_ohlcv('1Dutc')
+        df = fetch_ref_ohlcv('1Dutc')
 
         if df is None or df.empty or len(df) < REGIME0_MA_PERIOD:
-            logger.warning("[REGIME01] Insufficient BTC 1D data, defaulting to uptrend")
+            logger.warning(f"[REGIME01] Insufficient {REGIME_REFERENCE_SYMBOL} 1D data, defaulting to uptrend")
             return 'uptrend'
 
-        btc_close = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
+        ref_close = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
         ma        = float(pd.to_numeric(df['close'], errors='coerce').tail(REGIME0_MA_PERIOD).mean())
 
-        if btc_close > ma * GLOBAL_SYSTEM_REGIME_TH2:
+        if ref_close > ma * GLOBAL_SYSTEM_REGIME_TH2:
             direction = 'uptrend'
-        elif btc_close < ma * GLOBAL_SYSTEM_REGIME_TH1:
+        elif ref_close < ma * GLOBAL_SYSTEM_REGIME_TH1:
             direction = 'dwtrend'
         else:
             direction = 'uptrend'  # neutral → treat as uptrend
 
         logger.info(
-            f"[REGIME01] BTC direction: {direction.upper()} | "
-            f"BTC=${btc_close:.2f} | MA{REGIME0_MA_PERIOD}=${ma:.2f}"
+            f"[REGIME01] {REGIME_REFERENCE_SYMBOL} direction: {direction.upper()} | "
+            f"{REGIME_REFERENCE_SYMBOL}=${ref_close:.2f} | MA{REGIME0_MA_PERIOD}=${ma:.2f}"
         )
 
         return direction
 
     except Exception as e:
-        logger.error(f"[REGIME01] Error calculating BTC direction: {e}")
+        logger.error(f"[REGIME01] Error calculating {REGIME_REFERENCE_SYMBOL} direction: {e}")
         return 'uptrend'

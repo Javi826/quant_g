@@ -210,7 +210,7 @@
             </div>
             <!-- Card 7: BTC Price -->
             <div class="stat-card">
-                <div class="stat-label">BTC Price</div>
+                <div class="stat-label" id="ref-symbol-label">REF Price</div>
                 <div class="stat-value warning" id="btc-price">$-</div>
             </div>       
             <!-- Card 10: Market Regime -->
@@ -628,16 +628,14 @@
                 <h2>
                     <span>Market Regime Analysis</span>
                     <div class="view-selector">
-                        <button class="view-btn active" onclick="setRegimeTimeframe('4H')">4H</button>
-                        <button class="view-btn" onclick="setRegimeTimeframe('1H')">1H</button>
-                        <button class="view-btn" onclick="setRegimeTimeframe('6Hutc')">6Hutc</button>
+                        <div id="regime-timeframe-tabs"></div>
                     </div>
                 </h2>
 
                <!-- REGIME 0 - BTC 1D FILTER -->
                 <div style="margin-bottom: 24px;">
                     <h3 style="color: #c9d1d9; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #21262d; padding-bottom: 10px;">
-                        BTC 1D Global System REGIME
+                        <span id="regime0-ref-symbol">REF</span> 1D Global System REGIME
                     </h3>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
                         <!-- SHORT Card - LEFT -->
@@ -650,7 +648,7 @@
                             </div>
                             <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
                                 <div id="regime0-short-status" style="font-size: 14px; color: #6b7280; line-height: 1.4; margin-bottom: 4px;">-</div>
-                                <div id="regime0-short-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">BTC < MA5*th</div>
+                                <div id="regime0-short-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">REF < MA5*th</div>
                             </div>
                         </div>
                         
@@ -669,7 +667,7 @@
                                         <div id="regime0-none-short-th" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
                                     </div>
                                     <div style="flex: 1;">
-                                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">BTC</div>
+                                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;" id="regime0-none-btc-label">REF</div>
                                         <div id="regime0-none-btc" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
                                     </div>
                                     <div style="flex: 1;">
@@ -690,7 +688,7 @@
                             </div>
                             <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
                                 <div id="regime0-long-status" style="font-size: 14px; color: #6b7280; line-height: 1.4; margin-bottom: 4px;">-</div>
-                                <div id="regime0-long-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">BTC > MA5*th</div>
+                                <div id="regime0-long-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">REF > MA5*th</div>
                             </div>
                         </div>
                     </div>
@@ -907,25 +905,6 @@
                     <h3>Binomial Drift Detection</h3>
                     <div id="binomial-drift-table-container">
                         <p style="text-align: center; color: #8b949e;">Loading...</p>
-                    </div>
-                </div>
-                
-                <!-- Tabla 1: Strategy Drift Analysis -->
-                <div class="config-card">
-                    <h3>Strategy Drift Analysis</h3>
-                    <div id="drift-table-container">
-                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
-                    </div>
-                    <!-- Legend -->
-                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
-                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">LEGEND</div>
-                        <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
-                            <strong>STATUS:</strong><br>
-                            - HEALTHY: WinRate >= P50 (median performance expected)<br>
-                            - WARNING: WinRate < P50 (below median, informational only)<br>
-                            - DANGER: (WinRate < P5 AND Avg Profit < 0) confirmed in 2 consecutive checks<br>
-                            <strong>COUNTER:</strong> Tracks consecutive checks where DANGER condition is met. Resets to 0 if condition improves.
-                        </div>
                     </div>
                 </div>
                 <!-- Win Rate Evolution Chart -->

@@ -1,5 +1,5 @@
+#BOT_trading/quality_control/analyzer.py
 """
-quality_control/analyzer.py
 Quality Control Analyzer - Drift detection and execution quality metrics.
 
 FIXED: Changed to use CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
@@ -13,13 +13,13 @@ Calculates:
 """
 
 import pandas as pd
-import numpy as np
 from typing import Dict, List, Any
 import logging
 
-from config.settings import DRIFT_WINDOW_SIZE, DRIFT_CHECK_INTERVAL
 from config.settings import EXECUTION_WINDOW_SIZE
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT, LATENCY_WARNING_SEC, LATENCY_CRITICAL_SEC
+from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT_P50, DRIFT_CHECK_INTERVAL
+import math
 
 
 DRIFT_REFERENCE = {}  # overridden at runtime by configure_account()
@@ -28,7 +28,7 @@ def configure_account(account_number: str) -> None:
     global DRIFT_REFERENCE
     try:
         module = __import__(
-            f'quality_control.drift_montecarlo_{account_number}',
+            f'quality_control.drift_reference_{account_number}',
             fromlist=['DRIFT_REFERENCE']
         )
         DRIFT_REFERENCE = module.DRIFT_REFERENCE
@@ -36,136 +36,6 @@ def configure_account(account_number: str) -> None:
         pass  # keep default
 
 logger = logging.getLogger('BOT_trading.quality_control.analyzer')
-
-
-def analyze_drift_status(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
-    """
-    Analyze drift status for all strategies.
-    
-    UPDATED: Now uses adaptive window size - calculates with available trades (no minimum).
-    
-    Args:
-        df_trades: DataFrame with all closed trades (columns: STRATEGY, PROFIT, CLOSE_AT, etc.)
-        strategies_config: List of strategy configurations
-    
-    Returns:
-        Dict with drift analysis per strategy:
-        {
-            'strategy_id': {
-                'status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA' | 'NO_REFERENCE',
-                'winrate_100': 62.5,
-                'winrate_100_l20': 58.3,
-                'p5_reference': 52.0,
-                'p50_reference': 60.0,
-                'avg_profit_100': 12.5,
-                'total_trades': 145,
-                'counter': 0
-            }
-        }
-    """
-    results = {}
-    
-    for strat_config in strategies_config:
-        strategy_id = strat_config['id']
-        
-        # Get strategy trades
-        df_strat = df_trades[df_trades['STRATEGY'] == strategy_id].copy()
-        
-        if len(df_strat) == 0:
-            results[strategy_id] = {
-                'status': 'NO_DATA',
-                'winrate_100': None,
-                'winrate_100_l20': None,
-                'p5_reference': None,
-                'p50_reference': None,
-                'avg_profit_100': None,
-                'total_trades': 0,
-                'counter': 0
-            }
-            continue
-        
-        total_trades = len(df_strat)
-        
-        # Get reference values
-        reference = DRIFT_REFERENCE.get(strategy_id, {})
-        p5_wr = reference.get('p5_winrate')
-        p50_wr = reference.get('p50_winrate')
-        
-        if p5_wr is None or p50_wr is None:
-            logger.warning(f"[DRIFT] No reference values for {strategy_id}")
-            results[strategy_id] = {
-                'status': 'NO_REFERENCE',
-                'winrate_100': None,
-                'winrate_100_l20': None,
-                'p5_reference': None,
-                'p50_reference': None,
-                'avg_profit_100': None,
-                'total_trades': total_trades,
-                'counter': 0
-            }
-            continue
-        
-        # UPDATED: Use adaptive window size (max DRIFT_WINDOW_SIZE, or all available if less)
-        window_size = min(total_trades, DRIFT_WINDOW_SIZE)
-        df_last_N = df_strat.tail(window_size)
-        
-        # WinRate_100 (current window - using available trades)
-        winning_trades = len(df_last_N[df_last_N['PROFIT'] > 0])
-        winrate_100 = (winning_trades / window_size) * 100
-        
-        # WinRate_100_L20 (previous window - 20 trades ago)
-        winrate_100_l20 = None
-        if total_trades >= window_size + DRIFT_CHECK_INTERVAL:
-            start_idx = total_trades - window_size - DRIFT_CHECK_INTERVAL
-            end_idx = total_trades - DRIFT_CHECK_INTERVAL
-            df_prev_N = df_strat.iloc[start_idx:end_idx]
-            
-            if len(df_prev_N) == window_size:
-                prev_winning = len(df_prev_N[df_prev_N['PROFIT'] > 0])
-                winrate_100_l20 = (prev_winning / window_size) * 100
-        
-        # Avg Profit per trade (simpler than Avg_R)
-        avg_profit_100 = df_last_N['PROFIT'].mean()
-        
-        # Determine status
-        status = 'HEALTHY'
-        counter = 0
-        
-        if winrate_100 < p50_wr:
-            status = 'WARNING'
-        
-        if winrate_100 < p5_wr and avg_profit_100 < 0:
-            counter = 1
-            
-            # Check if this is 2nd consecutive failure (on-the-fly calculation)
-            if total_trades >= window_size + DRIFT_CHECK_INTERVAL:
-                # Get previous window
-                start_idx = total_trades - window_size - DRIFT_CHECK_INTERVAL
-                end_idx = total_trades - DRIFT_CHECK_INTERVAL
-                df_prev = df_strat.iloc[start_idx:end_idx]
-                
-                if len(df_prev) == window_size:
-                    prev_winning = len(df_prev[df_prev['PROFIT'] > 0])
-                    prev_winrate = (prev_winning / window_size) * 100
-                    prev_avg_profit = df_prev['PROFIT'].mean()
-                    
-                    if prev_winrate < p5_wr and prev_avg_profit < 0:
-                        status = 'DANGER'
-                        counter = 2
-        
-        results[strategy_id] = {
-            'status': status,
-            'winrate_100': round(winrate_100, 1),
-            'winrate_100_l20': round(winrate_100_l20, 1) if winrate_100_l20 is not None else None,
-            'p5_reference': round(p5_wr, 1),
-            'p50_reference': round(p50_wr, 1),
-            'avg_profit_100': round(avg_profit_100, 2),
-            'total_trades': int(total_trades),
-            'counter': int(counter)
-        }
-    
-    return results
-
 
 def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
     """
@@ -469,9 +339,6 @@ def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict
             }
         }
     """
-    from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT_P50, DRIFT_CHECK_INTERVAL
-    import math
-    
     results = {}
     
     for strategy in strategies_config:
@@ -479,7 +346,7 @@ def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict
         
         # Get P_target from DRIFT_REFERENCE
         if strategy_id in DRIFT_REFERENCE:
-            p_target = DRIFT_REFERENCE[strategy_id]['p50_winrate'] / 100
+            p_target = DRIFT_REFERENCE[strategy_id]['p_target_winrate'] / 100
         else:
             p_target = DRIFT_BINOMIAL_DEFAULT_P50
         

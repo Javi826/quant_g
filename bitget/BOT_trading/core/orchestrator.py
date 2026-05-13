@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime import get_current_regime, get_btc_1d_direction, PositionSizer,configure_regime
+from market_regime import get_current_regime, get_ref_1d_direction, PositionSizer,configure_regime
 from risk_control import RiskLimiter, ExposureCalculator
 from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
@@ -406,7 +406,8 @@ class BotOrchestrator:
             strategies_config=self.strategies,
             initial_capital=self.initial_capital,
             implemented_strategies=IMPLEMENTED_STRATEGIES,
-            symbols_by_strategy=self.final_by_strat
+            symbols_by_strategy=self.final_by_strat,
+            unique_timeframes=self.unique_timeframes
         )
         
         self.dashboard.start(port=self.dashboard_port)
@@ -779,7 +780,9 @@ class BotOrchestrator:
             self.logger.info(f"[REGIME01] Updating regime & direction for: {closed_timeframes}")
     
             # Direction is macro BTC 1D — calculated once per cycle
-            direction = get_btc_1d_direction()
+            from market_regime.regime_classifier import update_direction_cache
+            direction = get_ref_1d_direction()
+            update_direction_cache(direction)
     
             for tf in closed_timeframes:
                 try:

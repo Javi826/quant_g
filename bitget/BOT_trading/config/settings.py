@@ -1,6 +1,5 @@
+#BOT_trading/config/settings.py
 """
-BOT_trading/config/settings.pyBot Configuration Settings
-
 Centralizes all bot configuration including exchange settings,
 validation limits, paths, and account-specific settings.
 """
@@ -186,9 +185,7 @@ PERSISTENCE_DIR       = "persistence"
 # ==========================================================================
 # API - WEBSOCKET SETTINGS
 # ==========================================================================
-from shared.shared_trading_data.config_trading_data import API_TIMEOUT, API_MAX_RETRIES
 from shared.shared_trading_data.config_trading_data import BASE_URL, PRODUCT_TYPE
-from shared.shared_trading_data.config_trading_data import WS_PUBLIC_URL, WS_PRIVATE_URL
 # ==========================================================================
 # LOGGER SETTINGS
 # ==========================================================================

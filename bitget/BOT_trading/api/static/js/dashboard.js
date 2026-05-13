@@ -400,9 +400,8 @@ function updateRegimeUI(data) {
     const allThresholds = data.all_thresholds || {};
     
     // ✅ NUEVO: Renderizar las 3 cards de BTC trend
-    const btcPrice = data.btc_price;
-    const btcMa50 = data.btc_ma50;
-    const btcTrend = data.btc_trend;
+    const refPrice = data.ref_price;
+    const refTrend = data.ref_trend;
 
     
     // Get badge style
@@ -418,16 +417,16 @@ function updateRegimeUI(data) {
         regimeText.style.color = badgeStyle.bg;
     }
     
-    if (regimeDirection && btcTrend) {
+    if (regimeDirection && refTrend) {
         let dirSymbol = '';
         let dirText = '';
         let dirColor = '#8b949e';
         
-        if (btcTrend === 'uptrend') {
+        if (refTrend === 'uptrend') {
             dirSymbol = '';
             dirText = 'UP';
             dirColor = '#3fb950';  // Green
-        } else if (btcTrend === 'downtrend' || btcTrend === 'dwtrend') {
+        } else if (refTrend === 'downtrend' || refTrend === 'dwtrend') {
             dirSymbol = '';
             dirText = 'DW';
             dirColor = '#f85149';  // Red
@@ -736,9 +735,20 @@ async function loadRegime0Data() {
 
 function updateRegime0UI(data) {
     const btcClose = data.btc_close;
+    const refSymbol = data.ref_symbol || 'REF';
+
+    const titleEl = document.getElementById('regime0-ref-symbol');
+    if (titleEl) titleEl.textContent = refSymbol;
+    const btcLabelEl = document.getElementById('regime0-none-btc-label');
+    if (btcLabelEl) btcLabelEl.textContent = refSymbol;
     const ma5 = data.ma5;
     const longData = data.long;
     const shortData = data.short;
+
+    const shortRuleEl = document.getElementById('regime0-short-rule');
+    if (shortRuleEl) shortRuleEl.textContent = shortData.rule;
+    const longRuleEl = document.getElementById('regime0-long-rule');
+    if (longRuleEl) longRuleEl.textContent = longData.rule;
     
     const longAllowed = longData.allowed;
     const shortAllowed = shortData.allowed;
@@ -834,12 +844,7 @@ function updateRegime0UI(data) {
             regimeCard.style.border = '2px solid #d29922';  // Naranja (INACTIVE)
         }
     }
-    const shortRule = document.getElementById('regime0-short-rule');
-    const longRule  = document.getElementById('regime0-long-rule');
-    if (shortRule && shortData.rule) shortRule.textContent = shortData.rule;
-    if (longRule  && longData.rule)  longRule.textContent  = longData.rule;
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════
 // END MARKET REGIME FUNCTIONS
@@ -1615,48 +1620,6 @@ async function loadEquityTab() {
         
     } catch (error) {
         console.error('Error loading equity tab:', error);
-    }
-}
-
-
-async function loadMonthlyAnalysis() {
-    try {
-        const selectedStrategies = getSelectedStrategies('monthly-strategy-checkboxes');
-        
-        if (selectedStrategies.length === 0) {
-            alert('Please select at least one strategy');
-            return;
-        }
-        
-        const res = await fetch('/api/monthly-analysis?strategies=' + selectedStrategies.join(','));
-        const data = await res.json();
-        const container = document.getElementById('monthly-container');
-        
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available for selected strategies</div>';
-            return;
-        }
-        
-        const html = '<div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 10px 0;">' +
-            data.map(row => {
-                const profitPctClass = row.profit_pct >= 0 ? '#3fb950' : '#f85149';
-                const profitUsdClass = row.profit_usd >= 0 ? '#3fb950' : '#f85149';
-                const prefixPct = row.profit_pct >= 0 ? '+' : '';
-                const prefixUsd = row.profit_usd >= 0 ? '+$' : '$';
-                
-                return '<div style="background: #1c2128; border: 1px solid #21262d; border-radius: 8px; padding: 15px 20px; min-width: 100px; text-align: center;">' +
-                    '<div style="color: ' + profitPctClass + '; font-size: 18px; font-weight: 700; margin-bottom: 4px;">' + prefixPct + row.profit_pct.toFixed(1) + '%</div>' +
-                    '<div style="color: ' + profitUsdClass + '; font-size: 14px; font-weight: 600; margin-bottom: 8px;">' + prefixUsd + row.profit_usd.toFixed(0) + '</div>' +
-                    '<div style="color: #58a6ff; font-size: 13px; font-weight: 600; text-transform: uppercase;">' + row.month_name + '</div>' +
-                    '</div>';
-            }).join('') +
-            '</div>';
-        
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading monthly analysis:', error);
-        document.getElementById('monthly-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
     }
 }
 
@@ -2709,9 +2672,28 @@ async function loadData() {
             const tradesPctEl = document.getElementById('trades-pct');
             if (tradesPctEl) tradesPctEl.textContent = tradesPct.toFixed(1) + '%';
             
-            const btcPrice = status.btc_price || 0;
-            const btcPriceEl = document.getElementById('btc-price');
-            if (btcPriceEl) btcPriceEl.textContent = '$' + btcPrice.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            const refPrice = status.ref_price || 0;
+            const refPriceEl = document.getElementById('btc-price');
+            if (refPriceEl) refPriceEl.textContent = '$' + refPrice.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+
+            if (status.ref_symbol) {
+                const refLabel = document.getElementById('ref-symbol-label');
+                if (refLabel) refLabel.textContent = status.ref_symbol.replace('USDT', '') + ' Price';
+            }
+
+            if (status.unique_timeframes && status.unique_timeframes.length > 0) {
+                const tabsContainer = document.getElementById('regime-timeframe-tabs');
+                if (tabsContainer && tabsContainer.children.length === 0) {
+                    status.unique_timeframes.forEach((tf, idx) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'view-btn' + (idx === 0 ? ' active' : '');
+                        btn.textContent = tf;
+                        btn.onclick = () => setRegimeTimeframe(tf);
+                        tabsContainer.appendChild(btn);
+                    });
+                    setRegimeTimeframe(status.unique_timeframes[0]);
+                }
+            }
         });
         
         // Load exposure data with dynamic limits from backend
@@ -3190,22 +3172,8 @@ function renderBinomialDriftTable(data, windowSize) {
 // QUALITY CONTROL TAB
 // =============================================================================
 async function loadQualityTab() {
-    // Load binomial drift first
-    await loadBinomialDrift();
-    
     try {
-        // Load drift analysis
-        const driftRes = await fetch('/api/quality/drift');
-        const driftData = await driftRes.json();
-        
-        if (driftData.success) {
-            renderDriftTable(driftData.data);
-        } else {
-            document.getElementById('drift-table-container').innerHTML = 
-                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
-                (driftData.error || 'Error loading drift data') + 
-                '</div>';
-        }
+        await loadBinomialDrift();
         
         // Load execution quality
         const execRes = await fetch('/api/quality/execution');
@@ -3232,6 +3200,7 @@ async function loadQualityTab() {
                 (deviationData.error || 'Error loading deviation data') + 
                 '</div>';
         }
+
         // Initialize win rate evolution checkboxes
         await initStrategyCheckboxes(
             'winrate-strategy-checkboxes',
@@ -3241,8 +3210,6 @@ async function loadQualityTab() {
         
     } catch (error) {
         console.error('Error loading quality tab:', error);
-        document.getElementById('drift-table-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
         document.getElementById('execution-table-container').innerHTML = 
             '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
         document.getElementById('deviation-table-container').innerHTML = 
@@ -3250,73 +3217,6 @@ async function loadQualityTab() {
     }
 }
 
-
-function renderDriftTable(data) {
-    const container = document.getElementById('drift-table-container');
-    
-    if (!data || Object.keys(data).length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
-        return;
-    }
-    
-    // Sort by strategy ID
-    const sortedStrategies = Object.keys(data).sort();
-    
-    let html = '<table><thead><tr>' +
-            '<th>#</th>' +
-            '<th>Strategy</th>' +
-            '<th>Status</th>' +
-            '<th>P5_Ref</th>' +
-            '<th>P50_Ref</th>' +
-            '<th>WinRate_th</th>' +
-            '<th>WinRate_th_Lth</th>' +
-            '<th>Avg_Profit_th0</th>' +
-            '<th>Counter</th>' +
-            '<th>Total Trades</th>' +
-            '</tr></thead><tbody>';
-    
-    sortedStrategies.forEach((strategyId, index) => {
-        const strat = data[strategyId];
-        const num = String(index + 1).padStart(2, '0');
-        
-        // Status color
-        let statusColor = '#8b949e';
-        let statusText = strat.status;
-        
-        if (strat.status === 'HEALTHY') {
-            statusColor = COLORS.healthy;
-        } else if (strat.status === 'WARNING') {
-            statusColor = COLORS.warning;
-        } else if (strat.status === 'DANGER') {
-            statusColor = COLORS.danger;
-        }
-        
-        // Avg profit color
-        const avgProfitColor = strat.avg_profit_100 >= 0 ? '#3fb950' : COLORS.danger;
-        const avgProfitPrefix = strat.avg_profit_100 >= 0 ? '+$' : '$';
-        
-        // Counter color (red if > 0)
-        const counterColor = strat.counter > 0 ? COLORS.danger : '#c9d1d9';
-        
-        html += '<tr>' +
-            '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
-            '<td>' + strategyId + '</td>' +
-            '<td style="color: ' + statusColor + '; font-weight: 700; text-transform: uppercase;">' + statusText + '</td>' +
-            '<td>' + (strat.p5_reference !== null ? strat.p5_reference.toFixed(1) + '%' : '-') + '</td>' +
-            '<td>' + (strat.p50_reference !== null ? strat.p50_reference.toFixed(1) + '%' : '-') + '</td>' +
-            '<td>' + (strat.winrate_100 !== null ? strat.winrate_100.toFixed(1) + '%' : '-') + '</td>' +
-            '<td>' + (strat.winrate_100_l20 !== null ? strat.winrate_100_l20.toFixed(1) + '%' : '-') + '</td>' +
-            '<td style="color: ' + avgProfitColor + ';">' + 
-                (strat.avg_profit_100 !== null ? avgProfitPrefix + strat.avg_profit_100.toFixed(2) : '-') + 
-            '</td>' +
-            '<td style="color: ' + counterColor + '; font-weight: 600;">' + strat.counter + '</td>' +
-            '<td>' + strat.total_trades + '</td>' +
-            '</tr>';
-    });
-    
-    html += '</tbody></table>';
-    container.innerHTML = html;
-}
 function renderExecutionTable(data) {
     const container = document.getElementById('execution-table-container');
     
@@ -3563,7 +3463,7 @@ async function loadRiskHistoryChart() {
         }
         
         // Fetch BTC data for overlay
-        let btcPrices = [];
+        let refPrices = [];
         try {
             const btcRes = await fetch('/api/btc/history' + dateParams);
             const btcData = await btcRes.json();
@@ -3576,15 +3476,15 @@ async function loadRiskHistoryChart() {
                 });
                 
                 // Align with exposure dates
-                btcPrices = history.dates.map(date => btcMap[date] || null);
+                refPrices = history.dates.map(date => btcMap[date] || null);
             }
         } catch (error) {
             console.error('Error loading BTC data for risk chart:', error);
         }
         
         // Calculate Y2 axis range for BTC (min/max with 5% padding)
-        let btcMin = Math.min(...btcPrices.filter(p => p !== null));
-        let btcMax = Math.max(...btcPrices.filter(p => p !== null));
+        let btcMin = Math.min(...refPrices.filter(p => p !== null));
+        let btcMax = Math.max(...refPrices.filter(p => p !== null));
         const btcPadding = (btcMax - btcMin) * 0.05;
         btcMin -= btcPadding;
         btcMax += btcPadding;
@@ -3622,7 +3522,7 @@ async function loadRiskHistoryChart() {
                     },
                     {
                         label: 'BTC Price',
-                        data: btcPrices,
+                        data: refPrices,
                         borderColor: '#f59e0b',
                         backgroundColor: 'transparent',
                         borderWidth: 2,

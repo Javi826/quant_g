@@ -105,7 +105,7 @@ RUN_BEST_PORTFOLIO = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = False
+UPDATE_OUTPUTS     = True
 SAVE_TRADES        = False
 
 # STRATEGY SELECTION
@@ -190,8 +190,8 @@ STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategie
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
-DRIFT_MONTECARLO_FOLDER    = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_montecarlo")
-DRIFT_BATCH_PATH           = os.path.join(DRIFT_MONTECARLO_FOLDER, f"drift_montecarlo_{STRATEGIES_SET_NAME}_batch.py")
+DRIFT_REFERENCE_FOLDER     = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_reference")
+DRIFT_BATCH_PATH           = os.path.join(DRIFT_REFERENCE_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
 # DATA
 #------------------------------------------------------------------------------
@@ -308,12 +308,11 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 3 — Monte Carlo OOS1 (informational)
     # -------------------------------------------------------------------------
     ohlcv_data_oos1    = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
-    p5_winrate_oos1    = 0.0
-    p50_winrate_oos1   = 0.0
-    prob_negative_oos1 = 0.0
+    p_target_winrate_oos1 = 0.0
+    prob_negative_oos1    = 0.0
 
     if RUN_MC_OOS:
-        df_portfolio_oos1, p5_winrate_oos1, p50_winrate_oos1 = run_montecarlo_oos(
+        df_portfolio_oos1, _, _ = run_montecarlo_oos(
             ohlcv_data         = ohlcv_data_oos1,
             best_params        = best_params,
             param_names        = param_names,
@@ -329,7 +328,7 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped               = df_portfolio_oos1.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
-        logger.info(f"STAGE 3 ── MC OOS1                ── {N_PATHS_OOS1} paths — ProbNeg={prob_negative_oos1:.1f}% P5={float(p5_winrate_oos1)*100:.1f}% P50={float(p50_winrate_oos1)*100:.1f}%")
+        logger.info(f"STAGE M ── MC OOS1                ── {N_PATHS_OOS1} paths — ProbNeg={prob_negative_oos1:.1f}%")
         
     robustness_score = 0.0   
     if RUN_MC_REGIME_ROBUSTNESS:
@@ -525,11 +524,14 @@ def run_batch(strategy_config: dict) -> None:
     _icon        = "🔵" if _changes else "⚪"
     logger.debug(f"STAGE 8  ── Update & Compare       ── {_icon} {_changes_str}")
 
+    df_regime = trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline
+    p_target_winrate_oos1 = round((df_regime["profit"] > 0).mean() * 100, 1) if len(df_regime) > 0 else 0.0
+    
     _drift_results.append({
-        "strategy_id": STRATEGY_ID,
-        "p5_winrate":  round(float(p5_winrate_oos1) * 100, 1),
-        "p50_winrate": round(float(p50_winrate_oos1) * 100, 1),
-    })
+        "strategy_id":        STRATEGY_ID,
+        "p_target_winrate":   p_target_winrate_oos1,
+        })
+    
     _best_params_results[STRATEGY_ID] = best_params
 
     if _validation_results:

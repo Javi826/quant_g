@@ -33,7 +33,8 @@ class DashboardServer:
     
     def __init__(self, account_number, base_dir, get_current_price_func, 
                  get_balance_func, strategies_config,
-                 initial_capital=0, implemented_strategies=None, symbols_by_strategy=None):
+                 initial_capital=0, implemented_strategies=None, symbols_by_strategy=None,
+                 unique_timeframes=None):
         """
         Inicializa el servidor del dashboard.
         
@@ -55,6 +56,7 @@ class DashboardServer:
         self.initial_capital = initial_capital
         self.implemented_strategies = implemented_strategies or set()
         self.symbols_by_strategy = symbols_by_strategy or {}
+        self.unique_timeframes = unique_timeframes or []
         
         # ========================================================================
         # DEMO MODE DETECTION
@@ -471,9 +473,9 @@ class DashboardServer:
                         except Exception as e:
                             print(f"No PnL - {pos.get('symbol')}: {e}")
                 
-                btc_price = 0
+                ref_price = 0
                 try:
-                    btc_price = float(self.get_current_price(self.regime_reference_symbol))
+                    ref_price = float(self.get_current_price(self.regime_reference_symbol))
                 except:
                     pass
                 
@@ -489,8 +491,10 @@ class DashboardServer:
                     'profit_pct': float(profit_pct),
                     'num_trades': num_trades,
                     'trades_pct': float(trades_pct),
-                    'btc_price': float(btc_price),
-                    'timestamp': datetime.now(HOUR_ZONE).isoformat()
+                    'ref_price': float(ref_price),
+                    'timestamp': datetime.now(HOUR_ZONE).isoformat(),
+                    'ref_symbol': self.regime_reference_symbol,
+                    'unique_timeframes': self.unique_timeframes,
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -774,30 +778,6 @@ class DashboardServer:
                         'deprecating': deprecating_count,
                         'not_implemented': not_implemented_count
                     }
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/config')
-        def get_config():
-            try:
-                strategies_info = []
-                for strat in self.strategies:
-                    strategies_info.append({
-                        'id': strat['id'],
-                        'name': strat['name'],
-                        'timeframe': strat['timeframe'],
-                        'active': strat.get('active', True),
-                        'direction': strat['direction'],
-                        'tp_pct': strat['tp_pct'],
-                        'sl_pct': strat['sl_pct'],
-                        'order_amount': strat.get('order_amount', 0),
-                        'family_sizing': strat.get('family_sizing', None)
-                    })
-                
-                return jsonify({
-                    'account': self.account_number,
-                    'strategies': strategies_info
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -1633,6 +1613,7 @@ class DashboardServer:
                     }), 400
                 
                 # Obtener régimen actual
+                from market_regime.regime_classifier import get_cached_direction
                 regime_info = get_regime_info(timeframe)
                 
                 # Retornar info completa incluyendo todas las familias
@@ -1643,9 +1624,8 @@ class DashboardServer:
                     'multiplier': regime_info['multiplier'],
                     'metrics': regime_info['metrics'],
                     'thresholds': regime_info.get('thresholds', {}),
-                    'btc_price': regime_info.get('btc_price'),           
-                    'btc_ma50': regime_info.get('btc_ma50'),             
-                    'btc_trend': regime_info.get('btc_trend'),           
+                    'ref_price': float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
+                    'ref_trend': get_cached_direction(),       
                     'all_families': REGIME_GENERAL,
                     'all_thresholds': REGIME_FAMILIES
                 })
@@ -1666,7 +1646,7 @@ class DashboardServer:
         @self.app.route('/api/regime0/current')
         def get_regime0_current():
             try:
-                from market_regime.regime_classifier import fetch_btc_ohlcv
+                from market_regime.regime_classifier import fetch_ref_ohlcv
                 from config.utils.utils import get_account_config
                 import pandas as pd
         
@@ -1677,7 +1657,7 @@ class DashboardServer:
                 short_th     = account_config.get('regime01_short_th',  1.00)
         
                 # Fetch BTC 1D data
-                df = fetch_btc_ohlcv('1Dutc')
+                df = fetch_ref_ohlcv('1Dutc')
         
                 if df is None or df.empty or len(df) < ma_period:
                     return jsonify({
@@ -1695,21 +1675,25 @@ class DashboardServer:
                 long_allowed  = btc_close > long_threshold
                 short_allowed = btc_close < short_threshold
         
+                ref_symbol = self.regime_reference_symbol or 'REF'
+                ref_label  = ref_symbol.replace('USDT', '')
+
                 return jsonify({
                     'success': True,
                     'btc_close': btc_close,
+                    'ref_symbol': ref_label,
                     'ma5': ma,
                     'long': {
                         'allowed': long_allowed,
                         'threshold': long_threshold,
                         'multiplier': long_th,
-                        'rule': f'BTC > MA{ma_period}*{long_th}'
+                        'rule': f'{ref_label} > MA{ma_period}*{long_th}'
                     },
                     'short': {
                         'allowed': short_allowed,
                         'threshold': short_threshold,
                         'multiplier': short_th,
-                        'rule': f'BTC < MA{ma_period}*{short_th}'
+                        'rule': f'{ref_label} < MA{ma_period}*{short_th}'
                     }
                 })
         
@@ -2081,53 +2065,6 @@ class DashboardServer:
                     'data': {}
                 }), 500
                     
-        @self.app.route('/api/quality/drift')
-        def get_quality_drift():
-            """
-            Get drift analysis for all strategies.
-            
-            Returns:
-                JSON with drift status per strategy
-            """
-            try:
-                from quality_control.analyzer import analyze_drift_status
-                
-                # Load trades from PostgreSQL
-                df = self._load_trades_dataframe()
-                if df is None or df.empty:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No trades data available',
-                        'data': {}
-                    })
-                
-                # Get strategies config
-                strategies_list = self._get_full_strategies_list_with_numbers()
-                
-                # Filter only ACTIVE and DEPRECATING strategies
-                active_strategies = [
-                    s for s in strategies_list 
-                    if s['status'] in ('ACTIVE', 'DEPRECATING')
-                ]
-                
-                # Analyze drift
-                drift_results = analyze_drift_status(df, active_strategies)
-                
-                return jsonify({
-                    'success': True,
-                    'data': drift_results
-                })
-                
-            except Exception as e:
-                logger.error(f"Error in drift analysis: {e}")
-                import traceback
-                traceback.print_exc()
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'data': {}
-                }), 500
-
         @self.app.route('/api/quality/execution')
         def get_quality_execution():
             try:
@@ -2336,7 +2273,7 @@ class DashboardServer:
                 
                 # Get current BTC price
                 try:
-                    btc_price = float(self.get_current_price(self.regime_reference_symbol))
+                    ref_price = float(self.get_current_price(self.regime_reference_symbol))
                 except Exception as e:
                     cursor.close()
                     conn.close()
@@ -2351,18 +2288,18 @@ class DashboardServer:
                     INSERT INTO btc_history (date, price)
                     VALUES (%s, %s)
                     ON CONFLICT (date) DO NOTHING
-                """, [today, btc_price])
+                """, [today, ref_price])
                 
                 conn.commit()
                 cursor.close()
                 conn.close()
                 
-                logger.info(f"[BTC SNAPSHOT] Captured: {today} -> ${btc_price:.2f}")
+                logger.info(f"[BTC SNAPSHOT] Captured: {today} -> ${ref_price:.2f}")
                 
                 return jsonify({
                     'success': True,
                     'message': 'BTC snapshot captured successfully',
-                    'price': btc_price,
+                    'price': ref_price,
                     'date': today.isoformat()
                 })
                 

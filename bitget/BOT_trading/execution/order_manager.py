@@ -1,6 +1,5 @@
+#BOT_trading/execution/order_manager.py
 """
-Order Manager - Handles order placement and execution.
-
 This module is responsible for:
 - Placing market orders via REST API
 - Fetching current prices via WebSocket
@@ -437,7 +436,6 @@ def get_fills_for_order(order_id: str,
                         symbol: str, 
                         product_type: str = PRODUCT_TYPE,
                         send_request_func=None, 
-                        retries: int = 5, 
                         delay: float = 0.05) -> Tuple:
     """
     Get fills for an order via WebSocket.
