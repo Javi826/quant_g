@@ -1710,67 +1710,61 @@ class DashboardServer:
         # BTC DATA ENDPOINTS
         # ==============================================================================
         
-        @self.app.route('/api/btc/history')
-        def get_btc_history():
+        @self.app.route('/api/ref/history')
+        def get_ref_history():
             """
-            Get BTC price history for chart overlay.
-            
+            Get reference symbol price history for chart overlay.
+
             Query params:
                 date_from: YYYY-MM-DD (optional)
                 date_to: YYYY-MM-DD (optional)
-            
+
             Returns:
                 JSON with dates and prices arrays
             """
             try:
                 date_from = request.args.get('date_from')
-                date_to = request.args.get('date_to')
-                
-                # Build query
-                query = """
+                date_to   = request.args.get('date_to')
+
+                query  = """
                     SELECT date, price
-                    FROM btc_history
-                    WHERE 1=1
+                    FROM ref_history
+                    WHERE symbol = %s
                 """
-                params = []
-                
+                params = [self.regime_reference_symbol]
+
                 if date_from:
                     query += " AND date >= %s"
                     params.append(date_from)
-                
+
                 if date_to:
                     query += " AND date <= %s"
                     params.append(date_to)
-                
+
                 query += " ORDER BY date"
-                
-                # Execute query
-                conn = psycopg2.connect(**self.postgres_config)
+
+                conn   = psycopg2.connect(**self.postgres_config)
                 cursor = conn.cursor()
                 cursor.execute(query, params)
-                rows = cursor.fetchall()
+                rows   = cursor.fetchall()
                 cursor.close()
                 conn.close()
-                
+
                 if not rows:
-                    return jsonify({
-                        'success': True,
-                        'dates': [],
-                        'prices': []
-                    })
-                
-                # Format response
-                dates = [row[0].strftime('%Y-%m-%d') for row in rows]
+                    return jsonify({'success': True, 'dates': [], 'prices': []})
+
+                dates  = [row[0].strftime('%Y-%m-%d') for row in rows]
                 prices = [float(row[1]) if row[1] else None for row in rows]
-                
+
                 return jsonify({
                     'success': True,
-                    'dates': dates,
-                    'prices': prices
+                    'dates':   dates,
+                    'prices':  prices,
+                    'symbol':  self.regime_reference_symbol
                 })
-                
+
             except Exception as e:
-                logger.error(f"Error getting BTC history: {e}")
+                logger.error(f"Error getting ref history: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
             
         @self.app.route('/api/risk/exposure')
@@ -2236,79 +2230,76 @@ class DashboardServer:
                     'error': str(e)
                 }), 500
         
-        @self.app.route('/api/btc/snapshot')
-        def capture_btc_snapshot():
+        @self.app.route('/api/ref/snapshot')
+        def capture_ref_snapshot():
             """
-            Capture today's BTC price snapshot.
-            Auto-called by scheduler at 23:55 UTC daily.
-            
+            Capture today's reference symbol price snapshot.
+            Auto-called by scheduler at 00:05 UTC daily.
+
             Returns:
                 JSON with success status and captured price
             """
             try:
                 from datetime import date
-                
-                today = date.today()
-                
-                # Check if today's snapshot already exists
-                conn = psycopg2.connect(**self.postgres_config)
+
+                today  = date.today()
+                symbol = self.regime_reference_symbol
+
+                conn   = psycopg2.connect(**self.postgres_config)
                 cursor = conn.cursor()
-                
+
                 cursor.execute("""
-                    SELECT price FROM btc_history 
-                    WHERE date = %s
-                """, [today])
-                
+                    SELECT price FROM ref_history
+                    WHERE date = %s AND symbol = %s
+                """, [today, symbol])
+
                 existing = cursor.fetchone()
-                
+
                 if existing:
                     cursor.close()
                     conn.close()
                     return jsonify({
                         'success': True,
                         'message': 'Snapshot already exists for today',
-                        'price': float(existing[0]),
-                        'date': today.isoformat()
+                        'price':   float(existing[0]),
+                        'symbol':  symbol,
+                        'date':    today.isoformat()
                     })
-                
-                # Get current BTC price
+
                 try:
-                    ref_price = float(self.get_current_price(self.regime_reference_symbol))
+                    ref_price = float(self.get_current_price(symbol))
                 except Exception as e:
                     cursor.close()
                     conn.close()
-                    logger.error(f"[BTC SNAPSHOT] Error getting BTC price: {e}")
+                    logger.error(f"[REF SNAPSHOT] Error getting {symbol} price: {e}")
                     return jsonify({
                         'success': False,
-                        'error': f'Failed to get BTC price: {str(e)}'
+                        'error':   f'Failed to get {symbol} price: {str(e)}'
                     }), 500
-                
-                # Insert today's snapshot
+
                 cursor.execute("""
-                    INSERT INTO btc_history (date, price)
-                    VALUES (%s, %s)
-                    ON CONFLICT (date) DO NOTHING
-                """, [today, ref_price])
-                
+                    INSERT INTO ref_history (date, symbol, price)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (date, symbol) DO NOTHING
+                """, [today, symbol, ref_price])
+
                 conn.commit()
                 cursor.close()
                 conn.close()
-                
-                logger.info(f"[BTC SNAPSHOT] Captured: {today} -> ${ref_price:.2f}")
-                
+
+                logger.info(f"[REF SNAPSHOT] Captured: {today} {symbol} -> ${ref_price:.2f}")
+
                 return jsonify({
                     'success': True,
-                    'message': 'BTC snapshot captured successfully',
-                    'price': ref_price,
-                    'date': today.isoformat()
+                    'message': 'Ref snapshot captured successfully',
+                    'price':   ref_price,
+                    'symbol':  symbol,
+                    'date':    today.isoformat()
                 })
-                
+
             except Exception as e:
-                logger.error(f"[BTC SNAPSHOT] Error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e)
-                }), 500
+                logger.error(f"[REF SNAPSHOT] Error: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
     
     # ==========================================================================
     # DAILY SNAPSHOT SCHEDULER METHODS (CLASS LEVEL)
@@ -2341,53 +2332,45 @@ class DashboardServer:
         except Exception as e:
             logger.error(f"[SNAPSHOT] Error capturing snapshot: {e}")
     
-    def _capture_btc_snapshot(self):
+    def _capture_ref_snapshot(self):
         """
-        Capture daily BTC price snapshot by calling internal endpoint.
-        Triggered by scheduler at 23:55 UTC daily.
+        Capture daily reference symbol price snapshot by calling internal endpoint.
+        Triggered by scheduler at 00:05 UTC daily.
         """
         try:
             if not self.dashboard_port:
-                logger.warning("[BTC SNAPSHOT] Port not set, skipping")
+                logger.warning("[REF SNAPSHOT] Port not set, skipping")
                 return
-            
-            url = f'http://localhost:{self.dashboard_port}/api/btc/snapshot'
+
+            url      = f'http://localhost:{self.dashboard_port}/api/ref/snapshot'
             response = requests.get(url, timeout=10)
-            
+
             if response.ok:
                 data = response.json()
                 if data.get('success'):
-                    logger.info(f"[BTC SNAPSHOT] Daily BTC price captured: ${data.get('price')}")
+                    logger.info(f"[REF SNAPSHOT] Daily {self.regime_reference_symbol} price captured: ${data.get('price')}")
                 else:
-                    logger.warning(f"[BTC SNAPSHOT] Endpoint returned error: {data.get('error')}")
+                    logger.warning(f"[REF SNAPSHOT] Endpoint returned error: {data.get('error')}")
             else:
-                logger.warning(f"[BTC SNAPSHOT] HTTP {response.status_code}: {response.text[:100]}")
-                
+                logger.warning(f"[REF SNAPSHOT] HTTP {response.status_code}: {response.text[:100]}")
+
         except requests.exceptions.Timeout:
-            logger.error("[BTC SNAPSHOT] Request timeout (>10s)")
+            logger.error("[REF SNAPSHOT] Request timeout (>10s)")
         except Exception as e:
-            logger.error(f"[BTC SNAPSHOT] Error capturing snapshot: {e}")
-    
+            logger.error(f"[REF SNAPSHOT] Error capturing snapshot: {e}")
+
     def _schedule_daily_snapshot(self):
         """
         Scheduler loop that runs in separate thread.
-        Captures exposure snapshot daily at 23:55 UTC.
-        Only account 00 captures BTC price (shared resource).
+        Captures exposure and reference symbol snapshots daily at 00:05 UTC.
         """
-        schedule.every().day.at("23:55").do(self._capture_snapshot)
-        
-        # Only account 00 captures BTC (shared across all accounts)
-        if self.account_number == 'E1':
-            schedule.every().day.at("23:55").do(self._capture_btc_snapshot)
-            logger.info("[SNAPSHOT] Scheduler started-captures exposure + BTC daily at 23:55 UTC")
+        schedule.every().day.at("00:05").do(self._capture_snapshot)
+
+        if self.regime_reference_symbol:
+            schedule.every().day.at("00:05").do(self._capture_ref_snapshot)
+            logger.info(f"[SNAPSHOT] Scheduler started-captures exposure + {self.regime_reference_symbol} daily at 00:05 UTC")
         else:
-            logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 23:55 UTC")
-        
-        while self.snapshot_running:
-            schedule.run_pending()
-            time_module.sleep(60)  # Check every minute
-        
-        logger.info("[SNAPSHOT] Scheduler stopped")
+            logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 00:05 UTC")
     
     def _start_snapshot_scheduler(self):
         """Start snapshot scheduler thread"""

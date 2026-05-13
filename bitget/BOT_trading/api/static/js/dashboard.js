@@ -2452,7 +2452,7 @@ async function updateEquityChart() {
         }
         
         // Fetch BTC history with same date filters
-        const btcRes = await fetch('/api/btc/history?timeframe=1Dutc' + dateParams);
+        const btcRes = await fetch('/api/ref/history?timeframe=1Dutc' + dateParams);
         const btcData = await btcRes.json();
         
         document.getElementById('equity-metrics').style.display = 'block';
@@ -2521,7 +2521,7 @@ async function updateEquityChart() {
             const validPrices = alignedBtcPrices.filter(p => p !== null);
             if (validPrices.length > 0) {
                 datasets.push({
-                    label: 'BTC Price',
+                    label: (btcData.symbol || 'BTC') + ' Price',
                     data: alignedBtcPrices,
                     borderColor: '#f59e0b',
                     backgroundColor: 'transparent',
@@ -3465,7 +3465,7 @@ async function loadRiskHistoryChart() {
         // Fetch BTC data for overlay
         let refPrices = [];
         try {
-            const btcRes = await fetch('/api/btc/history' + dateParams);
+            const btcRes = await fetch('/api/ref/history' + dateParams);
             const btcData = await btcRes.json();
             
             if (btcData.success && btcData.dates && btcData.dates.length > 0) {
@@ -3521,7 +3521,7 @@ async function loadRiskHistoryChart() {
                         yAxisID: 'y'
                     },
                     {
-                        label: 'BTC Price',
+                        label: (btcData.symbol || 'BTC') + ' Price',
                         data: refPrices,
                         borderColor: '#f59e0b',
                         backgroundColor: 'transparent',
@@ -3597,7 +3597,7 @@ async function loadRiskHistoryChart() {
                         max: btcMax,
                         title: {
                             display: true,
-                            text: 'BTC Price ($)',
+                            text: (btcData.symbol || 'BTC') + ' Price ($)',
                             color: '#f59e0b',
                             font: { size: 14 }
                         },

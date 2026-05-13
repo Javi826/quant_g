@@ -100,12 +100,12 @@ OOS_R2_TH            = 0.82
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
+RUN_BEST_PORTFOLIO = True
 RUN_CORRELATION    = False
-RUN_BEST_PORTFOLIO = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = True
+UPDATE_OUTPUTS     = False
 SAVE_TRADES        = False
 
 # STRATEGY SELECTION
