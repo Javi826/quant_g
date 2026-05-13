@@ -3464,9 +3464,10 @@ async function loadRiskHistoryChart() {
         
         // Fetch BTC data for overlay
         let refPrices = [];
+        let btcData = { symbol: null };
         try {
             const btcRes = await fetch('/api/ref/history' + dateParams);
-            const btcData = await btcRes.json();
+            btcData = await btcRes.json();
             
             if (btcData.success && btcData.dates && btcData.dates.length > 0) {
                 // Create map: date -> price
