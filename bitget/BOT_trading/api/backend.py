@@ -13,7 +13,6 @@ import pandas as pd
 from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory, request
 import logging
-import schedule
 import time as time_module
 import requests
 from market_data.websocket_manager import get_ws_manager
@@ -2360,17 +2359,30 @@ class DashboardServer:
             logger.error(f"[REF SNAPSHOT] Error capturing snapshot: {e}")
 
     def _schedule_daily_snapshot(self):
-        """
-        Scheduler loop that runs in separate thread.
-        Captures exposure and reference symbol snapshots daily at 00:05 UTC.
-        """
-        schedule.every().day.at("00:05").do(self._capture_snapshot)
-
-        if self.regime_reference_symbol:
-            schedule.every().day.at("00:05").do(self._capture_ref_snapshot)
-            logger.info(f"[SNAPSHOT] Scheduler started-captures exposure + {self.regime_reference_symbol} daily at 00:05 UTC")
-        else:
-            logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 00:05 UTC")
+            """
+            Scheduler loop that runs in separate thread.
+            Captures exposure and reference symbol snapshots daily at 00:05 UTC.
+            """
+            if self.regime_reference_symbol:
+                logger.info(f"[SNAPSHOT] Scheduler started-captures exposure + {self.regime_reference_symbol} daily at 00:05 UTC")
+            else:
+                logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 00:05 UTC")
+    
+            triggered_today = False
+    
+            while self.snapshot_running:
+                now_utc = datetime.utcnow()
+                if now_utc.hour == 0 and now_utc.minute == 5:
+                    if not triggered_today:
+                        self._capture_snapshot()
+                        if self.regime_reference_symbol:
+                            self._capture_ref_snapshot()
+                        triggered_today = True
+                else:
+                    triggered_today = False
+                time_module.sleep(30)
+    
+            logger.info("[SNAPSHOT] Scheduler stopped")
     
     def _start_snapshot_scheduler(self):
         """Start snapshot scheduler thread"""

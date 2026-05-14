@@ -5,7 +5,8 @@ import numpy as np
 from numba import njit, prange
 from utils.ZX_utils import seed_for_symbol
 from scipy.stats import skew, kurtosis
-
+from typing import Union
+import hashlib
 # -----------------------------
 # CONFIGURACIÓN GLOBAL DE TIPO NUMÉRICO
 # -----------------------------
@@ -15,7 +16,12 @@ EPS = 1e-12
 # -----------------------------
 # FUNCIONES AUXILIARES
 # -----------------------------
+def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: int = 0, mod: int = 100000) -> int:
 
+    s = str(getattr(symbol, "name", symbol))
+    h = hashlib.md5(s.encode("utf-8")).hexdigest()[:8]
+    
+    return int(base_seed) + (int(h, 16) % mod) + int(path_idx)
 @njit
 def _lcg_next(state):
     a = np.uint64(6364136223846793005)

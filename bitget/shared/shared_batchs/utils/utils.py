@@ -1,17 +1,9 @@
 #shared_batch/utils.py
 import os
-import random
-import hashlib
-import numpy as np
 import pandas as pd
-from typing import Union
 from shared_config import VOLUME_COL
 import logging
 logger = logging.getLogger("BOT_batch.utils")
-
-np.random.seed(42)
-random.seed(42)
-
 symbols_to_exclude = {}
 
 symbols_to_include = [
@@ -27,7 +19,6 @@ symbols_to_include = [
     "METAUSDT",   # Meta          - corr 0.59, 195 rows
     "MSFTUSDT",   # Microsoft     - corr 0.48, 168 rows
 ]
-
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
@@ -115,11 +106,3 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     logger.debug(f"🔹Symbols remaining : {len(filtered_symbols)}")
     
     return ohlcv_data, filtered_symbols
-
-def seed_for_symbol(symbol: Union[str, object], base_seed: int = 42, path_idx: int = 0, mod: int = 100000) -> int:
-
-    s = str(getattr(symbol, "name", symbol))
-    h = hashlib.md5(s.encode("utf-8")).hexdigest()[:8]
-    
-    return int(base_seed) + (int(h, 16) % mod) + int(path_idx)
-
