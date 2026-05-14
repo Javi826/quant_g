@@ -153,9 +153,9 @@ def _print_best_combinations(top: list, period_weights: dict) -> None:
         combo          = entry["combo"]
         period_metrics = entry["period_metrics"]
 
-        logger.info(f"\n  #{rank}  ({len(combo)} strategies)")
+        logger.info(f"\n  BEST #{rank} — Selected Strategies: {len(combo)}")
         logger.info(f"  {'─'*W}")
-        for s in combo:
+        for s in sorted(combo, key=lambda s: int(s.split('_')[0])):
             icon = "🟢" if _is_long(s) else "🔴"
             logger.info(f"    {icon} {s}")
 

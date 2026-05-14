@@ -320,8 +320,12 @@ def run(config: dict) -> bool:
     os.makedirs(is_dir, exist_ok=True)
     os.makedirs(oos_dir, exist_ok=True)
 
-    files = sorted([f for f in os.listdir(input_dir) if f.endswith(".parquet")]) \
-        if os.path.exists(input_dir) else []
+    selected_symbols = config.get("selected_symbols") or []
+    files = sorted([
+        f for f in os.listdir(input_dir)
+        if f.endswith(".parquet")
+        and (not selected_symbols or any(f.startswith(s) for s in selected_symbols))
+    ]) if os.path.exists(input_dir) else []
 
     if not files:
         logger.warning(f"⚠ No parquet files found in {input_dir}")

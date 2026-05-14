@@ -88,14 +88,10 @@ N_PATHS_IS           = 1
 
 
 # ELITE -- MA4
-#----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 85
-OOS_MAX_DD_TH        = 7
-OOS_R2_TH            = 0.82  
-
-OOS_NETGAIN_TH       = 20
-OOS_MAX_DD_TH        = 11
-OOS_R2_TH            = 0.82  
+#------------------------------------------------------------------------------
+OOS_NETGAIN_TH       = -100
+OOS_MAX_DD_TH        = +100
+OOS_R2_TH            = 0.5  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -129,15 +125,13 @@ SELECTED_STRATEGIES = [
     "26_orderblocks_long_4H",
     "04_reversal_short_4H",
     # ------------------------------------------------------------------------
-# =============================================================================
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "21_parity_short_4H",
-#     "22_parity_short_6Hutc",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-# =============================================================================
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "12_parity_long_6Hutc",
+    "21_parity_short_4H",
+    "22_parity_short_6Hutc",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
 ]
 
 #MONTECARLOS
@@ -150,7 +144,7 @@ MC_SELECTION_PERCENTILE   = None
 
 RUN_MC_REGIME_ROBUSTNESS  = False
 N_PERMUTATIONS_REGIME     = 2000
-REGIME_ROBUSTNESS_TH      = 0  # NetGain > 0
+REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
 # VALIDATION CONFIGURATION
@@ -357,8 +351,8 @@ def run_batch(strategy_config: dict) -> None:
     approved, trades_df_oos1_baseline, trades_df_oos1_regime, _, _ = run_oos_period(
         strategy_id            = STRATEGY_ID,
         label                  = "OOS1",
-        stage_baseline         = "STAGE 4",
-        stage_regime           = "STAGE 5",
+        stage_baseline         = "STAGE 3",
+        stage_regime           = "STAGE 4",
         ohlcv_data             = ohlcv_data_oos1,
         signal_fn              = signal_fn,
         signal_params          = bt_signal_params,
@@ -433,8 +427,8 @@ def run_batch(strategy_config: dict) -> None:
         approved, _, _, _, _ = run_oos_period(
             strategy_id            = STRATEGY_ID,
             label                  = "OOS2",
-            stage_baseline         = "STAGE 6",
-            stage_regime           = "STAGE 6",
+            stage_baseline         = "STAGE 5",
+            stage_regime           = "STAGE 5",
             ohlcv_data             = ohlcv_oos2_data,
             signal_fn              = signal_fn,
             signal_params          = bt_signal_params,
@@ -483,8 +477,8 @@ def run_batch(strategy_config: dict) -> None:
         approved, _, _, _, _ = run_oos_period(
             strategy_id            = STRATEGY_ID,
             label                  = "OOS3",
-            stage_baseline         = "STAGE 7",
-            stage_regime           = "STAGE 7",
+            stage_baseline         = "STAGE 6",
+            stage_regime           = "STAGE 6",
             ohlcv_data             = ohlcv_oos3_data,
             signal_fn              = signal_fn,
             signal_params          = bt_signal_params,
@@ -544,7 +538,7 @@ def run_batch(strategy_config: dict) -> None:
 
 
 # =============================================================================
-# PORTFOLIO ANALYSIS
+# RUN SUMMARY
 # =============================================================================
 
 def run_summary():
@@ -631,9 +625,7 @@ def run_summary():
         
 # =============================================================================
 # RUNS
-# =============================================================================
-
-        
+# =============================================================================        
     # CORRELATION ANALYSIS 
     # -------------------------------------------------------------------------
     if RUN_CORRELATION:

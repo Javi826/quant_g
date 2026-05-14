@@ -20,7 +20,7 @@ STRATEGIES_LOOP = [
     },
     {
         "id": "03_parity_long_4H",
-        "n_symbols": 20,
+        "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],

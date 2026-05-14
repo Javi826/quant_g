@@ -21,6 +21,7 @@
 import logging
 import os
 import time
+import shutil
 
 import step0_symbol_selection
 import step1_extraction
@@ -38,13 +39,12 @@ logger = logging.getLogger("pipeline")
 # =============================================================================
 # FOLDERS
 # =============================================================================
-BASE_DIR                    = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR                    = os.path.join(BASE_DIR, "data")
-
-RAW_DIR                     = os.path.join(DATA_DIR, "01_raw")
-CLEAN_DIR                   = os.path.join(DATA_DIR, "02_clean")
-HIGHLOW_DIR                 = os.path.join(DATA_DIR, "03_highlow")
-SPLIT_DIR                   = os.path.join(DATA_DIR, "04_split")
+BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR    = os.path.join(BASE_DIR, "data")
+RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
+CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
+HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
+SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
 
 # =============================================================================
 # PIPELINE CONFIG
@@ -60,14 +60,12 @@ SYMBOL_MODE        = "auto"
 N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
-
-                                          
-
+                                       
 # =============================================================================
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-#TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
 START_DATE = "2021-01-01"
 END_DATE   = None 
 
@@ -75,7 +73,7 @@ END_DATE   = None
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
 TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
-#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["30m","5m"],["15m","5m"]]
 
 # =============================================================================
 # SPLIT DATA
@@ -86,8 +84,6 @@ SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
 IS_ROLLING_MONTHS    = 3     
-
-
 
 # =============================================================================
 # HELPERS
@@ -190,6 +186,13 @@ def _run_pipeline() -> None:
     ok = _run_step("STEP 7 — IS/OOS Split", step7_split.run, config)
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 7.")
+        integrity.print_summary(collector)
+        return
+
+    for d in [CLEAN_DIR, HIGHLOW_DIR]:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+            logger.info(f"🗑 Cleaned up: {os.path.basename(d)}/")
 
     integrity.print_summary(collector)
 # =============================================================================
