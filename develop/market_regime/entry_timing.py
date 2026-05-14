@@ -1,14 +1,11 @@
-#!/usr/bin/env python3
+#develop/market_regime/entry_timing.py
 """
-develop/market_regime/regime_temporal_analysis.py
-
 Temporal analysis of system performance by:
 - Hour of day (buy_time)
 - Day of week
+- Day + Hour compound (top 10)
 - Month of year
-
-Usage:
-    python regime_temporal_analysis.py
+- Day + Hour combinations below threshold
 """
 
 import os
@@ -27,9 +24,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # CONFIGURATION
 # =============================================================================
 
-TRADES_FOLDER = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
-SPLIT_MODE    = "expanding"
-SPLIT_BASE    = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+TRADES_FOLDER      = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
+SPLIT_MODE         = "expanding"
+SPLIT_BASE         = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 
 PERIOD_LABELS = [
     ("IS",   "is_regime"),
@@ -38,9 +35,10 @@ PERIOD_LABELS = [
     ("OOS3", "oos3_regime"),
 ]
 
-INITIAL_CAPITAL = 800
-MIN_TRADES      = 10
-MIN_OOS_OK      = 3
+INITIAL_CAPITAL    = 800
+MIN_TRADES         = 100
+TOP_N_COMPOUND     = 10
+WIN_RATE_THRESHOLD = 60  # combinations below this win rate are flagged
 
 # =============================================================================
 # DATA LOADING
@@ -61,13 +59,11 @@ def load_trades() -> pd.DataFrame:
         return pd.DataFrame()
     return pd.concat(all_trades, ignore_index=True).sort_values('buy_time').reset_index(drop=True)
 
-
 # =============================================================================
-# CONSOLE TABLE
+# CONSOLE TABLES
 # =============================================================================
 
 def print_table(df: pd.DataFrame, col: str, title: str, pct_all: float):
-    """Print WIN% table for a given temporal dimension, split by OOS period."""
     OOS_PERIODS       = ['OOS1', 'OOS2', 'OOS3']
     GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
 
@@ -105,12 +101,59 @@ def print_table(df: pd.DataFrame, col: str, title: str, pct_all: float):
     print(row_all + "\n")
 
 
+def print_compound_table(df: pd.DataFrame, pct_all: float):
+    GREEN, RED, RESET = "\033[92m", "\033[91m", "\033[0m"
+
+    print(f"  3. TOP {TOP_N_COMPOUND} DAY + HOUR COMBINATIONS")
+    print(f"  {'DAY':<12} {'HOUR':>6} {'N':>6} {'WIN%':>6}")
+    print(f"  {'-'*34}")
+
+    grouped = (
+        df.groupby(['dow', 'hour'], observed=True)['profit']
+        .agg(n='count', win_rate=lambda x: (x > 0).mean() * 100)
+        .reset_index()
+    )
+    grouped = grouped[grouped['n'] >= MIN_TRADES]
+    top     = grouped.sort_values('win_rate', ascending=False).head(TOP_N_COMPOUND)
+
+    for _, row in top.iterrows():
+        color = GREEN if row['win_rate'] >= pct_all else RED
+        print(f"  {str(row['dow']):<12} {int(row['hour']):>6}h {int(row['n']):>6} "
+              f"{color}{row['win_rate']:>5.0f}%{RESET}")
+    print()
+
+
+def print_below_threshold(df: pd.DataFrame):
+    RED, RESET = "\033[91m", "\033[0m"
+
+    print(f"  5. DAY + HOUR COMBINATIONS BELOW {WIN_RATE_THRESHOLD:.0f}% WIN RATE")
+    print(f"  {'DAY':<12} {'HOUR':>6} {'N':>6} {'WIN%':>6}")
+    print(f"  {'-'*34}")
+
+    grouped = (
+        df.groupby(['dow', 'hour'], observed=True)['profit']
+        .agg(n='count', win_rate=lambda x: (x > 0).mean() * 100)
+        .reset_index()
+    )
+    below = (
+        grouped[(grouped['n'] >= MIN_TRADES) & (grouped['win_rate'] < WIN_RATE_THRESHOLD)]
+        .sort_values('win_rate')
+    )
+
+    if below.empty:
+        print(f"  No combinations found below {WIN_RATE_THRESHOLD:.0f}%\n")
+        return
+
+    for _, row in below.iterrows():
+        print(f"  {str(row['dow']):<12} {int(row['hour']):>6}h {int(row['n']):>6} "
+              f"{RED}{row['win_rate']:>5.0f}%{RESET}")
+    print()
+
 # =============================================================================
 # PLOTS
 # =============================================================================
 
 def _base_plot_style(ax, title: str, xlabel: str):
-    """Apply consistent dark style to an axes."""
     ax.set_facecolor("#1a1a2e")
     ax.set_title(title, color="white", fontsize=13, pad=10)
     ax.set_xlabel(xlabel, color="#aaaaaa", fontsize=10)
@@ -125,10 +168,6 @@ def _base_plot_style(ax, title: str, xlabel: str):
 
 def plot_win_rate(df: pd.DataFrame, col: str, title: str, xlabel: str,
                   pct_all: float, x_labels=None):
-    """
-    Bar chart of WIN% per bucket with a horizontal average line.
-    x_labels: optional list to override x-axis tick labels.
-    """
     categories = list(df[col].cat.categories) if hasattr(df[col], 'cat') else sorted(df[col].unique())
 
     values, labels, counts = [], [], []
@@ -148,13 +187,11 @@ def plot_win_rate(df: pd.DataFrame, col: str, title: str, xlabel: str,
     _base_plot_style(ax, title, xlabel)
 
     colors = ["#2ecc71" if v >= pct_all else "#e74c3c" for v in values]
-    bars = ax.bar(range(len(values)), values, color=colors, alpha=0.85, width=0.65, zorder=3)
+    bars   = ax.bar(range(len(values)), values, color=colors, alpha=0.85, width=0.65, zorder=3)
 
-    # Average dashed line
     ax.axhline(pct_all, color="#f39c12", linestyle="--", linewidth=1.5,
                label=f"Average: {pct_all:.1f}%", zorder=4)
 
-    # Win rate integer label on each bar
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
                 f"{v:.0f}%", ha="center", va="bottom", color="white", fontsize=8, fontweight="bold")
@@ -162,11 +199,80 @@ def plot_win_rate(df: pd.DataFrame, col: str, title: str, xlabel: str,
     ax.set_xticks(range(len(labels)))
     ax.set_xticklabels(labels, rotation=45 if len(labels) > 8 else 0,
                        ha="right" if len(labels) > 8 else "center", color="#cccccc", fontsize=9)
-
     ax.legend(facecolor="#1a1a2e", edgecolor="#333355", labelcolor="white", fontsize=9)
     plt.tight_layout()
     plt.show()
 
+
+def plot_compound_top(df: pd.DataFrame, pct_all: float):
+    grouped = (
+        df.groupby(['dow', 'hour'], observed=True)['profit']
+        .agg(n='count', win_rate=lambda x: (x > 0).mean() * 100)
+        .reset_index()
+    )
+    grouped = grouped[grouped['n'] >= MIN_TRADES]
+    top     = grouped.sort_values('win_rate', ascending=False).head(TOP_N_COMPOUND)
+
+    if top.empty:
+        return
+
+    labels = [f"{row['dow'][:3]} {int(row['hour'])}h" for _, row in top.iterrows()]
+    values = top['win_rate'].tolist()
+    colors = ["#2ecc71" if v >= pct_all else "#e74c3c" for v in values]
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    fig.patch.set_facecolor("#0f0f23")
+    _base_plot_style(ax, f"Top {TOP_N_COMPOUND} Day + Hour Combinations by Win Rate", "Day + Hour")
+
+    bars = ax.bar(range(len(values)), values, color=colors, alpha=0.85, width=0.65, zorder=3)
+    ax.axhline(pct_all, color="#f39c12", linestyle="--", linewidth=1.5,
+               label=f"Average: {pct_all:.1f}%", zorder=4)
+
+    for bar, v in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
+                f"{v:.0f}%", ha="center", va="bottom", color="white", fontsize=8, fontweight="bold")
+
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha="right", color="#cccccc", fontsize=9)
+    ax.legend(facecolor="#1a1a2e", edgecolor="#333355", labelcolor="white", fontsize=9)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_below_threshold(df: pd.DataFrame):
+    grouped = (
+        df.groupby(['dow', 'hour'], observed=True)['profit']
+        .agg(n='count', win_rate=lambda x: (x > 0).mean() * 100)
+        .reset_index()
+    )
+    below = (
+        grouped[(grouped['n'] >= MIN_TRADES) & (grouped['win_rate'] < WIN_RATE_THRESHOLD)]
+        .sort_values('win_rate')
+    )
+
+    if below.empty:
+        return
+
+    labels = [f"{row['dow'][:3]} {int(row['hour'])}h" for _, row in below.iterrows()]
+    values = below['win_rate'].tolist()
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    fig.patch.set_facecolor("#0f0f23")
+    _base_plot_style(ax, f"Day + Hour Combinations Below {WIN_RATE_THRESHOLD:.0f}% Win Rate", "Day + Hour")
+
+    bars = ax.bar(range(len(values)), values, color="#e74c3c", alpha=0.85, width=0.65, zorder=3)
+    ax.axhline(WIN_RATE_THRESHOLD, color="#f39c12", linestyle="--", linewidth=1.5,
+               label=f"Threshold: {WIN_RATE_THRESHOLD:.0f}%", zorder=4)
+
+    for bar, v in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
+                f"{v:.0f}%", ha="center", va="bottom", color="white", fontsize=8, fontweight="bold")
+
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha="right", color="#cccccc", fontsize=9)
+    ax.legend(facecolor="#1a1a2e", edgecolor="#333355", labelcolor="white", fontsize=9)
+    plt.tight_layout()
+    plt.show()
 
 # =============================================================================
 # MAIN ANALYSIS
@@ -195,14 +301,14 @@ def run_temporal_analysis():
 
     pct_all = (oos['profit'] > 0).mean() * 100
 
-    # --- Console tables ---
     print_table(oos, 'hour',  '1. HOUR OF DAY (UTC)', pct_all)
     print_table(oos, 'dow',   '2. DAY OF WEEK',       pct_all)
-    print_table(oos, 'month', '3. MONTH OF YEAR',     pct_all)
+    print_compound_table(oos, pct_all)
+    print_table(oos, 'month', '4. MONTH OF YEAR',     pct_all)
+    print_below_threshold(oos)
 
     print(f"{'='*70}\n")
 
-    # --- Plots ---
     month_names = {
         1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May',  6: 'Jun',
         7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
@@ -210,9 +316,10 @@ def run_temporal_analysis():
 
     plot_win_rate(oos, 'hour',  "Win Rate by Hour of Day (UTC)", "Hour (UTC)", pct_all)
     plot_win_rate(oos, 'dow',   "Win Rate by Day of Week",       "Day",        pct_all)
+    plot_compound_top(oos, pct_all)
     plot_win_rate(oos, 'month', "Win Rate by Month of Year",     "Month",      pct_all,
                   x_labels=month_names)
-
+    plot_below_threshold(oos)
 
 # =============================================================================
 # ENTRY POINT

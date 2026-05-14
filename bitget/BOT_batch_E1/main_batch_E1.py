@@ -107,28 +107,24 @@ SAVE_TRADES        = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-# =============================================================================
-#     "03_parity_long_4H",
-#     "18_flag_long_1H",
-#     "20_flag_short_1H",
-#     "27_orderblocks_short_1H",
-#     # ------------------------------------------------------------------------
-#     "07_reversal_short_1H",
-#     "06_reversal_long_1H",
-#     "11_parity_short_1H",
-#     "10_parity_long_1H",
-#     "28_orderblocks_long_1H",
-# =============================================================================
+    "03_parity_long_4H",
+    "18_flag_long_1H",
+    "20_flag_short_1H",
+    "27_orderblocks_short_1H",
+    # ------------------------------------------------------------------------
+    "07_reversal_short_1H",
+    "06_reversal_long_1H",
+    "11_parity_short_1H",
+    "10_parity_long_1H",
+    "28_orderblocks_long_1H",
     "04_reversal_short_4H",
     "21_parity_short_4H",
-# =============================================================================
-#     "19_flag_short_4H",
-#     "17_flag_long_4H",
-#     "02_reversal_long_4H",
-#     "13_orderblocks_short_4H",
-#     "14_orderblocks_long_4H",
-#     "26_orderblocks_long_4H",
-# =============================================================================
+    "19_flag_short_4H",
+    "17_flag_long_4H",
+    "02_reversal_long_4H",
+    "13_orderblocks_short_4H",
+    "14_orderblocks_long_4H",
+    "26_orderblocks_long_4H",
     # ------------------------------------------------------------------------
 # =============================================================================
 #     "08_reversal_long_6Hutc",

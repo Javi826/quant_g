@@ -27,7 +27,7 @@ ACCOUNTS = {
         "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 3600,
+        "initial_capital": 3200,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",
@@ -69,7 +69,6 @@ REGIME_GENERAL = {
     'volatile': 1.0,
 }
 
-
 # ==========================================================================
 # RISK CONTROL SETTINGS
 # ==========================================================================
@@ -84,19 +83,16 @@ LEVERAGE = 10
 # =============================================================================
 
 # Drift detection
-DRIFT_WINDOW_SIZE          = 100
-
-DRIFT_BINOMIAL_WINDOW      = 100
-DRIFT_CHECK_INTERVAL       = 30
-
-DRIFT_BINOMIAL_DEFAULT_P50 = 0.55
+DRIFT_BINOMIAL_WINDOW  = 100
+DRIFT_CHECK_INTERVAL   = 30
+DRIFT_BINOMIAL_DEFAULT = 0.55
 
 # Execution quality
-EXECUTION_WINDOW_SIZE = 20
-SLIPPAGE_WARNING_PCT  = 0.2
-SLIPPAGE_CRITICAL_PCT = 0.3
-LATENCY_WARNING_SEC   = 0.5
-LATENCY_CRITICAL_SEC  = 1.0
+EXECUTION_WINDOW_SIZE  = 20
+SLIPPAGE_WARNING_PCT   = 0.2
+SLIPPAGE_CRITICAL_PCT  = 0.3
+LATENCY_WARNING_SEC    = 0.5
+LATENCY_CRITICAL_SEC   = 1.0
 
 # ==========================================================================
 # STRATEGY VALIDATION CONFIGURATION

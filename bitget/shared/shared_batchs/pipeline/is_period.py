@@ -3,7 +3,7 @@ import logging
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.torque import prepare_ohlcv_arrays
-from shared_batchs.regime.regime_filter import analyze_regime_is, run_oos_backtest_with_regime
+from shared_batchs.regime.regime_filter import analyze_regime_is
 from shared_batchs.utils.io import accumulate_strategy_trades
 
 logger = logging.getLogger("BOT_batch.pipeline.backtest")

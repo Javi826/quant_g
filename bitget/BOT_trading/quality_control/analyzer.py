@@ -18,7 +18,7 @@ import logging
 
 from config.settings import EXECUTION_WINDOW_SIZE
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT, LATENCY_WARNING_SEC, LATENCY_CRITICAL_SEC
-from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT_P50, DRIFT_CHECK_INTERVAL
+from config.settings import DRIFT_BINOMIAL_WINDOW, DRIFT_BINOMIAL_DEFAULT, DRIFT_CHECK_INTERVAL
 import math
 
 
@@ -348,7 +348,7 @@ def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict
         if strategy_id in DRIFT_REFERENCE:
             p_target = DRIFT_REFERENCE[strategy_id]['p_target_winrate'] / 100
         else:
-            p_target = DRIFT_BINOMIAL_DEFAULT_P50
+            p_target = DRIFT_BINOMIAL_DEFAULT
         
         # Filter trades for this strategy
         strategy_trades = df_trades[df_trades['STRATEGY'] == strategy_id].copy()

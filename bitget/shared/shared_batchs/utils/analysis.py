@@ -454,7 +454,7 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
     ordered_columns = parameters + [col for col in metric_columns if col in df_portfolio.columns]
     df_portfolio = df_portfolio[ordered_columns]
    
-# -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Best combinations per metric
     # -------------------------------------------------------------------------
     def _calc_r2(equity_hist):
@@ -537,6 +537,9 @@ def report_backtesting(df, parameters, data_folder, initial_capital, save_excel=
                  
     return df_portfolio, mi_series
 
+# =============================================================================
+# REPORT MONTECARLO
+# =============================================================================
 def report_montecarlo(df_portfolio, param_names, initial_balance, selection_percentile=None):
     import ast
     
@@ -645,9 +648,7 @@ def report_montecarlo(df_portfolio, param_names, initial_balance, selection_perc
     }).reset_index()
    
     path_grouped['Net_Gain_pct'] = (path_grouped['Portfolio_Final_Balance'] - initial_balance) / initial_balance * 100
-   
-
-       
+         
     # -----------------------------
     # MEJORES COMBOS POR MÉTRICA
     # -----------------------------
