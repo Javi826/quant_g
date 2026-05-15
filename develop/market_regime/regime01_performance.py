@@ -12,14 +12,14 @@ from shared.shared_batch_develop.market_regime.regime_analysis import  get_macro
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-REFERENCE_SYMBOL = 'QQQUSDT'
+REFERENCE_SYMBOL = 'BTCUSDT'
 TRADES_FOLDER    = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
 TRADES_LABEL     = "is_baseline" 
 
 SPLIT_MODE      = "expanding"
 SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-05_IS")
-#REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
+REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
 BTC_MA_PERIOD   = 4

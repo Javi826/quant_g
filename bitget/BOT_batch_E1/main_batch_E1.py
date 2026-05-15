@@ -122,25 +122,27 @@ SELECTED_STRATEGIES = [
     "14_orderblocks_long_4H",
     "26_orderblocks_long_4H",
     # ------------------------------------------------------------------------
-    "08_reversal_long_6Hutc",
-    "09_reversal_short_6Hutc",
-    "12_parity_long_6Hutc",
-    "22_parity_short_6Hutc",
-    "24_flag_long_6Hutc",
-    "25_flag_short_6Hutc",
+# =============================================================================
+#     "08_reversal_long_6Hutc",
+#     "09_reversal_short_6Hutc",
+#     "12_parity_long_6Hutc",
+#     "22_parity_short_6Hutc",
+#     "24_flag_long_6Hutc",
+#     "25_flag_short_6Hutc",
+# =============================================================================
 ]
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
-RUN_MC_OOS                = True
+
+RUN_MC_OOS                = False
 N_PATHS_OOS1              = 2000
 MC_SELECTION_PERCENTILE   = None  
 
-RUN_MC_REGIME_ROBUSTNESS  = True
+RUN_MC_REGIME_ROBUSTNESS  = False
 N_PERMUTATIONS_REGIME     = 2000
-BLOCK_SIZE_REGIME         = 1
 REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
@@ -334,7 +336,6 @@ def run_batch(strategy_config: dict) -> None:
             netgain_th      = REGIME_ROBUSTNESS_TH,
             n_jobs          = N_JOBS,
             show_progress   = SHOW_PROGRESS,
-            block_size = BLOCK_SIZE_REGIME,
         )
         logger.info(f"STAGE M ── MC Regime Robustness   ── ProbNeg={robustness_score:.1f}%")
 

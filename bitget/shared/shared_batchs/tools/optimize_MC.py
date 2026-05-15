@@ -1,4 +1,4 @@
-#shared/shared_batchs/tools/optimize_MCF.py
+#shared/shared_batchs/tools/optimize_MC.py
 import random
 import numpy as np
 import pandas as pd

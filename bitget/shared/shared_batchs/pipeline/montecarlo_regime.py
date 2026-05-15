@@ -19,6 +19,17 @@ from shared_batchs.regime.regime_filter import build_metrics_cache, REGIME_FAMIL
 from shared_batchs.regime.regime_config import REGIME_LOOKBACK_BARS
 logger = logging.getLogger("BOT_batch.pipeline.montecarlo_regime")
 
+
+BLOCK_SIZE_HOURS = 82
+
+_TIMEFRAME_HOURS = {
+    "15m":   0.25,
+    "30m":   0.5,
+    "1H":    1,
+    "4H":    4,
+    "6Hutc": 6,
+    "1Dutc": 24,
+}
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -152,7 +163,6 @@ def run_mc_regime_robustness(
     n_jobs: int         = -1,
     show_progress: bool = False,
     seed: int           = 42,
-    block_size: int = 1,
 ) -> tuple[float, pd.DataFrame]:
     """
     Monte Carlo regime robustness test via bin-series permutation.
@@ -182,7 +192,8 @@ def run_mc_regime_robustness(
             df_results       : DataFrame with per-permutation metrics
     """
     ohlcv_arrays = prepare_ohlcv_arrays(ohlcv_data)
-
+    block_size = max(1, round(BLOCK_SIZE_HOURS / _TIMEFRAME_HOURS.get(timeframe, 1)))
+    logger.debug(f"MC Regime — block_size={block_size} (timeframe={timeframe}, hours={BLOCK_SIZE_HOURS})")
     # --- Build baseline signal arrays per symbol ---
     signal_arrays      = {}
     timestamps_per_sym = {}
