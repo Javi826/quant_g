@@ -12,9 +12,8 @@ import importlib.util
 # =============================================================================
 # PATHS
 # =============================================================================
-PRODUCTION_PATH = "/home/javi/projects/quant/quant_b/bitget/BOT_trading/config/strategies_00.py"
-CANDIDATE_PATH  = "/home/javi/projects/quant/quant_b/bitget/BOT_batch/strategies_files/strategies_BT_00_batch.py"
-#CANDIDATE_PATH  = "/home/javi/projects/quant/quant_b/bitget/BOT_batch/strategies_E1/strategies_E1_batch.py"
+PRODUCTION_PATH = "/home/javi/projects/quant/quant_b/bitget/BOT_trading/config/strategies_E1.py"
+CANDIDATE_PATH  = "/home/javi/projects/quant/quant_b/bitget/BOT_batch_E1/strategies_files/files_E1/strategies_BT_E1_batch.py"
 IGNORE_FIELDS   = {"order_amount", "order_amount_prod"}
 # =============================================================================
 # LOADER

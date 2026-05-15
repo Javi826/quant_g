@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_crypto.py
+#BOT_batch/main_batch_E1.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
-SHOW_PLOTS = True
+SHOW_PLOTS = False
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -71,7 +71,7 @@ _best_params_results           : dict = {}
 # =============================================================================
 # SYMBOLS
 #------------------------------------------------------------------------------
-MY_SYMBOLS           = False
+MY_SYMBOLS = False
 
 # =============================================================================
 # RUN CONFIGURATION
@@ -81,17 +81,13 @@ MY_SYMBOLS           = False
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
-
-# REGULAR -- MA4
-#------------------------------------------------------------------------------
-
+N_PATHS_IS           = 1    
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 20
-OOS_MAX_DD_TH        = 11
-OOS_R2_TH            = 0.82  
+OOS_NETGAIN_TH       = -200
+OOS_MAX_DD_TH        = 200
+OOS_R2_TH            = 0.02  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -101,32 +97,34 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = False
-SAVE_TRADES        = False
+UPDATE_OUTPUTS = False
+SAVE_TRADES    = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "03_parity_long_4H",
-    "18_flag_long_1H",
-    "20_flag_short_1H",
+   # "03_parity_long_4H",
+# =============================================================================
+#     "18_flag_long_1H",
+#     "20_flag_short_1H",
+# =============================================================================
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
     "07_reversal_short_1H",
     "06_reversal_long_1H",
     "11_parity_short_1H",
     "10_parity_long_1H",
-    "28_orderblocks_long_1H",
-    "04_reversal_short_4H",
-    "21_parity_short_4H",
-    "19_flag_short_4H",
-    "17_flag_long_4H",
-    "02_reversal_long_4H",
-    "13_orderblocks_short_4H",
-    "14_orderblocks_long_4H",
-    "26_orderblocks_long_4H",
-    # ------------------------------------------------------------------------
 # =============================================================================
+#     "28_orderblocks_long_1H",
+#     "04_reversal_short_4H",
+#     "21_parity_short_4H",
+#     "19_flag_short_4H",
+#     "17_flag_long_4H",
+#     "02_reversal_long_4H",
+#     "13_orderblocks_short_4H",
+#     "14_orderblocks_long_4H",
+#     "26_orderblocks_long_4H",
+#     # ------------------------------------------------------------------------
 #     "08_reversal_long_6Hutc",
 #     "09_reversal_short_6Hutc",
 #     "12_parity_long_6Hutc",
@@ -186,8 +184,7 @@ STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategie
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
-DRIFT_REFERENCE_FOLDER     = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_reference")
-DRIFT_BATCH_PATH           = os.path.join(DRIFT_REFERENCE_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
+DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
 # DATA
 #------------------------------------------------------------------------------
@@ -197,7 +194,6 @@ DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================

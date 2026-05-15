@@ -1,4 +1,4 @@
-#shared/tools/optimize_MCF_tf.py
+#shared/shared_batchs/tools/optimize_MCF.py
 import random
 import numpy as np
 import pandas as pd

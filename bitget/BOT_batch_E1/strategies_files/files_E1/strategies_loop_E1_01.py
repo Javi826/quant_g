@@ -52,7 +52,7 @@ STRATEGIES_LOOP = [
         "param_grid": {
             "SELL_AFTER": [100],
             "LOOKBACK": [6],
-            "TOLERANCE": [25],
+            "TOLERANCE": [30],
             "MA_PERIOD": [10],
             "TP_PCT": [3],
             "SL_PCT": [3],

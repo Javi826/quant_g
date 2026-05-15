@@ -1,11 +1,11 @@
-#BOT_batch/main_batch_techs.py
+#BOT_batch/main_batch_00.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared_batch")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
 SHOW_PLOTS = True
@@ -33,7 +33,6 @@ DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
 
-
 from shared_batchs.utils.utils import filter_symbols
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
@@ -41,14 +40,17 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.universe import select_universe
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
-from shared_batchs.utils.batch_metrics import compute_metrics, compute_metrics as _cm
+from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batchs.utils.batch_metrics import compute_metrics as _cm
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
 from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
-from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is, REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
+from shared_batchs.utils.io import save_drift_reference, save_strategies_pr
+from shared_batchs.utils.io import compare_and_generate_csv, update_strategies_symbols, print_update_status
+from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
+from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
@@ -176,8 +178,7 @@ STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategie
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
-DRIFT_REFERENCE_FOLDER     = os.path.join(STRATEGIES_PARAMS_FOLDER, "drift_reference")
-DRIFT_BATCH_PATH           = os.path.join(DRIFT_REFERENCE_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
+DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
 # DATA
 #------------------------------------------------------------------------------

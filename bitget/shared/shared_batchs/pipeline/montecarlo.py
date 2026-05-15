@@ -25,6 +25,7 @@ def extract_best_params(df_summary, param_names, lists_for_grid, selection_perce
     int_params  = {k for k, lst in zip(param_names, lists_for_grid) if all(isinstance(x, int) for x in lst)}
     sort_col = "Net_Gain_pct_m" if selection_percentile is None else "Net_Gain_pct_pN"
     best_row = df_summary.loc[df_summary[sort_col].idxmax()]
+    
     best_params = {
         k: int(round(best_row[k])) if k in int_params else round(float(best_row[k]), 4)
         for k in param_names

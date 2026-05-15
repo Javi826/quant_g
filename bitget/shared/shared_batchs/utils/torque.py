@@ -1,4 +1,4 @@
-#shared_batch/torque.py
+#shared/shared_batch/torque.py
 import pandas as pd
 import numpy as np
 from shared_config import VOLUME_COL
@@ -57,8 +57,6 @@ def extract_ohlcv_from_path(paths_per_symbol, path_idx, ts_index=None, dtype=np.
         }
 
     return ohlcv_arrays
-
-
 
 def compile_grid_results(grid_results_list, param_names, initial_balance):
 
