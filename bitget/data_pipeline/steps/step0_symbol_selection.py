@@ -11,9 +11,9 @@ import time
 import requests
 import pandas as pd
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from shared.shared_trading_data.config_trading_data import BASE_URL, PRODUCT_TYPE, API_TIMEOUT
 from shared.shared_trading_data.broker_api.api_client import _call_history_candles, get_futures_symbols_from_api
+
 logger = logging.getLogger("pipeline.step0")
 
 # =============================================================================

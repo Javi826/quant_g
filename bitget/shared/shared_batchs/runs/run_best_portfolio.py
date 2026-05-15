@@ -5,7 +5,7 @@ import pandas as pd
 from itertools import combinations
 
 from shared_batchs.utils.batch_metrics import compute_metrics, _weekly_returns, _cvar, _neg_streak_stats
-from shared_batchs.utils.reporting import _build_robustness_rows, _print_robustness_df
+from shared_batchs.utils.reporting import _print_robustness_df
 
 logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 
@@ -22,6 +22,14 @@ PERIOD_WEIGHTS = {
     "OOS2": 0.25,
     "OOS3": 0.25,
 }
+
+# =============================================================================
+# PERIOD_WEIGHTS = {
+#     "OOS1": 0.70,
+#     "OOS2": 0.15,
+#     "OOS3": 0.15,
+# }
+# =============================================================================
 
 # ascending=False → higher is better  |  ascending=True → lower is better
 RANKING_CRITERIA = [

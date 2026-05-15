@@ -20,15 +20,20 @@
  # Example: END_DATE = "2025-06-01" downloads data up to June 2025 only
 import logging
 import os
+import sys
 import time
 import shutil
 
-import step0_symbol_selection
-import step1_extraction
-import integrity
-import step3_cleaning
-import step5_highlow
-import step7_split
+_BITGET_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _BITGET_DIR not in sys.path:
+    sys.path.insert(0, _BITGET_DIR)
+
+from steps import step0_symbol_selection
+from steps import step1_extraction
+from steps import integrity
+from steps import step3_cleaning
+from steps import step5_highlow
+from steps import step7_split
 
 # =============================================================================
 # LOGGING

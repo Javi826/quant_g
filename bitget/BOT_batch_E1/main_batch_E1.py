@@ -52,7 +52,7 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-
+from shared_batchs.pipeline.montecarlo_regime import run_mc_regime_robustness
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
@@ -85,9 +85,9 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = -200
-OOS_MAX_DD_TH        = 200
-OOS_R2_TH            = 0.02  
+OOS_NETGAIN_TH       = 20
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.82  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -103,46 +103,42 @@ SAVE_TRADES    = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-   # "03_parity_long_4H",
-# =============================================================================
-#     "18_flag_long_1H",
-#     "20_flag_short_1H",
-# =============================================================================
+    "03_parity_long_4H",
+    "18_flag_long_1H",
+    "20_flag_short_1H",
     "27_orderblocks_short_1H",
     # ------------------------------------------------------------------------
     "07_reversal_short_1H",
     "06_reversal_long_1H",
     "11_parity_short_1H",
     "10_parity_long_1H",
-# =============================================================================
-#     "28_orderblocks_long_1H",
-#     "04_reversal_short_4H",
-#     "21_parity_short_4H",
-#     "19_flag_short_4H",
-#     "17_flag_long_4H",
-#     "02_reversal_long_4H",
-#     "13_orderblocks_short_4H",
-#     "14_orderblocks_long_4H",
-#     "26_orderblocks_long_4H",
-#     # ------------------------------------------------------------------------
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "22_parity_short_6Hutc",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-# =============================================================================
+    "28_orderblocks_long_1H",
+    "04_reversal_short_4H",
+    "21_parity_short_4H",
+    "19_flag_short_4H",
+    "17_flag_long_4H",
+    "02_reversal_long_4H",
+    "13_orderblocks_short_4H",
+    "14_orderblocks_long_4H",
+    "26_orderblocks_long_4H",
+    # ------------------------------------------------------------------------
+    "08_reversal_long_6Hutc",
+    "09_reversal_short_6Hutc",
+    "12_parity_long_6Hutc",
+    "22_parity_short_6Hutc",
+    "24_flag_long_6Hutc",
+    "25_flag_short_6Hutc",
 ]
 
 #MONTECARLOS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
-RUN_MC_OOS                = False
+RUN_MC_OOS                = True
 N_PATHS_OOS1              = 2000
 MC_SELECTION_PERCENTILE   = None  
 
-RUN_MC_REGIME_ROBUSTNESS  = False
+RUN_MC_REGIME_ROBUSTNESS  = True
 N_PERMUTATIONS_REGIME     = 2000
 REGIME_ROBUSTNESS_TH      = 0  
 
@@ -320,11 +316,10 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped               = df_portfolio_oos1.groupby("path_index")["Portfolio_Final_Balance"].mean().reset_index()
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
-        logger.info(f"STAGE M ── MC OOS1                ── {N_PATHS_OOS1} paths — ProbNeg={prob_negative_oos1:.1f}%")
+        logger.info(f"STAGE M ── MC OOS1                ── ProbNeg={prob_negative_oos1:.1f}%")
         
     robustness_score = 0.0   
     if RUN_MC_REGIME_ROBUSTNESS:
-        from pipeline.montecarlo_regime import run_mc_regime_robustness
         robustness_score, _ = run_mc_regime_robustness(
             ohlcv_data      = ohlcv_data_oos1,
             signal_fn       = signal_fn,
@@ -339,7 +334,7 @@ def run_batch(strategy_config: dict) -> None:
             n_jobs          = N_JOBS,
             show_progress   = SHOW_PROGRESS,
         )
-        logger.info(f"STAGE M ── MC Regime Robustness   ── Score={robustness_score:.1f}%")
+        logger.info(f"STAGE M ── MC Regime Robustness   ── ProbNeg={robustness_score:.1f}%")
 
 
     # -------------------------------------------------------------------------
@@ -388,7 +383,7 @@ def run_batch(strategy_config: dict) -> None:
         "prob_neg_pct":    round(prob_negative_oos1, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
-        #"mc_regime_pct": round(robustness_score, 1),
+        "mc_regime_pct": round(robustness_score, 1),
     }
     
     _m = _cm(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
