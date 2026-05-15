@@ -82,11 +82,22 @@ def _run_single_permutation(
     best_params: dict,
     order_amount: int,
     seed: int,
+    block_size: int = 1,
 ) -> dict:
-    """Run one permutation: shuffle bin series, filter signals, backtest."""
-    rng            = np.random.default_rng(seed + perm_idx)
-    shuffled_bins  = bin_series.copy()
-    rng.shuffle(shuffled_bins)
+    """Run one permutation: shuffle bin series, filter signals, backtest.
+    block_size=1 → pure random shuffle (original behavior)
+    block_size>1 → block shuffle preserving temporal autocorrelation
+    """
+    rng           = np.random.default_rng(seed + perm_idx)
+    shuffled_bins = bin_series.copy()
+
+    if block_size <= 1:
+        rng.shuffle(shuffled_bins)
+    else:
+        n      = len(shuffled_bins)
+        blocks = [shuffled_bins[i:i + block_size] for i in range(0, n, block_size)]
+        rng.shuffle(blocks)
+        shuffled_bins = [b for block in blocks for b in block]
 
     # Map shuffled bins back to timestamps
     ts_to_bin = {int(pd.Timestamp(ts).value): b for ts, b in zip(all_timestamps, shuffled_bins)}
@@ -102,29 +113,26 @@ def _run_single_permutation(
                 sig[i] = 0
         ohlcv_permuted[sym] = {**arr, "signal": sig}
 
-    result   = run_grid_backtest(
+    result                = run_grid_backtest(
         ohlcv_permuted,
         sell_after   = best_params["SELL_AFTER"],
         tp_pct       = best_params["TP_PCT"],
         sl_pct       = best_params["SL_PCT"],
         order_amount = order_amount,
     )
-    trade_log            = result["__PORTFOLIO__"]["trade_log"].copy()
-    trade_log.columns    = trade_log.columns.str.lower().str.strip()
+    trade_log             = result["__PORTFOLIO__"]["trade_log"].copy()
+    trade_log.columns     = trade_log.columns.str.lower().str.strip()
     trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
 
     metrics = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="") if len(trade_log) > 0 else None
     return {
-        "perm_idx":    perm_idx,
-        "n_trades":    len(trade_log),
-        "net_gain_pct": metrics["Net_Gain_pct"]    if metrics else 0.0,
-        "max_dd_pct":   metrics["Max_DD_pct"]      if metrics else 0.0,
-        "r2":           metrics["R_Squared"]        if metrics else 0.0,
-        "win_rate":     metrics["Win_Rate"]         if metrics else 0.0,
+        "perm_idx":     perm_idx,
+        "n_trades":     len(trade_log),
+        "net_gain_pct": metrics["Net_Gain_pct"] if metrics else 0.0,
+        "max_dd_pct":   metrics["Max_DD_pct"]   if metrics else 0.0,
+        "r2":           metrics["R_Squared"]     if metrics else 0.0,
+        "win_rate":     metrics["Win_Rate"]      if metrics else 0.0,
     }
-
-
-
 
 # =============================================================================
 # PUBLIC API
@@ -144,6 +152,7 @@ def run_mc_regime_robustness(
     n_jobs: int         = -1,
     show_progress: bool = False,
     seed: int           = 42,
+    block_size: int = 1,
 ) -> tuple[float, pd.DataFrame]:
     """
     Monte Carlo regime robustness test via bin-series permutation.
@@ -227,6 +236,7 @@ def run_mc_regime_robustness(
                 best_params        = best_params,
                 order_amount       = order_amount,
                 seed               = seed,
+                block_size         = block_size,
             )
             for i in range(n_permutations)
         )

@@ -140,6 +140,7 @@ MC_SELECTION_PERCENTILE   = None
 
 RUN_MC_REGIME_ROBUSTNESS  = True
 N_PERMUTATIONS_REGIME     = 2000
+BLOCK_SIZE_REGIME         = 1
 REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
@@ -317,7 +318,7 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE M ── MC OOS1                ── ProbNeg={prob_negative_oos1:.1f}%")
-        
+   
     robustness_score = 0.0   
     if RUN_MC_REGIME_ROBUSTNESS:
         robustness_score, _ = run_mc_regime_robustness(
@@ -333,6 +334,7 @@ def run_batch(strategy_config: dict) -> None:
             netgain_th      = REGIME_ROBUSTNESS_TH,
             n_jobs          = N_JOBS,
             show_progress   = SHOW_PROGRESS,
+            block_size = BLOCK_SIZE_REGIME,
         )
         logger.info(f"STAGE M ── MC Regime Robustness   ── ProbNeg={robustness_score:.1f}%")
 
