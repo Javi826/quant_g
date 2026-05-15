@@ -77,14 +77,18 @@ MY_SYMBOLS           = True
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 0.2
 OOS_MAX_DD_TH        = 2
 OOS_R2_TH            = 0.15 
+
+OOS_NETGAIN_TH       = 20
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.82 
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -128,14 +132,22 @@ SELECTED_STRATEGIES = [
 ]
 # =============================================================================
 
-#MONTECARLOS
+# =============================================================================
+# MONTECARLOS
+# =============================================================================
+# IS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
-RUN_MC_OOS                = False
-N_PATHS_OOS1              = 20000
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  
 
+# OOS
+#------------------------------------------------------------------------------
+RUN_MC_OOS                = False
+N_PATHS_OOS1              = 2000
+
+# REGIME
+#------------------------------------------------------------------------------
 RUN_MC_REGIME_ROBUSTNESS  = False
 N_PERMUTATIONS_REGIME     = 2000
 REGIME_ROBUSTNESS_TH      = 0  
@@ -157,8 +169,8 @@ OOS2_FOR_VALIDATION = True
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = False
-OOS3_FOR_VALIDATION = False
+OOS3_RUN_ANALYSIS   = True
+OOS3_FOR_VALIDATION = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -182,13 +194,23 @@ DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_refe
 
 # DATA
 #------------------------------------------------------------------------------
+# =============================================================================
+# SPLIT_MODE       = "expanding"
+# SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
+# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
+# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
+# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
+# =============================================================================
+
+# DATA
+#------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
-#DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2026-03_2026-05_OOS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================

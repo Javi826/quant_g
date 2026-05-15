@@ -80,8 +80,8 @@ MY_SYMBOLS = False
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1    
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
@@ -132,15 +132,22 @@ SELECTED_STRATEGIES = [
 # =============================================================================
 ]
 
-#MONTECARLOS
+# =============================================================================
+# MONTECARLOS
+# =============================================================================
+# IS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
-
-RUN_MC_OOS                = False
-N_PATHS_OOS1              = 2000
 MC_SELECTION_PERCENTILE   = None  
 
+# OOS
+#------------------------------------------------------------------------------
+RUN_MC_OOS                = False
+N_PATHS_OOS1              = 2000
+
+# REGIME
+#------------------------------------------------------------------------------
 RUN_MC_REGIME_ROBUSTNESS  = False
 N_PERMUTATIONS_REGIME     = 2000
 REGIME_ROBUSTNESS_TH      = 0  

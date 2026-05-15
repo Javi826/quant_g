@@ -24,9 +24,11 @@ import sys
 import time
 import shutil
 
-_BITGET_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _BITGET_DIR not in sys.path:
-    sys.path.insert(0, _BITGET_DIR)
+_BITGET_DIR    = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_BITGET_SHARED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared"))
+for _p in [_BITGET_DIR, _BITGET_SHARED]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from steps import step0_symbol_selection
 from steps import step1_extraction
@@ -71,7 +73,7 @@ REFERENCE_SYMBOL   = "BTCUSDT"
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
-START_DATE = "2021-01-01"
+START_DATE = "2024-01-01"
 END_DATE   = None 
 
 # =============================================================================
@@ -84,7 +86,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"],["3
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 0
+WINDOW_OOS_MONTHS    = 12
 SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
