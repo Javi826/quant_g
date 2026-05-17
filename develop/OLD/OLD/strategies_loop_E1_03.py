@@ -1,20 +1,17 @@
 """
-strategies_loop_00_01_rwa.py — Batch loop configuration for RWA.
+strategies_loop.py — Batch loop configuration.
 Edit param_grid, n_symbols and order_amount before each run.
 This file is NOT updated by the batch automatically.
 """
 
 STRATEGIES_LOOP = [
-    # =========================================================================
-    # REVERSAL LONG
-    # =========================================================================
     {
-        "id": "30_reversal_long_1H",
+        "id": "02_reversal_long_4H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
+            "LOOKBACK": [2,4,6],
             "TOLERANCE": [10,20,30],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
@@ -22,12 +19,25 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "31_reversal_long_30m",
+        "id": "03_parity_long_4H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
+            "LOOKBACK": [50,100,150],
+            "TOLERANCE": [10,20,30],
+            "MA_PERIOD": [10,25,50],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "04_reversal_short_4H",
+        "n_symbols": 20,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [0],
+            "LOOKBACK": [2,4,6],
             "TOLERANCE": [10,20,30],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
@@ -35,28 +45,12 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "32_reversal_long_15m",
+        "id": "06_reversal_long_1H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
-            "TOLERANCE": [10,20,30],
-            "MA_PERIOD": [10,25],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    # =========================================================================
-    # REVERSAL SHORT
-    # =========================================================================
-    {
-        "id": "33_reversal_short_1H",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
+            "SELL_AFTER": [100],
+            "LOOKBACK": [6,7,8,9],
             "TOLERANCE": [10,20,30],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
@@ -64,12 +58,12 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "34_reversal_short_30m",
+        "id": "07_reversal_short_1H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
+            "SELL_AFTER": [100],
+            "LOOKBACK": [2,4,6],
             "TOLERANCE": [10,20,30],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
@@ -77,24 +71,60 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "35_reversal_short_15m",
+        "id": "08_reversal_long_6Hutc",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
-            "LOOKBACK": [6,8,10],
+            "LOOKBACK": [2,4,6],
+            "TOLERANCE": [10,15,20],
+            "MA_PERIOD": [10,25],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "09_reversal_short_6Hutc",
+        "n_symbols": 10,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [0],
+            "LOOKBACK": [2,4,6],
             "TOLERANCE": [10,20,30],
             "MA_PERIOD": [10,25],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },
     },
-    # =========================================================================
-    # PARITY LONG
-    # =========================================================================
     {
-        "id": "36_parity_long_1H",
+        "id": "10_parity_long_1H",
         "n_symbols": 10,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [75],
+            "LOOKBACK": [50,100,150],
+            "TOLERANCE": [10,20,30],
+            "MA_PERIOD": [10,25],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "11_parity_short_1H",
+        "n_symbols":10,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [100],
+            "LOOKBACK": [50,100,150],
+            "TOLERANCE": [10,20,30],
+            "MA_PERIOD": [10,25],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "12_parity_long_6Hutc",
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -106,79 +136,35 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "37_parity_long_30m",
-        "n_symbols": 10,
+        "id": "13_orderblocks_short_4H",
+        "n_symbols": 30,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
             "LOOKBACK": [50,100,150],
             "TOLERANCE": [10,20,30],
-            "MA_PERIOD": [10,25],
+            "IMPULSE": [0.02,0.05,0.08],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },
     },
     {
-        "id": "38_parity_long_15m",
+        "id": "17_flag_long_4H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
-            "LOOKBACK": [50,100,150],
-            "TOLERANCE": [10,20,30],
+            "LOOKBACK": [8,10,12],
             "MA_PERIOD": [10,25],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    # =========================================================================
-    # PARITY SHORT
-    # =========================================================================
-    {
-        "id": "39_parity_short_1H",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [50,100,150],
-            "TOLERANCE": [10,20,30],
-            "MA_PERIOD": [10,25],
+            "IMPULSE": [2,4,6],
+            "FLAG": [10,20,30],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },
     },
     {
-        "id": "40_parity_short_30m",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [50,100,150],
-            "TOLERANCE": [10,20,30],
-            "MA_PERIOD": [10,25],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    {
-        "id": "41_parity_short_15m",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [50, 100,150],
-            "TOLERANCE": [10,20,30],
-            "MA_PERIOD": [10, 25],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    # =========================================================================
-    # FLAG LONG
-    # =========================================================================
-    {
-        "id": "42_flag_long_1H",
-        "n_symbols": 10,
+        "id": "18_flag_long_1H",
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -191,8 +177,8 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "43_flag_long_30m",
-        "n_symbols": 10,
+        "id": "19_flag_short_4H",
+        "n_symbols": 20,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
@@ -205,28 +191,11 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "44_flag_long_15m",
-        "n_symbols": 10,
+        "id": "20_flag_short_1H",
+        "n_symbols": 20,
         "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [20,40,60],
-            "MA_PERIOD": [10,25],
-            "IMPULSE": [2,4,6],
-            "FLAG": [10,20,30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    # =========================================================================
-    # FLAG SHORT
-    # =========================================================================
-    {
-        "id": "45_flag_short_1H",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
+        "param_grid": { 
+            "SELL_AFTER": [100],
             "LOOKBACK": [20,40,60],
             "MA_PERIOD": [10,25],
             "IMPULSE": [2,4,6],
@@ -236,42 +205,78 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "46_flag_short_30m",
+        "id": "21_parity_short_4H",
+        "n_symbols": 20,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [0],
+            "LOOKBACK": [50,100,150],
+            "TOLERANCE": [10,20,30],
+            "MA_PERIOD": [10,25],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "22_parity_short_6Hutc",
+        "n_symbols": 10,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [0],
+            "LOOKBACK": [50,100,150],
+            "TOLERANCE": [10,20,30],
+            "MA_PERIOD": [10,25],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "24_flag_long_6Hutc",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
             "LOOKBACK": [20,40,60],
             "MA_PERIOD": [10,25],
-            "IMPULSE": [2, 4, 6],
+            "IMPULSE": [1,2,3],
             "FLAG": [10,20,30],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },
     },
     {
-        "id": "47_flag_short_15m",
+        "id": "25_flag_short_6Hutc",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
             "LOOKBACK": [20,40,60],
-            "MA_PERIOD": [10, 25],
-            "IMPULSE": [2,4,6],
+            "MA_PERIOD": [10,25],
+            "IMPULSE": [1,2,3],
             "FLAG": [10,20,30],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },
     },
-    # =========================================================================
-    # ORDERBLOCKS LONG
-    # =========================================================================
     {
-        "id": "48_orderblocks_long_1H",
+        "id": "26_orderblocks_long_4H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
             "SELL_AFTER": [0],
+            "LOOKBACK": [30,50,75],
+            "TOLERANCE": [10,20,30,40],
+            "IMPULSE": [0.02,0.05,0.08],
+            "TP_PCT": [2,3,4],
+            "SL_PCT": [2,3],
+        },
+    },
+    {
+        "id": "27_orderblocks_short_1H",
+        "n_symbols": 10,
+        "order_amount": 80,
+        "param_grid": {
+            "SELL_AFTER": [75],
             "LOOKBACK": [30,50,75],
             "TOLERANCE": [10,20,30],
             "IMPULSE": [0.02,0.05,0.08],
@@ -280,69 +285,14 @@ STRATEGIES_LOOP = [
         },
     },
     {
-        "id": "49_orderblocks_long_30m",
+        "id": "28_orderblocks_long_1H",
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [0],
+            "SELL_AFTER": [75],
             "LOOKBACK": [30,50,75],
             "TOLERANCE": [10,20,30],
             "IMPULSE": [0.02,0.05,0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    {
-        "id": "50_orderblocks_long_15m",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [30,50,75],
-            "TOLERANCE": [10,20,30],
-            "IMPULSE": [0.02,0.05,0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    # =========================================================================
-    # ORDERBLOCKS SHORT
-    # =========================================================================
-    {
-        "id": "51_orderblocks_short_1H",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [30,50,75],
-            "TOLERANCE": [10,20,30],
-            "IMPULSE": [0.02, 0.05, 0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    {
-        "id": "52_orderblocks_short_30m",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [30,50,75],
-            "TOLERANCE": [10,20,30],
-            "IMPULSE": [0.02,0.05,0.08],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
-        },
-    },
-    {
-        "id": "53_orderblocks_short_15m",
-        "n_symbols": 10,
-        "order_amount": 80,
-        "param_grid": {
-            "SELL_AFTER": [0],
-            "LOOKBACK": [30,50,75],
-            "TOLERANCE": [10,20,30],
-            "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
             "SL_PCT": [2,3],
         },

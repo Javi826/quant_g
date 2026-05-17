@@ -1,5 +1,5 @@
+#BOT_trading/market_data/data_utils.py
 """
-BOT_trading/market_data/data_utils.py
 Market Data Utils - OHLCV data processing and symbol management.
 This module provides utilities for:
 - Loading and filtering trading symbols

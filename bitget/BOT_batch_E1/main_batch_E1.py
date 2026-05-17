@@ -86,9 +86,9 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 20
-OOS_MAX_DD_TH        = 11
-OOS_R2_TH            = 0.82  
+OOS_NETGAIN_TH       = 60
+OOS_MAX_DD_TH        = 10
+OOS_R2_TH            = 0.90  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -104,34 +104,24 @@ SAVE_TRADES    = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "03_parity_long_4H",
-    "18_flag_long_1H",
-    "20_flag_short_1H",
-    "27_orderblocks_short_1H",
-    # ------------------------------------------------------------------------
-    "07_reversal_short_1H",
-    "06_reversal_long_1H",
-    "11_parity_short_1H",
-    "10_parity_long_1H",
-    "28_orderblocks_long_1H",
-    "04_reversal_short_4H",
-    "21_parity_short_4H",
-    "19_flag_short_4H",
-    "17_flag_long_4H",
-    "02_reversal_long_4H",
-    "13_orderblocks_short_4H",
-    "14_orderblocks_long_4H",
-    "26_orderblocks_long_4H",
-    # ------------------------------------------------------------------------
-# =============================================================================
-#     "08_reversal_long_6Hutc",
-#     "09_reversal_short_6Hutc",
-#     "12_parity_long_6Hutc",
-#     "22_parity_short_6Hutc",
-#     "24_flag_long_6Hutc",
-#     "25_flag_short_6Hutc",
-# =============================================================================
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "35_parity_long_15m",
+    "36_parity_short_30m",
+    "37_parity_short_15m",
+    "38_flag_long_30m",
+    "39_flag_long_15m",
+    "40_flag_short_30m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
+
 
 # =============================================================================
 # MONTECARLOS

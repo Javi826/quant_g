@@ -14,14 +14,14 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 14400,
+        "initial_capital": 20800,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
         "regime01_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime01_ma_period": 4,
+        "regime01_ma_period": 2,
         "regime01_long_th":   1.00,
         "regime01_short_th":  1.00,
         "regime_reference_symbol": "BTCUSDT",
@@ -121,7 +121,7 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 80
-MAX_ORDER_AMOUNT = 360
+MAX_ORDER_AMOUNT = 720
 
 # TP/SL limits (%)
 MIN_TP_PCT = 2
@@ -134,7 +134,7 @@ MIN_CANDLES = 50
 MAX_CANDLES = 100
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['15m','30m','1H','4H']
+VALID_TIMEFRAMES = ['15m','30m']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION

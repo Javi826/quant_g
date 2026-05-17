@@ -64,9 +64,9 @@ EXPORT_CSV = False
 SELECTED_SYMBOLS   = []
 SYMBOL_MODE        = "auto"
 
-N_SYMBOLS_DOWNLOAD = 40
-RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
-REFERENCE_SYMBOL   = "BTCUSDT"
+N_SYMBOLS_DOWNLOAD = 80
+RWA_MODE           = "rwa_only"   # "crypto_only" | "rwa_only"                                                            
+REFERENCE_SYMBOL   = "QQQUSDT"
                                        
 # =============================================================================
 # EXTRACTION

@@ -1,3 +1,4 @@
+#shared/shared_batchs/runs/run_best_portfolio.py
 import logging
 import numpy as np
 import pandas as pd
@@ -14,7 +15,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # =============================================================================
 
 MIN_STRATEGIES = 2
-MAX_STRATEGIES = 12
+MAX_STRATEGIES = 5
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -281,8 +282,9 @@ def _print_best_combinations(
 
         # Header: exclude primary metric (already shown in stats_str)
         secondary_str = "  |  ".join(f"{k}={v:.2f}" for k, v in metric_values.items() if k != primary_key)
-        stats_str     = f"{primary_key} → weighted={metric_values.get(primary_key, 0):.3f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
-        header_parts  = [f"Strategies: {len(combo)}", stats_str]
+        stats_str = f"Wpct_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
+        avg_trades   = np.mean([len(df) for sid, df in trades_per_period.get("OOS1", []) if sid in combo])
+        header_parts = [f"Strategies: {len(combo)}", f"AvgTrades={avg_trades:.0f}", stats_str]
         if secondary_str:
             header_parts.append(secondary_str)
 

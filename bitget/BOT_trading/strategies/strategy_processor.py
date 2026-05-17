@@ -1,5 +1,6 @@
+#BOT_trading/strategies/strategy_processor.py
 """
-strategies/strategy_processor.py - Handles strategy execution and order placement.
+Handles strategy execution and order placement.
 
 This module contains the StrategyProcessor class which coordinates:
 - Signal detection (hardcoded or real)

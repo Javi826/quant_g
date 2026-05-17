@@ -7,8 +7,8 @@ from datetime import datetime
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGIES_SET_NAME = "E1"  # "E1" | "00"
-TARGET_BATCH        = "BOT_batch_E1"  
+STRATEGIES_SET_NAME = "00" 
+TARGET_BATCH = f"BOT_batch_{STRATEGIES_SET_NAME}" 
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
 OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")

@@ -1,5 +1,6 @@
+#core/demo_operative.py
 """
-core/demo_operative.py Module - Simulation Trading Mode
+ Simulation Trading Mode
 
 PERSISTENCE MODEL:
 - ✅ JSON for state (open positions)
