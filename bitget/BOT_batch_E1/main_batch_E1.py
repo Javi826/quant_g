@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -86,9 +86,9 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = -20
-OOS_MAX_DD_TH        = 110
-OOS_R2_TH            = 0.082  
+OOS_NETGAIN_TH       = 20
+OOS_MAX_DD_TH        = 11
+OOS_R2_TH            = 0.82  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = True
+UPDATE_OUTPUTS = False
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION

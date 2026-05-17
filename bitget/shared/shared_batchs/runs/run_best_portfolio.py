@@ -14,7 +14,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # =============================================================================
 
 MIN_STRATEGIES = 2
-MAX_STRATEGIES = 4
+MAX_STRATEGIES = 12
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
