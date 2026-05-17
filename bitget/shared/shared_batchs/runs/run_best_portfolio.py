@@ -28,10 +28,6 @@ RANKING_CRITERIA = [
     ("NetGain%",   False),
 ]
 
-RANKING_CRITERIA = [
-    ("MinWeekly%", False),
-    ("NetGain%",   False),
-]
 
 TOP_N    = 2
 N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
