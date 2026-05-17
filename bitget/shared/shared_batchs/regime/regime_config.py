@@ -1,4 +1,4 @@
-# shared_batch/regime/regime_config.py
+#shared/shared_batchs/regime/regime_config.py
 
 # =============================================================================
 # REGIME FILTER SETTINGS

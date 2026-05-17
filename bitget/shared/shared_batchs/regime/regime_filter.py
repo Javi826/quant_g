@@ -1,4 +1,4 @@
-# BOT_batch/utils/regime_filter.py
+#shared/shared_batchs/regime_filter.py
 import logging
 import numpy as np
 import pandas as pd

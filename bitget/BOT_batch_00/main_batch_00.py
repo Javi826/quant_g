@@ -52,6 +52,7 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
+from shared_batchs.pipeline.montecarlo_regime import run_mc_regime_robustness
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -72,7 +73,7 @@ _best_params_results           : dict = {}
 
 # SYMBOLS
 #------------------------------------------------------------------------------
-MY_SYMBOLS           = True
+MY_SYMBOLS           = False
 
 # RUN + MC 
 #------------------------------------------------------------------------------
@@ -82,13 +83,14 @@ N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 0.2
-OOS_MAX_DD_TH        = 2
-OOS_R2_TH            = 0.15 
 
 OOS_NETGAIN_TH       = 20
 OOS_MAX_DD_TH        = 11
 OOS_R2_TH            = 0.82 
+
+OOS_NETGAIN_TH       = 60
+OOS_MAX_DD_TH        = 7
+OOS_R2_TH            = 0.90 
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -99,7 +101,7 @@ RUN_CORRELATION    = False
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS     = True
-SAVE_TRADES        = True
+SAVE_TRADES        = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -342,7 +344,6 @@ def run_batch(strategy_config: dict) -> None:
         
     robustness_score = 0.0   
     if RUN_MC_REGIME_ROBUSTNESS:
-        from pipeline.montecarlo_regime import run_mc_regime_robustness
         robustness_score, _ = run_mc_regime_robustness(
             ohlcv_data      = ohlcv_data_oos1,
             signal_fn       = signal_fn,

@@ -30,7 +30,7 @@ STRATEGIES = [
         "id": "03_parity_long_4H",
         "name": "parity_long_4H",
         "timeframe": "4H",
-        "active": True,
+        "active": False,
         "direction": "long",
         "regime_trending_uptrend": 1,
         "regime_trending_dwtrend": 0,

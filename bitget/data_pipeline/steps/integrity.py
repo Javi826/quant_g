@@ -1,4 +1,4 @@
-# data_pipeline/integrity.py
+# data_pipeline/steps/integrity.py
 # =============================================================================
 # Data Integrity — validates OHLCV data at different pipeline stages.
 #
@@ -364,23 +364,42 @@ def run_coverage(config: dict, collector: IssueCollector | None = None, toleranc
             logger.warning(f"  ⚠ [{symbol}] Could not read 1Dutc reference: {e}")
             continue
 
+        ref_max = pd.to_datetime(df_ref["timestamp"]).max()
+
         for tf, filepath in sorted(tf_files.items()):
             if tf == "1Dutc":
                 continue
             try:
                 df        = pd.read_parquet(filepath)
                 tf_min    = pd.to_datetime(df["timestamp"]).min()
-                diff_days = (tf_min - ref_min).days
-                if diff_days > tolerance_days:
+                tf_max    = pd.to_datetime(df["timestamp"]).max()
+
+                # Start coverage
+                diff_start = (tf_min - ref_min).days
+                if diff_start > tolerance_days:
                     issues += 1
                     logger.info(
-                        f"  ⚠ [{symbol}] {tf} starts {diff_days}d after 1Dutc "
+                        f"  ⚠ [{symbol}] {tf} starts {diff_start}d after 1Dutc "
                         f"({tf_min.date()} vs {ref_min.date()})"
                     )
                     if collector:
-                        collector.add(symbol, tf, "coverage", f"starts {diff_days}d after 1Dutc ({tf_min.date()} vs {ref_min.date()})")
+                        collector.add(symbol, tf, "coverage", f"starts {diff_start}d after 1Dutc ({tf_min.date()} vs {ref_min.date()})")
                 else:
-                    logger.debug(f"  ✅ [{symbol}] {tf} coverage OK (diff: {diff_days}d)")
+                    logger.debug(f"  ✅ [{symbol}] {tf} start coverage OK (diff: {diff_start}d)")
+
+                # End coverage
+                diff_end = abs((tf_max - ref_max).days)
+                if diff_end > tolerance_days:
+                    issues += 1
+                    logger.info(
+                        f"  ⚠ [{symbol}] {tf} ends {diff_end}d away from 1Dutc "
+                        f"({tf_max.date()} vs {ref_max.date()})"
+                    )
+                    if collector:
+                        collector.add(symbol, tf, "coverage", f"ends {diff_end}d away from 1Dutc ({tf_max.date()} vs {ref_max.date()})")
+                else:
+                    logger.debug(f"  ✅ [{symbol}] {tf} end coverage OK (diff: {diff_end}d)")
+
             except Exception as e:
                 logger.warning(f"  ⚠ [{symbol}] Could not read {tf}: {e}")
 
@@ -435,7 +454,7 @@ def print_summary(collector: IssueCollector) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    _base = os.path.dirname(os.path.abspath(__file__))
+    _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _config = {
         "raw_dir":            os.path.join(_base, "data", "01_raw"),
         "clean_dir":          os.path.join(_base, "data", "02_clean"),
