@@ -47,6 +47,7 @@ PERIODS = {
 
 # Periods to run individually + combined
 PERIOD_KEYS = ["IS", "OOS1", "OOS2", "OOS3"]
+PERIOD_KEYS = ["OOS1"]
 
 # Fixed params
 BTC_MA_PERIOD   = 4
@@ -66,6 +67,16 @@ INITIAL_CAPITAL = 800
 MA_PERIODS     = [2]
 ER_THRESHOLDS  = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 ATR_THRESHOLDS = [1.5, 2.0, 2.5]
+
+# Grid search ranges
+MA_PERIODS     = [2]
+ER_THRESHOLDS  = [0.4]
+ATR_THRESHOLDS = [2.0]
+
+# Grid search ranges
+MA_PERIODS     = [2]
+ER_THRESHOLDS  = [0.0]
+ATR_THRESHOLDS = [0.0]
 
 # =============================================================================
 # CACHE

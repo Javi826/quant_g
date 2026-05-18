@@ -14,11 +14,3 @@ REGIME_FAMILIES = {
     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
     'ranging': {}
 }
-
-# =============================================================================
-# REGIME_FAMILIES = {
-#     'trending': {'hurst': ('>', 0.55), 'efficiency_ratio': ('>', 0.6)},
-#     'volatile': {'atr_pct': ('>', 2.0), 'permutation_entropy': ('>', 0.2)},
-#     'ranging': {}
-# }
-# =============================================================================

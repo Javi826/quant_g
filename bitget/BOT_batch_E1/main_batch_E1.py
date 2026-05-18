@@ -81,8 +81,8 @@ MY_SYMBOLS = False
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 500
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ OOS_R2_TH            = 0.92
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
 RUN_BEST_PORTFOLIO = True
-RUN_CORRELATION    = False
+RUN_CORRELATION    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -109,20 +109,18 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-# =============================================================================
-#     "30_reversal_long_30m",
-#     "31_reversal_long_15m",
-#     "32_reversal_short_30m",
-#     "33_reversal_short_15m",
-#     "34_parity_long_30m",
-#     "37_parity_short_15m",
-#     "39_flag_long_15m",
-#     "41_flag_short_15m",
-#     "42_orderblocks_long_30m",
-#     "43_orderblocks_long_15m",
-#     "44_orderblocks_short_30m",
-#     "45_orderblocks_short_15m",
-# =============================================================================
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "37_parity_short_15m",
+    "39_flag_long_15m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
 
 
