@@ -78,8 +78,8 @@ MY_SYMBOLS           = True
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 100
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -88,7 +88,7 @@ OOS_NETGAIN_TH       = 60
 OOS_MAX_DD_TH        = 10
 OOS_R2_TH            = 0.90 
 
-OOS_NETGAIN_TH       = 2
+OOS_NETGAIN_TH       = 0.01
 OOS_MAX_DD_TH        = 10
 OOS_R2_TH            = 0.01 
 
@@ -128,6 +128,7 @@ SELECTED_STRATEGIES = [
 # =============================================================================
 # MONTECARLOS
 # =============================================================================
+
 # IS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
