@@ -1,4 +1,4 @@
-# develop/market_regime/analyze_regime_autocorr.py
+# develop/market_regime/analyze_autocor_regime.py
 """
 Estimates the optimal block_size for MC regime permutation test.
 

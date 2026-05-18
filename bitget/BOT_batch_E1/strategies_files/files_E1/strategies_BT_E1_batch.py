@@ -240,7 +240,7 @@ STRATEGIES = [
         "regime_ranging_dwtrend": 1.0,
         "regime_volatile_uptrend": 0.0,
         "regime_volatile_dwtrend": 1.0,
-        "sell_after_ncandles": 100,
+        "sell_after_ncandles": 50,
         "order_amount_prod": 520,
         "lookback": 60,
         "ma_period": 25,

@@ -73,13 +73,13 @@ _best_params_results           : dict = {}
 
 # SYMBOLS
 #------------------------------------------------------------------------------
-MY_SYMBOLS           = False
+MY_SYMBOLS           = True
 
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -88,11 +88,9 @@ OOS_NETGAIN_TH       = 60
 OOS_MAX_DD_TH        = 10
 OOS_R2_TH            = 0.90 
 
-# =============================================================================
-# OOS_NETGAIN_TH       = 60
-# OOS_MAX_DD_TH        = 7
-# OOS_R2_TH            = 0.90 
-# =============================================================================
+OOS_NETGAIN_TH       = 2
+OOS_MAX_DD_TH        = 10
+OOS_R2_TH            = 0.01 
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -102,29 +100,29 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = False
+UPDATE_OUTPUTS     = True
 SAVE_TRADES        = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "38_parity_long_15m",
-    "40_parity_short_30m",
-    "43_flag_long_30m",
-    "46_flag_short_30m",
-# -----------------------------------------------------------------------------
-    "31_reversal_long_30m",
-    "32_reversal_long_15m",
-    "34_reversal_short_30m",
-    "35_reversal_short_15m",
-    "37_parity_long_30m",
-    "41_parity_short_15m",
-    "44_flag_long_15m",
-    "47_flag_short_15m",
-    "49_orderblocks_long_30m",
-    "50_orderblocks_long_15m",
-    "52_orderblocks_short_30m",
-    "53_orderblocks_short_15m",
+    "35_parity_long_15m",
+    "36_parity_short_30m",
+    "38_flag_long_30m",
+    "40_flag_short_30m",
+#------------------------------------------------------------------------------
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "37_parity_short_15m",
+    "39_flag_long_15m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
 
 # =============================================================================
@@ -164,8 +162,8 @@ OOS2_FOR_VALIDATION = True
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = True
-OOS3_FOR_VALIDATION = True
+OOS3_RUN_ANALYSIS   = False
+OOS3_FOR_VALIDATION = False
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -189,23 +187,23 @@ DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_refe
 
 # DATA
 #------------------------------------------------------------------------------
-# =============================================================================
-# SPLIT_MODE       = "expanding"
-# SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
-# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
-# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
-# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
-# =============================================================================
-
-# DATA
-#------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
 SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
+
+# =============================================================================
+# # DATA
+# #------------------------------------------------------------------------------
+# SPLIT_MODE       = "expanding"
+# SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
+# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
+# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+# # =============================================================================
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================

@@ -1,4 +1,4 @@
-# develop/market_regime/analyze_returns_autocorr.py
+# develop/market_regime/analyze_autocor_returns.py
 """
 Estimates the optimal block_size for MC price path generation (bootstrap of returns).
 

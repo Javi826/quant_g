@@ -81,7 +81,7 @@ MY_SYMBOLS = False
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_75"
 N_PATHS_IS           = 1
 
 # ELITE -- MA4
@@ -98,7 +98,7 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = True
+UPDATE_OUTPUTS = False
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION

@@ -7,6 +7,7 @@ from glob import glob
 from itertools import product
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
 from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades
 from shared.shared_batch_develop.market_regime.regime_analysis import build_direction_cache
@@ -62,7 +63,7 @@ MIN_TRADES      = 2
 INITIAL_CAPITAL = 800
 
 # Grid search ranges
-MA_PERIODS     = [4]
+MA_PERIODS     = [2]
 ER_THRESHOLDS  = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 ATR_THRESHOLDS = [1.5, 2.0, 2.5]
 
@@ -157,7 +158,7 @@ def precompute_metrics_cache(btc_tf_df: pd.DataFrame) -> dict:
     """Precompute metrics for all BTC bars — reused across all grid combinations."""
 
     return build_metrics_cache(
-        btc_df=btc_tf_df, lookback=LOOKBACK_BARS,
+        ref_df=btc_tf_df, lookback=LOOKBACK_BARS,
         hurst_window=HURST_WINDOW, er_window=ER_WINDOW,
         atr_window=ATR_WINDOW, pe_window=PE_WINDOW, pe_order=PE_ORDER,
     )
@@ -175,11 +176,12 @@ def run_grid_search(period_key: str = "IS"):
 
     print(f"\n{'='*100}")
     print(f"  REGIME THRESHOLD GRID SEARCH — {period_key}")
+    print(f"{'='*100}")
     print(f"  MA periods    : {MA_PERIODS}")
     print(f"  ER thresholds : {ER_THRESHOLDS}")
     print(f"  ATR thresholds: {ATR_THRESHOLDS}")
     print(f"  Total combos  : {len(MA_PERIODS) * len(ER_THRESHOLDS) * len(ATR_THRESHOLDS)}")
-    print(f"{'='*100}\n")
+    print(f"  {'─'*96}\n")
 
     # Load BTC 1D once
     btc_1d_df = load_btc_1d(btc_folder)
@@ -267,11 +269,11 @@ def run_grid_search(period_key: str = "IS"):
         atr_th    = row['atr_th']
         sys_pct   = row['sys_pct']
 
-        print(f"\n{'='*100}")
+        print(f"\n{'─'*100}")
         print(f"  #{rank} BEST — MA{ma_period} | ER>{er_th} | ATR>{atr_th}  →  system improvement: {sys_pct:+.2f}%")
-        print(f"{'='*100}")
+        print(f"  {'─'*96}")
         print(f"  {'STRATEGY':<35} {'BASELINE':>10} {'FILTERED':>10} {'%_IMP':>8} {'BINS_FILTERED':>6}  {'BINS'}")
-        print(f"  {'-'*100}")
+        print(f"  {'─'*96}")
 
         for s in strategy_ids:
             baseline = row[f'{s}_baseline']
@@ -284,14 +286,14 @@ def run_grid_search(period_key: str = "IS"):
             print(f"  {s:<35} {baseline:>10.2f} {filtered:>10.2f} "
                   f"{color}{pct:>+7.2f}%{reset} {n_bins:>6}  {bins_str}")
 
-        print(f"  {'-'*100}")
+        print(f"  {'─'*96}")
         sys_base = row['sys_baseline']
         sys_filt = row['sys_filtered']
         color    = "\033[92m" if sys_pct > 0 else "\033[91m"
         reset    = "\033[0m"
         print(f"  {'SYSTEM TOTAL':<35} {sys_base:>10.2f} {sys_filt:>10.2f} "
               f"{color}{sys_pct:>+7.2f}%{reset}")
-        print(f"{'='*100}\n")
+        print(f"  {'─'*96}\n")
 
     # Run only best combination (#1)
     best_row = df_results.iloc[0].copy()
@@ -332,12 +334,12 @@ def run_grid_search(period_key: str = "IS"):
             if n >= MIN_TRADES and profit < 0:
                 system_bins_to_filter.add(f"{fam}_{direction}")
 
-    print(f"\n{'='*80}")
+    print(f"\n{'─'*80}")
     print(f"  BIN DISTRIBUTION — MA{ma_period} | ER>{er_th} | ATR>{atr_th}")
     print(f"  Total trades: {total_trades} | Valid (classified): {len(df_valid)}")
-    print(f"{'='*80}")
+    print(f"  {'─'*76}")
     print(f"  {'BIN':<30} {'TRADES':>8} {'%_SYSTEM':>10} {'PROFIT':>10} {'FILTER':>8}")
-    print(f"  {'-'*70}")
+    print(f"  {'─'*76}")
 
     for bin_key in [f"{fam}_{d}" for fam in ['trending', 'ranging', 'volatile'] for d in ['uptrend', 'dwtrend']]:
         fam, direction = bin_key.rsplit('_', 1)
@@ -350,12 +352,12 @@ def run_grid_search(period_key: str = "IS"):
 
     n_unknown = len(df_all[df_all['family'] == 'unknown'])
     n_neutral = len(df_all[df_all['direction'] == 'neutral'])
-    print(f"  {'-'*70}")
+    print(f"  {'─'*76}")
     print(f"  {'neutral_direction':<30} {n_neutral:>8} {n_neutral/total_trades*100:>9.1f}%")
     print(f"  {'unknown_family':<30} {n_unknown:>8} {n_unknown/total_trades*100:>9.1f}%")
-    print(f"  {'-'*70}")
+    print(f"  {'─'*76}")
     print(f"  {'TOTAL':<30} {total_trades:>8} {'100.0%':>10}")
-    print(f"{'='*80}\n")
+    print(f"  {'─'*76}\n")
 
     return df_results
 
@@ -369,11 +371,12 @@ def run_grid_search_combined(period_keys: list):
 
     print(f"\n{'='*100}")
     print(f"  REGIME THRESHOLD GRID SEARCH — ALL PERIODS COMBINED ({' + '.join(period_keys)})")
+    print(f"{'='*100}")
     print(f"  MA periods    : {MA_PERIODS}")
     print(f"  ER thresholds : {ER_THRESHOLDS}")
     print(f"  ATR thresholds: {ATR_THRESHOLDS}")
     print(f"  Total combos  : {len(MA_PERIODS) * len(ER_THRESHOLDS) * len(ATR_THRESHOLDS)}")
-    print(f"{'='*100}\n")
+    print(f"  {'─'*96}\n")
 
     btc_1d_df = load_btc_1d(BTC_FOLDER)
 
@@ -396,7 +399,7 @@ def run_grid_search_combined(period_keys: list):
             strategy  = df['strategy'].iloc[0]
             timeframe = extract_timeframe(df)
 
-            btc_tf_df     = load_reference_symbol_for_timeframe(btc_folder, timeframe, _btc_cache) \
+            btc_tf_df     = load_reference_symbol_for_timeframe(btc_folder, 'BTCUSDT', timeframe, _btc_cache) \
                             if FAMILY_SOURCE == 'strategy' else btc_1d_df
             buy_times     = pd.to_datetime(df['buy_time'])
             metrics_cache = precompute_metrics_cache(btc_tf_df)
@@ -448,11 +451,11 @@ def run_grid_search_combined(period_keys: list):
 
     # Print best combination
     best = df_results.iloc[0]
-    print(f"\n{'='*80}")
+    print(f"\n{'─'*80}")
     print(f"  COMBINED BEST — MA{int(best['ma_period'])} | ER>{best['er_th']} | ATR>{best['atr_th']}")
     print(f"  System improvement: {best['sys_pct']:+.2f}%  "
           f"(baseline={best['sys_baseline']:.2f} → filtered={best['sys_filtered']:.2f})")
-    print(f"{'='*80}\n")
+    print(f"  {'─'*76}\n")
 
     return df_results
 
@@ -492,8 +495,8 @@ if __name__ == "__main__":
     print(f"  STABILITY SUMMARY — Best params per period")
     print(f"{'='*80}")
     print(f"  {'PERIOD':<10} {'MA':>5} {'ER_TH':>8} {'ATR_TH':>8} {'SYS_%':>8}")
-    print(f"  {'-'*50}")
+    print(f"  {'─'*50}")
     for period, params in best_per_period.items():
         print(f"  {period:<10} {params['ma_period']:>5} {params['er_th']:>8.2f} "
               f"{params['atr_th']:>8.2f} {params['sys_pct']:>+7.2f}%")
-    print(f"{'='*80}\n")
+    print(f"  {'─'*50}\n")

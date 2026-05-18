@@ -1,5 +1,6 @@
+#develop/market_regime/regime00_exhaustive.py
 """
-develop/market_regime/regime0_exhaustive.py
+
 Find best LONG + SHORT BTC MA threshold combination by testing all pairs.
 Tests all combinations (MA_TYPES x THRESHOLDS) on all baseline periods.
 Shows results per period and aggregated.
