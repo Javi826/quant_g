@@ -52,7 +52,7 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-from shared_batchs.pipeline.montecarlo_regime import run_mc_regime_robustness
+
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -127,7 +127,6 @@ SELECTED_STRATEGIES = [
 # =============================================================================
 # MONTECARLOS
 # =============================================================================
-
 # IS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
@@ -138,12 +137,6 @@ MC_SELECTION_PERCENTILE   = None
 #------------------------------------------------------------------------------
 RUN_MC_OOS                = False
 N_PATHS_OOS1              = 500
-
-# REGIME
-#------------------------------------------------------------------------------
-RUN_MC_REGIME_ROBUSTNESS  = True
-N_PERMUTATIONS_REGIME     = 500
-REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
 # VALIDATION CONFIGURATION
@@ -320,25 +313,6 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE M ── MC OOS1                ── ProbNeg={prob_negative_oos1:.1f}%")
-   
-    robustness_score = 0.0   
-    if RUN_MC_REGIME_ROBUSTNESS:
-        robustness_score, _ = run_mc_regime_robustness(
-            ohlcv_data      = ohlcv_data_oos1,
-            signal_fn       = signal_fn,
-            signal_params   = bt_signal_params,
-            best_params     = best_params,
-            order_amount    = ORDER_AMOUNT,
-            bins_to_filter  = bins_to_filter,
-            data_folder     = DATA_FOLDER_OOS1,
-            timeframe       = TIMEFRAME,
-            n_permutations  = N_PERMUTATIONS_REGIME,
-            netgain_th      = REGIME_ROBUSTNESS_TH,
-            n_jobs          = N_JOBS,
-            show_progress   = SHOW_PROGRESS,
-        )
-        logger.info(f"STAGE M ── MC Regime Robustness   ── ProbNeg={robustness_score:.1f}%")
-
 
     # -------------------------------------------------------------------------
     # BLOCK 4  — OOS1 (baseline + regime + validation)
