@@ -53,7 +53,6 @@ from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combinatio
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
-
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
@@ -360,7 +359,6 @@ def run_batch(strategy_config: dict) -> None:
         "prob_neg_pct":    round(prob_negative_oos1, 2),
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
-        "mc_regime_pct": round(robustness_score, 1),
     }
     
     _m = _cm(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
