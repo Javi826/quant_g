@@ -20,7 +20,7 @@ from shared_batchs.regime.regime_config import REGIME_LOOKBACK_BARS
 logger = logging.getLogger("BOT_batch.pipeline.montecarlo_regime")
 
 
-BLOCK_SIZE_HOURS = 82
+BLOCK_SIZE_HOURS = 50
 
 _TIMEFRAME_HOURS = {
     "15m":   0.25,
@@ -30,6 +30,7 @@ _TIMEFRAME_HOURS = {
     "6Hutc": 6,
     "1Dutc": 24,
 }
+
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -45,9 +46,9 @@ def _build_bin_series(
     """
     bins = []
     for ts in timestamps:
-        ts_pd   = pd.Timestamp(ts)
-        metrics = metrics_cache.get(ts_pd)
-        family  = classify_trade_by_family(metrics, FAMILIES) if metrics else None
+        ts_pd     = pd.Timestamp(ts)
+        metrics   = metrics_cache.get(ts_pd)
+        family    = classify_trade_by_family(metrics, FAMILIES) if metrics else None
         direction = get_macro_direction(
             ref_1d_df  = ref_1d_df,
             trade_time = ts_pd,
@@ -72,10 +73,10 @@ def _apply_regime_filter(
     Zero out signals whose timestamp maps to a filtered bin.
     Returns a new signal array.
     """
-    filtered = signal_arr.copy()
+    filtered  = signal_arr.copy()
     ts_to_bin = {int(pd.Timestamp(ts).value): b for ts, b in zip(timestamps, bin_series)}
     for i, ts in enumerate(timestamps):
-        key = int(pd.Timestamp(ts).value)
+        key  = int(pd.Timestamp(ts).value)
         bin_ = ts_to_bin.get(key)
         if bin_ in bins_to_filter:
             filtered[i] = 0
@@ -85,46 +86,39 @@ def _apply_regime_filter(
 def _run_single_permutation(
     perm_idx: int,
     ohlcv_arrays: dict,
-    signal_arrays: dict,
-    timestamps_per_sym: dict,
-    bin_series: list,
-    all_timestamps: np.ndarray,
-    bins_to_filter: set,
+    regime_signal_arrays: dict,
     best_params: dict,
     order_amount: int,
     seed: int,
     block_size: int = 1,
 ) -> dict:
-    """Run one permutation: shuffle bin series, filter signals, backtest.
-    block_size=1 → pure random shuffle (original behavior)
-    block_size>1 → block shuffle preserving temporal autocorrelation
     """
-    rng           = np.random.default_rng(seed + perm_idx)
-    shuffled_bins = bin_series.copy()
+    Run one permutation: shuffle the regime-filtered signal arrays (baseline + regime merged)
+    using block shuffle, then backtest.
 
-    if block_size <= 1:
-        rng.shuffle(shuffled_bins)
-    else:
-        n      = len(shuffled_bins)
-        blocks = [shuffled_bins[i:i + block_size] for i in range(0, n, block_size)]
-        rng.shuffle(blocks)
-        shuffled_bins = [b for block in blocks for b in block]
+    This approach permutes the temporal distribution of regime signals directly,
+    simulating alternative regime histories while preserving signal density.
 
-    # Map shuffled bins back to timestamps
-    ts_to_bin = {int(pd.Timestamp(ts).value): b for ts, b in zip(all_timestamps, shuffled_bins)}
-
+    block_size=1  → pure random shuffle
+    block_size>1  → block shuffle preserving temporal autocorrelation
+    """
+    rng          = np.random.default_rng(seed + perm_idx)
     ohlcv_permuted = {}
+
     for sym, arr in ohlcv_arrays.items():
-        sig      = signal_arrays[sym].copy()
-        sym_ts   = timestamps_per_sym[sym]
-        for i, ts in enumerate(sym_ts):
-            key  = int(pd.Timestamp(ts).value)
-            bin_ = ts_to_bin.get(key)
-            if bin_ in bins_to_filter:
-                sig[i] = 0
+        sig = regime_signal_arrays[sym].copy()
+        n   = len(sig)
+
+        if block_size <= 1:
+            rng.shuffle(sig)
+        else:
+            blocks        = [sig[i:i + block_size] for i in range(0, n, block_size)]
+            rng.shuffle(blocks)
+            sig           = np.concatenate(blocks)[:n]
+
         ohlcv_permuted[sym] = {**arr, "signal": sig}
 
-    result                = run_grid_backtest(
+    result    = run_grid_backtest(
         ohlcv_permuted,
         sell_after   = best_params["SELL_AFTER"],
         tp_pct       = best_params["TP_PCT"],
@@ -144,6 +138,7 @@ def _run_single_permutation(
         "r2":           metrics["R_Squared"]     if metrics else 0.0,
         "win_rate":     metrics["Win_Rate"]      if metrics else 0.0,
     }
+
 
 # =============================================================================
 # PUBLIC API
@@ -165,11 +160,16 @@ def run_mc_regime_robustness(
     seed: int           = 42,
 ) -> tuple[float, pd.DataFrame]:
     """
-    Monte Carlo regime robustness test via bin-series permutation.
+    Monte Carlo regime robustness test via regime-signal permutation.
 
-    Generates signals baseline, computes the real regime bin series for the
-    period, shuffles it N times, and measures in what fraction of alternative
-    regime histories the strategy remains profitable.
+    Computes baseline signals, applies real regime filter (bins_to_filter),
+    then permutes the resulting regime-filtered signal arrays using block shuffle.
+    Measures in what fraction of alternative signal distributions the strategy
+    remains profitable.
+
+    This approach correctly handles strategies whose signal generator is
+    independent of the regime (e.g. parity, flag, reversal) — permuting bins
+    directly would artificially eliminate signals that exist regardless of regime.
 
     Args:
         ohlcv_data      : raw ohlcv dict {symbol: df}
@@ -180,7 +180,7 @@ def run_mc_regime_robustness(
         bins_to_filter  : regime bins to filter (from IS analysis)
         data_folder     : data folder for BTC loading
         timeframe       : timeframe string
-        n_permutations  : number of bin-series permutations
+        n_permutations  : number of permutations
         netgain_th      : net gain threshold to consider a permutation positive
         n_jobs          : joblib parallelism (-1 = all cores)
         show_progress   : show tqdm progress bar
@@ -188,20 +188,21 @@ def run_mc_regime_robustness(
 
     Returns:
         tuple: (robustness_score, df_results)
-            robustness_score : float — % permutations with NetGain > netgain_th
+            robustness_score : float — % permutations with NetGain < netgain_th
             df_results       : DataFrame with per-permutation metrics
     """
     ohlcv_arrays = prepare_ohlcv_arrays(ohlcv_data)
-    block_size = max(1, round(BLOCK_SIZE_HOURS / _TIMEFRAME_HOURS.get(timeframe, 1)))
+    block_size   = max(1, round(BLOCK_SIZE_HOURS / _TIMEFRAME_HOURS.get(timeframe, 1)))
     logger.debug(f"MC Regime — block_size={block_size} (timeframe={timeframe}, hours={BLOCK_SIZE_HOURS})")
-    # --- Build baseline signal arrays per symbol ---
+
+    # --- Build baseline signals ---
     signal_arrays      = {}
     timestamps_per_sym = {}
     for sym, arr in ohlcv_arrays.items():
         signal_arrays[sym]      = np.asarray(signal_fn(arr, **signal_params, live_trading=False))
         timestamps_per_sym[sym] = arr["ts"]
 
-    # --- Build unified timestamp axis & regime bin series ---
+    # --- Build regime bin series ---
     btc_cache = {}
     ref_1d_df = load_reference_symbol_for_timeframe(data_folder, REGIME_REFERENCE, "1Dutc", btc_cache)
     ref_tf_df = load_reference_symbol_for_timeframe(data_folder, REGIME_REFERENCE, timeframe, btc_cache) \
@@ -230,6 +231,16 @@ def run_mc_regime_robustness(
         )
     )
 
+    # --- Apply real regime filter to get regime_signal_arrays ---
+    regime_signal_arrays = {}
+    for sym, arr in ohlcv_arrays.items():
+        regime_signal_arrays[sym] = _apply_regime_filter(
+            signal_arr     = signal_arrays[sym],
+            timestamps     = timestamps_per_sym[sym],
+            bin_series     = bin_series,
+            bins_to_filter = bins_to_filter,
+        )
+
     # --- Run permutations in parallel ---
     with (
         tqdm_joblib(tqdm(total=n_permutations, desc="🔄 MC Regime permutations"))
@@ -237,17 +248,13 @@ def run_mc_regime_robustness(
     ):
         results_list = Parallel(n_jobs=n_jobs)(
             delayed(_run_single_permutation)(
-                perm_idx           = i,
-                ohlcv_arrays       = ohlcv_arrays,
-                signal_arrays      = signal_arrays,
-                timestamps_per_sym = timestamps_per_sym,
-                bin_series         = bin_series,
-                all_timestamps     = all_timestamps,
-                bins_to_filter     = bins_to_filter,
-                best_params        = best_params,
-                order_amount       = order_amount,
-                seed               = seed,
-                block_size         = block_size,
+                perm_idx             = i,
+                ohlcv_arrays         = ohlcv_arrays,
+                regime_signal_arrays = regime_signal_arrays,
+                best_params          = best_params,
+                order_amount         = order_amount,
+                seed                 = seed,
+                block_size           = block_size,
             )
             for i in range(n_permutations)
         )

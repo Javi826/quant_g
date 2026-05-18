@@ -137,12 +137,12 @@ MC_SELECTION_PERCENTILE   = None
 # OOS
 #------------------------------------------------------------------------------
 RUN_MC_OOS                = False
-N_PATHS_OOS1              = 2000
+N_PATHS_OOS1              = 500
 
 # REGIME
 #------------------------------------------------------------------------------
-RUN_MC_REGIME_ROBUSTNESS  = False
-N_PERMUTATIONS_REGIME     = 2000
+RUN_MC_REGIME_ROBUSTNESS  = True
+N_PERMUTATIONS_REGIME     = 500
 REGIME_ROBUSTNESS_TH      = 0  
 
 # =============================================================================
@@ -530,7 +530,7 @@ def run_batch(strategy_config: dict) -> None:
         })
 
     elapsed = int(time.time() - start_time)
-    logger.info(f"DONE  🏁 ──  {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
+    logger.info(f"DONE  🏁 ── {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
 
 
 # =============================================================================
