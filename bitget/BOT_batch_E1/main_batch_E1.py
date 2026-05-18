@@ -81,8 +81,8 @@ MY_SYMBOLS = False
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 500
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ OOS_R2_TH            = 0.92
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
 RUN_BEST_PORTFOLIO = True
-RUN_CORRELATION    = True
+RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ OOS23_MATCH_SYMBOLS = True
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.70
+CORRELATION_DD_THRESHOLD = 0.80
 
 # FILES
 #------------------------------------------------------------------------------
