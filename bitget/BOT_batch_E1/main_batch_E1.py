@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -108,20 +108,21 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-    "30_reversal_long_30m",
-    "31_reversal_long_15m",
-    "32_reversal_short_30m",
-    "33_reversal_short_15m",
-    "34_parity_long_30m",
-    "37_parity_short_15m",
-    "39_flag_long_15m",
-    "41_flag_short_15m",
-    "42_orderblocks_long_30m",
-    "43_orderblocks_long_15m",
-    "44_orderblocks_short_30m",
-    "45_orderblocks_short_15m",
+# =============================================================================
+#     "30_reversal_long_30m",
+#     "31_reversal_long_15m",
+#     "32_reversal_short_30m",
+#     "33_reversal_short_15m",
+#     "34_parity_long_30m",
+#     "37_parity_short_15m",
+#     "39_flag_long_15m",
+#     "41_flag_short_15m",
+#     "42_orderblocks_long_30m",
+#     "43_orderblocks_long_15m",
+#     "44_orderblocks_short_30m",
+#     "45_orderblocks_short_15m",
+# =============================================================================
 ]
-
 
 # =============================================================================
 # MONTECARLOS
@@ -527,7 +528,7 @@ def run_summary():
     print_strategies_summary(_validation_results)
 
     if _strategy_trades_oos1_baseline:
-        logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS\n{'─'*115}")
+        logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(_strategy_trades_oos1_baseline, "Baseline", INITIAL_BALANCE)
         if _strategy_trades_oos1_regime:
@@ -538,7 +539,6 @@ def run_summary():
     validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
 
     if validated_baseline:
-        logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*115}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_oos1_regime:
@@ -680,7 +680,7 @@ if __name__ == "__main__":
     logger.info(f"{'='*115}\n")
     
     for strategy in strategies_to_run:
-        logger.info(f"\n{'='*115}\n  Running: {strategy['id']}\n{'='*115}")
+        logger.info(f"\n{'─'*115}\n  Running: {strategy['id']}\n{'─'*115}")
         run_batch(strategy)
 
     if UPDATE_OUTPUTS:

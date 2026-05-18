@@ -62,9 +62,9 @@ def _print_robustness_df(rows: list, title: str) -> None:
     df                = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
 
     lines = [
-        f"\n\033[94m{'─'*115}",
+        f"\n{'─'*115}",
         f"  {title}",
-        f"{'─'*115}\033[0m",
+        f"{'─'*115}",
         df.to_string(index=False),
         f"{'─'*115}",
     ]
@@ -158,11 +158,9 @@ def print_all_curves_table(
     sep_row["Curve"] = "─" * max_len
     df_out           = pd.concat([df_out.iloc[:combined_idx], sep_row, df_out.iloc[combined_idx:]], ignore_index=True)
 
-    color = "\033[94m" if label == "Regime 0+1 — Validated only" else ""
-    reset = "\033[0m" if color else ""
     n     = len(named)
     lines = [
-        f"\n{color}{'─'*115}\n📊 ALL CURVES COMBINED OOS1 ({n}) — {label}\n{'─'*115}{reset}\n",
+        f"\n{'─'*115}\n📊 ALL CURVES COMBINED OOS1 ({n}) — {label}\n{'─'*115}\n",
         df_out.to_string(index=False),
     ]
     logger.info("\n".join(lines))

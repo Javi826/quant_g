@@ -15,7 +15,7 @@ PRICE_COL    = "close"
 VOLUME_COL   = "volume_quote"   # fallback to "volume" if not found
 
 YEAR_FILTER  = 2026             # e.g. 2024 or 2025 — None uses full history
-SORT_BY      = "volume"           # "corr" or "volume"
+SORT_BY      = "corr"           # "corr" or "volume"
 
 # =============================================================================
 # HELPERS

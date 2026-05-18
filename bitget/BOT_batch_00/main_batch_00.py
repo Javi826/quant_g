@@ -566,7 +566,7 @@ def run_summary():
     print_strategies_summary(_validation_results)
 
     if _strategy_trades_oos1_baseline:
-        logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS\n{'─'*115}")
+        logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(_strategy_trades_oos1_baseline, "Baseline", INITIAL_BALANCE)
         if _strategy_trades_oos1_regime:
@@ -577,7 +577,6 @@ def run_summary():
     validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
 
     if validated_baseline:
-        logger.info(f"\n{'─'*115}\n  PORTFOLIO ANALYSIS — VALIDATED ONLY\n{'─'*115}")
         if logger.isEnabledFor(logging.DEBUG):
             print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
     if validated_oos1_regime:
@@ -720,7 +719,7 @@ if __name__ == "__main__":
     logger.info(f"{'='*115}\n")
     
     for strategy in strategies_to_run:
-        logger.info(f"\n{'='*115}\n  Running: {strategy['id']}\n{'='*115}")
+        logger.info(f"\n{'─'*115}\n  Running: {strategy['id']}\n{'─'*115}")
         run_batch(strategy)
 
     if UPDATE_OUTPUTS:

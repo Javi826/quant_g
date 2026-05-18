@@ -268,7 +268,8 @@ def _print_best_combinations(
     W          = 115
     split_name = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
-    logger.info(f"\n{'─'*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'─'*W}")
+    #logger.info(f"\n{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}")
+    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}\033[0m")
 
     primary_key = ranking_criteria[0][0]
 
