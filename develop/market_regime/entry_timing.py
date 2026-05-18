@@ -29,10 +29,12 @@ SPLIT_MODE         = "expanding"
 SPLIT_BASE         = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
 
 PERIOD_LABELS = [
-    ("IS",   "is_regime"),
+ #   ("IS",   "is_regime"),
     ("OOS1", "oos1_regime"),
-    ("OOS2", "oos2_regime"),
-    ("OOS3", "oos3_regime"),
+# =============================================================================
+#     ("OOS2", "oos2_regime"),
+#     ("OOS3", "oos3_regime"),
+# =============================================================================
 ]
 
 INITIAL_CAPITAL    = 800

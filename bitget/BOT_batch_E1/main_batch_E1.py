@@ -86,9 +86,9 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 60
-OOS_MAX_DD_TH        = 10
-OOS_R2_TH            = 0.90  
+OOS_NETGAIN_TH       = 90
+OOS_MAX_DD_TH        = 9
+OOS_R2_TH            = 0.92  
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -98,23 +98,24 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = False
+UPDATE_OUTPUTS = True
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
+    "35_parity_long_15m",
+    "36_parity_short_30m",
+    "38_flag_long_30m",
+    "40_flag_short_30m",
+#------------------------------------------------------------------------------
     "30_reversal_long_30m",
     "31_reversal_long_15m",
     "32_reversal_short_30m",
     "33_reversal_short_15m",
     "34_parity_long_30m",
-    "35_parity_long_15m",
-    "36_parity_short_30m",
     "37_parity_short_15m",
-    "38_flag_long_30m",
     "39_flag_long_15m",
-    "40_flag_short_30m",
     "41_flag_short_15m",
     "42_orderblocks_long_30m",
     "43_orderblocks_long_15m",
