@@ -606,7 +606,6 @@ def run_grid_backtest(
     blocked_cash    = 0.0                      # efectivo bloqueado (ingresos de shorts)
     initial_balance = INITIAL_BALANCE
     
-
     (
         sym_data,
         signals_by_time,

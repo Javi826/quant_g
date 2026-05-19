@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-
 from shared_batchs.regime.regime_config import REGIME_REFERENCE
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.utils.plotting")
@@ -160,3 +159,102 @@ def plot_portfolio_comparison(
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
     _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, title)
+    
+def plot_best_portfolio(
+    combo: tuple,
+    trades_per_period: dict,
+    subperiod_scores: dict,
+    subperiods: list,
+    initial_balance: float,
+    data_folder_oos1: str,
+    data_folder_oos2: str,
+    data_folder_oos3: str,
+    show_plots: bool = False,
+) -> None:
+    """
+    Radar chart of normalized metrics (NetGain%, Weekly_pct, MaxDD% inv)
+    across OOS1/2/3 for the best portfolio combo.
+    Fixed reference ranges ensure meaningful visual comparison.
+    """
+    if not show_plots:
+        return
+
+    colors_per_period = {"OOS1": "#00897B", "OOS2": "#2E86C1", "OOS3": "#8E44AD"}
+
+    # -------------------------------------------------------------------------
+    # Compute metrics per OOS period
+    # -------------------------------------------------------------------------
+    period_metrics = {}
+    for period, trades_list in trades_per_period.items():
+        combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
+        if not combo_trades:
+            continue
+        tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
+        total_capital = initial_balance * len(combo)
+        period_metrics[period] = compute_metrics(tl, capital=total_capital, name="")
+
+    if not period_metrics:
+        return
+
+    # -------------------------------------------------------------------------
+    # Radar data — fixed reference ranges, higher = better on all axes
+    # -------------------------------------------------------------------------
+    radar_labels  = ["NetGain%", "Weekly_pct", "MaxDD%\n(inv)"]
+    n_axes        = len(radar_labels)
+    _RADAR_RANGES = [
+        (0,  300),  # NetGain%
+        (50, 100),  # Weekly_pct
+        (0,  10),   # MaxDD% inv
+    ]
+
+    def _get_radar_values(m: dict) -> list:
+        return [
+            m.get("Net_Gain_pct", 0),
+            m.get("Weekly_pct",   0),
+            -m.get("Max_DD_pct",  0),
+        ]
+
+    def _normalize(values: list) -> list:
+        return [
+            float(np.clip((v - lo) / (hi - lo), 0, 1))
+            for v, (lo, hi) in zip(values, _RADAR_RANGES)
+        ]
+
+    radar_raw  = {p: _get_radar_values(m) for p, m in period_metrics.items()}
+    radar_norm = {p: _normalize(v) for p, v in radar_raw.items()}
+
+    angles = np.linspace(0, 2 * np.pi, n_axes, endpoint=False).tolist()
+    angles += angles[:1]
+
+    # -------------------------------------------------------------------------
+    # Plot
+    # -------------------------------------------------------------------------
+    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+    fig.patch.set_facecolor("#F8F9FA")
+    ax.set_facecolor("#F8F9FA")
+
+    for period, norm_vals in radar_norm.items():
+        vals  = norm_vals + norm_vals[:1]
+        color = colors_per_period.get(period, "#555555")
+        raw   = radar_raw[period]
+        label = f"{period}  NetGain={raw[0]:.1f}%  Wpct={raw[1]:.1f}%  DD={-raw[2]:.1f}%"
+        ax.plot(angles, vals, color=color, linewidth=1.6, label=label)
+        ax.fill(angles, vals, color=color, alpha=0.12)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(radar_labels, fontsize=10)
+    ax.set_yticks([0.25, 0.5, 0.75, 1.0])
+    ax.set_yticklabels(["25%", "50%", "75%", "100%"], fontsize=7, color="#888888")
+    ax.set_title(
+        f"Best Portfolio — {' | '.join(sorted(combo, key=lambda s: int(s.split('_')[0])))}\nNormalized Metrics per OOS",
+        fontsize=10, fontweight="bold", pad=20
+    )
+    ax.legend(
+            loc="lower right", bbox_to_anchor=(1.6, -0.1),
+            fontsize=8, framealpha=0.9, facecolor="white", edgecolor="#AAAAAA",
+        )
+    ax.grid(True, linestyle="--", alpha=0.4, linewidth=0.6)
+    ax.spines["polar"].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()

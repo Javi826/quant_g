@@ -11,7 +11,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [6],
             "TOLERANCE": [30],
             "MA_PERIOD": [25],
@@ -24,7 +24,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [8],
             "TOLERANCE": [30],
             "MA_PERIOD": [25],
@@ -37,7 +37,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [6],
             "TOLERANCE": [30],
             "MA_PERIOD": [25],
@@ -50,7 +50,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [6],
             "TOLERANCE": [30],
             "MA_PERIOD": [25],
@@ -63,7 +63,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [150],
             "TOLERANCE": [20],
             "MA_PERIOD": [25],
@@ -76,7 +76,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [150],
             "TOLERANCE": [10],
             "MA_PERIOD": [25],
@@ -89,7 +89,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [150],
             "TOLERANCE": [30],
             "MA_PERIOD": [25],
@@ -102,7 +102,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [100],
             "TOLERANCE": [10],
             "MA_PERIOD": [25],
@@ -115,7 +115,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [60],
             "MA_PERIOD": [10],
             "IMPULSE": [2],
@@ -129,7 +129,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [60],
             "MA_PERIOD": [25],
             "IMPULSE": [4],
@@ -143,7 +143,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [20],
             "MA_PERIOD": [25],
             "IMPULSE": [2],
@@ -157,7 +157,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [60],
             "MA_PERIOD": [25],
             "IMPULSE": [4],
@@ -171,7 +171,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [50],
             "TOLERANCE": [20],
             "IMPULSE": [0.05],
@@ -184,7 +184,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [50],
             "TOLERANCE": [20],
             "IMPULSE": [0.05],
@@ -197,7 +197,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [75],
             "TOLERANCE": [30],
             "IMPULSE": [0.08],
@@ -210,7 +210,7 @@ STRATEGIES_LOOP = [
         "n_symbols": 10,
         "order_amount": 80,
         "param_grid": {
-            "SELL_AFTER": [50],
+            "SELL_AFTER": [0],
             "LOOKBACK": [30],
             "TOLERANCE": [20],
             "IMPULSE": [0.08],

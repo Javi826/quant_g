@@ -56,7 +56,7 @@ def _write_csv(df: pd.DataFrame, filepath: str) -> None:
 # CORE
 # =============================================================================
 
-def _find_timestamp_extremum(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol: str) -> pd.DataFrame:
+def _find_timestamp_extremum___(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol: str) -> pd.DataFrame:
     df = df_high.copy()
     df = df.loc[df_low.index[0]:]
     df["low_time"]  = pd.NaT
@@ -82,6 +82,31 @@ def _find_timestamp_extremum(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol
 
     return df
 
+def _find_timestamp_extremum(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    df = df_high.copy()
+    df = df.loc[df_low.index[0]:]
+
+    bar_starts = df.index[:-1]
+    bar_ends   = df.index[1:]
+    bins       = bar_starts.append(bar_ends[-1:])
+
+    df_low         = df_low.copy()
+    df_low["bar"]  = pd.cut(df_low.index, bins=bins, labels=bar_starts, right=False)
+    df_low         = df_low.dropna(subset=["bar"])
+
+    high_times = df_low.groupby("bar", observed=True)["high"].idxmax()
+    low_times  = df_low.groupby("bar", observed=True)["low"].idxmin()
+
+    df             = df.iloc[:-1]
+    df["high_time"] = high_times.reindex(df.index)
+    df["low_time"]  = low_times.reindex(df.index)
+
+    valid = df[["low_time", "high_time"]].notna().all(axis=1).sum()
+    total = len(df)
+    pct   = valid / total * 100 if total > 0 else 0
+    logger.info(f"  [{symbol}] Valid rows: {valid}/{total} ({pct:.1f}%)")
+
+    return df
 # =============================================================================
 # PAIR PROCESSOR
 # =============================================================================

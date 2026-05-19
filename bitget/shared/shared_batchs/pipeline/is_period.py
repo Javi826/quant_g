@@ -72,5 +72,3 @@ def run_backtest_is(
         )
 
     return bins_to_filter, trades_df_is
-
-

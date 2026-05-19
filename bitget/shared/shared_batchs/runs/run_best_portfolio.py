@@ -3,7 +3,6 @@ import logging
 import numpy as np
 import pandas as pd
 from itertools import combinations
-
 from shared_batchs.utils.batch_metrics import compute_metrics, _weekly_returns, _cvar, _neg_streak_stats
 from shared_batchs.utils.reporting import _print_robustness_df
 
@@ -15,7 +14,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # =============================================================================
 
 MIN_STRATEGIES = 2
-MAX_STRATEGIES = 5
+MAX_STRATEGIES = 4
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -26,7 +25,7 @@ PERIOD_WEIGHTS = {
 # ascending=False → higher is better  |  ascending=True → lower is better
 RANKING_CRITERIA = [
     ("Weekly_pct", False),
-    ("NetGain%",   False),
+    ("Weekly_std",   True),
 ]
 
 
@@ -242,6 +241,7 @@ def _compute_weighted_scores(
         row["subperiod_std"]    = round(float(np.std(values)), 2)  if values else np.nan
         row["subperiod_min"]    = round(float(np.min(values)), 1)  if values else np.nan
         row["subperiod_max"]    = round(float(np.max(values)), 1)  if values else np.nan
+        row["Weekly_std"]       = row["subperiod_std"]
 
         records.append(row)
 
@@ -289,8 +289,8 @@ def _print_best_combinations(
         if secondary_str:
             header_parts.append(secondary_str)
 
-        logger.info(f"\n  BEST #{rank} — " + "  |  ".join(header_parts))
-        logger.info(f"  {'─'*W}")
+        logger.info(f"\nBEST #{rank} — " + "  |  ".join(header_parts))
+        logger.info(f"{'─'*W}")
         for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
             icon = "🟢" if _is_long(s) else "🔴"
             logger.info(f"    {icon} {s}")
@@ -326,6 +326,10 @@ def find_best_portfolio_combination(
     ranking_criteria: list = RANKING_CRITERIA,
     top_n: int             = TOP_N,
     n_splits: int          = N_SPLITS,
+    data_folder_oos1: str = "",
+    data_folder_oos2: str = "",
+    data_folder_oos3: str = "",
+    show_plots: bool = False,
     **kwargs,
 ) -> list:
     """
@@ -389,5 +393,20 @@ def find_best_portfolio_combination(
 
     top = df_scored.head(top_n).to_dict("records")
     _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria)
+    
+    from shared_batchs.utils.plotting import plot_best_portfolio
 
+    plot_best_portfolio(
+        combo             = top[0]["combo"],
+        trades_per_period = trades_per_period,
+        subperiod_scores  = top[0]["subperiod_scores"],
+        subperiods        = subperiods,
+        initial_balance   = initial_balance,
+        data_folder_oos1  = data_folder_oos1,
+        data_folder_oos2  = data_folder_oos2,
+        data_folder_oos3  = data_folder_oos3,
+        show_plots        = show_plots,
+    )
+    
     return top
+

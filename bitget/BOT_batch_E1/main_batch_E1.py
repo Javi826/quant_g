@@ -33,12 +33,11 @@ DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
 
-from shared_batchs.utils.utils import filter_symbols
+from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
 from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
-from shared_batchs.pipeline.universe import select_universe
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.batch_metrics import compute_metrics as _cm
@@ -108,20 +107,18 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-# =============================================================================
-#     "30_reversal_long_30m",
-#     "31_reversal_long_15m",
-#     "32_reversal_short_30m",
-#     "33_reversal_short_15m",
-#     "34_parity_long_30m",
-#     "37_parity_short_15m",
-#     "39_flag_long_15m",
-#     "41_flag_short_15m",
-#     "42_orderblocks_long_30m",
-#     "43_orderblocks_long_15m",
-#     "44_orderblocks_short_30m",
-#     "45_orderblocks_short_15m",
-# =============================================================================
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "37_parity_short_15m",
+    "39_flag_long_15m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
 
 # =============================================================================
@@ -633,10 +630,14 @@ def run_summary():
     # -------------------------------------------------------------------------
     if RUN_BEST_PORTFOLIO:
         find_best_portfolio_combination(
-            validated_trades_oos1=validated_oos1_regime,
-            validated_trades_oos2=validated_oos2_regime,
-            validated_trades_oos3=validated_oos3_regime,
-            initial_balance=INITIAL_BALANCE,
+            validated_trades_oos1 = validated_oos1_regime,
+            validated_trades_oos2 = validated_oos2_regime,
+            validated_trades_oos3 = validated_oos3_regime,
+            initial_balance       = INITIAL_BALANCE,
+            data_folder_oos1      = DATA_FOLDER_OOS1,
+            data_folder_oos2      = DATA_FOLDER_OOS2,
+            data_folder_oos3      = DATA_FOLDER_OOS3,
+            show_plots            = SHOW_PLOTS,
         )
 # =============================================================================
 # MAIN

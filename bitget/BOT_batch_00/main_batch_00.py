@@ -52,7 +52,7 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-from shared_batchs.pipeline.montecarlo_regime import run_mc_regime_robustness
+
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -100,7 +100,7 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = True
+UPDATE_OUTPUTS     = False
 SAVE_TRADES        = False
 
 # STRATEGY SELECTION
@@ -334,25 +334,6 @@ def run_batch(strategy_config: dict) -> None:
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE 3 ── MC OOS1                ── {N_PATHS_OOS1} paths — ProbNeg={prob_negative_oos1:.1f}% P5={float(p5_winrate_oos1)*100:.1f}% P50={float(p50_winrate_oos1)*100:.1f}%")
         
-    robustness_score = 0.0   
-    if RUN_MC_REGIME_ROBUSTNESS:
-        robustness_score, _ = run_mc_regime_robustness(
-            ohlcv_data      = ohlcv_data_oos1,
-            signal_fn       = signal_fn,
-            signal_params   = bt_signal_params,
-            best_params     = best_params,
-            order_amount    = ORDER_AMOUNT,
-            bins_to_filter  = bins_to_filter,
-            data_folder     = DATA_FOLDER_OOS1,
-            timeframe       = TIMEFRAME,
-            n_permutations  = N_PERMUTATIONS_REGIME,
-            netgain_th      = REGIME_ROBUSTNESS_TH,
-            n_jobs          = N_JOBS,
-            show_progress   = SHOW_PROGRESS,
-        )
-        logger.info(f"STAGE M ── MC Regime Robustness   ── Score={robustness_score:.1f}%")
-
-
     # -------------------------------------------------------------------------
     # BLOCK 4  — OOS1 (baseline + regime + validation)
     # -------------------------------------------------------------------------
