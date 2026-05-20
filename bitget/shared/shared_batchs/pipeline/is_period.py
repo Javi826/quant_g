@@ -1,8 +1,8 @@
-#shared_batch/pipeline/is_period.py
+#shared_batchs/pipeline/is_period.py
 import logging
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
-from shared_batchs.utils.torque import prepare_ohlcv_arrays
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.regime.regime_filter import analyze_regime_is
 from shared_batchs.utils.io import accumulate_strategy_trades
 

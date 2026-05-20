@@ -1,11 +1,12 @@
-#shared_batch/pipeline/oss_period.py
+#shared_batchs/pipeline/oss_period.py
 import logging
 
 import pandas as pd
 
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
 from shared_batchs.utils.analysis import report_backtesting
-from shared_batchs.utils.torque import compile_grid_results, prepare_ohlcv_arrays
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+from shared_batchs.utils.backtest_compiler import compile_grid_results
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison

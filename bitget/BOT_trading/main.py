@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#BOT_trading/main.py
 """
 main.py Trading Bot - Main Entry Point
 

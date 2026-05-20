@@ -1,4 +1,4 @@
-    #BOT_batch/main_batch_00.py
+#BOT_batch/main_batch_00.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -40,7 +40,6 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.batch_metrics import compute_metrics as _cm
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
 from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
@@ -51,7 +50,6 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
-
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -77,8 +75,8 @@ MY_SYMBOLS           = True
 # RUN + MC 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #----------------------------------------------------------------------------
@@ -87,9 +85,11 @@ OOS_NETGAIN_TH       = 90
 OOS_MAX_DD_TH        = 9
 OOS_R2_TH            = 0.92  
 
-OOS_NETGAIN_TH       = 0.01
-OOS_MAX_DD_TH        = 10
-OOS_R2_TH            = 0.01 
+# =============================================================================
+# OOS_NETGAIN_TH       = 0.01
+# OOS_MAX_DD_TH        = 10
+# OOS_R2_TH            = 0.01 
+# =============================================================================
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -162,8 +162,8 @@ OOS2_FOR_VALIDATION = True
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = False
-OOS3_FOR_VALIDATION = False
+OOS3_RUN_ANALYSIS   = True
+OOS3_FOR_VALIDATION = True
 
 # OOS2/3 symbol selection
 #------------------------------------------------------------------------------
@@ -185,26 +185,26 @@ STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
 DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
-# DATA
-#------------------------------------------------------------------------------
-SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
-DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
-DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
-DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
-
 # =============================================================================
 # # DATA
 # #------------------------------------------------------------------------------
 # SPLIT_MODE       = "expanding"
 # SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
-# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
-# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
-# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-# 
+# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
+# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
+# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
+# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
 # =============================================================================
+
+# DATA
+#------------------------------------------------------------------------------
+SPLIT_MODE       = "expanding"
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
+DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
+DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
+DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
@@ -382,7 +382,7 @@ def run_batch(strategy_config: dict) -> None:
         "bins_to_filter":  bins_to_filter,
         #"mc_regime_pct": round(robustness_score, 1),
     }
-    _m = _cm(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
+    _m = compute_metrics(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
     _val_record.update({
         "net_gain_pct": round(_m["Net_Gain_pct"], 1),
         "dd_pct":       round(_m["Max_DD_pct"], 1),

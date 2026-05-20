@@ -12,7 +12,8 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from utils.torque import extract_ohlcv_from_path, compile_MC_results, prepare_ohlcv_arrays
+from utils.ohlcv_utils import extract_ohlcv_from_path, prepare_ohlcv_arrays
+from utils.backtest_compiler import compile_MC_results
 from tools.optimize_MC import generate_paths_for_all_symbols_functional
 
 

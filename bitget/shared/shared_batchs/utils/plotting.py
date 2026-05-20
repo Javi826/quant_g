@@ -349,3 +349,81 @@ def plot_best_portfolio(
 
     plt.tight_layout()
     plt.show()
+    
+def plot_netgain_dd(equity_hist, initial_capital, data_folder, title="Net Gain % y DD", reference_symbol=None):
+    from sklearn.linear_model import LinearRegression
+
+    timestamps = pd.to_datetime(equity_hist['timestamp'])
+    balances = np.array(equity_hist['balance'])
+
+    net_gain_pct = (balances - initial_capital) / initial_capital * 100
+    cumulative_max = np.maximum.accumulate(balances)
+    dd_pct = (balances - cumulative_max) / cumulative_max * 100
+
+    X = np.arange(len(balances)).reshape(-1, 1)
+    y = balances.reshape(-1, 1)
+    r2 = LinearRegression().fit(X, y).score(X, y)
+
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    if reference_symbol is not None:
+        ref_file = os.path.join(data_folder, f"{reference_symbol}_4H.parquet")
+        ref_df = pd.read_parquet(ref_file)
+        if 'timestamp' not in ref_df.columns:
+            if isinstance(ref_df.index, pd.DatetimeIndex):
+                ref_df = ref_df.reset_index().rename(columns={'index': 'timestamp'})
+            else:
+                raise ValueError("Reference parquet has no 'timestamp' column or datetime index.")
+        ref_df = ref_df[['timestamp', 'close']]
+        ref_df['timestamp'] = pd.to_datetime(ref_df['timestamp'])
+        ref_df['ref_net_gain_pct'] = (ref_df['close'] / ref_df['close'].iloc[0] - 1) * 100
+        ref_aligned = np.interp(
+            timestamps.astype(np.int64) / 10**9,
+            ref_df['timestamp'].astype(np.int64) / 10**9,
+            ref_df['ref_net_gain_pct']
+        )
+        above_ref = net_gain_pct >= ref_aligned
+        below_ref = net_gain_pct < ref_aligned
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=above_ref, alpha=0.2, color='green', interpolate=True)
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=below_ref, alpha=0.2, color='red', interpolate=True)
+        ax1.plot(ref_df['timestamp'], ref_df['ref_net_gain_pct'],
+                 color='darkorange', linewidth=0.6, linestyle='--', label=f'{reference_symbol} %')
+        final_ref = ref_df['ref_net_gain_pct'].iloc[-1]
+    else:
+        above_zero = net_gain_pct >= 0
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=above_zero, alpha=0.2, color='green', interpolate=True)
+        ax1.fill_between(timestamps, net_gain_pct, 0, where=~above_zero, alpha=0.2, color='red', interpolate=True)
+        final_ref = None
+
+    ax1.plot(timestamps, net_gain_pct, color='blue', linewidth=1.2, label='Net Gain %')
+    ax1.set_xlabel("Time")
+    ax1.set_ylabel("Net_Gain_pct", color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+
+    ax2 = ax1.twinx()
+    ax2.plot(timestamps, dd_pct, color='lightcoral', linewidth=0.1, label='DD %')
+    ax2.set_ylabel("Drawdown", color='red')
+    ax2.tick_params(axis='y', labelcolor='red')
+
+    final_net_gain = net_gain_pct[-1]
+    max_dd = dd_pct.min()
+
+    textstr = (
+        f'Net Gain STR : {final_net_gain:.2f}%\n'
+        + (f'Net Gain REF : {final_ref:.2f}%\n' if final_ref is not None else '')
+        + f'Max DD       : {max_dd:.2f}%\n'
+        + f'R²           : {r2:.3f}'
+    )
+
+    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    fig.suptitle(title)
+    fig.autofmt_xdate()
+    ax1.grid(True, linestyle='--', alpha=0.6)
+
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc='best')
+
+    plt.show()

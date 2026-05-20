@@ -11,35 +11,35 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 
 symbols_to_exclude = {}
 
-symbols_to_include = [
-    "NVDAUSDT",   # NVIDIA        - corr 0.77, 202 rows
-    "PLTRUSDT",   # Palantir      - corr 0.73, 181 rows
-    "HOODUSDT",   # Robinhood     - corr 0.71, 194 rows
-    "ASMLUSDT",   # ASML          - corr 0.70, 182 rows
-    "GOOGLUSDT",  # Alphabet      - corr 0.65, 195 rows
-    "AMZNUSDT",   # Amazon        - corr 0.65, 195 rows
-    "TSLAUSDT",   # Tesla         - corr 0.64, 202 rows
-    "COINUSDT",   # Coinbase      - corr 0.63, 194 rows
-    "MRVLUSDT",   # Marvell       - corr 0.63, 180 rows
-    "METAUSDT",   # Meta          - corr 0.59, 195 rows
-    "MSFTUSDT",   # Microsoft     - corr 0.48, 168 rows
-]
-
 # =============================================================================
 # symbols_to_include = [
-#     "BTCUSDT",   # Bitcoin       - corr 1.00, 133 rows
-#     "ETHUSDT",   # Ethereum      - corr 0.93, 133 rows
-#     "SOLUSDT",   # Solana        - corr 0.91, 133 rows
-#     "LINKUSDT",  # Chainlink     - corr 0.90, 133 rows
-#     "BNBUSDT",   # BNB           - corr 0.90, 133 rows
-#     "XRPUSDT",   # XRP           - corr 0.88, 133 rows
-#     "AVAXUSDT",  # Avalanche     - corr 0.87, 133 rows
-#     "ADAUSDT",   # Cardano       - corr 0.83, 133 rows
-#     "SUIUSDT",   # Sui           - corr 0.80, 133 rows
-#     "DOGEUSDT",  # Dogecoin      - corr 0.79, 133 rows
-#     "AAVEUSDT",  # Aave          - corr 0.75, 133 rows
+#     "NVDAUSDT",   # NVIDIA        - corr 0.77, 202 rows
+#     "PLTRUSDT",   # Palantir      - corr 0.73, 181 rows
+#     "HOODUSDT",   # Robinhood     - corr 0.71, 194 rows
+#     "ASMLUSDT",   # ASML          - corr 0.70, 182 rows
+#     "GOOGLUSDT",  # Alphabet      - corr 0.65, 195 rows
+#     "AMZNUSDT",   # Amazon        - corr 0.65, 195 rows
+#     "TSLAUSDT",   # Tesla         - corr 0.64, 202 rows
+#     "COINUSDT",   # Coinbase      - corr 0.63, 194 rows
+#     "MRVLUSDT",   # Marvell       - corr 0.63, 180 rows
+#     "METAUSDT",   # Meta          - corr 0.59, 195 rows
+#     "MSFTUSDT",   # Microsoft     - corr 0.48, 168 rows
 # ]
 # =============================================================================
+
+symbols_to_include = [
+    "BTCUSDT",   # Bitcoin       - corr 1.00, 133 rows
+    "ETHUSDT",   # Ethereum      - corr 0.93, 133 rows
+    "SOLUSDT",   # Solana        - corr 0.91, 133 rows
+    "LINKUSDT",  # Chainlink     - corr 0.90, 133 rows
+    "BNBUSDT",   # BNB           - corr 0.90, 133 rows
+    "XRPUSDT",   # XRP           - corr 0.88, 133 rows
+    "AVAXUSDT",  # Avalanche     - corr 0.87, 133 rows
+    "ADAUSDT",   # Cardano       - corr 0.83, 133 rows
+    "SUIUSDT",   # Sui           - corr 0.80, 133 rows
+    "DOGEUSDT",  # Dogecoin      - corr 0.79, 133 rows
+    "AAVEUSDT",  # Aave          - corr 0.75, 133 rows
+]
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):

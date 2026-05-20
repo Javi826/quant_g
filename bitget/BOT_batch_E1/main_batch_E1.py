@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -40,7 +40,6 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.batch_metrics import compute_metrics as _cm
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
 from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
@@ -72,15 +71,11 @@ _best_params_results           : dict = {}
 #------------------------------------------------------------------------------
 MY_SYMBOLS = False
 
-# =============================================================================
-# RUN CONFIGURATION
-# =============================================================================
-
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
-N_PATHS_IS           = 100
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
+N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
@@ -91,12 +86,12 @@ OOS_R2_TH            = 0.92
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
-RUN_BEST_PORTFOLIO = False
+RUN_BEST_PORTFOLIO = True
 RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = False
+UPDATE_OUTPUTS = True
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION
@@ -361,7 +356,7 @@ def run_batch(strategy_config: dict) -> None:
         "bins_to_filter":  bins_to_filter,
     }
     
-    _m = _cm(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
+    _m = compute_metrics(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
     _val_record.update({
         "net_gain_pct": round(_m["Net_Gain_pct"], 1),
         "dd_pct":       round(_m["Max_DD_pct"], 1),
