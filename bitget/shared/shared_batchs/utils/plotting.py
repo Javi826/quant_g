@@ -333,7 +333,7 @@ def plot_best_portfolio(
                 label=f"Weighted mean={weighted_mean:.1f}%")
     ax2.set_title("Weekly_pct per Subperiod", fontsize=9, fontweight="bold")
     ax2.set_ylabel("Weekly_pct (%)", fontsize=9)
-    ax2.set_ylim(60, 105)
+    ax2.set_ylim(90, 101)
     ax2.set_xticks(x_idx)
     ax2.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=6)
     ax2.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")

@@ -7,13 +7,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
-import matplotlib
-SHOW_PLOTS = True
-if not SHOW_PLOTS:
-    matplotlib.use("Agg")
-
-import logging
 import time
+import logging
+import matplotlib
 import numpy as np
 from itertools import product
 from importlib import import_module
@@ -32,6 +28,9 @@ logger = logging.getLogger("BOT_batch.main_batch")
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
+SHOW_PLOTS    = True
+if not SHOW_PLOTS:
+    matplotlib.use("Agg")
 
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
@@ -40,15 +39,12 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary
-from shared_batchs.utils.reporting import print_all_curves_table, print_robustness_table
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary,print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
-from shared_batchs.utils.io import save_drift_reference, save_strategies_pr
-from shared_batchs.utils.io import compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is
+from shared_batchs.utils.io import save_drift_reference, save_strategies_pr,compare_and_generate_csv, update_strategies_symbols, print_update_status
+from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is,REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
-from shared_batchs.regime.regime_filter import REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
 from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
@@ -102,18 +98,20 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-    "30_reversal_long_30m",
-    "31_reversal_long_15m",
-    "32_reversal_short_30m",
-    "33_reversal_short_15m",
-    "34_parity_long_30m",
-    "37_parity_short_15m",
-    "39_flag_long_15m",
-    "41_flag_short_15m",
-    "42_orderblocks_long_30m",
-    "43_orderblocks_long_15m",
-    "44_orderblocks_short_30m",
-    "45_orderblocks_short_15m",
+# =============================================================================
+#     "30_reversal_long_30m",
+#     "31_reversal_long_15m",
+#     "32_reversal_short_30m",
+#     "33_reversal_short_15m",
+#     "34_parity_long_30m",
+#     "37_parity_short_15m",
+#     "39_flag_long_15m",
+#     "41_flag_short_15m",
+#     "42_orderblocks_long_30m",
+#     "43_orderblocks_long_15m",
+#     "44_orderblocks_short_30m",
+#     "45_orderblocks_short_15m",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -178,6 +176,7 @@ DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
+
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
