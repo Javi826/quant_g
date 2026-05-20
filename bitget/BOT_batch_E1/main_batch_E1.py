@@ -91,7 +91,7 @@ RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = True
+UPDATE_OUTPUTS = False
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION
@@ -102,20 +102,18 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-# =============================================================================
-#     "30_reversal_long_30m",
-#     "31_reversal_long_15m",
-#     "32_reversal_short_30m",
-#     "33_reversal_short_15m",
-#     "34_parity_long_30m",
-#     "37_parity_short_15m",
-#     "39_flag_long_15m",
-#     "41_flag_short_15m",
-#     "42_orderblocks_long_30m",
-#     "43_orderblocks_long_15m",
-#     "44_orderblocks_short_30m",
-#     "45_orderblocks_short_15m",
-# =============================================================================
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "37_parity_short_15m",
+    "39_flag_long_15m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
 
 # =============================================================================

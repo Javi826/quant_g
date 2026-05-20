@@ -22,9 +22,9 @@ SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "..", "bitget",
 REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 #REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-05_IS")
 
-THRESHOLDS       = [0.98,0.99,1.00,1.01,1.02]
+THRESHOLDS       = [0.99,1.00,1.01]
 
-MA_TYPES         = [2,3,4,5,6]
+MA_TYPES         = [1,2,3]
 BTC_TIMEFRAME    = '1Dutc'
 
 # =============================================================================

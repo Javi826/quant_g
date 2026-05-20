@@ -10,7 +10,6 @@ Temporal analysis of system performance by:
 
 import os
 import sys
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -40,7 +39,7 @@ PERIOD_LABELS = [
 INITIAL_CAPITAL    = 800
 MIN_TRADES         = 100
 TOP_N_COMPOUND     = 10
-WIN_RATE_THRESHOLD = 60  # combinations below this win rate are flagged
+WIN_RATE_THRESHOLD = 70  # combinations below this win rate are flagged
 
 # =============================================================================
 # DATA LOADING
