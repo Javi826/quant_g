@@ -2,9 +2,7 @@
 import logging
 import numpy as np
 import pandas as pd
-
 from shared_batchs.utils.batch_metrics import compute_metrics, _weekly_returns, _cvar, _neg_streak_stats
-
 logger = logging.getLogger("BOT_batch.utils.reporting")
 
 
@@ -47,7 +45,6 @@ def _build_robustness_rows(
         })
     return rows
 
-
 def _print_robustness_df(rows: list, title: str) -> None:
     """Render robustness rows as a formatted table. Shared by all robustness print functions."""
     if not rows:
@@ -69,8 +66,6 @@ def _print_robustness_df(rows: list, title: str) -> None:
         f"{'─'*115}",
     ]
     logger.info("\n".join(lines))
-
-
 # =============================================================================
 # PRINT HELPERS
 # =============================================================================

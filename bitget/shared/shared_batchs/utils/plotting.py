@@ -172,14 +172,14 @@ def plot_best_portfolio(
     show_plots: bool = False,
 ) -> None:
     """
-    Radar chart of normalized metrics (NetGain%, Weekly_pct, MaxDD% inv)
-    across OOS1/2/3 for the best portfolio combo.
-    Fixed reference ranges ensure meaningful visual comparison.
+    Two-panel plot for the best portfolio combo:
+      1. Left:  Radar chart — normalized metrics per OOS (no fill, clean)
+      2. Right: Weekly_pct line per subperiod — consecutive, no IS gap
     """
     if not show_plots:
         return
 
-    colors_per_period = {"OOS1": "#00897B", "OOS2": "#2E86C1", "OOS3": "#8E44AD"}
+    colors_per_period = {"OOS1": "#0D3B6E", "OOS2": "#1B4D2E", "OOS3": "#7D1F00"}
 
     # -------------------------------------------------------------------------
     # Compute metrics per OOS period
@@ -197,64 +197,155 @@ def plot_best_portfolio(
         return
 
     # -------------------------------------------------------------------------
-    # Radar data — fixed reference ranges, higher = better on all axes
+    # Radar data — normalized as % of best period per metric, higher = better
     # -------------------------------------------------------------------------
-    radar_labels  = ["NetGain%", "Weekly_pct", "MaxDD%\n(inv)"]
-    n_axes        = len(radar_labels)
-    _RADAR_RANGES = [
-        (0,  300),  # NetGain%
-        (50, 100),  # Weekly_pct
-        (0,  10),   # MaxDD% inv
-    ]
+    radar_labels = ["NetGain%", "Weekly_pct", "MaxDD%\n(inv)"]
+    n_axes       = len(radar_labels)
 
     def _get_radar_values(m: dict) -> list:
         return [
             m.get("Net_Gain_pct", 0),
             m.get("Weekly_pct",   0),
-            -m.get("Max_DD_pct",  0),
+            m.get("Max_DD_pct",   0),
         ]
 
-    def _normalize(values: list) -> list:
-        return [
-            float(np.clip((v - lo) / (hi - lo), 0, 1))
-            for v, (lo, hi) in zip(values, _RADAR_RANGES)
-        ]
+    radar_raw = {p: _get_radar_values(m) for p, m in period_metrics.items()}
+    all_vals  = np.array(list(radar_raw.values()))
+    max_gain  = all_vals[:, 0].max()
+    max_wpct  = all_vals[:, 1].max()
+    min_dd    = all_vals[:, 2].min()
 
-    radar_raw  = {p: _get_radar_values(m) for p, m in period_metrics.items()}
-    radar_norm = {p: _normalize(v) for p, v in radar_raw.items()}
+    radar_norm = {
+        p: [
+            float(vals[0] / max_gain) if max_gain > 0 else 0.0,
+            float(vals[1] / max_wpct) if max_wpct > 0 else 0.0,
+            float(vals[2] / min_dd)   if min_dd   < 0 else 0.0,
+        ]
+        for p, vals in radar_raw.items()
+    }
+    for p in radar_norm:
+        radar_norm[p][2] = 1.0 - radar_norm[p][2] + min(v[2] for v in radar_norm.values())
 
     angles = np.linspace(0, 2 * np.pi, n_axes, endpoint=False).tolist()
     angles += angles[:1]
 
     # -------------------------------------------------------------------------
-    # Plot
+    # Build consecutive line data — sorted chronologically, no IS gap
     # -------------------------------------------------------------------------
-    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+    all_points = []
+    for period, split_label, split_trades, _ in subperiods:
+        key = f"{period}_{split_label}"
+        if key not in subperiod_scores:
+            continue
+        combo_trades = [(sid, df) for sid, df in split_trades if sid in combo]
+        if not combo_trades:
+            continue
+        all_times = pd.concat([df["sell_time"] for _, df in combo_trades], ignore_index=True)
+        t_mid     = pd.Timestamp(all_times.min() + (all_times.max() - all_times.min()) / 2)
+        all_points.append((t_mid, subperiod_scores[key], period))
+
+    all_points.sort(key=lambda x: x[0])
+
+    x_idx         = list(range(len(all_points)))
+    x_labels      = [p[0].strftime("%Y-%m") for p in all_points]
+    y_vals        = [p[1] for p in all_points]
+    pt_periods    = [p[2] for p in all_points]
+    weighted_mean = np.mean(y_vals) if y_vals else 0
+
+    # -------------------------------------------------------------------------
+    # Figure
+    # -------------------------------------------------------------------------
+    fig = plt.figure(figsize=(14, 6))
     fig.patch.set_facecolor("#F8F9FA")
-    ax.set_facecolor("#F8F9FA")
+    fig.suptitle(
+        f"Best Portfolio — {' | '.join(sorted(combo, key=lambda s: int(s.split('_')[0])))}",
+        fontsize=10, fontweight="bold"
+    )
+
+    ax1 = fig.add_subplot(1, 2, 1, polar=True)
+    ax2 = fig.add_subplot(1, 2, 2)
+    ax2.set_facecolor("#F8F9FA")
+
+    # ── Radar chart ───────────────────────────────────────────────────────────
+    ax1.set_facecolor("#F8F9FA")
+
+    # Only 2 reference circles: 80% red dashed, 100% black
+    ax1.set_yticks([0.8, 1.0])
+    ax1.set_yticklabels(["80%", "100%"], fontsize=6, color="#444444")
+    ax1.yaxis.grid(True, color="black", linewidth=0.4, linestyle="-", alpha=0.2)
+    ax1.xaxis.grid(True, color="black", linewidth=0.4, linestyle="-", alpha=0.2)
+
+    theta_circle = np.linspace(0, 2 * np.pi, 200)
+    ax1.plot(theta_circle, [1.0] * 200, color="#333333", linewidth=0.6,
+             linestyle="-", alpha=0.4, zorder=4)
+    ax1.plot(theta_circle, [0.8] * 200, color="#C0392B", linewidth=0.9,
+             linestyle="--", alpha=0.8, zorder=5)
 
     for period, norm_vals in radar_norm.items():
         vals  = norm_vals + norm_vals[:1]
         color = colors_per_period.get(period, "#555555")
         raw   = radar_raw[period]
-        label = f"{period}  NetGain={raw[0]:.1f}%  Wpct={raw[1]:.1f}%  DD={-raw[2]:.1f}%"
-        ax.plot(angles, vals, color=color, linewidth=1.6, label=label)
-        ax.fill(angles, vals, color=color, alpha=0.12)
+        label = f"{period}  NetGain={raw[0]:.1f}%  Wpct={raw[1]:.1f}%  DD={raw[2]:.1f}%"
+        ax1.plot(angles, vals, color=color, linewidth=0.8, label=label)
 
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(radar_labels, fontsize=10)
-    ax.set_yticks([0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["25%", "50%", "75%", "100%"], fontsize=7, color="#888888")
-    ax.set_title(
-        f"Best Portfolio — {' | '.join(sorted(combo, key=lambda s: int(s.split('_')[0])))}\nNormalized Metrics per OOS",
-        fontsize=10, fontweight="bold", pad=20
+    ax1.set_xticks(angles[:-1])
+    ax1.set_xticklabels(radar_labels, fontsize=9)
+    ax1.set_title("Normalized Metrics per OOS", fontsize=9, fontweight="bold", pad=15)
+    ax1.set_ylim(0, 1.05)
+    ax1.legend(
+        loc="upper right", bbox_to_anchor=(1.2, 0.1),
+        fontsize=7, framealpha=0.9, facecolor="white", edgecolor="#AAAAAA",
     )
-    ax.legend(
-            loc="lower right", bbox_to_anchor=(1.6, -0.1),
-            fontsize=8, framealpha=0.9, facecolor="white", edgecolor="#AAAAAA",
-        )
-    ax.grid(True, linestyle="--", alpha=0.4, linewidth=0.6)
-    ax.spines["polar"].set_visible(False)
+    ax1.spines["polar"].set_color("black")
+    ax1.spines["polar"].set_linewidth(0.4)
+
+    # ── Weekly_pct line — consecutive ────────────────────────────────────────
+    def _flush_segment(ax, sx, sy, sc, wm):
+        if len(sx) > 1:
+            ax.plot(sx, sy, color=sc, linewidth=1.0, alpha=0.85)
+            ax.fill_between(sx, sy, wm, alpha=0.05, color=sc)
+        if sx:
+            ax.scatter(sx, sy, color=sc, s=16, zorder=5, alpha=0.9)
+
+    prev_period = None
+    seg_x, seg_y, seg_c = [], [], None
+
+    for xi, yi, pi in zip(x_idx, y_vals, pt_periods):
+        color = colors_per_period.get(pi, "#555555")
+        if pi != prev_period:
+            if seg_x:
+                seg_x.append(xi)
+                seg_y.append(yi)
+                _flush_segment(ax2, seg_x, seg_y, seg_c, weighted_mean)
+            seg_x       = [xi]
+            seg_y       = [yi]
+            seg_c       = color
+            prev_period = pi
+            ax2.axvline(xi - 0.3, color=color, linewidth=0.5, linestyle="--", alpha=0.4)
+            ax2.text(xi - 0.1, yi + 1, pi, fontsize=7, color=color, fontweight="bold")
+        else:
+            seg_x.append(xi)
+            seg_y.append(yi)
+
+    _flush_segment(ax2, seg_x, seg_y, seg_c, weighted_mean)
+
+    ax2.axhline(weighted_mean, color="#E67E22", linewidth=0.9, linestyle="--",
+                label=f"Weighted mean={weighted_mean:.1f}%")
+    ax2.set_title("Weekly_pct per Subperiod", fontsize=9, fontweight="bold")
+    ax2.set_ylabel("Weekly_pct (%)", fontsize=9)
+    ax2.set_ylim(60, 105)
+    ax2.set_xticks(x_idx)
+    ax2.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=6)
+    ax2.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+    ax2.legend(loc="lower right", fontsize=8, framealpha=0.9,
+               facecolor="white", edgecolor="#AAAAAA")
+    
+    from matplotlib.lines import Line2D
+    line = Line2D([0.5, 0.5], [0.02, 0.92], transform=fig.transFigure,
+                  color="#222222", linewidth=1.5, linestyle="--")
+    fig.add_artist(line)
 
     plt.tight_layout()
     plt.show()

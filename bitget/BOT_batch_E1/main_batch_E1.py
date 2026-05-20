@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 import matplotlib
-SHOW_PLOTS = True
+SHOW_PLOTS = False
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 
@@ -79,8 +79,8 @@ MY_SYMBOLS = False
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
+N_PATHS_IS           = 100
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
@@ -91,7 +91,7 @@ OOS_R2_TH            = 0.92
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
-RUN_BEST_PORTFOLIO = True
+RUN_BEST_PORTFOLIO = False
 RUN_CORRELATION    = False
 
 # OUTPUTS
@@ -107,18 +107,20 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-    "30_reversal_long_30m",
-    "31_reversal_long_15m",
-    "32_reversal_short_30m",
-    "33_reversal_short_15m",
-    "34_parity_long_30m",
-    "37_parity_short_15m",
-    "39_flag_long_15m",
-    "41_flag_short_15m",
-    "42_orderblocks_long_30m",
-    "43_orderblocks_long_15m",
-    "44_orderblocks_short_30m",
-    "45_orderblocks_short_15m",
+# =============================================================================
+#     "30_reversal_long_30m",
+#     "31_reversal_long_15m",
+#     "32_reversal_short_30m",
+#     "33_reversal_short_15m",
+#     "34_parity_long_30m",
+#     "37_parity_short_15m",
+#     "39_flag_long_15m",
+#     "41_flag_short_15m",
+#     "42_orderblocks_long_30m",
+#     "43_orderblocks_long_15m",
+#     "44_orderblocks_short_30m",
+#     "45_orderblocks_short_15m",
+# =============================================================================
 ]
 
 # =============================================================================
@@ -501,8 +503,7 @@ def run_batch(strategy_config: dict) -> None:
 
     elapsed = int(time.time() - start_time)
     logger.info(f"DONE  🏁 ── {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
-
-
+    
 # =============================================================================
 # RUN SUMMARY
 # =============================================================================

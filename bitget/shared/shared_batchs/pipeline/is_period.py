@@ -1,4 +1,4 @@
-#shared_batch/pipeline/backtest.py
+#shared_batch/pipeline/is_period.py
 import logging
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest

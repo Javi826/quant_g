@@ -14,7 +14,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # =============================================================================
 
 MIN_STRATEGIES = 2
-MAX_STRATEGIES = 4
+MAX_STRATEGIES = 5
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -24,8 +24,8 @@ PERIOD_WEIGHTS = {
 
 # ascending=False → higher is better  |  ascending=True → lower is better
 RANKING_CRITERIA = [
-    ("Weekly_pct", False),
-    ("Weekly_std",   True),
+    ("Weekly_pct",False),
+    ("Weekly_std",True),
 ]
 
 
@@ -131,7 +131,7 @@ def _compute_subperiod_metrics(
     m             = compute_metrics(all_tl, capital=total_capital, name="")
     pf            = m["Profit_Factor"]
     weekly        = _weekly_returns(combo_trades, initial_balance)
-
+    
     if len(weekly) == 0:
         return None
 

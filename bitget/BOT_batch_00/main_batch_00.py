@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_00.py
+    #BOT_batch/main_batch_00.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -33,12 +33,11 @@ DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
 
-from shared_batchs.utils.utils import filter_symbols
+from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
 from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
-from shared_batchs.pipeline.universe import select_universe
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.batch_metrics import compute_metrics as _cm
@@ -84,9 +83,9 @@ N_PATHS_IS           = 1
 # ELITE -- MA4
 #----------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 60
-OOS_MAX_DD_TH        = 10
-OOS_R2_TH            = 0.90 
+OOS_NETGAIN_TH       = 90
+OOS_MAX_DD_TH        = 9
+OOS_R2_TH            = 0.92  
 
 OOS_NETGAIN_TH       = 0.01
 OOS_MAX_DD_TH        = 10
@@ -172,7 +171,7 @@ OOS23_MATCH_SYMBOLS = True
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.70
+CORRELATION_DD_THRESHOLD = 0.80
 
 # FILES
 #------------------------------------------------------------------------------
@@ -204,7 +203,8 @@ DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
 # DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 # DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
 # DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "crypto_2023-01_2024-01_OOS")
-# # =============================================================================
+# 
+# =============================================================================
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
@@ -653,10 +653,14 @@ def run_summary():
     # -------------------------------------------------------------------------
     if RUN_BEST_PORTFOLIO:
         find_best_portfolio_combination(
-            validated_trades_oos1=validated_oos1_regime,
-            validated_trades_oos2=validated_oos2_regime,
-            validated_trades_oos3=validated_oos3_regime,
-            initial_balance=INITIAL_BALANCE,
+            validated_trades_oos1 = validated_oos1_regime,
+            validated_trades_oos2 = validated_oos2_regime,
+            validated_trades_oos3 = validated_oos3_regime,
+            initial_balance       = INITIAL_BALANCE,
+            data_folder_oos1      = DATA_FOLDER_OOS1,
+            data_folder_oos2      = DATA_FOLDER_OOS2,
+            data_folder_oos3      = DATA_FOLDER_OOS3,
+            show_plots            = SHOW_PLOTS,
         )
 # =============================================================================
 # MAIN
