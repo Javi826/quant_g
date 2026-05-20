@@ -77,7 +77,12 @@ N_PATHS_IS           = 1
 #------------------------------------------------------------------------------
 OOS_NETGAIN_TH       = 90
 OOS_MAX_DD_TH        = 9
-OOS_R2_TH            = 0.92  
+OOS_R2_TH            = 0.92 
+
+
+OOS_NETGAIN_TH       = 10
+OOS_MAX_DD_TH        = 20
+OOS_R2_TH            = 0.50   
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -98,20 +103,18 @@ SELECTED_STRATEGIES = [
     "38_flag_long_30m",
     "40_flag_short_30m",
 #------------------------------------------------------------------------------
-# =============================================================================
-#     "30_reversal_long_30m",
-#     "31_reversal_long_15m",
-#     "32_reversal_short_30m",
-#     "33_reversal_short_15m",
-#     "34_parity_long_30m",
-#     "37_parity_short_15m",
-#     "39_flag_long_15m",
-#     "41_flag_short_15m",
-#     "42_orderblocks_long_30m",
-#     "43_orderblocks_long_15m",
-#     "44_orderblocks_short_30m",
-#     "45_orderblocks_short_15m",
-# =============================================================================
+    "30_reversal_long_30m",
+    "31_reversal_long_15m",
+    "32_reversal_short_30m",
+    "33_reversal_short_15m",
+    "34_parity_long_30m",
+    "37_parity_short_15m",
+    "39_flag_long_15m",
+    "41_flag_short_15m",
+    "42_orderblocks_long_30m",
+    "43_orderblocks_long_15m",
+    "44_orderblocks_short_30m",
+    "45_orderblocks_short_15m",
 ]
 
 # =============================================================================
@@ -171,7 +174,7 @@ DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_refe
 # DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")

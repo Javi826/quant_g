@@ -48,10 +48,10 @@ logger = logging.getLogger("pipeline")
 # =============================================================================
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(BASE_DIR, "data")
-RAW_DIR     = os.path.join(DATA_DIR, "01_raw_1min")
+RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
 CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
 HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
-SPLIT_DIR   = os.path.join(DATA_DIR, "04_split_1min")
+SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
 
 # =============================================================================
 # PIPELINE CONFIG
@@ -62,7 +62,7 @@ EXPORT_CSV = False
 # SYMBOL SELECTION
 # =============================================================================
 SELECTED_SYMBOLS   = ["BTCUSDT"]
-SYMBOL_MODE        = "manual"   #manual o auto
+SYMBOL_MODE        = "auto"   #manual o auto
 
 N_SYMBOLS_DOWNLOAD = 20
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
@@ -73,16 +73,13 @@ REFERENCE_SYMBOL   = "BTCUSDT"
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m","1m"]
-TIMEFRAMES = ["1Dutc","1m"]
 START_DATE = "2021-01-01"
 END_DATE   = None 
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","1H"],["4H","1H"],["1H","15m"]]
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","5m"]]
-
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
 
 # =============================================================================
 # SPLIT DATA

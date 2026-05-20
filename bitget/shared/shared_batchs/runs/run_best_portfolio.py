@@ -5,6 +5,7 @@ import pandas as pd
 from itertools import combinations
 from shared_batchs.utils.batch_metrics import compute_metrics, _weekly_returns, _cvar, _neg_streak_stats
 from shared_batchs.utils.reporting import _print_robustness_df
+from shared_batchs.utils.plotting import plot_best_portfolio
 
 logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 
@@ -332,28 +333,7 @@ def find_best_portfolio_combination(
     show_plots: bool = False,
     **kwargs,
 ) -> list:
-    """
-    Find the best portfolio combinations based on weighted absolute metrics
-    across subperiods.
 
-    Methodology:
-        1. Split each OOS period into n_splits equal subperiods
-        2. Compute ranking metrics for each combo in each subperiod
-        3. Aggregate as weighted average (weight = period_weight / n_splits)
-        4. Sort by ranking_criteria — absolute metrics, no relative ranking
-
-    n_splits=1  → equivalent to original method (one score per OOS period)
-    n_splits=4  → quarterly granularity (12 subperiods total)
-
-    validated_trades_oosN : list of (strategy_id, trades_df)
-    initial_balance       : capital per strategy
-    min_strategies        : minimum combo size
-    max_strategies        : maximum combo size
-    period_weights        : dict {period_label: weight} — must sum to 1.0
-    ranking_criteria      : list of (metric_key, ascending) pairs
-    top_n                 : number of top combinations to display
-    n_splits              : subperiods per OOS period
-    """
     trades_per_period = {
         "OOS1": validated_trades_oos1,
         "OOS2": validated_trades_oos2,
@@ -390,12 +370,20 @@ def find_best_portfolio_combination(
     if df_scored.empty:
         logger.warning("No scores computed — check trades data.")
         return []
+    
+    # Distribution analysis — overfitting check
+    primary_metric = ranking_criteria[0][0]
+    n_total        = len(df_scored)
+    best_val       = df_scored[primary_metric].iloc[0]
+    mean_val       = df_scored[primary_metric].mean()
+    std_val        = df_scored[primary_metric].std()
+    gap            = round(best_val - mean_val, 2)
+    zscore         = round((best_val - mean_val) / std_val, 2) if std_val > 0 else 0.0
+    logger.info(f"  Distribution ({primary_metric}): best={best_val:.1f}  mean={mean_val:.1f}  std={std_val:.1f}  min={df_scored[primary_metric].min():.1f}  max={df_scored[primary_metric].max():.1f}  gap={gap:.2f}%  z-score={zscore}")
 
     top = df_scored.head(top_n).to_dict("records")
     _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria)
     
-    from shared_batchs.utils.plotting import plot_best_portfolio
-
     plot_best_portfolio(
         combo             = top[0]["combo"],
         trades_per_period = trades_per_period,
@@ -405,6 +393,8 @@ def find_best_portfolio_combination(
         data_folder_oos1  = data_folder_oos1,
         data_folder_oos2  = data_folder_oos2,
         data_folder_oos3  = data_folder_oos3,
+        df_scored         = df_scored,        # añadir esto
+        ranking_criteria  = ranking_criteria, # añadir esto
         show_plots        = show_plots,
     )
     
