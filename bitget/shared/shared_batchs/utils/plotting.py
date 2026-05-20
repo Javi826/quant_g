@@ -270,15 +270,15 @@ def plot_best_portfolio(
     ax1.set_facecolor("#F8F9FA")
 
     # Only 2 reference circles: 80% red dashed, 100% black
-    ax1.set_yticks([0.8, 1.0])
-    ax1.set_yticklabels(["80%", "100%"], fontsize=6, color="#444444")
+    ax1.set_yticks([0.6, 1.0])
+    ax1.set_yticklabels(["60%", "100%"], fontsize=6, color="#444444")
     ax1.yaxis.grid(True, color="black", linewidth=0.4, linestyle="-", alpha=0.2)
     ax1.xaxis.grid(True, color="black", linewidth=0.4, linestyle="-", alpha=0.2)
 
     theta_circle = np.linspace(0, 2 * np.pi, 200)
     ax1.plot(theta_circle, [1.0] * 200, color="#333333", linewidth=0.6,
              linestyle="-", alpha=0.4, zorder=4)
-    ax1.plot(theta_circle, [0.8] * 200, color="#C0392B", linewidth=0.9,
+    ax1.plot(theta_circle, [0.6] * 200, color="#C0392B", linewidth=0.9,
              linestyle="--", alpha=0.8, zorder=5)
 
     for period, norm_vals in radar_norm.items():
@@ -333,7 +333,7 @@ def plot_best_portfolio(
                 label=f"Weighted mean={weighted_mean:.1f}%")
     ax2.set_title("Weekly_pct per Subperiod", fontsize=9, fontweight="bold")
     ax2.set_ylabel("Weekly_pct (%)", fontsize=9)
-    ax2.set_ylim(90, 101)
+    ax2.set_ylim(70, 101)
     ax2.set_xticks(x_idx)
     ax2.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=6)
     ax2.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")

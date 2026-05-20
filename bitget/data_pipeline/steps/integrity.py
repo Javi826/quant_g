@@ -326,7 +326,7 @@ def run_highlow(config: dict, collector: IssueCollector | None = None) -> bool:
     return True
 
 
-def run_coverage(config: dict, collector: IssueCollector | None = None, tolerance_days: int = 30) -> bool:
+def run_coverage(config: dict, collector: IssueCollector | None = None, tolerance_days: int = 5) -> bool:
     """
     Validates that all timeframes for each symbol start at roughly the same date.
     Uses 1Dutc as reference. Alerts if any timeframe starts more than tolerance_days later.

@@ -28,9 +28,8 @@ RANKING_CRITERIA = [
     ("Weekly_std",True),
 ]
 
-
 TOP_N    = 2
-N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
+N_SPLITS = 12  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
 
 # Label prefix per n_splits value
 _SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
@@ -137,6 +136,7 @@ def _compute_subperiod_metrics(
 
     cvar10           = _cvar(weekly, pct=10)
     avg_neg, max_neg = _neg_streak_stats(weekly)
+    #logger.info(f"  [DBG] {all_tl['sell_time'].min()} → {all_tl['sell_time'].max()}  n_weeks={len(weekly)}  wpct={round(float((weekly > 0).mean() * 100), 1)}")
 
     return {
         "NetGain%":     round(m["Net_Gain_pct"], 2),
@@ -409,4 +409,3 @@ def find_best_portfolio_combination(
     )
     
     return top
-

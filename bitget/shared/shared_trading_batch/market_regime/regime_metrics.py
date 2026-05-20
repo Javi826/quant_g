@@ -18,19 +18,7 @@ def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3
     return 0.8
 
 def calc_efficiency_ratio(close: np.ndarray, window: int = 14) -> float:
-    """
-    Calculates Kaufman's Efficiency Ratio.
-    
-    This is a simple metric - no library implementation needed.
-    Formula: ER = |price_change| / sum(|price_changes|)
-    
-    Args:
-        close: Array of closing prices
-        window: Lookback window
-    
-    Returns:
-        Efficiency ratio (0-1). 1 = perfect trend, 0 = choppy
-    """
+
     if len(close) < window + 1:
         return np.nan
     
@@ -83,20 +71,7 @@ def calc_all_metrics(
     pe_window: int = 50,
     pe_order: int = 3
 ) -> Dict[str, float]:
-    """
-    Calculates all regime metrics from OHLC data using proven libraries.
-    
-    Args:
-        ohlc: Dict with 'open', 'high', 'low', 'close' arrays
-        hurst_window: Window for Hurst exponent
-        er_window: Window for Efficiency Ratio
-        atr_window: Window for ATR
-        pe_window: Window for Permutation Entropy
-        pe_order: Order for Permutation Entropy
-    
-    Returns:
-        Dict with all metrics
-    """
+
     close = ohlc['close']
     high  = ohlc['high']
     low   = ohlc['low']

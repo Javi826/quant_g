@@ -18,21 +18,21 @@
  # None  → download up to today
  # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
  # Example: END_DATE = "2025-06-01" downloads data up to June 2025 only
-import logging
 import os
 import sys
 import time
 import shutil
+import logging
 
 _BITGET_DIR    = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _BITGET_SHARED = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared"))
 for _p in [_BITGET_DIR, _BITGET_SHARED]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
-
+        
+from steps import integrity
 from steps import step0_symbol_selection
 from steps import step1_extraction
-from steps import integrity
 from steps import step3_cleaning
 from steps import step5_highlow
 from steps import step7_split
@@ -48,10 +48,10 @@ logger = logging.getLogger("pipeline")
 # =============================================================================
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(BASE_DIR, "data")
-RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
+RAW_DIR     = os.path.join(DATA_DIR, "01_raw_1min")
 CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
 HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
-SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
+SPLIT_DIR   = os.path.join(DATA_DIR, "04_split_1min")
 
 # =============================================================================
 # PIPELINE CONFIG
@@ -61,10 +61,10 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = []
-SYMBOL_MODE        = "auto"
+SELECTED_SYMBOLS   = ["BTCUSDT"]
+SYMBOL_MODE        = "manual"   #manual o auto
 
-N_SYMBOLS_DOWNLOAD = 40
+N_SYMBOLS_DOWNLOAD = 20
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        
@@ -72,7 +72,8 @@ REFERENCE_SYMBOL   = "BTCUSDT"
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","15m"]
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m"]
+TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m","1m"]
+TIMEFRAMES = ["1Dutc","1m"]
 START_DATE = "2021-01-01"
 END_DATE   = None 
 

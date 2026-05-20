@@ -93,7 +93,7 @@ def find_earliest_available_timestamp(
     symbol: str,
     gran_ms: int,
     timeframe: str,
-    max_iters: int = 5000,
+    max_iters: int = 15000,
 ) -> int | None:
     window_ms      = API_WINDOW_LIMITS_MS.get(timeframe, DEFAULT_WINDOW_MS)
     end            = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
@@ -127,7 +127,7 @@ def download_candles_from_start(
     gran_ms: int,
     timeframe: str,
     end_ms: int | None = None,
-    max_iters: int = 5000,
+    max_iters: int = 15000,
 ) -> pd.DataFrame:
     all_rows      = []
     now_ms        = end_ms or int(datetime.now(tz=timezone.utc).timestamp() * 1000)
