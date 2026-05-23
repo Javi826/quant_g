@@ -11,11 +11,6 @@ import logging
 logger = logging.getLogger('BOT_trading.market_regime.regime_metrics')
 
 
-def calc_hurst(close: np.ndarray, window: int = 100) -> float:
-    return 0.8
-
-def calc_permutation_entropy(close: np.ndarray, window: int = 50, order: int = 3) -> float:
-    return 0.8
 
 def calc_efficiency_ratio(close: np.ndarray, window: int = 14) -> float:
 
@@ -65,20 +60,14 @@ def calc_atr_pct(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: i
 
 def calc_all_metrics(
     ohlc: Dict[str, np.ndarray],
-    hurst_window: int = 100,
     er_window: int = 14,
     atr_window: int = 14,
-    pe_window: int = 50,
-    pe_order: int = 3
 ) -> Dict[str, float]:
-
     close = ohlc['close']
     high  = ohlc['high']
     low   = ohlc['low']
-    
+
     return {
-        'hurst': calc_hurst(close, hurst_window),
         'efficiency_ratio': calc_efficiency_ratio(close, er_window),
-        'atr_pct': calc_atr_pct(high, low, close, atr_window),
-        'permutation_entropy': calc_permutation_entropy(close, pe_window, pe_order)
+        'atr_pct':          calc_atr_pct(high, low, close, atr_window),
     }

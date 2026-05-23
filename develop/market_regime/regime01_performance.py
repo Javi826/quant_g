@@ -6,6 +6,7 @@ from pathlib import Path
 from glob import glob
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 from shared.shared_batch_develop.market_regime.regime_analysis import extract_timeframe, load_reference_symbol_for_timeframe, calc_all_metrics_at_time
+from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_direction, get_macro_direction_tf
 from shared.shared_batch_develop.market_regime.regime_analysis import classify_trade_by_family, load_trades, calculate_max_dd_pct
 from shared.shared_batch_develop.market_regime.regime_analysis import  get_macro_direction
 
@@ -17,12 +18,12 @@ TRADES_FOLDER    = os.path.join(os.path.dirname(__file__), "..", "brief_trades")
 TRADES_LABEL     = "is_baseline" 
 
 SPLIT_MODE      = "expanding"
-SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE      = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
 REF_FOLDER      = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-01_2026-05_IS")
 REF_FOLDER       = os.path.join(SPLIT_BASE, "IS", "crypto_full_IS")
 
 # regime0 params — obtain from regime0_exhaustive.py
-BTC_MA_PERIOD   = 4
+BTC_MA_PERIOD   = 10
 LONG_TH         = 1.00
 SHORT_TH        = 1.00
 
@@ -40,9 +41,13 @@ PE_WINDOW       = 50
 PE_ORDER        = 3
 LOOKBACK_BARS   = 100
 
+DIRECTION_SOURCE = 'daily'         # 'daily' | 'strategy' 
+DIRECTION_SOURCE = 'strategy'      # 'daily' | 'strategy'
+
 # Family source: 'strategy' = BTC at strategy timeframe | 'macro' = BTC 1D
 FAMILY_SOURCE   = 'strategy'
 #FAMILY_SOURCE   = 'macro'
+
 
 # Analysis mode: 'family' = 3 bins | 'direction' = 2 bins | 'combined' = 6 bins
 ANALYSIS_MODE   = 'combined'
@@ -88,19 +93,22 @@ def load_btc_for_family(timeframe: str) -> pd.DataFrame:
 # =============================================================================
 
 def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.DataFrame) -> dict:
-    """
-    Classify a single trade by macro direction and family.
-    Uses only closed candles — no lookahead bias.
-
-    Returns dict with 'direction' and 'family' keys.
-    """
-    direction = get_macro_direction(
-        ref_1d_df  = btc_1d_df,
-        trade_time = trade['buy_time'],
-        ma_period  = BTC_MA_PERIOD,
-        long_th    = LONG_TH,
-        short_th   = SHORT_TH,
-    )
+    if DIRECTION_SOURCE == 'strategy':
+        direction = get_macro_direction_tf(
+            ref_tf_df  = btc_family_df,
+            trade_time = trade['buy_time'],
+            ma_period  = BTC_MA_PERIOD,
+            long_th    = LONG_TH,
+            short_th   = SHORT_TH,
+        )
+    else:
+        direction = get_macro_direction(
+            ref_1d_df  = btc_1d_df,
+            trade_time = trade['buy_time'],
+            ma_period  = BTC_MA_PERIOD,
+            long_th    = LONG_TH,
+            short_th   = SHORT_TH,
+        )
 
     metrics = calc_all_metrics_at_time(
         ref_df       = btc_family_df,
@@ -114,7 +122,6 @@ def classify_trade(trade: pd.Series, btc_1d_df: pd.DataFrame, btc_family_df: pd.
     )
 
     family = classify_trade_by_family(metrics, FAMILIES) if metrics else 'unknown'
-
     return {'direction': direction, 'family': family}
 
 

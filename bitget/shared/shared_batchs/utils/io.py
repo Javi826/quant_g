@@ -27,8 +27,20 @@ def _load_py_module(path: str, module_name: str):
     mod  = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
-
+# =============================================================================
+# BINS
+# =============================================================================
+def load_regime_bins(bins_path: str, strategy_id: str) -> set:
+    """
+    Load precomputed regime bins for a strategy from a generated regime_bins_{SET}.py file.
+    Returns empty set if file not found or strategy not present.
+    """
+    if not os.path.exists(bins_path):
+        logger.warning(f"⚠️  regime_bins file not found: {bins_path} — using empty bins.")
+        return set()
+    mod  = _load_py_module(bins_path, "regime_bins")
+    bins = getattr(mod, "REGIME_BINS", {})
+    return set(bins.get(strategy_id, set()))
 # =============================================================================
 # SAVE DRIFT REFERENCE
 # =============================================================================

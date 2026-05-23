@@ -1,4 +1,5 @@
 #shared/shared_batchs/runs/run_best_portfolio.py
+import os
 import logging
 import numpy as np
 import pandas as pd
@@ -13,9 +14,9 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-MIN_STRATEGIES = 2
-MAX_STRATEGIES = 5
+REQUIRE_LONG_SHORT = True
+MIN_STRATEGIES     = 3
+MAX_STRATEGIES     = 5
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -37,9 +38,17 @@ _SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
 _SPLIT_NAMES  = {1: "Annual", 2: "Semester", 3: "Quadrimester", 4: "Quarter", 6: "Bimester", 12: "Month"}
 
 
+
 # =============================================================================
 # PRIVATE HELPERS — Identity
 # =============================================================================
+def _parse_period_bounds(data_folder: str) -> tuple[str, str] | None:
+    """Extract (start, end) date strings from data folder name pattern 'crypto_YYYY-MM_YYYY-MM_OOS'."""
+    import re
+    match = re.search(r'(\d{4}-\d{2})_(\d{4}-\d{2})', os.path.basename(data_folder))
+    if not match:
+        return None
+    return (match.group(1) + "-01", match.group(2) + "-01")
 
 def _is_long(strategy_id: str) -> bool:
     return "_long_" in strategy_id
@@ -57,7 +66,7 @@ def _has_long_and_short(strategy_ids: tuple) -> bool:
 # PRIVATE HELPERS — Period splitting
 # =============================================================================
 
-def _split_into_subperiods(trades_list: list, n_splits: int) -> list[tuple[str, list]]:
+def _split_into_subperiods(trades_list: list, n_splits: int, bounds: tuple | None = None) -> list[tuple[str, list]]:
     """
     Split a list of (strategy_id, trades_df) into n_splits equal time buckets
     based on sell_time. Returns list of (label, trades_list_subset).
@@ -66,12 +75,18 @@ def _split_into_subperiods(trades_list: list, n_splits: int) -> list[tuple[str, 
     if not trades_list:
         return []
 
-    all_times  = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
-    t_min      = all_times.min()
-    t_max      = all_times.max()
+    if bounds:
+        t_min = pd.Timestamp(bounds[0])
+        t_max = pd.Timestamp(bounds[1])
+    else:
+        all_times = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
+        t_min     = all_times.min()
+        t_max     = all_times.max()
     total_days = (t_max - t_min).days
+    
     split_len  = total_days / n_splits
     prefix     = _SPLIT_LABELS.get(n_splits, "P")
+
 
     result = []
     for i in range(n_splits):
@@ -96,15 +111,13 @@ def _build_subperiod_index(
     trades_per_period: dict,
     n_splits: int,
     period_weights: dict,
+    period_date_bounds: dict = {},
 ) -> list[tuple[str, str, list, float]]:
-    """
-    Build the full list of subperiods across all OOS periods.
-    Returns list of (period_label, split_label, trades_list, split_weight).
-    """
     subperiods = []
     for period, trades_list in trades_per_period.items():
         split_weight = period_weights.get(period, 0) / n_splits
-        for split_label, split_trades in _split_into_subperiods(trades_list, n_splits):
+        bounds = period_date_bounds.get(period)
+        for split_label, split_trades in _split_into_subperiods(trades_list, n_splits, bounds):
             subperiods.append((period, split_label, split_trades, split_weight))
     return subperiods
 
@@ -138,6 +151,7 @@ def _compute_subperiod_metrics(
     cvar10           = _cvar(weekly, pct=10)
     avg_neg, max_neg = _neg_streak_stats(weekly)
     #logger.info(f"  [DBG] {all_tl['sell_time'].min()} → {all_tl['sell_time'].max()}  n_weeks={len(weekly)}  wpct={round(float((weekly > 0).mean() * 100), 1)}")
+
 
     return {
         "NetGain%":     round(m["Net_Gain_pct"], 2),
@@ -196,6 +210,7 @@ def _compute_period_metrics(
 # PRIVATE HELPERS — Weighted scoring
 # =============================================================================
 
+
 def _compute_weighted_scores(
     combos: list[tuple],
     subperiods: list[tuple],
@@ -205,22 +220,20 @@ def _compute_weighted_scores(
     """
     For each combo, compute metrics in each subperiod and aggregate as
     weighted average across subperiods. Weight = period_weight / n_splits.
-
-    Returns DataFrame with combo and one weighted column per ranking metric,
-    sorted by ranking_criteria.
+    Parallelized over combos using joblib.
     """
+    from joblib import Parallel, delayed
+
     metric_keys = [m for m, _ in ranking_criteria]
     primary_key = metric_keys[0]
-    records     = []
 
-    for combo in combos:
+    def _process_combo(combo: tuple) -> dict | None:
         row              = {"combo": combo}
         total_weight     = 0.0
         weighted_metrics = {k: 0.0 for k in metric_keys}
-        subperiod_scores = {}  # {period_splitlabel: Weekly_pct}
-
+        subperiod_scores = {}
         for period, split_label, split_trades, split_weight in subperiods:
-            m = _compute_subperiod_metrics(combo, split_trades, initial_balance)
+            m = _compute_subperiod_metrics(combo, split_trades, initial_balance)                
             if m is None:
                 continue
             key = f"{period}_{split_label}"
@@ -229,32 +242,31 @@ def _compute_weighted_scores(
                 if k in m and not np.isnan(m[k]):
                     weighted_metrics[k] += m[k] * split_weight
             total_weight += split_weight
-
         if total_weight == 0:
-            continue
-
+            return None
         for k in metric_keys:
             row[k] = round(weighted_metrics[k] / total_weight, 3)
-
-        # Subperiod stats for primary metric
         values = [v for v in subperiod_scores.values() if not np.isnan(v)]
         row["subperiod_scores"] = subperiod_scores
         row["subperiod_std"]    = round(float(np.std(values)), 2)  if values else np.nan
         row["subperiod_min"]    = round(float(np.min(values)), 1)  if values else np.nan
         row["subperiod_max"]    = round(float(np.max(values)), 1)  if values else np.nan
         row["Weekly_std"]       = row["subperiod_std"]
+        return row
 
-        records.append(row)
+    results = Parallel(n_jobs=-1)(
+        delayed(_process_combo)(combo) for combo in combos
+    )
+
+    records = [r for r in results if r is not None]
 
     if not records:
         return pd.DataFrame()
 
-    df        = pd.DataFrame(records)
+    df       = pd.DataFrame(records)
     sort_cols = [c for c, _ in ranking_criteria]
     sort_asc  = [a for _, a in ranking_criteria]
     return df.sort_values(sort_cols, ascending=sort_asc).reset_index(drop=True)
-
-
 # =============================================================================
 # PRINT
 # =============================================================================
@@ -269,7 +281,7 @@ def _print_best_combinations(
     W          = 115
     split_name = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
-    #logger.info(f"\n{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}")
+    
     logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}\033[0m")
 
     primary_key = ranking_criteria[0][0]
@@ -331,6 +343,7 @@ def find_best_portfolio_combination(
     data_folder_oos2: str = "",
     data_folder_oos3: str = "",
     show_plots: bool = False,
+    require_long_short: bool = REQUIRE_LONG_SHORT,
     **kwargs,
 ) -> list:
 
@@ -345,7 +358,12 @@ def find_best_portfolio_combination(
         logger.warning("No validated strategies — skipping best portfolio search.")
         return []
 
-    subperiods = _build_subperiod_index(trades_per_period, n_splits, period_weights)
+    period_date_bounds = {
+        "OOS1": _parse_period_bounds(data_folder_oos1),
+        "OOS2": _parse_period_bounds(data_folder_oos2),
+        "OOS3": _parse_period_bounds(data_folder_oos3),
+    }
+    subperiods = _build_subperiod_index(trades_per_period, n_splits, period_weights, period_date_bounds)
     if not subperiods:
         logger.warning("No subperiods could be built — check trades data.")
         return []
@@ -357,7 +375,7 @@ def find_best_portfolio_combination(
         combo
         for size in range(min_strategies, max_strategies + 1)
         for combo in combinations(all_ids, size)
-        if _has_long_and_short(combo)
+        if not require_long_short or _has_long_and_short(combo)
     ]
 
     if not combos:
@@ -373,7 +391,6 @@ def find_best_portfolio_combination(
     
     # Distribution analysis — overfitting check
     primary_metric = ranking_criteria[0][0]
-    n_total        = len(df_scored)
     best_val       = df_scored[primary_metric].iloc[0]
     mean_val       = df_scored[primary_metric].mean()
     std_val        = df_scored[primary_metric].std()
@@ -397,5 +414,5 @@ def find_best_portfolio_combination(
         ranking_criteria  = ranking_criteria, # añadir esto
         show_plots        = show_plots,
     )
-    
+        
     return top

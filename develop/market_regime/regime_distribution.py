@@ -6,19 +6,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from pathlib import Path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-from shared.shared_batch_develop.market_regime.regime_analysis import get_macro_direction, calc_all_metrics_at_time, classify_trade_by_family
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+
+from shared.shared_batch_develop.market_regime.regime_analysis import (
+    get_macro_direction,
+    calc_all_metrics_at_time,
+    classify_trade_by_family,
+)
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
 
 BTC_FILE = os.path.join(
     os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline",
-    "data", "04_split", "expanding", "IS", "rwa_2025-01_2026-05_IS", "BTCUSDT_1Dutc.parquet"
+    "data", "04_split_OLD", "expanding", "OOS", "crypto_2025-05_2026-05_OOS", "BTCUSDT_1Dutc.parquet"
 )
 
 PERIOD_MODE   = "year"      # "year" | "semester"
-ANALYSIS_MODE = "family"    # "direction" | "family" | "regime"
+ANALYSIS_MODE = "direction"    # "direction" | "family" | "regime"
 START_YEAR    = 2021        # data loaded from this year (warmup for lookback)
 DISPLAY_YEAR  = 2022        # periods shown in table and chart
 
@@ -106,10 +113,10 @@ def build_periods(df: pd.DataFrame) -> list[tuple[str, pd.DataFrame]]:
 # BIN CLASSIFICATION
 # =============================================================================
 
-def classify_bar(row: pd.Series, btc_df: pd.DataFrame) -> str:
+def classify_bar(row: pd.Series, ref_df: pd.DataFrame) -> str:
     """Classify a single BTC daily bar according to ANALYSIS_MODE."""
     direction = get_macro_direction(
-        btc_1d_df  = btc_df,
+        ref_1d_df  = ref_df,
         trade_time = row['ts'],
         ma_period  = BTC_MA_PERIOD,
         long_th    = LONG_TH,
@@ -123,7 +130,7 @@ def classify_bar(row: pd.Series, btc_df: pd.DataFrame) -> str:
         return 'unknown'
 
     metrics = calc_all_metrics_at_time(
-        btc_df       = btc_df,
+        ref_df       = ref_df,
         buy_time     = row['ts'],
         lookback     = LOOKBACK_BARS,
         hurst_window = HURST_WINDOW,
@@ -148,7 +155,7 @@ def classify_bar(row: pd.Series, btc_df: pd.DataFrame) -> str:
 # PERIOD ANALYSIS
 # =============================================================================
 
-def analyze_period(label: str, subset: pd.DataFrame, btc_df: pd.DataFrame) -> dict:
+def analyze_period(label: str, subset: pd.DataFrame, ref_df: pd.DataFrame) -> dict:
     """
     Classify every bar in the period and compute bin statistics.
 
@@ -158,7 +165,7 @@ def analyze_period(label: str, subset: pd.DataFrame, btc_df: pd.DataFrame) -> di
     bins_assigned = []
 
     for _, row in subset.iterrows():
-        bin_key = classify_bar(row, btc_df)
+        bin_key = classify_bar(row, ref_df)
         bins_assigned.append(bin_key)
 
     subset = subset.copy()
@@ -299,32 +306,25 @@ def main():
     print(f"BTC REGIME ANALYZER — {ANALYSIS_MODE.upper()}  mode={PERIOD_MODE.upper()}  MA={BTC_MA_PERIOD}  from {DISPLAY_YEAR}")
     print("=" * 80)
 
-    # Load BTC
     print("\n📂 Loading BTC 1D data...")
-    btc_df = load_btc()
-    btc_df = btc_df[btc_df['ts'].dt.year >= START_YEAR].reset_index(drop=True)
-    print(f"✅ {len(btc_df)} daily bars loaded  "
-          f"({btc_df['ts'].iloc[0].date()} → {btc_df['ts'].iloc[-1].date()})")
+    ref_df = load_btc()
+    ref_df = ref_df[ref_df['ts'].dt.year >= START_YEAR].reset_index(drop=True)
+    print(f"✅ {len(ref_df)} daily bars loaded  "
+          f"({ref_df['ts'].iloc[0].date()} → {ref_df['ts'].iloc[-1].date()})")
 
-    # Build periods
-    periods = build_periods(btc_df)
+    periods = build_periods(ref_df)
     print(f"📅 {len(periods)} periods to analyze\n")
 
-    # Analyze
     results = []
     for label, subset in periods:
         print(f"  Analyzing {label}... ({len(subset)} bars)", end="", flush=True)
-        result = analyze_period(label, subset, btc_df)
+        result = analyze_period(label, subset, ref_df)
         results.append(result)
         print(f"  ✅  unknown={result['n_unknown']}")
 
-    # Filter display results
     display_results = [r for r in results if int(r['label'][:4]) >= DISPLAY_YEAR]
 
-    # Print
     print_results(display_results)
-
-    # Plot
     plot_regime_distribution(display_results)
 
 

@@ -6,13 +6,12 @@ Integrates with BOT_trading's market_data infrastructure.
 import logging
 import pandas as pd
 from typing import Dict, Optional, Tuple
-from shared.shared_trading_batch.market_regime.regime_metrics import calc_all_metrics
+from shared_batchs.regime.regime_module import calc_all_metrics, ER_WINDOW as REGIME_ER_WINDOW, ATR_WINDOW as REGIME_ATR_WINDOW
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from config.settings import REGIME_FAMILIES, REGIME_GENERAL
-from config.settings import REGIME_HURST_WINDOW, REGIME_ER_WINDOW, REGIME_ATR_WINDOW
-from config.settings import REGIME_PE_WINDOW, REGIME_PE_ORDER
-from config.settings import ACCOUNTS
+from config.settings import REGIME_FAMILIES, REGIME_GENERAL, ACCOUNTS
+
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
+
 REGIME_REFERENCE_SYMBOL  = None
 REGIME0_MA_PERIOD        = None
 GLOBAL_SYSTEM_REGIME_TH1 = None
@@ -92,13 +91,10 @@ def calculate_regime_metrics(timeframe: str) -> Optional[Dict[str, float]]:
         }
 
         metrics = calc_all_metrics(
-            ohlc=ohlc,
-            hurst_window=REGIME_HURST_WINDOW,
-            er_window=REGIME_ER_WINDOW,
-            atr_window=REGIME_ATR_WINDOW,
-            pe_window=REGIME_PE_WINDOW,
-            pe_order=REGIME_PE_ORDER,
-        )
+                    ohlc       = ohlc,
+                    er_window  = REGIME_ER_WINDOW,
+                    atr_window = REGIME_ATR_WINDOW,
+                )
 
         logger.debug(f"Regime metrics calculated: {metrics}")
         return metrics
@@ -181,12 +177,10 @@ def get_current_regime(timeframe: str) -> Tuple[str, Optional[Dict[str, float]]]
     family = classify_regime(metrics)
 
     logger.debug(
-        f"Regime classified as '{family}' for {timeframe} | "
-        f"Metrics: hurst={metrics.get('hurst', 0):.3f}, "
-        f"er={metrics.get('efficiency_ratio', 0):.3f}, "
-        f"atr%={metrics.get('atr_pct', 0):.2f}, "
-        f"pe={metrics.get('permutation_entropy', 0):.3f}"
-    )
+            f"Regime classified as '{family}' for {timeframe} | "
+            f"Metrics: er={metrics.get('efficiency_ratio', 0):.3f}, "
+            f"atr%={metrics.get('atr_pct', 0):.2f}"
+        )
 
     return family, metrics
 

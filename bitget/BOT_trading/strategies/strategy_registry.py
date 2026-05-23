@@ -114,7 +114,8 @@ def detect_signals_for_strategy(
             # ==============================================================
             # STRATEGY IMPLEMENTATIONS - Add elif for each new strategy
             # ==============================================================
-            if strategy_id == '02_reversal_long_4H':
+
+            if strategy_id == '01_reversal_long_15m':
                 signals = reversal_long(
                     arr,
                     lookback=strat['lookback'],
@@ -122,8 +123,89 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '03_parity_long_4H':
+
+            elif strategy_id == '02_reversal_short_15m':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '03_reversal_long_30m':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '04_reversal_short_30m':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '05_reversal_long_1H':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '06_reversal_short_1H':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '07_reversal_long_4H':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '08_reversal_short_4H':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '09_reversal_long_6Hutc':
+                signals = reversal_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '10_reversal_short_6Hutc':
+                signals = reversal_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '11_parity_long_15m':
                 signals = parity_long(
                     arr,
                     lookback=strat['lookback'],
@@ -131,62 +213,8 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '04_reversal_short_4H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '06_reversal_long_1H':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '07_reversal_short_1H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '08_reversal_long_6Hutc':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '09_reversal_short_6Hutc':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '10_parity_long_1H':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '11_parity_short_1H':
+
+            elif strategy_id == '12_parity_short_15m':
                 signals = parity_short(
                     arr,
                     lookback=strat['lookback'],
@@ -194,8 +222,8 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '12_parity_long_6Hutc':
+
+            elif strategy_id == '13_parity_long_30m':
                 signals = parity_long(
                     arr,
                     lookback=strat['lookback'],
@@ -203,17 +231,71 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '13_orderblocks_short_4H':
-                signals = orderblocks_short(
+
+            elif strategy_id == '14_parity_short_30m':
+                signals = parity_short(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
+                    ma_period=strat['ma_period'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '17_flag_long_4H':
+
+            elif strategy_id == '15_parity_long_1H':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '16_parity_short_1H':
+                signals = parity_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '17_parity_long_4H':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '18_parity_short_4H':
+                signals = parity_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '19_parity_long_6Hutc':
+                signals = parity_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '20_parity_short_6Hutc':
+                signals = parity_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '21_flag_long_15m':
                 signals = flag_long(
                     arr,
                     lookback=strat['lookback'],
@@ -222,8 +304,18 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '18_flag_long_1H':
+
+            elif strategy_id == '22_flag_short_15m':
+                signals = flag_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '23_flag_long_30m':
                 signals = flag_long(
                     arr,
                     lookback=strat['lookback'],
@@ -232,8 +324,8 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '19_flag_short_4H':
+
+            elif strategy_id == '24_flag_short_30m':
                 signals = flag_short(
                     arr,
                     lookback=strat['lookback'],
@@ -242,37 +334,8 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-            
-            elif strategy_id == '20_flag_short_1H':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-            
-            elif strategy_id == '21_parity_short_4H':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-                
-            elif strategy_id == '22_parity_short_6Hutc':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-                
-                
-            elif strategy_id == '24_flag_long_6Hutc':
+
+            elif strategy_id == '25_flag_long_1H':
                 signals = flag_long(
                     arr,
                     lookback=strat['lookback'],
@@ -281,8 +344,8 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '25_flag_short_6Hutc':
+
+            elif strategy_id == '26_flag_short_1H':
                 signals = flag_short(
                     arr,
                     lookback=strat['lookback'],
@@ -291,8 +354,48 @@ def detect_signals_for_strategy(
                     ma_period=strat['ma_period'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '26_orderblocks_long_4H':
+
+            elif strategy_id == '27_flag_long_4H':
+                signals = flag_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '28_flag_short_4H':
+                signals = flag_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '29_flag_long_6Hutc':
+                signals = flag_long(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '30_flag_short_6Hutc':
+                signals = flag_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    impulse=strat['impulse'],
+                    flag=strat['flag'],
+                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '31_orderblocks_long_15m':
                 signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
@@ -300,8 +403,8 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-                         
-            elif strategy_id == '27_orderblocks_short_1H':
+
+            elif strategy_id == '32_orderblocks_short_15m':
                 signals = orderblocks_short(
                     arr,
                     lookback=strat['lookback'],
@@ -309,7 +412,8 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-            elif strategy_id == '28_orderblocks_long_1H':
+
+            elif strategy_id == '33_orderblocks_long_30m':
                 signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
@@ -317,60 +421,67 @@ def detect_signals_for_strategy(
                     impulse=strat['impulse'],
                     live_trading=True
                 )
-            elif strategy_id == '34_reversal_short_30m':
-                signals = reversal_short(
+
+            elif strategy_id == '34_orderblocks_short_30m':
+                signals = orderblocks_short(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
+                    impulse=strat['impulse'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '35_parity_long_15m':
-                signals = parity_long(
+
+            elif strategy_id == '35_orderblocks_long_1H':
+                signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
+                    impulse=strat['impulse'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '36_parity_short_30m':
-                signals = parity_short(
+
+            elif strategy_id == '36_orderblocks_short_1H':
+                signals = orderblocks_short(
                     arr,
                     lookback=strat['lookback'],
                     tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
+                    impulse=strat['impulse'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '38_flag_long_30m':
-                signals = flag_long(
+
+            elif strategy_id == '37_orderblocks_long_4H':
+                signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
                     impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '39_flag_long_15m':
-                signals = flag_long(
+
+            elif strategy_id == '38_orderblocks_short_4H':
+                signals = orderblocks_short(
                     arr,
                     lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
                     impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
                     live_trading=True
                 )
-                
-            elif strategy_id == '40_flag_short_30m':
-                signals = flag_short(
+
+            elif strategy_id == '39_orderblocks_long_6Hutc':
+                signals = orderblocks_long(
                     arr,
                     lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
                     impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
+                    live_trading=True
+                )
+
+            elif strategy_id == '40_orderblocks_short_6Hutc':
+                signals = orderblocks_short(
+                    arr,
+                    lookback=strat['lookback'],
+                    tolerance=strat['tolerance'],
+                    impulse=strat['impulse'],
                     live_trading=True
                 )
             # ==============================================================
@@ -423,35 +534,46 @@ def get_implemented_strategies() -> set:
     IMPORTANT: When adding a new strategy, add its ID here!
     """
     strategies = {
-       #'02_reversal_long_4H',
-       #'03_parity_long_4H',
-       #'04_reversal_short_4H',
-       #'06_reversal_long_1H',
-       #'07_reversal_short_1H',
-       #'08_reversal_long_6Hutc',
-       #'09_reversal_short_6Hutc',
-       #'10_parity_long_1H',
-       #'11_parity_short_1H',
-       #'12_parity_long_6Hutc',
-       #'13_orderblocks_short_4H',
-       #'17_flag_long_4H',
-       #'18_flag_long_1H',
-       #'19_flag_short_4H',
-       #'20_flag_short_1H',
-       #'21_parity_short_4H',
-       #'22_parity_short_6Hutc',
-       #'24_flag_long_6Hutc',
-       #'25_flag_short_6Hutc',
-       #'26_orderblocks_long_4H',
-       #'27_orderblocks_short_1H',
-       #'28_orderblocks_long_1H',
-       #'32_reversal_short_30m',
-       '35_parity_long_15m',
-       '36_parity_short_30m',
-       '38_flag_long_30m',
-       #'39_flag_long_15m',
-       '40_flag_short_30m',
-        
+       #'01_reversal_long_15m',
+       #'02_reversal_short_15m',
+       #'03_reversal_long_30m',
+       #'04_reversal_short_30m',
+       #'05_reversal_long_1H',
+       #'06_reversal_short_1H',
+       #'07_reversal_long_4H',
+       #'08_reversal_short_4H',
+       #'09_reversal_long_6Hutc',
+       #'10_reversal_short_6Hutc',
+       #'11_parity_long_15m',
+       #'12_parity_short_15m',
+       #'13_parity_long_30m',
+       #'14_parity_short_30m',
+       #'15_parity_long_1H',
+       #'16_parity_short_1H',
+       #'17_parity_long_4H',
+       #'18_parity_short_4H',
+       #'19_parity_long_6Hutc',
+       #'20_parity_short_6Hutc',
+       #'21_flag_long_15m',
+       #'22_flag_short_15m',
+       #'23_flag_long_30m',
+       #'24_flag_short_30m',
+       #'25_flag_long_1H',
+       #'26_flag_short_1H',
+       #'27_flag_long_4H',
+       #'28_flag_short_4H',
+       #'29_flag_long_6Hutc',
+       #'30_flag_short_6Hutc',
+       #'31_orderblocks_long_15m',
+       #'32_orderblocks_short_15m',
+       #'33_orderblocks_long_30m',
+       #'34_orderblocks_short_30m',
+       #'35_orderblocks_long_1H',
+       #'36_orderblocks_short_1H',
+       #'37_orderblocks_long_4H',
+       #'38_orderblocks_short_4H',
+       #'39_orderblocks_long_6Hutc',
+       #'40_orderblocks_short_6Hutc',
     }
     return strategies
 

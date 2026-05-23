@@ -18,7 +18,7 @@ ACCOUNTS = {
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime01_enabled": True,
+        "regime01_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
         "regime01_ma_period": 2,
@@ -59,10 +59,7 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared.shared_trading_batch.config_trading_batch import REGIME_HURST_WINDOW
-from shared.shared_trading_batch.config_trading_batch import REGIME_ER_WINDOW, REGIME_ATR_WINDOW
-from shared.shared_trading_batch.config_trading_batch import REGIME_PE_WINDOW, REGIME_PE_ORDER, REGIME_FAMILIES
-
+from shared_batchs.regime.regime_module import REGIME_FAMILIES, ER_WINDOW as REGIME_ER_WINDOW, ATR_WINDOW as REGIME_ATR_WINDOW
 REGIME_GENERAL = {
     'trending': 1.0,
     'ranging':  1.0,

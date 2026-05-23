@@ -28,10 +28,10 @@ logger = logging.getLogger("BOT_batch.main_batch")
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = True
+SHOW_PLOTS    = False
+
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
-
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
@@ -39,13 +39,12 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary,print_all_curves_table, print_robustness_table
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
-from shared_batchs.utils.io import save_drift_reference, save_strategies_pr,compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_filter import prepare_regime_metrics_cache_is,REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE
+from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
+from shared_batchs.regime.regime_module import REGIME_ENABLED, REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE, REGIME0_MA_PERIOD as R0_MA_PERIOD, run_oos_backtest_with_regime, load_regime_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
-from shared_batchs.regime.regime_config import REGIME0_MA_PERIOD as R0_MA_PERIOD, REGIME0_LONG_TH as R0_LONG_TH, REGIME0_SHORT_TH as R0_SHORT_TH
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -75,46 +74,69 @@ N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
-OOS_NETGAIN_TH       = 90
-OOS_MAX_DD_TH        = 9
-OOS_R2_TH            = 0.92 
-
 
 OOS_NETGAIN_TH       = 10
-OOS_MAX_DD_TH        = 20
-OOS_R2_TH            = 0.50   
+OOS_MAX_DD_TH        = 25
+OOS_R2_TH            = 0.001 
+
+OOS_NETGAIN_TH       = 10
+OOS_MAX_DD_TH        = 25
+OOS_R2_TH            = 0.001      
 
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
+RUN_CORRELATION    = True
 RUN_BEST_PORTFOLIO = True
-RUN_CORRELATION    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = False
+UPDATE_OUTPUTS = True
 SAVE_TRADES    = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "35_parity_long_15m",
-    "36_parity_short_30m",
-    "38_flag_long_30m",
-    "40_flag_short_30m",
-#------------------------------------------------------------------------------
-    "30_reversal_long_30m",
-    "31_reversal_long_15m",
-    "32_reversal_short_30m",
-    "33_reversal_short_15m",
-    "34_parity_long_30m",
-    "37_parity_short_15m",
-    "39_flag_long_15m",
-    "41_flag_short_15m",
-    "42_orderblocks_long_30m",
-    "43_orderblocks_long_15m",
-    "44_orderblocks_short_30m",
-    "45_orderblocks_short_15m",
+    "01_reversal_long_15m",
+    "02_reversal_short_15m",
+    "03_reversal_long_30m",
+    "04_reversal_short_30m",
+    "05_reversal_long_1H",
+    "06_reversal_short_1H",
+    "07_reversal_long_4H",
+    "08_reversal_short_4H",
+    "09_reversal_long_6Hutc",
+    "10_reversal_short_6Hutc",
+    "11_parity_long_15m",
+    "12_parity_short_15m",
+    "13_parity_long_30m",
+    "14_parity_short_30m",
+    "15_parity_long_1H",
+    "16_parity_short_1H",
+    "17_parity_long_4H",
+    "18_parity_short_4H",
+    "19_parity_long_6Hutc",
+    "20_parity_short_6Hutc",
+    "21_flag_long_15m",
+    "22_flag_short_15m",
+    "23_flag_long_30m",
+    "24_flag_short_30m",
+    "25_flag_long_1H",
+    "26_flag_short_1H",
+    "27_flag_long_4H",
+    "28_flag_short_4H",
+    "29_flag_long_6Hutc",
+    "30_flag_short_6Hutc",
+    "31_orderblocks_long_15m",
+    "32_orderblocks_short_15m",
+    "33_orderblocks_long_30m",
+    "34_orderblocks_short_30m",
+    "35_orderblocks_long_1H",
+    "36_orderblocks_short_1H",
+    "37_orderblocks_long_4H",
+    "38_orderblocks_short_4H",
+    "39_orderblocks_long_6Hutc",
+    "40_orderblocks_short_6Hutc",
 ]
 
 # =============================================================================
@@ -125,14 +147,10 @@ SELECTED_STRATEGIES = [
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  
-
-# OOS
-#------------------------------------------------------------------------------
-RUN_MC_OOS                = False
-N_PATHS_OOS1              = 500
+OOS23_MATCH_SYMBOLS       = True 
 
 # =============================================================================
-# VALIDATION CONFIGURATION
+# PIPELINES
 # =============================================================================
 
 # OOS2
@@ -151,13 +169,15 @@ R_R2_OOS3           = OOS_R2_TH
 OOS3_RUN_ANALYSIS   = True
 OOS3_FOR_VALIDATION = True
 
-# OOS2/3 symbol selection
+# MONTECARLO OOS1
 #------------------------------------------------------------------------------
-OOS23_MATCH_SYMBOLS = True  
+RUN_MC_OOS          = False
+N_PATHS_OOS1        = 500
+
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.80
+CORRELATION_DD_THRESHOLD = 0.7
 
 # FILES
 #------------------------------------------------------------------------------
@@ -170,6 +190,7 @@ CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
 DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
+REGIME_BINS_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"regime_bins_{STRATEGIES_SET_NAME}.py")
 
 # DATA
 #------------------------------------------------------------------------------
@@ -257,11 +278,6 @@ def run_batch(strategy_config: dict) -> None:
     bt_signal_params = {k: best_params[k.upper()] for k in signal_params_keys if k.upper() in best_params}
 
     # -------------------------------------------------------------------------
-    # BLOCK 1b — Build metrics cache for regime analysis
-    # -------------------------------------------------------------------------
-    metrics_cache_is = prepare_regime_metrics_cache_is(DATA_FOLDER_IS, TIMEFRAME)
-
-    # -------------------------------------------------------------------------
     # BLOCK 2 — Backtest IS + Regime Analysis
     # -------------------------------------------------------------------------
     bins_to_filter, _ = run_backtest_is(
@@ -275,11 +291,11 @@ def run_batch(strategy_config: dict) -> None:
         timeframe             = TIMEFRAME,
         data_folder_is        = DATA_FOLDER_IS,
         strategy_direction    = SIDE,
-        metrics_cache_is      = metrics_cache_is,
         save_trades           = SAVE_TRADES,
         trades_is_baseline    = _strategy_trades_is_baseline,
         trades_is_regime      = _strategy_trades_is_regime,
         brief_trades_folder   = brief_trades_folder,
+        regime_bins_path      = REGIME_BINS_PATH,
     )
 
     # -------------------------------------------------------------------------
@@ -311,8 +327,9 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     # BLOCK 4  — OOS1 (baseline + regime + validation)
     # -------------------------------------------------------------------------
-
-    approved, trades_df_oos1_baseline, trades_df_oos1_regime, _, _ = run_oos_period(
+    ohlcv_data_oos1 = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
+    approved, trades_df_oos1_baseline, trades_df_oos1_regime, _metrics_baseline_oos1, _metrics_regime_oos1 = run_oos_period(
+    
         strategy_id            = STRATEGY_ID,
         label                  = "OOS1",
         stage_baseline         = "STAGE 3",
@@ -339,6 +356,8 @@ def run_batch(strategy_config: dict) -> None:
         brief_trades_folder    = brief_trades_folder,
         run_report_backtesting = True,
     )
+    
+
 
     # -------------------------------------------------------------------------
     # BLOCK 5 — Build validation record
@@ -593,10 +612,9 @@ def run_summary():
         logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
         survivors_profit = decorrelate_by_profit(
             strategy_trades_oos1     = validated_oos1_regime,
-# =============================================================================
-#             strategy_trades_oos2     = validated_oos2_regime,
-#             strategy_trades_oos3     = validated_oos3_regime,
-# =============================================================================
+            #strategy_trades_oos1     = [],
+            #strategy_trades_oos2     = validated_oos2_regime,
+            #strategy_trades_oos3     = validated_oos3_regime,
             strategy_trades_oos2     = [],
             strategy_trades_oos3     = [],
             initial_balance          = INITIAL_BALANCE,
@@ -625,10 +643,20 @@ def run_summary():
     # BEST PORTFOLIO 
     # -------------------------------------------------------------------------
     if RUN_BEST_PORTFOLIO:
+        if RUN_CORRELATION and survivors_profit:
+            survivor_ids          = {sid for sid, _ in survivors_profit}
+            portfolio_trades_oos1 = [(sid, df) for sid, df in validated_oos1_regime if sid in survivor_ids]
+            portfolio_trades_oos2 = [(sid, df) for sid, df in validated_oos2_regime if sid in survivor_ids]
+            portfolio_trades_oos3 = [(sid, df) for sid, df in validated_oos3_regime if sid in survivor_ids]
+        else:
+            portfolio_trades_oos1 = validated_oos1_regime
+            portfolio_trades_oos2 = validated_oos2_regime
+            portfolio_trades_oos3 = validated_oos3_regime
+
         find_best_portfolio_combination(
-            validated_trades_oos1 = validated_oos1_regime,
-            validated_trades_oos2 = validated_oos2_regime,
-            validated_trades_oos3 = validated_oos3_regime,
+            validated_trades_oos1 = portfolio_trades_oos1,
+            validated_trades_oos2 = portfolio_trades_oos2,
+            validated_trades_oos3 = portfolio_trades_oos3,
             initial_balance       = INITIAL_BALANCE,
             data_folder_oos1      = DATA_FOLDER_OOS1,
             data_folder_oos2      = DATA_FOLDER_OOS2,
@@ -673,7 +701,7 @@ if __name__ == "__main__":
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
     logger.info(f"  Data OOS3      : {'🔵' if OOS3_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS3)}")
     logger.info(f"  Validation     : NetGain>{OOS_NETGAIN_TH}%  MaxDD<{OOS_MAX_DD_TH}%  R2>{OOS_R2_TH}")
-    logger.info(f"  Regime         : MA{R0_MA_PERIOD}  long_th={R0_LONG_TH}  short_th={R0_SHORT_TH}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
+    logger.info(f"  Regime         : MA{R0_MA_PERIOD}  min_trades={REGIME_MIN_TRADES}  source={REGIME_FAMILY_SOURCE}")
     logger.info(f"{'='*115}\n")
     
     for strategy in strategies_to_run:

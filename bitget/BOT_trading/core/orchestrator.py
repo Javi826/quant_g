@@ -794,7 +794,7 @@ class BotOrchestrator:
     
                     self.logger.info(
                         f"[REGIME01] {tf}: REGIME={family.upper()} | DIRECTION={direction.upper()} | "
-                        f"hurst={metrics.get('hurst', 0):.2f} er={metrics.get('efficiency_ratio', 0):.2f}"
+                        f"er={metrics.get('efficiency_ratio', 0):.2f} atr={metrics.get('atr_pct', 0):.2f}"
                         if metrics else
                         f"[REGIME01] {tf}: REGIME={family.upper()} | DIRECTION={direction.upper()}"
                     )

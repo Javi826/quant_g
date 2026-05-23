@@ -1,8 +1,6 @@
 #shared_batchs/pipeline/oss_period.py
 import logging
-
 import pandas as pd
-
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
 from shared_batchs.utils.analysis import report_backtesting
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
@@ -10,7 +8,7 @@ from shared_batchs.utils.backtest_compiler import compile_grid_results
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison
-from shared_batchs.regime.regime_filter import run_oos_backtest_with_regime
+from shared_batchs.regime.regime_module import run_oos_backtest_with_regime
 from shared_batchs.utils.io import accumulate_strategy_trades
 
 logger = logging.getLogger("BOT_batch.pipeline.oos_period")
@@ -117,6 +115,7 @@ def run_oos_period(
         trades_baseline             = result_baseline["__PORTFOLIO__"]["trade_log"].copy()
         trades_baseline.columns     = trades_baseline.columns.str.lower().str.strip()
         trades_baseline["buy_time"] = pd.to_datetime(trades_baseline["buy_time"])
+        
 
         if save_trades:
             accumulate_strategy_trades(
@@ -143,7 +142,10 @@ def run_oos_period(
         timeframe       = timeframe,
         bins_to_filter  = bins_to_filter,
         initial_balance = INITIAL_BALANCE,
+        debug_label     = label,
     )
+    #print(f"  DEBUG regime: trades={len(trades_regime)} | profit={trades_regime['profit'].sum():.1f} | wr={(trades_regime['profit']>0).mean()*100:.1f}%")
+    
 
     logger.debug(
         f"{stage_regime} ── Filter results         ── "

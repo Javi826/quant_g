@@ -29,9 +29,10 @@ DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
 SHOW_PLOTS    = True
+
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
-
+from shared_batchs.pipeline.robustness import run_bootstrap_test
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
@@ -63,86 +64,92 @@ _best_params_results           : dict = {}
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
-
 # SYMBOLS
 #------------------------------------------------------------------------------
-MY_SYMBOLS           = True
+MY_SYMBOLS = False
 
-# RUN + MC 
+# BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_03"
 N_PATHS_IS           = 100
 
 # ELITE -- MA4
-#----------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 84
-OOS_MAX_DD_TH        = 9
-OOS_R2_TH            = 0.95  
-
-# =============================================================================
-# OOS_NETGAIN_TH       = 0.01
-# OOS_MAX_DD_TH        = 10
-# OOS_R2_TH            = 0.01 
-# =============================================================================
+OOS_NETGAIN_TH       = 1
+OOS_MAX_DD_TH        = 25
+OOS_R2_TH            = 0.001   
 
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
+RUN_CORRELATION    = True
 RUN_BEST_PORTFOLIO = True
-RUN_CORRELATION    = False
+RUN_ROBUSTNESS     = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS     = False
-SAVE_TRADES        = False
+UPDATE_OUTPUTS = True
+SAVE_TRADES    = False
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "35_parity_long_15m",
-    "36_parity_short_30m",
-    "38_flag_long_30m",
-    "40_flag_short_30m",
-#------------------------------------------------------------------------------
-    "30_reversal_long_30m",
-    "31_reversal_long_15m",
-    "32_reversal_short_30m",
-    "33_reversal_short_15m",
-    "34_parity_long_30m",
-    "37_parity_short_15m",
-    "39_flag_long_15m",
-    "41_flag_short_15m",
-    "42_orderblocks_long_30m",
-    "43_orderblocks_long_15m",
-    "44_orderblocks_short_30m",
-    "45_orderblocks_short_15m",
+    "01_reversal_long_15m",
+    "02_reversal_short_15m",
+    "03_reversal_long_30m",
+    "04_reversal_short_30m",
+    "05_reversal_long_1H",
+    "06_reversal_short_1H",
+    "07_reversal_long_4H",
+    "08_reversal_short_4H",
+    "09_reversal_long_6Hutc",
+    "10_reversal_short_6Hutc",
+    "11_parity_long_15m",
+    "12_parity_short_15m",
+    "13_parity_long_30m",
+    "14_parity_short_30m",
+    "15_parity_long_1H",
+    "16_parity_short_1H",
+    "17_parity_long_4H",
+    "18_parity_short_4H",
+    "19_parity_long_6Hutc",
+    "20_parity_short_6Hutc",
+    "21_flag_long_15m",
+    "22_flag_short_15m",
+    "23_flag_long_30m",
+    "24_flag_short_30m",
+    "25_flag_long_1H",
+    "26_flag_short_1H",
+    "27_flag_long_4H",
+    "28_flag_short_4H",
+    "29_flag_long_6Hutc",
+    "30_flag_short_6Hutc",
+    "31_orderblocks_long_15m",
+    "32_orderblocks_short_15m",
+    "33_orderblocks_long_30m",
+    "34_orderblocks_short_30m",
+    "35_orderblocks_long_1H",
+    "36_orderblocks_short_1H",
+    "37_orderblocks_long_4H",
+    "38_orderblocks_short_4H",
+    "39_orderblocks_long_6Hutc",
+    "40_orderblocks_short_6Hutc",
 ]
 
 # =============================================================================
 # MONTECARLOS
 # =============================================================================
-
 # IS
 #------------------------------------------------------------------------------
 N_SYMBOLS_MCIS            = 6
 FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  
-
-# OOS
-#------------------------------------------------------------------------------
-RUN_MC_OOS                = False
-N_PATHS_OOS1              = 2000
-
-# REGIME
-#------------------------------------------------------------------------------
-RUN_MC_REGIME_ROBUSTNESS  = False
-N_PERMUTATIONS_REGIME     = 2000
-REGIME_ROBUSTNESS_TH      = 0  
+OOS23_MATCH_SYMBOLS       = True 
 
 # =============================================================================
-# VALIDATION CONFIGURATION
+# PIPELINES
 # =============================================================================
 
 # OOS2
@@ -161,13 +168,14 @@ R_R2_OOS3           = OOS_R2_TH
 OOS3_RUN_ANALYSIS   = True
 OOS3_FOR_VALIDATION = True
 
-# OOS2/3 symbol selection
+# MONTECARLO OOS1
 #------------------------------------------------------------------------------
-OOS23_MATCH_SYMBOLS = True  
+RUN_MC_OOS          = False
+N_PATHS_OOS1        = 500
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.80
+CORRELATION_DD_THRESHOLD = 0.7
 
 # FILES
 #------------------------------------------------------------------------------
@@ -181,21 +189,10 @@ STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
 DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
 
-# =============================================================================
-# # DATA
-# #------------------------------------------------------------------------------
-# SPLIT_MODE       = "expanding"
-# SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
-# DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "rwa_2025-11_2026-03_IS")
-# DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "rwa_2026-03_2026-05_OOS")
-# DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "rwa_2025-09_2025-11_OOS")
-# DATA_FOLDER_OOS3 = os.path.join(SPLIT_BASE, "OOS", "rwa_2023-01_2024-01_OOS")
-# =============================================================================
-
 # DATA
 #------------------------------------------------------------------------------
 SPLIT_MODE       = "expanding"
-SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE       = os.path.join(os.path.dirname(__file__), "..", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
 DATA_FOLDER_IS   = os.path.join(SPLIT_BASE, "IS",  "crypto_2024-01_2025-05_IS")
 DATA_FOLDER_OOS1 = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 DATA_FOLDER_OOS2 = os.path.join(SPLIT_BASE, "OOS", "crypto_2022-01_2023-01_OOS")
@@ -361,6 +358,27 @@ def run_batch(strategy_config: dict) -> None:
         brief_trades_folder    = brief_trades_folder,
         run_report_backtesting = True,
     )
+    # =============================================================================
+    #     if RUN_ROBUSTNESS:
+    #         from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+    #         _real_metrics    = _metrics_regime_oos1 if _metrics_regime_oos1 is not None else _metrics_baseline_oos1
+    #         _real_trades     = trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline
+    #         _ohlcv_arrays_bt = prepare_ohlcv_arrays(ohlcv_data_oos1)
+    #         run_bootstrap_test(
+    #             strategy_id    = STRATEGY_ID,
+    #             ohlcv_arrays   = _ohlcv_arrays_bt,
+    #             signal_fn      = signal_fn,
+    #             signal_params  = bt_signal_params,
+    #             best_params    = best_params,
+    #             order_amount   = ORDER_AMOUNT,
+    #             timeframe      = TIMEFRAME,
+    #             data_folder    = DATA_FOLDER_OOS1,
+    #             bins_to_filter = bins_to_filter,
+    #             real_metrics   = _real_metrics,
+    #             real_trades    = _real_trades,
+    #             show_plots     = SHOW_PLOTS,
+    #         )
+    # =============================================================================
 
     # -------------------------------------------------------------------------
     # BLOCK 5 — Build validation record
@@ -645,13 +663,24 @@ def run_summary():
                 ],
                 initial_balance=INITIAL_BALANCE,
             )   
+
     # BEST PORTFOLIO 
     # -------------------------------------------------------------------------
     if RUN_BEST_PORTFOLIO:
+        if RUN_CORRELATION and survivors_profit:
+            survivor_ids          = {sid for sid, _ in survivors_profit}
+            portfolio_trades_oos1 = [(sid, df) for sid, df in validated_oos1_regime if sid in survivor_ids]
+            portfolio_trades_oos2 = [(sid, df) for sid, df in validated_oos2_regime if sid in survivor_ids]
+            portfolio_trades_oos3 = [(sid, df) for sid, df in validated_oos3_regime if sid in survivor_ids]
+        else:
+            portfolio_trades_oos1 = validated_oos1_regime
+            portfolio_trades_oos2 = validated_oos2_regime
+            portfolio_trades_oos3 = validated_oos3_regime
+
         find_best_portfolio_combination(
-            validated_trades_oos1 = validated_oos1_regime,
-            validated_trades_oos2 = validated_oos2_regime,
-            validated_trades_oos3 = validated_oos3_regime,
+            validated_trades_oos1 = portfolio_trades_oos1,
+            validated_trades_oos2 = portfolio_trades_oos2,
+            validated_trades_oos3 = portfolio_trades_oos3,
             initial_balance       = INITIAL_BALANCE,
             data_folder_oos1      = DATA_FOLDER_OOS1,
             data_folder_oos2      = DATA_FOLDER_OOS2,

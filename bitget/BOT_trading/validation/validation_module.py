@@ -268,23 +268,14 @@ def validate_settings():
     # Val S13: REGIME thresholds coherence
     # ========================================================================
     validation_s13_errors = 0
-    
+
     for family, rules in REGIME_FAMILIES.items():
         for metric, rule in rules.items():
             if not isinstance(rule, tuple) or len(rule) != 2:
                 continue
-            
+
             operator, threshold = rule
-            
-            # Validate Hurst exponent range (0-1)
-            if 'hurst' in metric.lower():
-                if threshold < 0 or threshold > 1:
-                    errors.append(
-                        f"REGIME_FAMILIES['{family}']['{metric}'] threshold = {threshold} "
-                        f"(Hurst exponent must be between 0 and 1)"
-                    )
-                    validation_s13_errors += 1
-            
+
             # Validate Efficiency Ratio range (0-1)
             if 'efficiency' in metric.lower():
                 if threshold < 0 or threshold > 1:
@@ -293,16 +284,7 @@ def validate_settings():
                         f"(Efficiency Ratio must be between 0 and 1)"
                     )
                     validation_s13_errors += 1
-            
-            # Validate Permutation Entropy range (0-1)
-            if 'entropy' in metric.lower():
-                if threshold < 0 or threshold > 1:
-                    errors.append(
-                        f"REGIME_FAMILIES['{family}']['{metric}'] threshold = {threshold} "
-                        f"(Permutation Entropy must be between 0 and 1)"
-                    )
-                    validation_s13_errors += 1
-            
+
             # Validate ATR percentage reasonable range
             if 'atr' in metric.lower() and 'pct' in metric.lower():
                 if threshold < 0.1:
@@ -315,7 +297,7 @@ def validate_settings():
                         f"REGIME_FAMILIES['{family}']['{metric}'] = {threshold} "
                         f"(>15% is very high, may never trigger)"
                     )
-    
+
     if validation_s13_errors == 0:
         logger.debug("Val S13: REGIME thresholds coherent")
     
