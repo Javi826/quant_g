@@ -33,8 +33,8 @@ ER_WINDOW  = 14
 ATR_WINDOW = 14
 
 REGIME_FAMILIES = {
-    'trending': {'efficiency_ratio': ('>', 0.4)},
-    'volatile': {'atr_pct': ('>', 2.0)},
+    'trending': {'efficiency_ratio': ('>', 0.6)},
+    'volatile': {'atr_pct': ('>', 2.5)},
     'ranging':  {},
 }
 

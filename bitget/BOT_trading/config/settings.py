@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 20800,
+        "initial_capital": 12000,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -81,7 +81,7 @@ LEVERAGE = 10
 
 # Drift detection
 DRIFT_BINOMIAL_WINDOW  = 100
-DRIFT_CHECK_INTERVAL   = 30
+DRIFT_CHECK_INTERVAL   = 15
 DRIFT_BINOMIAL_DEFAULT = 0.55
 
 # Execution quality
@@ -118,20 +118,20 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 80
-MAX_ORDER_AMOUNT = 720
+MAX_ORDER_AMOUNT = 240
 
 # TP/SL limits (%)
 MIN_TP_PCT = 2
-MAX_TP_PCT = 3
+MAX_TP_PCT = 9
 MIN_SL_PCT = 2
-MAX_SL_PCT = 3
+MAX_SL_PCT = 9
 
 # Candles timeout limits
 MIN_CANDLES = 50
 MAX_CANDLES = 100
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['15m','30m']
+VALID_TIMEFRAMES = ['15m','30m','1H','4H','6Hutc']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION

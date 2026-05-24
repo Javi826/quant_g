@@ -1,20 +1,16 @@
-# bitget/develop/market_regime/session03_bin_search.py
 """
-Session optimization — exhaustive bin combination search.
+Volatility regime bin search — classify signals by relative volatility
+(std of returns over short window vs long window mean).
 
-For each strategy/period:
-  1. Pre-classify every signal by session bin (once) based on UTC hour
-  2. Run baseline backtest (once)
-  3. Evaluate all 64 bin combinations (2^6) — each requires one backtest
-  4. Pick the combination that maximizes profit on train periods
-  5. Validate on held-out period
+Bins:
+  low_vol    — vol_ratio < VOL_LOW_TH
+  normal_vol — VOL_LOW_TH <= vol_ratio <= VOL_HIGH_TH
+  high_vol   — vol_ratio > VOL_HIGH_TH
 
-Session bins are determined purely by signal timestamp (UTC hour) —
-no OHLCV reference data required.
+No lookahead: uses only closed bars prior to the signal bar.
+Vol reference: symbol's own OHLCV (same timeframe).
 
-Modes:
-  'search_by_tf'  — find best bin combo per timeframe on TRAIN_KEYS, validate on VALIDATE_KEY
-  'analyze_by_tf' — use fixed bins per strategy, persist
+Same structure as regime06_cross_period_search.py.
 """
 import os
 import sys
@@ -32,7 +28,6 @@ from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_B
 from shared_batchs.pipeline.universe import filter_symbols
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.regime.session_module import SESSION_BINS, ALL_SESSION_BINS, classify_signal_by_session
 
 # =============================================================================
 # CONFIGURATION
@@ -50,7 +45,8 @@ PERIODS = {
 
 STRATEGIES_SET_NAME  = "E1"
 SYMBOLS_LIVE_FOLDER  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch_E1", "strategies_E1", "symbols_live")
-BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"session_bins_03_{STRATEGIES_SET_NAME}.py")
+BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_volstd_{STRATEGIES_SET_NAME}.py")
+
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 STRATEGIES_LOOP_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch_E1",
@@ -58,42 +54,46 @@ STRATEGIES_LOOP_PATH = os.path.join(
     f"{STRATEGIES_LOOP_NAME}.py"
 )
 
-TRAIN_KEYS   = ["IS","OOS2","OOS3"]
-VALIDATE_KEY = "OOS1"
+TRAIN_KEYS        = ["IS", "OOS2", "OOS3"]
+VALIDATE_KEY      = "OOS1"
 
-# =============================================================================
-# MODE
-# 'search_by_tf'  — find best bin combo to filter (exhaustive 64 combos)
-# 'analyze_by_tf' — use FIXED_BINS_BY_STRATEGY, persist
-# =============================================================================
-MODE = 'search_by_tf'
+MATCH_MODE        = 'exact'   # 'exact' | 'intersection'
+MIN_PERIODS_MATCH = 2
 
-# Fixed bins per strategy for MODE='analyze_by_tf'
-FIXED_BINS_BY_STRATEGY: dict[str, set] = {}
-
-# Search params
 ORDER_AMOUNT        = 80
 MIN_SIGNALS_PER_BIN = 50
 
-# All 64 combinations (empty set + 2^6 - 1 non-empty)
-ALL_SESSION_BIN_COMBOS = [set()] + [
+# =============================================================================
+# VOLATILITY CONFIGURATION
+# =============================================================================
+
+VOL_SHORT_WINDOW = 10    # bars for current volatility (std of returns)
+VOL_LONG_WINDOW  = 50    # bars for historical volatility reference
+VOL_LOW_TH       = 0.7   # vol_ratio < VOL_LOW_TH  → low_vol
+VOL_HIGH_TH      = 1.3   # vol_ratio > VOL_HIGH_TH → high_vol
+                         # between thresholds        → normal_vol
+
+# =============================================================================
+# BINS
+# =============================================================================
+
+ALL_BINS = ['low_vol', 'normal_vol', 'high_vol']
+
+ALL_BIN_COMBOS = [set()] + [
     set(combo)
-    for r in range(1, len(ALL_SESSION_BINS) + 1)
-    for combo in combinations(ALL_SESSION_BINS, r)
+    for r in range(1, len(ALL_BINS) + 1)
+    for combo in combinations(ALL_BINS, r)
 ]
+
+_BIN_ABBREV = {
+    'low_vol':    'lo_v',
+    'normal_vol': 'nm_v',
+    'high_vol':   'hi_v',
+}
 
 # =============================================================================
 # HELPERS
 # =============================================================================
-
-_BIN_ABBREV = {
-    'asian_early':    'as_e',
-    'asian_late':     'as_l',
-    'european_early': 'eu_e',
-    'european_late':  'eu_l',
-    'american_early': 'am_e',
-    'american_late':  'am_l',
-}
 
 def _abbrev_bins(bins: set) -> str:
     if not bins:
@@ -107,8 +107,53 @@ def _pct_improvement(profit_filtered: float, profit_baseline: float) -> float:
     return (profit_filtered - profit_baseline) / abs(profit_baseline) * 100
 
 
-def _parse_signal_key(strategy_id: str) -> str:
-    return "_".join(strategy_id.split("_")[1:-1])
+def _get_vol_bin(vol_ratio: float) -> str:
+    if vol_ratio < VOL_LOW_TH:
+        return 'low_vol'
+    elif vol_ratio > VOL_HIGH_TH:
+        return 'high_vol'
+    return 'normal_vol'
+
+
+# =============================================================================
+# VOLATILITY CACHE
+# =============================================================================
+
+def _build_vol_cache(arr: dict) -> dict[int, float]:
+    """
+    For each bar index i, compute:
+      vol_short = std(returns[i-VOL_SHORT_WINDOW-1 : i-1])
+      vol_long  = std(returns[i-VOL_LONG_WINDOW-1  : i-1])
+      vol_ratio = vol_short / vol_long
+
+    Uses only closed bars prior to the signal bar — no lookahead.
+    Returns {bar_index: vol_ratio}.
+    """
+    closes  = arr['close'].astype(np.float64)
+    returns = np.diff(np.log(closes))  # log returns, length = len(closes) - 1
+    cache   = {}
+    n       = len(returns)
+
+    min_idx = VOL_LONG_WINDOW + 1
+
+    for i in range(min_idx, n):
+        # returns up to i-1 (closed before signal bar at i+1 in closes)
+        short_slice = returns[i - VOL_SHORT_WINDOW: i]
+        long_slice  = returns[i - VOL_LONG_WINDOW:  i]
+
+        if len(short_slice) < VOL_SHORT_WINDOW or len(long_slice) < VOL_LONG_WINDOW:
+            continue
+
+        vol_short = float(np.std(short_slice))
+        vol_long  = float(np.std(long_slice))
+
+        if vol_long == 0 or np.isnan(vol_long) or np.isnan(vol_short):
+            continue
+
+        # cache key is the signal bar index in closes (i+1 offset due to diff)
+        cache[i + 1] = vol_short / vol_long
+
+    return cache
 
 
 # =============================================================================
@@ -123,7 +168,7 @@ def load_strategies_config() -> list[dict]:
     strategies = []
     for entry in module.STRATEGIES_LOOP:
         strategy_id = entry["id"]
-        signal_key  = _parse_signal_key(strategy_id)
+        signal_key  = "_".join(strategy_id.split("_")[1:-1])
 
         if signal_key not in SIGNAL_REGISTRY:
             signal_key = "_".join(strategy_id.split("_")[:-1])
@@ -132,17 +177,14 @@ def load_strategies_config() -> list[dict]:
             continue
 
         registry      = SIGNAL_REGISTRY[signal_key]
-        signal_fn     = registry["fn"]
-        param_keys    = registry["params"]
         param_grid    = entry["param_grid"]
         best_params   = {k.upper(): v[0] for k, v in param_grid.items()}
-        signal_params = {k: best_params[k.upper()] for k in param_keys if k.upper() in best_params}
-        timeframe     = strategy_id.split("_")[-1]
+        signal_params = {k: best_params[k.upper()] for k in registry["params"] if k.upper() in best_params}
 
         strategies.append({
             "id":            strategy_id,
-            "timeframe":     timeframe,
-            "signal_fn":     signal_fn,
+            "timeframe":     strategy_id.split("_")[-1],
+            "signal_fn":     registry["fn"],
             "signal_params": signal_params,
             "best_params":   best_params,
         })
@@ -160,45 +202,35 @@ def load_symbols(strategy_id: str, timeframe: str) -> list[str]:
 
 
 # =============================================================================
-# SIGNAL CLASSIFICATION — pre-classify all signals by session bin (once)
+# SIGNAL CLASSIFICATION
 # =============================================================================
 
-def _classify_signals_by_session(
+def _classify_signals(
     ohlcv_arrays:  dict,
     signal_fn,
     signal_params: dict,
 ) -> dict[str, dict]:
-    """
-    For each symbol, generate signals and classify each signal into a session bin
-    based on its UTC timestamp. No OHLCV reference data required.
-    Returns {sym: {'signals': np.ndarray, 'signal_bins': dict{idx: bin_key}, 'arr': arr}}
-    Pre-computed once — reused across all 64 bin combinations.
-    """
     result = {}
     for sym, arr in ohlcv_arrays.items():
         signals     = signal_fn(arr, **signal_params, live_trading=False)
         signal_idxs = np.nonzero(signals)[0]
+        vol_cache   = _build_vol_cache(arr)
 
         signal_bins: dict[int, str] = {}
         for idx in signal_idxs:
-            t                    = pd.Timestamp(arr['ts'][idx])
-            session              = classify_signal_by_session(t)
-            signal_bins[int(idx)] = session
+            vol_ratio = vol_cache.get(int(idx))
+            if vol_ratio is None:
+                continue
+            signal_bins[int(idx)] = _get_vol_bin(vol_ratio)
 
-        result[sym] = {
-            'signals':     signals,
-            'signal_bins': signal_bins,
-            'arr':         arr,
-        }
+        result[sym] = {'signals': signals, 'signal_bins': signal_bins, 'arr': arr}
 
-    # Filter out bins with fewer than MIN_SIGNALS_PER_BIN signals across all symbols
     bin_counts: dict[str, int] = {}
     for sym_data in result.values():
         for bin_key in sym_data['signal_bins'].values():
             bin_counts[bin_key] = bin_counts.get(bin_key, 0) + 1
 
     valid_bins = {b for b, n in bin_counts.items() if n >= MIN_SIGNALS_PER_BIN}
-
     for sym_data in result.values():
         sym_data['signal_bins'] = {
             idx: b for idx, b in sym_data['signal_bins'].items() if b in valid_bins
@@ -207,47 +239,21 @@ def _classify_signals_by_session(
     return result
 
 
-def _run_backtest_raw(
-    ohlcv_arrays:  dict,
-    signal_fn,
-    signal_params: dict,
-    best_params:   dict,
-) -> tuple[pd.DataFrame, float]:
-    """Run baseline backtest. Returns (trades_df, profit)."""
-    arrays = {}
-    for sym, arr in ohlcv_arrays.items():
-        signals     = signal_fn(arr, **signal_params, live_trading=False)
-        arrays[sym] = {**arr, 'signal': signals}
-
-    result             = run_grid_backtest(
-        arrays,
-        sell_after   = best_params['SELL_AFTER'],
-        tp_pct       = best_params['TP_PCT'],
-        sl_pct       = best_params['SL_PCT'],
-        order_amount = ORDER_AMOUNT,
-    )
-    trades             = result['__PORTFOLIO__']['trade_log'].copy()
-    trades.columns     = trades.columns.str.lower().str.strip()
-    trades['buy_time'] = pd.to_datetime(trades['buy_time'])
-    return trades, trades['profit'].sum() if not trades.empty else 0.0
-
+# =============================================================================
+# BACKTEST
+# =============================================================================
 
 def _run_backtest_with_bins(
     classified:     dict[str, dict],
     bins_to_filter: set,
     best_params:    dict,
 ) -> dict:
-    """
-    Apply session bin filter to pre-classified signals and run backtest.
-    Returns dict with profit, win_rate, n_trades, max_dd.
-    """
     arrays = {}
     for sym, data in classified.items():
         signals = data['signals'].copy()
-        if bins_to_filter:
-            for idx, bin_key in data['signal_bins'].items():
-                if bin_key in bins_to_filter:
-                    signals[idx] = 0
+        for idx, bin_key in data['signal_bins'].items():
+            if bin_key in bins_to_filter:
+                signals[idx] = 0
         arrays[sym] = {**data['arr'], 'signal': signals}
 
     result = run_grid_backtest(
@@ -258,18 +264,15 @@ def _run_backtest_with_bins(
         order_amount = ORDER_AMOUNT,
     )
     trades = result['__PORTFOLIO__']['trade_log']
-
     if len(trades) == 0:
         return {'profit': 0.0, 'win_rate': 0.0, 'n_trades': 0, 'max_dd': 0.0}
 
-    profits  = trades['profit'] if hasattr(trades, 'columns') else pd.Series(trades['profit'])
-    n        = len(profits)
-    win_rate = float((profits > 0).mean() * 100)
+    profits  = trades['profit']
     profit   = float(profits.sum())
+    win_rate = float((profits > 0).mean() * 100)
+    n        = len(profits)
     equity   = INITIAL_BALANCE + profits.cumsum()
-    roll_max = equity.cummax()
-    max_dd   = float(((equity - roll_max) / roll_max).min() * 100)
-
+    max_dd   = float(((equity - equity.cummax()) / equity.cummax()).min() * 100)
     return {'profit': profit, 'win_rate': win_rate, 'n_trades': n, 'max_dd': max_dd}
 
 
@@ -291,32 +294,18 @@ def _load_period_data(strategy: dict, period_key: str) -> dict | None:
     if not ohlcv_data:
         return None
 
-    ohlcv_arrays = prepare_ohlcv_arrays(ohlcv_data)
-
-    classified = _classify_signals_by_session(
+    ohlcv_arrays     = prepare_ohlcv_arrays(ohlcv_data)
+    classified       = _classify_signals(
         ohlcv_arrays  = ohlcv_arrays,
         signal_fn     = strategy['signal_fn'],
         signal_params = strategy['signal_params'],
     )
-
-    _, profit_baseline = _run_backtest_raw(
-        ohlcv_arrays  = ohlcv_arrays,
-        signal_fn     = strategy['signal_fn'],
-        signal_params = strategy['signal_params'],
-        best_params   = strategy['best_params'],
-    )
-
-    baseline_metrics = _run_backtest_with_bins(
-        classified     = classified,
-        bins_to_filter = set(),
-        best_params    = strategy['best_params'],
-    )
+    baseline_metrics = _run_backtest_with_bins(classified, set(), strategy['best_params'])
 
     return {
         'classified':        classified,
-        'ohlcv_arrays':      ohlcv_arrays,
         'best_params':       strategy['best_params'],
-        'profit_baseline':   profit_baseline,
+        'profit_baseline':   baseline_metrics['profit'],
         'wr_baseline':       baseline_metrics['win_rate'],
         'n_trades_baseline': baseline_metrics['n_trades'],
         'dd_baseline':       baseline_metrics['max_dd'],
@@ -324,112 +313,125 @@ def _load_period_data(strategy: dict, period_key: str) -> dict | None:
 
 
 # =============================================================================
-# BIN SEARCH — evaluate all 64 combinations on train periods
+# BEST COMBO PER PERIOD
 # =============================================================================
 
-def _find_best_bins(
-    strategy:    dict,
-    period_data: dict,
-) -> tuple[set, float]:
-    """
-    Evaluate all 64 session bin combinations across train periods.
-    Optimizes for total profit. Returns (best_bins, profit_improvement).
-    """
-    best_bins       = set()
-    best_profit     = 0.0
-    profit_baseline = sum(d['profit_baseline'] for d in period_data.values())
+def _find_best_combo(period_data: dict) -> tuple[set, float]:
+    best_bins   = set()
+    best_profit = 0.0
 
-    for bins_combo in ALL_SESSION_BIN_COMBOS:
-        total_trades = 0
-        profit_total = 0.0
-        for data in period_data.values():
-            m             = _run_backtest_with_bins(data['classified'], bins_combo, data['best_params'])
-            total_trades += m['n_trades']
-            profit_total += m['profit']
-
-        if total_trades < MIN_SIGNALS_PER_BIN:
+    for bins_combo in ALL_BIN_COMBOS:
+        m = _run_backtest_with_bins(period_data['classified'], bins_combo, period_data['best_params'])
+        if m['n_trades'] < MIN_SIGNALS_PER_BIN:
             continue
-
-        if profit_total > best_profit:
-            best_profit = profit_total
+        if m['profit'] > best_profit:
+            best_profit = m['profit']
             best_bins   = bins_combo
 
-    return best_bins, best_profit - profit_baseline
+    return best_bins, best_profit
 
 
 # =============================================================================
-# SEARCH BY TIMEFRAME
+# DERIVE FINAL BINS
 # =============================================================================
 
-def run_search_by_tf(train_keys: list[str], val_key: str) -> None:
+def _derive_final_bins(
+    best_combos:       dict[str, set],
+    match_mode:        str,
+    min_periods_match: int,
+) -> set:
+    if match_mode == 'intersection':
+        if not best_combos:
+            return set()
+        combos = list(best_combos.values())
+        common = combos[0].copy()
+        for c in combos[1:]:
+            common &= c
+        return common
+
+    combo_counts: dict[frozenset, int] = {}
+    for combo in best_combos.values():
+        key = frozenset(combo)
+        combo_counts[key] = combo_counts.get(key, 0) + 1
+
+    best_key   = None
+    best_count = 0
+    for key, count in combo_counts.items():
+        if count > best_count:
+            best_count = count
+            best_key   = key
+
+    if best_key is not None and best_count >= min_periods_match:
+        return set(best_key)
+    return set()
+
+
+# =============================================================================
+# MAIN RUN
+# =============================================================================
+
+def run_volstd_search(train_keys: list[str], val_key: str) -> None:
     _t0 = time.time()
 
     print(f"\n{'='*100}")
-    print(f"  SESSION BIN SEARCH — Train: {' + '.join(train_keys)}  →  Validate: {val_key}")
-    print(f"  Bin combinations: {len(ALL_SESSION_BIN_COMBOS)}")
+    print(f"  VOLATILITY STD BIN SEARCH — Train: {' + '.join(train_keys)}  →  Validate: {val_key}")
+    print(f"  Short window: {VOL_SHORT_WINDOW} | Long window: {VOL_LONG_WINDOW} | Low<{VOL_LOW_TH}x | High>{VOL_HIGH_TH}x")
+    print(f"  Match mode: {MATCH_MODE}" + (f" | min_periods={MIN_PERIODS_MATCH}" if MATCH_MODE == 'exact' else ""))
+    print(f"  Bin combinations: {len(ALL_BIN_COMBOS)}")
     print(f"{'='*100}\n")
 
     strategies_all = load_strategies_config()
     if not strategies_all:
-        print("  No active strategies — aborting.")
+        print("  No strategies found — aborting.")
         return
+
+    bins_per_strategy:      dict[str, set]   = {}
+    train_pct_per_strategy: dict[str, float] = {}
 
     by_tf: dict[str, list] = {}
     for s in strategies_all:
         by_tf.setdefault(s['timeframe'], []).append(s)
 
-    bins_per_strategy:      dict[str, set]   = {}
-    train_pct_per_strategy: dict[str, float] = {}
-
     for tf, strategies in sorted(by_tf.items()):
         print(f"\n{'─'*100}")
-        print(f"  TF: {tf} | {len(strategies)} strategies | {len(ALL_SESSION_BIN_COMBOS)} combos × {len(train_keys)} periods")
+        print(f"  TF: {tf} | {len(strategies)} strategies | {len(ALL_BIN_COMBOS)} combos × {len(train_keys)} periods")
         print(f"{'─'*100}")
 
         for strategy in strategies:
-            sid         = strategy['id']
-            period_data = {}
+            sid          = strategy['id']
+            best_combos  : dict[str, set]   = {}
+            best_profits : dict[str, float] = {}
 
             for period_key in train_keys:
                 data = _load_period_data(strategy, period_key)
-                if data:
-                    period_data[period_key] = data
+                if not data:
+                    continue
+                best_bins, best_profit   = _find_best_combo(data)
+                best_combos[period_key]  = best_bins
+                best_profits[period_key] = best_profit
 
-            if not period_data:
+            if not best_combos:
                 bins_per_strategy[sid]      = set()
                 train_pct_per_strategy[sid] = 0.0
                 continue
 
-            best_bins, best_pct         = _find_best_bins(strategy, period_data)
-            bins_per_strategy[sid]      = best_bins
-            train_pct_per_strategy[sid] = best_pct
+            final_bins             = _derive_final_bins(best_combos, MATCH_MODE, MIN_PERIODS_MATCH)
+            bins_per_strategy[sid] = final_bins
+            consistent             = len(final_bins) > 0
+            color                  = "\033[92m" if consistent else "\033[91m"
+            reset                  = "\033[0m"
+            icon                   = "✅" if consistent else "❌"
+            avg_pct                = sum(best_profits.values()) / len(best_profits) if best_profits else 0.0
+            train_pct_per_strategy[sid] = avg_pct
 
-            color = "\033[92m" if best_pct > 0 else "\033[91m" if best_pct < 0 else ""
-            reset = "\033[0m"
-            print(f"  {sid:<35} {color}{best_pct:>+7.2f}%{reset}  bins: {_abbrev_bins(best_bins)}")
+            print(f"  {sid:<35} {color}{icon}{reset}  final={_abbrev_bins(final_bins)}")
+            for p in train_keys:
+                if p in best_combos:
+                    print(f"    {p:<8} best={_abbrev_bins(best_combos[p])}")
 
     oos1_pct_per_strategy = _run_validation_period(strategies_all, val_key, bins_per_strategy)
     _print_consistency_table(strategies_all, train_pct_per_strategy, oos1_pct_per_strategy, bins_per_strategy)
-    _save_session_bins(bins_per_strategy, train_keys)
-
-    elapsed = int(time.time() - _t0)
-    print(f"\n  ⏱  Completed in {elapsed//60}m {elapsed%60}s\n")
-
-
-# =============================================================================
-# ANALYZE — fixed bins
-# =============================================================================
-
-def run_analyze_by_tf(train_keys: list[str], val_key: str, fixed_bins: dict[str, set]) -> None:
-    _t0 = time.time()
-
-    print(f"\n{'='*100}")
-    print(f"  SESSION ANALYZE — Train: {' + '.join(train_keys)}  →  Validate: {val_key}")
-    print(f"{'='*100}\n")
-
-    strategies_all = load_strategies_config()
-    _run_validation_period(strategies_all, val_key, fixed_bins)
-    _save_session_bins(fixed_bins, train_keys)
+    _save_bins(bins_per_strategy, train_keys)
 
     elapsed = int(time.time() - _t0)
     print(f"\n  ⏱  Completed in {elapsed//60}m {elapsed%60}s\n")
@@ -450,10 +452,10 @@ def _run_validation_period(
     print(f"  {'STRATEGY':<35} {'B_WR%':>7} {'F_WR%':>7} {'ΔWR':>7} {'B_PROF':>8} {'F_PROF':>8} {'Δ%':>7} {'B_DD%':>7} {'F_DD%':>7}  {'BINS'}")
     print(f"  {'─'*115}")
 
-    sys_b_profit:          float            = 0.0
-    sys_f_profit:          float            = 0.0
-    pct_imp_per_strategy:  dict[str, float] = {}
-    rows:                  list             = []
+    sys_b_profit         = 0.0
+    sys_f_profit         = 0.0
+    pct_imp_per_strategy : dict[str, float] = {}
+    rows                 = []
 
     for strategy in strategies:
         sid  = strategy['id']
@@ -465,10 +467,9 @@ def _run_validation_period(
         m_b  = {
             'profit':   data['profit_baseline'],
             'win_rate': data['wr_baseline'],
-            'n_trades': data['n_trades_baseline'],
             'max_dd':   data['dd_baseline'],
         }
-        m_f = _run_backtest_with_bins(data['classified'], bins, data['best_params']) if bins else m_b
+        m_f  = _run_backtest_with_bins(data['classified'], bins, data['best_params']) if bins else m_b
 
         dwr   = m_f['win_rate'] - m_b['win_rate']
         dpct  = _pct_improvement(m_f['profit'], m_b['profit'])
@@ -479,9 +480,9 @@ def _run_validation_period(
               f"{dwr:>+6.1f}% {m_b['profit']:>8.1f} {m_f['profit']:>8.1f} "
               f"{color}{dpct:>+6.1f}%{reset} {m_b['max_dd']:>6.1f}% {m_f['max_dd']:>6.1f}%  {_abbrev_bins(bins)}")
 
-        pct_imp_per_strategy[sid] = dpct
-        sys_b_profit             += m_b['profit']
-        sys_f_profit             += m_f['profit']
+        pct_imp_per_strategy[sid]  = dpct
+        sys_b_profit              += m_b['profit']
+        sys_f_profit              += m_f['profit']
         rows.append({'b_wr': m_b['win_rate'], 'f_wr': m_f['win_rate'], 'dwr': dwr,
                      'b_dd': m_b['max_dd'],   'f_dd': m_f['max_dd']})
 
@@ -500,10 +501,6 @@ def _run_validation_period(
         print(f"  {'SYSTEM TOTAL':<35} {avg_b_wr:>6.1f}% {avg_f_wr:>6.1f}% "
               f"{dwr_color}{avg_dwr:>+6.1f}%{reset} {sys_b_profit:>8.1f} {sys_f_profit:>8.1f} "
               f"{color}{sys_pct:>+6.1f}%{reset} {avg_b_dd:>6.1f}% {avg_f_dd:>6.1f}%")
-    else:
-        print(f"  {'─'*115}")
-        print(f"  {'SYSTEM TOTAL':<35} {'':>7} {'':>7} {'':>7} {sys_b_profit:>8.1f} {sys_f_protein:>8.1f} "
-              f"{color}{sys_pct:>+6.1f}%{reset}")
 
     print(f"  {'─'*115}\n")
     return pct_imp_per_strategy
@@ -522,25 +519,24 @@ def _print_consistency_table(
     print(f"\n{'='*100}")
     print(f"  CONSISTENCY — Train vs OOS1")
     print(f"{'='*100}")
-    print(f"  {'STRATEGY':<35} {'TRAIN_Δ%':>10} {'OOS1_Δ%':>10} {'OK':>5}  {'BINS'}")
+    print(f"  {'STRATEGY':<35} {'TRAIN_AVG':>10} {'OOS1_Δ%':>10} {'OK':>5}  {'BINS'}")
     print(f"  {'─'*80}")
-
     consistent   = 0
     inconsistent = 0
-
     for strategy in strategies:
         sid   = strategy['id']
         t_pct = train_pct.get(sid, 0.0)
         o_pct = oos1_pct.get(sid, 0.0)
         bins  = bins_per_strategy.get(sid, set())
-        ok    = t_pct > 0 and o_pct > 0
+        ok    = len(bins) > 0 and o_pct > 0
         icon  = "✅" if ok else "❌"
         color = "\033[92m" if ok else "\033[91m"
         reset = "\033[0m"
-        consistent += 1 if ok else 0
-        inconsistent += 0 if ok else 1
+        if ok:
+            consistent += 1
+        else:
+            inconsistent += 1
         print(f"  {sid:<35} {color}{t_pct:>+9.2f}%{reset} {color}{o_pct:>+9.2f}%{reset} {icon}  {_abbrev_bins(bins)}")
-
     print(f"  {'─'*80}")
     print(f"  Consistent: {consistent} | Inconsistent: {inconsistent}\n")
 
@@ -549,12 +545,19 @@ def _print_consistency_table(
 # PERSIST
 # =============================================================================
 
-def _save_session_bins(bins_per_strategy: dict[str, set], train_keys: list[str]) -> None:
+def _save_bins(bins_per_strategy: dict[str, set], train_keys: list[str]) -> None:
     lines = [
-        f"# Auto-generated by session03_bin_search.py",
+        f"# Auto-generated by bin_volstd.py",
+        f"# Short window: {VOL_SHORT_WINDOW} | Long window: {VOL_LONG_WINDOW} | Low<{VOL_LOW_TH}x | High>{VOL_HIGH_TH}x",
         f"# Train: {' + '.join(train_keys)}",
+        f"# Match mode: {MATCH_MODE}" + (f" | min_periods={MIN_PERIODS_MATCH}" if MATCH_MODE == 'exact' else ""),
         f"",
-        f"SESSION_BINS_MAP = {{",
+        f"VOL_SHORT_WINDOW = {VOL_SHORT_WINDOW}",
+        f"VOL_LONG_WINDOW  = {VOL_LONG_WINDOW}",
+        f"VOL_LOW_TH       = {VOL_LOW_TH}",
+        f"VOL_HIGH_TH      = {VOL_HIGH_TH}",
+        f"",
+        f"REGIME_BINS = {{",
     ]
     for sid, bins in sorted(bins_per_strategy.items()):
         bins_str = "{" + ", ".join(f'"{b}"' for b in sorted(bins)) + "}"
@@ -563,7 +566,7 @@ def _save_session_bins(bins_per_strategy: dict[str, set], train_keys: list[str])
 
     with open(BINS_OUTPUT_PATH, "w") as f:
         f.write("\n".join(lines) + "\n")
-    print(f"  ✅ Session bins saved to: {BINS_OUTPUT_PATH}")
+    print(f"  ✅ Bins saved to: {BINS_OUTPUT_PATH}")
 
 
 # =============================================================================
@@ -571,8 +574,4 @@ def _save_session_bins(bins_per_strategy: dict[str, set], train_keys: list[str])
 # =============================================================================
 
 if __name__ == "__main__":
-    if MODE == 'search_by_tf':
-        run_search_by_tf(TRAIN_KEYS, VALIDATE_KEY)
-
-    elif MODE == 'analyze_by_tf':
-        run_analyze_by_tf(TRAIN_KEYS, VALIDATE_KEY, FIXED_BINS_BY_STRATEGY)
+    run_volstd_search(TRAIN_KEYS, VALIDATE_KEY)

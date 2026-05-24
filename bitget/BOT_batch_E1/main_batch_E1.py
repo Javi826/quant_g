@@ -28,7 +28,7 @@ logger = logging.getLogger("BOT_batch.main_batch")
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = False
+SHOW_PLOTS    = True
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
@@ -75,13 +75,10 @@ N_PATHS_IS           = 1
 # ELITE -- MA4
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 10
-OOS_MAX_DD_TH        = 25
-OOS_R2_TH            = 0.001 
+OOS_NETGAIN_TH       = 18
+OOS_MAX_DD_TH        = 15
+OOS_R2_TH            = 0.43
 
-OOS_NETGAIN_TH       = 10
-OOS_MAX_DD_TH        = 25
-OOS_R2_TH            = 0.001      
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -177,7 +174,7 @@ N_PATHS_OOS1        = 500
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.7
+CORRELATION_DD_THRESHOLD = 0.75
 
 # FILES
 #------------------------------------------------------------------------------
@@ -190,7 +187,7 @@ CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
 DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
-REGIME_BINS_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"regime_bins_{STRATEGIES_SET_NAME}.py")
+REGIME_BINS_PATH           = os.path.join(os.path.dirname(__file__), "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"regime_bins_{STRATEGIES_SET_NAME}.py")
 
 # DATA
 #------------------------------------------------------------------------------
