@@ -20,7 +20,7 @@ from shared_batch_regime.regime_GE_core import pct_improvement, is_trending, com
 from shared_batch_regime.regime_GE_core import load_strategies_config
 
 from shared_batch_regime.regime_GE_core import load_ohlcv_for_period, run_backtest, precompute_baselines
-from shared_batch_regime.regime_GE_core import build_indicator_cache, classify_strategy, print_combo_period_table
+from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, print_combo_period_table
 
 from shared_batch_regime.regime_GE_core import lookup_indicators
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
@@ -36,9 +36,10 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 
-ANALYSIS_MODE = "SYMBOL"   # "BTC" | "SYMBOL"
-BTC_TIMEFRAME = "1Dutc"
-COMBINE_MODES = ["OR"]     # single value used at runtime: COMBINE_MODES[0]
+ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
+BTC_TIMEFRAME         = "1Dutc"
+REGIME_TIMEFRAME_MODE = "STRATEGY"    # "DAILY" | "STRATEGY"
+COMBINE_MODES         = ["OR"]     # single value used at runtime: COMBINE_MODES[0]
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -54,7 +55,7 @@ INDICATORS: dict[str, dict] = {
     "hurst": {
         "windows":    [30],
         "thresholds": [0.8],
-        "enabled":    False,
+        "enabled":    True,
     },
 }
 
@@ -92,15 +93,16 @@ def _active_config() -> tuple[dict[str, int], dict[str, float], str]:
 # =============================================================================
 
 def _print_lookahead_debug(
-    strategy_id: str,
-    period_key:  str,
-    sym:         str,
-    arr:         dict,
-    ts_arr:      np.ndarray,
-    values_arr:  dict[str, np.ndarray],
-    thresholds:  dict[str, float],
-    mode:        str,
-    signals:     np.ndarray,
+    strategy_id:        str,
+    period_key:         str,
+    sym:                str,
+    arr:                dict,
+    ts_arr:             np.ndarray,
+    values_arr:         dict[str, np.ndarray],
+    thresholds:         dict[str, float],
+    mode:               str,
+    signals:            np.ndarray,
+    strategy_timeframe: str | None = None,
 ) -> None:
     signal_idxs = np.nonzero(signals)[0][:DEBUG_LOOKAHEAD_N]
     if len(signal_idxs) == 0:
@@ -115,7 +117,7 @@ def _print_lookahead_debug(
     print(f"  Indicators: {ind_info}")
     print(f"  MODE={mode}")
     print(f"{'='*120}")
-    print(f"  {'#':>3}  {'SIGNAL_TS':<26}  {'BTC_CANDLE_TS':<26}  {col_headers}  {'TRENDING':>8}")
+    print(f"  {'#':>3}  {'SIGNAL_TS':<26}  {'IND_CANDLE_TS':<26}  {col_headers}  {'TRENDING':>8}")
     print(f"  {'─'*110}")
 
     for n, sig_idx in enumerate(signal_idxs, 1):
@@ -123,20 +125,20 @@ def _print_lookahead_debug(
         if signal_ts.tzinfo is None:
             signal_ts = signal_ts.tz_localize("UTC")
 
-        indicator_values = lookup_indicators(ts_arr, values_arr, signal_ts)
-
-        ts_norm  = signal_ts.normalize() - pd.Timedelta(days=1)
-        ts_norm  = ts_norm.tz_localize("UTC") if ts_norm.tzinfo is None else ts_norm
-        idx      = np.searchsorted(ts_arr, np.datetime64(ts_norm.value, "ns"), side="right") - 1
-        btc_ts   = pd.Timestamp(ts_arr[idx]).tz_localize("UTC") if idx >= 0 else None
+        indicator_values, lookup_idx = lookup_indicators(
+            ts_arr, values_arr, signal_ts,
+            timeframe=strategy_timeframe if REGIME_TIMEFRAME_MODE == "STRATEGY" else None,
+            return_idx=True,
+        )
+        ind_ts = pd.Timestamp(ts_arr[lookup_idx]).tz_localize("UTC") if lookup_idx >= 0 else None
 
         trending   = is_trending(indicator_values, thresholds, mode)
         val_cols   = "  ".join(
             f"{indicator_values[k]:>8.4f}" if indicator_values.get(k) is not None else f"{'—':>8}"
             for k in active_keys
         )
-        btc_ts_str = str(btc_ts) if btc_ts else "NO BTC DATA"
-        print(f"  {n:>3}  {str(signal_ts):<26}  {btc_ts_str:<26}  {val_cols}  {str(trending):>8}")
+        ind_ts_str = str(ind_ts) if ind_ts else "NO DATA"
+        print(f"  {n:>3}  {str(signal_ts):<26}  {ind_ts_str:<26}  {val_cols}  {str(trending):>8}")
 
     print(f"  {'─'*110}\n")
 
@@ -145,13 +147,11 @@ def _print_lookahead_debug(
 # FILTERED ARRAYS BUILDER
 # =============================================================================
 
- 
- 
-DEBUG_SIGNALS_STRATEGY = "27_flag_long_4H"
+DEBUG_SIGNALS_STRATEGY = "02_reversal_short_15m"
 DEBUG_SIGNALS_SYMBOL   = "BTCUSDT"
 DEBUG_SIGNALS_N        = 10
- 
- 
+
+
 def _build_filtered_arrays(
     ohlcv_arrays:    dict,
     strategy:        dict,
@@ -161,33 +161,39 @@ def _build_filtered_arrays(
     period_key:      str,
 ) -> tuple[dict, dict, dict, float]:
     """
-    Build baseline, filter_trending and filter_ranging signal arrays.
+    Build baseline, trending and ranging signal arrays.
+    - trending_arrays: signals where market IS trending     (blocks ranging signals)
+    - ranging_arrays:  signals where market IS NOT trending (blocks trending signals)
     Returns (baseline_arrays, trending_arrays, ranging_arrays, trending_pct).
     """
     global DEBUG_LOOKAHEAD_DONE
- 
+
     baseline_arrays = {}
     trending_arrays = {}
     ranging_arrays  = {}
     n_trending      = 0
     n_ranging       = 0
- 
+
     btc_cache = indicator_cache.get("BTCUSDT") if ANALYSIS_MODE == "BTC" else None
- 
+
     _debug_signals = (
         logger.isEnabledFor(logging.DEBUG)
         and strategy['id'] == DEBUG_SIGNALS_STRATEGY
     )
- 
+
     for sym, arr in ohlcv_arrays.items():
         signals     = strategy['signal_fn'](arr, **strategy['signal_params'], live_trading=False)
         signal_idxs = np.nonzero(signals)[0]
- 
+
         filt_t = signals.copy()
         filt_r = signals.copy()
- 
+
         if ANALYSIS_MODE == "SYMBOL":
-            sym_cache = indicator_cache.get(sym)
+            sym_cache = (
+                        indicator_cache.get((sym, strategy['timeframe']))
+                        if REGIME_TIMEFRAME_MODE == "STRATEGY"
+                        else indicator_cache.get(sym)
+                    )
             if sym_cache is None:
                 filt_t[:] = 0
                 n_trending += int(signals.sum())
@@ -198,18 +204,19 @@ def _build_filtered_arrays(
             ts_arr, values_arr = sym_cache
         else:
             ts_arr, values_arr = btc_cache
- 
+
         if not DEBUG_LOOKAHEAD_DONE and logger.isEnabledFor(logging.DEBUG) and strategy['id'] == DEBUG_SIGNALS_STRATEGY:
             _print_lookahead_debug(
                 strategy['id'], period_key, sym, arr,
                 ts_arr, values_arr, thresholds, mode, signals,
+                strategy_timeframe=strategy['timeframe'],
             )
             DEBUG_LOOKAHEAD_DONE = True
- 
+
         _debug_this_sym = _debug_signals and sym == DEBUG_SIGNALS_SYMBOL
         _debug_count    = 0
         _ind_src        = "BTCUSDT" if ANALYSIS_MODE == "BTC" else sym
- 
+
         if _debug_this_sym:
             active_keys = list(values_arr.keys())
             col_ind     = "  ".join(f"{k.upper():>9}" for k in active_keys)
@@ -219,18 +226,23 @@ def _build_filtered_arrays(
             logger.debug(f"{'='*140}")
             logger.debug(f"  {'TIMESTAMP':<28}  {'BASELINE':>8}  {'FILT_T':>6}  {'FILT_R':>6}  {col_ind}  {'TRENDING':>8}  {'IND_SRC':<10}")
             logger.debug(f"  {'─'*140}")
- 
+
         for idx in signal_idxs:
-            indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(arr['ts'][idx]))
+            indicator_values = lookup_indicators(
+                ts_arr, values_arr, pd.Timestamp(arr['ts'][idx]),
+                timeframe=strategy['timeframe'] if REGIME_TIMEFRAME_MODE == "STRATEGY" else None,
+            )
             trending         = is_trending(indicator_values, thresholds, mode)
- 
+
             if trending:
-                filt_t[idx] = 0
+                # Market is trending → keep in trending_arrays, block from ranging_arrays
+                filt_r[idx] = 0
                 n_trending  += 1
             else:
-                filt_r[idx] = 0
+                # Market is ranging → keep in ranging_arrays, block from trending_arrays
+                filt_t[idx] = 0
                 n_ranging   += 1
- 
+
             if _debug_this_sym:
                 if _debug_count >= DEBUG_SIGNALS_N:
                     continue
@@ -249,22 +261,21 @@ def _build_filtered_arrays(
                     f"{_ind_src:<10}"
                 )
                 _debug_count += 1
- 
+
         if _debug_this_sym:
             n_sig     = len(signal_idxs)
             n_trend_s = int(np.sum(filt_t[signal_idxs] == 0))
             n_range_s = int(np.sum(filt_r[signal_idxs] == 0))
             logger.debug(f"  {'─'*130}")
-            logger.debug(f"  TOTAL signals={n_sig}  blocked_by_trending={n_trend_s}  blocked_by_ranging={n_range_s}\n")
- 
+            logger.debug(f"  TOTAL signals={n_sig}  blocked_by_ranging={n_trend_s}  blocked_by_trending={n_range_s}\n")
+
         baseline_arrays[sym] = {**arr, 'signal': signals}
         trending_arrays[sym] = {**arr, 'signal': filt_t}
         ranging_arrays[sym]  = {**arr, 'signal': filt_r}
- 
+
     total        = n_trending + n_ranging
     trending_pct = n_trending / max(total, 1) * 100
     return baseline_arrays, trending_arrays, ranging_arrays, trending_pct
-
 
 
 # =============================================================================
@@ -288,23 +299,23 @@ def _debug_print_trending_arrays(
     if sym not in baseline_arrays or sym not in trending_arrays:
         logger.debug(f"  [TRENDING ARRAY DEBUG] symbol {sym} not found")
         return
- 
+
     ts    = baseline_arrays[sym]['ts']
     sig_b = baseline_arrays[sym]['signal']
     sig_t = trending_arrays[sym]['signal']
- 
+
     logger.debug(f"\n  {'='*80}")
     logger.debug(f"  TRENDING ARRAY DEBUG — strategy={strategy_id} | period={period_key} | symbol={sym}")
     logger.debug(f"  Columns: BASELINE=signal_fn output | TRENDING_REGIME=is_trending result | FILT_T=enters backtester")
     logger.debug(f"  {'='*80}")
     logger.debug(f"  {'TIMESTAMP':<28}  {'BASELINE':>8}  {'TRENDING_REGIME':>15}  {'FILT_T':>6}")
     logger.debug(f"  {'─'*65}")
- 
+
     count = 0
     for i in range(len(ts)):
         if sig_b[i] == 0:
             continue
-        trending_regime = sig_t[i] == 0
+        trending_regime = sig_t[i] != 0
         logger.debug(
             f"  {str(pd.Timestamp(ts[i])):<28}  "
             f"{int(sig_b[i]):>8}  "
@@ -314,12 +325,12 @@ def _debug_print_trending_arrays(
         count += 1
         if count >= n:
             break
- 
+
     signal_rows = int(np.sum(sig_b != 0))
     logger.debug(f"  {'─'*65}")
     logger.debug(f"  showing {count} of {signal_rows} signal rows\n")
- 
- 
+
+
 def _evaluate_period(
     strategy:        dict,
     period_key:      str,
@@ -330,41 +341,43 @@ def _evaluate_period(
     ohlcv_data = load_ohlcv_for_period(strategy, period_key)
     if not ohlcv_data:
         return None
- 
+
     ohlcv_arrays = prepare_ohlcv_arrays(ohlcv_data)
- 
+
     baseline_arrays, trending_arrays, ranging_arrays, trending_pct = _build_filtered_arrays(
         ohlcv_arrays, strategy, indicator_cache, thresholds, mode, period_key,
     )
- 
+
     _debug_arrays = (
         logger.isEnabledFor(logging.DEBUG)
         and strategy['id'] == DEBUG_SIGNALS_STRATEGY
     )
- 
+
     if _debug_arrays:
         _debug_print_trending_arrays(
             baseline_arrays, trending_arrays,
             DEBUG_SIGNALS_SYMBOL, DEBUG_SIGNALS_N,
             period_key, strategy['id'],
         )
- 
+
     m_b = run_backtest(baseline_arrays, strategy['best_params'])
     m_t = run_backtest(trending_arrays, strategy['best_params'])
     m_r = run_backtest(ranging_arrays,  strategy['best_params'])
- 
+
     return {
         'baseline':     m_b,
         'trending':     m_t,
         'ranging':      m_r,
         'trending_pct': trending_pct,
     }
+
+
 # =============================================================================
 # PRINT HELPERS
 # =============================================================================
 
 def _print_consistency_table(strategy_results: dict) -> None:
-    for filter_key, filter_label in [("ranging_prof", "RANGING PASS"), ("trending_prof", "TRENDING PASS")]:
+    for filter_key, filter_label in [("trending_prof", "TRENDING PASS"), ("ranging_prof", "RANGING PASS")]:
         print(f"\n{'='*120}")
         print(f"  STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {filter_label}")
         print(f"{'='*120}")
@@ -469,7 +482,11 @@ def run(eval_keys: list[str]) -> None:
         print("  No strategies passed the baseline filter — aborting.")
         return
 
-    indicator_cache = build_indicator_cache(baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE)
+    indicator_cache = (
+    build_indicator_cache_by_timeframe(baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE)
+    if REGIME_TIMEFRAME_MODE == "STRATEGY"
+    else build_indicator_cache(baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE)
+)
 
     label             = combo_label(active_keys, windows, thresholds, mode)
     strategy_results: dict[str, dict] = {}
@@ -492,13 +509,12 @@ def run(eval_keys: list[str]) -> None:
             if sid not in results:
                 results[sid] = {'is_long': strategy['is_long']}
             results[sid][period_key] = {
-            # NUEVO
-            'b_prof': m_b['profit'], 'ranging_prof': m_t['profit'], 'trending_prof': m_r['profit'],
-            'b_dd':   m_b['max_dd'], 'ranging_dd':   m_t['max_dd'], 'trending_dd':   m_r['max_dd'],
-            'b_wr':   m_b['win_rate'], 'ranging_wr':  m_t['win_rate'], 'trending_wr':  m_r['win_rate'],
-                'trending_pct': trending_pct,
-                'ranging_pass_pct':  100 - trending_pct,
+                'b_prof':            m_b['profit'],   'trending_prof': m_t['profit'],   'ranging_prof': m_r['profit'],
+                'b_dd':              m_b['max_dd'],   'trending_dd':   m_t['max_dd'],   'ranging_dd':   m_r['max_dd'],
+                'b_wr':              m_b['win_rate'], 'trending_wr':   m_t['win_rate'], 'ranging_wr':   m_r['win_rate'],
+                'trending_pct':      trending_pct,
                 'trending_pass_pct': trending_pct,
+                'ranging_pass_pct':  100 - trending_pct,
             }
             logger.debug(f"  [n_trades] {sid} {period_key}: baseline={m_b['n_trades']}")
 

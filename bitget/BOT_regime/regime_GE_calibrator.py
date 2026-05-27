@@ -17,14 +17,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from shared_batch_regime.regime_GE_core import EVAL_KEYS,pct_improvement
 from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
-
+from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, combined_metrics
 from shared_batch_regime.regime_GE_core import precompute_baselines
-from shared_batch_regime.regime_GE_core import build_indicator_cache, classify_strategy, combined_metrics
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
 
 from shared_batch_regime.regime_GE_core import run_backtest
 from shared_batch_regime.regime_GE_core import lookup_indicators
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+
 import numpy as np
 import pandas as pd
 
@@ -35,6 +34,7 @@ import pandas as pd
 ANALYSIS_MODE = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME = "1Dutc"
 COMBINE_MODES = ["AND","OR"]
+REGIME_TIMEFRAME_MODE = "STRATEGY"    # "DAILY" | "STRATEGY"
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -44,27 +44,50 @@ PERIOD_WEIGHTS = {
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10,20],
+        "windows":    [10,30],
         "thresholds": [0.04,0.06,0.08],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,30],
+        "windows":    [10,50],
         "thresholds": [0.4,0.6,0.8],
         "enabled":    True,
     },
     "hurst": {
-        "windows":    [30],
-        "thresholds": [0.4,0.6,0.8],
+        "windows":    [30,80],
+        "thresholds": [0.2,0.4,0.6],
         "enabled":    True,
     },
 }
+
+# =============================================================================
+# INDICATORS: dict[str, dict] = {
+#     "atr_norm": {
+#         "windows":    [10],
+#         "thresholds": [0.04],
+#         "enabled":    True,
+#     },
+#     "er": {
+#         "windows":    [10],
+#         "thresholds": [0.6],
+#         "enabled":    True,
+#     },
+#     "hurst": {
+#         "windows":    [30],
+#         "thresholds": [0.8],
+#         "enabled":    True,
+#     },
+# }
+# =============================================================================
+
+
 
 ORDER_AMOUNT     = 80
 LONG_KEYWORD     = "long"
 DEBUG_TF_FILTER: list[str] = []
 
 logging.basicConfig(format="%(message)s", level=logging.WARNING)
+#logging.basicConfig(format="%(message)s", level=logging.DEBUG, force=True)
 logger = logging.getLogger(__name__)
 
 
@@ -132,7 +155,11 @@ def _run_filtered_combo(
                 filt_r  = signals.copy()
 
                 if ANALYSIS_MODE == "SYMBOL":
-                    sym_cache = indicator_cache.get(sym)
+                    sym_cache = (
+                                indicator_cache.get((sym, strategy['timeframe']))
+                                if REGIME_TIMEFRAME_MODE == "STRATEGY"
+                                else indicator_cache.get(sym)
+                                )
                     if sym_cache is None:
                         filt_r[:] = 0
                         n_ranging += int(signals.sum())
@@ -162,9 +189,9 @@ def _run_filtered_combo(
             trending_pct = n_trending / max(total, 1) * 100
 
             results[sid][period_key] = {
-                'b_prof':            m_base['profit'],   'ranging_prof':  m_t['profit'],   'trending_prof':  m_r['profit'],
-                'b_dd':              m_base['max_dd'],   'ranging_dd':    m_t['max_dd'],   'trending_dd':    m_r['max_dd'],
-                'b_wr':              m_base['win_rate'], 'ranging_wr':    m_t['win_rate'], 'trending_wr':    m_r['win_rate'],
+            'b_prof':  m_base['profit'],   'trending_prof': m_t['profit'],   'ranging_prof':  m_r['profit'],
+            'b_dd':    m_base['max_dd'],   'trending_dd':   m_t['max_dd'],   'ranging_dd':    m_r['max_dd'],
+            'b_wr':    m_base['win_rate'], 'trending_wr':   m_t['win_rate'], 'ranging_wr':    m_r['win_rate'],
                 'trending_pct':      trending_pct,
                 'ranging_pass_pct':  100 - trending_pct,
                 'trending_pass_pct': trending_pct,
@@ -250,9 +277,14 @@ def run() -> None:
         print(f"{'='*120}")
 
         if win_key not in indicator_cache_map:
-            indicator_cache_map[win_key] = build_indicator_cache(
-                baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE
-            )
+            if REGIME_TIMEFRAME_MODE == "STRATEGY":
+                indicator_cache_map[win_key] = build_indicator_cache_by_timeframe(
+                    baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE
+                )
+            else:
+                indicator_cache_map[win_key] = build_indicator_cache(
+                    baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE
+                )
         indicator_cache = indicator_cache_map[win_key]
 
         results = _run_filtered_combo(baselines, strategies_filtered, indicator_cache, thresholds, mode)

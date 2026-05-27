@@ -1,14 +1,5 @@
-#shared/shared_batch_regime/regime/regime_GE_core.py
-"""
-Core shared functions for the GE regime system.
-Imported by:
-  - regime_GE_calibration.py  (grid search calibration)
-  - regime_GE.py              (dual filter + classification + bins persistence)
-  - regime_GE_module.py       (main_batch integration)
+#shared/shared_batch_regime/regime_GE_core.py
 
-Indicator calculations delegated to:
-  - shared_trading_batch_regime.regime_metrics
-"""
 import os
 import logging
 import numpy as np
@@ -25,29 +16,22 @@ logger = logging.getLogger(__name__)
 # PATHS
 # =============================================================================
 
-_BITGET = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-_BASE   = os.path.join(_BITGET, "data_pipeline", "data", "04_split_OLD", "expanding")
-
+from shared_batch_regime.config_paths import BITGET_ROOT, DATA_FOLDER_IS, DATA_FOLDER_OOS1, DATA_FOLDER_OOS2, DATA_FOLDER_OOS3, CRYPTO_FULL_DIR
 PERIODS = {
-    "IS":   os.path.join(_BASE, "IS",  "crypto_2024-01_2025-05_IS"),
-    "OOS1": os.path.join(_BASE, "OOS", "crypto_2025-05_2026-05_OOS"),
-    "OOS2": os.path.join(_BASE, "OOS", "crypto_2022-01_2023-01_OOS"),
-    "OOS3": os.path.join(_BASE, "OOS", "crypto_2023-01_2024-01_OOS"),
+    "IS":   DATA_FOLDER_IS,
+    "OOS1": DATA_FOLDER_OOS1,
+    "OOS2": DATA_FOLDER_OOS2,
+    "OOS3": DATA_FOLDER_OOS3,
 }
-
-DATA_FOLDER_IS  = PERIODS["IS"]
-CRYPTO_FULL_DIR = os.path.join(_BASE, "IS", "crypto_full_IS")
-
 EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
 
 # =============================================================================
 # STRATEGY CONFIG PATHS  (set per batch)
 # =============================================================================
-
 STRATEGIES_SET_NAME  = "E1"
-SYMBOLS_LIVE_FOLDER  = os.path.join(_BITGET, "BOT_trading", "symbols_live", "E1")
+SYMBOLS_LIVE_FOLDER  = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", "E1")
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-STRATEGIES_LOOP_PATH = os.path.join(_BITGET, "BOT_batch_E1", "strategies_files", f"{STRATEGIES_LOOP_NAME}.py")
+STRATEGIES_LOOP_PATH = os.path.join(BITGET_ROOT, "BOT_batch_E1", "strategies_files", f"{STRATEGIES_LOOP_NAME}.py")
 
 BTC_TIMEFRAME    = "1Dutc"
 LONG_KEYWORD     = "long"
@@ -200,10 +184,71 @@ def load_ohlcv_for_period(strategy: dict, period_key: str) -> dict:
     logger.debug(f"[symbols] {strategy['id']} {period_key}: {sorted(ohlcv_oos.keys())}")
     return ohlcv_oos
 
+def load_ohlcv_raw(symbol: str, timeframe: str) -> pd.DataFrame:
+    """Load OHLCV from CRYPTO_FULL_DIR for a given symbol and timeframe."""
+    path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{timeframe}.parquet")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    df = pd.read_parquet(path)
+    df.columns = [c.lower().strip() for c in df.columns]
+    if df.index.name and df.index.name.lower() in ("timestamp", "ts", "date", "time"):
+        df.index.name = "ts"
+        df = df.reset_index()
+    if "volume_base" in df.columns and "volume_quote" in df.columns:
+        df.drop(columns=["volume_base"], inplace=True)
+    rename_map = {"timestamp": "ts", "open_time": "ts", "date": "ts", "time": "ts",
+                  "volume_quote": "volume", "vol": "volume"}
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
+    df["ts"] = pd.to_datetime(df["ts"], errors="coerce")
+    df["ts"] = df["ts"].dt.tz_localize("UTC") if df["ts"].dt.tz is None else df["ts"].dt.tz_convert("UTC")
+    df.dropna(subset=["ts"], inplace=True)
+    df.sort_values("ts", inplace=True)
+    df.drop_duplicates(subset=["ts"], keep="last", inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    for col in ("open", "high", "low", "close"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df.dropna(subset=["close"], inplace=True)
+    return df
 
 # =============================================================================
 # INDICATOR CACHE
 # =============================================================================
+
+
+def build_indicator_cache_by_timeframe(
+    baselines:     dict,
+    strategies:    list[dict],
+    windows:       dict[str, int],
+    analysis_mode: str = "SYMBOL",
+) -> dict[str, tuple]:
+    """
+    Build {(symbol, timeframe): (ts_arr, values_arr)} using each strategy's own timeframe.
+    analysis_mode: "SYMBOL" only — BTC mode not supported for per-timeframe cache.
+    """
+    cache: dict[tuple, tuple] = {}
+
+    symbols_by_timeframe: dict[str, set] = {}
+    for strategy in strategies:
+        tf = strategy['timeframe']
+        for period_key in EVAL_KEYS:
+            if period_key in baselines.get(strategy['id'], {}):
+                for sym in baselines[strategy['id']][period_key]['ohlcv_arrays']:
+                    symbols_by_timeframe.setdefault(tf, set()).add(sym)
+
+    for tf, symbols in symbols_by_timeframe.items():
+        for sym in sorted(symbols):
+            key = (sym, tf)
+            if key in cache:
+                continue
+            path = os.path.join(CRYPTO_FULL_DIR, f"{sym}_{tf}.parquet")
+            if not os.path.exists(path):
+                continue
+            df = load_ohlcv_raw(sym, tf)
+            if not df.empty:
+                cache[key] = precompute_indicators(df, windows)
+
+    return cache
 
 def build_indicator_cache(
     baselines:     dict,
@@ -315,14 +360,16 @@ def classify_strategy(results: dict, sid: str) -> str:
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
         return "neutral"
-    t_all = all(data[pk]['ranging_prof']  > data[pk]['b_prof'] for pk in periods_with_data)
-    r_all = all(data[pk]['trending_prof'] > data[pk]['b_prof'] for pk in periods_with_data)
+    # trending_prof: backtest with trending-only signals → strategy improves in trending market
+    # ranging_prof:  backtest with ranging-only signals  → strategy improves in ranging market
+    t_all = all(data[pk]['trending_prof'] > data[pk]['b_prof'] for pk in periods_with_data)
+    r_all = all(data[pk]['ranging_prof']  > data[pk]['b_prof'] for pk in periods_with_data)
     if t_all and r_all:
         return "both"
     if t_all:
-        return "ranging"
-    if r_all:
         return "trending"
+    if r_all:
+        return "ranging"
     return "neutral"
 
 
@@ -363,8 +410,8 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
     print(f"\n  {'─'*120}")
     print(f"  {combo_label}  |  PERIOD: {period_key}")
     print(f"  {'─'*120}")
-    print(f"  {'STRATEGY':<35} {'B_PROF':>8} {'RANGING':>8} {'RNG_Δ%':>7} {'TRENDING':>9} {'TRD_Δ%':>7} "
-          f"{'B_DD%':>7} {'RNG_DD%':>8} {'TRD_DD%':>8} {'TREND%':>7}")
+    print(f"  {'STRATEGY':<35} {'B_PROF':>8} {'TRENDING':>9} {'TRD_Δ%':>7} {'RANGING':>8} {'RNG_Δ%':>7} "
+          f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
     print(f"  {'─'*120}")
     sys_b = sys_t = sys_r = 0.0
     dd_b, dd_t, dd_r, trend_pcts = [], [], [], []
@@ -375,18 +422,18 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
         if not isinstance(results[sid][period_key], dict):
             continue
         d     = results[sid][period_key]
-        t_pct = pct_improvement(d['ranging_prof'],  d['b_prof'])
-        r_pct = pct_improvement(d['trending_prof'], d['b_prof'])
+        t_pct = pct_improvement(d['trending_prof'], d['b_prof'])
+        r_pct = pct_improvement(d['ranging_prof'],  d['b_prof'])
         tc    = "\033[92m" if t_pct > 0 else "\033[91m"
         rc    = "\033[92m" if r_pct > 0 else "\033[91m"
         rs    = "\033[0m"
-        print(f"  {sid:<35} {d['b_prof']:>8.1f} {d['ranging_prof']:>8.1f} "
-              f"{tc}{t_pct:>+6.1f}%{rs} {d['trending_prof']:>9.1f} "
+        print(f"  {sid:<35} {d['b_prof']:>8.1f} {d['trending_prof']:>9.1f} "
+              f"{tc}{t_pct:>+6.1f}%{rs} {d['ranging_prof']:>8.1f} "
               f"{rc}{r_pct:>+6.1f}%{rs} {d['b_dd']:>6.1f}% "
-              f"{d['ranging_dd']:>7.1f}% {d['trending_dd']:>7.1f}% "
+              f"{d['trending_dd']:>7.1f}% {d['ranging_dd']:>7.1f}% "
               f"{d['trending_pct']:>6.1f}%")
-        sys_b += d['b_prof'];  sys_t += d['ranging_prof'];  sys_r += d['trending_prof']
-        dd_b.append(d['b_dd']); dd_t.append(d['ranging_dd']); dd_r.append(d['trending_dd'])
+        sys_b += d['b_prof'];  sys_t += d['trending_prof'];  sys_r += d['ranging_prof']
+        dd_b.append(d['b_dd']); dd_t.append(d['trending_dd']); dd_r.append(d['ranging_dd'])
         trend_pcts.append(d['trending_pct'])
     t_pct_s   = pct_improvement(sys_t, sys_b)
     r_pct_s   = pct_improvement(sys_r, sys_b)
@@ -395,38 +442,38 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
     rc = "\033[92m" if r_pct_s > 0 else "\033[91m"
     rs = "\033[0m"
     print(f"  {'─'*110}")
-    print(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f} {sys_t:>8.1f} "
-          f"{tc}{t_pct_s:>+6.1f}%{rs} {sys_r:>9.1f} "
+    print(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f} {sys_t:>9.1f} "
+          f"{tc}{t_pct_s:>+6.1f}%{rs} {sys_r:>8.1f} "
           f"{rc}{r_pct_s:>+6.1f}%{rs} "
           f"{sum(dd_b)/len(dd_b) if dd_b else 0:>6.1f}% "
           f"{sum(dd_t)/len(dd_t) if dd_t else 0:>7.1f}% "
           f"{sum(dd_r)/len(dd_r) if dd_r else 0:>7.1f}% {avg_trend:>6.1f}%")
     return {
-        'sys_b':          sys_b,
-        'sys_ranging':    sys_t,
-        'sys_trending':   sys_r,
-        'ranging_pct':    t_pct_s,
-        'trending_pct':   r_pct_s,
-        'avg_dd_b':       sum(dd_b)/len(dd_b) if dd_b else 0.0,
-        'avg_dd_ranging': sum(dd_t)/len(dd_t) if dd_t else 0.0,
-        'avg_dd_trending':sum(dd_r)/len(dd_r) if dd_r else 0.0,
-        'avg_trend_pct':  avg_trend,
+        'sys_b':           sys_b,
+        'sys_trending':    sys_t,
+        'sys_ranging':     sys_r,
+        'trending_pct':    t_pct_s,
+        'ranging_pct':     r_pct_s,
+        'avg_dd_b':        sum(dd_b)/len(dd_b) if dd_b else 0.0,
+        'avg_dd_trending': sum(dd_t)/len(dd_t) if dd_t else 0.0,
+        'avg_dd_ranging':  sum(dd_r)/len(dd_r) if dd_r else 0.0,
+        'avg_trend_pct':   avg_trend,
     }
 
 
 def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, base_p, base_dd, label):
     print(f"\n  COMBO SUMMARY — {label}")
-    print(f"  {'PERIOD':<8} {'B_PROF':>10} {'RANGING':>10} {'RNG_Δ%':>7} {'TRENDING':>10} {'TRD_Δ%':>7} "
-          f"{'B_DD%':>7} {'RNG_DD%':>8} {'TRD_DD%':>8} {'TREND%':>7}")
+    print(f"  {'PERIOD':<8} {'B_PROF':>10} {'TRENDING':>10} {'TRD_Δ%':>7} {'RANGING':>10} {'RNG_Δ%':>7} "
+          f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
     print(f"  {'─'*95}")
     for pk, s in period_summaries.items():
-        tc = "\033[92m" if s['ranging_pct']  > 0 else "\033[91m"
-        rc = "\033[92m" if s['trending_pct'] > 0 else "\033[91m"
+        tc = "\033[92m" if s['trending_pct'] > 0 else "\033[91m"
+        rc = "\033[92m" if s['ranging_pct']  > 0 else "\033[91m"
         rs = "\033[0m"
-        print(f"  {pk:<8} {s['sys_b']:>10.1f} {s['sys_ranging']:>10.1f} "
-              f"{tc}{s['ranging_pct']:>+6.1f}%{rs} {s['sys_trending']:>10.1f} "
-              f"{rc}{s['trending_pct']:>+6.1f}%{rs} {s['avg_dd_b']:>6.1f}% "
-              f"{s['avg_dd_ranging']:>7.1f}% {s['avg_dd_trending']:>7.1f}% {s['avg_trend_pct']:>6.1f}%")
+        print(f"  {pk:<8} {s['sys_b']:>10.1f} {s['sys_trending']:>10.1f} "
+              f"{tc}{s['trending_pct']:>+6.1f}%{rs} {s['sys_ranging']:>10.1f} "
+              f"{rc}{s['ranging_pct']:>+6.1f}%{rs} {s['avg_dd_b']:>6.1f}% "
+              f"{s['avg_dd_trending']:>7.1f}% {s['avg_dd_ranging']:>7.1f}% {s['avg_trend_pct']:>6.1f}%")
     print(f"  {'─'*95}")
     comb_pct = pct_improvement(comb_p, base_p)
     cc = "\033[92m" if comb_pct > 0 else "\033[91m"
@@ -434,6 +481,7 @@ def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, b
     print(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  BOTH:{n_b}  NEUTRAL:{n_n}")
     print(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
     print(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {cc}Delta={comb_pct:>+6.1f}%{rs}")
+
 
 def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
     col_w  = {k: max(len(f"{k.upper()}_W"), 5) for k in active_keys}
@@ -490,6 +538,7 @@ def load_regime_bins_ge(bins_path: str, strategy_id: str) -> str:
     spec.loader.exec_module(module)
     bins = getattr(module, "REGIME_BINS", {})
     return bins.get(strategy_id, "neutral")
+
 
 # =============================================================================
 # TIME-SERIES PRECOMPUTATION
@@ -558,17 +607,25 @@ def lookup_indicators(
     ts_arr:     np.ndarray,
     values_arr: dict[str, np.ndarray],
     signal_ts,
-) -> dict[str, float | None]:
+    timeframe:       str | None = None,
+    return_idx:      bool = False,
+) -> dict[str, float | None] | tuple[dict[str, float | None], int]:
     """
     Return {indicator_key: value} for the last available row before signal_ts.
-    Applies normalize() - 1 day lookahead fix.
+    - timeframe=None or daily: applies normalize() - 1 day lookahead fix.
+    - intraday timeframe: uses searchsorted left - 1 (previous candle).
     """
     ts = pd.Timestamp(signal_ts)
     ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
-    ts = ts.normalize() - pd.Timedelta(days=1)
 
-    idx = np.searchsorted(ts_arr, np.datetime64(ts.value, "ns"), side="right") - 1
+    if timeframe is None or timeframe in ("1Dutc", "1D"):
+        ts  = ts.normalize() - pd.Timedelta(days=1)
+        idx = np.searchsorted(ts_arr, np.datetime64(ts.value, "ns"), side="right") - 1
+    else:
+        idx = np.searchsorted(ts_arr, np.datetime64(ts.value, "ns"), side="left") - 1
+
     if idx < 0:
-        return {k: None for k in values_arr}
-
-    return {k: float(arr[idx]) for k, arr in values_arr.items()}
+        result = {k: None for k in values_arr}
+        return (result, -1) if return_idx else result
+    result = {k: float(arr[idx]) for k, arr in values_arr.items()}
+    return (result, idx) if return_idx else result
