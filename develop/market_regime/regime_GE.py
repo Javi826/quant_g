@@ -36,7 +36,7 @@ from shared_batch_develop.regime_GE_core import (
     PERIODS,
     EVAL_KEYS,
     DATA_FOLDER_IS,
-    pct_improvement,
+    _pct_improvement,
     _is_trending,
     _combo_label,
     load_strategies_config,
@@ -295,11 +295,11 @@ def _print_consistency_table(strategy_results: dict) -> None:
             row       = f"  {sid:<35} {direction:<6} {cls:<10}"
             total_b = total_f = 0.0
             for pk in EVAL_KEYS:
-                dpct     = pct_improvement(data[pk][filter_key], data[pk]['b_prof'])
+                dpct     = _pct_improvement(data[pk][filter_key], data[pk]['b_prof'])
                 row     += f"  \033[92m{dpct:>+9.1f}%\033[0m"
                 total_b += data[pk]['b_prof']
                 total_f += data[pk][filter_key]
-            row += f"  \033[92m{pct_improvement(total_f, total_b):>+7.1f}%\033[0m"
+            row += f"  \033[92m{_pct_improvement(total_f, total_b):>+7.1f}%\033[0m"
             print(row)
         print(f"  {'─'*95}\n")
 
