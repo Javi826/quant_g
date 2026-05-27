@@ -1,3 +1,4 @@
+#develop/market_regime/bin_regime.py
 """
 Regime cross-period bin search — finds best bin combo per train period,
 requires consistency across periods, validates on OOS1.
@@ -51,7 +52,7 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_06_
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 STRATEGIES_LOOP_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "bitget", "BOT_batch_E1",
-    "strategies_files", f"files_{STRATEGIES_SET_NAME}",
+    "strategies_files",
     f"{STRATEGIES_LOOP_NAME}.py"
 )
 

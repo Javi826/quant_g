@@ -39,7 +39,7 @@ PERIOD_LABELS = [
 INITIAL_CAPITAL    = 800
 MIN_TRADES         = 100
 TOP_N_COMPOUND     = 10
-WIN_RATE_THRESHOLD = 50  # combinations below this win rate are flagged
+WIN_RATE_THRESHOLD = 60  # combinations below this win rate are flagged
 
 # =============================================================================
 # DATA LOADING

@@ -18,7 +18,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -31,7 +31,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -44,7 +44,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -57,7 +57,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -70,7 +70,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -83,7 +83,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -96,7 +96,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -109,7 +109,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -122,7 +122,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -135,7 +135,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     # =========================================================================
@@ -151,7 +151,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -164,7 +164,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -177,7 +177,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -190,7 +190,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -203,7 +203,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -216,7 +216,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -229,7 +229,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -242,7 +242,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -255,7 +255,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -268,7 +268,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     # =========================================================================
@@ -284,8 +284,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -298,8 +298,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -312,8 +312,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -326,8 +326,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -340,8 +340,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -354,8 +354,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -368,8 +368,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -382,8 +382,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -396,8 +396,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -410,8 +410,8 @@ STRATEGIES_LOOP = [
             "MA_PERIOD": [10, 25],
             "IMPULSE": [2, 4],
             "FLAG": [10, 20, 30],
-            "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "TP_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     # =========================================================================
@@ -427,7 +427,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -440,7 +440,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -453,7 +453,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -466,7 +466,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -479,7 +479,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -492,7 +492,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -505,7 +505,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -518,7 +518,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [7,8,9],
         },
     },
     {
@@ -531,7 +531,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [6,7,8,9],
         },
     },
     {
@@ -544,7 +544,7 @@ STRATEGIES_LOOP = [
             "TOLERANCE": [10, 20, 30],
             "IMPULSE": [0.02, 0.05, 0.08],
             "TP_PCT": [2,3,4],
-            "SL_PCT": [2,3],
+            "SL_PCT": [6,7,8,9],
         },
     },
 ]

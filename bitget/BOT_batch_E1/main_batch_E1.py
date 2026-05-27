@@ -6,7 +6,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "market_regime")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
-
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch_develop")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_trading_batch_develop")))
 import time
 import logging
 import matplotlib
@@ -28,7 +29,7 @@ logger = logging.getLogger("BOT_batch.main_batch")
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = True
+SHOW_PLOTS    = False
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
@@ -42,7 +43,7 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_module import REGIME_ENABLED, REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE, REGIME0_MA_PERIOD as R0_MA_PERIOD, run_oos_backtest_with_regime, load_regime_bins
+from shared_batchs.regime.regime_GE_module import REGIME_ENABLED, REGIME_MIN_TRADES, REGIME_FAMILY_SOURCE, REGIME0_MA_PERIOD as R0_MA_PERIOD, run_oos_backtest_with_regime, load_regime_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 
@@ -75,10 +76,9 @@ N_PATHS_IS           = 1
 # ELITE -- MA4
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 18
+OOS_NETGAIN_TH       = 19
 OOS_MAX_DD_TH        = 15
 OOS_R2_TH            = 0.43
-
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -178,16 +178,16 @@ CORRELATION_DD_THRESHOLD = 0.75
 
 # FILES
 #------------------------------------------------------------------------------
-STRATEGIES_BATCH           = import_module(f"strategies_files.files_{STRATEGIES_SET_NAME}.strategies_BT_{STRATEGIES_SET_NAME}_batch").STRATEGIES
+STRATEGIES_BATCH           = import_module(f"strategies_files.strategies_BT_{STRATEGIES_SET_NAME}_batch").STRATEGIES
 STRATEGIES_BT_BATCH_MODULE = f"strategies_BT_{STRATEGIES_SET_NAME}_batch"
-STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
-STRATEGIES_LOOP            = import_module(f"strategies_files.files_{STRATEGIES_SET_NAME}.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
+STRATEGIES_BT_BATCH_PATH   = os.path.join(os.path.dirname(__file__), "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+STRATEGIES_LOOP            = import_module(f"strategies_files.{STRATEGIES_LOOP_NAME}").STRATEGIES_LOOP
 STRATEGIES_PARAMS_FOLDER   = os.path.join(os.path.dirname(__file__), f"strategies_{STRATEGIES_SET_NAME}")
 CSV_PARAMS                 = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}.csv")
 STRATEGIES_PR_BATCH_PATH   = os.path.join(STRATEGIES_PARAMS_FOLDER, f"strategies_{STRATEGIES_SET_NAME}_batch.py")
 SYMBOLS_LIVE_FOLDER        = os.path.join(STRATEGIES_PARAMS_FOLDER, "symbols_live")
 DRIFT_BATCH_PATH           = os.path.join(STRATEGIES_PARAMS_FOLDER, f"drift_reference_{STRATEGIES_SET_NAME}_batch.py")
-REGIME_BINS_PATH           = os.path.join(os.path.dirname(__file__), "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"regime_bins_{STRATEGIES_SET_NAME}.py")
+REGIME_BINS_PATH           = os.path.join(os.path.dirname(__file__), "strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py")
 
 # DATA
 #------------------------------------------------------------------------------
@@ -403,7 +403,7 @@ def run_batch(strategy_config: dict) -> None:
             )
             ohlcv_oos2_data = ohlcv_oos2_raw
 
-        approved, _, _, _, _ = run_oos_period(
+        approved, trades_df_oos2_baseline, trades_df_oos2_regime, _, _ = run_oos_period(
             strategy_id            = STRATEGY_ID,
             label                  = "OOS2",
             stage_baseline         = "STAGE 5",
@@ -431,6 +431,15 @@ def run_batch(strategy_config: dict) -> None:
             run_report_backtesting = False,
             run_baseline           = SHOW_PLOTS or SAVE_TRADES,
         )
+        _m_oos2 = compute_metrics(
+            trades_df_oos2_regime if len(trades_df_oos2_regime) > 0 else trades_df_oos2_baseline,
+            capital=INITIAL_BALANCE, name=""
+        )
+        _validation_results[-1].update({
+            "net_gain_pct_oos2": round(_m_oos2["Net_Gain_pct"], 1),
+            "dd_pct_oos2":       round(_m_oos2["Max_DD_pct"], 1),
+            "r2_oos2":           _m_oos2["R_Squared"],
+        })
 
     # -------------------------------------------------------------------------
     # BLOCK 7 — OOS3
@@ -453,7 +462,7 @@ def run_batch(strategy_config: dict) -> None:
             )
             ohlcv_oos3_data = ohlcv_oos3_raw
 
-        approved, _, _, _, _ = run_oos_period(
+        approved, trades_df_oos3_baseline, trades_df_oos3_regime, _, _ = run_oos_period(
             strategy_id            = STRATEGY_ID,
             label                  = "OOS3",
             stage_baseline         = "STAGE 6",
@@ -481,6 +490,16 @@ def run_batch(strategy_config: dict) -> None:
             run_report_backtesting = False,
             run_baseline           = SHOW_PLOTS or SAVE_TRADES,
         )
+        _m_oos3 = compute_metrics(
+        trades_df_oos3_regime if len(trades_df_oos3_regime) > 0 else trades_df_oos3_baseline,
+        capital=INITIAL_BALANCE, name=""
+        )
+        _validation_results[-1].update({
+            "net_gain_pct_oos3": round(_m_oos3["Net_Gain_pct"], 1),
+            "dd_pct_oos3":       round(_m_oos3["Max_DD_pct"], 1),
+            "r2_oos3":           _m_oos3["R_Squared"],
+        })
+
 
     # -------------------------------------------------------------------------
     # BLOCK 8 — Update & Compare
@@ -659,6 +678,7 @@ def run_summary():
             data_folder_oos2      = DATA_FOLDER_OOS2,
             data_folder_oos3      = DATA_FOLDER_OOS3,
             show_plots            = SHOW_PLOTS,
+            validation_results    = _validation_results,
         )
 # =============================================================================
 # MAIN

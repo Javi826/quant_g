@@ -190,7 +190,7 @@ def select_universe(
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
 
     fix_str = "FIX=True" if fix_symbols_mcis else "FIX=False"
-    logger.info(f"STAGE 0 ── Universe Selection     ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
+    #logger.info(f"STAGE 0 ── Universe Selection     ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
 
     if fix_symbols_mcis:
         if len(symbols_is_final) < n_symbols_mcis:

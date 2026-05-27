@@ -8,7 +8,7 @@ from shared_batchs.utils.backtest_compiler import compile_grid_results
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison
-from shared_batchs.regime.regime_module import run_oos_backtest_with_regime
+from shared_batchs.regime.regime_GE_module import run_oos_backtest_with_regime
 from shared_batchs.utils.io import accumulate_strategy_trades
 
 logger = logging.getLogger("BOT_batch.pipeline.oos_period")
@@ -144,9 +144,10 @@ def run_oos_period(
         initial_balance = INITIAL_BALANCE,
         debug_label     = label,
     )
-    #print(f"  DEBUG regime: trades={len(trades_regime)} | profit={trades_regime['profit'].sum():.1f} | wr={(trades_regime['profit']>0).mean()*100:.1f}%")
-    
+    # después de: trades_regime, metrics_regime = run_oos_backtest_with_regime(...)
 
+    _b_profit = "N/A" if trades_baseline.empty else f"{trades_baseline['profit'].sum():.1f}"
+    logger.debug(f"  [DEBUG {label}] baseline profit={_b_profit} | regime profit={trades_regime['profit'].sum():.1f}")
     logger.debug(
         f"{stage_regime} ── Filter results         ── "
         f"baseline={len(trades_baseline)} | regime={len(trades_regime)} | diff={len(trades_baseline) - len(trades_regime)}"

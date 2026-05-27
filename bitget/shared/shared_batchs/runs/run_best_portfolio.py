@@ -282,14 +282,20 @@ def _print_best_combinations(
     initial_balance: float,
     n_splits: int,
     ranking_criteria: list[tuple[str, bool]],
+    validation_results: list = None,
 ) -> None:
     W          = 115
     split_name = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
-    
-    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}\033[0m")
 
+    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}\033[0m")
     primary_key = ranking_criteria[0][0]
+
+    # Build validation lookup: {strategy_id: {field: value}}
+    val_lookup = {}
+    if validation_results:
+        for v in validation_results:
+            val_lookup[v["strategy_id"]] = v
 
     for rank, entry in enumerate(top, start=1):
         combo            = entry["combo"]
@@ -299,11 +305,10 @@ def _print_best_combinations(
         mn               = entry.get("subperiod_min",  np.nan)
         mx               = entry.get("subperiod_max",  np.nan)
 
-        # Header: exclude primary metric (already shown in stats_str)
         secondary_str = "  |  ".join(f"{k}={v:.2f}" for k, v in metric_values.items() if k != primary_key)
-        stats_str = f"Wpct_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
-        avg_trades   = np.mean([len(df) for sid, df in trades_per_period.get("OOS1", []) if sid in combo])
-        header_parts = [f"Strategies: {len(combo)}", f"AvgTrades={avg_trades:.0f}", stats_str]
+        stats_str     = f"Wpct_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
+        avg_trades    = np.mean([len(df) for sid, df in trades_per_period.get("OOS1", []) if sid in combo])
+        header_parts  = [f"Strategies: {len(combo)}", f"AvgTrades={avg_trades:.0f}", stats_str]
         if secondary_str:
             header_parts.append(secondary_str)
 
@@ -325,6 +330,32 @@ def _print_best_combinations(
                 continue
             rows.append({"Period": period, **m})
         _print_robustness_df(rows, f"ROBUSTNESS TABLE — Combination #{rank}")
+
+        if val_lookup:
+            combo_strategies = sorted(combo, key=lambda s: int(s.split("_")[0]))
+            combo_val        = [val_lookup[sid] for sid in combo_strategies if sid in val_lookup]
+        
+            if combo_val:
+                worst_netgain = min(min(v.get("net_gain_pct", 0), v.get("net_gain_pct_oos2", 0), v.get("net_gain_pct_oos3", 0)) for v in combo_val)
+                worst_dd = min(min(v.get("dd_pct", 0), v.get("dd_pct_oos2", 0), v.get("dd_pct_oos3", 0)) for v in combo_val)
+                worst_r2      = min(min(v.get("r2", 0),           v.get("r2_oos2", 0),            v.get("r2_oos3", 0))           for v in combo_val)
+        
+                logger.info(f"\n{'─'*W}")
+                logger.info(f"  INDIVIDUAL STRATEGY THRESHOLDS — Combination #{rank}")
+                logger.info(f"{'─'*W}")
+                logger.info(f"  {'Strategy':<30} {'OOS':<6} {'NetGain%':>10} {'MaxDD%':>8} {'R2':>7}")
+                logger.info(f"  {'-'*W}")
+                for sid in combo_strategies:
+                    if sid not in val_lookup:
+                        continue
+                    v    = val_lookup[sid]
+                    icon = "🟢" if _is_long(sid) else "🔴"
+                    logger.info(f"  {icon} {sid:<28} {'OOS1':<6} {v.get('net_gain_pct', 0):>9.1f}% {v.get('dd_pct', 0):>7.1f}% {v.get('r2', 0):>7.3f}")
+                    logger.info(f"  {'':31} {'OOS2':<6} {v.get('net_gain_pct_oos2', 0):>9.1f}% {v.get('dd_pct_oos2', 0):>7.1f}% {v.get('r2_oos2', 0):>7.3f}")
+                    logger.info(f"  {'':31} {'OOS3':<6} {v.get('net_gain_pct_oos3', 0):>9.1f}% {v.get('dd_pct_oos3', 0):>7.1f}% {v.get('r2_oos3', 0):>7.3f}")
+                    logger.info(f"  {'-'*W}")
+                logger.info(f"  {'WORST':<30} {'ALL':<6} {worst_netgain:>9.1f}% {worst_dd:>7.1f}% {worst_r2:>7.3f}")
+                logger.info(f"{'─'*W}")
 
     logger.info(f"\n{'─'*W}")
 
@@ -349,6 +380,7 @@ def find_best_portfolio_combination(
     data_folder_oos3: str = "",
     show_plots: bool = False,
     require_long_short: bool = REQUIRE_LONG_SHORT,
+    validation_results: list = None,
     **kwargs,
 ) -> list:
 
@@ -404,7 +436,7 @@ def find_best_portfolio_combination(
     logger.info(f"  Distribution ({primary_metric}): best={best_val:.1f}  mean={mean_val:.1f}  std={std_val:.1f}  min={df_scored[primary_metric].min():.1f}  max={df_scored[primary_metric].max():.1f}  gap={gap:.2f}%  z-score={zscore}")
 
     top = df_scored.head(top_n).to_dict("records")
-    _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria)
+    _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria, validation_results)
     
     plot_best_portfolio(
         combo             = top[0]["combo"],

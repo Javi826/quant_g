@@ -7,12 +7,12 @@ from datetime import datetime
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-STRATEGIES_SET_NAME = "00" 
+STRATEGIES_SET_NAME = "E1" 
 TARGET_BATCH = f"BOT_batch_{STRATEGIES_SET_NAME}" 
 
 PROD_STRATEGIES   = import_module(f"config.strategies_{STRATEGIES_SET_NAME}").STRATEGIES
-OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
-OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"files_{STRATEGIES_SET_NAME}", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
+OUTPUT_BATCH = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"strategies_BT_{STRATEGIES_SET_NAME}_batch.py")
+OUTPUT_LOOP  = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_BATCH, "strategies_files", f"strategies_loop_{STRATEGIES_SET_NAME}.py")
 PARAM_GRID_KEYS   = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
 SIGNAL_PARAM_KEYS = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS   = (
