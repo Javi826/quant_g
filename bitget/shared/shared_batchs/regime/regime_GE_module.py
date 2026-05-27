@@ -1,71 +1,23 @@
 #shared/shared_batchs/regime/regime_GE_module.py
-"""
-GE Regime module — main_batch integration.
-Drop-in replacement for regime_module.py.
 
-Uses the GE regime system (ER / Hurst / ATR_norm indicators) to filter signals,
-loading indicator data from crypto_full_IS.
-
-Classification logic (from regime_GE.py):
-  "ranging"  → block signals when market is trending    (filter_trending improves)
-  "trending" → block signals when market is ranging     (filter_ranging improves)
-  "both"     → block both trending and ranging signals
-  "neutral"  → no filter applied
-
-Configuration mirrors INDICATORS dict from regime_GE.py.
-Copy the final chosen windows/thresholds/mode here after calibration.
-"""
-import os
 import logging
 import numpy as np
 import pandas as pd
-
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batch_develop.regime_GE_core import (
-    _load_ohlcv,
-    _is_trending,
-    load_regime_bins_ge,
-    CRYPTO_FULL_DIR,
-)
-from shared_trading_batch_develop.regime_metrics import (
-    precompute_indicators,
-    lookup_indicators,
-)
+from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
+from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE
+from shared_batch_regime.regime_GE_core import precompute_indicators, lookup_indicators
+from shared_batch_regime.regime_GE_core import load_ohlcv, is_trending, load_regime_bins_ge
 
 logger = logging.getLogger("shared_batch.regime.regime_GE_module")
 
 # =============================================================================
 # CONFIGURATION  — mirror from regime_GE.py after calibration
 # =============================================================================
+REGIME_REFERENCE = 'BTCUSDT'
+REGIME_ENABLED   = True
+DEBUG_REGIME_LOG = False
 
-REGIME_ENABLED = True
-
-INDICATORS: dict[str, dict] = {
-    "atr_norm": {
-        "windows":    [10],
-        "thresholds": [0.04],
-        "enabled":    True,
-    },
-    "er": {
-        "windows":    [10],
-        "thresholds": [0.6],
-        "enabled":    True,
-    },
-    "hurst": {
-        "windows":    [30],
-        "thresholds": [0.8],
-        "enabled":    True,
-    },
-}
-
-COMBINE_MODE  = "OR"
-ANALYSIS_MODE = "SYMBOL"
-
-# Kept for API compatibility with regime_module.py
-REGIME_MIN_TRADES    = 50
-REGIME_FAMILY_SOURCE = "strategy"
-REGIME0_MA_PERIOD    = 50
 
 # =============================================================================
 # ACTIVE CONFIG
@@ -88,7 +40,7 @@ _indicator_cache: dict[str, tuple] = {}
 def _get_indicator_cache(symbol: str) -> tuple | None:
     """Lazily load and cache indicator arrays for a symbol from crypto_full_IS."""
     if symbol not in _indicator_cache:
-        df = _load_ohlcv(symbol)
+        df = load_ohlcv(symbol)
         if df.empty:
             return None
         _indicator_cache[symbol] = precompute_indicators(df, _active_windows())
@@ -127,7 +79,7 @@ def _filter_signals_ge(
 
     for idx in np.nonzero(signals)[0]:
         indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]))
-        trending         = _is_trending(indicator_values, thresholds, mode)
+        trending         = is_trending(indicator_values, thresholds, mode)
 
         if classification == "ranging" and trending:
             filtered[idx] = 0
@@ -135,6 +87,25 @@ def _filter_signals_ge(
             filtered[idx] = 0
         elif classification == "both":
             filtered[idx] = 0
+
+    if DEBUG_REGIME_LOG:
+        rows = []
+        for idx in range(len(signals)):
+            indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]))
+            trending         = is_trending(indicator_values, _active_thresholds(), COMBINE_MODE)
+            rows.append({
+                "timestamp":       pd.Timestamp(ts[idx]),
+                "signal_baseline": int(signals[idx]),
+                "signal_regime":   int(filtered[idx]),
+                "regime_symbol":   "BTCUSDT" if ANALYSIS_MODE == "BTC" else symbol,
+                "trending":        trending,
+                "indicators":      str(indicator_values),
+            })
+        df_debug = pd.DataFrame(rows)
+        df_debug_all = df_debug[df_debug["signal_baseline"] != 0]
+        logger.info(f"  [REGIME COUNT] symbol={symbol} | total_signals={len(df_debug_all)}")
+        df_debug = df_debug_all.iloc[:10]
+        logger.info(f"\n[REGIME DEBUG] symbol={symbol} | classification={classification}\n{df_debug.to_string(index=False)}")
 
     return filtered
 
@@ -176,7 +147,7 @@ def run_oos_backtest_with_regime(
 
     for sym, arr in ohlcv_arrays.items():
         signals = signal_fn(arr, **signal_params, live_trading=False)
-
+        logger.debug(f"  [SIGNAL CHECK] sym={sym} | signals sum={int(signals.sum())} | len={len(signals)}")
         if REGIME_ENABLED and bins_to_filter and bins_to_filter != "neutral":
             signals = _filter_signals_ge(
                 signals        = signals,

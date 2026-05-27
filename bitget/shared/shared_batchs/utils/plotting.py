@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from shared_batchs.regime.regime_module import REGIME_REFERENCE
+from shared_batchs.regime.regime_GE_module import REGIME_REFERENCE
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.utils.plotting")
 

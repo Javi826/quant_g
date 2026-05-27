@@ -59,7 +59,13 @@ COMMISSION_PCT = 0.1
 # MARKET REGIME SETTINGS
 # ==========================================================================
 
-from shared_batchs.regime.regime_module import REGIME_FAMILIES, ER_WINDOW as REGIME_ER_WINDOW, ATR_WINDOW as REGIME_ATR_WINDOW
+REGIME_FAMILIES = {
+    "trending": {},
+    "ranging":  {},
+    "volatile": {},
+}
+REGIME_ER_WINDOW   = 50
+REGIME_ATR_WINDOW  = 50
 REGIME_GENERAL = {
     'trending': 1.0,
     'ranging':  1.0,

@@ -8,21 +8,21 @@ import numpy as np
 import pandas as pd
 
 for _key in list(sys.modules.keys()):
-    if any(_key.startswith(_mod) for _mod in ("shared_batchs", "shared_batch_develop", "shared_trading_batch_develop", "shared", "bitget")):
+    if any(_key.startswith(_mod) for _mod in ("shared_batchs", "shared_batch_regime", "shared_trading_batch_regime", "shared", "bitget")):
         del sys.modules[_key]
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batchs")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from shared_batch_develop.regime_GE_core import PERIODS, EVAL_KEYS, DATA_FOLDER_IS
-from shared_batch_develop.regime_GE_core import pct_improvement, is_trending, combo_label
-from shared_batch_develop.regime_GE_core import load_strategies_config, load_symbols, load_ohlcv
+from shared_batch_regime.regime_GE_core import EVAL_KEYS
+from shared_batch_regime.regime_GE_core import pct_improvement, is_trending, combo_label
+from shared_batch_regime.regime_GE_core import load_strategies_config
 
-from shared_batch_develop.regime_GE_core import load_ohlcv_for_period, run_backtest, precompute_baselines
-from shared_batch_develop.regime_GE_core import build_indicator_cache, classify_strategy, print_combo_period_table
+from shared_batch_regime.regime_GE_core import load_ohlcv_for_period, run_backtest, precompute_baselines
+from shared_batch_regime.regime_GE_core import build_indicator_cache, classify_strategy, print_combo_period_table
 
-from shared_trading_batch_develop.regime_metrics import lookup_indicators
+from shared_batch_regime.regime_GE_core import lookup_indicators
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 
 # =============================================================================
@@ -30,7 +30,7 @@ from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 # =============================================================================
 
 STRATEGIES_SET_NAME  = "E1"
-BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_06_{STRATEGIES_SET_NAME}_ge.py")
+BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_{STRATEGIES_SET_NAME}.py")
 
 # =============================================================================
 # REGIME CONFIGURATION

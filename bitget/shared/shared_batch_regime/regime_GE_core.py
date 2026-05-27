@@ -1,4 +1,4 @@
-#shared/shared_batchs/regime/regime_GE_core.py
+#shared/shared_batch_regime/regime/regime_GE_core.py
 """
 Core shared functions for the GE regime system.
 Imported by:
@@ -7,34 +7,18 @@ Imported by:
   - regime_GE_module.py       (main_batch integration)
 
 Indicator calculations delegated to:
-  - shared_trading_batch_develop.regime_metrics
+  - shared_trading_batch_regime.regime_metrics
 """
 import os
-import sys
 import logging
 import numpy as np
 import pandas as pd
-
-# Ensure shared_batchs and shared_trading_batch_develop are resolvable
-# regardless of which script imports this module.
-_SHARED = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if _SHARED not in sys.path:
-    sys.path.insert(0, _SHARED)
-
-_BITGET = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-if _BITGET not in sys.path:
-    sys.path.insert(0, _BITGET)
-
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_trading_batch_develop.regime_metrics import (
-    precompute_indicators,
-    lookup_indicators,
-)
+from shared_trading_batch_regime.regime_metrics import _CALC_FN
 from importlib.util import spec_from_file_location, module_from_spec
-
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -74,13 +58,13 @@ DEBUG_TF_FILTER: list[str] = []
 # HELPERS
 # =============================================================================
 
-def _pct_improvement(val: float, base: float) -> float:
+def pct_improvement(val: float, base: float) -> float:
     if base == 0:
         return 0.0
     return (val - base) / abs(base) * 100
 
 
-def _is_trending(values: dict[str, float | None], thresholds: dict[str, float], mode: str) -> bool:
+def is_trending(values: dict[str, float | None], thresholds: dict[str, float], mode: str) -> bool:
     """
     Evaluate trending condition for enabled indicators only.
     values:     {indicator_key: computed_value | None}
@@ -101,7 +85,7 @@ def _is_trending(values: dict[str, float | None], thresholds: dict[str, float], 
 # COMBO LABEL
 # =============================================================================
 
-def _combo_label(active_keys: list[str], windows: dict, thresholds: dict, mode: str) -> str:
+def combo_label(active_keys: list[str], windows: dict, thresholds: dict, mode: str) -> str:
     parts = [f"{k.upper()}_W={windows[k]} | {k.upper()}_TH={thresholds[k]:.3f}" for k in active_keys]
     return " | ".join(parts) + f" | MODE={mode}"
 
@@ -153,7 +137,7 @@ def load_symbols(strategy_id: str, timeframe: str) -> list[str]:
 # OHLCV LOADERS
 # =============================================================================
 
-def _load_ohlcv(symbol: str) -> pd.DataFrame:
+def load_ohlcv(symbol: str) -> pd.DataFrame:
     """Load full-history OHLCV from crypto_full_IS."""
     path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{BTC_TIMEFRAME}.parquet")
     if not os.path.exists(path):
@@ -186,7 +170,7 @@ def _load_ohlcv(symbol: str) -> pd.DataFrame:
     return df
 
 
-def _load_ohlcv_for_period(strategy: dict, period_key: str) -> dict:
+def load_ohlcv_for_period(strategy: dict, period_key: str) -> dict:
     """
     Load OHLCV data for a strategy/period matching main_batch logic:
       - OOS1: load symbols_live directly (my_symbols=True)
@@ -235,7 +219,7 @@ def build_indicator_cache(
     cache: dict[str, tuple] = {}
 
     if analysis_mode == "BTC":
-        df = _load_ohlcv("BTCUSDT")
+        df = load_ohlcv("BTCUSDT")
         if not df.empty:
             cache["BTCUSDT"] = precompute_indicators(df, windows)
         return cache
@@ -248,7 +232,7 @@ def build_indicator_cache(
                     symbols_needed.add(sym)
 
     for sym in sorted(symbols_needed):
-        df = _load_ohlcv(sym)
+        df = load_ohlcv(sym)
         if not df.empty:
             cache[sym] = precompute_indicators(df, windows)
 
@@ -259,7 +243,7 @@ def build_indicator_cache(
 # BACKTEST
 # =============================================================================
 
-def _run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
+def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
     result = run_grid_backtest(
         ohlcv_arrays,
         sell_after=best_params['SELL_AFTER'], tp_pct=best_params['TP_PCT'],
@@ -284,7 +268,7 @@ def _run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
 
 def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
     print(f"\n{'='*120}")
-    print(f"  PRECOMPUTING BASELINES — excluding strategies with B_PROF <= 0 in any period")
+    print(f"  PRECOMPUTING BASELINES")
     print(f"{'='*120}")
 
     baselines: dict[str, dict] = {}
@@ -297,7 +281,7 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
         baselines[sid] = {}
 
         for period_key in EVAL_KEYS:
-            ohlcv_data = _load_ohlcv_for_period(strategy, period_key)
+            ohlcv_data = load_ohlcv_for_period(strategy, period_key)
             if not ohlcv_data:
                 continue
 
@@ -310,23 +294,15 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
                 baseline_arrays[sym] = {**arr, 'signal': signals}
 
             baselines[sid][period_key] = {
-                'metrics':      _run_backtest(baseline_arrays, strategy['best_params']),
+                'metrics':      run_backtest(baseline_arrays, strategy['best_params']),
                 'signal_cache': signal_cache,
                 'ohlcv_arrays': ohlcv_arrays,
             }
 
-        all_positive = all(
-            baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
-            for pk in EVAL_KEYS
-        )
-        if all_positive:
-            print(f"  ✓ {sid}")
-        else:
-            del baselines[sid]
-            print(f"  ✗ {sid}  (excluded)")
+        print(f"  ✓ {sid}")
 
     strategies_filtered = [s for s in strategies_all if s['id'] in baselines]
-    print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
+    print(f"\n  {len(strategies_filtered)} loaded\n")
     return baselines, strategies_filtered
 
 
@@ -334,7 +310,7 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
 # CLASSIFICATION
 # =============================================================================
 
-def _classify_strategy(results: dict, sid: str) -> str:
+def classify_strategy(results: dict, sid: str) -> str:
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
@@ -354,7 +330,7 @@ def _classify_strategy(results: dict, sid: str) -> str:
 # COMBINED METRICS
 # =============================================================================
 
-def _combined_metrics(results: dict) -> tuple[float, float]:
+def combined_metrics(results: dict) -> tuple[float, float]:
     profits, dds = [], []
     for sid, data in results.items():
         if sid == 'is_long':
@@ -383,7 +359,7 @@ def _combined_metrics(results: dict) -> tuple[float, float]:
 # PRINT TABLES
 # =============================================================================
 
-def _print_combo_period_table(results, strategies, period_key, combo_label) -> dict:
+def print_combo_period_table(results, strategies, period_key, combo_label) -> dict:
     print(f"\n  {'─'*120}")
     print(f"  {combo_label}  |  PERIOD: {period_key}")
     print(f"  {'─'*120}")
@@ -399,8 +375,8 @@ def _print_combo_period_table(results, strategies, period_key, combo_label) -> d
         if not isinstance(results[sid][period_key], dict):
             continue
         d     = results[sid][period_key]
-        t_pct = _pct_improvement(d['ranging_prof'],  d['b_prof'])
-        r_pct = _pct_improvement(d['trending_prof'], d['b_prof'])
+        t_pct = pct_improvement(d['ranging_prof'],  d['b_prof'])
+        r_pct = pct_improvement(d['trending_prof'], d['b_prof'])
         tc    = "\033[92m" if t_pct > 0 else "\033[91m"
         rc    = "\033[92m" if r_pct > 0 else "\033[91m"
         rs    = "\033[0m"
@@ -412,8 +388,8 @@ def _print_combo_period_table(results, strategies, period_key, combo_label) -> d
         sys_b += d['b_prof'];  sys_t += d['ranging_prof'];  sys_r += d['trending_prof']
         dd_b.append(d['b_dd']); dd_t.append(d['ranging_dd']); dd_r.append(d['trending_dd'])
         trend_pcts.append(d['trending_pct'])
-    t_pct_s   = _pct_improvement(sys_t, sys_b)
-    r_pct_s   = _pct_improvement(sys_r, sys_b)
+    t_pct_s   = pct_improvement(sys_t, sys_b)
+    r_pct_s   = pct_improvement(sys_r, sys_b)
     avg_trend = sum(trend_pcts) / len(trend_pcts) if trend_pcts else 0.0
     tc = "\033[92m" if t_pct_s > 0 else "\033[91m"
     rc = "\033[92m" if r_pct_s > 0 else "\033[91m"
@@ -438,7 +414,7 @@ def _print_combo_period_table(results, strategies, period_key, combo_label) -> d
     }
 
 
-def _print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, base_p, base_dd, label):
+def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, base_p, base_dd, label):
     print(f"\n  COMBO SUMMARY — {label}")
     print(f"  {'PERIOD':<8} {'B_PROF':>10} {'RANGING':>10} {'RNG_Δ%':>7} {'TRENDING':>10} {'TRD_Δ%':>7} "
           f"{'B_DD%':>7} {'RNG_DD%':>8} {'TRD_DD%':>8} {'TREND%':>7}")
@@ -452,35 +428,37 @@ def _print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, 
               f"{rc}{s['trending_pct']:>+6.1f}%{rs} {s['avg_dd_b']:>6.1f}% "
               f"{s['avg_dd_ranging']:>7.1f}% {s['avg_dd_trending']:>7.1f}% {s['avg_trend_pct']:>6.1f}%")
     print(f"  {'─'*95}")
-    comb_pct = _pct_improvement(comb_p, base_p)
+    comb_pct = pct_improvement(comb_p, base_p)
     cc = "\033[92m" if comb_pct > 0 else "\033[91m"
     rs = "\033[0m"
     print(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  BOTH:{n_b}  NEUTRAL:{n_n}")
     print(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
     print(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {cc}Delta={comb_pct:>+6.1f}%{rs}")
 
-def _print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
+def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
     col_w  = {k: max(len(f"{k.upper()}_W"), 5) for k in active_keys}
     col_t  = {k: max(len(f"{k.upper()}_TH"), 7) for k in active_keys}
     ind_header = "  ".join(f"{k.upper()+'_W':>{col_w[k]}}  {k.upper()+'_TH':>{col_t[k]}}" for k in active_keys)
     ind_width  = sum(col_w[k] + 2 + col_t[k] + 2 for k in active_keys)
-    total_w    = 6 + ind_width + 7 + 8 + 8 + 7 + 6 + 6 + 12 + 11 + 9 + 9 + 9
+    total_w    = 6 + ind_width + 7 + 8 + 8 + 7 + 6 + 6 + 12 + 11 + 9 + 9 + 9 + 11
 
     print(f"\n\n{'='*total_w}")
-    print(f"  FINAL RANKING — ALL COMBOS BY COMBINED PROFIT VS BASELINE")
+    print(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
     print(f"  Active indicators: {', '.join(active_keys)}")
     print(f"{'='*total_w}")
     print(f"  {'#':>3}  {ind_header}  {'MODE':<5}  "
           f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'BOTH':>5} {'NEUT':>5}  "
-          f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8}  "
+          f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
           f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
     print(f"  {'─'*total_w}")
 
     for i, row in enumerate(ranking, 1):
-        pct = _pct_improvement(row['combined_profit'], row['baseline_profit'])
-        cc  = "\033[92m" if pct > 0 else "\033[91m"
-        ddc = "\033[92m" if row['combined_dd'] > row['baseline_dd'] else "\033[91m"
-        rs  = "\033[0m"
+        pct     = pct_improvement(row['combined_profit'], row['baseline_profit'])
+        w_delta = row.get('weighted_delta', 0.0)
+        cc      = "\033[92m" if pct > 0 else "\033[91m"
+        wc      = "\033[92m" if w_delta > 0 else "\033[91m"
+        ddc     = "\033[92m" if row['combined_dd'] > row['baseline_dd'] else "\033[91m"
+        rs      = "\033[0m"
         ind_cols = "  ".join(
             f"{row['windows'][k]:>{col_w[k]}} {row['thresholds'][k]:>{col_t[k]}.3f}"
             for k in active_keys
@@ -489,7 +467,7 @@ def _print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
               f"{row['avg_trend_pct']:>6.1f}%  "
               f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_both']:>5} {row['n_neutral']:>5}  "
               f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
-              f"{cc}{pct:>+7.1f}%{rs}  "
+              f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
               f"{row['baseline_dd']:>7.1f}% {ddc}{row['combined_dd']:>7.1f}%{rs}")
 
     print(f"  {'─'*total_w}\n")
@@ -512,3 +490,85 @@ def load_regime_bins_ge(bins_path: str, strategy_id: str) -> str:
     spec.loader.exec_module(module)
     bins = getattr(module, "REGIME_BINS", {})
     return bins.get(strategy_id, "neutral")
+
+# =============================================================================
+# TIME-SERIES PRECOMPUTATION
+# =============================================================================
+
+def precompute_indicators(
+    df:      pd.DataFrame,
+    windows: dict[str, int],
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """
+    Compute rolling indicator arrays for a full OHLCV DataFrame.
+
+    Parameters
+    ----------
+    df      : DataFrame with columns ts, high, low, close
+    windows : {indicator_key: window}  — only enabled indicators
+
+    Returns
+    -------
+    ts_arr     : np.ndarray[datetime64[ns]]
+    values_arr : {indicator_key: np.ndarray[float]}
+
+    Only rows where ALL indicators produced a valid (non-NaN) value are kept.
+    """
+    high  = df["high"].values
+    low   = df["low"].values
+    close = df["close"].values
+    ts    = df["ts"].values
+
+    min_win = (
+        max((w + 1 if k != "hurst" else w) for k, w in windows.items())
+        if windows else 1
+    )
+
+    ts_list:     list            = []
+    value_lists: dict[str, list] = {k: [] for k in windows}
+
+    for i in range(min_win, len(close)):
+        row_values: dict[str, float] = {}
+        valid = True
+
+        for key, w in windows.items():
+            val = _CALC_FN[key](high[: i + 1], low[: i + 1], close[: i + 1], w)
+            if np.isnan(val):
+                valid = False
+                break
+            row_values[key] = val
+
+        if not valid:
+            continue
+
+        ts_list.append(ts[i])
+        for key in windows:
+            value_lists[key].append(row_values[key])
+
+    ts_arr     = np.array(ts_list, dtype="datetime64[ns]")
+    values_arr = {k: np.array(v, dtype=float) for k, v in value_lists.items()}
+    return ts_arr, values_arr
+
+
+# =============================================================================
+# LOOKUP
+# =============================================================================
+
+def lookup_indicators(
+    ts_arr:     np.ndarray,
+    values_arr: dict[str, np.ndarray],
+    signal_ts,
+) -> dict[str, float | None]:
+    """
+    Return {indicator_key: value} for the last available row before signal_ts.
+    Applies normalize() - 1 day lookahead fix.
+    """
+    ts = pd.Timestamp(signal_ts)
+    ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+    ts = ts.normalize() - pd.Timedelta(days=1)
+
+    idx = np.searchsorted(ts_arr, np.datetime64(ts.value, "ns"), side="right") - 1
+    if idx < 0:
+        return {k: None for k in values_arr}
+
+    return {k: float(arr[idx]) for k, arr in values_arr.items()}

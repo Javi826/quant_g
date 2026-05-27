@@ -6,7 +6,9 @@ Integrates with BOT_trading's market_data infrastructure.
 import logging
 import pandas as pd
 from typing import Dict, Optional, Tuple
-from shared_batchs.regime.regime_module import calc_all_metrics, ER_WINDOW as REGIME_ER_WINDOW, ATR_WINDOW as REGIME_ATR_WINDOW
+from shared_trading_batch_regime.regime_metrics import calc_all_metrics
+REGIME_ER_WINDOW  = 0
+REGIME_ATR_WINDOW = 0
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from config.settings import REGIME_FAMILIES, REGIME_GENERAL, ACCOUNTS
 

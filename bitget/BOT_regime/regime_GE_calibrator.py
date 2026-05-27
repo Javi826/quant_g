@@ -7,23 +7,23 @@ import itertools
 import logging
 
 for _key in list(sys.modules.keys()):
-    if any(_key.startswith(_mod) for _mod in ("shared_batchs", "shared_batch_develop", "shared_trading_batch_develop", "shared", "bitget")):
+    if any(_key.startswith(_mod) for _mod in ("shared_batchs", "shared_batch_regime", "shared_trading_batch_regime", "shared", "bitget")):
         del sys.modules[_key]
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batchs")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from shared_batch_develop.regime_GE_core import EVAL_KEYS,pct_improvement
-from shared_batch_develop.regime_GE_core import is_trending
-from shared_batch_develop.regime_GE_core import combo_label, load_strategies_config
+from shared_batch_regime.regime_GE_core import EVAL_KEYS,pct_improvement
+from shared_batch_regime.regime_GE_core import is_trending
+from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
 
-from shared_batch_develop.regime_GE_core import precompute_baselines
-from shared_batch_develop.regime_GE_core import build_indicator_cache, classify_strategy, combined_metrics
-from shared_batch_develop.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
+from shared_batch_regime.regime_GE_core import precompute_baselines
+from shared_batch_regime.regime_GE_core import build_indicator_cache, classify_strategy, combined_metrics
+from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
 
-from shared_batch_develop.regime_GE_core import run_backtest
-from shared_trading_batch_develop.regime_metrics import lookup_indicators
+from shared_batch_regime.regime_GE_core import run_backtest
+from shared_batch_regime.regime_GE_core import lookup_indicators
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 import numpy as np
 import pandas as pd
@@ -34,7 +34,7 @@ import pandas as pd
 
 ANALYSIS_MODE = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME = "1Dutc"
-COMBINE_MODES = ["OR"]
+COMBINE_MODES = ["AND","OR"]
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -44,19 +44,19 @@ PERIOD_WEIGHTS = {
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10],
+        "windows":    [10,20],
         "thresholds": [0.04,0.06,0.08],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10],
+        "windows":    [10,30],
         "thresholds": [0.4,0.6,0.8],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
         "thresholds": [0.4,0.6,0.8],
-        "enabled":    False,
+        "enabled":    True,
     },
 }
 
@@ -303,7 +303,7 @@ def run() -> None:
     print_ranking(ranking, active_keys)
 
     elapsed = int(time.time() - _t0)
-    print(f"\n  Completed in {elapsed//60}m {elapsed%60}s\n")
+    print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
 
 
 if __name__ == "__main__":
