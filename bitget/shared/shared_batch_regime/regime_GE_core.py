@@ -122,36 +122,8 @@ def load_symbols(strategy_id: str, timeframe: str) -> list[str]:
 # =============================================================================
 
 def load_ohlcv(symbol: str) -> pd.DataFrame:
-    """Load full-history OHLCV from crypto_full_IS."""
-    path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{BTC_TIMEFRAME}.parquet")
-    if not os.path.exists(path):
-        return pd.DataFrame()
-
-    df = pd.read_parquet(path)
-    df.columns = [c.lower().strip() for c in df.columns]
-
-    if df.index.name and df.index.name.lower() in ("timestamp", "ts", "date", "time"):
-        df.index.name = "ts"
-        df = df.reset_index()
-
-    if "volume_base" in df.columns and "volume_quote" in df.columns:
-        df.drop(columns=["volume_base"], inplace=True)
-
-    rename_map = {"timestamp": "ts", "open_time": "ts", "date": "ts", "time": "ts",
-                  "volume_quote": "volume", "vol": "volume"}
-    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
-
-    df["ts"] = pd.to_datetime(df["ts"], errors="coerce")
-    df["ts"] = df["ts"].dt.tz_localize("UTC") if df["ts"].dt.tz is None else df["ts"].dt.tz_convert("UTC")
-    df.dropna(subset=["ts"], inplace=True)
-    df.sort_values("ts", inplace=True)
-    df.drop_duplicates(subset=["ts"], keep="last", inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    for col in ("open", "high", "low", "close"):
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-    df.dropna(subset=["close"], inplace=True)
-    return df
+    """Load full-history OHLCV from crypto_full_IS using BTC_TIMEFRAME."""
+    return load_ohlcv_raw(symbol, BTC_TIMEFRAME)
 
 
 def load_ohlcv_for_period(strategy: dict, period_key: str) -> dict:
@@ -216,70 +188,44 @@ def load_ohlcv_raw(symbol: str, timeframe: str) -> pd.DataFrame:
 # =============================================================================
 
 
-def build_indicator_cache_by_timeframe(
-    baselines:     dict,
-    strategies:    list[dict],
-    windows:       dict[str, int],
-    analysis_mode: str = "SYMBOL",
-) -> dict[str, tuple]:
-    """
-    Build {(symbol, timeframe): (ts_arr, values_arr)} using each strategy's own timeframe.
-    analysis_mode: "SYMBOL" only — BTC mode not supported for per-timeframe cache.
-    """
-    cache: dict[tuple, tuple] = {}
 
-    symbols_by_timeframe: dict[str, set] = {}
-    for strategy in strategies:
-        tf = strategy['timeframe']
-        for period_key in EVAL_KEYS:
-            if period_key in baselines.get(strategy['id'], {}):
-                for sym in baselines[strategy['id']][period_key]['ohlcv_arrays']:
-                    symbols_by_timeframe.setdefault(tf, set()).add(sym)
-
-    for tf, symbols in symbols_by_timeframe.items():
-        for sym in sorted(symbols):
-            key = (sym, tf)
-            if key in cache:
-                continue
-            path = os.path.join(CRYPTO_FULL_DIR, f"{sym}_{tf}.parquet")
-            if not os.path.exists(path):
-                continue
-            df = load_ohlcv_raw(sym, tf)
-            if not df.empty:
-                cache[key] = precompute_indicators(df, windows)
-
-    return cache
+def get_cache_key(sym: str, strategy: dict, analysis_mode: str, regime_timeframe_mode: str) -> str | tuple:
+    """Return the cache key for a symbol/strategy combination based on active modes."""
+    ref_sym = "BTCUSDT" if analysis_mode == "BTC" else sym
+    if regime_timeframe_mode == "STRATEGY":
+        return (ref_sym, strategy['timeframe'])
+    return ref_sym
 
 def build_indicator_cache(
-    baselines:     dict,
-    strategies:    list[dict],
-    windows:       dict[str, int],
-    analysis_mode: str = "SYMBOL",
-) -> dict[str, tuple]:
+    baselines:             dict,
+    strategies:            list[dict],
+    windows:               dict[str, int],
+    analysis_mode:         str = "SYMBOL",
+    regime_timeframe_mode: str = "DAILY",
+) -> dict:
     """
-    Build {symbol: (ts_arr, values_arr)} for all needed symbols.
-    analysis_mode: "BTC"    — single entry keyed "BTCUSDT"
-                   "SYMBOL" — one entry per unique symbol across all strategies/periods
+    Build indicator cache for all 4 mode combinations:
+      - SYMBOL + DAILY   : {sym: (ts_arr, values_arr)}
+      - SYMBOL + STRATEGY: {(sym, tf): (ts_arr, values_arr)}
+      - BTC + DAILY      : {"BTCUSDT": (ts_arr, values_arr)}
+      - BTC + STRATEGY   : {("BTCUSDT", tf): (ts_arr, values_arr)}
     """
-    cache: dict[str, tuple] = {}
+    cache: dict = {}
+    keys_needed: set = set()
 
-    if analysis_mode == "BTC":
-        df = load_ohlcv("BTCUSDT")
-        if not df.empty:
-            cache["BTCUSDT"] = precompute_indicators(df, windows)
-        return cache
-
-    symbols_needed: set[str] = set()
     for strategy in strategies:
         for period_key in EVAL_KEYS:
             if period_key in baselines.get(strategy['id'], {}):
                 for sym in baselines[strategy['id']][period_key]['ohlcv_arrays']:
-                    symbols_needed.add(sym)
+                    keys_needed.add(get_cache_key(sym, strategy, analysis_mode, regime_timeframe_mode))
 
-    for sym in sorted(symbols_needed):
-        df = load_ohlcv(sym)
+    for key in sorted(keys_needed, key=lambda x: x if isinstance(x, str) else f"{x[0]}_{x[1]}"):
+        if key in cache:
+            continue
+        sym, tf = key if isinstance(key, tuple) else (key, BTC_TIMEFRAME)
+        df = load_ohlcv_raw(sym, tf)
         if not df.empty:
-            cache[sym] = precompute_indicators(df, windows)
+            cache[key] = precompute_indicators(df, windows)
 
     return cache
 

@@ -21,5 +21,6 @@ INDICATORS: dict[str, dict] = {
     },
 }
 
-COMBINE_MODE  = "OR"
-ANALYSIS_MODE = "SYMBOL"
+COMBINE_MODE          = "OR"
+ANALYSIS_MODE         = "SYMBOL"
+REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"

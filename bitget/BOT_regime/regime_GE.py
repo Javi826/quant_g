@@ -20,8 +20,7 @@ from shared_batch_regime.regime_GE_core import pct_improvement, is_trending, com
 from shared_batch_regime.regime_GE_core import load_strategies_config
 
 from shared_batch_regime.regime_GE_core import load_ohlcv_for_period, run_backtest, precompute_baselines
-from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, print_combo_period_table
-
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, print_combo_period_table
 from shared_batch_regime.regime_GE_core import lookup_indicators
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 
@@ -174,8 +173,6 @@ def _build_filtered_arrays(
     n_trending      = 0
     n_ranging       = 0
 
-    btc_cache = indicator_cache.get("BTCUSDT") if ANALYSIS_MODE == "BTC" else None
-
     _debug_signals = (
         logger.isEnabledFor(logging.DEBUG)
         and strategy['id'] == DEBUG_SIGNALS_STRATEGY
@@ -188,22 +185,15 @@ def _build_filtered_arrays(
         filt_t = signals.copy()
         filt_r = signals.copy()
 
-        if ANALYSIS_MODE == "SYMBOL":
-            sym_cache = (
-                        indicator_cache.get((sym, strategy['timeframe']))
-                        if REGIME_TIMEFRAME_MODE == "STRATEGY"
-                        else indicator_cache.get(sym)
-                    )
-            if sym_cache is None:
-                filt_t[:] = 0
-                n_trending += int(signals.sum())
-                baseline_arrays[sym] = {**arr, 'signal': signals}
-                trending_arrays[sym] = {**arr, 'signal': filt_t}
-                ranging_arrays[sym]  = {**arr, 'signal': filt_r}
-                continue
-            ts_arr, values_arr = sym_cache
-        else:
-            ts_arr, values_arr = btc_cache
+        sym_cache = indicator_cache.get(get_cache_key(sym, strategy, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE))
+        if sym_cache is None:
+            filt_t[:] = 0
+            n_trending += int(signals.sum())
+            baseline_arrays[sym] = {**arr, 'signal': signals}
+            trending_arrays[sym] = {**arr, 'signal': filt_t}
+            ranging_arrays[sym]  = {**arr, 'signal': filt_r}
+            continue
+        ts_arr, values_arr = sym_cache
 
         if not DEBUG_LOOKAHEAD_DONE and logger.isEnabledFor(logging.DEBUG) and strategy['id'] == DEBUG_SIGNALS_STRATEGY:
             _print_lookahead_debug(
@@ -482,11 +472,11 @@ def run(eval_keys: list[str]) -> None:
         print("  No strategies passed the baseline filter — aborting.")
         return
 
-    indicator_cache = (
-    build_indicator_cache_by_timeframe(baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE)
-    if REGIME_TIMEFRAME_MODE == "STRATEGY"
-    else build_indicator_cache(baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE)
-)
+    indicator_cache = build_indicator_cache(
+        baselines, strategies_filtered, windows,
+        analysis_mode=ANALYSIS_MODE,
+        regime_timeframe_mode=REGIME_TIMEFRAME_MODE,
+    )
 
     label             = combo_label(active_keys, windows, thresholds, mode)
     strategy_results: dict[str, dict] = {}

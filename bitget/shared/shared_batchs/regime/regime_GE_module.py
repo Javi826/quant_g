@@ -5,16 +5,16 @@ import numpy as np
 import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
-from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE
+from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
 from shared_batch_regime.regime_GE_core import precompute_indicators, lookup_indicators
 from shared_batch_regime.regime_GE_core import load_ohlcv, is_trending, load_regime_bins_ge
 
 logger = logging.getLogger("shared_batch.regime.regime_GE_module")
-
+REGIME_REFERENCE = 'BTCUSDT'
 # =============================================================================
 # CONFIGURATION  — mirror from regime_GE.py after calibration
 # =============================================================================
-REGIME_REFERENCE = 'BTCUSDT'
+
 REGIME_ENABLED   = True
 DEBUG_REGIME_LOG = False
 

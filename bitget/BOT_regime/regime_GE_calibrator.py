@@ -17,10 +17,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from shared_batch_regime.regime_GE_core import EVAL_KEYS,pct_improvement
 from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
-from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, combined_metrics
 from shared_batch_regime.regime_GE_core import precompute_baselines
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
-from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, combined_metrics, lookup_indicators_batch
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch
 from shared_batch_regime.regime_GE_core import run_backtest
 
 
@@ -40,7 +39,7 @@ import numpy as np
 
 ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME         = "1Dutc"
-REGIME_TIMEFRAME_MODE = "STRATEGY"    # "DAILY" | "STRATEGY"
+REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
 
 
@@ -136,8 +135,6 @@ def _run_filtered_combo(
     mode:            str,
 ) -> dict:
     results: dict = {}
-    btc_cache = indicator_cache.get("BTCUSDT") if ANALYSIS_MODE == "BTC" else None
-    #print(f"  [DEBUG] btc_cache={btc_cache is not None} | keys={list(indicator_cache.keys())[:3]}")
 
     for strategy in strategies:
         sid = strategy['id']
@@ -150,38 +147,29 @@ def _run_filtered_combo(
             if period_key not in baselines[sid]:
                 continue
 
-            cached     = baselines[sid][period_key]
-            m_base     = cached['metrics']
-            n_trending = n_ranging = 0
+            cached       = baselines[sid][period_key]
+            m_base       = cached['metrics']
+            n_trending   = n_ranging = 0
             trending_arr = {}
             ranging_arr  = {}
 
             for sym, arr in cached['ohlcv_arrays'].items():
                 signals     = cached['signal_cache'][sym]
                 signal_idxs = np.nonzero(signals)[0]
+                filt_t      = signals.copy()
+                filt_r      = signals.copy()
 
-                filt_t = signals.copy()
-                filt_r = signals.copy()
-
-                if ANALYSIS_MODE == "SYMBOL":
-                    sym_cache = (
-                        indicator_cache.get((sym, strategy['timeframe']))
-                        if REGIME_TIMEFRAME_MODE == "STRATEGY"
-                        else indicator_cache.get(sym)
-                    )
-                    if sym_cache is None:
-                        filt_r[:] = 0
-                        n_ranging += int(signals.sum())
-                        trending_arr[sym] = {**arr, 'signal': filt_t}
-                        ranging_arr[sym]  = {**arr, 'signal': filt_r}
-                        continue
-                    ts_arr, values_arr = sym_cache
-                else:
-                    ts_arr, values_arr = btc_cache
+                sym_cache = indicator_cache.get(get_cache_key(sym, strategy, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE))
+                if sym_cache is None:
+                    filt_r[:] = 0
+                    n_ranging += int(signals.sum())
+                    trending_arr[sym] = {**arr, 'signal': filt_t}
+                    ranging_arr[sym]  = {**arr, 'signal': filt_r}
+                    continue
+                ts_arr, values_arr = sym_cache
 
                 if signal_idxs.size > 0:
-                    # FAST — batch lookup instead of per-signal loop
-                    tf = strategy['timeframe'] if REGIME_TIMEFRAME_MODE == "STRATEGY" else None
+                    tf    = strategy['timeframe'] if REGIME_TIMEFRAME_MODE == "STRATEGY" else None
                     batch = lookup_indicators_batch(
                         ts_arr, values_arr, arr['ts'][signal_idxs], timeframe=tf,
                     )
@@ -190,10 +178,10 @@ def _run_filtered_combo(
                         trending         = is_trending(indicator_values, thresholds, mode)
                         if trending:
                             filt_r[idx] = 0
-                            n_trending += 1
+                            n_trending  += 1
                         else:
                             filt_t[idx] = 0
-                            n_ranging  += 1
+                            n_ranging   += 1
 
                 trending_arr[sym] = {**arr, 'signal': filt_t}
                 ranging_arr[sym]  = {**arr, 'signal': filt_r}
@@ -293,14 +281,11 @@ def run() -> None:
         print(f"{'='*120}")
 
         if win_key not in indicator_cache_map:
-            if REGIME_TIMEFRAME_MODE == "STRATEGY":
-                indicator_cache_map[win_key] = build_indicator_cache_by_timeframe(
-                    baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE
-                )
-            else:
-                indicator_cache_map[win_key] = build_indicator_cache(
-                    baselines, strategies_filtered, windows, analysis_mode=ANALYSIS_MODE
-                )
+            indicator_cache_map[win_key] = build_indicator_cache(
+                baselines, strategies_filtered, windows,
+                analysis_mode=ANALYSIS_MODE,
+                regime_timeframe_mode=REGIME_TIMEFRAME_MODE,
+            )
         indicator_cache = indicator_cache_map[win_key]
 
         # FAST — experimental, remove if results differ from original
