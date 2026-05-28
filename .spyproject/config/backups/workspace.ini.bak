@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/shared/shared_batch_regime/regime_GE_core.py', 'bitget/BOT_batch_E1/main_batch_E1.py', 'bitget/shared/shared_trading_batch_regime/regime_metrics.py', 'bitget/shared/shared_batchs/regime/regime_GE_module.py']
+recent_files = ['bitget/BOT_regime/regime_GE_calibrator.py', 'bitget/BOT_regime/regime_GE.py']
 
 [main]
 version = 0.2.0

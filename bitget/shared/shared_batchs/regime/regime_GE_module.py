@@ -15,7 +15,7 @@ REGIME_REFERENCE = 'BTCUSDT'
 # CONFIGURATION  — mirror from regime_GE.py after calibration
 # =============================================================================
 
-REGIME_ENABLED   = True
+REGIME_ENABLED   = False
 DEBUG_REGIME_LOG = False
 
 

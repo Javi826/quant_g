@@ -4,6 +4,7 @@ import sys
 import time
 import itertools
 import logging
+from joblib import Parallel, delayed
 
 for _key in list(sys.modules.keys()):
     if any(_key.startswith(_mod) for _mod in ("shared_batchs", "shared_batch_regime", "shared_trading_batch_regime", "shared", "bitget")):
@@ -13,14 +14,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from shared_batch_regime.regime_GE_core import EVAL_KEYS,pct_improvement
+from shared_batch_regime.regime_GE_core import EVAL_KEYS, pct_improvement
 from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
 from shared_batch_regime.regime_GE_core import precompute_baselines
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
-from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP, _calmar
 from shared_batch_regime.regime_GE_core import run_backtest
 import numpy as np
+
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -30,55 +32,35 @@ PERIOD_WEIGHTS = {
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-COMBINE_MODES         = ["OR"]  
-ANALYSIS_MODE         = "SYMBOL" # "BTC" | "SYMBOL"
-REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
-OPTIMIZE_METRIC       = "win_rate" # "profit" | "max_dd" | "win_rate"  
+COMBINE_MODES         = ["AND","OR"]
+ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
+REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
+OPTIMIZE_METRIC       = "calmar"  # "profit" | "max_dd" | "win_rate" |"calmar"
+N_JOBS                = -1        # -1 = all cores, -2 = all but one
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
         "windows":    [5,10,15],
-        "thresholds": [0.02,0.04,0.06],
+        "thresholds": [0.03,0.04,0.05],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,20,30],
-        "thresholds": [0.5,0.6,0.7],
+        "windows":    [20,40,60],
+        "thresholds": [0.6,0.8,1.0],
         "enabled":    True,
     },
     "hurst": {
-        "windows":    [30,50],
-        "thresholds": [0.5,0.55,0.60,0.65],
+        "windows":    [30, 50],
+        "thresholds": [0.5,0.6,0.8],
         "enabled":    False,
     },
 }
-
-# =============================================================================
-# INDICATORS: dict[str, dict] = {
-#     "atr_norm": {
-#         "windows":    [10],
-#         "thresholds": [0.04],
-#         "enabled":    True,
-#     },
-#     "er": {
-#         "windows":    [20],
-#         "thresholds": [0.6],
-#         "enabled":    True,
-#     },
-#     "hurst": {
-#         "windows":    [30,50],
-#         "thresholds": [0.5,0.55,0.60,0.65],
-#         "enabled":    False,
-#     },
-# }
-# =============================================================================
 
 ORDER_AMOUNT     = 80
 LONG_KEYWORD     = "long"
 DEBUG_TF_FILTER: list[str] = []
 
 logging.basicConfig(format="%(message)s", level=logging.INFO)
-#logging.basicConfig(format="%(message)s", level=logging.DEBUG, force=True)
 logger = logging.getLogger(__name__)
 
 
@@ -112,7 +94,7 @@ def _unpack_combo(active_keys: list[str], combo: tuple) -> tuple[dict[str, int],
 # =============================================================================
 # FILTERED BACKTEST FOR A SINGLE COMBO
 # =============================================================================
-# FAST — experimental, remove if results differ from original
+
 def _run_filtered_combo(
     baselines:       dict,
     strategies:      list[dict],
@@ -197,16 +179,85 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
             continue
         d   = data[period_key]
         cls = data.get('classification', 'neutral')
-        base += d[b_key]
-        if cls == 'ranging':
-            comb += d[r_key]
-        elif cls == 'trending':
-            comb += d[t_key]
-        elif cls == 'both':
-            comb += max(d[r_key], d[t_key])
+        if optimize_metric == "calmar":
+            base += _calmar(d[b_key], d['b_dd'])
+            if cls == 'ranging':
+                comb += _calmar(d[r_key], d['ranging_dd'])
+            elif cls == 'trending':
+                comb += _calmar(d[t_key], d['trending_dd'])
+            elif cls == 'both':
+                comb += max(_calmar(d[r_key], d['ranging_dd']), _calmar(d[t_key], d['trending_dd']))
+            else:
+                comb += _calmar(d[b_key], d['b_dd'])
         else:
-            comb += d[b_key]
+            base += d[b_key]
+            if cls == 'ranging':
+                comb += d[r_key]
+            elif cls == 'trending':
+                comb += d[t_key]
+            elif cls == 'both':
+                comb += max(d[r_key], d[t_key])
+            else:
+                comb += d[b_key]
     return comb, base
+
+
+# =============================================================================
+# PROCESS SINGLE COMBO  (parallelizable unit)
+# =============================================================================
+
+def _process_combo(
+    combo_idx:        int,
+    combo:            tuple,
+    active_keys:      list[str],
+    total_combos:     int,
+    baselines:        dict,
+    strategies:       list[dict],
+    indicator_cache:  dict,
+    baseline_profit:  float,
+    baseline_dd:      float,
+) -> dict:
+    windows, thresholds, mode = _unpack_combo(active_keys, combo)
+    label = combo_label(active_keys, windows, thresholds, mode)
+
+    results = _run_filtered_combo(baselines, strategies, indicator_cache, thresholds, mode)
+    for sid in results:
+        if sid != 'is_long':
+            results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC)
+
+    period_summaries: dict[str, dict] = {}
+    for pk in EVAL_KEYS:
+        period_summaries[pk] = print_combo_period_table(results, strategies, pk, label)
+
+    cls_list       = [results[sid].get('classification', 'neutral') for sid in results if sid != 'is_long']
+    comb_p, comb_d = combined_metrics(results)
+    avg_trend      = sum(ps['avg_trend_pct'] for ps in period_summaries.values()) / max(len(period_summaries), 1)
+
+    weighted_delta = sum(
+        pct_improvement(*_combined_metric_for_period(results, pk, OPTIMIZE_METRIC)) * PERIOD_WEIGHTS.get(pk, 0)
+        for pk in period_summaries
+    ) / sum(PERIOD_WEIGHTS.get(pk, 0) for pk in period_summaries)
+
+    return {
+        'windows':          windows,
+        'thresholds':       thresholds,
+        'mode':             mode,
+        'combo_idx':        combo_idx,
+        'combined_profit':  comb_p,
+        'combined_dd':      comb_d,
+        'weighted_delta':   weighted_delta,
+        'baseline_profit':  baseline_profit,
+        'baseline_dd':      baseline_dd,
+        'avg_trend_pct':    avg_trend,
+        'n_ranging':        cls_list.count('ranging'),
+        'n_trending':       cls_list.count('trending'),
+        'n_both':           cls_list.count('both'),
+        'n_neutral':        cls_list.count('neutral'),
+        'period_summaries': period_summaries,
+        'label':            label,
+    }
+
+
 # =============================================================================
 # MAIN RUN
 # =============================================================================
@@ -257,69 +308,42 @@ def run() -> None:
     baseline_profit = sum(base_profits)
     baseline_dd     = sum(base_dds) / len(base_dds) if base_dds else 0.0
 
-    ranking: list[dict] = []
+    # Precalculate all indicator caches before parallel loop
     indicator_cache_map: dict[tuple, dict] = {}
-
-    for combo_idx, combo in enumerate(grid, 1):
-        windows, thresholds, mode = _unpack_combo(active_keys, combo)
-        label   = combo_label(active_keys, windows, thresholds, mode)
+    for combo in grid:
+        windows, _, _ = _unpack_combo(active_keys, combo)
         win_key = tuple(windows[k] for k in active_keys)
-
-        print(f"\n{'='*120}")
-        print(f"  COMBO {combo_idx}/{total_combos} — {label}")
-        print(f"{'='*120}")
-
         if win_key not in indicator_cache_map:
             indicator_cache_map[win_key] = build_indicator_cache(
                 baselines, strategies_filtered, windows,
                 analysis_mode=ANALYSIS_MODE,
                 regime_timeframe_mode=REGIME_TIMEFRAME_MODE,
             )
-        indicator_cache = indicator_cache_map[win_key]
 
-        # FAST — experimental, remove if results differ from original
-        results = _run_filtered_combo(baselines, strategies_filtered, indicator_cache, thresholds, mode)
-        for sid in results:
-            if sid != 'is_long':
-                results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC)
-
-        period_summaries: dict[str, dict] = {}
-        for pk in EVAL_KEYS:
-            period_summaries[pk] = print_combo_period_table(results, strategies_filtered, pk, label)
-
-        cls_list       = [results[sid].get('classification', 'neutral') for sid in results if sid != 'is_long']
-        comb_p, comb_d = combined_metrics(results)
-        avg_trend      = sum(ps['avg_trend_pct'] for ps in period_summaries.values()) / max(len(period_summaries), 1)
-
-        print_combo_summary(
-            period_summaries,
-            cls_list.count('ranging'), cls_list.count('trending'),
-            cls_list.count('both'),    cls_list.count('neutral'),
-            comb_p, comb_d, baseline_profit, baseline_dd, label,
+    ranking: list[dict] = Parallel(n_jobs=N_JOBS)(
+        delayed(_process_combo)(
+            combo_idx        = combo_idx,
+            combo            = combo,
+            active_keys      = active_keys,
+            total_combos     = total_combos,
+            baselines        = baselines,
+            strategies       = strategies_filtered,
+            indicator_cache  = indicator_cache_map[tuple(_unpack_combo(active_keys, combo)[0][k] for k in active_keys)],
+            baseline_profit  = baseline_profit,
+            baseline_dd      = baseline_dd,
         )
-# =============================================================================
-#         for pk in period_summaries:
-#             cp, bp = _combined_profit_for_period(results, pk)
-#             print(f"  {pk}: comb={cp:.1f}  base={bp:.1f}  delta={pct_improvement(cp, bp):.2f}%  weight={PERIOD_WEIGHTS.get(pk,0)}")
-# =============================================================================
-        weighted_delta = sum(
-            pct_improvement(*_combined_metric_for_period(results, pk, OPTIMIZE_METRIC)) * PERIOD_WEIGHTS.get(pk, 0)
-            for pk in period_summaries
-        ) / sum(PERIOD_WEIGHTS.get(pk, 0) for pk in period_summaries)
-        ranking.append({
-            'windows':    windows,
-            'thresholds': thresholds,
-            'mode':       mode,
-            'combo_idx':  combo_idx,
-            'combined_profit':  comb_p,          'combined_dd':   comb_d,
-            'weighted_delta':   weighted_delta,
-            'baseline_profit':  baseline_profit,  'baseline_dd':  baseline_dd,
-            'avg_trend_pct':    avg_trend,
-            'n_ranging':  cls_list.count('ranging'),
-            'n_trending': cls_list.count('trending'),
-            'n_both':     cls_list.count('both'),
-            'n_neutral':  cls_list.count('neutral'),
-        })
+        for combo_idx, combo in enumerate(grid, 1)
+    )
+    for row in sorted(ranking, key=lambda x: x['combo_idx']):
+        print(f"\n  COMBO {row['combo_idx']}/{total_combos}")
+        print_combo_summary(
+            row['period_summaries'],
+            row['n_ranging'], row['n_trending'],
+            row['n_both'],    row['n_neutral'],
+            row['combined_profit'], row['combined_dd'],
+            row['baseline_profit'], row['baseline_dd'],
+            row['label'],
+        )
 
     ranking.sort(key=lambda x: x['weighted_delta'], reverse=True)
     print_ranking(ranking, active_keys)

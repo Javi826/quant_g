@@ -20,7 +20,7 @@ from shared_batch_regime.regime_GE_core import pct_improvement, is_trending, com
 from shared_batch_regime.regime_GE_core import load_strategies_config
 
 from shared_batch_regime.regime_GE_core import load_ohlcv_for_period, run_backtest, precompute_baselines
-from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, print_combo_period_table
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, print_combo_period_table
 from shared_batch_regime.regime_GE_core import lookup_indicators
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 
@@ -39,7 +39,7 @@ ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME         = "1Dutc"
 REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
-OPTIMIZE_METRIC       = "profit"    # "profit" | "max_dd" | "win_rate"
+OPTIMIZE_METRIC       = "calmar"    # "profit" | "max_dd" | "win_rate"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -48,8 +48,8 @@ INDICATORS: dict[str, dict] = {
         "enabled":    True,
     },
     "er": {
-        "windows":    [20],
-        "thresholds": [0.6],
+        "windows":    [40],
+        "thresholds": [0.8],
         "enabled":    True,
     },
     "hurst": {
@@ -519,6 +519,10 @@ def run(eval_keys: list[str]) -> None:
         strategy_results[sid]['classification'] = classify_strategy(strategy_results, sid, optimize_metric=OPTIMIZE_METRIC)
 
     _print_consistency_table(strategy_results)
+    comb_p, comb_d  = combined_metrics(strategy_results)
+    baseline_profit = sum(strategy_results[sid][pk]['b_prof'] for sid in strategy_results for pk in EVAL_KEYS if pk in strategy_results[sid] and isinstance(strategy_results[sid][pk], dict))
+    comb_pct        = pct_improvement(comb_p, baseline_profit)
+    print(f"\n  BASELINE={baseline_profit:.1f}  COMB_PROF={comb_p:.1f}  COMB_Δ%={comb_pct:+.1f}%  COMB_DD%={comb_d:.1f}%")
     _print_classification_summary(strategy_results)
     _save_bins(strategy_results, windows, thresholds, mode)
 
