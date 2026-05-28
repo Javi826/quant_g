@@ -313,7 +313,7 @@ def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
 
 def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
     print(f"\n{'='*120}")
-    print(f"  PRECOMPUTING BASELINES")
+    print(f"  PRECOMPUTING BASELINES — excluding strategies with B_PROF <= 0 in any period")
     print(f"{'='*120}")
 
     baselines: dict[str, dict] = {}
@@ -344,10 +344,18 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
                 'ohlcv_arrays': ohlcv_arrays,
             }
 
-        print(f"  ✓ {sid}")
+        all_positive = all(
+            baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
+            for pk in EVAL_KEYS
+        )
+        if all_positive:
+            print(f"  ✓ {sid}")
+        else:
+            del baselines[sid]
+            print(f"  ✗ {sid}  (excluded)")
 
     strategies_filtered = [s for s in strategies_all if s['id'] in baselines]
-    print(f"\n  {len(strategies_filtered)} loaded\n")
+    print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
     return baselines, strategies_filtered
 
 
@@ -407,12 +415,12 @@ def combined_metrics(results: dict) -> tuple[float, float]:
 # =============================================================================
 
 def print_combo_period_table(results, strategies, period_key, combo_label) -> dict:
-    print(f"\n  {'─'*120}")
-    print(f"  {combo_label}  |  PERIOD: {period_key}")
-    print(f"  {'─'*120}")
-    print(f"  {'STRATEGY':<35} {'B_PROF':>8} {'TRENDING':>9} {'TRD_Δ%':>7} {'RANGING':>8} {'RNG_Δ%':>7} "
-          f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
-    print(f"  {'─'*120}")
+    logger.debug(f"\n  {'─'*120}")
+    logger.debug(f"  {combo_label}  |  PERIOD: {period_key}")
+    logger.debug(f"  {'─'*120}")
+    logger.debug(f"  {'STRATEGY':<35} {'B_PROF':>8} {'TRENDING':>9} {'TRD_Δ%':>7} {'RANGING':>8} {'RNG_Δ%':>7} "
+                 f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
+    logger.debug(f"  {'─'*120}")
     sys_b = sys_t = sys_r = 0.0
     dd_b, dd_t, dd_r, trend_pcts = [], [], [], []
     for s in strategies:
@@ -427,11 +435,11 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
         tc    = "\033[92m" if t_pct > 0 else "\033[91m"
         rc    = "\033[92m" if r_pct > 0 else "\033[91m"
         rs    = "\033[0m"
-        print(f"  {sid:<35} {d['b_prof']:>8.1f} {d['trending_prof']:>9.1f} "
-              f"{tc}{t_pct:>+6.1f}%{rs} {d['ranging_prof']:>8.1f} "
-              f"{rc}{r_pct:>+6.1f}%{rs} {d['b_dd']:>6.1f}% "
-              f"{d['trending_dd']:>7.1f}% {d['ranging_dd']:>7.1f}% "
-              f"{d['trending_pct']:>6.1f}%")
+        logger.debug(f"  {sid:<35} {d['b_prof']:>8.1f} {d['trending_prof']:>9.1f} "
+                     f"{tc}{t_pct:>+6.1f}%{rs} {d['ranging_prof']:>8.1f} "
+                     f"{rc}{r_pct:>+6.1f}%{rs} {d['b_dd']:>6.1f}% "
+                     f"{d['trending_dd']:>7.1f}% {d['ranging_dd']:>7.1f}% "
+                     f"{d['trending_pct']:>6.1f}%")
         sys_b += d['b_prof'];  sys_t += d['trending_prof'];  sys_r += d['ranging_prof']
         dd_b.append(d['b_dd']); dd_t.append(d['trending_dd']); dd_r.append(d['ranging_dd'])
         trend_pcts.append(d['trending_pct'])
@@ -441,13 +449,13 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
     tc = "\033[92m" if t_pct_s > 0 else "\033[91m"
     rc = "\033[92m" if r_pct_s > 0 else "\033[91m"
     rs = "\033[0m"
-    print(f"  {'─'*110}")
-    print(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f} {sys_t:>9.1f} "
-          f"{tc}{t_pct_s:>+6.1f}%{rs} {sys_r:>8.1f} "
-          f"{rc}{r_pct_s:>+6.1f}%{rs} "
-          f"{sum(dd_b)/len(dd_b) if dd_b else 0:>6.1f}% "
-          f"{sum(dd_t)/len(dd_t) if dd_t else 0:>7.1f}% "
-          f"{sum(dd_r)/len(dd_r) if dd_r else 0:>7.1f}% {avg_trend:>6.1f}%")
+    logger.debug(f"  {'─'*110}")
+    logger.debug(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f} {sys_t:>9.1f} "
+                 f"{tc}{t_pct_s:>+6.1f}%{rs} {sys_r:>8.1f} "
+                 f"{rc}{r_pct_s:>+6.1f}%{rs} "
+                 f"{sum(dd_b)/len(dd_b) if dd_b else 0:>6.1f}% "
+                 f"{sum(dd_t)/len(dd_t) if dd_t else 0:>7.1f}% "
+                 f"{sum(dd_r)/len(dd_r) if dd_r else 0:>7.1f}% {avg_trend:>6.1f}%")
     return {
         'sys_b':           sys_b,
         'sys_trending':    sys_t,
@@ -459,7 +467,6 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
         'avg_dd_ranging':  sum(dd_r)/len(dd_r) if dd_r else 0.0,
         'avg_trend_pct':   avg_trend,
     }
-
 
 def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, base_p, base_dd, label):
     print(f"\n  COMBO SUMMARY — {label}")
@@ -494,13 +501,13 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
     print(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
     print(f"  Active indicators: {', '.join(active_keys)}")
     print(f"{'='*total_w}")
-    print(f"  {'#':>3}  {ind_header}  {'MODE':<5}  "
+    print(f"  {'#':>3}  {'COMBO':>5}  {ind_header}  {'MODE':<5}  "
           f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'BOTH':>5} {'NEUT':>5}  "
           f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
           f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
     print(f"  {'─'*total_w}")
 
-    for i, row in enumerate(ranking, 1):
+    for i, row in enumerate(ranking[:5], 1):
         pct     = pct_improvement(row['combined_profit'], row['baseline_profit'])
         w_delta = row.get('weighted_delta', 0.0)
         cc      = "\033[92m" if pct > 0 else "\033[91m"
@@ -511,7 +518,7 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
             f"{row['windows'][k]:>{col_w[k]}} {row['thresholds'][k]:>{col_t[k]}.3f}"
             for k in active_keys
         )
-        print(f"  {i:>3}  {ind_cols}  {row['mode']:<5}  "
+        print(f"  {i:>3}  {row['combo_idx']:>5}  {ind_cols}  {row['mode']:<5}  "
               f"{row['avg_trend_pct']:>6.1f}%  "
               f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_both']:>5} {row['n_neutral']:>5}  "
               f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
@@ -602,7 +609,34 @@ def precompute_indicators(
 # =============================================================================
 # LOOKUP
 # =============================================================================
+# FAST — experimental, remove if results differ from original
+def lookup_indicators_batch(
+    ts_arr:        np.ndarray,
+    values_arr:    dict[str, np.ndarray],
+    signal_ts_arr: np.ndarray,
+    timeframe:     str | None = None,
+) -> dict[str, np.ndarray]:
+    """
+    Vectorized version of lookup_indicators for multiple timestamps at once.
+    Returns {indicator_key: np.ndarray of values} — one value per signal.
+    NaN where no valid index found.
+    """
+    ts = signal_ts_arr.astype("datetime64[ns]")
 
+    if timeframe is None or timeframe in ("1Dutc", "1D"):
+        ts   = (ts.astype("datetime64[D]") - np.timedelta64(1, "D")).astype("datetime64[ns]")
+        idxs = np.searchsorted(ts_arr, ts, side="right") - 1
+    else:
+        idxs = np.searchsorted(ts_arr, ts, side="left") - 1
+
+    valid = idxs >= 0
+    result = {}
+    for k, arr in values_arr.items():
+        out        = np.full(len(idxs), np.nan)
+        out[valid] = arr[idxs[valid]]
+        result[k]  = out
+
+    return result
 def lookup_indicators(
     ts_arr:     np.ndarray,
     values_arr: dict[str, np.ndarray],

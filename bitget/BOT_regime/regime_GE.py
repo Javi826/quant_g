@@ -38,8 +38,8 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_{ST
 
 ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME         = "1Dutc"
-REGIME_TIMEFRAME_MODE = "STRATEGY"    # "DAILY" | "STRATEGY"
-COMBINE_MODES         = ["OR"]     # single value used at runtime: COMBINE_MODES[0]
+REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
+COMBINE_MODES         = ["OR"]    
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -48,14 +48,14 @@ INDICATORS: dict[str, dict] = {
         "enabled":    True,
     },
     "er": {
-        "windows":    [10],
+        "windows":    [20],
         "thresholds": [0.6],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
-        "thresholds": [0.8],
-        "enabled":    True,
+        "thresholds": [0.5],
+        "enabled":    False,
     },
 }
 

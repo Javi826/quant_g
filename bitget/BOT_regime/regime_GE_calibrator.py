@@ -20,21 +20,29 @@ from shared_batch_regime.regime_GE_core import combo_label, load_strategies_conf
 from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, combined_metrics
 from shared_batch_regime.regime_GE_core import precompute_baselines
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
-
+from shared_batch_regime.regime_GE_core import build_indicator_cache, build_indicator_cache_by_timeframe, classify_strategy, combined_metrics, lookup_indicators_batch
 from shared_batch_regime.regime_GE_core import run_backtest
-from shared_batch_regime.regime_GE_core import lookup_indicators
+
 
 import numpy as np
-import pandas as pd
+
 
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
 
-ANALYSIS_MODE = "SYMBOL"   # "BTC" | "SYMBOL"
-BTC_TIMEFRAME = "1Dutc"
-COMBINE_MODES = ["AND","OR"]
+# =============================================================================
+# ANALYSIS_MODE         = "BTC"   # "BTC" | "SYMBOL"
+# BTC_TIMEFRAME         = "1Dutc"
+# COMBINE_MODES         = ["AND","OR"]
+# REGIME_TIMEFRAME_MODE = "STRATEGY" # "DAILY" | "STRATEGY"
+# =============================================================================
+
+ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
+BTC_TIMEFRAME         = "1Dutc"
 REGIME_TIMEFRAME_MODE = "STRATEGY"    # "DAILY" | "STRATEGY"
+COMBINE_MODES         = ["OR"]    
+
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -44,49 +52,47 @@ PERIOD_WEIGHTS = {
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10,30],
-        "thresholds": [0.04,0.06,0.08],
+        "windows":    [5,10,15],
+        "thresholds": [0.02,0.04,0.06],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,50],
-        "thresholds": [0.4,0.6,0.8],
+        "windows":    [10,20,30],
+        "thresholds": [0.5,0.6,0.7],
         "enabled":    True,
     },
     "hurst": {
-        "windows":    [30,80],
-        "thresholds": [0.2,0.4,0.6],
-        "enabled":    True,
+        "windows":    [30,50],
+        "thresholds": [0.5,0.55,0.60,0.65],
+        "enabled":    False,
     },
 }
 
-# =============================================================================
-# INDICATORS: dict[str, dict] = {
-#     "atr_norm": {
-#         "windows":    [10],
-#         "thresholds": [0.04],
-#         "enabled":    True,
-#     },
-#     "er": {
-#         "windows":    [10],
-#         "thresholds": [0.6],
-#         "enabled":    True,
-#     },
-#     "hurst": {
-#         "windows":    [30],
-#         "thresholds": [0.8],
-#         "enabled":    True,
-#     },
-# }
-# =============================================================================
 
 
+INDICATORS: dict[str, dict] = {
+    "atr_norm": {
+        "windows":    [10],
+        "thresholds": [0.04],
+        "enabled":    True,
+    },
+    "er": {
+        "windows":    [20],
+        "thresholds": [0.4],
+        "enabled":    True,
+    },
+    "hurst": {
+        "windows":    [30],
+        "thresholds": [0.4],
+        "enabled":    True,
+    },
+}
 
 ORDER_AMOUNT     = 80
 LONG_KEYWORD     = "long"
 DEBUG_TF_FILTER: list[str] = []
 
-logging.basicConfig(format="%(message)s", level=logging.WARNING)
+logging.basicConfig(format="%(message)s", level=logging.INFO)
 #logging.basicConfig(format="%(message)s", level=logging.DEBUG, force=True)
 logger = logging.getLogger(__name__)
 
@@ -121,7 +127,7 @@ def _unpack_combo(active_keys: list[str], combo: tuple) -> tuple[dict[str, int],
 # =============================================================================
 # FILTERED BACKTEST FOR A SINGLE COMBO
 # =============================================================================
-
+# FAST — experimental, remove if results differ from original
 def _run_filtered_combo(
     baselines:       dict,
     strategies:      list[dict],
@@ -131,6 +137,7 @@ def _run_filtered_combo(
 ) -> dict:
     results: dict = {}
     btc_cache = indicator_cache.get("BTCUSDT") if ANALYSIS_MODE == "BTC" else None
+    #print(f"  [DEBUG] btc_cache={btc_cache is not None} | keys={list(indicator_cache.keys())[:3]}")
 
     for strategy in strategies:
         sid = strategy['id']
@@ -143,23 +150,25 @@ def _run_filtered_combo(
             if period_key not in baselines[sid]:
                 continue
 
-            cached       = baselines[sid][period_key]
-            m_base       = cached['metrics']
-            n_trending   = n_ranging = 0
+            cached     = baselines[sid][period_key]
+            m_base     = cached['metrics']
+            n_trending = n_ranging = 0
             trending_arr = {}
             ranging_arr  = {}
 
             for sym, arr in cached['ohlcv_arrays'].items():
-                signals = cached['signal_cache'][sym]
-                filt_t  = signals.copy()
-                filt_r  = signals.copy()
+                signals     = cached['signal_cache'][sym]
+                signal_idxs = np.nonzero(signals)[0]
+
+                filt_t = signals.copy()
+                filt_r = signals.copy()
 
                 if ANALYSIS_MODE == "SYMBOL":
                     sym_cache = (
-                                indicator_cache.get((sym, strategy['timeframe']))
-                                if REGIME_TIMEFRAME_MODE == "STRATEGY"
-                                else indicator_cache.get(sym)
-                                )
+                        indicator_cache.get((sym, strategy['timeframe']))
+                        if REGIME_TIMEFRAME_MODE == "STRATEGY"
+                        else indicator_cache.get(sym)
+                    )
                     if sym_cache is None:
                         filt_r[:] = 0
                         n_ranging += int(signals.sum())
@@ -170,15 +179,21 @@ def _run_filtered_combo(
                 else:
                     ts_arr, values_arr = btc_cache
 
-                for idx in np.nonzero(signals)[0]:
-                    indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(arr['ts'][idx]))
-                    trending         = is_trending(indicator_values, thresholds, mode)
-                    if trending:
-                        filt_t[idx] = 0
-                        n_trending += 1
-                    else:
-                        filt_r[idx] = 0
-                        n_ranging  += 1
+                if signal_idxs.size > 0:
+                    # FAST — batch lookup instead of per-signal loop
+                    tf = strategy['timeframe'] if REGIME_TIMEFRAME_MODE == "STRATEGY" else None
+                    batch = lookup_indicators_batch(
+                        ts_arr, values_arr, arr['ts'][signal_idxs], timeframe=tf,
+                    )
+                    for i, idx in enumerate(signal_idxs):
+                        indicator_values = {k: float(v[i]) if not np.isnan(v[i]) else None for k, v in batch.items()}
+                        trending         = is_trending(indicator_values, thresholds, mode)
+                        if trending:
+                            filt_r[idx] = 0
+                            n_trending += 1
+                        else:
+                            filt_t[idx] = 0
+                            n_ranging  += 1
 
                 trending_arr[sym] = {**arr, 'signal': filt_t}
                 ranging_arr[sym]  = {**arr, 'signal': filt_r}
@@ -189,15 +204,16 @@ def _run_filtered_combo(
             trending_pct = n_trending / max(total, 1) * 100
 
             results[sid][period_key] = {
-            'b_prof':  m_base['profit'],   'trending_prof': m_t['profit'],   'ranging_prof':  m_r['profit'],
-            'b_dd':    m_base['max_dd'],   'trending_dd':   m_t['max_dd'],   'ranging_dd':    m_r['max_dd'],
-            'b_wr':    m_base['win_rate'], 'trending_wr':   m_t['win_rate'], 'ranging_wr':    m_r['win_rate'],
+                'b_prof':            m_base['profit'],   'trending_prof': m_t['profit'],   'ranging_prof':  m_r['profit'],
+                'b_dd':              m_base['max_dd'],   'trending_dd':   m_t['max_dd'],   'ranging_dd':    m_r['max_dd'],
+                'b_wr':              m_base['win_rate'], 'trending_wr':   m_t['win_rate'], 'ranging_wr':    m_r['win_rate'],
                 'trending_pct':      trending_pct,
                 'ranging_pass_pct':  100 - trending_pct,
                 'trending_pass_pct': trending_pct,
             }
 
     return results
+
 
 def _combined_profit_for_period(results: dict, period_key: str) -> tuple[float, float]:
     """Combined profit and baseline for a single period, respecting each strategy's classification."""
@@ -233,7 +249,7 @@ def run() -> None:
     for k in active_keys:
         cfg = INDICATORS[k]
         print(f"    {k.upper()}: windows={cfg['windows']}  thresholds={cfg['thresholds']}")
-    print(f"  BTC_TF={BTC_TIMEFRAME} | Lookahead fix: normalize()-1day")
+    print(f"  BTC_TF={BTC_TIMEFRAME} | Lookahead fix: normalize()-1day | TF_MODE={REGIME_TIMEFRAME_MODE}")
     print(f"  Periods: {' + '.join(EVAL_KEYS)}")
     print(f"{'='*120}")
 
@@ -287,8 +303,8 @@ def run() -> None:
                 )
         indicator_cache = indicator_cache_map[win_key]
 
+        # FAST — experimental, remove if results differ from original
         results = _run_filtered_combo(baselines, strategies_filtered, indicator_cache, thresholds, mode)
-
         for sid in results:
             if sid != 'is_long':
                 results[sid]['classification'] = classify_strategy(results, sid)
@@ -321,6 +337,7 @@ def run() -> None:
             'windows':    windows,
             'thresholds': thresholds,
             'mode':       mode,
+            'combo_idx':  combo_idx,
             'combined_profit':  comb_p,          'combined_dd':   comb_d,
             'weighted_delta':   weighted_delta,
             'baseline_profit':  baseline_profit,  'baseline_dd':  baseline_dd,
