@@ -331,7 +331,7 @@ def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit") 
         t_all = all(data[pk][t_key] > data[pk][b_key] for pk in periods_with_data)
         r_all = all(data[pk][r_key] > data[pk][b_key] for pk in periods_with_data)
     if t_all and r_all:
-        return "both"
+        return "neutral"
     if t_all:
         return "trending"
     if r_all:
@@ -357,14 +357,8 @@ def combined_metrics(results: dict) -> tuple[float, float]:
                 profits.append(d['ranging_prof']); dds.append(d['ranging_dd'])
             elif cls == 'trending':
                 profits.append(d['trending_prof']); dds.append(d['trending_dd'])
-            elif cls == 'both':
-                if d['ranging_prof'] >= d['trending_prof']:
-                    profits.append(d['ranging_prof']); dds.append(d['ranging_dd'])
-                else:
-                    profits.append(d['trending_prof']); dds.append(d['trending_dd'])
             else:
                 profits.append(d['b_prof']); dds.append(d['b_dd'])
-
     return sum(profits), (sum(dds) / len(dds) if dds else 0.0)
 
 
@@ -426,7 +420,7 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
         'avg_trend_pct':   avg_trend,
     }
 
-def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, base_p, base_dd, label):
+def print_combo_summary(period_summaries, n_r, n_t, n_n, comb_p, comb_dd, base_p, base_dd, label):
     print(f"\n  COMBO SUMMARY — {label}")
     print(f"  {'PERIOD':<8} {'B_PROF':>10} {'TRENDING':>10} {'TRD_Δ%':>7} {'RANGING':>10} {'RNG_Δ%':>7} "
           f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
@@ -443,7 +437,7 @@ def print_combo_summary(period_summaries, n_r, n_t, n_b, n_n, comb_p, comb_dd, b
     comb_pct = pct_improvement(comb_p, base_p)
     cc = "\033[92m" if comb_pct > 0 else "\033[91m"
     rs = "\033[0m"
-    print(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  BOTH:{n_b}  NEUTRAL:{n_n}")
+    print(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  NEUTRAL:{n_n}")
     print(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
     print(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {cc}Delta={comb_pct:>+6.1f}%{rs}")
 
@@ -453,14 +447,18 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
     col_t  = {k: max(len(f"{k.upper()}_TH"), 7) for k in active_keys}
     ind_header = "  ".join(f"{k.upper()+'_W':>{col_w[k]}}  {k.upper()+'_TH':>{col_t[k]}}" for k in active_keys)
     ind_width  = sum(col_w[k] + 2 + col_t[k] + 2 for k in active_keys)
-    total_w    = 6 + ind_width + 7 + 8 + 8 + 7 + 6 + 6 + 12 + 11 + 9 + 9 + 9 + 11
+    header_line = (f"  {'#':>3}  {'COMBO':>5}  {ind_header}  {'MODE':<5}  "
+               f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'NEUT':>5}  "
+               f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
+               f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
+    total_w = len(header_line) - 2
 
     print(f"\n\n{'='*total_w}")
     print(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
     print(f"  Active indicators: {', '.join(active_keys)}")
     print(f"{'='*total_w}")
     print(f"  {'#':>3}  {'COMBO':>5}  {ind_header}  {'MODE':<5}  "
-          f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'BOTH':>5} {'NEUT':>5}  "
+          f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'NEUT':>5}  "
           f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
           f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
     print(f"  {'─'*total_w}")
@@ -478,7 +476,7 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
         )
         print(f"  {i:>3}  {row['combo_idx']:>5}  {ind_cols}  {row['mode']:<5}  "
               f"{row['avg_trend_pct']:>6.1f}%  "
-              f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_both']:>5} {row['n_neutral']:>5}  "
+              f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_neutral']:>5}  "
               f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
               f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
               f"{row['baseline_dd']:>7.1f}% {ddc}{row['combined_dd']:>7.1f}%{rs}")

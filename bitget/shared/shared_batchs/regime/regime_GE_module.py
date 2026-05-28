@@ -15,7 +15,7 @@ REGIME_REFERENCE = 'BTCUSDT'
 # CONFIGURATION  — mirror from regime_GE.py after calibration
 # =============================================================================
 
-REGIME_ENABLED   = False
+REGIME_ENABLED   = True
 DEBUG_REGIME_LOG = False
 
 
@@ -62,7 +62,6 @@ def _filter_signals_ge(
     Filter signals for a single symbol based on the GE classification.
       "ranging"  → block when trending  (market is trending = bad for ranging strategy)
       "trending" → block when ranging   (market is ranging  = bad for trending strategy)
-      "both"     → block always
       "neutral"  → no filter
     """
     if classification == "neutral" or not REGIME_ENABLED:
@@ -87,8 +86,6 @@ def _filter_signals_ge(
         if classification == "ranging" and trending:
             filtered[idx] = 0
         elif classification == "trending" and not trending:
-            filtered[idx] = 0
-        elif classification == "both":
             filtered[idx] = 0
 
     if DEBUG_REGIME_LOG:
@@ -162,7 +159,7 @@ def run_oos_backtest_with_regime(
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}
 
-    result                = run_grid_backtest(
+    result = run_grid_backtest(
         ohlcv_arrays_regime,
         sell_after   = best_params["SELL_AFTER"],
         tp_pct       = best_params["TP_PCT"],

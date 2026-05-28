@@ -20,8 +20,8 @@ logger = logging.getLogger('BOT_trading.api.backend')
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
 import psycopg2
 from api.metrics import MetricsCalculator
-from market_regime.regime_classifier import get_regime_info
-from config.settings import REGIME_FAMILIES, REGIME_GENERAL
+from market_regime.regime_classifier import get_regime_info_front
+from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import HOUR_ZONE
 from config.utils.utils import get_account_config
@@ -160,10 +160,6 @@ class DashboardServer:
                 'fee': 'FEE',
                 'profit_pct': 'PROFIT_PCT',
                 'reason_out': 'REASON_OUT',
-                'regime_family': 'REGIME_FAMILY',
-                'regime_multiplier': 'REGIME_MULTIPLIER',
-                'market_direction': 'MARKET_DIRECTION',
-                'direction_multiplier': 'DIRECTION_MULTIPLIER',
                 'tp_target': 'TP_TARGET',
                 'sl_target': 'SL_TARGET'
             }, inplace=True)
@@ -791,22 +787,18 @@ class DashboardServer:
         
                 for idx, strat in enumerate(self.strategies, 1):
                     strategies_info.append({
-                        'number': idx,
-                        'id': strat['id'],
-                        'direction': strat.get('direction', 'long'),
-                        'regime_trending_uptrend':  strat.get('regime_trending_uptrend',  0),
-                        'regime_trending_dwtrend':  strat.get('regime_trending_dwtrend',  0),
-                        'regime_ranging_uptrend':   strat.get('regime_ranging_uptrend',   0),
-                        'regime_ranging_dwtrend':   strat.get('regime_ranging_dwtrend',   0),
-                        'regime_volatile_uptrend':  strat.get('regime_volatile_uptrend',  0),
-                        'regime_volatile_dwtrend':  strat.get('regime_volatile_dwtrend',  0),
-                        'active': strat.get('active', True)
-                    })
+                            'number':          idx,
+                            'id':              strat['id'],
+                            'direction':       strat.get('direction', 'long'),
+                            'regime_trending': strat.get('regime_trending', 1),
+                            'regime_ranging':  strat.get('regime_ranging',  1),
+                            'regime_neutral':  strat.get('regime_neutral',  1),
+                            'active':          strat.get('active', True)
+                        })
         
                 return jsonify({
                     'success': True,
                     'strategies': strategies_info,
-                    'regime_general': REGIME_GENERAL
                 })
         
             except Exception as e:
@@ -1036,111 +1028,7 @@ class DashboardServer:
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
         
-        @self.app.route('/api/symbols-analysis')
-        def get_symbols_analysis():
-            try:              
-                df = self._load_trades_dataframe()      
-                if df is None:
-                    logger.error("ERROR: DataFrame is None")
-                    return jsonify([])
-                
-                # Check if slippage columns exist (CLOSE execution data) - LOWERCASE
-                has_slippage_data = 'order_price_close' in df.columns and 'PRICE_CLOSE' in df.columns
-                
-                results = []
-                
-                for symbol in sorted(df['SYMBOL'].unique()):
-                    df_symbol = df[df['SYMBOL'] == symbol]
-                    
-                    # Existing metrics
-                    total_trades = len(df_symbol)
-                    positive_trades = len(df_symbol[df_symbol['PROFIT'] > 0])
-                    win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
-                    total_profit = df_symbol['PROFIT'].sum()
-                    avg_profit = total_profit / total_trades if total_trades > 0 else 0
-                    
-                    # Calculate slippage metrics from CLOSE execution data
-                    slippage_total = None
-                    slippage_l30 = None
-                    
-                    if has_slippage_data:
-                        df_with_slippage = df_symbol[
-                            df_symbol['order_price_close'].notna() & 
-                            df_symbol['PRICE_CLOSE'].notna()
-                        ].copy()
-                        
-                        # Total slippage
-                        if len(df_with_slippage) > 0:
-                            df_with_slippage['slippage_pct'] = (
-                                (df_with_slippage['PRICE_CLOSE'] - df_with_slippage['order_price_close']) 
-                                / df_with_slippage['order_price_close'] 
-                                * 100
-                            )
-                            slippage_total = df_with_slippage['slippage_pct'].mean()
-                        
-                        # Last 30 trades slippage
-                        if len(df_with_slippage) > 0:
-                            df_last30 = df_with_slippage.tail(30)
-                            if len(df_last30) > 0:
-                                df_last30['slippage_pct'] = (
-                                    (df_last30['PRICE_CLOSE'] - df_last30['order_price_close']) 
-                                    / df_last30['order_price_close'] 
-                                    * 100
-                                )
-                                slippage_l30 = df_last30['slippage_pct'].mean()
-                    
-                    results.append({
-                        'Symbol': symbol,
-                        'Total_Trades': total_trades,
-                        'Win_Pct': round(win_pct, 2),
-                        'Total_Profit': round(total_profit, 2),
-                        'Avg_Profit': round(avg_profit, 2),
-                        'Slippage_Total': round(slippage_total, 2) if slippage_total is not None else None,
-                        'Slippage_L30': round(slippage_l30, 2) if slippage_l30 is not None else None
-                    })
-                return jsonify(results)
-                
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/weekday-analysis')
-        def get_weekday_analysis():
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify([])
-                
-                df = self._prepare_trades_dataframe(df)
-                
-                df['weekday'] = df['OPEN_AT'].dt.day_name()
-                
-                weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                
-                results = []
-                
-                for day in weekday_order:
-                    df_day = df[df['weekday'] == day]
-                    
-                    if len(df_day) == 0:
-                        continue
-                    
-                    total_trades = len(df_day)
-                    positive_trades = len(df_day[df_day['PROFIT'] > 0])
-                    win_pct = (positive_trades / total_trades * 100) if total_trades > 0 else 0
-                    total_profit = df_day['PROFIT'].sum()
-                    avg_profit = total_profit / total_trades if total_trades > 0 else 0
-                    
-                    results.append({
-                        'Day': day,
-                        'Total_Trades': total_trades,
-                        'Win_Pct': round(win_pct, 2),
-                        'Total_Profit': round(total_profit, 2),
-                        'Avg_Profit': round(avg_profit, 2)
-                    })
-                
-                return jsonify(results)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
+
         
         @self.app.route('/api/equity-data')
         def get_equity_data():
@@ -1332,252 +1220,8 @@ class DashboardServer:
                 import traceback
                 traceback.print_exc()
                 return jsonify({'error': str(e)}), 500
-        
-        @self.app.route('/api/analytics/regime')
-        def get_regime_analytics():
-            """
-            Analytics by market regime: trades, P&L, and win rate per regime family.
-            
-            Returns:
-                JSON with stats per regime (trending, ranging, volatile, unknown)
-                
-            Example response:
-            {
-                "success": true,
-                "data": {
-                    "trending": {
-                        "trades": 45,
-                        "total_trades": 120,
-                        "pnl": 156.80,
-                        "winrate": 68.9
-                    },
-                    "ranging": {
-                        "trades": 32,
-                        "total_trades": 120,
-                        "pnl": 45.20,
-                        "winrate": 53.1
-                    },
-                    "volatile": {
-                        "trades": 12,
-                        "total_trades": 120,
-                        "pnl": -23.40,
-                        "winrate": 41.7
-                    },
-                    "unknown": {
-                        "trades": 5,
-                        "total_trades": 120,
-                        "pnl": 12.10,
-                        "winrate": 60.0
-                    }
-                }
-            }
-            """
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify({'error': 'No trades data available'}), 404
-                
-                # Check if regime columns exist
-                if 'REGIME_FAMILY' not in df.columns:
-                    return jsonify({
-                        'error': 'No regime data in trades file (old format)',
-                        'data': {}
-                    }), 200
-                
-                # Fill NaN with 'unknown'
-                df['REGIME_FAMILY'] = df['REGIME_FAMILY'].fillna('unknown')
-                
-                # Calculate total trades
-                total_trades = len(df)
-                
-                # Group by regime
-                results = {}
-                for regime in df['REGIME_FAMILY'].unique():
-                    df_regime = df[df['REGIME_FAMILY'] == regime]
-                    
-                    trades_count = len(df_regime)
-                    pnl = df_regime['PROFIT'].sum()
-                    positive_trades = len(df_regime[df_regime['PROFIT'] > 0])
-                    winrate = (positive_trades / trades_count * 100) if trades_count > 0 else 0
-                    
-                    results[regime] = {
-                        'trades': int(trades_count),
-                        'total_trades': int(total_trades),
-                        'pnl': round(float(pnl), 2),
-                        'winrate': round(float(winrate), 1)
-                    }
-                
-                return jsonify({
-                    'success': True,
-                    'data': results
-                })
-                
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                return jsonify({'error': str(e)}), 500
-            
-        @self.app.route('/api/regime/strategy-breakdown')
-        def get_regime_strategy_breakdown():
-            """
-            Performance breakdown by strategy across market regimes and directions.
-            
-            Query params:
-                date_from: YYYY-MM-DD (optional)
-                date_to: YYYY-MM-DD (optional)
-            
-            Returns:
-                JSON with per-strategy stats across regimes and directions
-            """
-            try:
-                date_from = request.args.get('date_from', None)
-                date_to = request.args.get('date_to', None)
-                
-                # Load trades
-                df = self._load_trades_dataframe()
-                if df is None or df.empty:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No trades data available',
-                        'data': []
-                    })
-                
-                # Check if regime columns exist
-                if 'REGIME_FAMILY' not in df.columns or 'MARKET_DIRECTION' not in df.columns:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No regime/direction data in trades file',
-                        'data': []
-                    })
-                
-                # Prepare and filter by dates
-                df = self._prepare_trades_dataframe(df)
-                df = self._filter_df_by_dates(df, date_from, date_to)
-                
-                if df.empty:
-                    return jsonify({
-                        'success': True,
-                        'data': []
-                    })
-                
-                # Fill NaN values
-                df['REGIME_FAMILY'] = df['REGIME_FAMILY'].fillna('unknown')
-                df['MARKET_DIRECTION'] = df['MARKET_DIRECTION'].fillna('unknown')
-                
-                # Get unique strategies
-                strategies = sorted(df['STRATEGY'].unique())
-                
-                results = []
-                
-                for idx, strategy in enumerate(strategies, 1):
-                    df_strat = df[df['STRATEGY'] == strategy]
-                    
-                    # Global stats
-                    total_trades = len(df_strat)
-                    positive_trades = len(df_strat[df_strat['PROFIT'] > 0])
-                    win_rate = (positive_trades / total_trades * 100) if total_trades > 0 else 0
-                    total_profit = df_strat['PROFIT'].sum()
-                    
-                    # Helper function to calculate regime/direction stats
-                    def get_stats(filtered_df):
-                        if len(filtered_df) == 0:
-                            return {'trades': 0, 'win_pct': 0}
-                        
-                        trades = len(filtered_df)
-                        wins = len(filtered_df[filtered_df['PROFIT'] > 0])
-                        win_pct = (wins / trades * 100) if trades > 0 else 0
-                        
-                        return {
-                            'trades': int(trades),
-                            'win_pct': round(float(win_pct), 1)
-                        }
-                    
-                    # Calculate stats for each regime
-                    trending_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'trending'])
-                    ranging_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'ranging'])
-                    volatile_stats = get_stats(df_strat[df_strat['REGIME_FAMILY'] == 'volatile'])
-                    
-                    # Calculate stats for each direction
-                    uptrend_stats = get_stats(df_strat[df_strat['MARKET_DIRECTION'] == 'uptrend'])
-                    downtrend_stats = get_stats(df_strat[df_strat['MARKET_DIRECTION'] == 'dwtrend'])
-                    
-                    results.append({
-                        'number': idx,
-                        'strategy': strategy,
-                        'total_trades': int(total_trades),
-                        'win_rate': round(float(win_rate), 1),
-                        'profit': round(float(total_profit), 2),
-                        'trending': trending_stats,
-                        'ranging': ranging_stats,
-                        'volatile': volatile_stats,
-                        'uptrend': uptrend_stats,
-                        'downtrend': downtrend_stats
-                    })
-                
-                return jsonify({
-                    'success': True,
-                    'data': results
-                })
-                
-            except Exception as e:
-                logger.error(f"Error in regime strategy breakdown: {e}")
-                import traceback
-                traceback.print_exc()
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'data': []
-                }), 500
-            
-        @self.app.route('/api/analytics/market-direction')
-        def get_market_direction_analytics():
-            """
-            Analytics by market direction: trades, P&L, and win rate per direction.
-            """
-            try:
-                df = self._load_trades_dataframe()
-                if df is None:
-                    return jsonify({'error': 'No trades data available'}), 404
-                
-                # Check if column exists
-                if 'MARKET_DIRECTION' not in df.columns:
-                    return jsonify({
-                        'error': 'No market direction data in trades file',
-                        'data': {}
-                    }), 200
-                
-                # Fill NaN with 'unknown'
-                df['MARKET_DIRECTION'] = df['MARKET_DIRECTION'].fillna('unknown')
-                
-                # Calculate total trades
-                total_trades = len(df)
-                
-                # Group by direction
-                results = {}
-                for direction in df['MARKET_DIRECTION'].unique():
-                    df_dir = df[df['MARKET_DIRECTION'] == direction]
-                    
-                    trades_count = len(df_dir)
-                    pnl = df_dir['PROFIT'].sum()
-                    positive_trades = len(df_dir[df_dir['PROFIT'] > 0])
-                    winrate = (positive_trades / trades_count * 100) if trades_count > 0 else 0
-                    
-                    results[direction] = {
-                        'trades': int(trades_count),
-                        'total_trades': int(total_trades),
-                        'pnl': round(float(pnl), 2),
-                        'winrate': round(float(winrate), 1)
-                    }
-                
-                return jsonify({
-                    'success': True,
-                    'data': results
-                })
-                
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                return jsonify({'error': str(e)}), 500
+
+
 
         # ==============================================================================
         # EXACT LOCATION IN FILE
@@ -1586,125 +1230,119 @@ class DashboardServer:
         @self.app.route('/api/regime/current')
         def get_regime_current():
             """
-            Obtiene el régimen de mercado actual para un timeframe específico.
-            
+            Get current market regime for reference symbol (header card).
+
             Query params:
-                timeframe: Timeframe a analizar (ej: '4H', '1H', '6Hutc')
-            
+                timeframe: Strategy timeframe selected in UI (e.g. '4H', '1H')
+
             Returns:
-                JSON con family, multiplier, metrics, thresholds, all_families, all_thresholds
+                JSON with family, metrics, config, ref_price, all_families
             """
             try:
-                timeframe = request.args.get('timeframe', '4H')
-                
-                # Validar timeframe
-                valid_timeframes = ['1H', '4H', '6Hutc', '2m', '5m', '15m', '30m']
-                if timeframe not in valid_timeframes:
-                    return jsonify({
-                        'success': False,
-                        'error': f'Invalid timeframe. Valid: {valid_timeframes}',
-                        'family': 'ranging',
-                        'multiplier': 1.0,
-                        'metrics': {},
-                        'timeframe': timeframe,
-                        'all_families': {},
-                        'all_thresholds': {}
-                    }), 400
-                
-                # Obtener régimen actual
-                from market_regime.regime_classifier import get_cached_direction
-                regime_info = get_regime_info(timeframe)
-                
-                # Retornar info completa incluyendo todas las familias
+                timeframe    = request.args.get('timeframe', '4H')
+                regime_info  = get_regime_info_front(timeframe, symbol=None)
+
+
                 return jsonify({
-                    'success': True,
-                    'timeframe': timeframe,
-                    'family': regime_info['family'],
-                    'multiplier': regime_info['multiplier'],
-                    'metrics': regime_info['metrics'],
-                    'thresholds': regime_info.get('thresholds', {}),
-                    'ref_price': float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
-                    'ref_trend': get_cached_direction(),       
-                    'all_families': REGIME_GENERAL,
-                    'all_thresholds': REGIME_FAMILIES
+                    'success':        regime_info['success'],
+                    'timeframe':      timeframe,
+                    'family':         regime_info['family'],
+                    'metrics':        regime_info['metrics'],
+                    'indicators_cfg': {
+                        k: {
+                            'window':    v['windows'][0],
+                            'threshold': v['thresholds'][0],
+                            'enabled':   v['enabled'],
+                        }
+                        for k, v in INDICATORS.items()
+                    },
+                    'ref_price':      float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
+                    'combine_mode':   COMBINE_MODE,
+                    'analysis_mode':  ANALYSIS_MODE,
+                    'tf_mode':        REGIME_TIMEFRAME_MODE,
                 })
-                
+
             except Exception as e:
                 logger.error(f"Error getting regime: {e}")
                 return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'family': 'ranging',
-                    'multiplier': 1.0,
-                    'metrics': {},
+                    'success':   False,
+                    'error':     str(e),
+                    'family':    'ranging',
+                    'metrics':   {},
                     'timeframe': request.args.get('timeframe', '4H'),
-                    'all_families': {},
-                    'all_thresholds': {}
                 }), 500
-        
-        @self.app.route('/api/regime0/current')
-        def get_regime0_current():
+            
+        @self.app.route('/api/symbols/unique')
+        def get_unique_symbols():
+            """
+            Returns unique symbols across all strategy CSV files for this account.
+            Reads from symbols_live/{account}/*.csv
+            """
             try:
-                from market_regime.regime_classifier import fetch_ref_ohlcv
-                from config.utils.utils import get_account_config
-                import pandas as pd
-        
-                # Get account-specific thresholds
-                account_config = get_account_config(self.account_number)
-                ma_period    = account_config.get('regime01_ma_period', 5)
-                long_th      = account_config.get('regime01_long_th',   1.02)
-                short_th     = account_config.get('regime01_short_th',  1.00)
-        
-                # Fetch BTC 1D data
-                df = fetch_ref_ohlcv('1Dutc')
-        
-                if df is None or df.empty or len(df) < ma_period:
-                    return jsonify({
-                        'success': False,
-                        'error': 'Insufficient BTC 1D data',
-                        'long_allowed': None,
-                        'short_allowed': None
-                    }), 500
-        
-                btc_close       = float(pd.to_numeric(df['close'].iloc[-1], errors='coerce'))
-                ma              = float(pd.to_numeric(df['close'], errors='coerce').tail(ma_period).mean())
-                long_threshold  = ma * long_th
-                short_threshold = ma * short_th
-        
-                long_allowed  = btc_close > long_threshold
-                short_allowed = btc_close < short_threshold
-        
-                ref_symbol = self.regime_reference_symbol or 'REF'
-                ref_label  = ref_symbol.replace('USDT', '')
+                symbols_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'symbols_live', self.account_number)
+                if not os.path.exists(symbols_dir):
+                    return jsonify({'success': False, 'error': f'Directory not found: {symbols_dir}'}), 404
+
+                symbol_set = set()
+                for fname in os.listdir(symbols_dir):
+                    if not fname.endswith('.csv'):
+                        continue
+                    fpath = os.path.join(symbols_dir, fname)
+                    try:
+                        df = pd.read_csv(fpath, header=None, names=['symbol'])
+                        symbol_set.update(df['symbol'].dropna().str.strip().tolist())
+                    except Exception as e:
+                        logger.warning(f"[SYMBOLS] Error reading {fname}: {e}")
 
                 return jsonify({
                     'success': True,
-                    'btc_close': btc_close,
-                    'ref_symbol': ref_label,
-                    'ma5': ma,
-                    'long': {
-                        'allowed': long_allowed,
-                        'threshold': long_threshold,
-                        'multiplier': long_th,
-                        'rule': f'{ref_label} > MA{ma_period}*{long_th}'
-                    },
-                    'short': {
-                        'allowed': short_allowed,
-                        'threshold': short_threshold,
-                        'multiplier': short_th,
-                        'rule': f'{ref_label} < MA{ma_period}*{short_th}'
-                    }
+                    'symbols': sorted(symbol_set),
+                    'count':   len(symbol_set)
                 })
-        
+
             except Exception as e:
-                logger.error(f"Error getting REGIME 0: {e}")
+                logger.error(f"[SYMBOLS] Error getting unique symbols: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @self.app.route('/api/regime/symbols')
+        def get_regime_symbols():
+            """
+            Get regime metrics for a single symbol.
+
+            Query params:
+                timeframe : Strategy timeframe selected in UI (e.g. '4H')
+                symbol    : Single symbol to calculate (e.g. 'ETHUSDT')
+            """
+            try:
+                timeframe = request.args.get('timeframe', '4H')
+                symbol    = request.args.get('symbol')
+
+                if not symbol:
+                    return jsonify({'success': False, 'error': 'symbol param required'}), 400
+
+                result      = get_regime_info_front(timeframe, symbol=[symbol])
+                symbol_data = result.get('symbols', {}).get(symbol, {})
+
                 return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'long_allowed': None,
-                    'short_allowed': None
-                }), 500
-        
+                    'success':        result['success'],
+                    'timeframe':      timeframe,
+                    'symbol':         symbol,
+                    'family':         symbol_data.get('family', 'neutral'),
+                    'metrics':        symbol_data.get('metrics', {}),
+                    'indicators_cfg': {
+                        k: {
+                            'window':    v['windows'][0],
+                            'threshold': v['thresholds'][0],
+                            'enabled':   v['enabled'],
+                        }
+                        for k, v in INDICATORS.items()
+                    },
+                })
+
+            except Exception as e:
+                logger.error(f"[REGIME SYMBOLS] Error for {request.args.get('symbol')}: {e}")
+                return jsonify({'success': False, 'error': str(e)}), 500
+
         # ==============================================================================
         # BTC DATA ENDPOINTS
         # ==============================================================================

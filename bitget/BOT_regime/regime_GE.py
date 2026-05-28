@@ -29,17 +29,15 @@ from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 # =============================================================================
 
 STRATEGIES_SET_NAME  = "E1"
-BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_bins_{STRATEGIES_SET_NAME}.py")
+BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{STRATEGIES_SET_NAME}.py")
 
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-
+OPTIMIZE_METRIC       = "calmar"    # "profit" | "max_dd" | "win_rate"
 ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
-BTC_TIMEFRAME         = "1Dutc"
 REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
-OPTIMIZE_METRIC       = "calmar"    # "profit" | "max_dd" | "win_rate"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -410,7 +408,7 @@ def _print_classification_summary(strategy_results: dict) -> None:
     for sid, data in sorted(strategy_results.items()):
         direction = "LONG" if data['is_long'] else "SHORT"
         cls       = data.get('classification', 'neutral').upper()
-        color     = {'RANGING': "\033[92m", 'TRENDING': "\033[94m", 'BOTH': "\033[93m", 'NEUTRAL': "\033[90m"}.get(cls, "")
+        color = {'RANGING': "\033[92m", 'TRENDING': "\033[94m", 'NEUTRAL': "\033[90m"}.get(cls, "")
         print(f"  {sid:<35} {direction:<6} {color}{cls:<10}\033[0m")
     print(f"  {'─'*55}\n")
 
@@ -459,7 +457,6 @@ def run(eval_keys: list[str]) -> None:
     print(f"  Active indicators: {', '.join(active_keys)}")
     for k in active_keys:
         print(f"    {k.upper()}: window={windows[k]}  threshold={thresholds[k]}  combine={mode}")
-    print(f"  BTC_TF={BTC_TIMEFRAME} | Lookahead fix: normalize()-1day")
     print(f"  Eval: {' + '.join(eval_keys)}")
     print(f"{'='*120}\n")
 

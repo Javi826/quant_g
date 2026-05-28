@@ -60,8 +60,7 @@ def configure_log_path(trades_log_path: str) -> None:
 
 def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbol, 
                         direction, usdt_amount, size_val, entry_price, close_price,
-                        profit, fee, profit_pct, reason, regime_family, regime_multiplier,
-                        market_direction, direction_multiplier,
+                        profit, fee, profit_pct, reason,
                         order_price_close, order_ts_close, exec_ts_close,
                         tp_target, sl_target):  # ← AÑADIR AQUÍ
     """
@@ -93,16 +92,14 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
             INSERT INTO trades (
                 account, open_at, close_at, duration_days, strategy, symbol, direction,
                 usdt_amount, size, price_entry, price_close, profit, fee,
-                profit_pct, reason_out, regime_family, regime_multiplier,
-                market_direction, direction_multiplier,
+                profit_pct, reason_out,
                 order_price_close, order_ts_close, exec_ts_close,
                 tp_target, sl_target  -- ← AÑADIR AQUÍ
             ) VALUES (
                 %(account)s, %(open_at)s, %(close_at)s, %(duration_days)s, %(strategy)s,
                 %(symbol)s, %(direction)s, %(usdt_amount)s, %(size)s,
                 %(price_entry)s, %(price_close)s, %(profit)s, %(fee)s,
-                %(profit_pct)s, %(reason_out)s, %(regime_family)s,
-                %(regime_multiplier)s, %(market_direction)s, %(direction_multiplier)s,
+                %(profit_pct)s, %(reason_out)s,
                 %(order_price_close)s, %(order_ts_close)s, %(exec_ts_close)s,
                 %(tp_target)s, %(sl_target)s  -- ← AÑADIR AQUÍ
             )
@@ -124,10 +121,6 @@ def _write_to_postgresql(opened_at_dt, closed_at, delta_days, strategy_id, symbo
             'fee': round(fee, 4),
             'profit_pct': round(profit_pct, 1),
             'reason_out': reason,
-            'regime_family': regime_family,
-            'regime_multiplier': round(regime_multiplier, 1),
-            'market_direction': market_direction,
-            'direction_multiplier': round(direction_multiplier, 1),
             'order_price_close': order_price_close,
             'order_ts_close': order_ts_close,
             'exec_ts_close': exec_ts_close,
@@ -164,10 +157,6 @@ def log_closed_position(opened_at,
                        profit_from_api: Optional[Decimal] = None,
                        fee_from_api: Optional[Decimal] = None,
                        bot_state=None,
-                       regime_family: Optional[str] = None,
-                       regime_multiplier: Optional[float] = None,
-                       market_direction: Optional[str] = None,            
-                       direction_multiplier: Optional[float] = None,
                        order_price_close: Optional[float] = None,
                        order_ts_close: Optional[float] = None,
                        exec_ts_close: Optional[float] = None,
@@ -196,8 +185,6 @@ def log_closed_position(opened_at,
         profit_from_api: Profit from API (if available)
         fee_from_api: Fee from API (if available)
         bot_state: Bot state object for profit tracking
-        regime_family: Market regime family when position opened ('volatile', 'ranging', 'trending')
-        regime_multiplier: Multiplier applied based on regime (0, 0.5, 1.0, 1.5, etc.)
     """
     if TRADES_LOG_PATH is None:
         logger.warning("WAR-TRADES_LOG_PATH not configured. Trade not logged.")
@@ -286,10 +273,6 @@ def log_closed_position(opened_at,
             'FEE': round(fee, 4) if profit_from_api is not None else 0,
             'PROFIT_PCT': round(profit_pct, 1),
             'REASON_OUT': reason,
-            'REGIME_FAMILY': regime_family if regime_family else 'unknown',
-            'REGIME_MULTIPLIER': round(regime_multiplier, 1) if regime_multiplier is not None else 1.0,
-            'MARKET_DIRECTION': market_direction if market_direction else 'unknown',
-            'DIRECTION_MULTIPLIER': round(direction_multiplier, 1) if direction_multiplier is not None else 1.0,
             'ORDER_PRICE_CLOSE': order_price_close,
             'ORDER_TS_CLOSE': order_ts_close,
             'EXEC_TS_CLOSE': exec_ts_close,
@@ -317,20 +300,12 @@ def log_closed_position(opened_at,
             opened_at_dt, closed_at, delta_days, strategy_id, symbol,
             direction, usdt_amount, size_val, entry_price, close_price,
             profit, fee, profit_pct, reason,
-            regime_family if regime_family else 'unknown',
-            regime_multiplier if regime_multiplier is not None else 1.0,
-            market_direction if market_direction else 'unknown',
-            direction_multiplier if direction_multiplier is not None else 1.0,
             order_price_close, order_ts_close, exec_ts_close,
             tp_target, sl_target
         )
 
-        # Enhanced logging with regime info
-        regime_info = ""
-        if regime_family:
-            regime_info = f" | Regime: {regime_family.upper()} ({regime_multiplier}x)"
         
-        logger.info(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%){regime_info}")
+        logger.info(f"Logged: {symbol} | Profit: {profit:.2f} $ ({profit_pct:+.2f}%)")
 
     except Exception as e:
         logger.error(f"Error-logging to Excel: {e}")

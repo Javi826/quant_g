@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime import get_current_regime, get_ref_1d_direction, PositionSizer,configure_regime
+from market_regime import  PositionSizer, configure_regime
 from risk_control import RiskLimiter, ExposureCalculator
 from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
@@ -130,8 +130,6 @@ class BotOrchestrator:
         self._initialized = False
         
         #Marke regime
-        self.regime_cache: Dict[str, str] = {}
-        self.direction_cache: Dict[str, str] = {}
         self.position_sizer: Optional[PositionSizer] = None
         #Risk
         self.risk_limiter: Optional[RiskLimiter] = None
@@ -265,18 +263,14 @@ class BotOrchestrator:
     def _log_account_flags(self) -> None:
         """Log account configuration flags at startup."""
         capital_str = f"${self.initial_capital:,.0f}"
-        regime01    = self.account_flags.get('regime01_enabled', True)
+        regime01    = self.account_flags.get('regime_enabled', True)
         risk        = self.account_flags.get('risk_control_enabled', True)
         pg          = self.account_flags.get('postgresql_enabled', True)
-        ma_period   = self.account_flags.get('regime01_ma_period', 5)
-        long_th     = self.account_flags.get('regime01_long_th', 1.02)
-        short_th    = self.account_flags.get('regime01_short_th', 1.00)
         self.logger.info(f"[{self.account_number}] ════ Account Configuration ════")
         self.logger.info(f"[{self.account_number}] Initial capital:  {capital_str}")
-        self.logger.info(f"[{self.account_number}] Regime01:         {'✅ enabled' if regime01 else '❌ disabled'}")
+        self.logger.info(f"[{self.account_number}] Regime  :         {'✅ enabled' if regime01 else '❌ disabled'}")
         self.logger.info(f"[{self.account_number}] Risk control:     {'✅ enabled' if risk else '❌ disabled'}")
-        self.logger.info(f"[{self.account_number}] PostgreSQL:       {'✅ enabled' if pg else '❌ disabled'}")
-        self.logger.info(f"[{self.account_number}] BTC MA period:    {ma_period} | Long TH: {long_th} | Short TH: {short_th}")  
+        self.logger.info(f"[{self.account_number}] PostgreSQL:       {'✅ enabled' if pg else '❌ disabled'}") 
         
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
@@ -523,8 +517,7 @@ class BotOrchestrator:
         # ========================================================================
         # REGIME UPDATE: Calculate market regime & direction for closed timeframes
         # ========================================================================
-        if self.account_flags.get('regime01_enabled', True):
-            self._update_regime_for_timeframes(closed_timeframes)
+
         
         now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
         self.logger.info(f"Searching Signals... - {now}")
@@ -622,29 +615,7 @@ class BotOrchestrator:
             # ====================================================================
             # REGIME LAYER 01
             # ====================================================================
-            if self.account_flags.get('regime01_enabled', True):
-                timeframe        = strat['timeframe']
-                market_regime    = self.regime_cache.get(timeframe, 'ranging')
-                market_direction = self.direction_cache.get(timeframe, 'uptrend')
-                adjusted_amount, metadata = self.position_sizer.calculate_adjusted_amount(
-                    base_amount      = strat['order_amount'],
-                    strat            = strat,
-                    market_regime    = market_regime,
-                    market_direction = market_direction,
-                )
-                if metadata['blocked']:
-                    log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                    self.logger.info(log_msg)
-                    continue
-                log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                self.logger.info(log_msg)
-            else:
-                adjusted_amount = strat['order_amount']
-                metadata = {
-                    'market_regime':    'no_regime',
-                    'market_direction': 'no_direction',
-                    'flag':             1,
-                }
+            adjusted_amount = strat['order_amount']
 
             # ====================================================================
             # RISK CHECK
@@ -667,20 +638,36 @@ class BotOrchestrator:
                 self.logger.info(log_msg)
 
             # ====================================================================
-            # SIGNAL PROCESSING: Execute strategy with retry logic
+            # SIGNAL PROCESSING: REGIME
             # ====================================================================
             try:
-                self.strategy_processor.process(
-                    strat=strat,
-                    final_symbols=self.final_by_strat.get(strat['id'], []),
-                    exchange=self.exchange,
-                    open_positions=self.open_positions,
-                    strategy_candles=self.strategy_candles,
-                    adjusted_order_amount=adjusted_amount,
-                    regime_family=metadata['market_regime'],
-                    regime_multiplier=float(metadata['flag']),
-                    direction=metadata['market_direction'],
-                    direction_multiplier=1.0,
+                signals = self.strategy_processor.detect_signals(
+                    strat         = strat,
+                    final_symbols = self.final_by_strat.get(strat['id'], []),
+                    exchange      = self.exchange,
+                )
+                
+                if self.account_flags.get('regime_enabled', True):
+                    approved_signals = []
+                    for sig in signals:
+                        _, metadata = self.position_sizer.calculate_adjusted_amount(
+                            base_amount   = adjusted_amount,
+                            strat         = strat,
+                            market_regime = sig.get('regime', 'neutral'),
+                        )
+                        log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                        self.logger.info(log_msg)
+                        if not metadata['blocked']:
+                            approved_signals.append(sig)
+                else:
+                    approved_signals = signals
+                
+                self.strategy_processor.execute_signals(
+                    strat            = strat,
+                    signals          = approved_signals,
+                    open_positions   = self.open_positions,
+                    strategy_candles = self.strategy_candles,
+                    order_amount     = adjusted_amount,
                 )
             except Exception as e:
                 self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
@@ -701,17 +688,33 @@ class BotOrchestrator:
 
                     if remaining_symbols:
                         try:
-                            self.strategy_processor.process(
-                                strat=strat,
-                                final_symbols=remaining_symbols,
-                                exchange=self.exchange,
-                                open_positions=self.open_positions,
-                                strategy_candles=self.strategy_candles,
-                                adjusted_order_amount=adjusted_amount,
-                                regime_family=metadata['market_regime'],
-                                regime_multiplier=float(metadata['flag']),
-                                direction=metadata['market_direction'],
-                                direction_multiplier=1.0,
+                            signals = self.strategy_processor.detect_signals(
+                                strat         = strat,
+                                final_symbols = self.final_by_strat.get(strat['id'], []),
+                                exchange      = self.exchange,
+                            )
+                            
+                            if self.account_flags.get('regime_enabled', True):
+                                approved_signals = []
+                                for sig in signals:
+                                    _, metadata = self.position_sizer.calculate_adjusted_amount(
+                                        base_amount   = adjusted_amount,
+                                        strat         = strat,
+                                        market_regime = sig.get('regime', 'neutral'),
+                                    )
+                                    log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                                    self.logger.info(log_msg)
+                                    if not metadata['blocked']:
+                                        approved_signals.append(sig)
+                            else:
+                                approved_signals = signals
+                            
+                            self.strategy_processor.execute_signals(
+                                strat            = strat,
+                                signals          = approved_signals,
+                                open_positions   = self.open_positions,
+                                strategy_candles = self.strategy_candles,
+                                order_amount     = adjusted_amount,
                             )
                             self.logger.info(f"Retry successful for {strat_id} ({len(remaining_symbols)} remaining symbols processed)")
                         except Exception as e2:
@@ -722,17 +725,33 @@ class BotOrchestrator:
                     self.logger.info(f"Retrying {strat_id} after 3 seconds... (no positions opened yet)")
                     time.sleep(3)
                     try:
-                        self.strategy_processor.process(
-                            strat=strat,
-                            final_symbols=self.final_by_strat.get(strat['id'], []),
-                            exchange=self.exchange,
-                            open_positions=self.open_positions,
-                            strategy_candles=self.strategy_candles,
-                            adjusted_order_amount=adjusted_amount,
-                            regime_family=metadata['market_regime'],
-                            regime_multiplier=float(metadata['flag']),
-                            direction=metadata['market_direction'],
-                            direction_multiplier=1.0,
+                        signals = self.strategy_processor.detect_signals(
+                            strat         = strat,
+                            final_symbols = self.final_by_strat.get(strat['id'], []),
+                            exchange      = self.exchange,
+                        )
+                        
+                        if self.account_flags.get('regime_enabled', True):
+                            approved_signals = []
+                            for sig in signals:
+                                _, metadata = self.position_sizer.calculate_adjusted_amount(
+                                    base_amount   = adjusted_amount,
+                                    strat         = strat,
+                                    market_regime = sig.get('regime', 'neutral'),
+                                )
+                                log_msg = self.position_sizer.format_log_message(strat_id, metadata)
+                                self.logger.info(log_msg)
+                                if not metadata['blocked']:
+                                    approved_signals.append(sig)
+                        else:
+                            approved_signals = signals
+                        
+                        self.strategy_processor.execute_signals(
+                            strat            = strat,
+                            signals          = approved_signals,
+                            open_positions   = self.open_positions,
+                            strategy_candles = self.strategy_candles,
+                            order_amount     = adjusted_amount,
                         )
                         self.logger.info(f"Retry successful for {strat_id}")
                     except Exception as e2:
@@ -769,40 +788,7 @@ class BotOrchestrator:
     # HELPER METHODS (Private)
     # ======================================================================
 
-    
-    def _update_regime_for_timeframes(self, closed_timeframes: List[str]) -> None:
-            """
-            Update regime and direction for timeframes that just closed.
-    
-            Args:
-                closed_timeframes: List of timeframes that just closed (e.g., ['4H', '1H'])
-            """
-            self.logger.info(f"[REGIME01] Updating regime & direction for: {closed_timeframes}")
-    
-            # Direction is macro BTC 1D — calculated once per cycle
-            from market_regime.regime_classifier import update_direction_cache
-            direction = get_ref_1d_direction()
-            update_direction_cache(direction)
-    
-            for tf in closed_timeframes:
-                try:
-                    family, metrics = get_current_regime(tf)
-                    if family == 'default':
-                        family = 'ranging'
-                    self.regime_cache[tf]    = family
-                    self.direction_cache[tf] = direction
-    
-                    self.logger.info(
-                        f"[REGIME01] {tf}: REGIME={family.upper()} | DIRECTION={direction.upper()} | "
-                        f"er={metrics.get('efficiency_ratio', 0):.2f} atr={metrics.get('atr_pct', 0):.2f}"
-                        if metrics else
-                        f"[REGIME01] {tf}: REGIME={family.upper()} | DIRECTION={direction.upper()}"
-                    )
-    
-                except Exception as e:
-                    self.logger.error(f"[REGIME01] Error for {tf}: {e}")
-                    self.regime_cache[tf]    = 'ranging'
-                    self.direction_cache[tf] = 'uptrend'
+
         
     def _send_request_wrapper(
         self,

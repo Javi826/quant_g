@@ -18,7 +18,6 @@ To add a new strategy:
 import sys
 import os
 import logging
-
 # Setup logger
 logger = logging.getLogger('BOT_trading.strategies.registry')
 
@@ -45,6 +44,7 @@ from signals.add_signals_flag import flag_long, flag_short
 
 # Import market data utilities
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
+from market_regime import get_symbol_regime
 
 
 #===========================================================================
@@ -503,10 +503,12 @@ def detect_signals_for_strategy(
             # Check if last candle has signal
             if signals[-1] != 0:
                 last_row = df_norm.iloc[-1]
+                regime = get_symbol_regime(symbol, timeframe, arr)
                 all_signals.append({
-                    'symbol': symbol,
+                    'symbol':    symbol,
                     'timestamp': last_row.name if 'timestamp' not in df_norm.columns else last_row['timestamp'],
-                    'close': float(arr['close'][-1])
+                    'close':     float(arr['close'][-1]),
+                    'regime':    regime,
                 })
         
         except Exception as e:
@@ -557,7 +559,7 @@ def get_implemented_strategies() -> set:
        #'21_flag_long_15m',
        '22_flag_short_15m',
        #'23_flag_long_30m',
-       #'24_flag_short_30m',
+       '24_flag_short_30m',
        #'25_flag_long_1H',
        #'26_flag_short_1H',
        #'27_flag_long_4H',

@@ -78,11 +78,7 @@ class DemoOperative:
     
     def place_simulated_order(self, symbol: str, direction: str,
                              usdt_amount: float, tp_pct: float,
-                             sl_pct: float, strategy_id: str,
-                             regime_family: str = 'unknown',
-                             regime_multiplier: float = 1.0,
-                             market_direction: str = 'unknown',
-                             direction_multiplier: float = 1.0) -> Optional[Dict]:
+                             sl_pct: float, strategy_id: str) -> Optional[Dict]:
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
             if not current_price:
@@ -110,10 +106,6 @@ class DemoOperative:
                 'order_id':             f"demo_{int(time.time() * 1000000)}",
                 'opened_at':            datetime.now(HOUR_ZONE),
                 'usdt_amount':          usdt_amount,
-                'regime_family':        regime_family,
-                'regime_multiplier':    regime_multiplier,
-                'market_direction':     market_direction,
-                'direction_multiplier': direction_multiplier,
                 'tp_pct':               tp_pct,
                 'sl_pct':               sl_pct,
                 'simulated':            True
@@ -128,7 +120,7 @@ class DemoOperative:
             logger.info(
                 f"[DEMO] ENTRY {direction.upper()} {symbol} @ ${entry_price:.4f} | "
                 f"${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f} | "
-                f"Regime: {regime_family} | Direction: {market_direction}"
+                f"Regime: unknown"
             )
     
             return position
@@ -251,10 +243,6 @@ class DemoOperative:
                 tp_target=position['tp'],
                 sl_target=position['sl'],
                 commission=commission,
-                regime_family=position.get('regime_family', 'unknown'),
-                regime_multiplier=position.get('regime_multiplier', 1.0),
-                market_direction=position.get('market_direction', 'unknown'),
-                direction_multiplier=position.get('direction_multiplier', 1.0)
             )
     
             logger.info(
@@ -297,9 +285,7 @@ class DemoOperative:
                      entry_price: float, close_price: float, profit: float,
                      profit_pct: float, reason: str, entry_time: datetime,
                      close_time: datetime, usdt_amount: float, size: float,
-                     tp_target: float, sl_target: float, commission: float = 0.0,
-                     regime_family: str = 'unknown', regime_multiplier: float = 1.0,
-                     market_direction: str = 'unknown', direction_multiplier: float = 1.0) -> None:
+                     tp_target: float, sl_target: float, commission: float = 0.0) -> None:
         try:
             duration_days = (close_time - entry_time).total_seconds() / (3600 * 24)
     
@@ -318,10 +304,6 @@ class DemoOperative:
                 'FEE':                  round(commission, 4),
                 'PROFIT_PCT':           round(profit_pct, 2),
                 'REASON_OUT':           reason,
-                'REGIME_FAMILY':        regime_family,
-                'REGIME_MULTIPLIER':    round(regime_multiplier, 1),
-                'MARKET_DIRECTION':     market_direction,
-                'DIRECTION_MULTIPLIER': round(direction_multiplier, 1),
                 'ORDER_PRICE_CLOSE':    None,
                 'ORDER_TS_CLOSE':       None,
                 'EXEC_TS_CLOSE':        None,
@@ -435,8 +417,6 @@ class DemoOperative:
         
     def place_order(self, symbol: str, direction: str, usdt_amount: float,
                     tp_pct: float, sl_pct: float, strategy_id: str,
-                    regime_family: str = 'unknown', regime_multiplier: float = 1.0,
-                    market_direction: str = 'unknown', direction_multiplier: float = 1.0,
                     signal_close: float = 0) -> None:
         self.place_simulated_order(
             symbol=symbol,
@@ -444,11 +424,7 @@ class DemoOperative:
             usdt_amount=usdt_amount,
             tp_pct=tp_pct,
             sl_pct=sl_pct,
-            strategy_id=strategy_id,
-            regime_family=regime_family,
-            regime_multiplier=regime_multiplier,
-            market_direction=market_direction,
-            direction_multiplier=direction_multiplier
+            strategy_id=strategy_id
         )
         
     def sync_broker(self) -> None:

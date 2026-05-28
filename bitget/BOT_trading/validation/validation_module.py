@@ -9,7 +9,6 @@ logger = logging.getLogger('BOT_trading.validation.validation_module')
 from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_TP_PCT
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
 from config.settings import VALID_TIMEFRAMES
-from config.settings import REGIME_FAMILIES, REGIME_GENERAL
 from config.settings import STRATEGY_TYPE_REQUIRED_PARAMS, COMMON_REQUIRED_PARAMS
 from config.settings import ACCOUNTS, BASE_URL
 from config.settings import POSTGRES_CONFIG
@@ -143,163 +142,6 @@ def validate_settings():
     
     if validation_s8_errors == 0:
         logger.debug("Val S8: Candles limits valid")
-    
-    # ========================================================================
-    # Val S9: REGIME_FAMILIES required families
-    # ========================================================================
-    validation_s9_errors = 0
-    required_families = {'volatile', 'ranging', 'trending'}
-    configured_families = set(REGIME_FAMILIES.keys())
-    
-    missing_families = required_families - configured_families
-    if missing_families:
-        errors.append(
-            f"REGIME_FAMILIES missing required families: {missing_families}"
-        )
-        validation_s9_errors += 1
-    
-    if validation_s9_errors == 0:
-        logger.debug("Val S9: REGIME_FAMILIES has all required families")
-    
-    # ========================================================================
-    # Val S10: REGIME_FAMILIES structure validation
-    # ========================================================================
-    validation_s10_errors = 0
-    
-    # Validate structure of each family
-    for family, rules in REGIME_FAMILIES.items():
-        if not isinstance(rules, dict):
-            errors.append(
-                f"REGIME_FAMILIES['{family}'] must be a dict, got {type(rules)}"
-            )
-            validation_s10_errors += 1
-            continue
-        
-        # Validate rule structure: {metric: (operator, threshold)}
-        for metric, rule in rules.items():
-            if not isinstance(rule, tuple) or len(rule) != 2:
-                errors.append(
-                    f"REGIME_FAMILIES['{family}']['{metric}'] must be tuple "
-                    f"(operator, threshold), got {type(rule)}"
-                )
-                validation_s10_errors += 1
-                continue
-            
-            operator, threshold = rule
-            
-            # Validate operator
-            if operator not in ['>', '<', '>=', '<=', '==']:
-                errors.append(
-                    f"REGIME_FAMILIES['{family}']['{metric}'] has invalid operator "
-                    f"'{operator}' (valid: >, <, >=, <=, ==)"
-                )
-                validation_s10_errors += 1
-            
-            # Validate threshold is numeric
-            if not isinstance(threshold, (int, float)):
-                errors.append(
-                    f"REGIME_FAMILIES['{family}']['{metric}'] threshold must be "
-                    f"numeric, got {type(threshold)}"
-                )
-                validation_s10_errors += 1
-            elif threshold < 0:
-                errors.append(
-                    f"REGIME_FAMILIES['{family}']['{metric}'] threshold = {threshold} "
-                    f"(must be >= 0)"
-                )
-                validation_s10_errors += 1
-    
-    if validation_s10_errors == 0:
-        logger.debug("Val S10: REGIME_FAMILIES structure valid")
-    
-    # ========================================================================
-    # Val S11: REGIME_GENERAL required families
-    # ========================================================================
-    validation_s11_errors = 0
-    required_families = {'volatile', 'ranging', 'trending'}
-    configured_families = set(REGIME_GENERAL.keys())
-    
-    missing_families = required_families - configured_families
-    if missing_families:
-        warnings.append(
-            f"REGIME_GENERAL missing families: {missing_families} "
-            f"(will use fallback 1.0)"
-        )
-    
-    if validation_s11_errors == 0:
-        logger.debug("Val S11: REGIME_GENERAL families checked")
-    
-    # ========================================================================
-    # Val S12: REGIME_GENERAL multipliers validation
-    # ========================================================================
-    validation_s12_errors = 0
-    
-    # Validate multipliers
-    for family, multiplier in REGIME_GENERAL.items():
-        if not isinstance(multiplier, (int, float)):
-            errors.append(
-                f"REGIME_GENERAL['{family}'] must be numeric, "
-                f"got {type(multiplier)}"
-            )
-            validation_s12_errors += 1
-            continue
-        
-        # Warn about extreme values
-        if multiplier < 0:
-            errors.append(
-                f"REGIME_GENERAL['{family}'] = {multiplier} (must be >= 0)"
-            )
-            validation_s12_errors += 1
-        elif multiplier > 5.0:
-            warnings.append(
-                f"REGIME_GENERAL['{family}'] = {multiplier} "
-                f"(>5.0 is very aggressive)"
-            )
-        elif multiplier == 0 and family != 'volatile':
-            warnings.append(
-                f"REGIME_GENERAL['{family}'] = 0 "
-                f"(blocks trading in this regime)"
-            )
-    
-    if validation_s12_errors == 0:
-        logger.debug("Val S12: REGIME_GENERAL multipliers valid")
-    
-    # ========================================================================
-    # Val S13: REGIME thresholds coherence
-    # ========================================================================
-    validation_s13_errors = 0
-
-    for family, rules in REGIME_FAMILIES.items():
-        for metric, rule in rules.items():
-            if not isinstance(rule, tuple) or len(rule) != 2:
-                continue
-
-            operator, threshold = rule
-
-            # Validate Efficiency Ratio range (0-1)
-            if 'efficiency' in metric.lower():
-                if threshold < 0 or threshold > 1:
-                    errors.append(
-                        f"REGIME_FAMILIES['{family}']['{metric}'] threshold = {threshold} "
-                        f"(Efficiency Ratio must be between 0 and 1)"
-                    )
-                    validation_s13_errors += 1
-
-            # Validate ATR percentage reasonable range
-            if 'atr' in metric.lower() and 'pct' in metric.lower():
-                if threshold < 0.1:
-                    warnings.append(
-                        f"REGIME_FAMILIES['{family}']['{metric}'] = {threshold} "
-                        f"(<0.1% is very low, may trigger too often)"
-                    )
-                elif threshold > 15:
-                    warnings.append(
-                        f"REGIME_FAMILIES['{family}']['{metric}'] = {threshold} "
-                        f"(>15% is very high, may never trigger)"
-                    )
-
-    if validation_s13_errors == 0:
-        logger.debug("Val S13: REGIME thresholds coherent")
     
     # ========================================================================
     # Val S14: REGIME reference symbol
@@ -634,77 +476,77 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     if validation_y10_errors == 0:
         logger.debug("Val Y10: All IDs have correct prefix format (NN_name)")
     
-# ========================================================================
+    # ========================================================================
     # Val Y11: regime01 bin flags (6 bins: family x direction)
     # ========================================================================
-    validation_y11_errors = 0
-
-    regime01_bins = [
-        'regime_trending_uptrend', 'regime_trending_dwtrend',
-        'regime_ranging_uptrend',  'regime_ranging_dwtrend',
-        'regime_volatile_uptrend', 'regime_volatile_dwtrend',
-    ]
-
-    for strat in strategies:
-        strat_id = strat.get('id', 'UNKNOWN')
-
-        for bin_key in regime01_bins:
-            if bin_key not in strat:
-                errors.append(
-                    f"Strategy '{strat_id}' missing required field '{bin_key}'"
-                )
-                validation_y11_errors += 1
-            else:
-                val = strat[bin_key]
-                if not isinstance(val, (int, float)):
-                    errors.append(
-                        f"Strategy '{strat_id}' {bin_key} must be numeric, got {type(val)}"
-                    )
-                    validation_y11_errors += 1
-                elif val < 0:
-                    errors.append(
-                        f"Strategy '{strat_id}' {bin_key} = {val} (must be >= 0)"
-                    )
-                    validation_y11_errors += 1
-                elif val > 5.0:
-                    warnings.append(
-                        f"Strategy '{strat_id}' {bin_key} = {val} (>5.0 is very aggressive)"
-                    )
-
-    if validation_y11_errors == 0:
-        logger.debug("Val Y11: All regime01 bin flags valid")
+# =============================================================================
+#     validation_y11_errors = 0
+# 
+#     regime01_bins = [p for p in COMMON_REQUIRED_PARAMS if p.startswith('regime_')]
+# 
+#     for strat in strategies:
+#         strat_id = strat.get('id', 'UNKNOWN')
+# 
+#         for bin_key in regime01_bins:
+#             if bin_key not in strat:
+#                 errors.append(
+#                     f"Strategy '{strat_id}' missing required field '{bin_key}'"
+#                 )
+#                 validation_y11_errors += 1
+#             else:
+#                 val = strat[bin_key]
+#                 if not isinstance(val, (int, float)):
+#                     errors.append(
+#                         f"Strategy '{strat_id}' {bin_key} must be numeric, got {type(val)}"
+#                     )
+#                     validation_y11_errors += 1
+#                 elif val < 0:
+#                     errors.append(
+#                         f"Strategy '{strat_id}' {bin_key} = {val} (must be >= 0)"
+#                     )
+#                     validation_y11_errors += 1
+#                 elif val > 5.0:
+#                     warnings.append(
+#                         f"Strategy '{strat_id}' {bin_key} = {val} (>5.0 is very aggressive)"
+#                     )
+# 
+#     if validation_y11_errors == 0:
+#         logger.debug("Val Y11: All regime01 bin flags valid")
+# =============================================================================
 
  # ========================================================================
     # Val Y13: Coherencia entre direction y dir_mode
     # ========================================================================
-    validation_y13_errors = 0
-    
-    for strat in strategies:
-        strat_id = strat.get('id', 'UNKNOWN')
-        direction = strat.get('direction', '').lower()
-        dir_mode = strat.get('dir_mode', 'general')
-        
-        # Skip if dir_mode is 'general' (always valid)
-        if dir_mode == 'general':
-            continue
-        
-        # LONG strategies can only use 'uptrend'
-        if direction == 'long' and dir_mode != 'long_only':
-            errors.append(
-                f"Strategy '{strat_id}' has direction='long' but dir_mode='{dir_mode}'. "
-                f"LONG strategies must use dir_mode='uptrend' or 'general'"
-            )
-            validation_y13_errors += 1
-        
-        # SHORT strategies can only use 'dwtrend'
-        elif direction == 'short' and dir_mode != 'short_only':
-            errors.append(
-                f"Strategy '{strat_id}' has direction='short' but dir_mode='{dir_mode}'. "
-                f"SHORT strategies must use dir_mode='dwtrend' or 'general'"
-            )
-            validation_y13_errors += 1
-    
-    if validation_y13_errors == 0:
-        logger.debug("Val Y13: All direction/dir_mode combinations are coherent")
+# =============================================================================
+#     validation_y13_errors = 0
+#     
+#     for strat in strategies:
+#         strat_id = strat.get('id', 'UNKNOWN')
+#         direction = strat.get('direction', '').lower()
+#         dir_mode = strat.get('dir_mode', 'general')
+#         
+#         # Skip if dir_mode is 'general' (always valid)
+#         if dir_mode == 'general':
+#             continue
+#         
+#         # LONG strategies can only use 'uptrend'
+#         if direction == 'long' and dir_mode != 'long_only':
+#             errors.append(
+#                 f"Strategy '{strat_id}' has direction='long' but dir_mode='{dir_mode}'. "
+#                 f"LONG strategies must use dir_mode='uptrend' or 'general'"
+#             )
+#             validation_y13_errors += 1
+#         
+#         # SHORT strategies can only use 'dwtrend'
+#         elif direction == 'short' and dir_mode != 'short_only':
+#             errors.append(
+#                 f"Strategy '{strat_id}' has direction='short' but dir_mode='{dir_mode}'. "
+#                 f"SHORT strategies must use dir_mode='dwtrend' or 'general'"
+#             )
+#             validation_y13_errors += 1
+#     
+#     if validation_y13_errors == 0:
+#         logger.debug("Val Y13: All direction/dir_mode combinations are coherent")
+# =============================================================================
         
     return errors, warnings

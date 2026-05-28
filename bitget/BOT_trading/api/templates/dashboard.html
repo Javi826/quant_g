@@ -306,9 +306,6 @@
                     <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('period')">Period</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('correlation')">Correlation</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('regime')">Regime</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('symbols')">Symbols</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('weekday')">Week Day</button>
                 </div>
                 
                 <div id="equity-subtab-curves" class="tab-content active">
@@ -518,68 +515,7 @@
                     </div>
 
                 </div>
-                <div id="equity-subtab-symbols" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Symbol Performance Analysis</h3>
-                    <div id="symbols-container">Loading...</div>
-                    
-                    <!-- Leyenda para Analytics → Symbols -->
-                    <div style="margin-top: 15px; padding: 12px; background: rgba(139, 148, 158, 0.1); border-radius: 6px; border-left: 3px solid #8b949e;">
-                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 8px; font-weight: 600;">SLIPPAGE COLOR LEGEND</div>
-                        <div style="font-size: 12px; color: #c9d1d9; line-height: 1.8;">
-                            <span style="color: #3fb950;">●</span> Green: Positive slippage or low magnitude<br>
-                            <span style="color: #d29922;">●</span> Yellow: Moderate negative slippage.<br>
-                            <span style="color: #f85149;">●</span> Red: High negative slippage.
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="equity-subtab-weekday" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Week Day Performance Analysis</h3>
-                    <div id="weekday-container">Loading...</div>
-                </div>
                
-                <div id="equity-subtab-regime" class="tab-content">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; color: #c9d1d9;">Performance by Market Regime</h3>
-                        <div class="view-selector">
-                            <button class="view-btn active" onclick="setRegimeAnalyticsMode('regime')">Market Regime</button>
-                            <button class="view-btn" onclick="setRegimeAnalyticsMode('direction')">Market Direction</button>
-                        </div>
-                    </div>
-                    
-                    <!-- NEW: Strategy Breakdown Table -->
-                    <div class="config-card" style="margin-bottom: 30px;">
-                        <h3>Performance by Strategy</h3>
-                        
-                        <!-- Date Filter -->
-                        <div class="date-filter-container">
-                            <div class="date-filter-group">
-                                <label>From:</label>
-                                <input type="date" id="regime-breakdown-date-from">
-                            </div>
-                            <div class="date-filter-group">
-                                <label>To:</label>
-                                <input type="date" id="regime-breakdown-date-to">
-                            </div>
-                            <button class="btn-clear-dates" onclick="clearRegimeBreakdownDates()">Clear</button>
-                            <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadRegimeStrategyBreakdown()">🔄 Update</button>
-                        </div>
-                        
-                        <!-- Table Container -->
-                        <div id="regime-breakdown-container" style="margin-top: 20px;">
-                            <div style="text-align: center; color: #8b949e; padding: 40px;">
-                                Click "🔄 Update" to load strategy breakdown
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- EXISTING: Aggregated stats cards -->
-                    <div id="regime-analytics-container">
-                        <div style="text-align: center; color: #8b949e; padding: 40px;">
-                            Loading regime analytics...
-                        </div>
-                    </div>
-                </div>              
                 <div id="equity-subtab-correlation" class="tab-content">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="margin: 0; color: #c9d1d9;">Strategy Correlation Analysis</h3>
@@ -632,179 +568,15 @@
                     </div>
                 </h2>
 
-               <!-- REGIME 0 - BTC 1D FILTER -->
-                <div style="margin-bottom: 24px;">
-                    <h3 style="color: #c9d1d9; margin-bottom: 16px; font-size: 18px; border-bottom: 2px solid #21262d; padding-bottom: 10px;">
-                        <span id="regime0-ref-symbol">REF</span> 1D Global System REGIME
-                    </h3>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-                        <!-- SHORT Card - LEFT -->
-                        <div id="regime0-card-short" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                            <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f85149" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 5v14M19 12l-7 7-7-7"/>
-                                </svg>
-                                SHORTS
-                            </div>
-                            <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                                <div id="regime0-short-status" style="font-size: 14px; color: #6b7280; line-height: 1.4; margin-bottom: 4px;">-</div>
-                                <div id="regime0-short-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">REF < MA5*th</div>
-                            </div>
-                        </div>
-                        
-                        <!-- INACTIVE Card - CENTER -->
-                        <div id="regime0-card-none" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                            <div style="font-size: 32px; font-weight: 700; color: #d29922; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                                </svg>
-                                INACTIVE
-                            </div>
-                            <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                                <div style="display: flex; justify-content: space-around; align-items: center; gap: 20px;">
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Short TH</div>
-                                        <div id="regime0-none-short-th" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;" id="regime0-none-btc-label">REF</div>
-                                        <div id="regime0-none-btc" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Long TH</div>
-                                        <div id="regime0-none-long-th" style="font-size: 28px; color: #c9d1d9; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">$-</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- LONG Card - RIGHT -->
-                        <div id="regime0-card-long" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                            <div style="font-size: 32px; font-weight: 700; color: #3fb950; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12 19V5M5 12l7-7 7 7"/>
-                                </svg>
-                                LONGS
-                            </div>
-                            <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                                <div id="regime0-long-status" style="font-size: 14px; color: #6b7280; line-height: 1.4; margin-bottom: 4px;">-</div>
-                                <div id="regime0-long-rule" style="font-size: 13px; color: #6b7280; line-height: 1.4;">REF > MA5*th</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>                
-                <!-- ✅ SEGUNDA FILA: REGIME CARDS -->
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
-                    <!-- VOLATILE Card -->
-                    <div id="regime-card-volatile" class="regime-family-card" style="background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="font-size: 32px; font-weight: 700; color: #f85149; margin-bottom: 8px;">VOLATILE</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                            <div id="regime-card-volatile-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
-                                Loading rules...
-                            </div>
-                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
-                                High volatility + unpredictable
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- RANGING Card -->
-                    <div id="regime-card-ranging" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="font-size: 32px; font-weight: 700; color: #9ca3af; margin-bottom: 8px;">RANGING</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                            <div id="regime-card-ranging-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
-                                Loading rules...
-                            </div>
-                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
-                                Lateral without clear trend
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- TRENDING Card -->
-                    <div id="regime-card-trending" class="regime-family-card" style="opacity: 0.4; background: #1c2128; padding: 20px; border-radius: 12px; border: 2px solid #21262d; text-align: center; cursor: default; transition: all 0.3s ease; min-height: 160px; display: flex; flex-direction: column; justify-content: center;">
-                        <div style="font-size: 32px; font-weight: 700; color: #58a6ff; margin-bottom: 8px;">TRENDING</div>
-                        <div style="border-top: 1px solid #21262d; padding-top: 10px; margin-top: 10px;">
-                            <div id="regime-card-trending-rules" style="font-size: 14px; color: #8b949e; margin-bottom: 6px; font-family: monospace; font-weight: 500;">
-                                Loading rules...
-                            </div>
-                            <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
-                                Strong directional movement
-                            </div>
-                        </div>
+                
+                <!-- Symbols Regime Metrics -->
+                <div class="config-card">
+                    <h3>Symbols Regime Metrics</h3>
+                    <div id="regime-config-pills" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+                    <div id="regime-symbols-container" style="margin-top: 20px;">
+                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
                     </div>
                 </div>
-                
-                <!-- Technical Metrics -->
-                <div class="config-card">
-                    <h3>Technical Metrics</h3>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">
-                        <!-- Hurst Exponent -->
-                        <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Hurst Exponent</div>
-                                <div style="font-size: 20px; font-weight: 700; color: #58a6ff;" id="regime-metric-hurst">-</div>
-                            </div>
-                            <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-hurst">
-                                <span style="color: #2d333b;">████████████████████</span>
-                            </div>
-                            <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
-                                <span>&lt;0.5 Mean-rev</span>
-                                <span>=0.5 Random</span>
-                                <span>&gt;0.5 Trending</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Efficiency Ratio -->
-                        <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Efficiency Ratio</div>
-                                <div style="font-size: 20px; font-weight: 700; color: #22d3ee;" id="regime-metric-er">-</div>
-                            </div>
-                            <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-er">
-                                <span style="color: #2d333b;">████████████████████</span>
-                            </div>
-                            <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
-                                <span>0.0 Choppy</span>
-                                <span>0.5 Moderate</span>
-                                <span>1.0 Trend</span>
-                            </div>
-                        </div>
-                        
-                        <!-- ATR Percentage -->
-                        <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">ATR Percentage</div>
-                                <div style="font-size: 20px; font-weight: 700; color: #f59e0b;" id="regime-metric-atr">-</div>
-                            </div>
-                            <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-atr">
-                                <span style="color: #2d333b;">████████████████████</span>
-                            </div>
-                            <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
-                                <span>0% Low</span>
-                                <span>1.5% Normal</span>
-                                <span>2%+ High</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Permutation Entropy -->
-                        <div style="background: #1c2128; padding: 20px; border-radius: 8px; border: 1px solid #21262d;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <div style="color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Permutation Entropy</div>
-                                <div style="font-size: 20px; font-weight: 700; color: #a78bfa;" id="regime-metric-pe">-</div>
-                            </div>
-                            <div style="font-family: monospace; font-size: 16px; margin-bottom: 8px; letter-spacing: 1px;" id="regime-bar-pe">
-                                <span style="color: #2d333b;">████████████████████</span>
-                            </div>
-                            <div style="font-size: 11px; color: #6b7280; display: flex; justify-content: space-between;">
-                                <span>0.0 Predictable</span>
-                                <span>0.5 Moderate</span>
-                                <span>1.0 Random</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>               
             </div>
         </div>
         
@@ -1013,21 +785,10 @@
                     <h3>Market Regime Strategy Matrix</h3>
                     <div style="overflow-x: auto;">
                         <table id="regime-strategy-matrix">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>ID</th>
-                                    <th>Direction</th>
-                                    <th>Trending ↑</th>
-                                    <th>Trending ↓</th>
-                                    <th>Ranging ↑</th>
-                                    <th>Ranging ↓</th>
-                                    <th>Volatile ↑</th>
-                                    <th>Volatile ↓</th>
-                                </tr>
+                            <thead id="regime-strategy-matrix-head">
                             </thead>
                             <tbody id="regime-strategy-matrix-body">
-                                <tr><td colspan="9" style="text-align: center;">Loading...</td></tr>
+                                <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>

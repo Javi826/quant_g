@@ -32,21 +32,21 @@ PERIOD_WEIGHTS = {
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-COMBINE_MODES         = ["AND","OR"]
+COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
-OPTIMIZE_METRIC       = "calmar"  # "profit" | "max_dd" | "win_rate" |"calmar"
+OPTIMIZE_METRIC       = "profit"  # "profit" | "max_dd" | "win_rate" |"calmar"
 N_JOBS                = -1        # -1 = all cores, -2 = all but one
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [5,10,15],
-        "thresholds": [0.03,0.04,0.05],
+        "windows":    [30],
+        "thresholds": [0.02],
         "enabled":    True,
     },
     "er": {
-        "windows":    [20,40,60],
-        "thresholds": [0.6,0.8,1.0],
+        "windows":    [40,],
+        "thresholds": [0.6],
         "enabled":    True,
     },
     "hurst": {
@@ -185,8 +185,6 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
                 comb += _calmar(d[r_key], d['ranging_dd'])
             elif cls == 'trending':
                 comb += _calmar(d[t_key], d['trending_dd'])
-            elif cls == 'both':
-                comb += max(_calmar(d[r_key], d['ranging_dd']), _calmar(d[t_key], d['trending_dd']))
             else:
                 comb += _calmar(d[b_key], d['b_dd'])
         else:
@@ -195,8 +193,6 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
                 comb += d[r_key]
             elif cls == 'trending':
                 comb += d[t_key]
-            elif cls == 'both':
-                comb += max(d[r_key], d[t_key])
             else:
                 comb += d[b_key]
     return comb, base
@@ -251,7 +247,6 @@ def _process_combo(
         'avg_trend_pct':    avg_trend,
         'n_ranging':        cls_list.count('ranging'),
         'n_trending':       cls_list.count('trending'),
-        'n_both':           cls_list.count('both'),
         'n_neutral':        cls_list.count('neutral'),
         'period_summaries': period_summaries,
         'label':            label,
@@ -339,7 +334,7 @@ def run() -> None:
         print_combo_summary(
             row['period_summaries'],
             row['n_ranging'], row['n_trending'],
-            row['n_both'],    row['n_neutral'],
+            row['n_neutral'],
             row['combined_profit'], row['combined_dd'],
             row['baseline_profit'], row['baseline_dd'],
             row['label'],

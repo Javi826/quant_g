@@ -75,6 +75,12 @@ def save_drift_reference(drift_results: list, output_path: str) -> None:
 # SAVE STRATEGIES PR BATCH
 # =============================================================================
 
+_GE_CLASSIFICATION_MAP = {
+    "ranging":  {"regime_ranging": 1, "regime_trending": 0, "regime_neutral": 0},
+    "trending": {"regime_ranging": 0, "regime_trending": 1, "regime_neutral": 0},
+    "neutral":  {"regime_ranging": 1, "regime_trending": 1, "regime_neutral": 1},
+}
+
 def save_strategies_pr(
     strategies_batch_path: str,
     output_path: str,
@@ -83,10 +89,6 @@ def save_strategies_pr(
     strategy_ids_to_run: list = None,
     module_name: str = "strategies_BT_batch",
 ) -> None:
-    """
-    Generate strategies_PR_batch.py for production deployment.
-    Reads strategies_BT_batch.py (never modified), applies dynamic fields from memory.
-    """
     if not os.path.exists(strategies_batch_path):
         logger.warning(f"⚠️  {os.path.basename(strategies_batch_path)} not found — skipping.")
         return
@@ -96,15 +98,6 @@ def save_strategies_pr(
         strategies = [s for s in strategies if s["id"] in strategy_ids_to_run]
 
     val_map = {v["strategy_id"]: v for v in validation_results}
-
-    all_bins = [
-        "regime_trending_uptrend",
-        "regime_trending_dwtrend",
-        "regime_ranging_uptrend",
-        "regime_ranging_dwtrend",
-        "regime_volatile_uptrend",
-        "regime_volatile_dwtrend",
-    ]
 
     pr_lines = [
         '"""',
@@ -125,13 +118,18 @@ def save_strategies_pr(
 
         if v:
             updated["active"] = "VALIDATED" in v["verdict"]
-            bins_to_filter    = v.get("bins_to_filter", set())
+            classification    = v.get("bins_to_filter", "neutral")
         else:
-            bins_to_filter = set()
+            classification = "neutral"
+
+        if not isinstance(classification, str):
+            classification = "neutral"
 
         if bp:
             for k, val in bp.items():
                 updated[k.lower()] = val
+
+        regime_values = _GE_CLASSIFICATION_MAP.get(classification, _GE_CLASSIFICATION_MAP["neutral"])
 
         pr_lines.append("    {")
         pr_lines.append(f'        "id": "{sid}",')
@@ -140,10 +138,8 @@ def save_strategies_pr(
         pr_lines.append(f'        "active": {updated.get("active", False)},')
         pr_lines.append(f'        "direction": "{updated["direction"]}",')
 
-        for bin_key in all_bins:
-            family, direction = bin_key.replace("regime_", "").rsplit("_", 1)
-            blocked = f"{family}_{direction}" in bins_to_filter
-            pr_lines.append(f'        "{bin_key}": {0 if blocked else 1},')
+        for bin_key, val in regime_values.items():
+            pr_lines.append(f'        "{bin_key}": {val},')
 
         pr_lines.append(f'        "sell_after_ncandles": {updated.get("sell_after_ncandles", 0)},')
         pr_lines.append(f'        "order_amount": {updated.get("order_amount_prod", 200)},')
@@ -164,7 +160,7 @@ def save_strategies_pr(
     with open(output_path, "w") as f:
         f.write("\n".join(pr_lines) + "\n")
 
-    logger.info(f"\n{'─'*115}\n  ✅ strategies_OO/E1_batch.py generated\n{'─'*115}")
+    logger.info(f"\n{'─'*115}\n  ✅ strategies_PR_batch.py generated\n{'─'*115}")
 
 
 # =============================================================================
@@ -176,10 +172,6 @@ def compare_and_generate_csv(
     pr_batch_path: str,
     csv_path: str,
 ) -> None:
-    """
-    Compare strategies_batch.py (previous state) vs strategies_NN_batch.py (new state).
-    Generate strategies_params.csv with change columns for diagnostics.
-    """
     if not os.path.exists(strategies_batch_path):
         logger.warning(f"⚠️  strategies_batch.py not found — skipping CSV generation.")
         return
@@ -190,11 +182,7 @@ def compare_and_generate_csv(
     prev_map = {s["id"]: s for s in _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES}
     new_map  = {s["id"]: s for s in _load_py_module(pr_batch_path, "strategies_pr_batch").STRATEGIES}
 
-    regime_bin_keys = (
-        "regime_trending_uptrend", "regime_trending_dwtrend",
-        "regime_ranging_uptrend",  "regime_ranging_dwtrend",
-        "regime_volatile_uptrend", "regime_volatile_dwtrend",
-    )
+    regime_bin_keys = ("regime_ranging", "regime_trending", "regime_neutral")
 
     rows = []
     for sid, new in new_map.items():
@@ -219,7 +207,7 @@ def compare_and_generate_csv(
         for bin_key in regime_bin_keys:
             prev_val = prev.get(bin_key)
             new_val  = new.get(bin_key)
-            if prev_val is not None and new_val is not None and float(prev_val) != float(new_val):
+            if prev_val is not None and new_val is not None and int(prev_val) != int(new_val):
                 regime_changes.append(f"{bin_key}: {prev_val}→{new_val}")
         change_regime = " | ".join(regime_changes) if regime_changes else "N/A"
 
@@ -245,7 +233,7 @@ def compare_and_generate_csv(
             "last_change_regime":  change_regime,
         }
         for bin_key in regime_bin_keys:
-            row[bin_key] = new.get(bin_key, 1.0)
+            row[bin_key] = new.get(bin_key, 1)
 
         rows.append(row)
 
@@ -318,13 +306,6 @@ def print_update_status(
     symbols_live_folder: str,
     validation_results: list,
 ) -> None:
-    """
-    Print update status tables reading from CSV:
-      1. Active
-      2. Params
-      3. Market Regime
-      4. Symbols
-    """
     if not validation_results:
         return
 
@@ -380,16 +361,16 @@ def print_update_status(
     # Table 3 — Market Regime
     lines = [
         f"\n{'─'*115}", f"  MARKET REGIME", f"{'─'*115}",
-        f"  {'Strategy':<27} {'Trending':>10} {'Ranging':>10} {'Volatile':>10} {'Changes':<40}",
+        f"  {'Strategy':<27} {'Ranging':>10} {'Trending':>10} {'Neutral':>10} {'Changes':<40}",
         f"  {'-'*103}",
     ]
     for sid in strategy_ids:
-        trending = _get(sid, "regime_trending")
         ranging  = _get(sid, "regime_ranging")
-        volatile = _get(sid, "regime_volatile")
+        trending = _get(sid, "regime_trending")
+        neutral  = _get(sid, "regime_neutral")
         change   = _get(sid, "last_change_regime")
         lines.append(
-            f"  {sid:<27} {trending:>10} {ranging:>10} {volatile:>10} {_change_icon(change):<40}"
+            f"  {sid:<27} {ranging:>10} {trending:>10} {neutral:>10} {_change_icon(change):<40}"
         )
     lines.append(f"  {'─'*115}")
     logger.info("\n".join(lines))

@@ -18,38 +18,29 @@ ACCOUNTS = {
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime01_enabled": False,
+        "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime01_ma_period": 2,
-        "regime01_long_th":   1.00,
-        "regime01_short_th":  1.00,
         "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 3200,
+        "initial_capital": 9600,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",
-        "regime01_enabled": True,
+        "regime_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
-        "regime01_ma_period": 2,
-        "regime01_long_th":   1.00,
-        "regime01_short_th":  1.00,
-        "regime_reference_symbol": "QQQUSDT"
+        "regime_reference_symbol": "BTCUSDT"
     },
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,
         "description": "Testing Account",
-        "type": "demo",
-        "regime01_enabled": False,
+        "type": "demo,production",
+        "regime_enabled": False,
         "risk_control_enabled": False,
         "postgresql_enabled": False,
-        "regime01_ma_period": 5,
-        "regime01_long_th":   1.00,
-        "regime01_short_th":  1.00,
     }
 }
 
@@ -58,19 +49,6 @@ COMMISSION_PCT = 0.1
 # ==========================================================================
 # MARKET REGIME SETTINGS
 # ==========================================================================
-
-REGIME_FAMILIES = {
-    "trending": {},
-    "ranging":  {},
-    "volatile": {},
-}
-REGIME_ER_WINDOW   = 50
-REGIME_ATR_WINDOW  = 50
-REGIME_GENERAL = {
-    'trending': 1.0,
-    'ranging':  1.0,
-    'volatile': 1.0,
-}
 
 # ==========================================================================
 # RISK CONTROL SETTINGS
@@ -105,9 +83,7 @@ LATENCY_CRITICAL_SEC   = 1.0
 COMMON_REQUIRED_PARAMS = [
     'id', 'name', 'timeframe', 'active', 'sell_after_ncandles',
     'order_amount', 'tp_pct', 'sl_pct', 'direction',
-    'regime_trending_uptrend', 'regime_trending_dwtrend',
-    'regime_ranging_uptrend',  'regime_ranging_dwtrend',
-    'regime_volatile_uptrend', 'regime_volatile_dwtrend',
+    #'regime_trending', 'regime_ranging','regime_neutral',
 ]
 
 # Strategy-specific required parameters by strategy type

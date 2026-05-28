@@ -14,7 +14,6 @@ import logging
 import warnings
 
 import numpy as np
-import pandas as pd
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)

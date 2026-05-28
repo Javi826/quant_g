@@ -299,554 +299,249 @@ function getFamilyColor(family) {
     return colors[family] || '#8b949e';
 }
 
-async function loadRegimeSizing() {
-    try {
-        const res = await fetch('/api/regime/current?timeframe=4H');
-        const data = await res.json();
-        
-        if (data.success && data.all_families) {
-            window.REGIME_SIZING = data.all_families;
-        }
-    } catch (error) {
-        console.error('Error loading regime sizing:', error);
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 let currentRegimeTimeframe = '4H';
 
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
 function getRegimeBadgeStyle(family) {
     const styles = {
-        'trending': { bg: '#58a6ff', color: '#ffffff', text: 'TRENDING' },      // AZUL
-        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },      // ROJO
-        'ranging': { bg: '#9ca3af', color: '#ffffff', text: 'RANGING' },        // GRIS CLARO
-        'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' }
+        'trending': { bg: '#58a6ff', color: '#ffffff', text: 'TRENDING' },
+        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },
+        'ranging':  { bg: '#9ca3af', color: '#ffffff', text: 'RANGING'  },
+        'default':  { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN'  },
     };
     return styles[family] || styles['default'];
 }
 
+function _metricColor(value, reverse) {
+    if (reverse) {
+        if (value < 0.33) return '#3fb950';
+        if (value < 0.66) return '#f59e0b';
+        return '#f85149';
+    } else {
+        if (value < 0.33) return '#f85149';
+        if (value < 0.66) return '#f59e0b';
+        return '#3fb950';
+    }
+}
+
+function _buildBar(value, reverse, totalBlocks = 40) {
+    const filled = Math.round(Math.min(Math.max(value, 0), 1) * totalBlocks);
+    const color  = _metricColor(value, reverse);
+    let html = '';
+    for (let i = 0; i < totalBlocks; i++) {
+        html += `<span style="color:${i < filled ? color : '#2d333b'};">█</span>`;
+    }
+    return html;
+}
+
+// Metadata per metric key — display name, reverse scale, format fn
+const METRIC_META = {
+    atr_norm: { label: 'ATR Norm',          reverse: true,  fmt: v => (v * 100).toFixed(2) + '%' },
+    er:       { label: 'Efficiency Ratio',  reverse: false, fmt: v => v.toFixed(3)               },
+    hurst:    { label: 'Hurst Exponent',    reverse: false, fmt: v => v.toFixed(3)               },
+};
+
+// -----------------------------------------------------------------------------
+// Timeframe selector
+// -----------------------------------------------------------------------------
+
 function setRegimeTimeframe(timeframe) {
     currentRegimeTimeframe = timeframe;
-    
-    // Update active button
+
     document.querySelectorAll('#tab-regime .view-selector .view-btn').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent === timeframe) {
-            btn.classList.add('active');
-        }
+        if (btn.textContent === timeframe) btn.classList.add('active');
     });
-    
-    // Load regime data
-    loadRegimeData();
-    loadRegime0Data();
 
+    loadRegimeData();
 }
+
+// -----------------------------------------------------------------------------
+// /api/regime/current  →  header card + family cards
+// -----------------------------------------------------------------------------
 
 async function loadRegimeData() {
     try {
-        const res = await fetch('/api/regime/current?timeframe=' + currentRegimeTimeframe);
+        const res  = await fetch('/api/regime/current?timeframe=' + currentRegimeTimeframe);
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        
         const data = await res.json();
-        
+
         if (!data.success) {
             console.error('Regime API error:', data.error);
-            updateRegimeUI({
-                family: 'error',
-                multiplier: 1.0,
-                metrics: {},
-                timeframe: currentRegimeTimeframe
-            });
             return;
         }
-        
+
         updateRegimeUI(data);
-        
+        loadRegimeSymbols(data.indicators_cfg);
+
     } catch (error) {
         console.error('Error loading regime data:', error);
-        updateRegimeUI({
-            family: 'error',
-            multiplier: 1.0,
-            metrics: {},
-            timeframe: currentRegimeTimeframe
-        });
     }
 }
 
 function updateRegimeUI(data) {
-    const family = data.family || 'default';
-    const multiplier = data.multiplier || 1.0;
-    const metrics = data.metrics || {};
+    const family    = data.family   || 'default';
     const timeframe = data.timeframe || currentRegimeTimeframe;
-    
-    // GLOBAL CONSTANTS
-    const TOTAL_BLOCKS = 72;
-    
-    // CRITICAL: all_families must come from backend (settings.py)
-    // If backend fails, show error instead of using outdated hardcoded values
-    const allFamilies = data.all_families;
-    
-    if (!allFamilies || Object.keys(allFamilies).length === 0) {
-        console.error('Backend did not return all_families - check REGIME_FAMILY_SIZING in settings.py');
-        const regimeContainer = document.getElementById('tab-regime');
-        if (regimeContainer) {
-            regimeContainer.innerHTML = '<div style="color: #f85149; padding: 40px; text-align: center;">Error: Market regime configuration not available. Check backend logs.</div>';
-        }
-        return;
-    }
-    const allThresholds = data.all_thresholds || {};
-    
-    // ✅ NUEVO: Renderizar las 3 cards de BTC trend
-    const refPrice = data.ref_price;
-    const refTrend = data.ref_trend;
+    const refTrend  = data.ref_trend;
 
-    
-    // Get badge style
+    // Header stat card
     const badgeStyle = getRegimeBadgeStyle(family);
-    
-    // Update header stat card
     const regimeText = document.getElementById('regime-text');
-    const regimeDirection = document.getElementById('regime-direction');
-    const regimeTimeframeEl = document.getElementById('regime-timeframe');
-    
     if (regimeText) {
         regimeText.textContent = badgeStyle.text;
         regimeText.style.color = badgeStyle.bg;
     }
-    
+
+    const regimeDirection = document.getElementById('regime-direction');
     if (regimeDirection && refTrend) {
-        let dirSymbol = '';
-        let dirText = '';
-        let dirColor = '#8b949e';
-        
-        if (refTrend === 'uptrend') {
-            dirSymbol = '';
-            dirText = 'UP';
-            dirColor = '#3fb950';  // Green
-        } else if (refTrend === 'downtrend' || refTrend === 'dwtrend') {
-            dirSymbol = '';
-            dirText = 'DW';
-            dirColor = '#f85149';  // Red
-        } else {
-            dirSymbol = '•';
-            dirText = '--';
-            dirColor = '#8b949e';  // Gray
-        }
-        
-        regimeDirection.textContent = dirSymbol + dirText;
-        regimeDirection.style.color = dirColor;
-    }
-    
-    if (regimeTimeframeEl) {
-        regimeTimeframeEl.textContent = timeframe;
-    }
-    
-    // Helper function to format rules
-    function formatRules(familyName) {
-        const rules = allThresholds[familyName] || {};
-        
-        if (Object.keys(rules).length === 0) {
-            return 'Default - All other conditions';
-        }
-        
-        const metricNames = {
-            'hurst': 'Hurst',
-            'efficiency_ratio': 'ER',
-            'atr_pct': 'ATR%',
-            'permutation_entropy': 'PE'
+        const map = {
+            uptrend:   { sym: '▲', label: 'UP', color: '#3fb950' },
+            downtrend: { sym: '▼', label: 'DW', color: '#f85149' },
+            dwtrend:   { sym: '▼', label: 'DW', color: '#f85149' },
         };
-        
-        const parts = [];
-        for (const [metric, [op, threshold]] of Object.entries(rules)) {
-            const name = metricNames[metric] || metric;
-            parts.push(name + ' ' + op + ' ' + threshold);
-        }
-        
-        return parts.join(' AND ');
+        const d = map[refTrend] || { sym: '•', label: '--', color: '#8b949e' };
+        regimeDirection.textContent = d.sym + d.label;
+        regimeDirection.style.color = d.color;
     }
-    
-    // Update family cards with rules and active state (NO MULTIPLIERS)
-    const families = ['volatile', 'ranging', 'trending'];
-    const familyColors = {
-        'volatile': '#f85149',       // ROJO
-        'ranging': '#9ca3af',         // GRIS CLARO
-        'trending': '#58a6ff'         // AZUL
-    };
-    const familyBgColors = {
-        'volatile': 'rgba(248, 81, 73, 0.15)',
-        'ranging': 'rgba(156, 163, 175, 0.15)',
-        'trending': 'rgba(88, 166, 255, 0.15)'
-    };
-    
-    families.forEach(f => {
-        const card = document.getElementById('regime-card-' + f);
-        const rulesSpan = document.getElementById('regime-card-' + f + '-rules');
-        
-        if (card) {
-            // Set rules
-            if (rulesSpan) {
-                rulesSpan.textContent = formatRules(f);
-            }
-            
-            // Set active/inactive state with colored background
-            if (f === family.toLowerCase()) {
-                // Active card
-                card.style.border = '2px solid ' + familyColors[f];
-                card.style.background = familyBgColors[f]; // Soft colored background
-                card.style.opacity = '1';
-            } else {
-                // Inactive card
-                card.style.border = '2px solid #21262d';
-                card.style.background = '#1c2128'; // Normal background
-                card.style.opacity = '0.4';
-            }
-        }
-    });
-    
-    // Helper function to create colored block bar
-    function createColoredBar(value, reverse = false) {
-        const totalBlocks = TOTAL_BLOCKS;
-        const filledBlocks = Math.round(value * totalBlocks);
-        
-        // Determine single color based on value (not position)
-        let fillColor;
-        
-        if (reverse) {
-            // For ATR and PE (lower is better): green → yellow → red
-            if (value < 0.33) {
-                fillColor = '#3fb950'; // Green (low value is good)
-            } else if (value < 0.66) {
-                fillColor = '#f59e0b'; // Yellow (medium value)
-            } else {
-                fillColor = '#f85149'; // Red (high value is bad)
-            }
-        } else {
-            // For Hurst and ER (higher is better): red → yellow → green
-            if (value < 0.33) {
-                fillColor = '#f85149'; // Red (low value is bad)
-            } else if (value < 0.66) {
-                fillColor = '#f59e0b'; // Yellow (medium value)
-            } else {
-                fillColor = '#3fb950'; // Green (high value is good)
-            }
-        }
-        
-        // Build HTML with single color for all filled blocks
-        let html = '';
-        
-        for (let i = 0; i < totalBlocks; i++) {
-            if (i < filledBlocks) {
-                html += '<span style="color: ' + fillColor + ';">█</span>';
-            } else {
-                html += '<span style="color: #2d333b;">█</span>';
-            }
-        }
-        
-        return html;
+
+    const regimeTimeframeEl = document.getElementById('regime-timeframe');
+    if (regimeTimeframeEl) regimeTimeframeEl.textContent = timeframe;
+
+    // Config pills
+    const cfgContainer = document.getElementById('regime-config-pills');
+    if (cfgContainer) {
+        const pills = [
+            { label: 'Combine',   value: data.combine_mode  || '-' },
+            { label: 'Analysis',  value: data.analysis_mode || '-' },
+            { label: 'Timeframe', value: data.tf_mode        || '-' },
+        ];
+        cfgContainer.innerHTML = pills.map(p =>
+            `<span style="background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:13px;color:#8b949e;">
+                <span style="color:#6b7280;">${p.label}:</span>
+                <span style="color:#c9d1d9;font-weight:600;margin-left:4px;">${p.value}</span>
+            </span>`
+        ).join('');
     }
-    
-    // Helper to create empty bar
-    function createEmptyBar() {
-        const totalBlocks = TOTAL_BLOCKS;
-        let html = '';
-        for (let i = 0; i < totalBlocks; i++) {
-            html += '<span style="color: #2d333b;">█</span>';
-        }
-        return html;
+}
+// -----------------------------------------------------------------------------
+// /api/regime/symbols  →  symbols metrics grid (one request per symbol)
+// -----------------------------------------------------------------------------
+
+async function loadRegimeSymbols(indicatorsCfg) {
+    const container = document.getElementById('regime-symbols-container');
+    if (!container) return;
+
+    let symbols = [];
+    try {
+        const res  = await fetch('/api/symbols/unique');
+        const data = await res.json();
+        if (data.success) symbols = data.symbols;
+    } catch (e) {
+        console.error('Error fetching symbols:', e);
     }
-    
-    // Update metrics with colored block bars
-    const hurst = metrics.hurst;
-    const er = metrics.efficiency_ratio;
-    const atr = metrics.atr_pct;
-    const pe = metrics.permutation_entropy;
-    
-    // Hurst Exponent (0-1 range, higher is better)
-    if (hurst !== undefined && hurst !== null && !isNaN(hurst)) {
-        const hurstElement = document.getElementById('regime-metric-hurst');
-        hurstElement.textContent = hurst.toFixed(3);
-        
-        // Set color to match bar color
-        let hurstColor;
-        if (hurst < 0.33) {
-            hurstColor = '#f85149'; // Red (low value is bad)
-        } else if (hurst < 0.66) {
-            hurstColor = '#f59e0b'; // Yellow (medium value)
-        } else {
-            hurstColor = '#3fb950'; // Green (high value is good)
-        }
-        hurstElement.style.color = hurstColor;
-        
-        const hurstBar = document.getElementById('regime-bar-hurst');
-        if (hurstBar) {
-            hurstBar.innerHTML = createColoredBar(hurst, false);
-            hurstBar.style.width = '100%';
-        }
-    } else {
-        document.getElementById('regime-metric-hurst').textContent = '-';
-        document.getElementById('regime-metric-hurst').style.color = '#58a6ff';
-        const hurstBar = document.getElementById('regime-bar-hurst');
-        if (hurstBar) {
-            hurstBar.innerHTML = createEmptyBar();
-            hurstBar.style.width = '100%';
-        }
+
+    if (!symbols.length) {
+        container.innerHTML = '<div style="text-align:center;color:#8b949e;padding:40px;">No active symbols</div>';
+        return;
     }
-    
-    // Efficiency Ratio (0-1 range, higher is better)
-    if (er !== undefined && er !== null && !isNaN(er)) {
-        const erElement = document.getElementById('regime-metric-er');
-        erElement.textContent = er.toFixed(3);
-        
-        // Set color to match bar color
-        let erColor;
-        if (er < 0.33) {
-            erColor = '#f85149'; // Red (low value is bad)
-        } else if (er < 0.66) {
-            erColor = '#f59e0b'; // Yellow (medium value)
-        } else {
-            erColor = '#3fb950'; // Green (high value is good)
-        }
-        erElement.style.color = erColor;
-        
-        const erBar = document.getElementById('regime-bar-er');
-        if (erBar) {
-            erBar.innerHTML = createColoredBar(er, false);
-            erBar.style.width = '100%';
-        }
-    } else {
-        document.getElementById('regime-metric-er').textContent = '-';
-        document.getElementById('regime-metric-er').style.color = '#22d3ee';
-        const erBar = document.getElementById('regime-bar-er');
-        if (erBar) {
-            erBar.innerHTML = createEmptyBar();
-            erBar.style.width = '100%';
-        }
+
+    const enabledMetrics = Object.entries(indicatorsCfg || {}).filter(([, cfg]) => cfg.enabled);
+    const firstLoad = !document.getElementById(`sym-card-${symbols[0]}`);
+    if (firstLoad) {
+        container.innerHTML = symbols.map(sym => _buildSymbolCardSkeleton(sym, enabledMetrics)).join('');
     }
-    
-    // ATR Percentage (scale 0-4% to 0-1, lower is better)
-    if (atr !== undefined && atr !== null && !isNaN(atr)) {
-        const atrElement = document.getElementById('regime-metric-atr');
-        atrElement.textContent = atr.toFixed(2) + '%';
-        
-        // Color for text based on absolute ATR value
-        let atrColor;
-        if (atr > 2.0) {
-            atrColor = '#f85149'; // Red if > 2%
-        } else if (atr > 1.0) {
-            atrColor = '#f59e0b'; // Yellow if 1-2%
-        } else {
-            atrColor = '#3fb950'; // Green if < 1%
-        }
-        atrElement.style.color = atrColor;
-        
-        // Bar uses SAME color logic (not reverse gradient)
-        const atrScaled = Math.min(atr / 2.5, 1.0);
-        const totalBlocks = TOTAL_BLOCKS;
-        const filledBlocks = Math.round(atrScaled * totalBlocks);
-        
-        // Determine bar color based on actual ATR value
-        let barFillColor;
-        if (atr > 2.0) {
-            barFillColor = '#f85149'; // Red
-        } else if (atr > 1.0) {
-            barFillColor = '#f59e0b'; // Yellow
-        } else {
-            barFillColor = '#3fb950'; // Green
-        }
-        
-        let barHtml = '';
-        for (let i = 0; i < totalBlocks; i++) {
-            if (i < filledBlocks) {
-                barHtml += '<span style="color: ' + barFillColor + ';">█</span>';
-            } else {
-                barHtml += '<span style="color: #2d333b;">█</span>';
-            }
-        }
-        
-        const atrBar = document.getElementById('regime-bar-atr');
-        if (atrBar) {
-            atrBar.innerHTML = barHtml;
-            atrBar.style.width = '100%';
-        }
-    } else {
-        document.getElementById('regime-metric-atr').textContent = '-';
-        document.getElementById('regime-metric-atr').style.color = '#f59e0b';
-        const atrBar = document.getElementById('regime-bar-atr');
-        if (atrBar) {
-            atrBar.innerHTML = createEmptyBar();
-            atrBar.style.width = '100%';
-        }
-    }
-    
-    // Permutation Entropy (0-1 range, lower is better)
-    if (pe !== undefined && pe !== null && !isNaN(pe)) {
-        const peElement = document.getElementById('regime-metric-pe');
-        peElement.textContent = pe.toFixed(3);
-        
-        // Set color to match bar color (reverse - lower is better)
-        let peColor;
-        if (pe < 0.33) {
-            peColor = '#3fb950'; // Green (low value is good)
-        } else if (pe < 0.66) {
-            peColor = '#f59e0b'; // Yellow (medium value)
-        } else {
-            peColor = '#f85149'; // Red (high value is bad)
-        }
-        peElement.style.color = peColor;
-        
-        const peBar = document.getElementById('regime-bar-pe');
-        if (peBar) {
-            peBar.innerHTML = createColoredBar(pe, true);
-            peBar.style.width = '100%';
-        }
-    } else {
-        document.getElementById('regime-metric-pe').textContent = '-';
-        document.getElementById('regime-metric-pe').style.color = '#a78bfa';
-        const peBar = document.getElementById('regime-bar-pe');
-        if (peBar) {
-            peBar.innerHTML = createEmptyBar();
-            peBar.style.width = '100%';
+
+    for (const sym of symbols) {
+        try {
+            const res  = await fetch(`/api/regime/symbols?timeframe=${currentRegimeTimeframe}&symbol=${sym}`);
+            const data = await res.json();
+            _updateSymbolCard(sym, data, enabledMetrics);
+        } catch (e) {
+            console.error(`Error loading regime for ${sym}:`, e);
+            _updateSymbolCardError(sym);
         }
     }
 }
 
-// REGIME 0 (BTC 1D FILTER) FUNCTIONS
-async function loadRegime0Data() {
-    try {
-        const res = await fetch('/api/regime0/current');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        
-        const data = await res.json();
-        
-        if (!data.success) {
-            console.error('Regime 0 API error:', data.error);
+function _buildSymbolCardSkeleton(symbol, enabledMetrics) {
+    const metricCols = enabledMetrics.map(([key]) => {
+        const meta = METRIC_META[key] || { label: key };
+        return `
+            <div style="flex:1;text-align:center;">
+                <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">${meta.label}</div>
+                <div id="sym-metric-${symbol}-${key}" style="font-size:26px;font-weight:700;color:#8b949e;">-</div>
+                <div id="sym-bar-${symbol}-${key}" style="font-family:monospace;font-size:13px;margin-top:6px;">
+                    <span style="color:#2d333b;">████████████████████</span>
+                </div>
+                <div id="sym-th-${symbol}-${key}" style="font-size:12px;color:#6b7280;margin-top:4px;">th: -</div>
+            </div>`;
+    }).join('');
+
+    return `
+        <div id="sym-card-${symbol}" style="background:#1c2128;border:2px solid #21262d;border-radius:10px;padding:20px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+                <span style="font-size:20px;font-weight:700;color:#c9d1d9;">${symbol.replace('USDT','')}<span style="font-size:14px;color:#8b949e;">/USDT</span></span>
+                <span id="sym-family-${symbol}" style="font-size:14px;font-weight:600;padding:3px 12px;border-radius:20px;background:#21262d;color:#8b949e;">...</span>
+            </div>
+            <div style="display:flex;gap:20px;">${metricCols}</div>
+        </div>`;
+}
+
+function _updateSymbolCard(symbol, data, enabledMetrics) {
+    const family     = data.family  || 'neutral';
+    const metrics    = data.metrics || {};
+    const indicators = data.indicators_cfg || {};
+
+    const badgeStyle = getRegimeBadgeStyle(family);
+    const familyEl   = document.getElementById(`sym-family-${symbol}`);
+    if (familyEl) {
+        familyEl.textContent      = badgeStyle.text;
+        familyEl.style.background = badgeStyle.bg + '33';
+        familyEl.style.color      = badgeStyle.bg;
+    }
+
+    const card = document.getElementById(`sym-card-${symbol}`);
+    if (card) card.style.border = `2px solid ${badgeStyle.bg}66`;
+
+    enabledMetrics.forEach(([key]) => {
+        const meta     = METRIC_META[key] || { label: key, reverse: false, fmt: v => v.toFixed(3) };
+        const value    = metrics[key];
+        const cfg      = indicators[key] || {};
+        const metricEl = document.getElementById(`sym-metric-${symbol}-${key}`);
+        const barEl    = document.getElementById(`sym-bar-${symbol}-${key}`);
+        const thEl     = document.getElementById(`sym-th-${symbol}-${key}`);
+
+        if (thEl && cfg.threshold !== undefined) thEl.textContent = `th: ${cfg.threshold}`;
+
+        if (value === undefined || value === null || isNaN(value)) {
+            if (metricEl) { metricEl.textContent = '-'; metricEl.style.color = '#8b949e'; }
             return;
         }
-        
-        updateRegime0UI(data);
-        
-    } catch (error) {
-        console.error('Error loading REGIME 0 data:', error);
-    }
-}
 
-function updateRegime0UI(data) {
-    const btcClose = data.btc_close;
-    const refSymbol = data.ref_symbol || 'REF';
-
-    const titleEl = document.getElementById('regime0-ref-symbol');
-    if (titleEl) titleEl.textContent = refSymbol;
-    const btcLabelEl = document.getElementById('regime0-none-btc-label');
-    if (btcLabelEl) btcLabelEl.textContent = refSymbol;
-    const ma5 = data.ma5;
-    const longData = data.long;
-    const shortData = data.short;
-
-    const shortRuleEl = document.getElementById('regime0-short-rule');
-    if (shortRuleEl) shortRuleEl.textContent = shortData.rule;
-    const longRuleEl = document.getElementById('regime0-long-rule');
-    if (longRuleEl) longRuleEl.textContent = longData.rule;
-    
-    const longAllowed = longData.allowed;
-    const shortAllowed = shortData.allowed;
-    const noneActive = !longAllowed && !shortAllowed;
-    
-    // Update SHORT card (LEFT) - No numbers
-    const shortCard = document.getElementById('regime0-card-short');
-    const shortStatus = document.getElementById('regime0-short-status');
-    
-    if (shortAllowed) {
-        shortCard.style.border = '2px solid #f85149';
-        shortCard.style.background = 'rgba(248, 81, 73, 0.1)';
-        shortStatus.textContent = 'ALLOW';
-        shortStatus.style.color = '#f85149';
-    } else {
-        shortCard.style.border = '2px solid #21262d';
-        shortCard.style.background = '#1c2128';
-        shortStatus.textContent = 'BLOCK';
-        shortStatus.style.color = '#6b7280';
-    }
-    
-    // Update INACTIVE card (CENTER) - 3 values only
-    const noneCard = document.getElementById('regime0-card-none');
-    const noneShortTh = document.getElementById('regime0-none-short-th');
-    const noneBtc = document.getElementById('regime0-none-btc');
-    const noneLongTh = document.getElementById('regime0-none-long-th');
-    
-    if (noneActive) {
-        noneCard.style.border = '2px solid #d29922';
-        noneCard.style.background = 'rgba(210, 153, 34, 0.1)';
-    } else {
-        noneCard.style.border = '2px solid #21262d';
-        noneCard.style.background = '#1c2128';
-    }
-    
-    // Update 3 values in INACTIVE card
-    if (noneShortTh && shortData.threshold) {
-        noneShortTh.textContent = '$' + shortData.threshold.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-    }
-    if (noneBtc && btcClose) {
-        noneBtc.textContent = '$' + btcClose.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-    }
-    if (noneLongTh && longData.threshold) {
-        noneLongTh.textContent = '$' + longData.threshold.toLocaleString('es-ES', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-    }
-    
-    // Update LONG card (RIGHT) - No numbers
-    const longCard = document.getElementById('regime0-card-long');
-    const longStatus = document.getElementById('regime0-long-status');
-    
-    if (longAllowed) {
-        longCard.style.border = '2px solid #3fb950';
-        longCard.style.background = 'rgba(63, 185, 80, 0.1)';
-        longStatus.textContent = 'ALLOW';
-        longStatus.style.color = '#3fb950';
-    } else {
-        longCard.style.border = '2px solid #21262d';
-        longCard.style.background = '#1c2128';
-        longStatus.textContent = 'BLOCK';
-        longStatus.style.color = '#6b7280';
-    }
-    
-    // Update opacity for REGIME 0 cards
-    if (shortAllowed) {
-        // SHORT activa
-        shortCard.style.opacity = '1';
-        longCard.style.opacity = '0.4';
-    } else if (longAllowed) {
-        // LONG activa
-        longCard.style.opacity = '1';
-        shortCard.style.opacity = '0.4';
-    } else {
-        // Ambas inactivas
-        shortCard.style.opacity = '0.4';
-        longCard.style.opacity = '0.4';
-    }
-    
-    // Update opacity for INACTIVE card (CENTER)
-    if (noneActive) {
-        noneCard.style.opacity = '1';
-    } else {
-        noneCard.style.opacity = '0.4';
-    }
-    
-    // Update Market Regime card border based on REGIME 0
-    const regimeCard = document.getElementById('regime-card');
-    if (regimeCard) {
-        if (longAllowed) {
-            regimeCard.style.border = '2px solid #3fb950';  // Verde (LONG ALLOW)
-        } else if (shortAllowed) {
-            regimeCard.style.border = '2px solid #f85149';  // Rojo (SHORT ALLOW)
-        } else {
-            regimeCard.style.border = '2px solid #d29922';  // Naranja (INACTIVE)
+        const normalized = Math.min(Math.max(value, 0), 1);
+        if (metricEl) {
+            metricEl.textContent = meta.fmt(value);
+            metricEl.style.color = _metricColor(normalized, meta.reverse);
         }
-    }
+        if (barEl) barEl.innerHTML = _buildBar(normalized, meta.reverse, 20);
+    });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+function _updateSymbolCardError(symbol) {
+    const familyEl = document.getElementById(`sym-family-${symbol}`);
+    if (familyEl) { familyEl.textContent = 'ERROR'; familyEl.style.color = '#f85149'; }
+}
+// -----------------------------------------------------------------------------
+// REGIME 0 (REF 1D FILTER)
+// -----------------------------------------------------------------------------
+
 // END MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -947,7 +642,6 @@ function switchTab(tabName) {
     if (tabName === 'equity') loadEquityTab();
     if (tabName === 'regime') {
     loadRegimeData();
-    loadRegime0Data();
 }
     if (tabName === 'risk') loadRiskTab();
     if (tabName === 'quality') loadQualityTab();
@@ -959,11 +653,9 @@ function switchEquitySubTab(subTabName) {
     document.querySelectorAll('#tab-equity .tab-content').forEach(content => content.classList.remove('active'));
     document.getElementById('equity-subtab-' + subTabName).classList.add('active');
     
-    if (subTabName === 'symbols') loadSymbolsAnalysis();
     if (subTabName === 'weekday') loadWeekDayAnalysis();
     if (subTabName === 'period') initPeriodTab();
     if (subTabName === 'correlation') initCorrelationTab();
-    if (subTabName === 'regime') loadRegimeAnalytics();
     if (subTabName === 'compose') {
         const container = document.getElementById('compose-container');
         const currentContent = container.innerHTML.trim();
@@ -1328,56 +1020,65 @@ async function loadStrategyAnalysis() {
 // =============================================================================
 async function renderRegimeStrategyMatrix() {
     try {
-        const res = await fetch('/api/regime/strategies');
+        const res  = await fetch('/api/regime/strategies');
         const data = await res.json();
-
         if (!data.success) {
             console.error('Failed to load regime strategies:', data.error);
             return;
         }
 
         const tbody = document.getElementById('regime-strategy-matrix-body');
+        const thead = document.getElementById('regime-strategy-matrix-head');
         if (!tbody) return;
 
         const strategiesData = data.strategies || [];
-
         if (strategiesData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No strategies</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No strategies</td></tr>';
             return;
         }
 
-        const sorted = strategiesData.sort((a, b) => a.id.localeCompare(b.id));
+        // Detect regime fields dynamically from first strategy
+        const regimeFields = Object.keys(strategiesData[0])
+            .filter(k => k.startsWith('regime_'))
+            .sort();
 
-        const cellColor = (val) => {
-            if (val === 0) return '#6b7280';
-            if (val === 1) return '#c9d1d9';
-            if (val > 1)  return '#58a6ff';
-            return '#f85149';
-        };
+        // Update headers dynamically
+        if (thead) {
+            const headerCells = regimeFields.map(f => {
+                const label = f.replace('regime_', '').toUpperCase();
+                return `<th>${label}</th>`;
+            }).join('');
+            thead.innerHTML = `<tr>
+                <th>#</th>
+                <th>ID</th>
+                <th>Direction</th>
+                ${headerCells}
+            </tr>`;
+        }
 
+        const sorted   = strategiesData.sort((a, b) => a.id.localeCompare(b.id));
         const dirColor = (dir) => dir === 'long' ? '#3fb950' : '#f85149';
+        const cellStyle = (val) => val === 0
+            ? 'color:#8b949e;font-weight:700;'
+            : 'color:#8b949e;font-weight:700;';
+        const cellText = (val) => val === 0 ? '0x' : '1x';
 
         let html = '';
         sorted.forEach((strat, idx) => {
-            const num = String(idx + 1).padStart(2, '0');
-            const fields = [
-                'regime_trending_uptrend', 'regime_trending_dwtrend',
-                'regime_ranging_uptrend',  'regime_ranging_dwtrend',
-                'regime_volatile_uptrend', 'regime_volatile_dwtrend'
-            ];
-            const cells = fields.map(f => {
+            const num   = String(idx + 1).padStart(2, '0');
+            const cells = regimeFields.map(f => {
                 const val = strat[f];
-                return `<td style="color: ${cellColor(val)}; font-weight: 700;">${val}x</td>`;
+                return `<td style="${cellStyle(val)}">${cellText(val)}</td>`;
             }).join('');
 
-            html += `<tr>
-                <td style="color: #8b949e; font-weight: 600;">${num}</td>
+            const rowOpacity = strat.active ? '1' : '0.4';
+            html += `<tr style="opacity:${rowOpacity};">
+                <td style="color:#8b949e;font-weight:600;">${num}</td>
                 <td>${strat.id}</td>
-                <td style="color: ${dirColor(strat.direction)}; font-weight: 600; text-transform: uppercase;">${strat.direction}</td>
+                <td style="color:${dirColor(strat.direction)};font-weight:600;text-transform:uppercase;">${strat.direction}</td>
                 ${cells}
             </tr>`;
         });
-
         tbody.innerHTML = html;
 
     } catch (error) {
@@ -1386,7 +1087,6 @@ async function renderRegimeStrategyMatrix() {
 }
 // =============================================================================
 // END REGIME STRATEGY MATRIX
-// =============================================================================
 
 async function loadBotConfig() {
     try {
@@ -1508,7 +1208,6 @@ async function loadBotConfig() {
         }
         
         // MODIFIED: Call new regime matrix functions
-        await loadRegimeSizing();
         renderRegimeStrategyMatrix(data.strategies);
         
     } catch (error) {
@@ -2028,407 +1727,6 @@ async function loadComposeCharts() {
     }
 }
 
-async function loadSymbolsAnalysis() {
-    try {
-        const res = await fetch('/api/symbols-analysis');
-        const data = await res.json();
-        const container = document.getElementById('symbols-container');
-        
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
-            return;
-        }
-        
-        const sortedData = data.sort((a, b) => b.Win_Pct - a.Win_Pct);
-        
-        function formatSlippage(value) {
-            if (value === null || value === undefined) {
-                return '<span style="color: #6b7280;">N/A</span>';
-            }
-            
-            let color;
-            
-            // Positive slippage = better execution (always green)
-            if (value > 0) {
-                color = '#3fb950';
-            } else {
-                const absValue = Math.abs(value);
-                if (absValue < SLIPPAGE_THRESHOLDS.warning) {
-                    color = '#3fb950';
-                } else if (absValue < SLIPPAGE_THRESHOLDS.critical) {
-                    color = '#d29922';
-                } else {
-                    color = '#f85149';
-                }
-            }
-            
-            const prefix = value >= 0 ? '+' : '';
-            return `<span style="color: ${color}; font-weight: 600;">${prefix}${value.toFixed(2)}%</span>`;
-        }
-        
-        const html = '<table><thead><tr><th>Symbol</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th><th>Slippage Total</th><th>Slippage L30</th></tr></thead><tbody>' +
-            sortedData.map(s => {
-                const profitClass = s.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
-                const avgProfitClass = s.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
-                
-                return '<tr>' +
-                    '<td>' + s.Symbol + '</td>' +
-                    '<td>' + s.Total_Trades + '</td>' +
-                    '<td>' + s.Win_Pct.toFixed(1) + '%</td>' +
-                    '<td class="' + profitClass + '">' + (s.Total_Profit >= 0 ? '+' : '') + '$' + s.Total_Profit.toFixed(2) + '</td>' +
-                    '<td class="' + avgProfitClass + '">' + (s.Avg_Profit >= 0 ? '+' : '') + '$' + s.Avg_Profit.toFixed(2) + '</td>' +
-                    '<td>' + formatSlippage(s.Slippage_Total) + '</td>' +
-                    '<td>' + formatSlippage(s.Slippage_L30) + '</td>' +
-                    '</tr>';
-            }).join('') +
-            '</tbody></table>';
-        container.innerHTML = html;
-    } catch (error) {
-        console.error('Error loading symbols analysis:', error);
-        document.getElementById('symbols-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
-    }
-}
-async function loadWeekDayAnalysis() {
-    try {
-        const res = await fetch('/api/weekday-analysis');
-        const data = await res.json();
-        const container = document.getElementById('weekday-container');
-        
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No data available</div>';
-            return;
-        }
-        
-        const html = '<table><thead><tr><th>Day</th><th>Total Trades</th><th>Win %</th><th>Total Profit</th><th>Avg Profit</th></tr></thead><tbody>' +
-            data.map(d => {
-                const profitClass = d.Total_Profit >= 0 ? 'direction-long' : 'direction-short';
-                const avgProfitClass = d.Avg_Profit >= 0 ? 'direction-long' : 'direction-short';
-                return '<tr><td>' + d.Day + '</td><td>' + d.Total_Trades + '</td><td>' + d.Win_Pct.toFixed(1) + '%</td><td class="' + profitClass + '">' + (d.Total_Profit >= 0 ? '+' : '') + '$' + d.Total_Profit.toFixed(2) + '</td><td class="' + avgProfitClass + '">' + (d.Avg_Profit >= 0 ? '+' : '') + '$' + d.Avg_Profit.toFixed(2) + '</td></tr>';
-            }).join('') +
-            '</tbody></table>';
-        container.innerHTML = html;
-    } catch (error) {
-        console.error('Error loading weekday analysis:', error);
-        document.getElementById('weekday-container').innerHTML = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
-    }
-}
-
-// =============================================================================
-// REGIME ANALYTICS
-// =============================================================================
-
-async function loadRegimeAnalytics() {
-    try {
-        const res = await fetch('/api/analytics/regime');
-        
-        if (!res.ok) {
-            throw new Error('HTTP ' + res.status);
-        }
-        
-        const response = await res.json();
-        const container = document.getElementById('regime-analytics-container');
-        
-        if (!response.success || !response.data || Object.keys(response.data).length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
-                (response.error || 'No regime data available yet') +
-                '</div>';
-            return;
-        }
-        
-        const data = response.data;
-        
-        // Sort regimes by priority: trending > ranging > volatile > unknown
-        const regimeOrder = ['trending', 'ranging', 'volatile', 'unknown'];
-        const sortedRegimes = Object.keys(data).sort((a, b) => {
-            const indexA = regimeOrder.indexOf(a);
-            const indexB = regimeOrder.indexOf(b);
-            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-        });
-        
-        // Colors for each regime - UPDATED
-        const regimeColors = {
-            'trending': { bar: '#58a6ff', text: '#58a6ff', bg: 'rgba(88, 166, 255, 0.1)' },        // AZUL
-            'ranging': { bar: '#9ca3af', text: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)' },        // GRIS CLARO
-            'volatile': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },        // ROJO
-            'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
-        };
-        
-        let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
-        
-        sortedRegimes.forEach(regime => {
-            const stats = data[regime];
-            const colors = regimeColors[regime] || regimeColors['unknown'];
-            
-            const winrateWidth = Math.round(stats.winrate);
-            const pnlClass = stats.pnl >= 0 ? 'direction-long' : 'direction-short';
-            const pnlPrefix = stats.pnl >= 0 ? '+$' : '$';
-            
-            html += `
-                <div style="background: ${colors.bg}; border: 1px solid ${colors.bar}; border-radius: 8px; padding: 20px;">
-                    <!-- Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
-                            ${regime}
-                        </div>
-                        <div style="font-size: 24px; color: #8b949e;">
-                            ${stats.trades}/${stats.total_trades} trades
-                        </div>
-                    </div>
-                    
-                    <!-- Win Rate Bar -->
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span style="color: #8b949e; font-size: 21px; font-weight: 600;">Win Rate</span>
-                            <span style="color: ${colors.text}; font-size: 21px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
-                        </div>
-                        <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
-                            <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- P&L -->
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #8b949e; font-size: 21px; font-weight: 600;">P&L</span>
-                        <span class="${pnlClass}" style="font-size: 27px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading regime analytics:', error);
-        document.getElementById('regime-analytics-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading regime data</div>';
-    }
-}
-
-// =============================================================================
-// REGIME ANALYTICS MODE SELECTOR
-// =============================================================================
-
-function setRegimeAnalyticsMode(mode) {
-    currentRegimeAnalyticsMode = mode;
-    
-    // Update button states
-    document.querySelectorAll('#equity-subtab-regime .view-selector .view-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if ((mode === 'regime' && btn.textContent.includes('Market Regime')) ||
-            (mode === 'direction' && btn.textContent.includes('Market Direction'))) {
-            btn.classList.add('active');
-        }
-    });
-    
-    // Load corresponding data
-    if (mode === 'regime') {
-        loadRegimeAnalytics();
-    } else {
-        loadMarketDirectionAnalytics();
-    }
-}
-
-// =============================================================================
-// MARKET DIRECTION ANALYTICS
-// =============================================================================
-
-async function loadMarketDirectionAnalytics() {
-    try {
-        const res = await fetch('/api/analytics/market-direction');
-        
-        if (!res.ok) {
-            throw new Error('HTTP ' + res.status);
-        }
-        
-        const response = await res.json();
-        const container = document.getElementById('regime-analytics-container');
-        
-        if (!response.success || !response.data || Object.keys(response.data).length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
-                (response.error || 'No market direction data available yet') +
-                '</div>';
-            return;
-        }
-        
-        const data = response.data;
-        
-        // Sort directions: uptrend > downtrend > unknown
-        const directionOrder = ['uptrend', 'dwtrend', 'unknown'];
-        const sortedDirections = Object.keys(data).sort((a, b) => {
-            const indexA = directionOrder.indexOf(a);
-            const indexB = directionOrder.indexOf(b);
-            return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-        });
-        
-        // Colors for each direction
-        const directionColors = {
-            'uptrend': { bar: '#3fb950', text: '#3fb950', bg: 'rgba(63, 185, 80, 0.1)' },      // Green
-            'dwtrend': { bar: '#f85149', text: '#f85149', bg: 'rgba(248, 81, 73, 0.1)' },   // Red
-            'unknown': { bar: '#8b949e', text: '#8b949e', bg: 'rgba(139, 148, 158, 0.1)' }
-        };
-        
-        let html = '<div style="display: flex; flex-direction: column; gap: 20px;">';
-        
-        sortedDirections.forEach(direction => {
-            const stats = data[direction];
-            const colors = directionColors[direction] || directionColors['unknown'];
-            
-            const winrateWidth = Math.round(stats.winrate);
-            const pnlClass = stats.pnl >= 0 ? 'direction-long' : 'direction-short';
-            const pnlPrefix = stats.pnl >= 0 ? '+$' : '$';
-            
-            html += `
-                <div style="background: ${colors.bg}; border: 1px solid ${colors.bar}; border-radius: 8px; padding: 20px;">
-                    <!-- Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <div style="font-size: 24px; font-weight: 700; text-transform: uppercase; color: ${colors.text};">
-                            ${direction}
-                        </div>
-                        <div style="font-size: 24px; color: #8b949e;">
-                            ${stats.trades}/${stats.total_trades} trades
-                        </div>
-                    </div>
-                    
-                    <!-- Win Rate Bar -->
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span style="color: #8b949e; font-size: 21px; font-weight: 600;">Win Rate</span>
-                            <span style="color: ${colors.text}; font-size: 21px; font-weight: 700;">${stats.winrate.toFixed(1)}%</span>
-                        </div>
-                        <div style="background: #21262d; height: 20px; border-radius: 4px; overflow: hidden;">
-                            <div style="background: ${colors.bar}; height: 100%; width: ${winrateWidth}%; transition: width 0.3s ease;"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- P&L -->
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #8b949e; font-size: 21px; font-weight: 600;">P&L</span>
-                        <span class="${pnlClass}" style="font-size: 27px; font-weight: 700;">${pnlPrefix}${stats.pnl.toFixed(2)}</span>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading market direction analytics:', error);
-        document.getElementById('regime-analytics-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading market direction data</div>';
-    }
-}
-
-// =============================================================================
-// END REGIME ANALYTICS
-// =============================================================================
-// =============================================================================
-// REGIME STRATEGY BREAKDOWN
-// =============================================================================
-
-function clearRegimeBreakdownDates() {
-    document.getElementById('regime-breakdown-date-from').value = '';
-    document.getElementById('regime-breakdown-date-to').value = '';
-}
-
-function getRegimeBreakdownDateParams() {
-    const dateFrom = document.getElementById('regime-breakdown-date-from').value;
-    const dateTo = document.getElementById('regime-breakdown-date-to').value;
-    let params = '';
-    if (dateFrom) params += '&date_from=' + dateFrom;
-    if (dateTo) params += '&date_to=' + dateTo;
-    return params;
-}
-
-async function loadRegimeStrategyBreakdown() {
-    try {
-        const dateParams = getRegimeBreakdownDateParams();
-        const res = await fetch('/api/regime/strategy-breakdown?' + dateParams);
-        
-        if (!res.ok) {
-            throw new Error('HTTP ' + res.status);
-        }
-        
-        const response = await res.json();
-        const container = document.getElementById('regime-breakdown-container');
-        
-        if (!response.success || !response.data || response.data.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">' +
-                (response.error || 'No data available for selected date range') +
-                '</div>';
-            return;
-        }
-        
-        const data = response.data;
-        
-        // Build table
-        let html = '<table><thead><tr>' +
-            '<th>#</th>' +
-            '<th>Strategy</th>' +
-            '<th>Total Trades</th>' +
-            '<th>Win %</th>' +
-            '<th>Profit</th>' +
-            '<th>TRENDING</th>' +
-            '<th>RANGING</th>' +
-            '<th>VOLATILE</th>' +
-            '<th>UPTREND</th>' +
-            '<th>DOWNTREND</th>' +
-            '</tr></thead><tbody>';
-        
-        data.forEach(row => {
-            const num = String(row.number).padStart(2, '0');
-            const profitClass = row.profit >= 0 ? 'direction-long' : 'direction-short';
-            const profitPrefix = row.profit >= 0 ? '+$' : '$';
-            
-            // Helper to format regime/direction cells
-            // Helper to format regime/direction cells
-            function formatCell(stats, globalWinRate) {
-                if (stats.trades === 0) {
-                    return '<span style="color: #6b7280;">-</span>';
-                }
-                
-                let arrowColor = '#6b7280'; // Default grey
-                let arrow = '=';
-                
-                if (stats.win_pct > globalWinRate) {
-                    arrowColor = '#3fb950'; // Green
-                    arrow = '↑';
-                } else if (stats.win_pct < globalWinRate) {
-                    arrowColor = '#f85149'; // Red
-                    arrow = '↓';
-                }
-                
-            return '<span style="color: #58a6ff;">' + stats.trades + ' / ' + stats.win_pct.toFixed(1) + '%</span>' +
-                   ' <span style="color: ' + arrowColor + '; font-weight: 700; font-size: 24px;">' + arrow + '</span>';
-            }
-            
-            html += '<tr>' +
-                '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
-                '<td>' + row.strategy + '</td>' +
-                '<td style="text-align: center;">' + row.total_trades + '</td>' +
-                '<td style="text-align: center;">' + row.win_rate.toFixed(1) + '%</td>' +
-                '<td class="' + profitClass + '">' + profitPrefix + row.profit.toFixed(2) + '</td>' +
-                '<td style="text-align: center;">' + formatCell(row.trending, row.win_rate) + '</td>' +
-                '<td style="text-align: center;">' + formatCell(row.ranging, row.win_rate) + '</td>' +
-                '<td style="text-align: center;">' + formatCell(row.volatile, row.win_rate) + '</td>' +
-                '<td style="text-align: center;">' + formatCell(row.uptrend, row.win_rate) + '</td>' +
-                '<td style="text-align: center;">' + formatCell(row.downtrend, row.win_rate) + '</td>' +
-                '</tr>';
-        });
-        
-        html += '</tbody></table>';
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading regime strategy breakdown:', error);
-        document.getElementById('regime-breakdown-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
-    }
-}
-
 // =============================================================================
 // END REGIME STRATEGY BREAKDOWN
 // =============================================================================
@@ -2684,13 +1982,15 @@ async function loadData() {
             if (status.unique_timeframes && status.unique_timeframes.length > 0) {
                 const tabsContainer = document.getElementById('regime-timeframe-tabs');
                 if (tabsContainer && tabsContainer.children.length === 0) {
-                    status.unique_timeframes.forEach((tf, idx) => {
+                    const timeframes = ['1Dutc', ...status.unique_timeframes.filter(tf => tf !== '1Dutc')];
+                    timeframes.forEach((tf, idx) => {
                         const btn = document.createElement('button');
                         btn.className = 'view-btn' + (idx === 0 ? ' active' : '');
                         btn.textContent = tf;
                         btn.onclick = () => setRegimeTimeframe(tf);
                         tabsContainer.appendChild(btn);
                     });
+                    setRegimeTimeframe(timeframes[0]);
                     setRegimeTimeframe(status.unique_timeframes[0]);
                 }
             }
@@ -2776,7 +2076,6 @@ async function loadData() {
         
         // Load regime data (non-blocking)
         loadRegimeData().catch(console.error);
-        loadRegime0Data().catch(console.error); 
         
     } catch (error) {
         console.error('Error:', error);

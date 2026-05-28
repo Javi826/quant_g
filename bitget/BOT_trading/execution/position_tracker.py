@@ -18,6 +18,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional, Any
 import logging
+from state.state_manager import save_state_local
 logger = logging.getLogger('BOT_trading.execution.position_tracker')
 
 from execution.order_manager import get_current_price, close_position
@@ -94,10 +95,6 @@ def add_position(
     state_file: str,
     hour_zone, 
     usdt_amount: float = 0,
-    regime_family: Optional[str] = None,
-    regime_multiplier: Optional[float] = None,
-    market_direction: Optional[str] = None,            
-    direction_multiplier: Optional[float] = None,
 ) -> None:
     """
     Add a new position to tracking system.
@@ -124,7 +121,7 @@ def add_position(
         regime_family: Market regime family at position open
         regime_multiplier: Regime multiplier applied
     """
-    from state.state_manager import save_state_local
+    
     
     if strat_id not in open_positions:
         open_positions[strat_id] = []
@@ -141,10 +138,6 @@ def add_position(
         'order_id': order_id,
         'opened_at': datetime.now(hour_zone),
         'usdt_amount': usdt_amount,
-        'regime_family': regime_family if regime_family else 'unknown',
-        'regime_multiplier': regime_multiplier if regime_multiplier is not None else 1.0,
-        'market_direction': market_direction if market_direction else 'unknown',
-        'direction_multiplier': direction_multiplier if direction_multiplier is not None else 1.0
     }
     
     open_positions[strat_id].append(position)
@@ -238,10 +231,6 @@ def check_tp_sl_for_strategy(strat_id: str,
                     'entry_price': pos['entry_price'],
                     'tp': pos.get('tp'),  
                     'sl': pos.get('sl'),          
-                    'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                    'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': pos.get('direction_multiplier', 1.0)
                 }
                 if close_position(symbol, pos['size'], direction, send_request_func, 
                                 reason="TP", position_data=position_data, bot_state=bot_state):
@@ -255,10 +244,6 @@ def check_tp_sl_for_strategy(strat_id: str,
                     'entry_price': pos['entry_price'],
                     'tp': pos.get('tp'),   
                     'sl': pos.get('sl'),        
-                    'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': pos.get('regime_multiplier', 1.0),
-                    'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': pos.get('direction_multiplier', 1.0)
                 }
                 if close_position(symbol, pos['size'], direction, send_request_func, 
                                 reason="SL", position_data=position_data, bot_state=bot_state):

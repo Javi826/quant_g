@@ -1,3 +1,4 @@
+#BOT_trading/core/production_operative.py
 """
 core/production_operative.py - Production operative mode.
 
@@ -9,7 +10,7 @@ import logging
 from typing import Dict, List, Tuple
 
 from state.state_manager import load_state, save_state_local, sync_broker
-from state import increment_strategy_candles, check_candles_timeout_for_strategy
+from state import increment_strategy_candles
 from execution import check_all_tp_sl, check_tp_sl_for_strategy, place_order, add_position, get_fills_for_order, get_usdt_balance_ws
 import time
 from decimal import Decimal
@@ -89,8 +90,6 @@ class ProductionOperative:
         
     def place_order(self, symbol: str, direction: str, usdt_amount: float,
                     tp_pct: float, sl_pct: float, strategy_id: str,
-                    regime_family: str = 'unknown', regime_multiplier: float = 1.0,
-                    market_direction: str = 'unknown', direction_multiplier: float = 1.0,
                     signal_close: float = 0) -> None:
 
         usdt_balance = get_usdt_balance_ws()
@@ -146,11 +145,7 @@ class ProductionOperative:
                 account_number=self.account_number,
                 state_file=self.state_file,
                 hour_zone=HOUR_ZONE,
-                usdt_amount=usdt_amount,
-                regime_family=regime_family,
-                regime_multiplier=regime_multiplier,
-                market_direction=market_direction,
-                direction_multiplier=direction_multiplier
+                usdt_amount=usdt_amount
             )
         else:
             logger.warning(f"WAR-Order executed but no orderId for {symbol}")

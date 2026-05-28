@@ -19,10 +19,8 @@ from decimal import Decimal
 from typing import Dict, Tuple
 
 from market_data import get_ws_manager
-from execution.trade_logger import log_closed_position
 from config.settings import POSTGRES_CONFIG
-from alerts.telegram_notifier import send_sync_alert
-from execution.trade_logger import log_sync_discrepancy
+
 
 import logging
 logger = logging.getLogger('BOT_trading.execution.state_manager')
@@ -100,10 +98,6 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
                             'order_id': pos.get('order_id'),
                             'opened_at': datetime.fromisoformat(pos.get('opened_at')),
                             'usdt_amount': float(pos.get('usdt_amount', 0)),
-                            'regime_family': pos.get('regime_family', 'unknown'),
-                            'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
-                            'market_direction': pos.get('market_direction', 'unknown'),
-                            'direction_multiplier': float(pos.get('direction_multiplier', 1.0))
                         })
                 
                 total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
@@ -157,10 +151,6 @@ def load_state(account_number: str, state_file: str) -> Tuple[Dict, Dict]:
                     'order_id': pos.get('order_id'),
                     'opened_at': datetime.fromisoformat(pos.get('opened_at')),
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
-                    'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
-                    'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0))
                 })
         
         total_positions = sum(len(p) for p in OPEN_POSITIONS.values())
@@ -212,10 +202,6 @@ def save_state_local(
                     'order_id': pos['order_id'],
                     'opened_at': pos['opened_at'].isoformat(),
                     'usdt_amount': float(pos.get('usdt_amount', 0)),
-                    'regime_family': pos.get('regime_family', 'unknown'),
-                    'regime_multiplier': float(pos.get('regime_multiplier', 1.0)),
-                    'market_direction': pos.get('market_direction', 'unknown'),
-                    'direction_multiplier': float(pos.get('direction_multiplier', 1.0)) 
                 })
 
         state_data = {
@@ -440,7 +426,7 @@ def sync_broker(open_positions: Dict,
                         broker_size=0.0,
                         strategies=local_data['long_strategies']
                     )
-                    
+                    from execution.trade_logger import log_sync_discrepancy
                     # PostgreSQL log
                     log_sync_discrepancy(
                         account=account_number,
