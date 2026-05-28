@@ -309,15 +309,20 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
 # CLASSIFICATION
 # =============================================================================
 
-def classify_strategy(results: dict, sid: str) -> str:
+_METRIC_MAP = {
+    "profit":   ("trending_prof", "ranging_prof", "b_prof"),
+    "max_dd":   ("trending_dd",   "ranging_dd",   "b_dd"),
+    "win_rate": ("trending_wr",   "ranging_wr",   "b_wr"),
+}
+
+def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit") -> str:
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
         return "neutral"
-    # trending_prof: backtest with trending-only signals → strategy improves in trending market
-    # ranging_prof:  backtest with ranging-only signals  → strategy improves in ranging market
-    t_all = all(data[pk]['trending_prof'] > data[pk]['b_prof'] for pk in periods_with_data)
-    r_all = all(data[pk]['ranging_prof']  > data[pk]['b_prof'] for pk in periods_with_data)
+    t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
+    t_all = all(data[pk][t_key] > data[pk][b_key] for pk in periods_with_data)
+    r_all = all(data[pk][r_key] > data[pk][b_key] for pk in periods_with_data)
     if t_all and r_all:
         return "both"
     if t_all:

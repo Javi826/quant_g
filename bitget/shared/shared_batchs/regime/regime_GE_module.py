@@ -6,7 +6,7 @@ import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
-from shared_batch_regime.regime_GE_core import precompute_indicators, lookup_indicators
+from shared_batch_regime.regime_GE_core import precompute_indicators, lookup_indicators, load_ohlcv_raw
 from shared_batch_regime.regime_GE_core import load_ohlcv, is_trending, load_regime_bins_ge
 
 logger = logging.getLogger("shared_batch.regime.regime_GE_module")
@@ -23,7 +23,6 @@ DEBUG_REGIME_LOG = False
 # ACTIVE CONFIG
 # =============================================================================
 
-# CORRECTO
 def _active_windows() -> dict[str, int]:
     return {k: v["windows"][0] for k, v in INDICATORS.items() if v.get("enabled")}
 
@@ -31,20 +30,21 @@ def _active_thresholds() -> dict[str, float]:
     return {k: v["thresholds"][0] for k, v in INDICATORS.items() if v.get("enabled")}
 
 # =============================================================================
-# INDICATOR CACHE  (per-run, keyed by symbol)
+# INDICATOR CACHE  (per-run, keyed by symbol or (symbol, timeframe))
 # =============================================================================
 
-_indicator_cache: dict[str, tuple] = {}
+_indicator_cache: dict = {}
 
 
-def _get_indicator_cache(symbol: str) -> tuple | None:
+def _get_indicator_cache(symbol: str, timeframe: str | None = None) -> tuple | None:
     """Lazily load and cache indicator arrays for a symbol from crypto_full_IS."""
-    if symbol not in _indicator_cache:
-        df = load_ohlcv(symbol)
+    key = (symbol, timeframe) if REGIME_TIMEFRAME_MODE == "STRATEGY" and timeframe else symbol
+    if key not in _indicator_cache:
+        df = load_ohlcv_raw(symbol, timeframe) if REGIME_TIMEFRAME_MODE == "STRATEGY" and timeframe else load_ohlcv(symbol)
         if df.empty:
             return None
-        _indicator_cache[symbol] = precompute_indicators(df, _active_windows())
-    return _indicator_cache[symbol]
+        _indicator_cache[key] = precompute_indicators(df, _active_windows())
+    return _indicator_cache[key]
 
 
 # =============================================================================
@@ -56,6 +56,7 @@ def _filter_signals_ge(
     ts:             np.ndarray,
     symbol:         str,
     classification: str,
+    timeframe:      str | None = None,
 ) -> np.ndarray:
     """
     Filter signals for a single symbol based on the GE classification.
@@ -69,16 +70,18 @@ def _filter_signals_ge(
 
     thresholds = _active_thresholds()
     mode       = COMBINE_MODE
+    ref_sym    = "BTCUSDT" if ANALYSIS_MODE == "BTC" else symbol
 
-    cache = _get_indicator_cache("BTCUSDT" if ANALYSIS_MODE == "BTC" else symbol)
+    cache = _get_indicator_cache(ref_sym, timeframe)
     if cache is None:
         return signals
 
     ts_arr, values_arr = cache
     filtered           = signals.copy()
+    tf                 = timeframe if REGIME_TIMEFRAME_MODE == "STRATEGY" else None
 
     for idx in np.nonzero(signals)[0]:
-        indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]))
+        indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]), timeframe=tf)
         trending         = is_trending(indicator_values, thresholds, mode)
 
         if classification == "ranging" and trending:
@@ -91,13 +94,13 @@ def _filter_signals_ge(
     if DEBUG_REGIME_LOG:
         rows = []
         for idx in range(len(signals)):
-            indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]))
+            indicator_values = lookup_indicators(ts_arr, values_arr, pd.Timestamp(ts[idx]), timeframe=tf)
             trending         = is_trending(indicator_values, _active_thresholds(), COMBINE_MODE)
             rows.append({
                 "timestamp":       pd.Timestamp(ts[idx]),
                 "signal_baseline": int(signals[idx]),
                 "signal_regime":   int(filtered[idx]),
-                "regime_symbol":   "BTCUSDT" if ANALYSIS_MODE == "BTC" else symbol,
+                "regime_symbol":   ref_sym,
                 "trending":        trending,
                 "indicators":      str(indicator_values),
             })
@@ -154,6 +157,7 @@ def run_oos_backtest_with_regime(
                 ts             = arr['ts'],
                 symbol         = sym,
                 classification = bins_to_filter,
+                timeframe      = timeframe,
             )
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}

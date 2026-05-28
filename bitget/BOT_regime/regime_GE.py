@@ -39,6 +39,7 @@ ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 BTC_TIMEFRAME         = "1Dutc"
 REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
+OPTIMIZE_METRIC       = "profit"    # "profit" | "max_dd" | "win_rate"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -515,7 +516,7 @@ def run(eval_keys: list[str]) -> None:
         print_combo_period_table(results, strategies_filtered, period_key, label)
 
     for sid in strategy_results:
-        strategy_results[sid]['classification'] = classify_strategy(strategy_results, sid)
+        strategy_results[sid]['classification'] = classify_strategy(strategy_results, sid, optimize_metric=OPTIMIZE_METRIC)
 
     _print_consistency_table(strategy_results)
     _print_classification_summary(strategy_results)

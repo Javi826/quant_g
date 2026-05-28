@@ -1,5 +1,4 @@
 #develop/market_regime/regime_GE_calibration.py
-
 import os
 import sys
 import time
@@ -19,35 +18,22 @@ from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
 from shared_batch_regime.regime_GE_core import precompute_baselines
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
-from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP
 from shared_batch_regime.regime_GE_core import run_backtest
-
-
 import numpy as np
-
-
-# =============================================================================
-# REGIME CONFIGURATION
-# =============================================================================
-
-# =============================================================================
-# ANALYSIS_MODE         = "BTC"   # "BTC" | "SYMBOL"
-# BTC_TIMEFRAME         = "1Dutc"
-# COMBINE_MODES         = ["AND","OR"]
-# REGIME_TIMEFRAME_MODE = "STRATEGY" # "DAILY" | "STRATEGY"
-# =============================================================================
-
-ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
-BTC_TIMEFRAME         = "1Dutc"
-REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
-COMBINE_MODES         = ["OR"]    
-
-
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
     "OOS3": 0.25,
 }
+
+# =============================================================================
+# REGIME CONFIGURATION
+# =============================================================================
+COMBINE_MODES         = ["OR"]  
+ANALYSIS_MODE         = "SYMBOL" # "BTC" | "SYMBOL"
+REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
+OPTIMIZE_METRIC       = "win_rate" # "profit" | "max_dd" | "win_rate"  
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -67,25 +53,25 @@ INDICATORS: dict[str, dict] = {
     },
 }
 
-
-
-INDICATORS: dict[str, dict] = {
-    "atr_norm": {
-        "windows":    [10],
-        "thresholds": [0.04],
-        "enabled":    True,
-    },
-    "er": {
-        "windows":    [20],
-        "thresholds": [0.4],
-        "enabled":    True,
-    },
-    "hurst": {
-        "windows":    [30],
-        "thresholds": [0.4],
-        "enabled":    True,
-    },
-}
+# =============================================================================
+# INDICATORS: dict[str, dict] = {
+#     "atr_norm": {
+#         "windows":    [10],
+#         "thresholds": [0.04],
+#         "enabled":    True,
+#     },
+#     "er": {
+#         "windows":    [20],
+#         "thresholds": [0.6],
+#         "enabled":    True,
+#     },
+#     "hurst": {
+#         "windows":    [30,50],
+#         "thresholds": [0.5,0.55,0.60,0.65],
+#         "enabled":    False,
+#     },
+# }
+# =============================================================================
 
 ORDER_AMOUNT     = 80
 LONG_KEYWORD     = "long"
@@ -203,23 +189,23 @@ def _run_filtered_combo(
     return results
 
 
-def _combined_profit_for_period(results: dict, period_key: str) -> tuple[float, float]:
-    """Combined profit and baseline for a single period, respecting each strategy's classification."""
+def _combined_metric_for_period(results: dict, period_key: str, optimize_metric: str = "profit") -> tuple[float, float]:
+    t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
     comb, base = 0.0, 0.0
     for sid, data in results.items():
         if sid == 'is_long' or period_key not in data or not isinstance(data[period_key], dict):
             continue
         d   = data[period_key]
         cls = data.get('classification', 'neutral')
-        base += d['b_prof']
+        base += d[b_key]
         if cls == 'ranging':
-            comb += d['ranging_prof']
+            comb += d[r_key]
         elif cls == 'trending':
-            comb += d['trending_prof']
+            comb += d[t_key]
         elif cls == 'both':
-            comb += max(d['ranging_prof'], d['trending_prof'])
+            comb += max(d[r_key], d[t_key])
         else:
-            comb += d['b_prof']
+            comb += d[b_key]
     return comb, base
 # =============================================================================
 # MAIN RUN
@@ -232,12 +218,15 @@ def run() -> None:
     total_combos      = len(grid)
 
     print(f"\n{'='*120}")
-    print(f"  REGIME CALIBRATION — {total_combos} combinations  [MODE={ANALYSIS_MODE}]")
+    print(f"  REGIME CALIBRATION — {total_combos} combinations")
     print(f"  Active indicators: {', '.join(active_keys)}")
     for k in active_keys:
         cfg = INDICATORS[k]
         print(f"    {k.upper()}: windows={cfg['windows']}  thresholds={cfg['thresholds']}")
-    print(f"  BTC_TF={BTC_TIMEFRAME} | Lookahead fix: normalize()-1day | TF_MODE={REGIME_TIMEFRAME_MODE}")
+    print(f"  ANALYSIS_MODE={ANALYSIS_MODE} | REGIME_TIMEFRAME_MODE={REGIME_TIMEFRAME_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC}")
+    if ANALYSIS_MODE == "BTC" and REGIME_TIMEFRAME_MODE == "STRATEGY":
+        print(f"  → BTCUSDT loaded per strategy timeframe")
+    print(f"  Lookahead fix: normalize()-1day")
     print(f"  Periods: {' + '.join(EVAL_KEYS)}")
     print(f"{'='*120}")
 
@@ -292,7 +281,7 @@ def run() -> None:
         results = _run_filtered_combo(baselines, strategies_filtered, indicator_cache, thresholds, mode)
         for sid in results:
             if sid != 'is_long':
-                results[sid]['classification'] = classify_strategy(results, sid)
+                results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC)
 
         period_summaries: dict[str, dict] = {}
         for pk in EVAL_KEYS:
@@ -314,10 +303,9 @@ def run() -> None:
 #             print(f"  {pk}: comb={cp:.1f}  base={bp:.1f}  delta={pct_improvement(cp, bp):.2f}%  weight={PERIOD_WEIGHTS.get(pk,0)}")
 # =============================================================================
         weighted_delta = sum(
-            pct_improvement(*_combined_profit_for_period(results, pk)) * PERIOD_WEIGHTS.get(pk, 0)
+            pct_improvement(*_combined_metric_for_period(results, pk, OPTIMIZE_METRIC)) * PERIOD_WEIGHTS.get(pk, 0)
             for pk in period_summaries
         ) / sum(PERIOD_WEIGHTS.get(pk, 0) for pk in period_summaries)
-
         ranking.append({
             'windows':    windows,
             'thresholds': thresholds,

@@ -10,16 +10,17 @@ INDICATORS: dict[str, dict] = {
         "enabled":    True,
     },
     "er": {
-        "windows":    [10],
+        "windows":    [20],
         "thresholds": [0.6],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
-        "thresholds": [0.8],
-        "enabled":    True,
+        "thresholds": [0.5],
+        "enabled":    False,
     },
 }
+
 
 COMBINE_MODE          = "OR"
 ANALYSIS_MODE         = "SYMBOL"
