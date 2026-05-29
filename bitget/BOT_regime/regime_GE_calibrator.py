@@ -40,37 +40,36 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
+AUTO_SAVE_BINS        = True 
 COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
-MIX_WEIGHT_PROFIT     = 0.8
-MIX_WEIGHT_DD         = 0.2
-OPTIMIZE_METRIC       = "calmar" # "profit" | "win_rate" | "calmar" | "mix"
-CLASSIFICATION_MODE   = "oos1_weighted" # "strict" | "oos1_weighted"
-
-AUTO_SAVE_BINS        = True            # True = auto-save top1 bins after calibration
+MIX_WEIGHT_PROFIT     = 0.4
+MIX_WEIGHT_DD         = 0.6
+OPTIMIZE_METRIC       = "mix" # "profit" | "win_rate" | "calmar" | "mix"
+CLASSIFICATION_MODE   = "strict" # "strict" | "oos1_weighted"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10, 30],
-        "thresholds": [0.02, 0.04],
+        "windows":    [10,40],
+        "thresholds": [0.02,0.04,0.06],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,30],
-        "thresholds": [0.6,0.8],
+        "windows":    [10,40],
+        "thresholds": [0.4,0.6,0.8],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30, 50],
-        "thresholds": [0.5, 0.6, 0.8],
+        "thresholds": [0.5, 0.6, 0.7],
         "enabled":    False,
     },
 }
 
-ORDER_AMOUNT         = 80
-LONG_KEYWORD         = "long"
+ORDER_AMOUNT               = 80
+LONG_KEYWORD               = "long"
 DEBUG_TF_FILTER: list[str] = []
 
 
@@ -380,7 +379,12 @@ def run() -> None:
     print_classification_summary(top1_results)
 
     if AUTO_SAVE_BINS:
-        save_bins(top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH, STRATEGIES_SET_NAME)
+        save_bins(
+            top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH, STRATEGIES_SET_NAME, strategies_all,
+            optimize_metric     = OPTIMIZE_METRIC,
+            classification_mode = CLASSIFICATION_MODE,
+            mix_weights         = (MIX_WEIGHT_PROFIT, MIX_WEIGHT_DD) if OPTIMIZE_METRIC == "mix" else None,
+        )
     else:
         logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")
 

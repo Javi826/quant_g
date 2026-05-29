@@ -13,7 +13,7 @@ logger = logging.getLogger("shared_batch.regime.regime_GE_module")
 REGIME_REFERENCE = 'BTCUSDT'
 
 # =============================================================================
-# CONFIGURATION  — mirror from regime_GE.py after calibration
+# CONFIGURATION  
 # =============================================================================
 REGIME_ENABLED        = True
 DEBUG_REGIME_LOG      = False

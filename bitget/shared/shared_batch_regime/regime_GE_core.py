@@ -590,7 +590,7 @@ def print_classification_summary(strategy_results: dict) -> None:
     print(f"  {'─'*55}\n")
 
 
-def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str, strategies_set_name: str = "E1") -> None:
+def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str, strategies_set_name: str = "E1", all_strategies: list[dict] | None = None, optimize_metric: str = "", classification_mode: str = "", mix_weights: tuple | None = None) -> None:
     from datetime import datetime
     active_keys    = list(windows.keys())
     generated_at   = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
@@ -618,9 +618,24 @@ def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str
         f'ANALYSIS_MODE         = "SYMBOL"',
         f'REGIME_TIMEFRAME_MODE = "DAILY"',
         "",
-        "REGIME_BINS = {",
     ]
-    bin_lines = [f'    "{sid}": "{data.get("classification", "neutral")}",' for sid, data in sorted(strategy_results.items())]
+    if optimize_metric:
+        header_lines.append(f'OPTIMIZE_METRIC       = "{optimize_metric}"')
+    if classification_mode:
+        header_lines.append(f'CLASSIFICATION_MODE   = "{classification_mode}"')
+    if mix_weights and optimize_metric == "mix":
+        header_lines.append(f'MIX_WEIGHT_PROFIT     = {mix_weights[0]}')
+        header_lines.append(f'MIX_WEIGHT_DD         = {mix_weights[1]}')
+    header_lines += ["", "REGIME_BINS = {"]
+    all_ids     = {s['id'] for s in all_strategies} if all_strategies else set()
+    missing     = all_ids - set(strategy_results.keys())
+    all_entries = {sid: data.get("classification", "neutral") for sid, data in strategy_results.items()}
+    for sid in missing:
+        all_entries[sid] = "neutral"
+    bin_lines = [
+        f'    "{sid}": "{cls}",{"  # excluded from calibration" if sid in missing else ""}'
+        for sid, cls in sorted(all_entries.items())
+    ]
     with open(output_path, "w") as f:
         f.write("\n".join(header_lines + bin_lines + ["}"]) + "\n")
     print(f"\n  ✅ Bins saved to: {output_path}")

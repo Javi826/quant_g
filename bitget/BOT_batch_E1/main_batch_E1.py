@@ -44,11 +44,11 @@ from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_s
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
 from shared_batchs.regime import regime_GE_module
-from shared_batchs.regime.regime_GE_module import REGIME_ENABLED, load_config_from_bins
+from shared_batchs.regime.regime_GE_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 
-
+regime_GE_module._indicator_cache = {}
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
@@ -90,11 +90,11 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED  = False
+REGIME_ENABLED  = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = False
+UPDATE_OUTPUTS  = True
 SAVE_TRADES     = False
 
 
