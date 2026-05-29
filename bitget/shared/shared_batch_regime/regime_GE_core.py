@@ -320,23 +320,45 @@ def _mix_score(prof: float, dd: float, w_profit: float = 0.6, w_dd: float = 0.4)
 def _calmar(prof: float, dd: float) -> float:
     """Calmar ratio: profit / abs(max_dd). Returns 0 if dd is 0."""
     return prof / abs(dd) if dd != 0 else 0.0
-def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit") -> str:
+
+def _metric_value(d: dict, key: str, dd_key: str, optimize_metric: str) -> float:
+    if optimize_metric == "calmar":
+        return _calmar(d[key], d[dd_key])
+    if optimize_metric == "mix":
+        return _mix_score(d[key], d[dd_key])
+    return d[key]
+
+
+def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit", classification_mode: str = "strict") -> str:
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
         return "neutral"
+
     t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
-    
-    if optimize_metric == "calmar":
-        t_all = all(_calmar(data[pk][t_key], data[pk]['trending_dd']) > _calmar(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
-        r_all = all(_calmar(data[pk][r_key], data[pk]['ranging_dd'])  > _calmar(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
-        
-    elif optimize_metric == "mix":
-        t_all = all(_mix_score(data[pk][t_key], data[pk]['trending_dd']) > _mix_score(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
-        r_all = all(_mix_score(data[pk][r_key], data[pk]['ranging_dd'])  > _mix_score(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
+
+    def _beats_baseline(pk: str, filt_key: str, dd_key: str) -> bool:
+        return _metric_value(data[pk], filt_key, dd_key, optimize_metric) > _metric_value(data[pk], b_key, 'b_dd', optimize_metric)
+
+    if classification_mode == "oos1_weighted":
+        oos1_ok = "OOS1" in periods_with_data
+        oos23   = [pk for pk in periods_with_data if pk != "OOS1"]
+
+        def _passes(filt_key: str, dd_key: str) -> bool:
+            if not oos1_ok or not _beats_baseline("OOS1", filt_key, dd_key):
+                return False
+            if not oos23:
+                return True
+            avg = sum(_metric_value(data[pk], filt_key, dd_key, optimize_metric) for pk in oos23) / len(oos23)
+            avg_b = sum(_metric_value(data[pk], b_key, 'b_dd', optimize_metric) for pk in oos23) / len(oos23)
+            return avg > avg_b
+
+        t_all = _passes(t_key, 'trending_dd')
+        r_all = _passes(r_key, 'ranging_dd')
     else:
-        t_all = all(data[pk][t_key] > data[pk][b_key] for pk in periods_with_data)
-        r_all = all(data[pk][r_key] > data[pk][b_key] for pk in periods_with_data)
+        t_all = all(_beats_baseline(pk, t_key, 'trending_dd') for pk in periods_with_data)
+        r_all = all(_beats_baseline(pk, r_key, 'ranging_dd') for pk in periods_with_data)
+
     if t_all and r_all:
         return "neutral"
     if t_all:
@@ -428,26 +450,25 @@ def print_combo_period_table(results, strategies, period_key, combo_label) -> di
     }
 
 def print_combo_summary(period_summaries, n_r, n_t, n_n, comb_p, comb_dd, base_p, base_dd, label):
-    print(f"\n  COMBO SUMMARY — {label}")
-    print(f"  {'PERIOD':<8} {'B_PROF':>10} {'TRENDING':>10} {'TRD_Δ%':>7} {'RANGING':>10} {'RNG_Δ%':>7} "
-          f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
-    print(f"  {'─'*95}")
+    logger.info(f"\n  COMBO SUMMARY — {label}")
+    logger.info(f"  {'PERIOD':<8} {'B_PROF':>10} {'TRENDING':>10} {'TRD_Δ%':>7} {'RANGING':>10} {'RNG_Δ%':>7} "
+                f"{'B_DD%':>7} {'TRD_DD%':>8} {'RNG_DD%':>8} {'TREND%':>7}")
+    logger.info(f"  {'─'*95}")
     for pk, s in period_summaries.items():
         tc = "\033[92m" if s['trending_pct'] > 0 else "\033[91m"
         rc = "\033[92m" if s['ranging_pct']  > 0 else "\033[91m"
         rs = "\033[0m"
-        print(f"  {pk:<8} {s['sys_b']:>10.1f} {s['sys_trending']:>10.1f} "
-              f"{tc}{s['trending_pct']:>+6.1f}%{rs} {s['sys_ranging']:>10.1f} "
-              f"{rc}{s['ranging_pct']:>+6.1f}%{rs} {s['avg_dd_b']:>6.1f}% "
-              f"{s['avg_dd_trending']:>7.1f}% {s['avg_dd_ranging']:>7.1f}% {s['avg_trend_pct']:>6.1f}%")
-    print(f"  {'─'*95}")
+        logger.info(f"  {pk:<8} {s['sys_b']:>10.1f} {s['sys_trending']:>10.1f} "
+                    f"{tc}{s['trending_pct']:>+6.1f}%{rs} {s['sys_ranging']:>10.1f} "
+                    f"{rc}{s['ranging_pct']:>+6.1f}%{rs} {s['avg_dd_b']:>6.1f}% "
+                    f"{s['avg_dd_trending']:>7.1f}% {s['avg_dd_ranging']:>7.1f}% {s['avg_trend_pct']:>6.1f}%")
+    logger.info(f"  {'─'*95}")
     comb_pct = pct_improvement(comb_p, base_p)
     cc = "\033[92m" if comb_pct > 0 else "\033[91m"
     rs = "\033[0m"
-    print(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  NEUTRAL:{n_n}")
-    print(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
-    print(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {cc}Delta={comb_pct:>+6.1f}%{rs}")
-
+    logger.info(f"  Classifications — RANGING:{n_r}  TRENDING:{n_t}  NEUTRAL:{n_n}")
+    logger.info(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
+    logger.info(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {cc}Delta={comb_pct:>+6.1f}%{rs}")
 
 def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
     col_w  = {k: max(len(f"{k.upper()}_W"), 5) for k in active_keys}
@@ -459,17 +480,15 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
                f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
                f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
     total_w = len(header_line) - 2
-
-    print(f"\n\n{'='*total_w}")
-    print(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
-    print(f"  Active indicators: {', '.join(active_keys)}")
-    print(f"{'='*total_w}")
-    print(f"  {'#':>3}  {'COMBO':>5}  {ind_header}  {'MODE':<5}  "
-          f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'NEUT':>5}  "
-          f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
-          f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
-    print(f"  {'─'*total_w}")
-
+    logger.info(f"\n\n{'='*total_w}")
+    logger.info(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
+    logger.info(f"  Active indicators: {', '.join(active_keys)}")
+    logger.info(f"{'='*total_w}")
+    logger.info(f"  {'#':>3}  {'COMBO':>5}  {ind_header}  {'MODE':<5}  "
+                f"{'TREND%':>7}  {'RANGING':>7} {'TREND':>6} {'NEUT':>5}  "
+                f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
+                f"{'BASE_DD%':>8} {'COMB_DD%':>8}")
+    logger.info(f"  {'─'*total_w}")
     for i, row in enumerate(ranking[:5], 1):
         pct     = pct_improvement(row['combined_profit'], row['baseline_profit'])
         w_delta = row.get('weighted_delta', 0.0)
@@ -481,51 +500,80 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
             f"{row['windows'][k]:>{col_w[k]}} {row['thresholds'][k]:>{col_t[k]}.3f}"
             for k in active_keys
         )
-        print(f"  {i:>3}  {row['combo_idx']:>5}  {ind_cols}  {row['mode']:<5}  "
-              f"{row['avg_trend_pct']:>6.1f}%  "
-              f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_neutral']:>5}  "
-              f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
-              f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
-              f"{row['baseline_dd']:>7.1f}% {ddc}{row['combined_dd']:>7.1f}%{rs}")
-
-    print(f"  {'─'*total_w}\n")
-
+        logger.info(f"  {i:>3}  {row['combo_idx']:>5}  {ind_cols}  {row['mode']:<5}  "
+                    f"{row['avg_trend_pct']:>6.1f}%  "
+                    f"{row['n_ranging']:>7} {row['n_trending']:>6} {row['n_neutral']:>5}  "
+                    f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
+                    f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
+                    f"{row['baseline_dd']:>7.1f}% {ddc}{row['combined_dd']:>7.1f}%{rs}")
+    logger.info(f"  {'─'*total_w}\n")
 # =============================================================================
 # REPORTING & PERSISTENCE
 # =============================================================================
 
 def print_consistency_table(strategy_results: dict) -> None:
-    for filter_key, filter_label in [("trending_prof", "TRENDING PASS"), ("ranging_prof", "RANGING PASS")]:
+    def _has_all_periods(data: dict) -> bool:
+        return all(pk in data and isinstance(data[pk], dict) for pk in EVAL_KEYS)
+
+    def _print_table(title: str, consistent: list, col_fn, improvement_fn) -> None:
+        if not consistent:
+            return
         print(f"\n{'='*120}")
-        print(f"  STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {filter_label}")
+        print(f"  {title}")
         print(f"{'='*120}")
         header = f"  {'STRATEGY':<35} {'DIR':<6} {'CLASS':<10}"
         for pk in EVAL_KEYS:
             header += f"  {pk:>10}"
         header += f"  {'ALL Δ%':>8}"
         print(header)
-        print(f"  {'─'*95}")
-        consistent = [
-            (sid, data) for sid, data in sorted(strategy_results.items())
-            if all(pk in data and isinstance(data[pk], dict) for pk in EVAL_KEYS)
-            and all(data[pk][filter_key] > data[pk]['b_prof'] for pk in EVAL_KEYS)
-        ]
-        if not consistent:
-            print(f"  No strategy improved profit in all {len(EVAL_KEYS)} periods.\n")
-            continue
+        print(f"  {'─'*110}")
         for sid, data in consistent:
             direction = "LONG" if data['is_long'] else "SHORT"
             cls       = data.get('classification', 'neutral').upper()
             row       = f"  {sid:<35} {direction:<6} {cls:<10}"
-            total_b = total_f = 0.0
+            total_f = total_b = 0.0
             for pk in EVAL_KEYS:
-                dpct     = pct_improvement(data[pk][filter_key], data[pk]['b_prof'])
-                row     += f"  \033[92m{dpct:>+9.1f}%\033[0m"
-                total_b += data[pk]['b_prof']
-                total_f += data[pk][filter_key]
-            row += f"  \033[92m{pct_improvement(total_f, total_b):>+7.1f}%\033[0m"
+                val_f, val_b = col_fn(data[pk])
+                dpct         = improvement_fn(val_f, val_b)
+                color        = "\033[92m" if dpct > 0 else "\033[91m"
+                row         += f"  {color}{dpct:>+9.1f}%\033[0m"
+                total_f     += val_f
+                total_b     += val_b
+            all_pct = improvement_fn(total_f, total_b)
+            color   = "\033[92m" if all_pct > 0 else "\033[91m"
+            row    += f"  {color}{all_pct:>+7.1f}%\033[0m"
             print(row)
-        print(f"  {'─'*95}\n")
+        print(f"  {'─'*110}\n")
+
+    for filter_prof, filter_dd, label in [
+        ("trending_prof", "trending_dd", "TRENDING"),
+        ("ranging_prof",  "ranging_dd",  "RANGING"),
+    ]:
+        # PROFIT table
+        consistent_prof = [
+            (sid, data) for sid, data in sorted(strategy_results.items())
+            if _has_all_periods(data)
+            and all(data[pk][filter_prof] > data[pk]['b_prof'] for pk in EVAL_KEYS)
+        ]
+        _print_table(
+            title         = f"STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
+            consistent    = consistent_prof,
+            col_fn        = lambda d, fp=filter_prof: (d[fp], d['b_prof']),
+            improvement_fn= pct_improvement,
+        )
+
+        # DD table — improvement = filtered DD less negative than baseline DD
+        consistent_dd = [
+            (sid, data) for sid, data in sorted(strategy_results.items())
+            if _has_all_periods(data)
+            and all(data[pk][filter_dd] > data[pk]['b_dd'] for pk in EVAL_KEYS)
+        ]
+        _print_table(
+            title         = f"STRATEGIES IMPROVING DRAWDOWN IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
+            consistent    = consistent_dd,
+            col_fn        = lambda d, fd=filter_dd: (d[fd], d['b_dd']),
+            improvement_fn= pct_improvement,
+        )
 
 
 def print_classification_summary(strategy_results: dict) -> None:
@@ -542,7 +590,7 @@ def print_classification_summary(strategy_results: dict) -> None:
     print(f"  {'─'*55}\n")
 
 
-def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str) -> None:
+def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str, strategies_set_name: str = "E1") -> None:
     active_keys  = list(windows.keys())
     from datetime import datetime
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M")

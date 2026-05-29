@@ -22,6 +22,7 @@ from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_
 from shared_batch_regime.regime_GE_core import print_consistency_table, print_classification_summary, save_bins
 from shared_batch_regime.regime_GE_core import run_backtest, print_ranking, print_combo_period_table, print_combo_summary
 import numpy as np
+
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ PERIOD_WEIGHTS = {
     "OOS2": 0.25,
     "OOS3": 0.25,
 }
+
 STRATEGIES_SET_NAME  = "E1"
 BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{STRATEGIES_SET_NAME}.py")
 
@@ -39,13 +41,15 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 COMBINE_MODES         = ["OR"]
-ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
-REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
+ANALYSIS_MODE         = "SYMBOL" # "BTC" | "SYMBOL"
+REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
-OPTIMIZE_METRIC       = "mix"     # "profit" | "win_rate" | "calmar" | "mix"
 MIX_WEIGHT_PROFIT     = 0.8
 MIX_WEIGHT_DD         = 0.2
-AUTO_SAVE_BINS        = False      # True = auto-save top1 bins after calibration
+OPTIMIZE_METRIC       = "calmar" # "profit" | "win_rate" | "calmar" | "mix"
+CLASSIFICATION_MODE   = "oos1_weighted" # "strict" | "oos1_weighted"
+
+AUTO_SAVE_BINS        = True            # True = auto-save top1 bins after calibration
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -233,7 +237,7 @@ def _process_combo(
     results = _run_filtered_combo(baselines, strategies, indicator_cache, thresholds, mode)
     for sid in results:
         if sid != 'is_long':
-            results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC)
+            results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE)
 
     period_summaries: dict[str, dict] = {}
     for pk in EVAL_KEYS:
@@ -283,7 +287,7 @@ def run() -> None:
     for k in active_keys:
         cfg = INDICATORS[k]
         logger.info(f"    {k.upper()}: windows={cfg['windows']}  thresholds={cfg['thresholds']}")
-    logger.info(f"  ANALYSIS_MODE={ANALYSIS_MODE} | REGIME_TIMEFRAME_MODE={REGIME_TIMEFRAME_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC}")
+    logger.info(f"  ANALYSIS_MODE={ANALYSIS_MODE} | REGIME_TIMEFRAME_MODE={REGIME_TIMEFRAME_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC} | CLASSIFICATION_MODE={CLASSIFICATION_MODE}")
     if ANALYSIS_MODE == "BTC" and REGIME_TIMEFRAME_MODE == "STRATEGY":
         logger.info(f"  → BTCUSDT loaded per strategy timeframe")
     logger.info(f"  Lookahead fix: normalize()-1day")
@@ -370,19 +374,18 @@ def run() -> None:
         top1['thresholds'], top1['mode'],
     )
     for sid in top1_results:
-        top1_results[sid]['classification'] = classify_strategy(top1_results, sid, optimize_metric=OPTIMIZE_METRIC)
+        top1_results[sid]['classification'] = classify_strategy(top1_results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE)
 
     print_consistency_table(top1_results)
     print_classification_summary(top1_results)
 
     if AUTO_SAVE_BINS:
-        save_bins(top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH)
+        save_bins(top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH, STRATEGIES_SET_NAME)
     else:
         logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")
 
     elapsed = int(time.time() - _t0)
-    logger.info(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
-
+    print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
 
 if __name__ == "__main__":
     run()

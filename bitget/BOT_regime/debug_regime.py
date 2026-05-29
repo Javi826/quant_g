@@ -35,7 +35,8 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{ST
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-OPTIMIZE_METRIC       = "calmar"   # "profit" | "max_dd" | "win_rate"
+OPTIMIZE_METRIC       = "calmar"   # "profit" | "win_rate" | "calmar" | "mix"
+CLASSIFICATION_MODE   = "oos1_weighted"   # "strict" | "oos1_weighted"
 ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
@@ -442,7 +443,7 @@ def run(eval_keys: list[str]) -> None:
         print_combo_period_table(results, strategies_filtered, period_key, label)
 
     for sid in strategy_results:
-        strategy_results[sid]['classification'] = classify_strategy(strategy_results, sid, optimize_metric=OPTIMIZE_METRIC)
+        strategy_results[sid]['classification'] = classify_strategy(strategy_results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE)
 
     print_consistency_table(strategy_results)
     comb_p, comb_d  = combined_metrics(strategy_results)
