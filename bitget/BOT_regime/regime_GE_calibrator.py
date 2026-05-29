@@ -18,16 +18,22 @@ from shared_batch_regime.regime_GE_core import EVAL_KEYS, pct_improvement
 from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
 from shared_batch_regime.regime_GE_core import precompute_baselines
-from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
 from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP, _calmar, _mix_score
-from shared_batch_regime.regime_GE_core import run_backtest
+from shared_batch_regime.regime_GE_core import print_consistency_table, print_classification_summary, save_bins
+from shared_batch_regime.regime_GE_core import run_backtest, print_ranking, print_combo_period_table, print_combo_summary
 import numpy as np
-N_JOBS                = -1  
+LOG_LEVEL = logging.INFO
+logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
+logger = logging.getLogger(__name__)
+
+N_JOBS = -1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
     "OOS3": 0.25,
 }
+STRATEGIES_SET_NAME  = "E1"
+BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{STRATEGIES_SET_NAME}.py")
 
 # =============================================================================
 # REGIME CONFIGURATION
@@ -35,34 +41,33 @@ PERIOD_WEIGHTS = {
 COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
-OPTIMIZE_METRIC       = "mix"     # "profit" | "max_dd" | "win_rate" | "calmar" | "mix"
+
+OPTIMIZE_METRIC       = "mix"     # "profit" | "win_rate" | "calmar" | "mix"
 MIX_WEIGHT_PROFIT     = 0.8
 MIX_WEIGHT_DD         = 0.2
+AUTO_SAVE_BINS        = False      # True = auto-save top1 bins after calibration
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10,30,50],
-        "thresholds": [0.02,0.04,0.06],
+        "windows":    [10, 30, 50],
+        "thresholds": [0.02, 0.04, 0.06],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,30,50],
-        "thresholds": [0.02,0.04,0.06],
+        "windows":    [10, 30, 50],
+        "thresholds": [0.2, 0.4, 0.6],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30, 50],
-        "thresholds": [0.5,0.6,0.8],
+        "thresholds": [0.5, 0.6, 0.8],
         "enabled":    False,
     },
 }
 
-ORDER_AMOUNT     = 80
-LONG_KEYWORD     = "long"
+ORDER_AMOUNT         = 80
+LONG_KEYWORD         = "long"
 DEBUG_TF_FILTER: list[str] = []
-
-logging.basicConfig(format="%(message)s", level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -272,31 +277,31 @@ def run() -> None:
     active_keys, grid = _build_grid()
     total_combos      = len(grid)
 
-    print(f"\n{'='*120}")
-    print(f"  REGIME CALIBRATION — {total_combos} combinations")
-    print(f"  Active indicators: {', '.join(active_keys)}")
+    logger.info(f"\n{'='*120}")
+    logger.info(f"  REGIME CALIBRATION — {total_combos} combinations")
+    logger.info(f"  Active indicators: {', '.join(active_keys)}")
     for k in active_keys:
         cfg = INDICATORS[k]
-        print(f"    {k.upper()}: windows={cfg['windows']}  thresholds={cfg['thresholds']}")
-    print(f"  ANALYSIS_MODE={ANALYSIS_MODE} | REGIME_TIMEFRAME_MODE={REGIME_TIMEFRAME_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC}")
+        logger.info(f"    {k.upper()}: windows={cfg['windows']}  thresholds={cfg['thresholds']}")
+    logger.info(f"  ANALYSIS_MODE={ANALYSIS_MODE} | REGIME_TIMEFRAME_MODE={REGIME_TIMEFRAME_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC}")
     if ANALYSIS_MODE == "BTC" and REGIME_TIMEFRAME_MODE == "STRATEGY":
-        print(f"  → BTCUSDT loaded per strategy timeframe")
-    print(f"  Lookahead fix: normalize()-1day")
-    print(f"  Periods: {' + '.join(EVAL_KEYS)}")
-    print(f"{'='*120}")
+        logger.info(f"  → BTCUSDT loaded per strategy timeframe")
+    logger.info(f"  Lookahead fix: normalize()-1day")
+    logger.info(f"  Periods: {' + '.join(EVAL_KEYS)}")
+    logger.info(f"{'='*120}")
 
     if not active_keys:
-        print("  No indicators enabled — aborting.")
+        logger.info("  No indicators enabled — aborting.")
         return
 
-    strategies_all = load_strategies_config()
+    strategies_all = load_strategies_config(STRATEGIES_SET_NAME)
     if not strategies_all:
-        print("  No strategies found — aborting.")
+        logger.info("  No strategies found — aborting.")
         return
 
-    baselines, strategies_filtered = precompute_baselines(strategies_all)
+    baselines, strategies_filtered = precompute_baselines(strategies_all, STRATEGIES_SET_NAME)
     if not strategies_filtered:
-        print("  No strategies passed the baseline filter — aborting.")
+        logger.info("  No strategies passed the baseline filter — aborting.")
         return
 
     base_profits = [
@@ -338,8 +343,9 @@ def run() -> None:
         )
         for combo_idx, combo in enumerate(grid, 1)
     )
+
     for row in sorted(ranking, key=lambda x: x['combo_idx']):
-        print(f"\n  COMBO {row['combo_idx']}/{total_combos}")
+        logger.info(f"\n  COMBO {row['combo_idx']}/{total_combos}")
         print_combo_summary(
             row['period_summaries'],
             row['n_ranging'], row['n_trending'],
@@ -352,8 +358,30 @@ def run() -> None:
     ranking.sort(key=lambda x: x['weighted_delta'], reverse=True)
     print_ranking(ranking, active_keys)
 
+    # =========================================================================
+    # TOP1 CLASSIFICATION & BINS
+    # =========================================================================
+    top1 = ranking[0]
+    logger.info(f"\n  TOP1 COMBO — {top1['label']}")
+
+    top1_results = _run_filtered_combo(
+        baselines, strategies_filtered,
+        indicator_cache_map[tuple(top1['windows'][k] for k in active_keys)],
+        top1['thresholds'], top1['mode'],
+    )
+    for sid in top1_results:
+        top1_results[sid]['classification'] = classify_strategy(top1_results, sid, optimize_metric=OPTIMIZE_METRIC)
+
+    print_consistency_table(top1_results)
+    print_classification_summary(top1_results)
+
+    if AUTO_SAVE_BINS:
+        save_bins(top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH)
+    else:
+        logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")
+
     elapsed = int(time.time() - _t0)
-    print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
+    logger.info(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
 
 
 if __name__ == "__main__":

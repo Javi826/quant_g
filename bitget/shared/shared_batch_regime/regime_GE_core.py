@@ -28,10 +28,6 @@ EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
 # =============================================================================
 # STRATEGY CONFIG PATHS  (set per batch)
 # =============================================================================
-STRATEGIES_SET_NAME  = "E1"
-SYMBOLS_LIVE_FOLDER  = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", "E1")
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-STRATEGIES_LOOP_PATH = os.path.join(BITGET_ROOT, "BOT_batch_E1", "strategies_files", f"{STRATEGIES_LOOP_NAME}.py")
 
 BTC_TIMEFRAME    = "1Dutc"
 LONG_KEYWORD     = "long"
@@ -78,8 +74,10 @@ def combo_label(active_keys: list[str], windows: dict, thresholds: dict, mode: s
 # CONFIG LOADERS
 # =============================================================================
 
-def load_strategies_config() -> list[dict]:
-    spec   = spec_from_file_location(STRATEGIES_LOOP_NAME, STRATEGIES_LOOP_PATH)
+def load_strategies_config(strategies_set_name: str) -> list[dict]:
+    loop_name = f"strategies_loop_{strategies_set_name}_01"
+    loop_path = os.path.join(BITGET_ROOT, f"BOT_batch_{strategies_set_name}", "strategies_files", f"{loop_name}.py")
+    spec      = spec_from_file_location(loop_name, loop_path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
 
@@ -109,8 +107,9 @@ def load_strategies_config() -> list[dict]:
     return strategies
 
 
-def load_symbols(strategy_id: str, timeframe: str) -> list[str]:
-    filepath = os.path.join(SYMBOLS_LIVE_FOLDER, f"symbols_live_{strategy_id}_{timeframe}.csv")
+def load_symbols(strategy_id: str, timeframe: str, strategies_set_name: str) -> list[str]:
+    symbols_folder = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", strategies_set_name)
+    filepath       = os.path.join(symbols_folder, f"symbols_live_{strategy_id}_{timeframe}.csv")
     if not os.path.exists(filepath):
         return []
     df = pd.read_csv(filepath, header=None)
@@ -126,14 +125,9 @@ def load_ohlcv(symbol: str) -> pd.DataFrame:
     return load_ohlcv_raw(symbol, BTC_TIMEFRAME)
 
 
-def load_ohlcv_for_period(strategy: dict, period_key: str) -> dict:
-    """
-    Load OHLCV data for a strategy/period matching main_batch logic:
-      - OOS1: load symbols_live directly (my_symbols=True)
-      - OOS2/OOS3: select_universe with my_symbols=False (top N by volume)
-    """
+def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: str) -> dict:
     if period_key == "OOS1":
-        symbols = load_symbols(strategy['id'], strategy['timeframe'])
+        symbols = load_symbols(strategy['id'], strategy['timeframe'], strategies_set_name)
         if not symbols:
             return {}
         ohlcv_data, _ = filter_symbols(
@@ -257,7 +251,7 @@ def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
 # BASELINE PRECOMPUTATION
 # =============================================================================
 
-def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
+def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -> tuple[dict, list[dict]]:
     print(f"\n{'='*120}")
     print(f"  PRECOMPUTING BASELINES — excluding strategies with B_PROF <= 0 in any period")
     print(f"{'='*120}")
@@ -272,7 +266,7 @@ def precompute_baselines(strategies_all: list[dict]) -> tuple[dict, list[dict]]:
         baselines[sid] = {}
 
         for period_key in EVAL_KEYS:
-            ohlcv_data = load_ohlcv_for_period(strategy, period_key)
+            ohlcv_data = load_ohlcv_for_period(strategy, period_key, strategies_set_name)
             if not ohlcv_data:
                 continue
 
@@ -496,7 +490,86 @@ def print_ranking(ranking: list[dict], active_keys: list[str]) -> None:
 
     print(f"  {'─'*total_w}\n")
 
+# =============================================================================
+# REPORTING & PERSISTENCE
+# =============================================================================
 
+def print_consistency_table(strategy_results: dict) -> None:
+    for filter_key, filter_label in [("trending_prof", "TRENDING PASS"), ("ranging_prof", "RANGING PASS")]:
+        print(f"\n{'='*120}")
+        print(f"  STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {filter_label}")
+        print(f"{'='*120}")
+        header = f"  {'STRATEGY':<35} {'DIR':<6} {'CLASS':<10}"
+        for pk in EVAL_KEYS:
+            header += f"  {pk:>10}"
+        header += f"  {'ALL Δ%':>8}"
+        print(header)
+        print(f"  {'─'*95}")
+        consistent = [
+            (sid, data) for sid, data in sorted(strategy_results.items())
+            if all(pk in data and isinstance(data[pk], dict) for pk in EVAL_KEYS)
+            and all(data[pk][filter_key] > data[pk]['b_prof'] for pk in EVAL_KEYS)
+        ]
+        if not consistent:
+            print(f"  No strategy improved profit in all {len(EVAL_KEYS)} periods.\n")
+            continue
+        for sid, data in consistent:
+            direction = "LONG" if data['is_long'] else "SHORT"
+            cls       = data.get('classification', 'neutral').upper()
+            row       = f"  {sid:<35} {direction:<6} {cls:<10}"
+            total_b = total_f = 0.0
+            for pk in EVAL_KEYS:
+                dpct     = pct_improvement(data[pk][filter_key], data[pk]['b_prof'])
+                row     += f"  \033[92m{dpct:>+9.1f}%\033[0m"
+                total_b += data[pk]['b_prof']
+                total_f += data[pk][filter_key]
+            row += f"  \033[92m{pct_improvement(total_f, total_b):>+7.1f}%\033[0m"
+            print(row)
+        print(f"  {'─'*95}\n")
+
+
+def print_classification_summary(strategy_results: dict) -> None:
+    print(f"\n{'='*120}")
+    print(f"  STRATEGY CLASSIFICATION SUMMARY")
+    print(f"{'='*120}")
+    print(f"  {'STRATEGY':<35} {'DIR':<6} {'CLASS':<10}")
+    print(f"  {'─'*55}")
+    for sid, data in sorted(strategy_results.items()):
+        direction = "LONG" if data['is_long'] else "SHORT"
+        cls       = data.get('classification', 'neutral').upper()
+        color = {'RANGING': "\033[92m", 'TRENDING': "\033[94m", 'NEUTRAL': "\033[90m"}.get(cls, "")
+        print(f"  {sid:<35} {direction:<6} {color}{cls:<10}\033[0m")
+    print(f"  {'─'*55}\n")
+
+
+def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str) -> None:
+    active_keys  = list(windows.keys())
+    from datetime import datetime
+    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    indicators_str = " | ".join(f"{k.upper()}({windows[k]})>={thresholds[k]}" for k in active_keys)
+    header_lines = [
+        '"""',
+        f"regime_BINS_{STRATEGIES_SET_NAME}.py — Regime classification bins. Do not edit manually.",
+        f"Generated by regime_GE_calibration.py — {indicators_str} | MODE={mode}",
+        f"Auto-generated on {generated_at} UTC.",
+        '"""',
+        "",
+    ]
+    for k in active_keys:
+        header_lines.append(f"{k.upper()}_WINDOW    = {windows[k]}")
+        header_lines.append(f"{k.upper()}_THRESHOLD = {thresholds[k]}")
+    header_lines += [f"COMBINE_MODE = '{mode}'", "", "REGIME_BINS = {"]
+
+    bin_lines = [f'    "{sid}": "{data.get("classification", "neutral")}",' for sid, data in sorted(strategy_results.items())]
+
+    with open(output_path, "w") as f:
+        f.write("\n".join(header_lines + bin_lines + ["}"]) + "\n")
+    print(f"\n  ✅ Bins saved to: {output_path}")
+
+
+# =============================================================================
+# LOAD REGIME BINS
+# =============================================================================
 # =============================================================================
 # LOAD REGIME BINS
 # =============================================================================
