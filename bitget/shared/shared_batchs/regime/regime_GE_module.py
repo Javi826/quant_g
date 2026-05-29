@@ -40,7 +40,7 @@ def load_config_from_bins(bins_path: str) -> None:
         REGIME_TIMEFRAME_MODE = module.REGIME_TIMEFRAME_MODE
 
     _indicator_cache = {}
-    logger.info(f"[REGIME] Config loaded from {bins_path}")
+    logger.debug(f"[REGIME] Config loaded from {bins_path}")
 
 
 # =============================================================================

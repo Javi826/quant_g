@@ -28,7 +28,8 @@ def run_backtest_is(
     trades_is_baseline: list,
     trades_is_regime: list,
     brief_trades_folder: str,
-    regime_bins_path: str
+    regime_bins_path: str,
+    regime_enabled:   bool = True
 ) -> tuple:
     """
     Run IS backtest, regime analysis and optionally IS regime backtest.
@@ -56,7 +57,7 @@ def run_backtest_is(
     trades_df_is.columns     = trades_df_is.columns.str.lower().str.strip()
     trades_df_is["buy_time"] = pd.to_datetime(trades_df_is["buy_time"])
 
-    bins_to_filter = load_regime_bins(regime_bins_path, strategy_id) if REGIME_ENABLED else "neutral"
+    bins_to_filter = load_regime_bins(regime_bins_path, strategy_id) if regime_enabled else "neutral"
     #print(f"  DEBUG bins_path={regime_bins_path} | exists={os.path.exists(regime_bins_path)} | bins={bins_to_filter}")
     logger.info(f"STAGE 2 ── Backtest IS            ── symbols: {len(symbols_oos_final)} | total={len(trades_df_is)} | bins={len(bins_to_filter)}")
     if save_trades:

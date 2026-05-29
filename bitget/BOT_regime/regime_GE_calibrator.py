@@ -58,7 +58,7 @@ INDICATORS: dict[str, dict] = {
         "enabled":    True,
     },
     "er": {
-        "windows":    [10, 40],
+        "windows":    [10,30],
         "thresholds": [0.6,0.8],
         "enabled":    True,
     },

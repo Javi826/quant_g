@@ -88,14 +88,15 @@ RUN_SUMMARY        = True
 RUN_CORRELATION    = True
 RUN_BEST_PORTFOLIO = True
 
+# REGIME
+#------------------------------------------------------------------------------
+REGIME_ENABLED  = False
+
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
-# REGIME
-#------------------------------------------------------------------------------
-REGIME_ENABLED  = True
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -294,6 +295,7 @@ def run_batch(strategy_config: dict) -> None:
         trades_is_regime      = _strategy_trades_is_regime,
         brief_trades_folder   = brief_trades_folder,
         regime_bins_path      = REGIME_BINS_PATH,
+        regime_enabled   = REGIME_ENABLED,
     )
 
     # -------------------------------------------------------------------------
