@@ -314,7 +314,15 @@ _METRIC_MAP = {
     "max_dd":   ("trending_dd",   "ranging_dd",   "b_dd"),
     "win_rate": ("trending_wr",   "ranging_wr",   "b_wr"),
     "calmar":   ("trending_prof", "ranging_prof", "b_prof"),
+    "mix":      ("trending_prof", "ranging_prof", "b_prof"),
 }
+
+def _mix_score(prof: float, dd: float, w_profit: float = 0.6, w_dd: float = 0.4) -> float:
+    """Weighted mix of profit and inverse drawdown. Higher is better."""
+    inv_dd = 1 / abs(dd) if dd != 0 else 0.0
+    return w_profit * prof + w_dd * inv_dd
+
+
 def _calmar(prof: float, dd: float) -> float:
     """Calmar ratio: profit / abs(max_dd). Returns 0 if dd is 0."""
     return prof / abs(dd) if dd != 0 else 0.0
@@ -324,9 +332,14 @@ def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit") 
     if not periods_with_data:
         return "neutral"
     t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
+    
     if optimize_metric == "calmar":
         t_all = all(_calmar(data[pk][t_key], data[pk]['trending_dd']) > _calmar(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
         r_all = all(_calmar(data[pk][r_key], data[pk]['ranging_dd'])  > _calmar(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
+        
+    elif optimize_metric == "mix":
+        t_all = all(_mix_score(data[pk][t_key], data[pk]['trending_dd']) > _mix_score(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
+        r_all = all(_mix_score(data[pk][r_key], data[pk]['ranging_dd'])  > _mix_score(data[pk][b_key], data[pk]['b_dd']) for pk in periods_with_data)
     else:
         t_all = all(data[pk][t_key] > data[pk][b_key] for pk in periods_with_data)
         r_all = all(data[pk][r_key] > data[pk][b_key] for pk in periods_with_data)

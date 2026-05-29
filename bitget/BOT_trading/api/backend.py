@@ -21,7 +21,6 @@ from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
 import psycopg2
 from api.metrics import MetricsCalculator
 from market_regime.regime_classifier import get_regime_info_front
-from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import HOUR_ZONE
 from config.utils.utils import get_account_config
@@ -1231,18 +1230,15 @@ class DashboardServer:
         def get_regime_current():
             """
             Get current market regime for reference symbol (header card).
-
             Query params:
                 timeframe: Strategy timeframe selected in UI (e.g. '4H', '1H')
-
             Returns:
                 JSON with family, metrics, config, ref_price, all_families
             """
             try:
                 timeframe    = request.args.get('timeframe', '4H')
                 regime_info  = get_regime_info_front(timeframe, symbol=None)
-
-
+                account_cfg  = ACCOUNTS.get(self.account_number, {})
                 return jsonify({
                     'success':        regime_info['success'],
                     'timeframe':      timeframe,
@@ -1250,18 +1246,17 @@ class DashboardServer:
                     'metrics':        regime_info['metrics'],
                     'indicators_cfg': {
                         k: {
-                            'window':    v['windows'][0],
-                            'threshold': v['thresholds'][0],
+                            'window':    v['window'],
+                            'threshold': v['threshold'],
                             'enabled':   v['enabled'],
                         }
-                        for k, v in INDICATORS.items()
+                        for k, v in account_cfg.get('regime_indicators', {}).items()
                     },
                     'ref_price':      float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
-                    'combine_mode':   COMBINE_MODE,
-                    'analysis_mode':  ANALYSIS_MODE,
-                    'tf_mode':        REGIME_TIMEFRAME_MODE,
+                    'combine_mode':   account_cfg.get('regime_combine_mode',   'OR'),
+                    'analysis_mode':  account_cfg.get('regime_analysis_mode',  'SYMBOL'),
+                    'tf_mode':        account_cfg.get('regime_timeframe_mode', 'DAILY'),
                 })
-
             except Exception as e:
                 logger.error(f"Error getting regime: {e}")
                 return jsonify({
@@ -1308,14 +1303,14 @@ class DashboardServer:
         def get_regime_symbols():
             """
             Get regime metrics for a single symbol.
-
             Query params:
                 timeframe : Strategy timeframe selected in UI (e.g. '4H')
                 symbol    : Single symbol to calculate (e.g. 'ETHUSDT')
             """
             try:
-                timeframe = request.args.get('timeframe', '4H')
-                symbol    = request.args.get('symbol')
+                timeframe   = request.args.get('timeframe', '4H')
+                symbol      = request.args.get('symbol')
+                account_cfg = ACCOUNTS.get(self.account_number, {})
 
                 if not symbol:
                     return jsonify({'success': False, 'error': 'symbol param required'}), 400
@@ -1331,11 +1326,11 @@ class DashboardServer:
                     'metrics':        symbol_data.get('metrics', {}),
                     'indicators_cfg': {
                         k: {
-                            'window':    v['windows'][0],
-                            'threshold': v['thresholds'][0],
+                            'window':    v['window'],
+                            'threshold': v['threshold'],
                             'enabled':   v['enabled'],
                         }
-                        for k, v in INDICATORS.items()
+                        for k, v in account_cfg.get('regime_indicators', {}).items()
                     },
                 })
 

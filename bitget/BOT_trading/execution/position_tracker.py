@@ -118,8 +118,7 @@ def add_position(
         state_file: Path to state file
         hour_zone: Timezone for timestamps
         usdt_amount: USDT amount invested
-        regime_family: Market regime family at position open
-        regime_multiplier: Regime multiplier applied
+
     """
     
     

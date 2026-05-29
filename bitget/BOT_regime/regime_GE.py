@@ -34,20 +34,20 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{ST
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-OPTIMIZE_METRIC       = "calmar"    # "profit" | "max_dd" | "win_rate"
+OPTIMIZE_METRIC       = "calmar"   # "profit" | "max_dd" | "win_rate"
 ANALYSIS_MODE         = "SYMBOL"   # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 COMBINE_MODES         = ["OR"]    
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10],
-        "thresholds": [0.04],
+        "windows":    [30],
+        "thresholds": [0.02],
         "enabled":    True,
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0.8],
+        "thresholds": [0.6],
         "enabled":    True,
     },
     "hurst": {

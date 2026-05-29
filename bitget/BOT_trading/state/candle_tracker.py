@@ -158,10 +158,6 @@ def check_candles_timeout_for_strategy(strat_id: str,
             'entry_price': pos['entry_price'],
             'tp': pos.get('tp'),
             'sl': pos.get('sl'),
-            'regime_family': pos.get('regime_family', 'unknown'),
-            'regime_multiplier': pos.get('regime_multiplier', 1.0),
-            'market_direction': pos.get('market_direction', 'unknown'),
-            'direction_multiplier': pos.get('direction_multiplier', 1.0),
         }
 
         if close_position(

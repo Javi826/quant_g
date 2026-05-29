@@ -43,10 +43,10 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_GE_module import REGIME_ENABLED
+from shared_batchs.regime.regime_GE_module import REGIME_ENABLED,COMBINE_MODE, ANALYSIS_MODE
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
-from shared_trading_batch.config_trading_batch import COMBINE_MODE, ANALYSIS_MODE
+
 
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
@@ -78,7 +78,7 @@ N_PATHS_IS           = 1
 #------------------------------------------------------------------------------
 
 OOS_NETGAIN_TH       = 19
-OOS_MAX_DD_TH        = 20
+OOS_MAX_DD_TH        = 15
 OOS_R2_TH            = 0.43
 
 # RUNS

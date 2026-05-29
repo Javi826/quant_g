@@ -1,3 +1,4 @@
+#BOT_trading/execution/trade_logger.py
 """
 execution.trade_logger.py - Handles trade logging to Excel.
 

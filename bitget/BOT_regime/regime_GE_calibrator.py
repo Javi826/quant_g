@@ -19,10 +19,10 @@ from shared_batch_regime.regime_GE_core import is_trending
 from shared_batch_regime.regime_GE_core import combo_label, load_strategies_config
 from shared_batch_regime.regime_GE_core import precompute_baselines
 from shared_batch_regime.regime_GE_core import print_combo_period_table, print_combo_summary, print_ranking
-from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP, _calmar
+from shared_batch_regime.regime_GE_core import build_indicator_cache, get_cache_key, classify_strategy, combined_metrics, lookup_indicators_batch, _METRIC_MAP, _calmar, _mix_score
 from shared_batch_regime.regime_GE_core import run_backtest
 import numpy as np
-
+N_JOBS                = -1  
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -35,18 +35,19 @@ PERIOD_WEIGHTS = {
 COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
-OPTIMIZE_METRIC       = "profit"  # "profit" | "max_dd" | "win_rate" |"calmar"
-N_JOBS                = -1        # -1 = all cores, -2 = all but one
+OPTIMIZE_METRIC       = "mix"     # "profit" | "max_dd" | "win_rate" | "calmar" | "mix"
+MIX_WEIGHT_PROFIT     = 0.8
+MIX_WEIGHT_DD         = 0.2
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [30],
-        "thresholds": [0.02],
+        "windows":    [10,30,50],
+        "thresholds": [0.02,0.04,0.06],
         "enabled":    True,
     },
     "er": {
-        "windows":    [40,],
-        "thresholds": [0.6],
+        "windows":    [10,30,50],
+        "thresholds": [0.02,0.04,0.06],
         "enabled":    True,
     },
     "hurst": {
@@ -187,6 +188,14 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
                 comb += _calmar(d[t_key], d['trending_dd'])
             else:
                 comb += _calmar(d[b_key], d['b_dd'])
+        elif optimize_metric == "mix":
+            base += _mix_score(d[b_key], d['b_dd'])
+            if cls == 'ranging':
+                comb += _mix_score(d[r_key], d['ranging_dd'])
+            elif cls == 'trending':
+                comb += _mix_score(d[t_key], d['trending_dd'])
+            else:
+                comb += _mix_score(d[b_key], d['b_dd'])
         else:
             base += d[b_key]
             if cls == 'ranging':

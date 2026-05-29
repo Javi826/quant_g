@@ -5,10 +5,8 @@ Uses GE indicator config (config_trading_batch.py) mirroring batch logic.
 """
 import logging
 import numpy as np
-import pandas as pd
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
-from shared_trading_batch.config_trading_batch import INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
 from shared_trading_batch_regime.regime_metrics import _CALC_FN
 from market_data.data_utils import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 from config.settings import ACCOUNTS
@@ -16,12 +14,19 @@ from config.settings import ACCOUNTS
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
 REGIME_REFERENCE_SYMBOL = None
-
-
+REGIME_INDICATORS       = {}
+REGIME_COMBINE_MODE     = "OR"
+REGIME_ANALYSIS_MODE    = "SYMBOL"
+REGIME_TIMEFRAME_MODE   = "DAILY"
 def configure_regime(account_number: str) -> None:
-    global REGIME_REFERENCE_SYMBOL
+    global REGIME_REFERENCE_SYMBOL, REGIME_INDICATORS, REGIME_COMBINE_MODE
+    global REGIME_ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
     config                  = ACCOUNTS.get(account_number, {})
-    REGIME_REFERENCE_SYMBOL = config.get('regime_reference_symbol')
+    REGIME_REFERENCE_SYMBOL = config.get('regime_reference_symbol', 'BTCUSDT')
+    REGIME_INDICATORS       = config.get('regime_indicators', {})
+    REGIME_COMBINE_MODE     = config.get('regime_combine_mode', 'OR')
+    REGIME_ANALYSIS_MODE    = config.get('regime_analysis_mode', 'SYMBOL')
+    REGIME_TIMEFRAME_MODE   = config.get('regime_timeframe_mode', 'DAILY')
 
 
 # =============================================================================
@@ -29,11 +34,10 @@ def configure_regime(account_number: str) -> None:
 # =============================================================================
 
 def _active_windows() -> Dict[str, int]:
-    return {k: v["windows"][0] for k, v in INDICATORS.items() if v.get("enabled")}
+    return {k: v["window"] for k, v in REGIME_INDICATORS.items() if v.get("enabled")}
 
 def _active_thresholds() -> Dict[str, float]:
-    return {k: v["thresholds"][0] for k, v in INDICATORS.items() if v.get("enabled")}
-
+    return {k: v["threshold"] for k, v in REGIME_INDICATORS.items() if v.get("enabled")}
 
 # =============================================================================
 # CLASSIFICATION
@@ -48,7 +52,7 @@ def _is_trending(metrics: Dict[str, Optional[float]]) -> bool:
         signals.append(val >= thresholds[key])
     if not signals:
         return False
-    return all(signals) if COMBINE_MODE == "AND" else any(signals)
+    return all(signals) if REGIME_COMBINE_MODE == "AND" else any(signals)
 
 
 def _classify(metrics: Dict[str, Optional[float]]) -> str:
@@ -128,18 +132,11 @@ def get_symbol_regime(
     Returns:
         'trending' | 'ranging' | 'neutral'
     """
-    ref_symbol   = REGIME_REFERENCE_SYMBOL if ANALYSIS_MODE == "BTC" else symbol
+    ref_symbol    = REGIME_REFERENCE_SYMBOL if REGIME_ANALYSIS_MODE == "BTC" else symbol
     ref_timeframe = "1Dutc" if REGIME_TIMEFRAME_MODE == "DAILY" else timeframe
-
-    logger.info(
-        f"[REGIME_GE] {symbol} | ref={ref_symbol} | tf={ref_timeframe} | "
-        f"mode={ANALYSIS_MODE} | tf_mode={REGIME_TIMEFRAME_MODE}"
-    )
-
-    # Reuse arr only when symbol and timeframe match exactly
     can_reuse = (
         arr is not None
-        and ANALYSIS_MODE == "SYMBOL"
+        and REGIME_ANALYSIS_MODE == "SYMBOL"
         and REGIME_TIMEFRAME_MODE == "STRATEGY"
     )
 

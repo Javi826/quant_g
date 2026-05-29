@@ -22,17 +22,33 @@ ACCOUNTS = {
         "risk_control_enabled": True,
         "postgresql_enabled": True,
         "regime_reference_symbol": "BTCUSDT",
+        "regime_indicators": {
+            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
+            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
+        },
+        "regime_combine_mode":   "OR",
+        "regime_analysis_mode":  "SYMBOL",
+        "regime_timeframe_mode": "DAILY",
     },
     "00": {
-        "initial_capital": 9600,
+        "initial_capital": 4000,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",
         "regime_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
-        "regime_reference_symbol": "BTCUSDT"
+        "regime_reference_symbol": "BTCUSDT",
+        "regime_indicators": {
+            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
+            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
+        },
+        "regime_combine_mode":   "OR",
+        "regime_analysis_mode":  "SYMBOL",
+        "regime_timeframe_mode": "DAILY",
     },
+    
+    
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,
@@ -41,7 +57,15 @@ ACCOUNTS = {
         "regime_enabled": False,
         "risk_control_enabled": False,
         "postgresql_enabled": False,
-    }
+        "regime_reference_symbol": "BTCUSDT",
+        "regime_indicators": {
+            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
+            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
+        },
+        "regime_combine_mode":   "OR",
+        "regime_analysis_mode":  "SYMBOL",
+        "regime_timeframe_mode": "DAILY",
+    },
 }
 
 COMMISSION_PCT = 0.1
