@@ -6,38 +6,41 @@ import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 
+from importlib.util import spec_from_file_location, module_from_spec
 from shared_batch_regime.regime_GE_core import precompute_indicators, lookup_indicators, load_ohlcv_raw
 from shared_batch_regime.regime_GE_core import load_ohlcv, is_trending, load_regime_bins_ge
-
 logger = logging.getLogger("shared_batch.regime.regime_GE_module")
 REGIME_REFERENCE = 'BTCUSDT'
 
 # =============================================================================
 # CONFIGURATION  — mirror from regime_GE.py after calibration
 # =============================================================================
-INDICATORS: dict[str, dict] = {
-    "atr_norm": {
-        "windows":    [10],
-        "thresholds": [0.04],
-        "enabled":    True,
-    },
-    "er": {
-        "windows":    [40],
-        "thresholds": [0.8],
-        "enabled":    True,
-    },
-    "hurst": {
-        "windows":    [30],
-        "thresholds": [0.5],
-        "enabled":    False,
-    },
-}
-
-COMBINE_MODE          = "OR"
-ANALYSIS_MODE         = "SYMBOL"
-REGIME_TIMEFRAME_MODE = "DAILY"    # "DAILY" | "STRATEGY"
 REGIME_ENABLED        = True
 DEBUG_REGIME_LOG      = False
+
+
+def load_config_from_bins(bins_path: str) -> None:
+    """
+    Load INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE
+    from a regime_BINS file. Updates module-level globals in place.
+    """
+    global INDICATORS, COMBINE_MODE, ANALYSIS_MODE, REGIME_TIMEFRAME_MODE, _indicator_cache
+
+    spec   = spec_from_file_location("regime_bins", bins_path)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    if hasattr(module, "INDICATORS"):
+        INDICATORS = module.INDICATORS
+    if hasattr(module, "COMBINE_MODE"):
+        COMBINE_MODE = module.COMBINE_MODE
+    if hasattr(module, "ANALYSIS_MODE"):
+        ANALYSIS_MODE = module.ANALYSIS_MODE
+    if hasattr(module, "REGIME_TIMEFRAME_MODE"):
+        REGIME_TIMEFRAME_MODE = module.REGIME_TIMEFRAME_MODE
+
+    _indicator_cache = {}
+    logger.info(f"[REGIME] Config loaded from {bins_path}")
 
 
 # =============================================================================

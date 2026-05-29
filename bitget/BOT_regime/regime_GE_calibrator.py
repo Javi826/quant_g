@@ -35,7 +35,7 @@ PERIOD_WEIGHTS = {
 }
 
 STRATEGIES_SET_NAME  = "E1"
-BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), f"regime_BINS_{STRATEGIES_SET_NAME}.py")
+BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}", "strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py")
 
 # =============================================================================
 # REGIME CONFIGURATION
@@ -53,13 +53,13 @@ AUTO_SAVE_BINS        = True            # True = auto-save top1 bins after calib
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10, 30, 50],
-        "thresholds": [0.02, 0.04, 0.06],
+        "windows":    [10, 30],
+        "thresholds": [0.02, 0.04],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10, 30, 50],
-        "thresholds": [0.2, 0.4, 0.6],
+        "windows":    [10, 40],
+        "thresholds": [0.6,0.8],
         "enabled":    True,
     },
     "hurst": {

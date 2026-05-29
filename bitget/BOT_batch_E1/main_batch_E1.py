@@ -43,7 +43,8 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime.regime_GE_module import REGIME_ENABLED,COMBINE_MODE, ANALYSIS_MODE
+from shared_batchs.regime import regime_GE_module
+from shared_batchs.regime.regime_GE_module import REGIME_ENABLED, load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 
@@ -89,8 +90,12 @@ RUN_BEST_PORTFOLIO = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS = False
-SAVE_TRADES    = False
+UPDATE_OUTPUTS  = False
+SAVE_TRADES     = False
+
+# REGIME
+#------------------------------------------------------------------------------
+REGIME_ENABLED  = True
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -707,7 +712,9 @@ if __name__ == "__main__":
     logger.info(f"  Strategies set : {STRATEGIES_SET_NAME}-{len(strategies_to_run)} stratagies")
     logger.info(f"  Loop config    : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
-    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  mode={COMBINE_MODE}  analysis={ANALYSIS_MODE}")
+    regime_GE_module.REGIME_ENABLED = REGIME_ENABLED
+    load_config_from_bins(REGIME_BINS_PATH)
+    logger.info(f"  Regime         : {'🟢 enabled' if regime_GE_module.REGIME_ENABLED else '⚪ disabled'}  mode={regime_GE_module.COMBINE_MODE}  analysis={regime_GE_module.ANALYSIS_MODE}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
