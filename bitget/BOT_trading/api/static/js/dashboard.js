@@ -341,12 +341,9 @@ function _buildBar(value, reverse, totalBlocks = 40) {
     return html;
 }
 
-// Metadata per metric key — display name, reverse scale, format fn
-const METRIC_META = {
-    atr_norm: { label: 'ATR Norm',          reverse: true,  fmt: v => (v * 100).toFixed(2) + '%' },
-    er:       { label: 'Efficiency Ratio',  reverse: false, fmt: v => v.toFixed(3)               },
-    hurst:    { label: 'Hurst Exponent',    reverse: false, fmt: v => v.toFixed(3)               },
-};
+// Metric display — dynamic, driven by indicators_cfg from backend
+const METRIC_META = {};
+const _fmtMetric = v => v !== null && v !== undefined ? parseFloat(v).toFixed(3) : '-';
 
 // -----------------------------------------------------------------------------
 // Timeframe selector
@@ -385,7 +382,6 @@ async function loadRegimeData() {
         console.error('Error loading regime data:', error);
     }
 }
-
 function updateRegimeUI(data) {
     const family    = data.family   || 'default';
     const timeframe = data.timeframe || currentRegimeTimeframe;
@@ -417,11 +413,20 @@ function updateRegimeUI(data) {
     // Config pills
     const cfgContainer = document.getElementById('regime-config-pills');
     if (cfgContainer) {
+        const indicatorsCfg = data.indicators_cfg || {};
+        const metricPills   = Object.entries(indicatorsCfg)
+            .filter(([, cfg]) => cfg.enabled)
+            .map(([key, cfg]) => {
+                return { label: cfg.label || key, value: `w=${cfg.window} th=${cfg.threshold}` };
+            });
+
         const pills = [
             { label: 'Combine',   value: data.combine_mode  || '-' },
             { label: 'Analysis',  value: data.analysis_mode || '-' },
             { label: 'Timeframe', value: data.tf_mode        || '-' },
+            ...metricPills,
         ];
+
         cfgContainer.innerHTML = pills.map(p =>
             `<span style="background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:13px;color:#8b949e;">
                 <span style="color:#6b7280;">${p.label}:</span>
@@ -471,11 +476,10 @@ async function loadRegimeSymbols(indicatorsCfg) {
 }
 
 function _buildSymbolCardSkeleton(symbol, enabledMetrics) {
-    const metricCols = enabledMetrics.map(([key]) => {
-        const meta = METRIC_META[key] || { label: key };
+    const metricCols = enabledMetrics.map(([key, cfg]) => {
         return `
             <div style="flex:1;text-align:center;">
-                <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">${meta.label}</div>
+                <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">${cfg.label || key}</div>
                 <div id="sym-metric-${symbol}-${key}" style="font-size:26px;font-weight:700;color:#8b949e;">-</div>
                 <div id="sym-bar-${symbol}-${key}" style="font-family:monospace;font-size:13px;margin-top:6px;">
                     <span style="color:#2d333b;">████████████████████</span>
@@ -483,7 +487,6 @@ function _buildSymbolCardSkeleton(symbol, enabledMetrics) {
                 <div id="sym-th-${symbol}-${key}" style="font-size:12px;color:#6b7280;margin-top:4px;">th: -</div>
             </div>`;
     }).join('');
-
     return `
         <div id="sym-card-${symbol}" style="background:#1c2128;border:2px solid #21262d;border-radius:10px;padding:20px;margin-bottom:14px;">
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
@@ -510,28 +513,23 @@ function _updateSymbolCard(symbol, data, enabledMetrics) {
     const card = document.getElementById(`sym-card-${symbol}`);
     if (card) card.style.border = `2px solid ${badgeStyle.bg}66`;
 
-    enabledMetrics.forEach(([key]) => {
-        const meta     = METRIC_META[key] || { label: key, reverse: false, fmt: v => v.toFixed(3) };
-        const value    = metrics[key];
-        const cfg      = indicators[key] || {};
-        const metricEl = document.getElementById(`sym-metric-${symbol}-${key}`);
-        const barEl    = document.getElementById(`sym-bar-${symbol}-${key}`);
-        const thEl     = document.getElementById(`sym-th-${symbol}-${key}`);
-
-        if (thEl && cfg.threshold !== undefined) thEl.textContent = `th: ${cfg.threshold}`;
-
-        if (value === undefined || value === null || isNaN(value)) {
-            if (metricEl) { metricEl.textContent = '-'; metricEl.style.color = '#8b949e'; }
-            return;
-        }
-
-        const normalized = Math.min(Math.max(value, 0), 1);
-        if (metricEl) {
-            metricEl.textContent = meta.fmt(value);
-            metricEl.style.color = _metricColor(normalized, meta.reverse);
-        }
-        if (barEl) barEl.innerHTML = _buildBar(normalized, meta.reverse, 20);
-    });
+    enabledMetrics.forEach(([key, cfg]) => {
+            const value    = metrics[key];
+            const metricEl = document.getElementById(`sym-metric-${symbol}-${key}`);
+            const barEl    = document.getElementById(`sym-bar-${symbol}-${key}`);
+            const thEl     = document.getElementById(`sym-th-${symbol}-${key}`);
+            if (thEl && cfg.threshold !== undefined) thEl.textContent = `th: ${cfg.threshold}`;
+            if (value === undefined || value === null || isNaN(value)) {
+                if (metricEl) { metricEl.textContent = '-'; metricEl.style.color = '#8b949e'; }
+                return;
+            }
+            const normalized = Math.min(Math.max(value, 0), 1);
+            if (metricEl) {
+                metricEl.textContent = _fmtMetric(value);
+                metricEl.style.color = _metricColor(normalized, false);
+            }
+            if (barEl) barEl.innerHTML = _buildBar(normalized, false, 20);
+        });
 }
 
 function _updateSymbolCardError(symbol) {

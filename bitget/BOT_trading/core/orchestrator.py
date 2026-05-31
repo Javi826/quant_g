@@ -380,7 +380,8 @@ class BotOrchestrator:
             hour_zone=HOUR_ZONE,
             account_number=self.account_number,
             state_file=self.state_file,
-            use_hardcoded=USE_HARDCODED_SIGNALS
+            use_hardcoded=USE_HARDCODED_SIGNALS,
+            regime_enabled=self.account_flags.get('regime_enabled', True),
         )
 
         self.strategy_processor.operative = self.operative

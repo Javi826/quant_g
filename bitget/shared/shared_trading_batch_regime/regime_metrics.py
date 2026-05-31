@@ -21,7 +21,45 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # SINGLE-VALUE CALCULATORS
 # =============================================================================
+def calc_vol_regime(
+    high:        np.ndarray,
+    low:         np.ndarray,
+    close:       np.ndarray,
+    window:      int = 7,
+    long_factor: int = 4,
+) -> float:
+    """
+    Vol regime ratio: ATR(window) / ATR(window * long_factor).
+    > 1 → volatility expanding (trending)
+    < 1 → volatility contracting (ranging)
+    Uses Wilder smoothing for both ATRs.
+    """
+    window_long = window * long_factor
+    needed      = window_long + 1
+    if len(close) < needed:
+        return np.nan
 
+    h  = high[-needed:]
+    l  = low[-needed:]
+    c  = close[-needed:]
+    tr = np.maximum(
+        h[1:] - l[1:],
+        np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])),
+    )
+
+    # Short ATR
+    atr_s = float(np.mean(tr[:window]))
+    for i in range(window, len(tr)):
+        atr_s = (atr_s * (window - 1) + tr[i]) / window
+
+    # Long ATR
+    atr_l = float(np.mean(tr[:window_long]))
+    for i in range(window_long, len(tr)):
+        atr_l = (atr_l * (window_long - 1) + tr[i]) / window_long
+
+    if atr_l == 0:
+        return np.nan
+    return float(np.clip(atr_s / atr_l, 0.0, 10.0))
 def calc_atr_norm(
     high:   np.ndarray,
     low:    np.ndarray,
@@ -109,26 +147,83 @@ def calc_hurst(close: np.ndarray, window: int = 30) -> float:
 # =============================================================================
 # CONVENIENCE WRAPPER
 # =============================================================================
+def calc_adx(
+    high:   np.ndarray,
+    low:    np.ndarray,
+    close:  np.ndarray,
+    window: int = 14,
+) -> float:
+    """
+    ADX (Average Directional Index) using Wilder smoothing.
+    Returns value in [0, 100]: <25 ranging | 25-50 trending | >50 strong trend.
+    """
+    needed = window * 2 + 1
+    if len(close) < needed:
+        return np.nan
+
+    h = high[-needed:]
+    l = low[-needed:]
+    c = close[-needed:]
+
+    # True Range and Directional Movement
+    tr   = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
+    dm_p = np.where((h[1:] - h[:-1]) > (l[:-1] - l[1:]), np.maximum(h[1:] - h[:-1], 0.0), 0.0)
+    dm_n = np.where((l[:-1] - l[1:]) > (h[1:] - h[:-1]), np.maximum(l[:-1] - l[1:], 0.0), 0.0)
+
+    # Wilder smoothing seed
+    atr_s  = float(np.mean(tr[:window]))
+    dmp_s  = float(np.mean(dm_p[:window]))
+    dmn_s  = float(np.mean(dm_n[:window]))
+
+    dx_vals = []
+    for i in range(window, len(tr)):
+        atr_s = (atr_s * (window - 1) + tr[i])  / window
+        dmp_s = (dmp_s * (window - 1) + dm_p[i]) / window
+        dmn_s = (dmn_s * (window - 1) + dm_n[i]) / window
+
+        if atr_s == 0:
+            continue
+        di_p = 100.0 * dmp_s / atr_s
+        di_n = 100.0 * dmn_s / atr_s
+        denom = di_p + di_n
+        dx_vals.append(100.0 * abs(di_p - di_n) / denom if denom != 0 else 0.0)
+
+    if len(dx_vals) < window:
+        return np.nan
+
+    adx = float(np.mean(dx_vals[:window]))
+    for i in range(window, len(dx_vals)):
+        adx = (adx * (window - 1) + dx_vals[i]) / window
+
+    return float(np.clip(adx, 0.0, 100.0))
+
+
 
 _CALC_FN = {
-    "atr_norm": lambda high, low, close, w: calc_atr_norm(high, low, close, w),
-    "er":       lambda high, low, close, w: calc_er(close, w),
-    "hurst":    lambda high, low, close, w: calc_hurst(close, w),
+    "atr_norm":   lambda high, low, close, w: calc_atr_norm(high, low, close, w),
+    "er":         lambda high, low, close, w: calc_er(close, w),
+    "hurst":      lambda high, low, close, w: calc_hurst(close, w),
+    "adx":        lambda high, low, close, w: calc_adx(high, low, close, w),
+    "vol_regime": lambda high, low, close, w: calc_vol_regime(high, low, close, w),
 }
 
 
 def calc_all_metrics(
-    ohlc:       dict[str, np.ndarray],
-    er_window:  int = 14,
-    atr_window: int = 14,
-    hurst_window: int = 30,
+    ohlc:              dict[str, np.ndarray],
+    er_window:         int = 14,
+    atr_window:        int = 14,
+    hurst_window:      int = 30,
+    adx_window:        int = 14,
+    vol_regime_window: int = 7,
 ) -> dict[str, float]:
     """Return all indicator values for the latest candle."""
     close = ohlc["close"]
     high  = ohlc["high"]
     low   = ohlc["low"]
     return {
-        "atr_norm": calc_atr_norm(high, low, close, atr_window),
-        "er":       calc_er(close, er_window),
-        "hurst":    calc_hurst(close, hurst_window),
+        "atr_norm":   calc_atr_norm(high, low, close, atr_window),
+        "er":         calc_er(close, er_window),
+        "hurst":      calc_hurst(close, hurst_window),
+        "adx":        calc_adx(high, low, close, adx_window),
+        "vol_regime": calc_vol_regime(high, low, close, vol_regime_window),
     }

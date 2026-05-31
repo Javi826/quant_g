@@ -94,7 +94,7 @@ REGIME_ENABLED  = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = True
+UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
 

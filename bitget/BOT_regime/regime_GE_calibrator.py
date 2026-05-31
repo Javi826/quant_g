@@ -1,4 +1,5 @@
 #develop/market_regime/regime_GE_calibration.py
+import gc
 import os
 import sys
 import time
@@ -26,6 +27,7 @@ import numpy as np
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
+logging.getLogger("shared_batch_regime.regime_GE_core").setLevel(logging.INFO)
 
 N_JOBS = -1
 PERIOD_WEIGHTS = {
@@ -42,28 +44,41 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # =============================================================================
 AUTO_SAVE_BINS        = True 
 COMBINE_MODES         = ["OR"]
-ANALYSIS_MODE         = "SYMBOL" # "BTC" | "SYMBOL"
+ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
-MIX_WEIGHT_PROFIT     = 0.4
-MIX_WEIGHT_DD         = 0.6
-OPTIMIZE_METRIC       = "mix" # "profit" | "win_rate" | "calmar" | "mix"
+MIX_WEIGHT_PROFIT     = 0.5
+MIX_WEIGHT_DD         = 0.5
+OPTIMIZE_METRIC       = "calmar" # "profit" | "win_rate" | "calmar" | "mix"
 CLASSIFICATION_MODE   = "strict" # "strict" | "oos1_weighted"
+MIN_CLASSIFIED_PCT    = 0.0
+RANKING_MODE          = "n_classified"  # "weighted_delta" | "n_classified"
+RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
         "windows":    [10,40],
-        "thresholds": [0.02,0.04,0.06],
+        "thresholds": [0.04,0.06,0.08],
         "enabled":    True,
     },
     "er": {
         "windows":    [10,40],
-        "thresholds": [0.4,0.6,0.8],
+        "thresholds": [0.7,0.8,0.9,1.0],
         "enabled":    True,
     },
     "hurst": {
-        "windows":    [30, 50],
-        "thresholds": [0.5, 0.6, 0.7],
+        "windows":    [30,50],
+        "thresholds": [0.5,0.6,0.7,0.8],
+        "enabled":    False,
+    },
+    "adx": {
+        "windows":    [10,20],
+        "thresholds": [10,25,50],
+        "enabled":    False,
+    },
+    "vol_regime": {
+        "windows":    [7, 10, 14],
+        "thresholds": [0.9, 1.0, 1.1],
         "enabled":    False,
     },
 }
@@ -172,6 +187,7 @@ def _run_filtered_combo(
                 'b_prof':            m_base['profit'],   'trending_prof': m_t['profit'],   'ranging_prof':  m_r['profit'],
                 'b_dd':              m_base['max_dd'],   'trending_dd':   m_t['max_dd'],   'ranging_dd':    m_r['max_dd'],
                 'b_wr':              m_base['win_rate'], 'trending_wr':   m_t['win_rate'], 'ranging_wr':    m_r['win_rate'],
+                'b_r2':              m_base['r2'],       'trending_r2':   m_t['r2'],       'ranging_r2':    m_r['r2'],
                 'trending_pct':      trending_pct,
                 'ranging_pass_pct':  100 - trending_pct,
                 'trending_pass_pct': trending_pct,
@@ -277,6 +293,8 @@ def _process_combo(
 def run() -> None:
     _t0 = time.time()
 
+    gc.collect()
+
     active_keys, grid = _build_grid()
     total_combos      = len(grid)
 
@@ -358,13 +376,28 @@ def run() -> None:
             row['label'],
         )
 
-    ranking.sort(key=lambda x: x['weighted_delta'], reverse=True)
-    print_ranking(ranking, active_keys)
+    n_total        = len(strategies_filtered)
+    min_classified = int(n_total * MIN_CLASSIFIED_PCT)
+    
+    ranking_filtered = [
+        row for row in ranking
+        if (row['n_ranging'] + row['n_trending']) >= min_classified
+    ]
+    
+    if not ranking_filtered:
+        logger.info(f"\n  ⚠️  No combos passed MIN_CLASSIFIED_PCT={MIN_CLASSIFIED_PCT} — showing full ranking.")
+        ranking_filtered = ranking
+    
+    if RANKING_MODE == "n_classified":
+        ranking_filtered.sort(key=lambda x: x['n_ranging'] + x['n_trending'], reverse=True)
+    else:
+        ranking_filtered.sort(key=lambda x: x['weighted_delta'], reverse=True)
+    print_ranking(ranking_filtered, active_keys)
 
     # =========================================================================
     # TOP1 CLASSIFICATION & BINS
     # =========================================================================
-    top1 = ranking[0]
+    top1 = ranking_filtered[0]
     logger.info(f"\n  TOP1 COMBO — {top1['label']}")
 
     top1_results = _run_filtered_combo(
@@ -390,6 +423,11 @@ def run() -> None:
 
     elapsed = int(time.time() - _t0)
     print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
-
+    del baselines, indicator_cache_map, ranking, ranking_filtered
+    gc.collect()
+    
 if __name__ == "__main__":
     run()
+    from joblib.externals.loky import get_reusable_executor
+    get_reusable_executor().shutdown(wait=True)
+    gc.collect()

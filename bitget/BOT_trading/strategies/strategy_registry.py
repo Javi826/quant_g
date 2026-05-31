@@ -55,7 +55,8 @@ def detect_signals_for_strategy(
     strat: dict,
     final_symbols: list,
     exchange,
-    use_hardcoded: bool = False
+    use_hardcoded:  bool = False,
+    regime_enabled: bool = True,
 ) -> list:
     """
     Args:
@@ -503,7 +504,7 @@ def detect_signals_for_strategy(
             # Check if last candle has signal
             if signals[-1] != 0:
                 last_row = df_norm.iloc[-1]
-                regime = get_symbol_regime(symbol, timeframe, arr)
+                regime   = get_symbol_regime(symbol, timeframe, arr) if regime_enabled else 'neutral'
                 all_signals.append({
                     'symbol':    symbol,
                     'timestamp': last_row.name if 'timestamp' not in df_norm.columns else last_row['timestamp'],

@@ -15,7 +15,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 # CONFIGURATION
 # =============================================================================
 REQUIRE_LONG_SHORT = True
-MIN_STRATEGIES     = 3
+MIN_STRATEGIES     = 2
 MAX_STRATEGIES     = 5
 
 PERIOD_WEIGHTS = {
@@ -30,10 +30,12 @@ RANKING_CRITERIA = [
     ("Weekly_std",True),
 ]
 
-#RANKING_CRITERIA = [
-#    ("NetGain%",False),
-#    ("MaxDD%",False),
-#]
+# =============================================================================
+# RANKING_CRITERIA = [
+#     ("R2",False),
+#     ("R2",True),
+# ]
+# =============================================================================
 
 TOP_N    = 2
 N_SPLITS = 12  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months

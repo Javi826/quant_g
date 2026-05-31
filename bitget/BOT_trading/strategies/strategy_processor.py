@@ -42,6 +42,7 @@ class StrategyProcessor:
         account_number:    str,
         state_file:        str,
         use_hardcoded:     bool = False,
+        regime_enabled:    bool = True,
     ):
         self.send_request   = send_request_func
         self.get_balance    = get_balance_func
@@ -50,6 +51,7 @@ class StrategyProcessor:
         self.state_file     = state_file
         self.use_hardcoded  = use_hardcoded
         self.operative      = None
+        self.regime_enabled = regime_enabled
 
         self._detect_real_signals   = detect_signals_for_strategy
         self._get_hardcoded_signals = get_hardcoded_signals
@@ -73,7 +75,7 @@ class StrategyProcessor:
         if self.use_hardcoded:
             signals = self._get_hardcoded_signals(strat_id, self.send_request, self.hour_zone)
         else:
-            signals = self._detect_real_signals(strat, final_symbols, None)
+            signals = self._detect_real_signals(strat, final_symbols, None, regime_enabled=self.regime_enabled)
 
         logger.info(f"Signals detected {strat_id}: {len(signals)}")
         return signals

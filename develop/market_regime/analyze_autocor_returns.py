@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 # CONFIGURATION
 # =============================================================================
 SPLIT_MODE  = "expanding"
-SPLIT_BASE  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split_OLD", SPLIT_MODE)
 DATA_FOLDER = os.path.join(SPLIT_BASE, "IS", "crypto_2024-01_2025-05_IS")
 TIMEFRAME   = "1H"
 TOP_N       = 20

@@ -10,6 +10,7 @@ from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_trading_batch_regime.regime_metrics import _CALC_FN
 from importlib.util import spec_from_file_location, module_from_spec
+from sklearn.linear_model import LinearRegression
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -236,16 +237,19 @@ def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
     )
     trades = result['__PORTFOLIO__']['trade_log']
     if len(trades) == 0:
-        return {'profit': 0.0, 'win_rate': 0.0, 'n_trades': 0, 'max_dd': 0.0}
+        return {'profit': 0.0, 'win_rate': 0.0, 'n_trades': 0, 'max_dd': 0.0, 'r2': 0.0}
     profits = trades['profit']
     equity  = INITIAL_BALANCE + profits.cumsum()
+    eq_arr  = equity.values.reshape(-1, 1)
+    x_arr   = np.arange(len(eq_arr)).reshape(-1, 1)
+    r2      = float(round(LinearRegression().fit(x_arr, eq_arr).score(x_arr, eq_arr), 3))
     return {
         'profit':   float(profits.sum()),
         'win_rate': float((profits > 0).mean() * 100),
         'n_trades': len(profits),
         'max_dd':   float(((equity - equity.cummax()) / equity.cummax()).min() * 100),
+        'r2':       r2,
     }
-
 
 # =============================================================================
 # BASELINE PRECOMPUTATION
@@ -309,12 +313,13 @@ _METRIC_MAP = {
     "win_rate": ("trending_wr",   "ranging_wr",   "b_wr"),
     "calmar":   ("trending_prof", "ranging_prof", "b_prof"),
     "mix":      ("trending_prof", "ranging_prof", "b_prof"),
+    "r2":       ("trending_r2",   "ranging_r2",   "b_r2"),
 }
 
-def _mix_score(prof: float, dd: float, w_profit: float = 0.6, w_dd: float = 0.4) -> float:
-    """Weighted mix of profit and inverse drawdown. Higher is better."""
-    inv_dd = 1 / abs(dd) if dd != 0 else 0.0
-    return w_profit * prof + w_dd * inv_dd
+def _mix_score(prof: float, dd: float, w_profit: float = 0.1, w_dd: float = 0.9) -> float:
+    calmar    = prof / abs(dd) if dd != 0 else 0.0
+    calmar_sq = prof / (abs(dd) ** 2) if dd != 0 else 0.0
+    return w_profit * calmar + w_dd * calmar_sq
 
 
 def _calmar(prof: float, dd: float) -> float:
@@ -326,6 +331,8 @@ def _metric_value(d: dict, key: str, dd_key: str, optimize_metric: str) -> float
         return _calmar(d[key], d[dd_key])
     if optimize_metric == "mix":
         return _mix_score(d[key], d[dd_key])
+    if optimize_metric == "r2":
+        return d[key]
     return d[key]
 
 
@@ -338,8 +345,9 @@ def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit", 
     t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
 
     def _beats_baseline(pk: str, filt_key: str, dd_key: str) -> bool:
-        return _metric_value(data[pk], filt_key, dd_key, optimize_metric) > _metric_value(data[pk], b_key, 'b_dd', optimize_metric)
-
+        beats_metric = _metric_value(data[pk], filt_key, dd_key, optimize_metric) > _metric_value(data[pk], b_key, 'b_dd', optimize_metric)
+        beats_r2     = data[pk].get(dd_key.replace('_dd', '_r2'), 0.0) > data[pk].get('b_r2', 0.0)
+        return beats_metric or beats_r2
     if classification_mode == "oos1_weighted":
         oos1_ok = "OOS1" in periods_with_data
         oos23   = [pk for pk in periods_with_data if pk != "OOS1"]
@@ -518,15 +526,15 @@ def print_consistency_table(strategy_results: dict) -> None:
     def _print_table(title: str, consistent: list, col_fn, improvement_fn) -> None:
         if not consistent:
             return
-        print(f"\n{'='*120}")
-        print(f"  {title}")
-        print(f"{'='*120}")
+        logger.debug(f"\n{'='*120}")
+        logger.debug(f"  {title}")
+        logger.debug(f"{'='*120}")
         header = f"  {'STRATEGY':<35} {'DIR':<6} {'CLASS':<10}"
         for pk in EVAL_KEYS:
             header += f"  {pk:>10}"
         header += f"  {'ALL Δ%':>8}"
-        print(header)
-        print(f"  {'─'*110}")
+        logger.debug(header)
+        logger.debug(f"  {'─'*110}")
         for sid, data in consistent:
             direction = "LONG" if data['is_long'] else "SHORT"
             cls       = data.get('classification', 'neutral').upper()
@@ -542,37 +550,47 @@ def print_consistency_table(strategy_results: dict) -> None:
             all_pct = improvement_fn(total_f, total_b)
             color   = "\033[92m" if all_pct > 0 else "\033[91m"
             row    += f"  {color}{all_pct:>+7.1f}%\033[0m"
-            print(row)
-        print(f"  {'─'*110}\n")
+            logger.debug(row)
+        logger.debug(f"  {'─'*110}\n")
 
-    for filter_prof, filter_dd, label in [
-        ("trending_prof", "trending_dd", "TRENDING"),
-        ("ranging_prof",  "ranging_dd",  "RANGING"),
+    for filter_prof, filter_dd, filter_r2, label in [
+        ("trending_prof", "trending_dd", "trending_r2", "TRENDING"),
+        ("ranging_prof",  "ranging_dd",  "ranging_r2",  "RANGING"),
     ]:
-        # PROFIT table
         consistent_prof = [
             (sid, data) for sid, data in sorted(strategy_results.items())
             if _has_all_periods(data)
             and all(data[pk][filter_prof] > data[pk]['b_prof'] for pk in EVAL_KEYS)
         ]
         _print_table(
-            title         = f"STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
-            consistent    = consistent_prof,
-            col_fn        = lambda d, fp=filter_prof: (d[fp], d['b_prof']),
-            improvement_fn= pct_improvement,
+            title          = f"STRATEGIES IMPROVING PROFIT IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
+            consistent     = consistent_prof,
+            col_fn         = lambda d, fp=filter_prof: (d[fp], d['b_prof']),
+            improvement_fn = pct_improvement,
         )
 
-        # DD table — improvement = filtered DD less negative than baseline DD
         consistent_dd = [
             (sid, data) for sid, data in sorted(strategy_results.items())
             if _has_all_periods(data)
             and all(data[pk][filter_dd] > data[pk]['b_dd'] for pk in EVAL_KEYS)
         ]
         _print_table(
-            title         = f"STRATEGIES IMPROVING DRAWDOWN IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
-            consistent    = consistent_dd,
-            col_fn        = lambda d, fd=filter_dd: (d[fd], d['b_dd']),
-            improvement_fn= pct_improvement,
+            title          = f"STRATEGIES IMPROVING DRAWDOWN IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
+            consistent     = consistent_dd,
+            col_fn         = lambda d, fd=filter_dd: (d[fd], d['b_dd']),
+            improvement_fn = pct_improvement,
+        )
+
+        consistent_r2 = [
+            (sid, data) for sid, data in sorted(strategy_results.items())
+            if _has_all_periods(data)
+            and all(data[pk][filter_r2] > data[pk]['b_r2'] for pk in EVAL_KEYS)
+        ]
+        _print_table(
+            title          = f"STRATEGIES IMPROVING R2 IN ALL {len(EVAL_KEYS)} OOS PERIODS — {label} PASS",
+            consistent     = consistent_r2,
+            col_fn         = lambda d, fr=filter_r2: (d[fr], d['b_r2']),
+            improvement_fn = pct_improvement,
         )
 
 
@@ -753,6 +771,7 @@ def lookup_indicators_batch(
         result[k]  = out
 
     return result
+
 def lookup_indicators(
     ts_arr:     np.ndarray,
     values_arr: dict[str, np.ndarray],

@@ -1249,6 +1249,7 @@ class DashboardServer:
                             'window':    v['window'],
                             'threshold': v['threshold'],
                             'enabled':   v['enabled'],
+                            'label':     k.replace('_', ' ').title(),
                         }
                         for k, v in account_cfg.get('regime_indicators', {}).items()
                     },
@@ -1329,6 +1330,7 @@ class DashboardServer:
                             'window':    v['window'],
                             'threshold': v['threshold'],
                             'enabled':   v['enabled'],
+                            'label':     k.replace('_', ' ').title(),
                         }
                         for k, v in account_cfg.get('regime_indicators', {}).items()
                     },

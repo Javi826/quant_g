@@ -59,7 +59,7 @@ def run_backtest_is(
 
     bins_to_filter = load_regime_bins(regime_bins_path, strategy_id) if regime_enabled else "neutral"
     #print(f"  DEBUG bins_path={regime_bins_path} | exists={os.path.exists(regime_bins_path)} | bins={bins_to_filter}")
-    logger.info(f"STAGE 2 ── Backtest IS            ── symbols: {len(symbols_oos_final)} | total={len(trades_df_is)} | bins={len(bins_to_filter)}")
+    logger.info(f"STAGE 2 ── Backtest IS            ── symbols: {len(symbols_oos_final)} | total={len(trades_df_is)}")
     if save_trades:
         accumulate_strategy_trades(
             trades_is_baseline, strategy_id, trades_df_is,

@@ -40,7 +40,7 @@ from shared.shared_trading_batch.config_trading_batch import (
 # CONFIGURATION
 # =============================================================================
 SPLIT_MODE  = "expanding"
-SPLIT_BASE  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_split", SPLIT_MODE)
+SPLIT_BASE  = os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "data_pipeline", "data", "04_splitOLD", SPLIT_MODE)
 DATA_FOLDER = os.path.join(SPLIT_BASE, "OOS", "crypto_2025-05_2026-05_OOS")
 TIMEFRAME   = "1H"
 
