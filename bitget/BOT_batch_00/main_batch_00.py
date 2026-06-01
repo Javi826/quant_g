@@ -71,22 +71,16 @@ MY_SYMBOLS = False
 
 # BATCH 
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME  = "E1"  
+STRATEGIES_SET_NAME  = "00"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
 
 # ELITE -- MA4
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 19
-OOS_MAX_DD_TH        = 15
-OOS_R2_TH            = 0.43
-
-# =============================================================================
-# OOS_NETGAIN_TH       = 1
-# OOS_MAX_DD_TH        = 30
-# OOS_R2_TH            = 0.01
-# =============================================================================
+OOS_NETGAIN_TH       = 1
+OOS_MAX_DD_TH        = 30
+OOS_R2_TH            = 0.01
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -100,7 +94,7 @@ REGIME_ENABLED  = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = False
+UPDATE_OUTPUTS  = True
 SAVE_TRADES     = False
 
 

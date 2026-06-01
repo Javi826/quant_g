@@ -30,11 +30,11 @@ EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
 # STRATEGY CONFIG PATHS  (set per batch)
 # =============================================================================
 
-BTC_TIMEFRAME    = "1Dutc"
-LONG_KEYWORD     = "long"
-ORDER_AMOUNT     = 80
-DEBUG_TF_FILTER: list[str] = []
-
+REGIME_DEFAULT_TIMEFRAME       = "1Dutc"
+LONG_KEYWORD                   = "long"
+ORDER_AMOUNT                   = 80
+DEBUG_TF_FILTER: list[str]     = []
+FILTER_NEGATIVE_BASELINE: bool = True
 # =============================================================================
 # HELPERS
 # =============================================================================
@@ -122,8 +122,8 @@ def load_symbols(strategy_id: str, timeframe: str, strategies_set_name: str) -> 
 # =============================================================================
 
 def load_ohlcv(symbol: str) -> pd.DataFrame:
-    """Load full-history OHLCV from crypto_full_IS using BTC_TIMEFRAME."""
-    return load_ohlcv_raw(symbol, BTC_TIMEFRAME)
+    """Load full-history OHLCV from crypto_full_IS using REGIME_DEFAULT_TIMEFRAME."""
+    return load_ohlcv_raw(symbol, REGIME_DEFAULT_TIMEFRAME)
 
 
 def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: str) -> dict:
@@ -217,7 +217,7 @@ def build_indicator_cache(
     for key in sorted(keys_needed, key=lambda x: x if isinstance(x, str) else f"{x[0]}_{x[1]}"):
         if key in cache:
             continue
-        sym, tf = key if isinstance(key, tuple) else (key, BTC_TIMEFRAME)
+        sym, tf = key if isinstance(key, tuple) else (key, REGIME_DEFAULT_TIMEFRAME)
         df = load_ohlcv_raw(sym, tf)
         if not df.empty:
             cache[key] = precompute_indicators(df, windows)
@@ -256,24 +256,20 @@ def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
 # =============================================================================
 
 def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -> tuple[dict, list[dict]]:
+    label = "excluding strategies with B_PROF <= 0 in any period" if FILTER_NEGATIVE_BASELINE else "including all strategies"
     print(f"\n{'='*120}")
-    print(f"  PRECOMPUTING BASELINES — excluding strategies with B_PROF <= 0 in any period")
+    print(f"  PRECOMPUTING BASELINES — {label}")
     print(f"{'='*120}")
-
     baselines: dict[str, dict] = {}
-
     for strategy in strategies_all:
         if DEBUG_TF_FILTER and strategy['timeframe'] not in DEBUG_TF_FILTER:
             continue
-
         sid            = strategy['id']
         baselines[sid] = {}
-
         for period_key in EVAL_KEYS:
             ohlcv_data = load_ohlcv_for_period(strategy, period_key, strategies_set_name)
             if not ohlcv_data:
                 continue
-
             ohlcv_arrays    = prepare_ohlcv_arrays(ohlcv_data)
             signal_cache    = {}
             baseline_arrays = {}
@@ -281,23 +277,20 @@ def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -
                 signals              = strategy['signal_fn'](arr, **strategy['signal_params'], live_trading=False)
                 signal_cache[sym]    = signals
                 baseline_arrays[sym] = {**arr, 'signal': signals}
-
             baselines[sid][period_key] = {
                 'metrics':      run_backtest(baseline_arrays, strategy['best_params']),
                 'signal_cache': signal_cache,
                 'ohlcv_arrays': ohlcv_arrays,
             }
-
         all_positive = all(
             baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
             for pk in EVAL_KEYS
         )
-        if all_positive:
+        if not FILTER_NEGATIVE_BASELINE or all_positive:
             print(f"  ✓ {sid}")
         else:
             del baselines[sid]
             print(f"  ✗ {sid}  (excluded)")
-
     strategies_filtered = [s for s in strategies_all if s['id'] in baselines]
     print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
     return baselines, strategies_filtered
@@ -336,18 +329,24 @@ def _metric_value(d: dict, key: str, dd_key: str, optimize_metric: str) -> float
     return d[key]
 
 
-def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit", classification_mode: str = "strict") -> str:
+def classify_strategy(results: dict, sid: str, optimize_metric: str = "profit", classification_mode: str = "strict", secondary_metric: str | None = None) -> str:
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
         return "neutral"
-
     t_key, r_key, b_key = _METRIC_MAP.get(optimize_metric, _METRIC_MAP["profit"])
-
     def _beats_baseline(pk: str, filt_key: str, dd_key: str) -> bool:
-        beats_metric = _metric_value(data[pk], filt_key, dd_key, optimize_metric) > _metric_value(data[pk], b_key, 'b_dd', optimize_metric)
-        beats_r2     = data[pk].get(dd_key.replace('_dd', '_r2'), 0.0) > data[pk].get('b_r2', 0.0)
-        return beats_metric or beats_r2
+        beats_primary = _metric_value(data[pk], filt_key, dd_key, optimize_metric) > _metric_value(data[pk], b_key, 'b_dd', optimize_metric)
+        if beats_primary or secondary_metric is None:
+            return beats_primary
+        
+        
+        s_t_key, s_r_key, s_b_key = _METRIC_MAP.get(secondary_metric, _METRIC_MAP["profit"])
+        s_filt_key = s_t_key if filt_key == t_key else s_r_key
+        s_dd_key   = dd_key
+        return _metric_value(data[pk], s_filt_key, s_dd_key, secondary_metric) > _metric_value(data[pk], s_b_key, 'b_dd', secondary_metric)
+    
+    
     if classification_mode == "oos1_weighted":
         oos1_ok = "OOS1" in periods_with_data
         oos23   = [pk for pk in periods_with_data if pk != "OOS1"]
@@ -608,7 +607,9 @@ def print_classification_summary(strategy_results: dict) -> None:
     print(f"  {'─'*55}\n")
 
 
-def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str, strategies_set_name: str = "E1", all_strategies: list[dict] | None = None, optimize_metric: str = "", classification_mode: str = "", mix_weights: tuple | None = None) -> None:
+def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str,
+              strategies_set_name: str = "E1", all_strategies: list[dict] | None = None, optimize_metric: str = "", 
+              classification_mode: str = "", mix_weights: tuple | None = None, secondary_metric: str | None = None) -> None:
     from datetime import datetime
     active_keys    = list(windows.keys())
     generated_at   = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
@@ -644,6 +645,8 @@ def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str
     if mix_weights and optimize_metric == "mix":
         header_lines.append(f'MIX_WEIGHT_PROFIT     = {mix_weights[0]}')
         header_lines.append(f'MIX_WEIGHT_DD         = {mix_weights[1]}')
+    if secondary_metric:
+        header_lines.append(f'CLASSIFY_SECONDARY_METRIC = "{secondary_metric}"')
     header_lines += ["", "REGIME_BINS = {"]
     all_ids     = {s['id'] for s in all_strategies} if all_strategies else set()
     missing     = all_ids - set(strategy_results.keys())

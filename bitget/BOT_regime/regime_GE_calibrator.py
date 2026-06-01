@@ -29,7 +29,7 @@ logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 logging.getLogger("shared_batch_regime.regime_GE_core").setLevel(logging.INFO)
 
-N_JOBS = -1
+N_JOBS = 1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -47,41 +47,58 @@ COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
-MIX_WEIGHT_PROFIT     = 0.5
-MIX_WEIGHT_DD         = 0.5
-OPTIMIZE_METRIC       = "calmar" # "profit" | "win_rate" | "calmar" | "mix"
-CLASSIFICATION_MODE   = "strict" # "strict" | "oos1_weighted"
+MIX_WEIGHT_PROFIT          = 0.9
+MIX_WEIGHT_DD              = 0.1
+OPTIMIZE_METRIC            = "calmar"    # "profit" | "win_rate" | "calmar" | "mix"
+CLASSIFICATION_MODE        = "strict"    # "strict" | "oos1_weighted"
+CLASSIFY_SECONDARY_METRIC  = "r2"      # None | "r2" | "profit" | "calmar"
+
 MIN_CLASSIFIED_PCT    = 0.0
-RANKING_MODE          = "n_classified"  # "weighted_delta" | "n_classified"
 RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10,40],
-        "thresholds": [0.04,0.06,0.08],
+        "windows":    [10],
+        "thresholds": [0.02,0.03,0.04,0.05],
         "enabled":    True,
     },
     "er": {
-        "windows":    [10,40],
-        "thresholds": [0.7,0.8,0.9,1.0],
-        "enabled":    True,
+        "windows":    [40],
+        "thresholds": [0.4,0.5,0.6,0.7,0.8],
+        "enabled":    False,
     },
     "hurst": {
-        "windows":    [30,50],
+        "windows":    [30],
         "thresholds": [0.5,0.6,0.7,0.8],
         "enabled":    False,
     },
     "adx": {
-        "windows":    [10,20],
+        "windows":    [10],
         "thresholds": [10,25,50],
         "enabled":    False,
     },
     "vol_regime": {
-        "windows":    [7, 10, 14],
-        "thresholds": [0.9, 1.0, 1.1],
+        "windows":    [7],
+        "thresholds": [1.0,1.1,1.2],
         "enabled":    False,
     },
 }
+
+# =============================================================================
+# INDICATORS: dict[str, dict] = {
+#     "atr_norm": {
+#         "windows":    [10],
+#         "thresholds": [0.04],
+#         "enabled":    True,
+#     },
+#     "er": {
+#         "windows":    [40],
+#         "thresholds": [0.8],
+#         "enabled":    True,
+#     },
+# 
+# }
+# =============================================================================
 
 ORDER_AMOUNT               = 80
 LONG_KEYWORD               = "long"
@@ -252,7 +269,7 @@ def _process_combo(
     results = _run_filtered_combo(baselines, strategies, indicator_cache, thresholds, mode)
     for sid in results:
         if sid != 'is_long':
-            results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE)
+            results[sid]['classification'] = classify_strategy(results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE, secondary_metric=CLASSIFY_SECONDARY_METRIC)
 
     period_summaries: dict[str, dict] = {}
     for pk in EVAL_KEYS:
@@ -406,7 +423,8 @@ def run() -> None:
         top1['thresholds'], top1['mode'],
     )
     for sid in top1_results:
-        top1_results[sid]['classification'] = classify_strategy(top1_results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE)
+        for sid in top1_results:
+            top1_results[sid]['classification'] = classify_strategy(top1_results, sid, optimize_metric=OPTIMIZE_METRIC, classification_mode=CLASSIFICATION_MODE, secondary_metric=CLASSIFY_SECONDARY_METRIC)
 
     print_consistency_table(top1_results)
     print_classification_summary(top1_results)
@@ -417,6 +435,7 @@ def run() -> None:
             optimize_metric     = OPTIMIZE_METRIC,
             classification_mode = CLASSIFICATION_MODE,
             mix_weights         = (MIX_WEIGHT_PROFIT, MIX_WEIGHT_DD) if OPTIMIZE_METRIC == "mix" else None,
+            secondary_metric    = CLASSIFY_SECONDARY_METRIC,
         )
     else:
         logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")
