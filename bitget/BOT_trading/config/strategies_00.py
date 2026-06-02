@@ -1,3 +1,4 @@
+#BOT_trading/config/strategies_00.py
 """
 Trading Strategies Configuration
 

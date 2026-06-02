@@ -602,7 +602,7 @@ def print_classification_summary(strategy_results: dict) -> None:
     for sid, data in sorted(strategy_results.items()):
         direction = "LONG" if data['is_long'] else "SHORT"
         cls       = data.get('classification', 'neutral').upper()
-        color = {'RANGING': "\033[92m", 'TRENDING': "\033[94m", 'NEUTRAL': "\033[90m"}.get(cls, "")
+        color = {'RANGING': "\033[93m", 'TRENDING': "\033[94m", 'NEUTRAL': "\033[90m"}.get(cls, "")
         print(f"  {sid:<35} {direction:<6} {color}{cls:<10}\033[0m")
     print(f"  {'─'*55}\n")
 

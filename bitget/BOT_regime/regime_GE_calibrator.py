@@ -29,7 +29,7 @@ logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 logging.getLogger("shared_batch_regime.regime_GE_core").setLevel(logging.INFO)
 
-N_JOBS = 1
+N_JOBS = -1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -43,44 +43,45 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS        = True 
-COMBINE_MODES         = ["OR"]
+COMBINE_MODES         = ["AND","OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
-MIX_WEIGHT_PROFIT          = 0.9
-MIX_WEIGHT_DD              = 0.1
+MIX_WEIGHT_PROFIT          = 0.5
+MIX_WEIGHT_DD              = 0.5
 OPTIMIZE_METRIC            = "calmar"    # "profit" | "win_rate" | "calmar" | "mix"
 CLASSIFICATION_MODE        = "strict"    # "strict" | "oos1_weighted"
-CLASSIFY_SECONDARY_METRIC  = "r2"      # None | "r2" | "profit" | "calmar"
+CLASSIFY_SECONDARY_METRIC  = "r2"        # None | "r2" | "profit" | "calmar"
 
-MIN_CLASSIFIED_PCT    = 0.0
-RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified"
+MIN_CLASSIFIED_PCT    = 0.5
+RANKING_MODE          = "weight_delta"  # "weighted_delta" | "n_classified"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
         "windows":    [10],
-        "thresholds": [0.02,0.03,0.04,0.05],
+        "thresholds": [0,0.03,0.04,0.05],
         "enabled":    True,
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0.4,0.5,0.6,0.7,0.8],
-        "enabled":    False,
+        "thresholds": [0,0.4,0.5,0.6,0.7,0.8],
+        "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
         "thresholds": [0.5,0.6,0.7,0.8],
-        "enabled":    False,
+        "enabled":    True,
     },
     "adx": {
         "windows":    [10],
-        "thresholds": [10,25,50],
-        "enabled":    False,
+        "thresholds": [0,10,25,50],
+        
+        "enabled":    True,
     },
     "vol_regime": {
         "windows":    [7],
-        "thresholds": [1.0,1.1,1.2],
-        "enabled":    False,
+        "thresholds": [0,1.0,1.1,1.2],
+        "enabled":    True,
     },
 }
 
