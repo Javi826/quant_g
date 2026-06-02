@@ -43,7 +43,7 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS        = True 
-COMBINE_MODES         = ["OR"]
+COMBINE_MODES         = ["AND","OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
