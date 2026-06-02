@@ -61,7 +61,7 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = ["BTCUSDT"]
+SELECTED_SYMBOLS   = ["PIPPINUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
 N_SYMBOLS_DOWNLOAD = 20
