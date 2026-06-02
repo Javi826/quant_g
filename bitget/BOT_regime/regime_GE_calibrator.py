@@ -51,7 +51,7 @@ MIX_WEIGHT_PROFIT          = 0.5
 MIX_WEIGHT_DD              = 0.5
 OPTIMIZE_METRIC            = "calmar"    # "profit" | "win_rate" | "calmar" | "mix"
 CLASSIFICATION_MODE        = "strict"    # "strict" | "oos1_weighted"
-CLASSIFY_SECONDARY_METRIC  = None        # None | "r2" | "profit" | "calmar"
+CLASSIFY_SECONDARY_METRIC  = "r2"        # None | "r2" | "profit" | "calmar"
 
 MIN_CLASSIFIED_PCT    = 0.0
 RANKING_MODE          = "weight_delta"  # "weighted_delta" | "n_classified"
@@ -64,24 +64,23 @@ INDICATORS: dict[str, dict] = {
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0,0.4,0.5,0.6,0.7,0.8],
+        "thresholds": [0,0.4,0.5,0.6,0.7,0.75,0.8,0.85],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
         "thresholds": [0.5,0.6,0.7,0.8],
-        "enabled":    True,
+        "enabled":    False,
     },
     "adx": {
         "windows":    [10],
-        "thresholds": [0,10,25,50],
-        
-        "enabled":    True,
+        "thresholds": [0,10,25,50],        
+        "enabled":    False,
     },
     "vol_regime": {
         "windows":    [7],
         "thresholds": [0,1.0,1.1,1.2],
-        "enabled":    True,
+        "enabled":    False,
     },
 }
 
