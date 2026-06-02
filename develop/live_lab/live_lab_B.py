@@ -8,14 +8,15 @@ import sys
 # =============================================================================
 BITGET_ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget"))
 CRYPTO_FULL_DIR  = os.path.join(BITGET_ROOT, "data_pipeline", "data", "04_split_OLD", "expanding", "IS", "crypto_full_IS")
+RAW_DIR          = os.path.join(BITGET_ROOT, "data_pipeline", "data", "01_raw")
 SYMBOLS_LIVE_DIR = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", "E1")
 
 # =============================================================================
 # SELECTED STRATEGIES — set to [] to run all active strategies
 # =============================================================================
 SELECTED_STRATEGIES = [
-    "05_reversal_long_1H",
-    "31_orderblocks_long_15m",
+    #"05_reversal_long_1H",
+   # "31_orderblocks_long_15m",
 ]
 
 # =============================================================================
@@ -115,9 +116,36 @@ def trading_get_signal(strat: dict, symbol: str) -> int:
 # HELPERS — batch pipeline signal
 # =============================================================================
 
+def load_ohlcv_from_dir(symbol: str, timeframe: str, data_dir: str) -> pd.DataFrame:
+    """Clone of load_ohlcv_raw but reading from a custom directory."""
+    path = os.path.join(data_dir, f"{symbol}_{timeframe}.parquet")
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    df = pd.read_parquet(path)
+    df.columns = [c.lower().strip() for c in df.columns]
+    if df.index.name and df.index.name.lower() in ("timestamp", "ts", "date", "time"):
+        df.index.name = "ts"
+        df = df.reset_index()
+    rename_map = {"timestamp": "ts", "open_time": "ts", "date": "ts", "time": "ts",
+                  "volume_quote": "volume", "vol": "volume"}
+    df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
+    if "volume_base" in df.columns:
+        df.drop(columns=["volume_base"], inplace=True)
+    df["ts"] = pd.to_datetime(df["ts"], errors="coerce")
+    df["ts"] = df["ts"].dt.tz_localize("UTC") if df["ts"].dt.tz is None else df["ts"].dt.tz_convert("UTC")
+    df.dropna(subset=["ts", "close"], inplace=True)
+    df.sort_values("ts", inplace=True)
+    df.drop_duplicates(subset=["ts"], keep="last", inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    for col in ("open", "high", "low", "close"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+
 def batch_get_signal(strat: dict, symbol: str) -> int:
-    """Load parquet data and compute signal on last candle. Returns 0 or 1."""
-    df = load_ohlcv_raw(symbol, strat["timeframe"])
+    """Load raw parquet data and compute signal on last candle. Returns 0 or 1."""
+    df = load_ohlcv_from_dir(symbol, strat["timeframe"], RAW_DIR)
     if df.empty:
         return -1
     key   = _signal_key(strat)
@@ -134,7 +162,10 @@ def batch_get_signal(strat: dict, symbol: str) -> int:
     }
     params  = _signal_params(strat, entry)
     signals = entry["fn"](arr, **params, live_trading=True)
-    return int(signals[-1]) if signals is not None and len(signals) > 0 else -1
+    if signals is None or len(signals) == 0:
+        return 0
+    last = int(signals[-1])
+    return 1 if last != 0 else 0
 
 
 # =============================================================================
@@ -144,14 +175,13 @@ def batch_get_signal(strat: dict, symbol: str) -> int:
 def batch_get_regime(symbol: str, signal_ts: pd.Timestamp) -> tuple:
     """Batch pipeline: precompute_indicators + lookup_indicators + is_trending.
     Returns (regime_str, ts_of_daily_candle_used)."""
-    from shared_batch_regime.regime_GE_core import load_ohlcv_raw as _load
     from config.settings import ACCOUNTS
     config     = ACCOUNTS[ACCOUNT_NUMBER]
     windows    = {k: v["window"]    for k, v in config["regime_indicators"].items() if v.get("enabled")}
     thresholds = {k: v["threshold"] for k, v in config["regime_indicators"].items() if v.get("enabled")}
     mode       = config["regime_combine_mode"]
 
-    df = _load(symbol, REGIME_TIMEFRAME)
+    df = load_ohlcv_from_dir(symbol, REGIME_TIMEFRAME, RAW_DIR)
     if df.empty:
         return "no_data", None
 
@@ -189,9 +219,11 @@ def apply_regime_filter(strat: dict, baseline_signal: int, regime: str) -> int:
 # =============================================================================
 
 def main():
-    df_test = load_ohlcv_raw("BTCUSDT", "1H")
-    print(f"CRYPTO_FULL_DIR : {CRYPTO_FULL_DIR}")
-    print(f"BTCUSDT 1H last candle in parquet: {df_test['ts'].iloc[-1]}")
+    df_test_1h = load_ohlcv_from_dir("BTCUSDT", "1H", RAW_DIR)
+    df_test_1d = load_ohlcv_from_dir("BTCUSDT", REGIME_TIMEFRAME, RAW_DIR)
+    print(f"RAW_DIR         : {RAW_DIR}")
+    print(f"BTCUSDT 1H       last candle — raw : {df_test_1h['ts'].iloc[-1]}")
+    print(f"BTCUSDT {REGIME_TIMEFRAME} last candle — raw : {df_test_1d['ts'].iloc[-1]}")
 
     strategies = [s for s in STRATEGIES if s.get("active", False)]
     if SELECTED_STRATEGIES:
@@ -221,7 +253,16 @@ def main():
             continue
 
         # Pre-fetch broker data once per strategy (reused per symbol inside detect_signals_for_strategy)
-        broker_data = fetch_ohlcv_data(symbols, timeframe)
+        broker_data   = fetch_ohlcv_data(symbols, timeframe)
+        _sample_sym   = symbols[0]
+        _df_broker_s  = broker_data.get(_sample_sym)
+        _df_raw_s     = load_ohlcv_from_dir(_sample_sym, timeframe, RAW_DIR)
+        _df_broker_r  = fetch_ohlcv_data([_sample_sym], REGIME_TIMEFRAME).get(_sample_sym)
+        _df_raw_r     = load_ohlcv_from_dir(_sample_sym, REGIME_TIMEFRAME, RAW_DIR)
+        _ts_broker_s  = normalize_live_ohlcv(_df_broker_s).index[-1] if _df_broker_s is not None and not _df_broker_s.empty else "N/A"
+        _ts_broker_r  = normalize_live_ohlcv(_df_broker_r).index[-1] if _df_broker_r is not None and not _df_broker_r.empty else "N/A"
+        _ts_raw_s     = pd.Timestamp(_df_raw_s["ts"].iloc[-1])        if not _df_raw_s.empty  else "N/A"
+        _ts_raw_r     = pd.Timestamp(_df_raw_r["ts"].iloc[-1])        if not _df_raw_r.empty  else "N/A"
 
         for symbol in symbols:
 
@@ -239,17 +280,17 @@ def main():
             reg_trading  = get_symbol_regime(symbol, timeframe) if base_trading >= 0 else "no_data"
             fin_trading  = apply_regime_filter(strat, base_trading, reg_trading)
 
-            # ── BATCH: parquet ────────────────────────────────────────────
-            df_parquet = load_ohlcv_raw(symbol, timeframe)
-            if df_parquet.empty:
-                print(f"  {sid:<30} {symbol:<14} | ⚠️  no parquet data")
+            # ── BATCH: raw ───────────────────────────────────────────────
+            df_raw = load_ohlcv_from_dir(symbol, timeframe, RAW_DIR)
+            if df_raw.empty:
+                print(f"  {sid:<30} {symbol:<14} | ⚠️  no raw data")
                 n_nodata += 1
                 continue
 
-            ts_batch              = pd.Timestamp(df_parquet["ts"].iloc[-1])
-            base_batch            = batch_get_signal(strat, symbol)
+            ts_batch                = pd.Timestamp(df_raw["ts"].iloc[-1])
+            base_batch              = batch_get_signal(strat, symbol)
             reg_batch, ts_reg_batch = batch_get_regime(symbol, ts_batch)
-            fin_batch             = apply_regime_filter(strat, base_batch, reg_batch)
+            fin_batch               = apply_regime_filter(strat, base_batch, reg_batch)
 
             # ── COMPARE ───────────────────────────────────────────────────
             if base_trading == -1 or base_batch == -1:

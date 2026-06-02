@@ -43,7 +43,7 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS        = True 
-COMBINE_MODES         = ["AND","OR"]
+COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
@@ -51,9 +51,9 @@ MIX_WEIGHT_PROFIT          = 0.5
 MIX_WEIGHT_DD              = 0.5
 OPTIMIZE_METRIC            = "calmar"    # "profit" | "win_rate" | "calmar" | "mix"
 CLASSIFICATION_MODE        = "strict"    # "strict" | "oos1_weighted"
-CLASSIFY_SECONDARY_METRIC  = "r2"        # None | "r2" | "profit" | "calmar"
+CLASSIFY_SECONDARY_METRIC  = None        # None | "r2" | "profit" | "calmar"
 
-MIN_CLASSIFIED_PCT    = 0.5
+MIN_CLASSIFIED_PCT    = 0.0
 RANKING_MODE          = "weight_delta"  # "weighted_delta" | "n_classified"
 
 INDICATORS: dict[str, dict] = {
