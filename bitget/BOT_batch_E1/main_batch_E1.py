@@ -90,11 +90,11 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED  =True
+REGIME_ENABLED  = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = False
+UPDATE_OUTPUTS  = True
 SAVE_TRADES     = False
 
 

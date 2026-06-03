@@ -59,28 +59,28 @@ RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified" "c
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
         "windows":    [10],
-        "thresholds": [0,0.03,0.04,0.05],
+        "thresholds": [0.03,0.04,0.05],
         "enabled":    True,
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0,0.4,0.5,0.6,0.7,0.8],
+        "thresholds": [0.4,0.5,0.6,0.7,0.8],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
         "thresholds": [0.5,0.6,0.7,0.8],
-        "enabled":    False,
+        "enabled":    True,
     },
     "adx": {
         "windows":    [10],
-        "thresholds": [0,10,25,50],        
-        "enabled":    False,
+        "thresholds": [10,25,50],        
+        "enabled":    True,
     },
     "vol_regime": {
         "windows":    [7],
-        "thresholds": [0,1.0,1.1,1.2],
-        "enabled":    False,
+        "thresholds": [1.4,1.5,1.6],
+        "enabled":    True,
     },
 }
 

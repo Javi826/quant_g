@@ -9,7 +9,7 @@ from typing import Optional
 logger = logging.getLogger('BOT_trading.alerts.telegram')
 
 # Telegram API credentials
-TELEGRAM_TOKEN = "8286623131:AAHvHBYKuLXukcBjtymA9BNKnVfljYYEGzg"
+TELEGRAM_TOKEN = "8962549784:AAFvrdbv0fQKW_DAGRl17k8H3muIZsJGXd4"
 TELEGRAM_CHAT_ID = "6327321903"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
