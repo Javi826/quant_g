@@ -10,7 +10,7 @@ from shared_batchs.utils.plotting import plot_best_portfolio
 
 logger = logging.getLogger("BOT_batch.runs.run_best_portfolio")
 
-
+import random
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -361,7 +361,119 @@ def _print_best_combinations(
 
     logger.info(f"\n{'─'*W}")
 
+# =============================================================================
+# BOOTSTRAP RANKING
+# =============================================================================
 
+N_BOOTSTRAP     = 200
+TOP_N_BOOTSTRAP = 2
+
+
+def _bootstrap_ranking(
+    df_scored       : pd.DataFrame,
+    subperiods      : list,
+    initial_balance : float,
+    ranking_criteria: list,
+    n_iterations    : int = N_BOOTSTRAP,
+    top_n           : int = TOP_N_BOOTSTRAP,
+) -> pd.DataFrame:
+    """
+    Bootstrap the combo ranking reusing precomputed subperiod_scores.
+    Drops one random subperiod per iteration and re-ranks by weighted average.
+    Adds `rank1_rate` column: fraction of iterations each combo was #1.
+    """
+    primary_key  = ranking_criteria[0][0]
+    primary_asc  = ranking_criteria[0][1]
+    rank1_counts = {}
+
+    # Build subperiod weight map: key = "PERIOD_splitlabel"
+    subperiod_weights = {
+        f"{period}_{split_label}": split_weight
+        for period, split_label, _, split_weight in subperiods
+    }
+    all_subperiod_keys = list(subperiod_weights.keys())
+
+    # Pre-extract scores per combo: {combo: {"OOS1_M1": 65.2, ...}}
+    combo_scores = {}
+    for _, row in df_scored.iterrows():
+        combo_scores[row["combo"]] = row.get("subperiod_scores", {})
+
+    for _ in range(n_iterations):
+        if len(all_subperiod_keys) < 2:
+            break
+
+        drop_key        = random.choice(all_subperiod_keys)
+        reduced_weights = {k: v for k, v in subperiod_weights.items() if k != drop_key}
+
+        records = []
+        for combo, scores in combo_scores.items():
+            total_weight    = 0.0
+            weighted_metric = 0.0
+
+            for key, weight in reduced_weights.items():
+                val = scores.get(key, np.nan)
+                if not np.isnan(val):
+                    weighted_metric += val * weight
+                    total_weight    += weight
+
+            if total_weight == 0:
+                continue
+
+            records.append({"combo": combo, primary_key: round(weighted_metric / total_weight, 3)})
+
+        if not records:
+            continue
+
+        df_iter = pd.DataFrame(records).sort_values(primary_key, ascending=primary_asc).reset_index(drop=True)
+        winner  = df_iter.iloc[0]["combo"]
+        rank1_counts[winner] = rank1_counts.get(winner, 0) + 1
+
+    df_out               = df_scored.copy()
+    df_out["rank1_rate"] = df_out["combo"].map(
+        lambda c: round(rank1_counts.get(c, 0) / n_iterations * 100, 1)
+    )
+    df_out = df_out.sort_values("rank1_rate", ascending=False).reset_index(drop=True)
+
+    _print_bootstrap_ranking(df_out, top_n, n_iterations, ranking_criteria)
+    return df_out
+
+
+def _print_bootstrap_ranking(
+    df_scored       : pd.DataFrame,
+    top_n           : int,
+    n_iterations    : int,
+    ranking_criteria: list,
+) -> None:
+    W            = 115
+    primary_key  = ranking_criteria[0][0]
+    metric_str   = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
+    top          = df_scored.head(top_n)
+    n_ever_first = (df_scored["rank1_rate"] > 0).sum()
+
+    logger.info(f"\n\033[94m{'='*W}")
+    logger.info(f"  BOOTSTRAP RANKING — {n_iterations} iterations | drop-one-subperiod | ranked by: rank1_rate")
+    logger.info(f"  Base criteria: {metric_str}")
+    logger.info(f"  Combos that were #1 at least once: {n_ever_first} / {len(df_scored)}")
+    logger.info(f"{'='*W}\033[0m")
+
+    for rank, (_, row) in enumerate(top.iterrows(), start=1):
+        combo       = row["combo"]
+        rank1_rate  = row["rank1_rate"]
+        primary_val = row.get(primary_key, np.nan)
+        std         = row.get("subperiod_std", np.nan)
+        mn          = row.get("subperiod_min",  np.nan)
+        stability   = "🟢 STABLE" if rank1_rate >= 50 else ("🟡 MODERATE" if rank1_rate >= 25 else "🔴 FRAGILE")
+
+        logger.info(f"\nRANK #{rank}  —  rank1_rate={rank1_rate:.1f}%  {stability}  |  {primary_key}={primary_val:.2f}  std={std:.1f}  min={mn:.1f}")
+        logger.info(f"{'─'*W}")
+        for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
+            icon = "🟢" if "_long_" in s else "🔴"
+            logger.info(f"    {icon} {s}")
+
+    logger.info(f"\n{'─'*W}")
+    logger.info(f"  NOTE: rank1_rate ≥ 50% → robust to subperiod removal")
+    logger.info(f"        rank1_rate < 25% → selection driven by specific subperiods (fragile)")
+    logger.info(f"{'─'*W}\n")
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
@@ -453,5 +565,13 @@ def find_best_portfolio_combination(
         ranking_criteria  = ranking_criteria, # añadir esto
         show_plots        = show_plots,
     )
-        
+    
+    df_scored = _bootstrap_ranking(
+        df_scored        = df_scored,
+        subperiods       = subperiods,
+        initial_balance  = initial_balance,
+        ranking_criteria = ranking_criteria,
+    )
+
     return top
+        

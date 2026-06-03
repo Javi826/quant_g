@@ -60,6 +60,7 @@ def calc_vol_regime(
     if atr_l == 0:
         return np.nan
     return float(np.clip(atr_s / atr_l, 0.0, 10.0))
+
 def calc_atr_norm(
     high:   np.ndarray,
     low:    np.ndarray,

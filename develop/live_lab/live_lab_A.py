@@ -1,230 +1,211 @@
 """
-validate_regime.py
-------------------
-Validates that regime classification produces identical results
-between the batch pipeline and the trading pipeline.
+Production vs Batch trade comparison tool.
 
-For each trade in the Excel:
-  - Loads OHLCV from disk (CRYPTO_FULL_DIR, 1Dutc timeframe)
-  - Classifies regime using BATCH functions  (precompute_indicators + lookup_indicators + is_trending)
-  - Classifies regime using TRADING functions (_calc_metrics_from_arr + _is_trending)
-  - Compares and prints result
+Compares trade metrics between live production trades (xlsx) and batch backtest
+trades (csv) over a configurable time window and strategy selection.
 """
 
 import os
-import sys
-
-# =============================================================================
-# PATHS — adjust if needed
-# =============================================================================
-BITGET_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget"))
-TRADES_XLSX    = os.path.join(BITGET_ROOT, "BOT_trading", "persistence", "bot_files_00", "bot_trades_00.xlsx")
-CRYPTO_FULL_DIR = os.path.join(BITGET_ROOT, "data_pipeline", "data", "04_split_OLD", "expanding", "IS", "crypto_full_IS")
-
-# Add shared paths — order matters: signals must be before shared_batchs loads
-SIGNALS_DIR             = os.path.join(BITGET_ROOT, "signals")
-SHARED_DIR              = os.path.join(BITGET_ROOT, "shared")
-SHARED_BATCH_REGIME_DIR = os.path.join(BITGET_ROOT, "shared", "shared_batch_regime")
-SHARED_TRADING_DIR      = os.path.join(BITGET_ROOT, "shared", "shared_trading_batch_regime")
-SHARED_BATCHS_DIR       = os.path.join(BITGET_ROOT, "shared", "shared_batchs")
-BOT_TRADING_DIR         = os.path.join(BITGET_ROOT, "BOT_trading")
-
-for p in [SIGNALS_DIR, SHARED_DIR, SHARED_BATCH_REGIME_DIR, SHARED_TRADING_DIR, SHARED_BATCHS_DIR, BOT_TRADING_DIR]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
-# Force signals into sys.modules so nested imports from shared_batchs find it
-import importlib.util as _ilu
-for _mod, _path in [
-    ("signals", os.path.join(SIGNALS_DIR, "__init__.py")),
-]:
-    if _mod not in sys.modules:
-        _spec = _ilu.spec_from_file_location(_mod, _path)
-        _m    = _ilu.module_from_spec(_spec)
-        sys.modules[_mod] = _m
-        _spec.loader.exec_module(_m)
-
-# =============================================================================
-# ACCOUNT CONFIG — trading pipeline params (from settings.py ACCOUNTS["E1"])
-# =============================================================================
-ACCOUNT_CONFIG = {
-    "regime_indicators": {
-        "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
-        "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
-    },
-    "regime_combine_mode":   "OR",
-    "regime_analysis_mode":  "SYMBOL",
-    "regime_timeframe_mode": "DAILY",
-}
-
-REGIME_TIMEFRAME = "1Dutc"
-
-# =============================================================================
-# IMPORTS
-# =============================================================================
+import glob
+import logging
 import numpy as np
 import pandas as pd
 
-# Batch imports
-from regime_GE_core import precompute_indicators, lookup_indicators, is_trending, load_ohlcv_raw
-
-# Trading imports
-from regime_metrics import _CALC_FN
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("live_lab.compare")
 
 # =============================================================================
-# HELPERS — trading pipeline (mirrors regime_classifier.py)
+# CONFIGURATION
 # =============================================================================
 
-def _active_windows() -> dict:
-    return {k: v["window"] for k, v in ACCOUNT_CONFIG["regime_indicators"].items() if v.get("enabled")}
+PRODUCTION_XLSX = os.path.expanduser(
+    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
+)
+BATCH_TRADES_DIR = os.path.expanduser(
+    "~/projects/quant/quant_b/develop/brief_trades"
+)
 
-def _active_thresholds() -> dict:
-    return {k: v["threshold"] for k, v in ACCOUNT_CONFIG["regime_indicators"].items() if v.get("enabled")}
+# Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
+OOS_PERIOD  = "oos3"       # "oos1" | "oos2" | "oos3"
+BATCH_MODE  = "baseline"   # "baseline" | "regime"
 
-def trading_calc_metrics(arr: dict) -> dict:
-    """Mirrors _calc_metrics_from_arr in regime_classifier.py."""
-    windows = _active_windows()
-    high    = arr["high"]
-    low     = arr["low"]
-    close   = arr["close"]
-    metrics = {}
-    for key, w in windows.items():
-        val = _CALC_FN[key](high, low, close, w)
-        metrics[key] = float(val) if not np.isnan(val) else None
-    return metrics
+# Time window filter (None = no filter)
+DATE_FROM = "2025-01-01"
+DATE_TO   = "2025-12-31"
 
-def trading_is_trending(metrics: dict) -> bool:
-    """Mirrors _is_trending in regime_classifier.py."""
-    thresholds = _active_thresholds()
-    mode       = ACCOUNT_CONFIG["regime_combine_mode"]
-    signals    = []
-    for key, val in metrics.items():
-        if val is None or np.isnan(val):
+# Set to [] to compare all available strategies
+SELECTED_STRATEGIES = [
+    "05_reversal_long_1H",
+    "26_flag_short_1H",
+]
+
+# =============================================================================
+# LOADERS
+# =============================================================================
+
+def load_production(path: str) -> pd.DataFrame:
+    df = pd.read_excel(path)
+    df.columns = [c.strip().upper() for c in df.columns]
+    df["OPEN_AT"]  = pd.to_datetime(df["OPEN_AT"],  errors="coerce", utc=True)
+    df["CLOSE_AT"] = pd.to_datetime(df["CLOSE_AT"], errors="coerce", utc=True)
+    df = df.rename(columns={
+        "OPEN_AT":   "buy_time",
+        "CLOSE_AT":  "sell_time",
+        "STRATEGY":  "strategy",
+        "SYMBOL":    "symbol",
+        "PROFIT":    "profit",
+    })
+    df["profit"] = pd.to_numeric(df["profit"], errors="coerce")
+    return df[["buy_time", "sell_time", "strategy", "symbol", "profit"]].dropna(subset=["buy_time"])
+
+
+def load_batch(trades_dir: str, oos_period: str, mode: str, strategy_ids: list[str]) -> pd.DataFrame:
+    frames = []
+    pattern = os.path.join(trades_dir, f"trades_{oos_period}_{mode}_*.csv")
+    for path in glob.glob(pattern):
+        fname    = os.path.basename(path)
+        # Extract strategy_id from filename: trades_{period}_{mode}_{strategy_id}.csv
+        prefix   = f"trades_{oos_period}_{mode}_"
+        strat_id = fname.replace(prefix, "").replace(".csv", "")
+        if strategy_ids and strat_id not in strategy_ids:
             continue
-        signals.append(val >= thresholds[key])
-    if not signals:
-        return False
-    return all(signals) if mode == "AND" else any(signals)
+        try:
+            df = pd.read_csv(path)
+            df["strategy"] = strat_id
+            frames.append(df)
+        except Exception as e:
+            logger.warning(f"  ⚠️  Could not read {fname}: {e}")
 
-def trading_classify(metrics: dict) -> str:
-    if not metrics or all(v is None for v in metrics.values()):
-        return "neutral"
-    return "trending" if trading_is_trending(metrics) else "ranging"
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
+    df["buy_time"]  = pd.to_datetime(df["buy_time"],  errors="coerce", utc=True)
+    df["sell_time"] = pd.to_datetime(df["sell_time"], errors="coerce", utc=True)
+    df["profit"]    = pd.to_numeric(df["profit"],     errors="coerce")
+    return df[["buy_time", "sell_time", "strategy", "symbol", "profit"]].dropna(subset=["buy_time"])
+
 
 # =============================================================================
-# HELPERS — batch pipeline
+# FILTERS
 # =============================================================================
 
-def batch_classify(symbol: str, open_at: pd.Timestamp) -> str:
-    """Classify regime using batch pipeline functions."""
-    windows    = _active_windows()
-    thresholds = _active_thresholds()
-    mode       = ACCOUNT_CONFIG["regime_combine_mode"]
+def apply_filters(
+    df:           pd.DataFrame,
+    date_from:    str | None,
+    date_to:      str | None,
+    strategy_ids: list[str],
+) -> pd.DataFrame:
+    if date_from:
+        df = df[df["buy_time"] >= pd.Timestamp(date_from, tz="UTC")]
+    if date_to:
+        df = df[df["buy_time"] <= pd.Timestamp(date_to,   tz="UTC")]
+    if strategy_ids:
+        df = df[df["strategy"].isin(strategy_ids)]
+    return df.copy()
 
-    df = load_ohlcv_raw(symbol, REGIME_TIMEFRAME)
+
+# =============================================================================
+# METRICS
+# =============================================================================
+
+def compute_metrics(df: pd.DataFrame) -> dict:
     if df.empty:
-        return "no_data"
-
-    ts_arr, values_arr = precompute_indicators(df, windows)
-    if len(ts_arr) == 0:
-        return "no_data"
-
-    indicator_values = lookup_indicators(ts_arr, values_arr, open_at, timeframe=REGIME_TIMEFRAME)
-    if all(v is None for v in indicator_values.values()):
-        return "no_data"
-
-    trending = is_trending(indicator_values, thresholds, mode)
-    return "trending" if trending else "ranging"
-
-# =============================================================================
-# HELPERS — trading pipeline (full fetch from disk, mirrors get_symbol_regime)
-# =============================================================================
-
-def trading_classify_from_disk(symbol: str, open_at: pd.Timestamp) -> str:
-    """
-    Classify regime using trading pipeline functions.
-    Fetches the full 1Dutc series up to open_at, takes the last candle.
-    """
-    df = load_ohlcv_raw(symbol, REGIME_TIMEFRAME)
-    if df.empty:
-        return "no_data"
-
-    # Use only candles available at signal time (same as live: latest candle)
-    open_at_utc = open_at.tz_localize("UTC") if open_at.tzinfo is None else open_at
-    df_at_time  = df[df["ts"] < open_at_utc]
-    if df_at_time.empty:
-        return "no_data"
-
-    arr = {
-        "high":  df_at_time["high"].values,
-        "low":   df_at_time["low"].values,
-        "close": df_at_time["close"].values,
+        return {"n_trades": 0, "win_rate": np.nan, "total_profit": np.nan}
+    n      = len(df)
+    wins   = (df["profit"] > 0).sum()
+    return {
+        "n_trades":     n,
+        "win_rate":     round(wins / n * 100, 1),
+        "total_profit": round(df["profit"].sum(), 2),
     }
-    metrics = trading_calc_metrics(arr)
-    return trading_classify(metrics)
+
+
+# =============================================================================
+# REPORT
+# =============================================================================
+
+def print_report(
+    results:    list[dict],
+    oos_period: str,
+    batch_mode: str,
+    date_from:  str | None,
+    date_to:    str | None,
+) -> None:
+    period_str = f"{date_from or '—'} → {date_to or '—'}"
+    logger.info(f"\n{'='*110}")
+    logger.info(f"  PRODUCTION vs BATCH COMPARISON")
+    logger.info(f"  Period     : {period_str}")
+    logger.info(f"  Batch      : {oos_period.upper()} | {batch_mode}")
+    logger.info(f"{'='*110}")
+    logger.info(
+        f"  {'STRATEGY':<32} "
+        f"{'N_TR prod':>9} {'N_TR btch':>9} {'Δ':>6} | "
+        f"{'WR% prod':>9} {'WR% btch':>9} {'Δ':>6} | "
+        f"{'PNL prod':>10} {'PNL btch':>10} {'Δ':>8}"
+    )
+    logger.info(f"  {'-'*105}")
+
+    for r in results:
+        p  = r["prod"]
+        b  = r["batch"]
+        sid = r["strategy_id"]
+
+        dn = (b["n_trades"]     - p["n_trades"])     if (p["n_trades"] and b["n_trades"])         else None
+        dw = round(b["win_rate"]     - p["win_rate"], 1) if not (np.isnan(p["win_rate"])  or np.isnan(b["win_rate"]))  else None
+        dp = round(b["total_profit"] - p["total_profit"], 2) if not (np.isnan(p["total_profit"]) or np.isnan(b["total_profit"])) else None
+
+        def _fmt(val, fmt=".1f"):
+            return f"{val:{fmt}}" if val is not None and not (isinstance(val, float) and np.isnan(val)) else "—"
+
+        def _delta(val, fmt=".1f"):
+            if val is None:
+                return "—"
+            sign = "+" if val > 0 else ""
+            return f"{sign}{val:{fmt}}"
+
+        logger.info(
+            f"  {sid:<32} "
+            f"{_fmt(p['n_trades'], 'd'):>9} {_fmt(b['n_trades'], 'd'):>9} {_delta(dn, 'd'):>6} | "
+            f"{_fmt(p['win_rate']):>9} {_fmt(b['win_rate']):>9} {_delta(dw):>6} | "
+            f"{_fmt(p['total_profit'], '.2f'):>10} {_fmt(b['total_profit'], '.2f'):>10} {_delta(dp, '.2f'):>8}"
+        )
+
+    logger.info(f"  {'='*105}\n")
+
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
-def main():
-    print(f"\n{'='*80}")
-    print(f"  REGIME VALIDATION — Batch vs Trading pipeline")
-    print(f"  Indicators : {list(_active_windows().keys())}")
-    print(f"  Windows    : {_active_windows()}")
-    print(f"  Thresholds : {_active_thresholds()}")
-    print(f"  Mode       : {ACCOUNT_CONFIG['regime_combine_mode']}")
-    print(f"  Timeframe  : {REGIME_TIMEFRAME}")
-    print(f"{'='*80}\n")
+def main() -> None:
+    strategy_ids = SELECTED_STRATEGIES or []
 
-    df_trades = pd.read_excel(TRADES_XLSX)
-    df_trades.columns = [c.strip().upper() for c in df_trades.columns]
+    logger.info("  Loading production trades...")
+    df_prod  = load_production(PRODUCTION_XLSX)
+    df_prod  = apply_filters(df_prod,  DATE_FROM, DATE_TO, strategy_ids)
 
-    required = {"OPEN_AT", "SYMBOL", "STRATEGY"}
-    missing  = required - set(df_trades.columns)
-    if missing:
-        print(f"ERROR: missing columns in Excel: {missing}")
-        print(f"Available columns: {list(df_trades.columns)}")
+    logger.info("  Loading batch trades...")
+    df_batch = load_batch(BATCH_TRADES_DIR, OOS_PERIOD, BATCH_MODE, strategy_ids)
+    df_batch = apply_filters(df_batch, DATE_FROM, DATE_TO, strategy_ids)
+
+    all_strategies = sorted(
+        set(df_prod["strategy"].unique()) | set(df_batch["strategy"].unique())
+    )
+    if not all_strategies:
+        logger.warning("  ⚠️  No trades found for the given filters.")
         return
 
-    df_trades["OPEN_AT"] = pd.to_datetime(df_trades["OPEN_AT"], utc=True, errors="coerce")
-    df_trades = df_trades.dropna(subset=["OPEN_AT", "SYMBOL"])
+    results = []
+    for sid in all_strategies:
+        results.append({
+            "strategy_id": sid,
+            "prod":        compute_metrics(df_prod[df_prod["strategy"]   == sid]),
+            "batch":       compute_metrics(df_batch[df_batch["strategy"] == sid]),
+        })
 
-    print(f"  Trades to validate: {len(df_trades)}\n")
-    print(f"  {'#':<5} {'STRATEGY':<30} {'SYMBOL':<14} {'OPEN_AT':<22} {'BATCH':<10} {'TRADING':<10} {'MATCH'}")
-    print(f"  {'-'*95}")
+    print_report(results, OOS_PERIOD, BATCH_MODE, DATE_FROM, DATE_TO)
 
-    n_match    = 0
-    n_mismatch = 0
-    n_nodata   = 0
-
-    for i, row in df_trades.iterrows():
-        symbol      = str(row["SYMBOL"]).strip()
-        open_at     = row["OPEN_AT"]
-        strategy_id = str(row["STRATEGY"]).strip()
-
-        batch_regime   = batch_classify(symbol, open_at)
-        trading_regime = trading_classify_from_disk(symbol, open_at)
-
-        if "no_data" in (batch_regime, trading_regime):
-            match_str = "⚠️  NO DATA"
-            n_nodata += 1
-        elif batch_regime == trading_regime:
-            match_str = "✅ MATCH"
-            n_match += 1
-        else:
-            match_str = "❌ MISMATCH"
-            n_mismatch += 1
-
-        print(f"  {i+1:<5} {strategy_id:<30} {symbol:<14} {str(open_at)[:19]:<22} "
-              f"{batch_regime:<10} {trading_regime:<10} {match_str}")
-
-    total = n_match + n_mismatch + n_nodata
-    print(f"\n  {'-'*95}")
-    print(f"  RESULTS: {total} trades | ✅ {n_match} match | ❌ {n_mismatch} mismatch | ⚠️  {n_nodata} no data")
-    pct = n_match / (n_match + n_mismatch) * 100 if (n_match + n_mismatch) > 0 else 0
-    print(f"  Match rate: {pct:.1f}%")
-    print(f"{'='*80}\n")
 
 if __name__ == "__main__":
     main()

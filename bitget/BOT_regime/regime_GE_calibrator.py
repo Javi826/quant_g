@@ -49,12 +49,12 @@ REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
 MIX_WEIGHT_PROFIT          = 0.5
 MIX_WEIGHT_DD              = 0.5
-OPTIMIZE_METRIC            = "calmar"    # "profit" | "win_rate" | "calmar" | "mix"
-CLASSIFICATION_MODE        = "strict"    # "strict" | "oos1_weighted"
-CLASSIFY_SECONDARY_METRIC  = "r2"        # None | "r2" | "profit" | "calmar"
+OPTIMIZE_METRIC            = "calmar"     # "profit" | "win_rate" | "calmar" | "mix"
+CLASSIFICATION_MODE        = "strict"     # "strict" | "oos1_weighted"
+CLASSIFY_SECONDARY_METRIC  = "r2"         # None | "r2" | "profit" | "calmar"
 
 MIN_CLASSIFIED_PCT    = 0.0
-RANKING_MODE          = "weight_delta"  # "weighted_delta" | "n_classified"
+RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified" "combo_delta"
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
@@ -64,7 +64,7 @@ INDICATORS: dict[str, dict] = {
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0,0.4,0.5,0.6,0.7,0.75,0.8,0.85],
+        "thresholds": [0,0.4,0.5,0.6,0.7,0.8],
         "enabled":    True,
     },
     "hurst": {
@@ -103,7 +103,6 @@ INDICATORS: dict[str, dict] = {
 ORDER_AMOUNT               = 80
 LONG_KEYWORD               = "long"
 DEBUG_TF_FILTER: list[str] = []
-
 
 # =============================================================================
 # GRID BUILDER
@@ -405,10 +404,20 @@ def run() -> None:
         logger.info(f"\n  ⚠️  No combos passed MIN_CLASSIFIED_PCT={MIN_CLASSIFIED_PCT} — showing full ranking.")
         ranking_filtered = ranking
     
+# =============================================================================
+#     if RANKING_MODE == "n_classified":
+#         ranking_filtered.sort(key=lambda x: x['n_ranging'] + x['n_trending'], reverse=True)
+#     else:
+#         ranking_filtered.sort(key=lambda x: x['weighted_delta'], reverse=True)
+#         
+# =============================================================================
     if RANKING_MODE == "n_classified":
         ranking_filtered.sort(key=lambda x: x['n_ranging'] + x['n_trending'], reverse=True)
+    elif RANKING_MODE == "combo_delta":
+        ranking_filtered.sort(key=lambda x: pct_improvement(x['combined_profit'], x['baseline_profit']), reverse=True)
     else:
         ranking_filtered.sort(key=lambda x: x['weighted_delta'], reverse=True)
+        
     print_ranking(ranking_filtered, active_keys)
 
     # =========================================================================
