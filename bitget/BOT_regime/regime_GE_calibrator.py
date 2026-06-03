@@ -70,17 +70,17 @@ INDICATORS: dict[str, dict] = {
     "hurst": {
         "windows":    [30],
         "thresholds": [0.5,0.6,0.7,0.8],
-        "enabled":    True,
+        "enabled":    False,
     },
     "adx": {
         "windows":    [10],
         "thresholds": [10,25,50],        
-        "enabled":    True,
+        "enabled":    False,
     },
     "vol_regime": {
         "windows":    [7],
         "thresholds": [1.4,1.5,1.6],
-        "enabled":    True,
+        "enabled":    False,
     },
 }
 

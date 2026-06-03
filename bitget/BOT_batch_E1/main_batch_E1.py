@@ -82,6 +82,10 @@ OOS_NETGAIN_TH       = 19
 OOS_MAX_DD_TH        = 15
 OOS_R2_TH            = 0.43
 
+OOS_NETGAIN_TH       = 28
+OOS_MAX_DD_TH        = 14
+OOS_R2_TH            = 0.47
+
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
@@ -94,7 +98,7 @@ REGIME_ENABLED  = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = True
+UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
 
