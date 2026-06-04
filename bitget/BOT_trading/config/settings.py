@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 28000,
+        "initial_capital": 40000,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -124,7 +124,7 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 80
-MAX_ORDER_AMOUNT = 540
+MAX_ORDER_AMOUNT = 800
 
 # TP/SL limits (%)
 MIN_TP_PCT = 2

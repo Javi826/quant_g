@@ -295,7 +295,53 @@ def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -
     print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
     return baselines, strategies_filtered
 
-
+def precompute_baselines_00(strategies_all: list[dict], strategies_set_name: str) -> tuple[dict, list[dict]]:
+    label = "excluding strategies with B_PROF <= 0 in any period" if FILTER_NEGATIVE_BASELINE else "including all strategies"
+    print(f"\n{'='*120}")
+    print(f"  PRECOMPUTING BASELINES — {label}")
+    print(f"{'='*120}")
+    baselines: dict[str, dict] = {}
+    for strategy in strategies_all:
+        if DEBUG_TF_FILTER and strategy['timeframe'] not in DEBUG_TF_FILTER:
+            continue
+        sid            = strategy['id']
+        baselines[sid] = {}
+        for period_key in EVAL_KEYS:
+            ohlcv_data = load_ohlcv_for_period(strategy, period_key, strategies_set_name)
+            if not ohlcv_data:
+                continue
+            ohlcv_arrays    = prepare_ohlcv_arrays(ohlcv_data)
+            signal_cache    = {}
+            baseline_arrays = {}
+            for sym, arr in ohlcv_arrays.items():
+                signals              = strategy['signal_fn'](arr, **strategy['signal_params'], live_trading=False)
+                signal_cache[sym]    = signals
+                baseline_arrays[sym] = {**arr, 'signal': signals}
+            baselines[sid][period_key] = {
+                'metrics':      run_backtest(baseline_arrays, strategy['best_params']),
+                'signal_cache': signal_cache,
+                'ohlcv_arrays': ohlcv_arrays,
+            }
+        all_positive = all(
+            baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
+            for pk in EVAL_KEYS
+        )
+        # --- OPTIONAL STRICT FILTER ---
+        all_positive = all_positive and all(
+            baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) >= 19
+            and baselines[sid].get(pk, {}).get('metrics', {}).get('max_dd', 0.0) >= -20
+            and baselines[sid].get(pk, {}).get('metrics', {}).get('r2', 0.0) >= 0.40
+            for pk in EVAL_KEYS
+        )
+        # --- END OPTIONAL STRICT FILTER ---
+        if not FILTER_NEGATIVE_BASELINE or all_positive:
+            print(f"  ✓ {sid}")
+        else:
+            del baselines[sid]
+            print(f"  ✗ {sid}  (excluded)")
+    strategies_filtered = [s for s in strategies_all if s['id'] in baselines]
+    print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
+    return baselines, strategies_filtered
 # =============================================================================
 # CLASSIFICATION
 # =============================================================================

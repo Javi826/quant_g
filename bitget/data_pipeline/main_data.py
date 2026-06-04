@@ -64,7 +64,7 @@ EXPORT_CSV = False
 SELECTED_SYMBOLS   = ["PIPPINUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
-N_SYMBOLS_DOWNLOAD = 20
+N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        

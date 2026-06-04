@@ -27,11 +27,11 @@ BATCH_TRADES_DIR = os.path.expanduser(
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
 OOS_PERIOD  = "oos3"       # "oos1" | "oos2" | "oos3"
-BATCH_MODE  = "baseline"   # "baseline" | "regime"
+BATCH_MODE  = "regime"   # "baseline" | "regime"
 
 # Time window filter (None = no filter)
-DATE_FROM = "2025-01-01"
-DATE_TO   = "2025-12-31"
+DATE_FROM = "2026-05-29"
+DATE_TO   = "2026-06-03"
 
 # Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
@@ -173,11 +173,9 @@ def print_report(
 
     logger.info(f"  {'='*105}\n")
 
-
 # =============================================================================
 # MAIN
 # =============================================================================
-
 def main() -> None:
     strategy_ids = SELECTED_STRATEGIES or []
 
@@ -205,7 +203,6 @@ def main() -> None:
         })
 
     print_report(results, OOS_PERIOD, BATCH_MODE, DATE_FROM, DATE_TO)
-
 
 if __name__ == "__main__":
     main()
