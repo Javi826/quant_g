@@ -17,6 +17,7 @@ import random
 REQUIRE_LONG_SHORT = True
 MIN_STRATEGIES     = 2
 MAX_STRATEGIES     = 5
+SELECTION_MODE     = "weighted"  # "weighted" | "ranking"
 
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
@@ -38,7 +39,7 @@ RANKING_CRITERIA = [
 # =============================================================================
 
 TOP_N    = 2
-N_SPLITS = 12  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
+N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
 
 # Label prefix per n_splits value
 _SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
@@ -216,7 +217,84 @@ def _compute_period_metrics(
 # =============================================================================
 # PRIVATE HELPERS — Weighted scoring
 # =============================================================================
+def _compute_ranking_scores(
+    combos: list[tuple],
+    subperiods: list[tuple],
+    initial_balance: float,
+    ranking_criteria: list[tuple[str, bool]],
+) -> pd.DataFrame:
+    """
+    For each combo, compute primary metric in each subperiod, rank all combos
+    within each subperiod, then compute weighted average rank.
+    Weight = period_weight / n_splits → OOS1 ranks count more if weight is higher.
+    Lower weighted_avg_rank = more consistent combo.
+    Parallelized over combos using joblib.
+    """
+    from joblib import Parallel, delayed
 
+    primary_key   = ranking_criteria[0][0]
+    primary_asc   = ranking_criteria[0][1]  # True = lower is better
+    subperiod_keys = [f"{p}_{q}" for p, q, _, _ in subperiods]
+    weights        = {f"{p}_{q}": w for p, q, _, w in subperiods}
+
+    # Step 1 — compute primary metric for all combos in all subperiods
+    def _score_combo(combo: tuple) -> dict | None:
+        row = {"combo": combo}
+        for period, split_label, split_trades, _ in subperiods:
+            key = f"{period}_{split_label}"
+            m   = _compute_subperiod_metrics(combo, split_trades, initial_balance)
+            row[key] = m.get(primary_key, np.nan) if m is not None else np.nan
+        return row
+
+    results = Parallel(n_jobs=-1)(
+        delayed(_score_combo)(combo) for combo in combos
+    )
+    records = [r for r in results if r is not None]
+    if not records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(records)
+
+    # Step 2 — rank combos within each subperiod using numpy lexsort
+    rank_cols = []
+    for key in subperiod_keys:
+        rank_col     = f"rank_{key}"
+        col_vals     = df[key].fillna(-np.inf if not primary_asc else np.inf).values
+        order        = np.argsort(col_vals)[::-1] if not primary_asc else np.argsort(col_vals)
+        ranks        = np.empty(len(df), dtype=int)
+        ranks[order] = np.arange(1, len(df) + 1)
+        df[rank_col] = ranks
+        rank_cols.append(rank_col)
+
+    # Step 3 — weighted average rank
+    total_weight        = sum(weights[key] for key in subperiod_keys)
+    df["weighted_rank"] = sum(df[f"rank_{key}"] * weights[key] for key in subperiod_keys) / total_weight
+
+    # Step 4 — rank variance as stability tiebreaker
+    df["rank_variance"] = df[[f"rank_{key}" for key in subperiod_keys]].var(axis=1)
+
+    # Step 5 — subperiod scores for reporting (primary metric values)
+    df["subperiod_scores"] = df.apply(
+        lambda row: {key: row[key] for key in subperiod_keys}, axis=1
+    )
+    df["subperiod_std"] = df[subperiod_keys].std(axis=1).round(2)
+    df["subperiod_min"] = df[subperiod_keys].min(axis=1).round(1)
+    df["subperiod_max"] = df[subperiod_keys].max(axis=1).round(1)
+    df["Weekly_std"]    = df["subperiod_std"]
+
+    # Add primary metric weighted value for reporting
+    df[primary_key] = df[subperiod_keys].apply(
+        lambda row: sum(row[key] * weights[key] for key in subperiod_keys
+                        if not np.isnan(row[key])) / total_weight,
+        axis=1
+    ).round(3)
+
+    return (
+        df[["combo", "weighted_rank", "rank_variance", "subperiod_scores",
+            "subperiod_std", "subperiod_min", "subperiod_max", "Weekly_std", primary_key]]
+        .sort_values(["weighted_rank", "rank_variance"])
+        .reset_index(drop=True)
+    )
 
 def _compute_weighted_scores(
     combos: list[tuple],
@@ -285,15 +363,16 @@ def _print_best_combinations(
     n_splits: int,
     ranking_criteria: list[tuple[str, bool]],
     validation_results: list = None,
+    selection_mode: str = "weighted",
 ) -> None:
     W          = 115
     split_name = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
+    mode_str   = "Ranking (avg position)" if selection_mode == "ranking" else "Weighted metrics"
 
-    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | ranked by: {metric_str}\n{'='*W}\033[0m")
+    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | mode: {mode_str} | ranked by: {metric_str}\n{'='*W}\033[0m")
     primary_key = ranking_criteria[0][0]
 
-    # Build validation lookup: {strategy_id: {field: value}}
     val_lookup = {}
     if validation_results:
         for v in validation_results:
@@ -306,10 +385,16 @@ def _print_best_combinations(
         std              = entry.get("subperiod_std", np.nan)
         mn               = entry.get("subperiod_min",  np.nan)
         mx               = entry.get("subperiod_max",  np.nan)
+        avg_trades       = np.mean([len(df) for sid, df in trades_per_period.get("OOS1", []) if sid in combo])
+
+        if selection_mode == "ranking":
+            weighted_rank  = entry.get("weighted_rank", np.nan)
+            rank_variance  = entry.get("rank_variance", np.nan)
+            stats_str      = f"avg_rank={weighted_rank:.2f}  rank_var={rank_variance:.1f}  {primary_key}_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
+        else:
+            stats_str      = f"Wpct_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
 
         secondary_str = "  |  ".join(f"{k}={v:.2f}" for k, v in metric_values.items() if k != primary_key)
-        stats_str     = f"Wpct_w={metric_values.get(primary_key, 0):.2f}  std={std:.1f}  min={mn:.1f}  max={mx:.1f}"
-        avg_trades    = np.mean([len(df) for sid, df in trades_per_period.get("OOS1", []) if sid in combo])
         header_parts  = [f"Strategies: {len(combo)}", f"AvgTrades={avg_trades:.0f}", stats_str]
         if secondary_str:
             header_parts.append(secondary_str)
@@ -336,12 +421,12 @@ def _print_best_combinations(
         if val_lookup:
             combo_strategies = sorted(combo, key=lambda s: int(s.split("_")[0]))
             combo_val        = [val_lookup[sid] for sid in combo_strategies if sid in val_lookup]
-        
+
             if combo_val:
                 worst_netgain = min(min(v.get("net_gain_pct", 0), v.get("net_gain_pct_oos2", 0), v.get("net_gain_pct_oos3", 0)) for v in combo_val)
-                worst_dd = min(min(v.get("dd_pct", 0), v.get("dd_pct_oos2", 0), v.get("dd_pct_oos3", 0)) for v in combo_val)
-                worst_r2      = min(min(v.get("r2", 0),           v.get("r2_oos2", 0),            v.get("r2_oos3", 0))           for v in combo_val)
-        
+                worst_dd      = min(min(v.get("dd_pct", 0), v.get("dd_pct_oos2", 0), v.get("dd_pct_oos3", 0)) for v in combo_val)
+                worst_r2      = min(min(v.get("r2", 0), v.get("r2_oos2", 0), v.get("r2_oos3", 0)) for v in combo_val)
+
                 logger.info(f"\n{'─'*W}")
                 logger.info(f"  INDIVIDUAL STRATEGY THRESHOLDS — Combination #{rank}")
                 logger.info(f"{'─'*W}")
@@ -361,121 +446,7 @@ def _print_best_combinations(
 
     logger.info(f"\n{'─'*W}")
 
-# =============================================================================
-# BOOTSTRAP RANKING
-# =============================================================================
-N_BOOTSTRAP     = 200
-TOP_N_BOOTSTRAP = 2
 
-
-def _bootstrap_ranking(
-    df_scored       : pd.DataFrame,
-    subperiods      : list,
-    initial_balance : float,
-    ranking_criteria: list,
-    n_iterations    : int   = N_BOOTSTRAP,
-    top_n           : int   = TOP_N_BOOTSTRAP,
-    drop_fraction   : float = 0.5,
-) -> pd.DataFrame:
-    """
-    Bootstrap the combo ranking by dropping a random fraction of subperiods
-    from each OOS period per iteration. Adds `avg_rank` column: average ranking
-    position across all iterations. Sorted ascending by avg_rank (lower is better).
-    """
-    primary_key  = ranking_criteria[0][0]
-    primary_asc  = ranking_criteria[0][1]
-    combos       = [row["combo"] for _, row in df_scored.iterrows()]
-    rank_accum   = {combo: [] for combo in combos}
-
-    subperiod_weights = {
-        f"{period}_{split_label}": split_weight
-        for period, split_label, _, split_weight in subperiods
-    }
-
-    # Group subperiod keys by OOS period
-    keys_by_period: dict[str, list] = {}
-    for period, split_label, _, _ in subperiods:
-        keys_by_period.setdefault(period, []).append(f"{period}_{split_label}")
-
-    combo_scores = {}
-    for _, row in df_scored.iterrows():
-        combo_scores[row["combo"]] = row.get("subperiod_scores", {})
-
-    for _ in range(n_iterations):
-        # Drop a random fraction of subperiods from each OOS period
-        dropped_keys = set()
-        for period_keys in keys_by_period.values():
-            n_drop = max(1, round(len(period_keys) * drop_fraction))
-            dropped_keys.update(random.sample(period_keys, n_drop))
-
-        reduced_weights = {k: v for k, v in subperiod_weights.items() if k not in dropped_keys}
-        if len(reduced_weights) < 2:
-            continue
-
-        records = []
-        for combo, scores in combo_scores.items():
-            total_weight    = 0.0
-            weighted_metric = 0.0
-
-            for key, weight in reduced_weights.items():
-                val = scores.get(key, np.nan)
-                if not np.isnan(val):
-                    weighted_metric += val * weight
-                    total_weight    += weight
-
-            if total_weight == 0:
-                continue
-
-            records.append({"combo": combo, primary_key: round(weighted_metric / total_weight, 3)})
-
-        if not records:
-            continue
-
-        df_iter = pd.DataFrame(records).sort_values(primary_key, ascending=primary_asc).reset_index(drop=True)
-        for rank, row in enumerate(df_iter.itertuples(), start=1):
-            rank_accum[row.combo].append(rank)
-
-    df_out             = df_scored.copy()
-    df_out["avg_rank"] = df_out["combo"].map(
-        lambda c: round(float(np.mean(rank_accum[c])), 2) if rank_accum.get(c) else np.nan
-    )
-    df_out = df_out.sort_values("avg_rank", ascending=True).reset_index(drop=True)
-
-    _print_bootstrap_ranking(df_out, top_n, n_iterations, ranking_criteria)
-    return df_out
-
-
-def _print_bootstrap_ranking(
-    df_scored       : pd.DataFrame,
-    top_n           : int,
-    n_iterations    : int,
-    ranking_criteria: list,
-) -> None:
-    W           = 115
-    primary_key = ranking_criteria[0][0]
-    metric_str  = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
-    top         = df_scored.head(top_n)
-
-    logger.info(f"\n\033[94m{'='*W}")
-    logger.info(f"  BOOTSTRAP RANKING — {n_iterations} iterations | drop {50}% subperiods per OOS | ranked by: avg_rank")
-    logger.info(f"  Base criteria: {metric_str}")
-    logger.info(f"  Total combos evaluated: {len(df_scored)}")
-    logger.info(f"{'='*W}\033[0m")
-
-    for rank, (_, row) in enumerate(top.iterrows(), start=1):
-        combo       = row["combo"]
-        avg_rank    = row.get("avg_rank", np.nan)
-        primary_val = row.get(primary_key, np.nan)
-        std         = row.get("subperiod_std", np.nan)
-        mn          = row.get("subperiod_min",  np.nan)
-
-        logger.info(f"\nRANK #{rank}  —  avg_rank={avg_rank:.2f}  |  {primary_key}={primary_val:.2f}  std={std:.1f}  min={mn:.1f}")
-        logger.info(f"{'─'*W}")
-        for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
-            icon = "🟢" if "_long_" in s else "🔴"
-            logger.info(f"    {icon} {s}")
-
-    logger.info(f"\n{'─'*W}\n")
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
@@ -485,18 +456,19 @@ def find_best_portfolio_combination(
     validated_trades_oos2: list,
     validated_trades_oos3: list,
     initial_balance: float,
-    min_strategies: int    = MIN_STRATEGIES,
-    max_strategies: int    = MAX_STRATEGIES,
-    period_weights: dict   = PERIOD_WEIGHTS,
-    ranking_criteria: list = RANKING_CRITERIA,
-    top_n: int             = TOP_N,
-    n_splits: int          = N_SPLITS,
-    data_folder_oos1: str = "",
-    data_folder_oos2: str = "",
-    data_folder_oos3: str = "",
-    show_plots: bool = False,
+    min_strategies: int      = MIN_STRATEGIES,
+    max_strategies: int      = MAX_STRATEGIES,
+    period_weights: dict     = PERIOD_WEIGHTS,
+    ranking_criteria: list   = RANKING_CRITERIA,
+    top_n: int               = TOP_N,
+    n_splits: int            = N_SPLITS,
+    data_folder_oos1: str    = "",
+    data_folder_oos2: str    = "",
+    data_folder_oos3: str    = "",
+    show_plots: bool         = False,
     require_long_short: bool = REQUIRE_LONG_SHORT,
     validation_results: list = None,
+    selection_mode: str      = SELECTION_MODE,
     **kwargs,
 ) -> list:
 
@@ -536,8 +508,12 @@ def find_best_portfolio_combination(
         return []
 
     logger.info(f"  Evaluating {len(combos)} combo(s)...")
-
-    df_scored = _compute_weighted_scores(combos, subperiods, initial_balance, ranking_criteria)
+    #RANKING
+    if selection_mode == "ranking":
+        df_scored = _compute_ranking_scores(combos, subperiods, initial_balance, ranking_criteria)
+    else:
+       df_scored = _compute_weighted_scores(combos, subperiods, initial_balance, ranking_criteria)
+       
     if df_scored.empty:
         logger.warning("No scores computed — check trades data.")
         return []
@@ -552,7 +528,7 @@ def find_best_portfolio_combination(
     logger.info(f"  Distribution ({primary_metric}): best={best_val:.1f}  mean={mean_val:.1f}  std={std_val:.1f}  min={df_scored[primary_metric].min():.1f}  max={df_scored[primary_metric].max():.1f}  gap={gap:.2f}%  z-score={zscore}")
 
     top = df_scored.head(top_n).to_dict("records")
-    _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria, validation_results)
+    _print_best_combinations(top, trades_per_period, initial_balance, n_splits, ranking_criteria, validation_results, selection_mode)
     
     plot_best_portfolio(
         combo             = top[0]["combo"],
@@ -567,13 +543,7 @@ def find_best_portfolio_combination(
         ranking_criteria  = ranking_criteria, # añadir esto
         show_plots        = show_plots,
     )
-    
-    df_scored = _bootstrap_ranking(
-        df_scored        = df_scored,
-        subperiods       = subperiods,
-        initial_balance  = initial_balance,
-        ranking_criteria = ranking_criteria,
-    )
+
 
     return top
         
