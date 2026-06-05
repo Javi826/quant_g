@@ -78,9 +78,9 @@ N_PATHS_IS           = 1
 # ELITE -- MA4
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 19
-OOS_MAX_DD_TH        = 15
-OOS_R2_TH            = 0.43
+OOS_NETGAIN_TH       = 1
+OOS_MAX_DD_TH        = 150
+OOS_R2_TH            = 0.043
 
 
 # RUNS
@@ -182,7 +182,7 @@ N_PATHS_OOS1        = 500
 
 # Correlation analysis
 #------------------------------------------------------------------------------
-CORRELATION_DD_THRESHOLD = 0.75
+CORRELATION_DD_THRESHOLD = 0.90
 
 # FILES
 #------------------------------------------------------------------------------
