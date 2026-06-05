@@ -39,7 +39,7 @@ RANKING_CRITERIA = [
 # =============================================================================
 
 TOP_N    = 2
-N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
+N_SPLITS = 12  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
 
 # Label prefix per n_splits value
 _SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
