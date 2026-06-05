@@ -250,6 +250,7 @@ def plot_best_portfolio(
     df_scored: pd.DataFrame = None,
     ranking_criteria: list  = None,
     show_plots: bool = False,
+    title: str = None,
 ) -> None:
     """
     4-panel plot for the best portfolio combo:
@@ -366,11 +367,9 @@ def plot_best_portfolio(
                              gridspec_kw={"width_ratios": [1, 1.4]},
                              subplot_kw={"polar": False})
     fig.patch.set_facecolor("#F8F9FA")
-    fig.suptitle(
-        f"Best Portfolio — {' | '.join(sorted(combo, key=lambda s: int(s.split('_')[0])))}",
-        fontsize=10, fontweight="bold"
-    )
-
+    combo_str  = ' | '.join(sorted(combo, key=lambda s: int(s.split('_')[0])))
+    title_str  = title if title else f"Best Portfolio — {combo_str}"
+    fig.suptitle(title_str, fontsize=10, fontweight="bold")
     # Replace top-left with polar
     axes[0, 0].remove()
     ax1 = fig.add_subplot(2, 2, 1, polar=True)

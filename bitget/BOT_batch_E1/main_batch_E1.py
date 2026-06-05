@@ -29,7 +29,7 @@ logger = logging.getLogger("BOT_batch.main_batch")
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = False
+SHOW_PLOTS    = True
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
