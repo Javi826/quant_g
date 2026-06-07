@@ -85,6 +85,10 @@ def _find_timestamp_extremum___(df_high: pd.DataFrame, df_low: pd.DataFrame, sym
 def _find_timestamp_extremum(df_high: pd.DataFrame, df_low: pd.DataFrame, symbol: str) -> pd.DataFrame:
     df = df_high.copy()
     df = df.loc[df_low.index[0]:]
+    
+    if len(df) < 2:
+        logger.info(f"  ⚠ [{symbol}] Not enough bars for high/low computation. Skipping.")
+        return df
 
     bar_starts = df.index[:-1]
     bar_ends   = df.index[1:]

@@ -43,7 +43,7 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS        = True 
-COMBINE_MODES         = ["OR"]
+COMBINE_MODES         = ["AND","OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
@@ -64,12 +64,12 @@ INDICATORS: dict[str, dict] = {
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0.4,0.5,0.6,0.7,0.8],
+        "thresholds": [0.3,0.4,0.5,0.6,0.7,0.8],
         "enabled":    True,
     },
     "hurst": {
         "windows":    [30],
-        "thresholds": [0.5,0.6,0.7,0.8],
+        "thresholds": [0.4,0.5,0.6,0.7,0.8],
         "enabled":    False,
     },
     "adx": {
