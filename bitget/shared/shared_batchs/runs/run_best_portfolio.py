@@ -36,6 +36,13 @@ N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters,
 _SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
 _SPLIT_NAMES  = {1: "Annual", 2: "Semester", 3: "Quadrimester", 4: "Quarter", 6: "Bimester", 12: "Month"}
 
+# Display colors per mode
+_MODE_COLOR = {
+    "weighted": "\033[94m",   # blue
+    "ranking":  "\033[96m",   # cyan
+}
+_COLOR_RESET = "\033[0m"
+
 
 # =============================================================================
 # PRIVATE HELPERS — Identity
@@ -129,13 +136,13 @@ def _build_subperiod_index(
 # PRIVATE HELPERS — Metrics
 # =============================================================================
 
-def _compute_subperiod_metrics(
+def _compute_combo_metrics(
     combo: tuple,
     trades_list: list,
     initial_balance: float,
 ) -> dict | None:
     """
-    Compute all ranking metrics for a combo in one subperiod.
+    Compute all metrics for a combo in one time period (subperiod or full OOS).
     Returns None if no trades found for this combo.
     """
     combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
@@ -155,45 +162,6 @@ def _compute_subperiod_metrics(
     avg_neg, max_neg = _neg_streak_stats(weekly)
 
     return {
-        "NetGain%":     round(m["Net_Gain_pct"], 2),
-        "MaxDD%":       round(m["Max_DD_pct"], 2),
-        "R2":           round(m["R_Squared"], 3),
-        "ProfitFactor": round(pf if pf != float("inf") else 0, 1),
-        "CVaR10%":      round(cvar10, 2),
-        "AvgNegStreak": round(avg_neg, 1),
-        "MaxNegStreak": max_neg,
-        "Weekly_pct":   round(float((weekly > 0).mean() * 100), 1),
-        "Weekly_avg%":  round(float(weekly.mean()), 1),
-        "MinWeekly%":   round(float(weekly.min()), 1),
-    }
-
-
-def _compute_period_metrics(
-    combo: tuple,
-    trades_list: list,
-    initial_balance: float,
-) -> dict | None:
-    """
-    Compute full robustness metrics for a combo in one OOS period.
-    Returns None if no trades found.
-    """
-    combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
-    if not combo_trades:
-        return None
-
-    all_tl        = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-    total_capital = initial_balance * len(combo_trades)
-    m             = compute_metrics(all_tl, capital=total_capital, name="")
-    pf            = m["Profit_Factor"]
-
-    weekly           = _weekly_returns(combo_trades, initial_balance)
-    cvar10           = _cvar(weekly, pct=10)
-    avg_neg, max_neg = _neg_streak_stats(weekly)
-    weekly_avg       = round(float(weekly.mean()), 1) if len(weekly) > 0 else np.nan
-    weekly_min       = round(float(weekly.min()), 1)  if len(weekly) > 0 else np.nan
-    weekly_pct       = round(float((weekly > 0).mean() * 100), 1)
-
-    return {
         "NetGain%":     round(m["Net_Gain_pct"], 1),
         "MaxDD%":       round(m["Max_DD_pct"], 1),
         "R2":           round(m["R_Squared"], 2),
@@ -201,9 +169,9 @@ def _compute_period_metrics(
         "CVaR10%":      round(cvar10, 2),
         "AvgNegStreak": round(avg_neg, 1),
         "MaxNegStreak": max_neg,
-        "Weekly_pct":   weekly_pct,
-        "Weekly_avg%":  weekly_avg,
-        "MinWeekly%":   weekly_min,
+        "Weekly_pct":   round(float((weekly > 0).mean() * 100), 1),
+        "Weekly_avg%":  round(float(weekly.mean()), 1),
+        "MinWeekly%":   round(float(weekly.min()), 1),
     }
 
 
@@ -224,13 +192,11 @@ def _build_metrics_table(
     """
     from joblib import Parallel, delayed
 
-    subperiod_keys = [f"{p}_{q}" for p, q, _, _ in subperiods]
-
     def _score_combo(combo: tuple) -> dict:
         row = {"combo": combo}
         for period, split_label, split_trades, _ in subperiods:
             key = f"{period}_{split_label}"
-            m   = _compute_subperiod_metrics(combo, split_trades, initial_balance)
+            m   = _compute_combo_metrics(combo, split_trades, initial_balance)
             row[key] = m.get(primary_key, np.nan) if m is not None else np.nan
         return row
 
@@ -244,6 +210,16 @@ def _build_metrics_table(
 # =============================================================================
 # PRIVATE HELPERS — Scoring modes
 # =============================================================================
+
+def _add_subperiod_stats(df: pd.DataFrame, subperiod_keys: list) -> pd.DataFrame:
+    """Add subperiod aggregation columns to a scored DataFrame."""
+    df["subperiod_scores"] = df.apply(lambda row: {k: row[k] for k in subperiod_keys}, axis=1)
+    df["subperiod_std"]    = df[subperiod_keys].std(axis=1).round(2)
+    df["subperiod_min"]    = df[subperiod_keys].min(axis=1).round(1)
+    df["subperiod_max"]    = df[subperiod_keys].max(axis=1).round(1)
+    df["Weekly_std"]       = df["subperiod_std"]
+    return df
+
 
 def _apply_weighted_scoring(
     df_metrics: pd.DataFrame,
@@ -267,13 +243,9 @@ def _apply_weighted_scoring(
         axis=1,
     ).round(3)
 
-    df["subperiod_scores"] = df.apply(lambda row: {k: row[k] for k in subperiod_keys}, axis=1)
-    df["subperiod_std"]    = df[subperiod_keys].std(axis=1).round(2)
-    df["subperiod_min"]    = df[subperiod_keys].min(axis=1).round(1)
-    df["subperiod_max"]    = df[subperiod_keys].max(axis=1).round(1)
-    df["Weekly_std"]       = df["subperiod_std"]
-    df["weighted_rank"]    = np.nan
-    df["rank_variance"]    = np.nan
+    df = _add_subperiod_stats(df, subperiod_keys)
+    df["weighted_rank"] = np.nan
+    df["rank_variance"] = np.nan
 
     sort_cols = [c for c, _ in ranking_criteria if c in df.columns]
     sort_asc  = [a for c, a in ranking_criteria if c in df.columns]
@@ -315,11 +287,7 @@ def _apply_ranking_scoring(
     ) / total_weight
     df["rank_variance"] = df[[f"rank_{key}" for key in subperiod_keys]].var(axis=1)
 
-    df["subperiod_scores"] = df.apply(lambda row: {k: row[k] for k in subperiod_keys}, axis=1)
-    df["subperiod_std"]    = df[subperiod_keys].std(axis=1).round(2)
-    df["subperiod_min"]    = df[subperiod_keys].min(axis=1).round(1)
-    df["subperiod_max"]    = df[subperiod_keys].max(axis=1).round(1)
-    df["Weekly_std"]       = df["subperiod_std"]
+    df = _add_subperiod_stats(df, subperiod_keys)
 
     df[primary_key] = df[subperiod_keys].apply(
         lambda row: sum(row[key] * weights[key] for key in subperiod_keys
@@ -357,30 +325,23 @@ def _log_top_combo_breakdown(
     logger.debug(f"  {tag} Top combo subperiod breakdown — {primary_key}")
     logger.debug(f"  Combo: {list(top_combo)}")
 
-    if mode == "ranking":
-        logger.debug(f"  {'Subperiod':<18} {'Value':>10} {'Rank':>6} {'NaN/None':>10}")
-        logger.debug(f"  {'-'*48}")
-        for key in sorted(scores.keys()):
-            val      = scores[key]
-            is_nan   = isinstance(val, float) and np.isnan(val)
-            flag     = "⚠️ NaN" if is_nan else ("⚠️ None" if val is None else "")
-            val_str  = "NaN" if is_nan else ("None" if val is None else f"{val:.1f}")
+    header = f"  {'Subperiod':<18} {'Value':>10}" + (f" {'Rank':>6}" if mode == "ranking" else "") + f" {'NaN/None':>10}"
+    logger.debug(header)
+    logger.debug(f"  {'-'*48}")
+    for key in sorted(scores.keys()):
+        val      = scores[key]
+        is_nan   = isinstance(val, float) and np.isnan(val)
+        flag     = "⚠️ NaN" if is_nan else ("⚠️ None" if val is None else "")
+        val_str  = "NaN" if is_nan else ("None" if val is None else f"{val:.1f}")
+        rank_str = ""
+        if mode == "ranking":
             rank_val = top_row.get(f"rank_{key}", "—")
-            rank_str = f"{rank_val}" if isinstance(rank_val, (int, np.integer)) else "—"
-            logger.debug(f"  {key:<18} {val_str:>10} {rank_str:>6} {flag}")
-        logger.debug(f"  {'-'*48}")
+            rank_str = f" {rank_val:>6}" if isinstance(rank_val, (int, np.integer)) else f" {'—':>6}"
+        logger.debug(f"  {key:<18} {val_str:>10}{rank_str} {flag}")
+    logger.debug(f"  {'-'*48}")
+    if mode == "ranking":
         logger.debug(f"  Weighted rank     : {top_row['weighted_rank']:.3f}")
         logger.debug(f"  Rank variance     : {top_row['rank_variance']:.1f}")
-    else:
-        logger.debug(f"  {'Subperiod':<18} {'Value':>10} {'NaN/None':>10}")
-        logger.debug(f"  {'-'*40}")
-        for key in sorted(scores.keys()):
-            val     = scores[key]
-            is_nan  = isinstance(val, float) and np.isnan(val)
-            flag    = "⚠️ NaN" if is_nan else ("⚠️ None" if val is None else "")
-            val_str = "NaN" if is_nan else ("None" if val is None else f"{val:.1f}")
-            logger.debug(f"  {key:<18} {val_str:>10} {flag}")
-        logger.debug(f"  {'-'*40}")
 
     logger.debug(f"  NaN subperiods    : {len(nan_keys)}  → {nan_keys}")
     logger.debug(f"  None subperiods   : {len(none_keys)} → {none_keys}")
@@ -401,20 +362,18 @@ def _print_consensus(top_weighted: list, top_ranking: list) -> None:
 
     weighted_combos = {frozenset(e["combo"]): (i + 1, e) for i, e in enumerate(top_weighted)}
     ranking_combos  = {frozenset(e["combo"]): (i + 1, e) for i, e in enumerate(top_ranking)}
-
-    shared      = sorted(weighted_combos.keys() & ranking_combos.keys(),  key=lambda c: weighted_combos[c][0])
+    shared          = sorted(weighted_combos.keys() & ranking_combos.keys(), key=lambda c: weighted_combos[c][0])
 
     logger.info(f"\n\033[94m{'='*W}\n  PORTFOLIO CONSENSUS\n{'='*W}\033[0m")
 
     if shared:
         for fs in shared:
-            w_rank = weighted_combos[fs][0]
-            r_rank = ranking_combos[fs][0]
+            w_rank    = weighted_combos[fs][0]
+            r_rank    = ranking_combos[fs][0]
             combo_str = "  |  ".join(sorted(fs, key=lambda s: int(s.split("_")[0])))
             logger.info(f" ⭐  {combo_str}   →   Weighted #{w_rank}  |  Ranking #{r_rank}")
     else:
         logger.info(f"  ⚠️  No combos in common between weighted and ranking top-{len(top_weighted)}")
-
 
     logger.info(f"{'─'*W}")
 
@@ -433,12 +392,13 @@ def _print_best_combinations(
     mode: str = "weighted",
 ) -> None:
     W           = 115
+    color       = _MODE_COLOR.get(mode, "\033[94m")
     split_name  = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str  = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
     mode_str    = "Ranking (avg position)" if mode == "ranking" else "Weighted metrics"
     primary_key = ranking_criteria[0][0]
 
-    logger.info(f"\n\033[94m{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | mode: {mode_str} | ranked by: {metric_str}\n{'='*W}\033[0m")
+    logger.info(f"\n{color}{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | mode: {mode_str} | ranked by: {metric_str}\n{'='*W}{_COLOR_RESET}")
 
     val_lookup = {v["strategy_id"]: v for v in validation_results} if validation_results else {}
 
@@ -467,7 +427,7 @@ def _print_best_combinations(
 
         rows = []
         for period, trades_list in trades_per_period.items():
-            m = _compute_period_metrics(combo, trades_list, initial_balance)
+            m = _compute_combo_metrics(combo, trades_list, initial_balance)
             if m is None:
                 continue
             rows.append({"Period": period, **m})
@@ -580,16 +540,17 @@ def find_best_portfolio_combination(
 
     results = {}
     for mode, df_scored in [("weighted", df_weighted), ("ranking", df_ranking)]:
-        best_val   = df_scored[primary_key].iloc[0]
-        mean_val   = df_scored[primary_key].mean()
-        std_val    = df_scored[primary_key].std()
-        gap        = round(best_val - mean_val, 2)
-        zscore     = round((best_val - mean_val) / std_val, 2) if std_val > 0 else 0.0
-        logger.info(
-            f"  [{mode.upper()}] Distribution ({primary_key}): "
+        color     = _MODE_COLOR.get(mode, "\033[94m")
+        best_val  = df_scored[primary_key].iloc[0]
+        mean_val  = df_scored[primary_key].mean()
+        std_val   = df_scored[primary_key].std()
+        gap       = round(best_val - mean_val, 2)
+        zscore    = round((best_val - mean_val) / std_val, 2) if std_val > 0 else 0.0
+        logger.debug(
+            f"{color}  [{mode.upper()}] Distribution ({primary_key}): "
             f"best={best_val:.1f}  mean={mean_val:.1f}  std={std_val:.1f}  "
             f"min={df_scored[primary_key].min():.1f}  max={df_scored[primary_key].max():.1f}  "
-            f"gap={gap:.2f}  z-score={zscore}"
+            f"gap={gap:.2f}  z-score={zscore}{_COLOR_RESET}"
         )
 
         top = df_scored.head(top_n).to_dict("records")

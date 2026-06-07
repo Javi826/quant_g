@@ -23,6 +23,7 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger("BOT_batch.main_batch")
+logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 
 # COMPUTE CONFIGURATION
 #------------------------------------------------------------------------------

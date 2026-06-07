@@ -488,10 +488,10 @@ def plot_best_portfolio(
             colLabels=["Parameter", "Value"],
             cellLoc="center",
             loc="center",
-            bbox=[0.1, 0.1, 0.8, 0.85],
+            bbox=[0.05, 0.05, 0.9, 0.92],
         )
         table.auto_set_font_size(False)
-        table.set_fontsize(9)
+        table.set_fontsize(11)
         for (row, col), cell in table.get_celld().items():
             cell.set_edgecolor("#CCCCCC")
             if row == 0:
