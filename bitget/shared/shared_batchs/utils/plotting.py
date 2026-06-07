@@ -438,9 +438,11 @@ def plot_best_portfolio(
     _flush_segment(ax2, seg_x, seg_y, seg_c, weighted_mean)
     ax2.axhline(weighted_mean, color="#E67E22", linewidth=0.9, linestyle="--",
                 label=f"Weighted mean={weighted_mean:.1f}%")
-    ax2.set_title("Weekly_pct per Subperiod", fontsize=9, fontweight="bold")
-    ax2.set_ylabel("Weekly_pct (%)", fontsize=9)
-    ax2.set_ylim(max(0, min(y_vals) - 10), 105)
+    primary_metric = ranking_criteria[0][0] if ranking_criteria else "Weekly_pct"
+    y_margin       = (max(y_vals) - min(y_vals)) * 0.15 if y_vals else 10
+    ax2.set_title(f"{primary_metric} per Subperiod", fontsize=9, fontweight="bold")
+    ax2.set_ylabel(f"{primary_metric}", fontsize=9)
+    ax2.set_ylim(min(y_vals) - y_margin, max(y_vals) + y_margin)
     ax2.set_xticks(x_idx)
     ax2.set_xticklabels(x_labels, rotation=45, ha="right", fontsize=6)
     ax2.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")

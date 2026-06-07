@@ -29,20 +29,15 @@ RANKING_CRITERIA = [
     ("Weekly_std", True),
 ]
 
+# =============================================================================
+# RANKING_CRITERIA = [
+#     ("MaxDD%", False),
+#     ("Weekly_pct", False),
+# ]
+# =============================================================================
+
 TOP_N    = 2
 N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
-
-# Label prefix per n_splits value
-_SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
-_SPLIT_NAMES  = {1: "Annual", 2: "Semester", 3: "Quadrimester", 4: "Quarter", 6: "Bimester", 12: "Month"}
-
-# Display colors per mode
-_MODE_COLOR = {
-    "weighted": "\033[94m",   # blue
-    "ranking":  "\033[96m",   # cyan
-}
-_COLOR_RESET = "\033[0m"
-
 
 # =============================================================================
 # PRIVATE HELPERS — Identity
@@ -67,8 +62,20 @@ def _is_short(strategy_id: str) -> bool:
 
 def _has_long_and_short(strategy_ids: tuple) -> bool:
     return any(_is_long(s) for s in strategy_ids) and any(_is_short(s) for s in strategy_ids)
+# =============================================================================
+# COLORS + SUFIX
+# =============================================================================
 
+# Label prefix per n_splits value
+_SPLIT_LABELS = {1: "A", 2: "S", 3: "P", 4: "Q", 6: "B", 12: "M"}
+_SPLIT_NAMES  = {1: "Annual", 2: "Semester", 3: "Quadrimester", 4: "Quarter", 6: "Bimester", 12: "Month"}
 
+# Display colors per mode
+_MODE_COLOR = {
+    "weighted": "\033[94m",   # blue
+    "ranking":  "\033[96m",   # cyan
+}
+_COLOR_RESET = "\033[0m"
 # =============================================================================
 # PRIVATE HELPERS — Period splitting
 # =============================================================================
@@ -285,7 +292,8 @@ def _apply_ranking_scoring(
     df["weighted_rank"] = sum(
         (df[f"rank_{key}"] / n_combos) * weights[key] for key in subperiod_keys
     ) / total_weight
-    df["rank_variance"] = df[[f"rank_{key}" for key in subperiod_keys]].var(axis=1)
+    rank_cols = [f"rank_{key}" for key in subperiod_keys]
+    df["rank_variance"] = (df[rank_cols] / len(df)).var(axis=1).round(3)
 
     df = _add_subperiod_stats(df, subperiod_keys)
 
@@ -395,7 +403,7 @@ def _print_best_combinations(
     color       = _MODE_COLOR.get(mode, "\033[94m")
     split_name  = _SPLIT_NAMES.get(n_splits, f"{n_splits}-Split")
     metric_str  = " | ".join(f"{m} ({'↑' if not asc else '↓'})" for m, asc in ranking_criteria)
-    mode_str    = "Ranking (avg position)" if mode == "ranking" else "Weighted metrics"
+    mode_str    = "Ranking normalized" if mode == "ranking" else "Weighted metrics"
     primary_key = ranking_criteria[0][0]
 
     logger.info(f"\n{color}{'='*W}\n  BEST PORTFOLIO COMBINATIONS — {split_name} splits | mode: {mode_str} | ranked by: {metric_str}\n{'='*W}{_COLOR_RESET}")

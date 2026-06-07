@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_batch_E1/main_batch_E1.py']
+recent_files = ['bitget/BOT_batch_E1/main_batch_E1.py', 'develop/live_lab/live_lab_A.py']
 
 [main]
 version = 0.2.0
