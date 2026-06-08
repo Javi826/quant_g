@@ -654,8 +654,9 @@ def print_classification_summary(strategy_results: dict) -> None:
 
 
 def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str, output_path: str,
-              strategies_set_name: str = "E1", all_strategies: list[dict] | None = None, optimize_metric: str = "", 
-              classification_mode: str = "", mix_weights: tuple | None = None, secondary_metric: str | None = None) -> None:
+              strategies_set_name: str = "E1", all_strategies: list[dict] | None = None, optimize_metric: str = "",
+              classification_mode: str = "", mix_weights: tuple | None = None, secondary_metric: str | None = None,
+              analysis_mode: str = "SYMBOL", regime_timeframe_mode: str = "DAILY") -> None:
     from datetime import datetime
     active_keys    = list(windows.keys())
     generated_at   = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
@@ -680,8 +681,8 @@ def save_bins(strategy_results: dict, windows: dict, thresholds: dict, mode: str
     header_lines += [
         "}",
         f'COMBINE_MODE          = "{mode}"',
-        f'ANALYSIS_MODE         = "SYMBOL"',
-        f'REGIME_TIMEFRAME_MODE = "DAILY"',
+        f'ANALYSIS_MODE         = "{analysis_mode}"',
+        f'REGIME_TIMEFRAME_MODE = "{regime_timeframe_mode}"',
         "",
     ]
     if optimize_metric:

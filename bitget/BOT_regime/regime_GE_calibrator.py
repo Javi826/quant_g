@@ -43,7 +43,7 @@ BINS_OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{ST
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS        = True 
-COMBINE_MODES         = ["AND","OR"]
+COMBINE_MODES         = ["OR"]
 ANALYSIS_MODE         = "SYMBOL" # "BTC"   | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"  # "DAILY" | "STRATEGY"
 
@@ -440,10 +440,12 @@ def run() -> None:
     if AUTO_SAVE_BINS:
         save_bins(
             top1_results, top1['windows'], top1['thresholds'], top1['mode'], BINS_OUTPUT_PATH, STRATEGIES_SET_NAME, strategies_all,
-            optimize_metric     = OPTIMIZE_METRIC,
-            classification_mode = CLASSIFICATION_MODE,
-            mix_weights         = (MIX_WEIGHT_PROFIT, MIX_WEIGHT_DD) if OPTIMIZE_METRIC == "mix" else None,
-            secondary_metric    = CLASSIFY_SECONDARY_METRIC,
+            optimize_metric        = OPTIMIZE_METRIC,
+            classification_mode    = CLASSIFICATION_MODE,
+            mix_weights            = (MIX_WEIGHT_PROFIT, MIX_WEIGHT_DD) if OPTIMIZE_METRIC == "mix" else None,
+            secondary_metric       = CLASSIFY_SECONDARY_METRIC,
+            analysis_mode          = ANALYSIS_MODE,
+            regime_timeframe_mode  = REGIME_TIMEFRAME_MODE,
         )
     else:
         logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")
