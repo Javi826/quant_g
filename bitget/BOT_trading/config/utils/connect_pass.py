@@ -1,4 +1,4 @@
-#config/connect_pass.py
+#BOT_trading/config/connect_pass.py
 
 import ccxt
 

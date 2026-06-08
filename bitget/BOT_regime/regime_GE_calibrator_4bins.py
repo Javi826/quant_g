@@ -61,7 +61,7 @@ CLASSIFICATION_MODE       = "strict"  # "strict" | "oos1_weighted"
 CLASSIFY_SECONDARY_METRIC = "r2"      # None | "r2" | "profit" | "calmar"
 
 MIN_CLASSIFIED_PCT = 0.0
-RANKING_MODE       = "weighted_delta"  # "weighted_delta" | "n_classified" | "combo_delta"
+RANKING_MODE       = "combo_delta"  # "weighted_delta" | "n_classified" | "combo_delta"
 
 # =============================================================================
 # INDICATOR GRID

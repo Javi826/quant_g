@@ -30,7 +30,7 @@ logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = True
+SHOW_PLOTS    = False
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")

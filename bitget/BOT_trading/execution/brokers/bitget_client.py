@@ -1,3 +1,4 @@
+#BOT_trading/execution/brokers/bitget_client.py
 """
 Bitget API Client - Professional HTTP client for Bitget Futures API.
 
