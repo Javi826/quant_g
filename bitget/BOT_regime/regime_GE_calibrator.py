@@ -1,4 +1,4 @@
-#develop/market_regime/regime_GE_calibration.py
+#develop/market_regime/regime_GE_calibrator.py
 import gc
 import os
 import sys
@@ -58,14 +58,14 @@ RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified" "c
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10],
-        "thresholds": [0.03,0.04,0.05],
+        "windows":    [10,20],
+        "thresholds": [0.02,0.03,0.04,0.05,0.06],
         "enabled":    True,
     },
     "er": {
         "windows":    [40],
-        "thresholds": [0.3,0.4,0.5,0.6,0.7,0.8],
-        "enabled":    True,
+        "thresholds": [0.2,0.3,0.4,0.5,0.6,0.7,0.8],
+        "enabled":    False,
     },
     "hurst": {
         "windows":    [30],
