@@ -39,13 +39,7 @@ INITIAL_CAPITAL = None
 # ==========================================================================
 def configure_paths(trades_log_path: str, 
                    initial_capital: float = 1000) -> None:
-    """
-    Configure global paths and settings for order manager.
-    
-    Args:
-        trades_log_path: Path to Excel file for trade logger
-        initial_capital: Initial capital for the account
-    """
+
     global TRADES_LOG_PATH,INITIAL_CAPITAL
     
     TRADES_LOG_PATH = trades_log_path
@@ -64,19 +58,7 @@ def configure_paths(trades_log_path: str,
 # WEBSOCKET DATA FETCHING
 # ==========================================================================
 def fetch_ticker_ws(symbol: str) -> Tuple[Optional[Decimal], None]:
-    """
-    Fetch current ticker price via WebSocket.
-    
-    Args:
-        symbol: Trading symbol (e.g., 'BTCUSDT')
-    
-    Returns:
-        Tuple of (price, None) where price is Decimal or None
-    
-    Raises:
-        RuntimeError: If WebSocket not initialized
-        TimeoutError: If no fresh data received within timeout
-    """
+
     if not get_ws_manager():
         raise RuntimeError("Error-WebSocket not initialized")
     
@@ -107,19 +89,7 @@ def fetch_ticker_ws(symbol: str) -> Tuple[Optional[Decimal], None]:
 
 
 def fetch_contracts_ws(symbol: str) -> Dict[str, Any]:
-    """
-    Fetch contract information from WebSocket cache.
-    
-    Args:
-        symbol: Trading symbol
-    
-    Returns:
-        Contract information dictionary
-    
-    Raises:
-        RuntimeError: If WebSocket not initialized
-        ValueError: If contract not in cache
-    """
+
     if not get_ws_manager():
         raise RuntimeError("Error-WebSocket not initialized")
     
@@ -131,15 +101,7 @@ def fetch_contracts_ws(symbol: str) -> Dict[str, Any]:
 
 
 def get_usdt_balance_ws(exchange=None) -> float:
-    """
-    Get USDT balance from WebSocket equity channel.
-    
-    Args:
-        exchange: Ignored (kept for compatibility)
-    
-    Returns:
-        USDT balance as float
-    """
+
     if not get_ws_manager():
         logger.error("Error-WS manager not init for balance.")
         return 0.0
@@ -156,20 +118,7 @@ def get_usdt_balance_ws(exchange=None) -> float:
 
 
 def get_current_price(symbol: str, max_cache_age: float = 0.5) -> Decimal:
-    """
-    Get current market price via WebSocket with caching.
-    
-    Args:
-        symbol: Trading symbol
-        max_cache_age: Maximum age of cached price in seconds
-    
-    Returns:
-        Current price as Decimal
-    
-    Raises:
-        RuntimeError: If WebSocket not initialized
-        TimeoutError: If no fresh price received
-    """
+
     if not get_ws_manager():
         raise RuntimeError("Error-WS manager not init.")
     
@@ -350,22 +299,7 @@ def place_order(symbol: str,
                 margin_mode: str = MARGIN_MODE,
                 send_request_func=None,
                 client_oid: Optional[str] = None) -> Optional[Dict]:
-    """
-    Place a market order via REST API.
-    
-    Args:
-        symbol: Trading symbol (e.g., 'BTCUSDT')
-        direction: 'long' or 'short'
-        usdt_amount: Amount in USDT to invest
-        product_type: Product type
-        margin_coin: Margin coin
-        margin_mode: Margin mode
-        send_request_func: Function to send REST requests
-        client_oid: Custom client order ID (optional)
-    
-    Returns:
-        Order response dictionary or None on error
-    """
+
     if send_request_func is None:
         raise ValueError("Error-Send request error.")
         
@@ -418,7 +352,7 @@ def place_order(symbol: str,
     if filled_amount < size_q * Decimal('0.95'):  # Tolerancia 5%
         logger.warning(f"WAR-Partial fill for {symbol}: requested={size_q}, filled={filled_amount}")
     
-    logger.info(f"{direction.upper():<6} {symbol:<10} | Amount: ${usdt_amount:.2f} | "
+    logger.debug(f"{direction.upper():<6} {symbol:<10} | Amount: ${usdt_amount:.2f} | "
            f"Price: {exec_price}")
        
 
@@ -437,21 +371,7 @@ def get_fills_for_order(order_id: str,
                         product_type: str = PRODUCT_TYPE,
                         send_request_func=None, 
                         delay: float = 0.05) -> Tuple:
-    """
-    Get fills for an order via WebSocket.
-    
-    Args:
-        order_id: Order ID to get fills for
-        symbol: Trading symbol
-        product_type: Product type
-        send_request_func: Ignored (kept for compatibility)
-        retries: Number of retries (unused)
-        delay: Initial delay before checking
-    
-    Returns:
-        Tuple of (total_base, entry_price, total_profit, total_fee)
-        Returns (None, None, None, None) on timeout
-    """
+
     time.sleep(delay)
     
     if not get_ws_manager():
@@ -516,21 +436,7 @@ def close_position(symbol: str,
                    reason: str = "NO_INFO", 
                    position_data: Optional[Dict] = None,
                    bot_state=None) -> bool:
-    """
-    Close a position with market order.
-    
-    Args:
-        symbol: Trading symbol
-        size: Position size
-        direction: Position direction ('long' or 'short')
-        send_request_func: Function to send REST requests
-        reason: Reason for closing ('TP', 'SL', 'TIMEOUT', etc.)
-        position_data: Position metadata for logger
-        bot_state: Bot state object for profit tracking
-    
-    Returns:
-        True if position closed successfully, False otherwise
-    """
+
     try:
         close_side = "sell" if direction.lower() == "short" else "buy"
                 

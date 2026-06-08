@@ -89,8 +89,8 @@ class ProductionOperative:
         )
         
     def place_order(self, symbol: str, direction: str, usdt_amount: float,
-                    tp_pct: float, sl_pct: float, strategy_id: str,
-                    signal_close: float = 0) -> None:
+                tp_pct: float, sl_pct: float, strategy_id: str,
+                signal_close: float = 0, regime: str = 'unknown') -> None:
 
         usdt_balance = get_usdt_balance_ws()
         if usdt_balance < usdt_amount:
@@ -146,6 +146,10 @@ class ProductionOperative:
                 state_file=self.state_file,
                 hour_zone=HOUR_ZONE,
                 usdt_amount=usdt_amount
+            )
+            logger.info(
+                f"ENTRY {direction.upper()} {symbol}  ${float(entry_price):.4f} | "
+                f"${usdt_amount:.2f} | Regime: {regime}"
             )
         else:
             logger.warning(f"WAR-Order executed but no orderId for {symbol}")

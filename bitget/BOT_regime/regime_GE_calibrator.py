@@ -58,7 +58,7 @@ RANKING_MODE          = "weighted_delta"  # "weighted_delta" | "n_classified" "c
 
 INDICATORS: dict[str, dict] = {
     "atr_norm": {
-        "windows":    [10,20],
+        "windows":    [10],
         "thresholds": [0.02,0.03,0.04,0.05,0.06],
         "enabled":    True,
     },

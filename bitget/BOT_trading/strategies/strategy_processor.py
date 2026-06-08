@@ -21,18 +21,7 @@ from .hardcoded_signals import get_hardcoded_signals
 
 
 class StrategyProcessor:
-    """
-    Processes trading strategies: detects signals and executes orders.
 
-    Attributes:
-        send_request   : Function to send REST API requests
-        get_balance    : Function to get USDT balance
-        hour_zone      : Timezone object for timestamps
-        account_number : Account identifier
-        state_file     : Path to state file
-        use_hardcoded  : Whether to use hardcoded signals for testing
-        operative      : Operative mode instance
-    """
 
     def __init__(
         self,
@@ -88,16 +77,7 @@ class StrategyProcessor:
         strategy_candles: Dict,
         order_amount:     float,
     ) -> None:
-        """
-        Execute orders for a list of approved signals.
 
-        Args:
-            strat            : Strategy config dict
-            signals          : Approved signals from orchestrator (already regime-filtered)
-            open_positions   : Current open positions
-            strategy_candles : Candle counters
-            order_amount     : Final order amount to use
-        """
         strat_id = strat['id']
 
         if not signals:
