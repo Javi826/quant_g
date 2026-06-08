@@ -2108,9 +2108,9 @@ let dataInterval, logsInterval;
 
 function updateClock() {
     const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(now.getUTCSeconds()).padStart(2, '0');
     const clockEl = document.getElementById('live-clock');
     if (clockEl) {
         clockEl.textContent = `${hours}:${minutes}:${seconds}`;
@@ -2471,31 +2471,21 @@ function renderBinomialDriftTable(data, windowSize) {
 async function loadQualityTab() {
     try {
         await loadBinomialDrift();
-        
-        // Load execution quality
-        const execRes = await fetch('/api/quality/execution');
-        const execData = await execRes.json();
-        
-        if (execData.success) {
-            renderExecutionTable(execData.data);
+
+        // Load execution quality + target deviation in a single request
+        const qualityRes  = await fetch('/api/quality/all');
+        const qualityData = await qualityRes.json();
+
+        if (qualityData.success) {
+            renderExecutionTable(qualityData.data.execution);
+            renderTargetDeviationTable(qualityData.data.deviation);
         } else {
-            document.getElementById('execution-table-container').innerHTML = 
-                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
-                (execData.error || 'Error loading execution data') + 
+            const errorHtml =
+                '<div style="text-align: center; color: #f85149; padding: 40px;">' +
+                (qualityData.error || 'Error loading quality data') +
                 '</div>';
-        }
-        
-        // Load target deviation
-        const deviationRes = await fetch('/api/quality/target-deviation');
-        const deviationData = await deviationRes.json();
-        
-        if (deviationData.success) {
-            renderTargetDeviationTable(deviationData.data);
-        } else {
-            document.getElementById('deviation-table-container').innerHTML = 
-                '<div style="text-align: center; color: #f85149; padding: 40px;">' + 
-                (deviationData.error || 'Error loading deviation data') + 
-                '</div>';
+            document.getElementById('execution-table-container').innerHTML  = errorHtml;
+            document.getElementById('deviation-table-container').innerHTML  = errorHtml;
         }
 
         // Initialize win rate evolution checkboxes
@@ -2504,13 +2494,12 @@ async function loadQualityTab() {
             'winrate-strat-',
             'winrate-strat-all'
         );
-        
+
     } catch (error) {
         console.error('Error loading quality tab:', error);
-        document.getElementById('execution-table-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
-        document.getElementById('deviation-table-container').innerHTML = 
-            '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+        const errorHtml = '<div style="text-align: center; color: #f85149; padding: 40px;">Error loading data</div>';
+        document.getElementById('execution-table-container').innerHTML = errorHtml;
+        document.getElementById('deviation-table-container').innerHTML = errorHtml;
     }
 }
 
@@ -2641,7 +2630,7 @@ function renderTargetDeviationTable(data) {
         const slDevColor = getDeviationColor(strat.sl_deviation);
         
         // Total trades = TP trades + SL trades
-        const totalTrades = strat.tp_trades + strat.sl_trades;
+        const totalTrades = strat.tp_trades + strat.sl_trades + (strat.timeout_trades || 0);
         
         html += '<tr>' +
             '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +

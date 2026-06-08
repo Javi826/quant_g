@@ -1693,11 +1693,11 @@ class DashboardServer:
                     'data': {}
                 }), 500
                     
-        @self.app.route('/api/quality/execution')
-        def get_quality_execution():
+        @self.app.route('/api/quality/all')
+        def get_quality_all():
             try:
-                from quality_control.analyzer import analyze_execution_quality
-                
+                from quality_control.analyzer import analyze_execution_quality, analyze_target_deviation
+
                 df = self._load_trades_dataframe()
                 if df is None or df.empty:
                     return jsonify({
@@ -1705,66 +1705,23 @@ class DashboardServer:
                         'error': 'No trades data available',
                         'data': {}
                     })
-                
+
                 strategies_list = self._get_full_strategies_list_with_numbers()
                 active_strategies = [
-                    s for s in strategies_list 
+                    s for s in strategies_list
                     if s['status'] in ('ACTIVE', 'DEPRECATING')
                 ]
-                
-                execution_results = analyze_execution_quality(df, active_strategies)
-                
+
                 return jsonify({
                     'success': True,
-                    'data': execution_results
+                    'data': {
+                        'execution':  analyze_execution_quality(df, active_strategies),
+                        'deviation':  analyze_target_deviation(df, active_strategies)
+                    }
                 })
-                
+
             except Exception as e:
-                logger.error(f"Error in execution quality analysis: {e}")
-                import traceback
-                traceback.print_exc()
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'data': {}
-                }), 500
-            
-        @self.app.route('/api/quality/target-deviation')
-        def get_quality_target_deviation():
-            """
-            Get target deviation analysis (TP/SL real vs configured).
-            """
-            try:
-                from quality_control.analyzer import analyze_target_deviation
-                
-                # Load trades from PostgreSQL
-                df = self._load_trades_dataframe()
-                if df is None or df.empty:
-                    return jsonify({
-                        'success': False,
-                        'error': 'No trades data available',
-                        'data': {}
-                    })
-                
-                # Get strategies config
-                strategies_list = self._get_full_strategies_list_with_numbers()
-                
-                # Filter only ACTIVE and DEPRECATING strategies
-                active_strategies = [
-                    s for s in strategies_list 
-                    if s['status'] in ('ACTIVE', 'DEPRECATING')
-                ]
-                
-                # Analyze target deviation
-                deviation_results = analyze_target_deviation(df, active_strategies)
-                
-                return jsonify({
-                    'success': True,
-                    'data': deviation_results
-                })
-                
-            except Exception as e:
-                logger.error(f"Error in target deviation analysis: {e}")
+                logger.error(f"Error in quality analysis: {e}")
                 import traceback
                 traceback.print_exc()
                 return jsonify({

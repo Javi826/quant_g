@@ -1,23 +1,15 @@
+#BOT_trading/strategies/strategy_loader.py
 """
 Strategy Loader
-
-Loads strategy configurations from per-account YAML files.
-
-Each account has its own YAML file:
-  - config/strategies_00.yaml (Main Account)
-  - config/strategies_E1.yaml (Elite Account)
-  - config/strategies_01.yaml (Testing Account)
-
-The YAML files contain only the strategies for that account,
-with order_amount already adjusted appropriately.
+Loads strategy configurations from per-account Python modules.
 """
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 logger = logging.getLogger('BOT_trading.strategies.strategy_loader')
 
 
-def load_strategies(account_number: str, yaml_path: Optional[str] = None) -> List[Dict]:
+def load_strategies(account_number: str) -> List[Dict]:
     # Importar módulo según cuenta
     if account_number == '00':
         from config.strategies_00 import STRATEGIES
@@ -117,63 +109,3 @@ def get_strategy_config(account_number: str, strategy_id: str) -> Dict:
         f"Available IDs: {', '.join(available_ids)}"
     )
 
-# =============================================================================
-# def load_strategies_from_yaml(yaml_path: str) -> List[Dict]:
-#     """
-#     Load all strategies from YAML configuration file.
-#     
-#     Args:
-#         yaml_path: Full path to YAML file
-#     
-#     Returns:
-#         List of strategy dictionaries
-#     
-#     Raises:
-#         FileNotFoundError: If YAML file doesn't exist
-#         ValueError: If YAML is invalid or missing required keys
-#     
-#     Example:
-#         >>> strategies = load_strategies_from_yaml('/path/to/strategies_00.yaml')
-#         >>> len(strategies)
-#         16
-#     """
-#     if not os.path.exists(yaml_path):
-#         raise FileNotFoundError(f"Strategies YAML file not found: {yaml_path}")
-#     
-#     try:
-#         with open(yaml_path, 'r', encoding='utf-8') as f:
-#             data = yaml.safe_load(f)
-#         
-#         if not data or 'strategies' not in data:
-#             raise ValueError(
-#                 f"Invalid YAML format in {yaml_path}: missing 'strategies' key"
-#             )
-#         
-#         strategies = data['strategies']
-#         
-#         if not strategies:
-#             raise ValueError(
-#                 f"No strategies found in {yaml_path}. "
-#                 f"YAML must contain at least one strategy."
-#             )
-#         
-#         # Validate each strategy has required keys
-#         for i, strat in enumerate(strategies):
-#             try:
-#                 validate_strategy_config(strat)
-#             except ValueError as e:
-#                 raise ValueError(
-#                     f"Strategy #{i+1} in {yaml_path} is invalid: {e}"
-#                 )
-#         
-#         logger.info(
-#             f"Loaded {len(strategies)} strategies from {os.path.basename(yaml_path)}"
-#         )
-#         return strategies
-#     
-#     except yaml.YAMLError as e:
-#         raise ValueError(f"Invalid YAML syntax in {yaml_path}: {e}")
-#     except Exception as e:
-#         raise ValueError(f"Error loading YAML {yaml_path}: {e}")
-# 
-# =============================================================================

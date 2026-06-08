@@ -50,7 +50,7 @@ BINS_OUTPUT_PATH    = os.path.join(
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-AUTO_SAVE_BINS        = True
+AUTO_SAVE_BINS        = False
 ANALYSIS_MODE         = "SYMBOL"  # "BTC" | "SYMBOL"
 REGIME_TIMEFRAME_MODE = "DAILY"   # "DAILY" | "STRATEGY"
 
@@ -68,10 +68,10 @@ RANKING_MODE       = "combo_delta"  # "weighted_delta" | "n_classified" | "combo
 # ER  → direction  (trending vs ranging)
 # ATR → volatility (highvol vs lowvol)
 # =============================================================================
-ER_WINDOWS:      list[int]   = [10,40]
+ER_WINDOWS:      list[int]   = [10]
 ER_THRESHOLDS:   list[float] = [0.5, 0.6, 0.7, 0.8]
  
-ATR_WINDOWS:     list[int]   = [10,40]
+ATR_WINDOWS:     list[int]   = [10]
 ATR_THRESHOLDS:  list[float] = [0.02, 0.03, 0.04, 0.05]
 
 ORDER_AMOUNT               = 80

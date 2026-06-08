@@ -43,23 +43,6 @@ from state.state_manager import BotState, configure_postgres as sm_configure_pos
 from execution.trade_logger import configure_postgres as tl_configure_postgres
 
 class BotOrchestrator:
-    """
-    Main orchestrator for the trading bot.
-    
-    Encapsulates all bot state and execution logic, making it
-    testable and allowing multiple instances to run in parallel.
-    
-    Attributes:
-        account_number: Account identifier (e.g., "01", "E1", "00")
-        config: Account-specific configuration
-        open_positions: Dictionary of open positions by strategy
-        strategy_candles: Candle counters by strategy
-        strategies: List of active strategies
-        
-    Example:
-        >>> bot = BotOrchestrator("01")
-        >>> bot.run()
-    """
     
     def __init__(
         self,
@@ -68,16 +51,7 @@ class BotOrchestrator:
         connect_bitget_func: callable,
         active_strategy_ids: Optional[List[str]] = None
     ):
-        """
-        Initialize the bot orchestrator.
-        
-        Args:
-            account_number: Account number (e.g., "01", "E1", "00")
-            bitget_client: Authenticated Bitget API client
-            connect_bitget_func: Function to connect CCXT exchange
-            active_strategy_ids: Optional list of strategy IDs to set as active
-                               (overrides YAML configuration)
-        """
+
         self.account_number = account_number
         self.logger = logging.getLogger(f'BOT_trading.core.orchestrator.{account_number}')
         
@@ -140,11 +114,7 @@ class BotOrchestrator:
     # ======================================================================
     
     def run(self) -> None:
-        """
-        Main entry point to run the bot.
-        
-        Initializes all components and starts the main trading loop.
-        """
+
         if not self._initialized:
             self.initialize()
         
@@ -157,18 +127,7 @@ class BotOrchestrator:
             self.shutdown()
     
     def initialize(self) -> None:
-        """
-        Initialize all bot components.
-        
-        This method sets up:
-        - Directory structure
-        - logger
-        - State loading
-        - Strategy loading and validation
-        - Market data connections
-        - Dashboard
-        - WebSocket connections
-        """
+
         if self._initialized:
             self.logger.warning("WAR-Bot already initialized, skipping...")
             return
@@ -213,18 +172,7 @@ class BotOrchestrator:
         self.logger.info("⛔ BOT Stopped")
     
     def get_status(self) -> Dict[str, Any]:
-        """
-        Get current bot status for monitoring.
-        
-        Returns:
-            Dictionary with current bot status including:
-            - account_number
-            - total_positions
-            - active_strategies
-            - websocket_status
-            - uptime
-            - etc.
-        """
+
         total_positions   = sum(len(positions) for positions in self.open_positions.values())
         active_strategies = sum(1 for s in self.strategies if s.get('active', True))
         
@@ -239,23 +187,7 @@ class BotOrchestrator:
             'dashboard_port': self.dashboard_port,
             'total_profit': self.bot_state.closed_total_profit if self.bot_state else 0
         }
-    
-    def reload_strategies(self) -> None:
-        """
-        Reload strategies from YAML without restarting the bot.
         
-        Useful for applying strategy parameter changes without downtime.
-        """
-        self.logger.info("Reloading strategies...")
-        self.strategies = load_strategies(self.account_number)
-        self.strategies = [s for s in self.strategies if s['id'] in IMPLEMENTED_STRATEGIES]
-        
-        if self.active_strategy_ids:
-            from strategies.strategy_loader import apply_set_active_argument
-            apply_set_active_argument(self.strategies, self.active_strategy_ids)
-        
-        self.logger.info(f"Reloaded {len(self.strategies)} strategies")
-    
     # ======================================================================
     # INITIALIZATION METHODS (Private)
     # ======================================================================
@@ -465,13 +397,7 @@ class BotOrchestrator:
     # ======================================================================
     
     def _main_loop(self) -> None:
-        """
-        Main trading loop.
-        
-        Continuously checks for:
-        - New closed candles → process signals
-        - TP/SL hits → close positions
-        """
+
         # Split-brain protection (only checks on LOCAL)
         while self._running:
             check_split_brain(self)
@@ -499,13 +425,7 @@ class BotOrchestrator:
         closed_timeframes: List[str],
         now_datetime: datetime
     ) -> None:
-        """
-        Process new closed candles.
-        
-        Args:
-            closed_timeframes: List of timeframes that just closed
-            now_datetime: Current datetime
-        """
+
         self.logger.info(f"{'=' * 48}")
         self.logger.info(f"New candles {now_datetime.strftime('%Y-%m-%d %H:%M:%S')} UTC")
         self.logger.info(f"Timeframes: {', '.join(closed_timeframes)}")
@@ -518,7 +438,6 @@ class BotOrchestrator:
         # ========================================================================
         # REGIME UPDATE: Calculate market regime & direction for closed timeframes
         # ========================================================================
-
         
         now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
         self.logger.info(f"Searching Signals... - {now}")
@@ -555,12 +474,7 @@ class BotOrchestrator:
 
     
     def _process_candle_timeouts(self, strategies_to_process: List[Dict]) -> None:
-        """
-        Process strategies with open positions (candle timeout logic).
-        
-        Args:
-            strategies_to_process: Strategies to check for timeouts
-        """
+
         for strat in strategies_to_process:
             strat_id = strat['id']
             has_positions = (
@@ -594,12 +508,7 @@ class BotOrchestrator:
                     self.operative.monitor_exits()
     
     def _search_signals(self, strategies_to_process: List[Dict]) -> None:
-        """
-        Search for new trading signals.
 
-        Args:
-            strategies_to_process: Strategies to check for signals
-        """
         for strat in strategies_to_process:
             strat_id = strat['id']
 
@@ -760,12 +669,7 @@ class BotOrchestrator:
 
     
     def _periodic_tpsl_check(self, current_time: float) -> None:
-        """
-        Periodic TP/SL check (when no new candles).
-        
-        Args:
-            current_time: Current timestamp
-        """
+
         if current_time - self.last_tpsl_check >= CHECK_INTERVAL:
             self.operative.monitor_exits()
             
@@ -788,9 +692,7 @@ class BotOrchestrator:
     # ======================================================================
     # HELPER METHODS (Private)
     # ======================================================================
-
-
-        
+       
     def _send_request_wrapper(
         self,
         method: str,
@@ -798,18 +700,7 @@ class BotOrchestrator:
         params: Optional[Dict] = None,
         body: Optional[Dict] = None
     ) -> Any:
-        """
-        Wrapper for Bitget API requests.
-        
-        Args:
-            method: HTTP method
-            path: API path
-            params: Query parameters
-            body: Request body
-        
-        Returns:
-            API response
-        """
+
         return self.bitget_client.send_request(method, path, params, body)
     
     def _log_startup(self) -> None:

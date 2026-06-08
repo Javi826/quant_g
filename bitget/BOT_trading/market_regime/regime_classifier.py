@@ -77,7 +77,7 @@ def _calc_metrics_from_arr(arr: dict) -> Dict[str, Optional[float]]:
             val          = _CALC_FN[key](high, low, close, w)
             metrics[key] = float(val) if not np.isnan(val) else None
         except Exception as e:
-            logger.warning(f"[REGIME_GE] Error computing {key}: {e}")
+            logger.warning(f"[REGIME] Error computing {key}: {e}")
             metrics[key] = None
     return metrics
 
@@ -92,13 +92,13 @@ def _fetch_and_calc_metrics(symbol: str, timeframe: str) -> Dict[str, Optional[f
         ohlcv_data = fetch_ohlcv_data([symbol], timeframe)
         df         = ohlcv_data.get(symbol)
         if df is None or df.empty:
-            logger.warning(f"[REGIME_GE] No data for {symbol} {timeframe}")
+            logger.warning(f"[REGIME] No data for {symbol} {timeframe}")
             return {}
         df_norm = normalize_live_ohlcv(df)
         arr     = df_to_arrays_live(df_norm)
         return _calc_metrics_from_arr(arr)
     except Exception as e:
-        logger.error(f"[REGIME_GE] Error fetching {symbol} {timeframe}: {e}")
+        logger.error(f"[REGIME] Error fetching {symbol} {timeframe}: {e}")
         return {}
 
 
@@ -146,13 +146,13 @@ def get_symbol_regime(
         metrics = _fetch_and_calc_metrics(ref_symbol, ref_timeframe)
 
     if not metrics:
-        logger.warning(f"[REGIME_GE] No metrics for {ref_symbol} {ref_timeframe} — defaulting to neutral")
+        logger.warning(f"[REGIME] No metrics for {ref_symbol} {ref_timeframe} — defaulting to neutral")
         return 'neutral'
 
     regime = _classify(metrics)
 
     logger.info(
-        f"[REGIME_GE] {symbol} → regime={regime.upper()} | "
+        f"[REGIME] {symbol} → regime={regime.upper()} | "
         + " | ".join(
             f"{k}={v:.4f}" if v is not None else f"{k}=None"
             for k, v in metrics.items()

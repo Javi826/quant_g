@@ -197,7 +197,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     Validates strategy configuration against all validation rules.
     
     Args:
-        strategies: List of strategy dicts loaded from YAML
+        strategies: List of strategy dicts loaded from settings.
         implemented_strategies: Set of strategy IDs that have implementations
     
     Returns:

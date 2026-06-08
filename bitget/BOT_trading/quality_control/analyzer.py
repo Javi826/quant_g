@@ -272,7 +272,7 @@ def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Di
                 'sl_trades': 0,
                 'sl_real_pct': None,
                 'sl_target_pct': sl_target_pct,
-                'sl_deviation': None
+                'timeout_trades': 0
             }
             continue
         
@@ -298,6 +298,8 @@ def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Di
             if sl_target_pct is not None:
                 sl_deviation = sl_real_pct - sl_target_pct
         
+        timeout_trades = len(df_strat[df_strat['REASON_OUT'] == 'TIMEOUT'])
+        
         results[strategy_id] = {
             'tp_trades': int(tp_trades),
             'tp_real_pct': round(tp_real_pct, 2) if tp_real_pct is not None else None,
@@ -306,7 +308,8 @@ def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Di
             'sl_trades': int(sl_trades),
             'sl_real_pct': round(sl_real_pct, 2) if sl_real_pct is not None else None,
             'sl_target_pct': round(sl_target_pct, 2) if sl_target_pct is not None else None,
-            'sl_deviation': round(sl_deviation, 2) if sl_deviation is not None else None
+            'sl_deviation': round(sl_deviation, 2) if sl_deviation is not None else None,
+            'timeout_trades': int(timeout_trades)
         }
     
     return results

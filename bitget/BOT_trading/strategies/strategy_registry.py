@@ -10,8 +10,7 @@ This module provides:
 This is the SINGLE SOURCE OF TRUTH for strategy implementations.
 
 To add a new strategy:
-1. Add entry in strategies.yaml
-2. Add elif in detect_signals_for_strategy() below
+1. Add elif in detect_signals_for_strategy() below
 3. Add strategy name to get_implemented_strategies()
 """
 
@@ -60,7 +59,7 @@ def detect_signals_for_strategy(
 ) -> list:
     """
     Args:
-        strat: Strategy configuration dictionary from YAML containing:
+        strat: Strategy configuration dictionary from  containing:
             - id: Strategy identifier
             - name: Strategy name (e.g., 'reversal_long_4H')
             - timeframe: Timeframe (e.g., '4H', '1H', '6Hutc')
@@ -531,7 +530,7 @@ def get_implemented_strategies() -> set:
     """
     Returns set of all implemented strategy IDs.
     
-    This is used by validation system to ensure strategies in YAML
+    
     are actually implemented.
     
     IMPORTANT: When adding a new strategy, add its ID here!

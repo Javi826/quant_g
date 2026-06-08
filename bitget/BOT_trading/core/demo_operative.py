@@ -77,8 +77,9 @@ class DemoOperative:
     
     
     def place_simulated_order(self, symbol: str, direction: str,
-                             usdt_amount: float, tp_pct: float,
-                             sl_pct: float, strategy_id: str) -> Optional[Dict]:
+                         usdt_amount: float, tp_pct: float,
+                         sl_pct: float, strategy_id: str,
+                         regime: str = 'unknown') -> Optional[Dict]:
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
             if not current_price:
@@ -120,7 +121,7 @@ class DemoOperative:
             logger.info(
                 f"[DEMO] ENTRY {direction.upper()} {symbol} @ ${entry_price:.4f} | "
                 f"${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f} | "
-                f"Regime: unknown"
+                f"Regime: {regime}"
             )
     
             return position
@@ -417,14 +418,15 @@ class DemoOperative:
         
     def place_order(self, symbol: str, direction: str, usdt_amount: float,
                     tp_pct: float, sl_pct: float, strategy_id: str,
-                    signal_close: float = 0) -> None:
+                    signal_close: float = 0, regime: str = 'unknown') -> None:
         self.place_simulated_order(
             symbol=symbol,
             direction=direction,
             usdt_amount=usdt_amount,
             tp_pct=tp_pct,
             sl_pct=sl_pct,
-            strategy_id=strategy_id
+            strategy_id=strategy_id,
+            regime=regime
         )
         
     def sync_broker(self) -> None:

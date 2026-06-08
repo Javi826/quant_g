@@ -119,6 +119,7 @@ class StrategyProcessor:
                 tp_pct       = strat['tp_pct'],
                 sl_pct       = strat['sl_pct'],
                 strategy_id  = strat_id,
-                signal_close = sig.get('close', 0)
+                signal_close = sig.get('close', 0),
+                regime       = sig.get('regime', 'unknown')
             )
             time.sleep(0.05)

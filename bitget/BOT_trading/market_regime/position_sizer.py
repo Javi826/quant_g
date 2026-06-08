@@ -3,7 +3,7 @@
 Position sizing based on market regime and direction alignment.
 
 Calculates adjusted order amounts by applying multipliers from:
-- regime_trending/ranging/volatile: Strategy's own regime multipliers (from YAML)
+- regime_trending/ranging/volatile: Strategy's own regime multipliers
 - DIRECTION_MATRIX: Strategy direction mode vs market direction alignment
 """
 
