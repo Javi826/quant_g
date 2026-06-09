@@ -3,12 +3,8 @@
 import logging
 
 logger = logging.getLogger(__name__)
-BINS: list[str] = ["uptrend", "dwtrend"]
 
-def pct_improvement(val: float, base: float) -> float:
-    if base == 0:
-        return 0.0
-    return (val - base) / abs(base) * 100
+from shared_batch_regime.regime_core import BINS, pct_improvement
 
 # =============================================================================
 # COMBO PERIOD TABLE

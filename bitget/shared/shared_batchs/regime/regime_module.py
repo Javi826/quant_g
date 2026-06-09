@@ -4,17 +4,12 @@ import logging
 import numpy as np
 import pandas as pd
 from importlib.util import spec_from_file_location, module_from_spec
-
+import os
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batch_regime.regime_core import (
-    REGIME_TIMEFRAME,
-    load_ohlcv_raw,
-    precompute_indicators,
-    lookup_ma_batch,
-    classify_market_regime,
-    load_regime_bins_ge,
-)
+from shared_batch_regime.regime_core import REGIME_TIMEFRAME, load_ohlcv_raw
+from shared_batch_regime.regime_core import precompute_indicators, lookup_ma_batch
+from shared_batch_regime.regime_core import classify_market_regime
 
 logger = logging.getLogger("shared_batch.regime.regime_module")
 
@@ -22,7 +17,7 @@ logger = logging.getLogger("shared_batch.regime.regime_module")
 # CONFIGURATION  (populated by load_config_from_bins)
 # =============================================================================
 REGIME_ENABLED = True
-MA_WINDOW      = 3
+MA_WINDOW      = None
 
 # =============================================================================
 # INDICATOR CACHE  (MA over daily close, keyed by symbol)
@@ -51,7 +46,7 @@ def load_config_from_bins(bins_path: str) -> None:
         MA_WINDOW = module.MA_WINDOW
 
     _indicator_cache = {}
-    logger.info(f"  [regime_module] config loaded — MA_WINDOW={MA_WINDOW} MA_TIMEFRAME={REGIME_TIMEFRAME}")
+    logger.debug(f"  [regime_module] config loaded — MA_WINDOW={MA_WINDOW} MA_TIMEFRAME={REGIME_TIMEFRAME}")
 
 
 def _get_indicator_cache(symbol: str) -> tuple | None:
@@ -69,9 +64,14 @@ def _get_indicator_cache(symbol: str) -> tuple | None:
 # =============================================================================
 
 def load_regime_bins(bins_path: str, strategy_id: str) -> str:
-    """Return the uptrend/downtrend/neutral classification for a strategy."""
-    return load_regime_bins_ge(bins_path, strategy_id)
-
+    if not os.path.exists(bins_path):
+        logger.warning(f"regime_bins file not found: {bins_path} — defaulting to neutral.")
+        return "neutral"
+    spec   = spec_from_file_location("regime_bins", bins_path)
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bins = getattr(module, "REGIME_BINS", {})
+    return bins.get(strategy_id, "neutral")
 
 # =============================================================================
 # RUN OOS BACKTEST WITH REGIME
@@ -87,14 +87,7 @@ def run_oos_backtest_with_regime(
     bins_to_filter:  str,
     initial_balance: float,
 ) -> tuple:
-    """
-    Run OOS backtest applying the uptrend/downtrend MA regime filter.
 
-    bins_to_filter : "uptrend" | "downtrend" | "neutral"
-      - "uptrend"   → keep signals only when close > MA  (uptrend regime)
-      - "dwtrend" → keep signals only when close < MA  (downtrend regime)
-      - "neutral"   → no filter applied
-    """
     ohlcv_arrays_regime: dict = {}
 
     for sym, arr in ohlcv_arrays.items():

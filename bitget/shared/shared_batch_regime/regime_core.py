@@ -37,7 +37,7 @@ REGIME_TIMEFRAME: str = "1Dutc"  # daily timeframe for MA computation — only "
 if REGIME_TIMEFRAME != "1Dutc":
     raise ValueError(f"❌ REGIME_TIMEFRAME='{REGIME_TIMEFRAME}' is not supported. Only '1Dutc' is allowed.")
 
-logger.info(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
+logger.debug(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
 
 # =============================================================================
 # CONSTANTS
@@ -198,10 +198,7 @@ def build_indicator_cache(
     strategies: list[dict],
     ma_window:  int,
 ) -> dict:
-    """
-    Build MA indicator cache keyed by symbol (always REGIME_TIMEFRAME).
-    Returns {sym: (ts_arr, ma_arr)} where ma_arr is the MA(ma_window) series.
-    """
+
     cache: dict      = {}
     keys_needed: set = set()
 
@@ -501,31 +498,12 @@ def save_bins(
         f.write("\n".join(header_lines + bin_lines + ["}"]) + "\n")
     print(f"\n  ✅ Bins saved to: {output_path}")
 
-
-# =============================================================================
-# LOAD REGIME BINS
-# =============================================================================
-
-def load_regime_bins_ge(bins_path: str, strategy_id: str) -> str:
-    if not os.path.exists(bins_path):
-        logger.warning(f"regime_bins file not found: {bins_path} — defaulting to neutral.")
-        return "neutral"
-    spec   = spec_from_file_location("regime_bins_ge", bins_path)
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
-    bins = getattr(module, "REGIME_BINS", {})
-    return bins.get(strategy_id, "neutral")
-
-
 # =============================================================================
 # TIME-SERIES PRECOMPUTATION
 # =============================================================================
 
 def precompute_indicators(df: pd.DataFrame, ma_window: int) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Compute MA(ma_window) over daily close prices.
-    Returns (ts_arr, ma_arr) — only rows where MA is valid (non-NaN).
-    """
+
     close = df["close"].values
     ts    = df["ts"].values
     ma    = compute_ma(close, ma_window)
@@ -547,14 +525,7 @@ def lookup_ma_batch(
     close_arr:     np.ndarray | None = None,
     debug_n:       int = 0,
 ) -> np.ndarray:
-    """
-    Vectorized lookup of MA value for multiple signal timestamps.
-    Always applies D-1 lookahead fix: uses the daily candle from the day before the signal.
-    Returns np.ndarray of MA values — NaN where no valid index found.
 
-    debug_n   : if > 0, prints the first debug_n signal_ts / daily_candle_ts pairs (raw, no logic).
-    close_arr : optional, used for debug only.
-    """
     ts_lookup = signal_ts_arr.astype("datetime64[ns]")
     ts_fixed  = (ts_lookup.astype("datetime64[D]") - np.timedelta64(1, "D")).astype("datetime64[ns]")
     idxs      = np.searchsorted(ts_arr, ts_fixed, side="right") - 1

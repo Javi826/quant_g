@@ -28,14 +28,14 @@ logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 logging.getLogger("shared_batch_regime.regime_core").setLevel(logging.INFO)
 
-N_JOBS = 1
+N_JOBS = -1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
     "OOS3": 0.25,
 }
 
-STRATEGIES_SET_NAME = "E1"
+STRATEGIES_SET_NAME = "00"
 BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}","strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py",)
 
 # =============================================================================
@@ -49,37 +49,36 @@ RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
 # INDICATOR GRID
 # MA window over REGIME_TIMEFRAME close — determines uptrend/downtrend boundary
 # =============================================================================
-MA_WINDOWS: list[int] = [3]
-
-ORDER_AMOUNT               = 80
-LONG_KEYWORD               = "long"
-DEBUG_TF_FILTER: list[str] = []
-
+MA_WINDOWS: list[int] = [2,3,4]
 
 # =============================================================================
 # COMBINED METRIC FOR A SINGLE PERIOD
 # =============================================================================
 
-def _combined_metric_for_period(results: dict, period_key: str, optimize_metric: str = "profit") -> tuple[float, float]:
+def _combined_metric_for_period(
+    results:         dict,
+    period_key:      str,
+    optimize_metric: str = "profit",
+) -> tuple[float, float]:
     comb = base = 0.0
     for sid, data in results.items():
-        if sid == 'is_long' or period_key not in data or not isinstance(data[period_key], dict):
+        if sid == "is_long" or period_key not in data or not isinstance(data[period_key], dict):
             continue
         d   = data[period_key]
-        cls = data.get('classification', 'neutral')
+        cls = data.get("classification", "neutral")
 
         if optimize_metric == "calmar":
-            base += _calmar(d['b_prof'], d['b_dd'])
-            if cls in ('uptrend', 'downtrend'):
+            base += _calmar(d["b_prof"], d["b_dd"])
+            if cls in BINS:
                 comb += _calmar(d[f"{cls}_prof"], d[f"{cls}_dd"])
             else:
-                comb += _calmar(d['b_prof'], d['b_dd'])
+                comb += _calmar(d["b_prof"], d["b_dd"])
         else:
-            base += d['b_prof']
-            if cls in ('uptrend', 'downtrend'):
+            base += d["b_prof"]
+            if cls in BINS:
                 comb += d[f"{cls}_prof"]
             else:
-                comb += d['b_prof']
+                comb += d["b_prof"]
 
     return comb, base
 

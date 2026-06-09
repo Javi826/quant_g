@@ -48,6 +48,7 @@ from shared_batchs.regime import regime_module
 from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
+from shared_batch_regime.regime_core import REGIME_TIMEFRAME
 
 regime_module._indicator_cache = {}
 # Global accumulators
@@ -76,13 +77,12 @@ STRATEGIES_SET_NAME  = "00"
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
 
-# ELITE -- MA4
+# ELITE -- MA3
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 23
+OOS_NETGAIN_TH       = 27
 OOS_MAX_DD_TH        = 14
-OOS_R2_TH            = 0.43
-
+OOS_R2_TH            = 0.47
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = True
+UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
 
@@ -704,7 +704,7 @@ if __name__ == "__main__":
     logger.info(f"  Outputs update : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
-    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}")
+    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}  TF={REGIME_TIMEFRAME}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
