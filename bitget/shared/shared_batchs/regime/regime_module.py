@@ -1,4 +1,4 @@
-#shared/shared_batchs/regime/regime_GE_module_uptrend.py
+#shared/shared_batchs/regime/regime_module.py
 
 import logging
 import numpy as np
@@ -7,7 +7,8 @@ from importlib.util import spec_from_file_location, module_from_spec
 
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batch_regime.regime_GE_core_uptrend import (
+from shared_batch_regime.regime_core import (
+    REGIME_TIMEFRAME,
     load_ohlcv_raw,
     precompute_indicators,
     lookup_ma_batch,
@@ -15,15 +16,13 @@ from shared_batch_regime.regime_GE_core_uptrend import (
     load_regime_bins_ge,
 )
 
-logger = logging.getLogger("shared_batch.regime.regime_GE_module_uptrend")
+logger = logging.getLogger("shared_batch.regime.regime_module")
 
 # =============================================================================
-# CONFIGURATION  (populated by load_config_from_bins_uptrend)
+# CONFIGURATION  (populated by load_config_from_bins)
 # =============================================================================
 REGIME_ENABLED = True
 MA_WINDOW      = 3
-MA_TIMEFRAME   = "1Dutc"
-ANALYSIS_MODE  = "SYMBOL"
 
 # =============================================================================
 # INDICATOR CACHE  (MA over daily close, keyed by symbol)
@@ -32,29 +31,33 @@ ANALYSIS_MODE  = "SYMBOL"
 _indicator_cache: dict = {}
 
 
-def load_config_from_bins_uptrend(bins_path: str) -> None:
-    """Load MA_WINDOW, MA_TIMEFRAME, ANALYSIS_MODE from a regime_bins_uptrend file."""
-    global MA_WINDOW, MA_TIMEFRAME, ANALYSIS_MODE, _indicator_cache
+def load_config_from_bins(bins_path: str) -> None:
+    """Load MA_WINDOW from a regime_bins file. Validates MA_TIMEFRAME against REGIME_TIMEFRAME."""
+    global MA_WINDOW, _indicator_cache
 
-    spec   = spec_from_file_location("regime_bins_uptrend", bins_path)
+    spec   = spec_from_file_location("regime_bins", bins_path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
 
+    bins_timeframe = getattr(module, "MA_TIMEFRAME", None)
+    if bins_timeframe and bins_timeframe != REGIME_TIMEFRAME:
+        raise ValueError(
+            f"❌ Bins MA_TIMEFRAME='{bins_timeframe}' does not match "
+            f"regime_core REGIME_TIMEFRAME='{REGIME_TIMEFRAME}'. "
+            f"Re-calibrate or update REGIME_TIMEFRAME."
+        )
+
     if hasattr(module, "MA_WINDOW"):
         MA_WINDOW = module.MA_WINDOW
-    if hasattr(module, "MA_TIMEFRAME"):
-        MA_TIMEFRAME = module.MA_TIMEFRAME
-    if hasattr(module, "ANALYSIS_MODE"):
-        ANALYSIS_MODE = module.ANALYSIS_MODE
 
     _indicator_cache = {}
-    logger.debug(f"[REGIME UPTREND] Config loaded — MA_WINDOW={MA_WINDOW} MA_TIMEFRAME={MA_TIMEFRAME} ANALYSIS_MODE={ANALYSIS_MODE}")
+    logger.info(f"  [regime_module] config loaded — MA_WINDOW={MA_WINDOW} MA_TIMEFRAME={REGIME_TIMEFRAME}")
 
 
 def _get_indicator_cache(symbol: str) -> tuple | None:
-    """Lazily load and cache (ts_arr, ma_arr) for a symbol on daily timeframe."""
+    """Lazily load and cache (ts_arr, ma_arr) for a symbol on REGIME_TIMEFRAME."""
     if symbol not in _indicator_cache:
-        df = load_ohlcv_raw(symbol, MA_TIMEFRAME)
+        df = load_ohlcv_raw(symbol)
         if df.empty:
             return None
         _indicator_cache[symbol] = precompute_indicators(df, MA_WINDOW)
@@ -65,16 +68,16 @@ def _get_indicator_cache(symbol: str) -> tuple | None:
 # LOAD REGIME BINS
 # =============================================================================
 
-def load_regime_bins_uptrend(bins_path: str, strategy_id: str) -> str:
-    """Return the uptrend classification string for a strategy."""
+def load_regime_bins(bins_path: str, strategy_id: str) -> str:
+    """Return the uptrend/downtrend/neutral classification for a strategy."""
     return load_regime_bins_ge(bins_path, strategy_id)
 
 
 # =============================================================================
-# RUN OOS BACKTEST WITH UPTREND REGIME
+# RUN OOS BACKTEST WITH REGIME
 # =============================================================================
 
-def run_oos_backtest_with_regime_uptrend(
+def run_oos_backtest_with_regime(
     strategy_id:     str,
     ohlcv_arrays:    dict,
     signal_fn,
@@ -89,7 +92,7 @@ def run_oos_backtest_with_regime_uptrend(
 
     bins_to_filter : "uptrend" | "downtrend" | "neutral"
       - "uptrend"   → keep signals only when close > MA  (uptrend regime)
-      - "downtrend" → keep signals only when close < MA  (downtrend regime)
+      - "dwtrend" → keep signals only when close < MA  (downtrend regime)
       - "neutral"   → no filter applied
     """
     ohlcv_arrays_regime: dict = {}
@@ -98,8 +101,7 @@ def run_oos_backtest_with_regime_uptrend(
         signals = signal_fn(arr, **signal_params, live_trading=False)
 
         if REGIME_ENABLED and bins_to_filter and bins_to_filter != "neutral":
-            ref_sym   = "BTCUSDT" if ANALYSIS_MODE == "BTC" else sym
-            sym_cache = _get_indicator_cache(ref_sym)
+            sym_cache = _get_indicator_cache(sym)
 
             if sym_cache is not None:
                 ts_arr, ma_arr = sym_cache

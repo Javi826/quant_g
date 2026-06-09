@@ -22,13 +22,7 @@ ACCOUNTS = {
         "risk_control_enabled": True,
         "postgresql_enabled": True,
         "regime_reference_symbol": "BTCUSDT",
-        "regime_indicators": {
-            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
-            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
-        },
-        "regime_combine_mode":   "OR",
-        "regime_analysis_mode":  "SYMBOL",
-        "regime_timeframe_mode": "DAILY",
+        "regime_ma_window": 3,
     },
     "00": {
         "initial_capital": 4000,
@@ -39,13 +33,7 @@ ACCOUNTS = {
         "risk_control_enabled": True,
         "postgresql_enabled": False,
         "regime_reference_symbol": "BTCUSDT",
-        "regime_indicators": {
-            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
-            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
-        },
-        "regime_combine_mode":   "OR",
-        "regime_analysis_mode":  "SYMBOL",
-        "regime_timeframe_mode": "DAILY",
+        "regime_ma_window": 3,
     },
     
     
@@ -58,21 +46,11 @@ ACCOUNTS = {
         "risk_control_enabled": False,
         "postgresql_enabled": False,
         "regime_reference_symbol": "BTCUSDT",
-        "regime_indicators": {
-            "atr_norm": {"window": 10, "threshold": 0.04, "enabled": True},
-            "er":       {"window": 40, "threshold": 0.8,  "enabled": True},
-        },
-        "regime_combine_mode":   "OR",
-        "regime_analysis_mode":  "SYMBOL",
-        "regime_timeframe_mode": "DAILY",
+        "regime_ma_window": 3,
     },
 }
 
 COMMISSION_PCT = 0.1
-
-# ==========================================================================
-# MARKET REGIME SETTINGS
-# ==========================================================================
 
 # ==========================================================================
 # RISK CONTROL SETTINGS
@@ -107,7 +85,7 @@ LATENCY_CRITICAL_SEC   = 1.0
 COMMON_REQUIRED_PARAMS = [
     'id', 'name', 'timeframe', 'active', 'sell_after_ncandles',
     'order_amount', 'tp_pct', 'sl_pct', 'direction',
-    #'regime_trending', 'regime_ranging','regime_neutral',
+    #'regime_uptrend', 'regime_dwtrend','regime_neutral',
 ]
 
 # Strategy-specific required parameters by strategy type

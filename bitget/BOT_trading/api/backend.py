@@ -33,20 +33,10 @@ class DashboardServer:
                  get_balance_func, strategies_config,
                  initial_capital=0, implemented_strategies=None, symbols_by_strategy=None,
                  unique_timeframes=None):
-        """
-        Inicializa el servidor del dashboard.
-        
-        Args:
-            account_number: Número de cuenta (ej: "01", "E1")
-            base_dir: Directorio base de los archivos del bot
-            get_current_price_func: Función para obtener precio actual de un símbolo
-            get_balance_func: Función para obtener balance USDT
-            initial_capital: Capital inicial de la cuenta
-            implemented_strategies: Set de estrategias implementadas
-            symbols_by_strategy: Dict con símbolos por estrategiafrom config.utils import get_account_config
-        """
+
         self.account_number = account_number
         self.regime_reference_symbol = ACCOUNTS.get(account_number, {}).get('regime_reference_symbol')
+        self.regime_ma_window        = ACCOUNTS.get(account_number, {}).get('regime_ma_window', 3)
         self.base_dir = base_dir
         self.get_current_price = get_current_price_func
         self.get_balance = get_balance_func
@@ -184,17 +174,7 @@ class DashboardServer:
         return df
     
     def _filter_df_by_dates(self, df, date_from=None, date_to=None):
-        """
-        Filtra DataFrame por rango de fechas.
-        
-        Args:
-            df: DataFrame con columna CLOSE_AT
-            date_from: Fecha inicio (string YYYY-MM-DD o None)
-            date_to: Fecha fin (string YYYY-MM-DD o None)
-        
-        Returns:
-            DataFrame filtrado
-        """
+
         if df is None or df.empty:
             return df
         
@@ -221,12 +201,7 @@ class DashboardServer:
     
     
     def _load_state(self):
-        """
-        Load bot state from PostgreSQL or JSON (demo mode).
-        
-        Returns:
-            Dictionary with 'positions' and 'strategy_candles'
-        """
+
         # DEMO MODE: Read from JSON
         if self.is_demo:
             try:
@@ -778,22 +753,20 @@ class DashboardServer:
             
         @self.app.route('/api/regime/strategies')
         def get_regime_strategies():
-            """
-            Returns strategies with their regime multipliers and direction for the matrix table.
-            """
+
             try:
                 strategies_info = []
         
                 for idx, strat in enumerate(self.strategies, 1):
-                    strategies_info.append({
-                            'number':          idx,
-                            'id':              strat['id'],
-                            'direction':       strat.get('direction', 'long'),
-                            'regime_trending': strat.get('regime_trending', 1),
-                            'regime_ranging':  strat.get('regime_ranging',  1),
-                            'regime_neutral':  strat.get('regime_neutral',  1),
-                            'active':          strat.get('active', True)
-                        })
+                        strategies_info.append({
+                                'number':          idx,
+                                'id':              strat['id'],
+                                'direction':       strat.get('direction', 'long'),
+                                'regime_uptrend':  strat.get('regime_uptrend',  1),
+                                'regime_dwtrend':  strat.get('regime_dwtrend',  1),
+                                'regime_neutral':  strat.get('regime_neutral',  1),
+                                'active':          strat.get('active', True)
+                            })
         
                 return jsonify({
                     'success': True,
@@ -1228,52 +1201,30 @@ class DashboardServer:
         
         @self.app.route('/api/regime/current')
         def get_regime_current():
-            """
-            Get current market regime for reference symbol (header card).
-            Query params:
-                timeframe: Strategy timeframe selected in UI (e.g. '4H', '1H')
-            Returns:
-                JSON with family, metrics, config, ref_price, all_families
-            """
             try:
-                timeframe    = request.args.get('timeframe', '4H')
-                regime_info  = get_regime_info_front(timeframe, symbol=None)
-                account_cfg  = ACCOUNTS.get(self.account_number, {})
+                timeframe   = request.args.get('timeframe', '4H')
+                regime_info = get_regime_info_front(timeframe, symbol=None)
                 return jsonify({
-                    'success':        regime_info['success'],
-                    'timeframe':      timeframe,
-                    'family':         regime_info['family'],
-                    'metrics':        regime_info['metrics'],
-                    'indicators_cfg': {
-                        k: {
-                            'window':    v['window'],
-                            'threshold': v['threshold'],
-                            'enabled':   v['enabled'],
-                            'label':     k.replace('_', ' ').title(),
-                        }
-                        for k, v in account_cfg.get('regime_indicators', {}).items()
-                    },
-                    'ref_price':      float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
-                    'combine_mode':   account_cfg.get('regime_combine_mode',   'OR'),
-                    'analysis_mode':  account_cfg.get('regime_analysis_mode',  'SYMBOL'),
-                    'tf_mode':        account_cfg.get('regime_timeframe_mode', 'DAILY'),
+                    'success':   regime_info['success'],
+                    'timeframe': regime_info['timeframe'],
+                    'family':    regime_info['family'],
+                    'metrics':   regime_info['metrics'],
+                    'ma_window': self.regime_ma_window,
+                    'ref_price': float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
                 })
             except Exception as e:
                 logger.error(f"Error getting regime: {e}")
                 return jsonify({
                     'success':   False,
                     'error':     str(e),
-                    'family':    'ranging',
+                    'family':    'neutral',
                     'metrics':   {},
                     'timeframe': request.args.get('timeframe', '4H'),
                 }), 500
             
         @self.app.route('/api/symbols/unique')
         def get_unique_symbols():
-            """
-            Returns unique symbols across all strategy CSV files for this account.
-            Reads from symbols_live/{account}/*.csv
-            """
+
             try:
                 symbols_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'symbols_live', self.account_number)
                 if not os.path.exists(symbols_dir):
@@ -1302,40 +1253,25 @@ class DashboardServer:
 
         @self.app.route('/api/regime/symbols')
         def get_regime_symbols():
-            """
-            Get regime metrics for a single symbol.
-            Query params:
-                timeframe : Strategy timeframe selected in UI (e.g. '4H')
-                symbol    : Single symbol to calculate (e.g. 'ETHUSDT')
-            """
             try:
                 timeframe   = request.args.get('timeframe', '4H')
                 symbol      = request.args.get('symbol')
-                account_cfg = ACCOUNTS.get(self.account_number, {})
-
+        
                 if not symbol:
                     return jsonify({'success': False, 'error': 'symbol param required'}), 400
-
+        
                 result      = get_regime_info_front(timeframe, symbol=[symbol])
                 symbol_data = result.get('symbols', {}).get(symbol, {})
-
+        
                 return jsonify({
-                    'success':        result['success'],
-                    'timeframe':      timeframe,
-                    'symbol':         symbol,
-                    'family':         symbol_data.get('family', 'neutral'),
-                    'metrics':        symbol_data.get('metrics', {}),
-                    'indicators_cfg': {
-                        k: {
-                            'window':    v['window'],
-                            'threshold': v['threshold'],
-                            'enabled':   v['enabled'],
-                            'label':     k.replace('_', ' ').title(),
-                        }
-                        for k, v in account_cfg.get('regime_indicators', {}).items()
-                    },
+                    'success':   result['success'],
+                    'timeframe': result['timeframe'],
+                    'symbol':    symbol,
+                    'family':    symbol_data.get('family', 'neutral'),
+                    'metrics':   symbol_data.get('metrics', {}),
+                    'ma_window': self.regime_ma_window,
                 })
-
+        
             except Exception as e:
                 logger.error(f"[REGIME SYMBOLS] Error for {request.args.get('symbol')}: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
@@ -1346,16 +1282,7 @@ class DashboardServer:
         
         @self.app.route('/api/ref/history')
         def get_ref_history():
-            """
-            Get reference symbol price history for chart overlay.
 
-            Query params:
-                date_from: YYYY-MM-DD (optional)
-                date_to: YYYY-MM-DD (optional)
-
-            Returns:
-                JSON with dates and prices arrays
-            """
             try:
                 date_from = request.args.get('date_from')
                 date_to   = request.args.get('date_to')
@@ -1403,12 +1330,7 @@ class DashboardServer:
             
         @self.app.route('/api/risk/exposure')
         def get_risk_exposure():
-            """
-            Get current risk exposure snapshot.
-            
-            Returns:
-                JSON with gross/net exposure metrics and per-strategy breakdown
-            """
+
             try:
                 state = self._load_state()
                 
@@ -1491,17 +1413,7 @@ class DashboardServer:
             
         @self.app.route('/api/risk/exposure-history')
         def get_risk_exposure_history():
-            """
-            Get historical risk exposure data.
-            
-            Query params:
-                days: Number of days to retrieve (default: 30)
-                date_from: Start date (YYYY-MM-DD, optional)
-                date_to: End date (YYYY-MM-DD, optional)
-            
-            Returns:
-                JSON with historical exposure data
-            """
+
             try:
                 from datetime import date, datetime, timedelta
                 
@@ -1646,13 +1558,7 @@ class DashboardServer:
             
         @self.app.route('/api/quality/drift-binomial')
         def get_quality_drift_binomial():
-            """
-            Get binomial drift analysis for all strategies.
-            Uses statistical thresholds (P_target ± σ) with double confirmation.
-            
-            Returns:
-                JSON with drift status per strategy using binomial distribution
-            """
+
             try:
                 from quality_control.analyzer import analyze_drift_binomial
                 
@@ -1732,17 +1638,7 @@ class DashboardServer:
             
         @self.app.route('/api/quality/winrate-evolution')
         def get_winrate_evolution():
-            """
-            Get cumulative win rate evolution over time for selected strategies.
-            
-            Query params:
-                strategies: Comma-separated strategy IDs
-                date_from: Start date (YYYY-MM-DD, optional)
-                date_to: End date (YYYY-MM-DD, optional)
-            
-            Returns:
-                JSON with dates and cumulative win rate percentages
-            """
+
             try:
                 # Get parameters
                 strategies_param = request.args.get('strategies', '')
@@ -1823,13 +1719,7 @@ class DashboardServer:
         
         @self.app.route('/api/ref/snapshot')
         def capture_ref_snapshot():
-            """
-            Capture today's reference symbol price snapshot.
-            Auto-called by scheduler at 00:05 UTC daily.
 
-            Returns:
-                JSON with success status and captured price
-            """
             try:
                 from datetime import date
 
@@ -2043,7 +1933,6 @@ class DashboardServer:
         self.running = False
         logger.info("Dashboard server stopped")
 
-
 def create_dashboard_template(base_dir):
     """Crea el archivo HTML del dashboard si no existe en ruta común"""
     api_dir = os.path.join(os.path.dirname(__file__))
@@ -2057,7 +1946,6 @@ def create_dashboard_template(base_dir):
     
     logger.warning(f"WAR-Creating template at {template_path}")
     logger.warning(f"WAR-Please ensure the complete dashboard.html is in place")
-
 
 if __name__ == '__main__':
     logger.info("This module should be imported, not run directly")

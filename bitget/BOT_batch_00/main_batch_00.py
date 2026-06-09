@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_E1.py
+#BOT_batch/main_batch_00.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -23,6 +23,7 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger("BOT_batch.main_batch")
+logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 
 # COMPUTE CONFIGURATION
 #------------------------------------------------------------------------------
@@ -43,12 +44,12 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
-from shared_batchs.regime import regime_GE_module
-from shared_batchs.regime.regime_GE_module import load_config_from_bins
+from shared_batchs.regime import regime_module
+from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 
-regime_GE_module._indicator_cache = {}
+regime_module._indicator_cache = {}
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
@@ -78,9 +79,10 @@ N_PATHS_IS           = 1
 # ELITE -- MA4
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 1
-OOS_MAX_DD_TH        = 30
-OOS_R2_TH            = 0.01
+OOS_NETGAIN_TH       = 23
+OOS_MAX_DD_TH        = 14
+OOS_R2_TH            = 0.43
+
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -90,7 +92,7 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED  = True
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -205,21 +207,7 @@ from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1, D
 # =============================================================================
 
 def run_batch(strategy_config: dict) -> None:
-    """
-    Run the full batch pipeline for a single strategy.
 
-    strategy_config keys:
-        id               : str   e.g. "03_parity_long_4H"
-        name             : str
-        direction        : str   "long" | "short"
-        timeframe        : str   e.g. "4H"
-        n_symbols        : int
-        order_amount     : int
-        order_amount_prod: int
-        direction_mode   : str
-        sell_after_ncandles: int
-        param_grid       : dict  {PARAM_NAME: [values], ...}
-    """
     start_time = time.time()
 
     STRATEGY_ID       = strategy_config["id"]
@@ -294,8 +282,8 @@ def run_batch(strategy_config: dict) -> None:
         trades_is_baseline    = _strategy_trades_is_baseline,
         trades_is_regime      = _strategy_trades_is_regime,
         brief_trades_folder   = brief_trades_folder,
-        regime_bins_path      = REGIME_BINS_PATH,
-        regime_enabled   = REGIME_ENABLED,
+        regime_bins_path          = REGIME_BINS_PATH,
+        regime_enabled            = REGIME_ENABLED
     )
 
     # -------------------------------------------------------------------------
@@ -714,9 +702,9 @@ if __name__ == "__main__":
     logger.info(f"  Strategies set : {STRATEGIES_SET_NAME}-{len(strategies_to_run)} stratagies")
     logger.info(f"  Loop config    : {STRATEGIES_LOOP_NAME}")
     logger.info(f"  Outputs update : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
-    regime_GE_module.REGIME_ENABLED = REGIME_ENABLED
+    regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
-    logger.info(f"  Regime         : {'🟢 enabled' if regime_GE_module.REGIME_ENABLED else '⚪ disabled'}  mode={regime_GE_module.COMBINE_MODE}  analysis={regime_GE_module.ANALYSIS_MODE}")
+    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")

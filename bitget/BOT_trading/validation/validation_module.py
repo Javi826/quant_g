@@ -20,15 +20,7 @@ from psycopg2 import OperationalError
 # ==========================================================================
 
 def validate_postgresql_connection():
-    """
-    Validates PostgreSQL connection is available before bot starts.
-    
-    Raises:
-        SystemExit: If PostgreSQL is not accessible
-    
-    Returns:
-        bool: True if connection successful
-    """
+
     try:
         logger.debug("Validating PostgreSQL connection...")
         
@@ -54,12 +46,7 @@ def validate_postgresql_connection():
 # ==========================================================================
 
 def validate_settings():
-    """
-    Validates system configuration and market regime settings.
-    
-    Returns:
-        tuple: (errors, warnings) - lists of validation messages
-    """
+
     
     errors = []
     warnings = []
@@ -193,17 +180,7 @@ def validate_settings():
 # ==========================================================================
 
 def validate_strategy_configuration(strategies, implemented_strategies):
-    """
-    Validates strategy configuration against all validation rules.
-    
-    Args:
-        strategies: List of strategy dicts loaded from settings.
-        implemented_strategies: Set of strategy IDs that have implementations
-    
-    Returns:
-        tuple: (errors, warnings) - lists of validation messages
-    """
-    
+
     # Use IDs instead of names for validation
     declared_strategies    = {s['id'] for s in strategies}
     missing_implementation = declared_strategies - implemented_strategies

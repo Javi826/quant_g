@@ -8,11 +8,10 @@ from shared_batchs.utils.backtest_compiler import compile_grid_results
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison
-from shared_batchs.regime.regime_GE_module import run_oos_backtest_with_regime
 from shared_batchs.utils.io import accumulate_strategy_trades
+from shared_batchs.regime.regime_module import run_oos_backtest_with_regime
 
 logger = logging.getLogger("BOT_batch.pipeline.oos_period")
-
 
 # =============================================================================
 # RUN OOS PERIOD — GENERIC
@@ -44,42 +43,9 @@ def run_oos_period(
     show_plots: bool,
     brief_trades_folder: str,
     run_report_backtesting: bool = False,
-    run_baseline: bool = True,
+    run_baseline:           bool = True,
 ) -> tuple:
-    """
-    Generic OOS period pipeline: baseline + regime backtest, validation, trade accumulation.
 
-    Args:
-        strategy_id            : strategy identifier
-        label                  : period label e.g. "OOS1", "OOS2", "OOS3"
-        stage_baseline         : log stage label for baseline e.g. "STAGE 3"
-        stage_regime           : log stage label for regime e.g. "STAGE 4"
-        ohlcv_data             : raw ohlcv dict {symbol: ohlcv_df}
-        signal_fn              : signal generation function
-        signal_params          : signal parameters dict
-        best_params            : best params from MC IS
-        param_names            : list of param names
-        order_amount           : order amount
-        timeframe              : timeframe string
-        data_folder            : data folder for this OOS period
-        bins_to_filter         : regime bins to filter
-        netgain_th             : net gain threshold for validation
-        max_dd_th              : max drawdown threshold for validation
-        r2_th                  : R² threshold for validation
-        for_validation         : whether this period counts for validation
-        approved               : current approval state (may be overridden)
-        validation_record      : validation record dict to update if rejected
-        trades_baseline_accum  : accumulator list for baseline trades
-        trades_regime_accum    : accumulator list for regime trades
-        save_trades            : whether to save trades to CSV
-        show_plots             : whether to show plots
-        brief_trades_folder    : folder for trade CSVs
-        run_report_backtesting : whether to run report_backtesting (OOS1 only)
-        run_baseline           : whether to run baseline backtest (OOS1 always, OOS2/3 only if show_plots or save_trades)
-
-    Returns:
-        tuple: (approved, trades_df_baseline, trades_df_regime, metrics_baseline, metrics_regime)
-    """
     ohlcv_arrays     = prepare_ohlcv_arrays(ohlcv_data)
     trades_baseline  = pd.DataFrame()
     metrics_baseline = None
@@ -132,19 +98,15 @@ def run_oos_period(
     logger.debug(f"{stage_regime} ── Backtest {label} Regime   ── {_symbols_str}bins: {bins_to_filter if bins_to_filter else 'none'}")
 
     trades_regime, metrics_regime = run_oos_backtest_with_regime(
-        strategy_id     = f"{strategy_id}_{label.lower()}_regime",
-        ohlcv_arrays    = ohlcv_arrays,
-        signal_fn       = signal_fn,
-        signal_params   = signal_params,
-        best_params     = best_params,
-        order_amount    = order_amount,
-        data_folder     = data_folder,
-        timeframe       = timeframe,
-        bins_to_filter  = bins_to_filter,
-        initial_balance = INITIAL_BALANCE,
-        debug_label     = label,
-    )
-    # después de: trades_regime, metrics_regime = run_oos_backtest_with_regime(...)
+            strategy_id     = f"{strategy_id}_{label.lower()}_regime",
+            ohlcv_arrays    = ohlcv_arrays,
+            signal_fn       = signal_fn,
+            signal_params   = signal_params,
+            best_params     = best_params,
+            order_amount    = order_amount,
+            bins_to_filter  = bins_to_filter,
+            initial_balance = INITIAL_BALANCE,
+        )
 
     _b_profit = "N/A" if trades_baseline.empty else f"{trades_baseline['profit'].sum():.1f}"
     logger.debug(f"  [DEBUG {label}] baseline profit={_b_profit} | regime profit={trades_regime['profit'].sum():.1f}")

@@ -3,9 +3,8 @@ import logging
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.regime.regime_GE_module import load_regime_bins
+from shared_batchs.regime.regime_module import load_regime_bins
 from shared_batchs.utils.io import accumulate_strategy_trades
-import os
 logger = logging.getLogger("BOT_batch.pipeline.backtest")
 
 
@@ -57,7 +56,10 @@ def run_backtest_is(
     trades_df_is.columns     = trades_df_is.columns.str.lower().str.strip()
     trades_df_is["buy_time"] = pd.to_datetime(trades_df_is["buy_time"])
 
-    bins_to_filter = load_regime_bins(regime_bins_path, strategy_id) if regime_enabled else "neutral"
+    if not regime_enabled:
+        bins_to_filter = "neutral"
+    else:
+        bins_to_filter = load_regime_bins(regime_bins_path, strategy_id)
     #print(f"  DEBUG bins_path={regime_bins_path} | exists={os.path.exists(regime_bins_path)} | bins={bins_to_filter}")
     logger.info(f"STAGE 2 ── Backtest IS            ── symbols: {len(symbols_oos_final)} | total={len(trades_df_is)}")
     if save_trades:

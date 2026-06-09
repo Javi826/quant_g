@@ -76,9 +76,9 @@ def save_drift_reference(drift_results: list, output_path: str) -> None:
 # =============================================================================
 
 _GE_CLASSIFICATION_MAP = {
-    "ranging":  {"regime_ranging": 1, "regime_trending": 0, "regime_neutral": 0},
-    "trending": {"regime_ranging": 0, "regime_trending": 1, "regime_neutral": 0},
-    "neutral":  {"regime_ranging": 1, "regime_trending": 1, "regime_neutral": 1},
+    "uptrend":  {"regime_uptrend": 1, "regime_dwtrend": 0, "regime_neutral": 0},
+    "dwtrend":  {"regime_uptrend": 0, "regime_dwtrend": 1, "regime_neutral": 0},
+    "neutral":  {"regime_uptrend": 1, "regime_dwtrend": 1, "regime_neutral": 1},
 }
 
 def save_strategies_pr(
@@ -182,7 +182,7 @@ def compare_and_generate_csv(
     prev_map = {s["id"]: s for s in _load_py_module(strategies_batch_path, "strategies_batch").STRATEGIES}
     new_map  = {s["id"]: s for s in _load_py_module(pr_batch_path, "strategies_pr_batch").STRATEGIES}
 
-    regime_bin_keys = ("regime_ranging", "regime_trending", "regime_neutral")
+    regime_bin_keys = ("regime_uptrend", "regime_dwtrend", "regime_neutral")
 
     rows = []
     for sid, new in new_map.items():
@@ -361,7 +361,7 @@ def print_update_status(
     # Table 3 — Market Regime
     lines = [
         f"\n{'─'*115}", f"  MARKET REGIME", f"{'─'*115}",
-        f"  {'Strategy':<27} {'Ranging':>10} {'Trending':>10} {'Neutral':>10} {'Changes':<40}",
+        f"  {'Uptrend':>10} {'Dwtrend':>10} {'Neutral':>10}",
         f"  {'-'*103}",
     ]
     for sid in strategy_ids:

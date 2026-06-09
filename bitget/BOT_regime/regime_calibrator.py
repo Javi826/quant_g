@@ -1,4 +1,4 @@
-#develop/market_regime/regime_GE_calibration_uptrend.py
+#develop/market_regime/regime_calibration.py
 import gc
 import os
 import sys
@@ -14,26 +14,21 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from shared_batch_regime.regime_GE_core_uptrend import (
-    EVAL_KEYS, BINS, pct_improvement,
-    combo_label, load_strategies_config,
-    precompute_baselines,
-    build_indicator_cache, get_cache_key,
-    classify_strategy, combined_metrics,
-    _calmar,
-    print_classification_summary, save_bins,
-    run_backtest, print_ranking,
-    print_combo_period_table, print_combo_summary,
-    run_filtered_combo,
-)
-import numpy as np
+from shared_batch_regime.regime_core import EVAL_KEYS, BINS, REGIME_TIMEFRAME
+from shared_batch_regime.regime_core import pct_improvement, combo_label, classify_strategy
+from shared_batch_regime.regime_core import load_strategies_config, precompute_baselines
+from shared_batch_regime.regime_core import build_indicator_cache, combined_metrics, _calmar
+from shared_batch_regime.regime_core import save_bins, run_filtered_combo
+
+from shared_batch_regime.regime_reporting import print_combo_period_table, print_combo_summary
+from shared_batch_regime.regime_reporting import print_ranking, print_classification_summary
 
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
-logging.getLogger("shared_batch_regime.regime_GE_core_uptrend").setLevel(logging.INFO)
+logging.getLogger("shared_batch_regime.regime_core").setLevel(logging.INFO)
 
-N_JOBS = -1
+N_JOBS = 1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -41,25 +36,20 @@ PERIOD_WEIGHTS = {
 }
 
 STRATEGIES_SET_NAME = "E1"
-BINS_OUTPUT_PATH    = os.path.join(
-    os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}",
-    "strategies_files", f"regime_bins_uptrend_{STRATEGIES_SET_NAME}.py",
-)
+BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}","strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py",)
 
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS  = True
-ANALYSIS_MODE   = "SYMBOL"   # "BTC" | "SYMBOL"
 OPTIMIZE_METRIC = "calmar"   # "profit" | "win_rate" | "calmar"
-
-RANKING_MODE = "weighted_delta"  # "weighted_delta" | "combo_delta"
+RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
 
 # =============================================================================
 # INDICATOR GRID
-# MA window over 1Dutc close — determines uptrend/downtrend boundary
+# MA window over REGIME_TIMEFRAME close — determines uptrend/downtrend boundary
 # =============================================================================
-MA_WINDOWS: list[int] = [2,3,4,5,6,7,8]
+MA_WINDOWS: list[int] = [3]
 
 ORDER_AMOUNT               = 80
 LONG_KEYWORD               = "long"
@@ -84,7 +74,6 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
                 comb += _calmar(d[f"{cls}_prof"], d[f"{cls}_dd"])
             else:
                 comb += _calmar(d['b_prof'], d['b_dd'])
-
         else:
             base += d['b_prof']
             if cls in ('uptrend', 'downtrend'):
@@ -93,7 +82,6 @@ def _combined_metric_for_period(results: dict, period_key: str, optimize_metric:
                 comb += d['b_prof']
 
     return comb, base
-
 
 # =============================================================================
 # PROCESS SINGLE COMBO  (parallelizable unit)
@@ -111,8 +99,7 @@ def _process_combo(
 ) -> dict:
     label   = combo_label(ma_window)
     results = run_filtered_combo(
-        baselines, strategies, indicator_cache,
-        ma_window, ANALYSIS_MODE,
+        baselines, strategies, indicator_cache, ma_window,
     )
 
     for sid in results:
@@ -153,7 +140,6 @@ def _process_combo(
         'label':            label,
     }
 
-
 # =============================================================================
 # MAIN RUN
 # =============================================================================
@@ -165,11 +151,11 @@ def run() -> None:
     total_combos = len(MA_WINDOWS)
 
     logger.info(f"\n{'='*120}")
-    logger.info(f"  REGIME CALIBRATION [MA UPTREND MODE] — {total_combos} combinations")
-    logger.info(f"  MA windows (1Dutc): {MA_WINDOWS}")
+    logger.info(f"  REGIME CALIBRATION — {total_combos} combinations")
+    logger.info(f"  MA windows ({REGIME_TIMEFRAME}): {MA_WINDOWS}")
     logger.info(f"  BINS: {' | '.join(BINS)}")
-    logger.info(f"  ANALYSIS_MODE={ANALYSIS_MODE} | OPTIMIZE_METRIC={OPTIMIZE_METRIC}")
-    logger.info(f"  Lookahead fix: normalize()-1day")
+    logger.info(f"  OPTIMIZE_METRIC={OPTIMIZE_METRIC} | RANKING_MODE={RANKING_MODE}")
+    logger.info(f"  Lookahead fix: D-1 daily candle")
     logger.info(f"  Periods: {' + '.join(EVAL_KEYS)}")
     logger.info(f"{'='*120}")
 
@@ -201,8 +187,7 @@ def run() -> None:
         if ma_w not in cache_map:
             cache_map[ma_w] = build_indicator_cache(
                 baselines, strategies_filtered,
-                ma_window     = ma_w,
-                analysis_mode = ANALYSIS_MODE,
+                ma_window = ma_w,
             )
 
     ranking: list[dict] = Parallel(n_jobs=N_JOBS)(
@@ -246,7 +231,7 @@ def run() -> None:
     top1_results = run_filtered_combo(
         baselines, strategies_filtered,
         cache_map[top1['ma_window']],
-        top1['ma_window'], ANALYSIS_MODE,
+        top1['ma_window'],
     )
     for sid in top1_results:
         if sid != 'is_long':
@@ -265,7 +250,6 @@ def run() -> None:
             strategies_set_name = STRATEGIES_SET_NAME,
             all_strategies      = strategies_all,
             optimize_metric     = OPTIMIZE_METRIC,
-            analysis_mode       = ANALYSIS_MODE,
         )
     else:
         logger.info("\n  ⚠️  AUTO_SAVE_BINS=False — bins not saved. Set to True to persist.")

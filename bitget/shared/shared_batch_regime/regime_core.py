@@ -1,4 +1,4 @@
-#shared/shared_batch_regime/regime_GE_core_uptrend.py
+#shared/shared_batch_regime/regime_core.py
 
 import os
 import logging
@@ -12,6 +12,7 @@ from importlib.util import spec_from_file_location, module_from_spec
 from sklearn.linear_model import LinearRegression
 
 logger = logging.getLogger(__name__)
+
 
 # =============================================================================
 # PATHS
@@ -28,16 +29,26 @@ PERIODS = {
 EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
 
 # =============================================================================
+# REGIME CONSTANTS — edit here to change global behaviour
+# =============================================================================
+
+REGIME_TIMEFRAME: str = "1Dutc"  # daily timeframe for MA computation — only "1Dutc" is supported
+
+if REGIME_TIMEFRAME != "1Dutc":
+    raise ValueError(f"❌ REGIME_TIMEFRAME='{REGIME_TIMEFRAME}' is not supported. Only '1Dutc' is allowed.")
+
+logger.info(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
+
+# =============================================================================
 # CONSTANTS
 # =============================================================================
 
-REGIME_DEFAULT_TIMEFRAME       = "1Dutc"
 LONG_KEYWORD                   = "long"
 ORDER_AMOUNT                   = 80
 DEBUG_TF_FILTER: list[str]     = []
 FILTER_NEGATIVE_BASELINE: bool = True
 
-BINS: list[str] = ["uptrend", "downtrend"]
+BINS: list[str] = ["uptrend", "dwtrend"]
 
 # =============================================================================
 # HELPERS
@@ -58,14 +69,10 @@ def compute_ma(close: np.ndarray, window: int) -> np.ndarray:
 
 
 def classify_market_regime(close: float, ma: float) -> str:
-    """
-    Classify a single bar into uptrend or downtrend based on close vs MA.
-    Returns "uptrend" if close > MA, else "downtrend".
-    Falls back to "downtrend" if any value is NaN/None.
-    """
+
     if close is None or ma is None or np.isnan(close) or np.isnan(ma):
-        return "downtrend"
-    return "uptrend" if close > ma else "downtrend"
+        return "dwtrend"
+    return "uptrend" if close > ma else "dwtrend"
 
 
 # =============================================================================
@@ -152,8 +159,9 @@ def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: 
     return ohlcv_oos
 
 
-def load_ohlcv_raw(symbol: str, timeframe: str) -> pd.DataFrame:
-    path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{timeframe}.parquet")
+def load_ohlcv_raw(symbol: str) -> pd.DataFrame:
+    """Load raw OHLCV data for a symbol on REGIME_TIMEFRAME."""
+    path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{REGIME_TIMEFRAME}.parquet")
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_parquet(path)
@@ -182,22 +190,16 @@ def load_ohlcv_raw(symbol: str, timeframe: str) -> pd.DataFrame:
 
 
 # =============================================================================
-# INDICATOR CACHE  (MA over daily close)
+# INDICATOR CACHE  (MA over daily close, keyed by symbol)
 # =============================================================================
 
-def get_cache_key(sym: str, strategy: dict, analysis_mode: str) -> str:
-    """Cache key is always daily — MA is always computed on 1Dutc."""
-    return "BTCUSDT" if analysis_mode == "BTC" else sym
-
-
 def build_indicator_cache(
-    baselines:     dict,
-    strategies:    list[dict],
-    ma_window:     int,
-    analysis_mode: str = "SYMBOL",
+    baselines:  dict,
+    strategies: list[dict],
+    ma_window:  int,
 ) -> dict:
     """
-    Build MA indicator cache keyed by symbol (always daily timeframe).
+    Build MA indicator cache keyed by symbol (always REGIME_TIMEFRAME).
     Returns {sym: (ts_arr, ma_arr)} where ma_arr is the MA(ma_window) series.
     """
     cache: dict      = {}
@@ -207,14 +209,14 @@ def build_indicator_cache(
         for period_key in EVAL_KEYS:
             if period_key in baselines.get(strategy['id'], {}):
                 for sym in baselines[strategy['id']][period_key]['ohlcv_arrays']:
-                    keys_needed.add(get_cache_key(sym, strategy, analysis_mode))
+                    keys_needed.add(sym)
 
-    for key in sorted(keys_needed):
-        if key in cache:
+    for sym in sorted(keys_needed):
+        if sym in cache:
             continue
-        df = load_ohlcv_raw(key, REGIME_DEFAULT_TIMEFRAME)
+        df = load_ohlcv_raw(sym)
         if not df.empty:
-            cache[key] = precompute_indicators(df, ma_window)
+            cache[sym] = precompute_indicators(df, ma_window)
 
     return cache
 
@@ -323,13 +325,7 @@ def classify_strategy(
     sid:             str,
     optimize_metric: str = "profit",
 ) -> str:
-    """
-    Classify a strategy into exactly one bin (strict mode):
-      - uptrend   : beats baseline in ALL periods in uptrend bucket
-      - downtrend : beats baseline in ALL periods in downtrend bucket
-      - both pass : neutral (no discriminative power)
-      - none pass : neutral
-    """
+
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
@@ -342,14 +338,14 @@ def classify_strategy(
         return _metric_value(d, val_key, dd_key, optimize_metric) > _metric_value(d, "b_prof", "b_dd", optimize_metric)
 
     up_passes   = all(_beats_baseline(pk, "uptrend")   for pk in periods_with_data)
-    down_passes = all(_beats_baseline(pk, "downtrend") for pk in periods_with_data)
+    down_passes = all(_beats_baseline(pk, "dwtrend") for pk in periods_with_data)
 
     if up_passes and down_passes:
         return "neutral"
     if up_passes:
         return "uptrend"
     if down_passes:
-        return "downtrend"
+        return "dwtrend"
     return "neutral"
 
 
@@ -370,9 +366,9 @@ def combined_metrics(results: dict) -> tuple[float, float]:
             if cls == 'uptrend':
                 profits.append(d['uptrend_prof'])
                 dds.append(d['uptrend_dd'])
-            elif cls == 'downtrend':
-                profits.append(d['downtrend_prof'])
-                dds.append(d['downtrend_dd'])
+            elif cls == 'dwtrend':
+                profits.append(d['dwtrend_prof'])
+                dds.append(d['dwtrend_dd'])
             else:
                 profits.append(d['b_prof'])
                 dds.append(d['b_dd'])
@@ -388,14 +384,9 @@ def run_filtered_combo(
     strategies:      list[dict],
     indicator_cache: dict,
     ma_window:       int,
-    analysis_mode:   str,
     debug_n:         int = 0,
 ) -> dict:
-    """
-    For each strategy and period, route each signal into uptrend or downtrend
-    based on close vs MA(ma_window) on the daily timeframe.
-    debug_n: if > 0, prints raw candle debug for first debug_n signals of first symbol.
-    """
+
     results: dict = {}
 
     for strategy in strategies:
@@ -421,12 +412,11 @@ def run_filtered_combo(
 
                 bin_signals: dict[str, np.ndarray] = {b: np.zeros_like(signals) for b in BINS}
 
-                cache_key = get_cache_key(sym, strategy, analysis_mode)
-                sym_cache = indicator_cache.get(cache_key)
+                sym_cache = indicator_cache.get(sym)
 
                 if sym_cache is None or signal_idxs.size == 0:
-                    bin_signals["downtrend"] = signals.copy()
-                    bin_counts["downtrend"] += int(signals.sum())
+                    bin_signals["dwtrend"] = signals.copy()
+                    bin_counts["dwtrend"] += int(signals.sum())
                 else:
                     ts_arr, ma_arr  = sym_cache
                     signal_ts       = arr['ts'][signal_idxs]
@@ -445,8 +435,8 @@ def run_filtered_combo(
                     bin_arrays[b][sym] = {**arr, 'signal': bin_signals[b]}
 
             bin_metrics: dict[str, dict] = {b: run_backtest(bin_arrays[b], strategy['best_params']) for b in BINS}
-            total        = sum(bin_counts.values())
-            uptrend_pct  = bin_counts["uptrend"] / max(total, 1) * 100
+            total       = sum(bin_counts.values())
+            uptrend_pct = bin_counts["uptrend"] / max(total, 1) * 100
 
             results[sid][period_key] = {
                 'b_prof': m_base['profit'],
@@ -463,151 +453,6 @@ def run_filtered_combo(
 
     return results
 
-
-# =============================================================================
-# PRINT TABLES
-# =============================================================================
-
-def print_combo_period_table(results: dict, strategies: list[dict], period_key: str, label: str) -> dict:
-    logger.debug(f"\n  {'─'*120}")
-    logger.debug(f"  {label}  |  PERIOD: {period_key}")
-    logger.debug(f"  {'─'*120}")
-    logger.debug(
-        f"  {'STRATEGY':<35} {'B_PROF':>8}"
-        + "  ".join(f"  {b.upper()[:10]:>12} {'Δ%':>6}" for b in BINS)
-        + f"  {'UP%':>7}"
-    )
-    logger.debug(f"  {'─'*120}")
-
-    sys_b   = 0.0
-    sys_bin = {b: 0.0 for b in BINS}
-    dd_b    = []
-    dd_bin  = {b: [] for b in BINS}
-    up_pcts = []
-
-    for s in strategies:
-        sid = s['id']
-        if sid not in results or period_key not in results[sid]:
-            continue
-        if not isinstance(results[sid][period_key], dict):
-            continue
-        d = results[sid][period_key]
-
-        bin_cols = ""
-        for b in BINS:
-            delta = pct_improvement(d[f"{b}_prof"], d['b_prof'])
-            color = "\033[92m" if delta > 0 else "\033[91m"
-            bin_cols += f"  {d[f'{b}_prof']:>12.1f} {color}{delta:>+5.1f}%\033[0m"
-
-        logger.debug(f"  {sid:<35} {d['b_prof']:>8.1f}{bin_cols}  {d['uptrend_pct']:>6.1f}%")
-
-        sys_b += d['b_prof']
-        dd_b.append(d['b_dd'])
-        up_pcts.append(d['uptrend_pct'])
-        for b in BINS:
-            sys_bin[b] += d[f"{b}_prof"]
-            dd_bin[b].append(d[f"{b}_dd"])
-
-    logger.debug(f"  {'─'*120}")
-    sys_cols = ""
-    avg_up   = sum(up_pcts) / len(up_pcts) if up_pcts else 0.0
-    for b in BINS:
-        delta = pct_improvement(sys_bin[b], sys_b)
-        color = "\033[92m" if delta > 0 else "\033[91m"
-        sys_cols += f"  {sys_bin[b]:>12.1f} {color}{delta:>+5.1f}%\033[0m"
-    logger.debug(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f}{sys_cols}  {avg_up:>6.1f}%")
-
-    return {
-        'sys_b':       sys_b,
-        'avg_dd_b':    sum(dd_b) / len(dd_b) if dd_b else 0.0,
-        'avg_up_pct':  avg_up,
-        **{f"sys_{b}":    sys_bin[b]                             for b in BINS},
-        **{f"pct_{b}":    pct_improvement(sys_bin[b], sys_b)     for b in BINS},
-        **{f"avg_dd_{b}": sum(dd_bin[b]) / len(dd_bin[b]) if dd_bin[b] else 0.0 for b in BINS},
-    }
-
-
-def print_combo_summary(
-    period_summaries: dict,
-    bin_counts:       dict[str, int],
-    n_neutral:        int,
-    comb_p:           float,
-    comb_dd:          float,
-    base_p:           float,
-    base_dd:          float,
-    label:            str,
-) -> None:
-    logger.info(f"\n  COMBO SUMMARY — {label}")
-    header = f"  {'PERIOD':<8} {'B_PROF':>10}" + "".join(f"  {b.upper():>12} {'Δ%':>7}" for b in BINS) + f"  {'UP%':>7}"
-    logger.info(header)
-    logger.info(f"  {'─'*90}")
-    for pk, s in period_summaries.items():
-        row = f"  {pk:<8} {s['sys_b']:>10.1f}"
-        for b in BINS:
-            color = "\033[92m" if s[f'pct_{b}'] > 0 else "\033[91m"
-            row  += f"  {s[f'sys_{b}']:>12.1f} {color}{s[f'pct_{b}']:>+6.1f}%\033[0m"
-        row += f"  {s['avg_up_pct']:>6.1f}%"
-        logger.info(row)
-    logger.info(f"  {'─'*90}")
-    comb_pct = pct_improvement(comb_p, base_p)
-    color    = "\033[92m" if comb_pct > 0 else "\033[91m"
-    cls_str  = "  ".join(f"{b.upper()}:{bin_counts.get(b, 0)}" for b in BINS)
-    logger.info(f"  Classifications — {cls_str}  NEUTRAL:{n_neutral}")
-    logger.info(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
-    logger.info(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {color}Delta={comb_pct:>+6.1f}%\033[0m")
-
-
-def print_ranking(ranking: list[dict]) -> None:
-    bin_headers = "  ".join(f"{b.upper()[:8]:>8}" for b in BINS)
-    header_line = (
-        f"  {'#':>3}  {'COMBO':>5}  {'MA_W':>5}  "
-        f"{bin_headers}  {'NEUT':>5}  "
-        f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
-        f"{'BASE_DD%':>8} {'COMB_DD%':>8}"
-    )
-    total_w = len(header_line) - 2
-    logger.info(f"\n\n{'='*total_w}")
-    logger.info(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE  [MA UPTREND MODE]")
-    logger.info(f"{'='*total_w}")
-    logger.info(header_line)
-    logger.info(f"  {'─'*total_w}")
-    for i, row in enumerate(ranking[:5], 1):
-        pct     = pct_improvement(row['combined_profit'], row['baseline_profit'])
-        w_delta = row.get('weighted_delta', 0.0)
-        cc      = "\033[92m" if pct > 0 else "\033[91m"
-        wc      = "\033[92m" if w_delta > 0 else "\033[91m"
-        ddc     = "\033[92m" if row['combined_dd'] > row['baseline_dd'] else "\033[91m"
-        rs      = "\033[0m"
-        bin_cols = "  ".join(f"{row['bin_counts'].get(b, 0):>8}" for b in BINS)
-        logger.info(
-            f"  {i:>3}  {row['combo_idx']:>5}  {row['ma_window']:>5}  "
-            f"{bin_cols}  {row['n_neutral']:>5}  "
-            f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
-            f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
-            f"{row['baseline_dd']:>7.1f}% {ddc}{row['combined_dd']:>7.1f}%{rs}"
-        )
-    logger.info(f"  {'─'*total_w}\n")
-
-
-def print_classification_summary(strategy_results: dict) -> None:
-    print(f"\n{'='*120}")
-    print(f"  STRATEGY CLASSIFICATION SUMMARY  [MA UPTREND MODE]")
-    print(f"{'='*120}")
-    print(f"  {'STRATEGY':<35} {'DIR':<6} {'BIN'}")
-    print(f"  {'─'*70}")
-    bin_colors = {
-        "uptrend":   "\033[92m",
-        "downtrend": "\033[91m",
-        "neutral":   "\033[90m",
-    }
-    for sid, data in sorted(strategy_results.items()):
-        direction = "LONG" if data.get('is_long') else "SHORT"
-        cls       = data.get('classification', 'neutral')
-        color     = bin_colors.get(cls, "")
-        print(f"  {sid:<35} {direction:<6} {color}{cls.upper()}\033[0m")
-    print(f"  {'─'*70}\n")
-
-
 # =============================================================================
 # PERSISTENCE
 # =============================================================================
@@ -619,20 +464,18 @@ def save_bins(
     strategies_set_name: str = "E1",
     all_strategies:      list[dict] | None = None,
     optimize_metric:     str = "",
-    analysis_mode:       str = "SYMBOL",
 ) -> None:
     from datetime import datetime
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     header_lines = [
         '"""',
         f"regime_bins_{strategies_set_name}.py — MA uptrend regime classification. Do not edit manually.",
-        f"Generated by regime_GE_calibration_uptrend.py — MA({ma_window}) on {REGIME_DEFAULT_TIMEFRAME}",
+        f"Generated by regime_calibration.py — MA({ma_window}) on {REGIME_TIMEFRAME}",
         f"Auto-generated on {generated_at} UTC.",
         '"""',
         "",
-        f'MA_WINDOW             = {ma_window}',
-        f'MA_TIMEFRAME          = "{REGIME_DEFAULT_TIMEFRAME}"',
-        f'ANALYSIS_MODE         = "{analysis_mode}"',
+        f'MA_WINDOW    = {ma_window}',
+        f'MA_TIMEFRAME = "{REGIME_TIMEFRAME}"',
         "",
     ]
     if optimize_metric:
@@ -706,11 +549,11 @@ def lookup_ma_batch(
 ) -> np.ndarray:
     """
     Vectorized lookup of MA value for multiple signal timestamps.
-    Always applies normalize()-1day lookahead fix (daily timeframe).
+    Always applies D-1 lookahead fix: uses the daily candle from the day before the signal.
     Returns np.ndarray of MA values — NaN where no valid index found.
 
-    debug_n   : if > 0, prints the first debug_n signals with raw candle info.
-    close_arr : optional close array aligned with ts_arr, used for debug only.
+    debug_n   : if > 0, prints the first debug_n signal_ts / daily_candle_ts pairs (raw, no logic).
+    close_arr : optional, used for debug only.
     """
     ts_lookup = signal_ts_arr.astype("datetime64[ns]")
     ts_fixed  = (ts_lookup.astype("datetime64[D]") - np.timedelta64(1, "D")).astype("datetime64[ns]")
@@ -721,16 +564,13 @@ def lookup_ma_batch(
     out[valid] = ma_arr[idxs[valid]]
 
     if debug_n > 0:
-        print(f"\n  [LOOKUP DEBUG] showing first {min(debug_n, len(idxs))} signals")
-        print(f"  {'SIGNAL_TS':<28} {'LOOKUP_TS (D-1)':<28} {'CANDLE_TS':<28} {'CLOSE':>10} {'MA':>10}")
-        print(f"  {'─'*105}")
+        print(f"\n  [LOOKUP DEBUG] first {min(debug_n, len(idxs))} signals — raw timestamps only")
+        print(f"  {'SIGNAL_TS':<30} {'DAILY_CANDLE_TS (used for MA)'}")
+        print(f"  {'─'*65}")
         for i in range(min(debug_n, len(idxs))):
             sig_ts    = str(signal_ts_arr[i])
-            fixed_ts  = str(ts_fixed[i])
-            idx       = idxs[i]
-            candle_ts = str(ts_arr[idx]) if idx >= 0 else "N/A"
-            ma_val    = f"{ma_arr[idx]:.6f}" if idx >= 0 else "N/A"
-            close_val = f"{close_arr[idx]:.6f}" if (close_arr is not None and idx >= 0) else "N/A"
-            print(f"  {sig_ts:<28} {fixed_ts:<28} {candle_ts:<28} {close_val:>10} {ma_val:>10}")
+            daily_idx = idxs[i]
+            candle_ts = str(ts_arr[daily_idx]) if daily_idx >= 0 else "N/A"
+            print(f"  {sig_ts:<30} {candle_ts}")
 
     return out

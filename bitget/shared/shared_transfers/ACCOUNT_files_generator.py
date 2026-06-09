@@ -18,8 +18,8 @@ OUTPUT_REGIME_BINS = os.path.join(os.path.dirname(__file__), "..", "..", TARGET_
 PARAM_GRID_KEYS    = {"lookback", "tolerance", "ma_period", "tp_pct", "sl_pct", "impulse", "flag"}
 SIGNAL_PARAM_KEYS  = ("lookback", "tolerance", "ma_period", "impulse", "flag")
 REGIME_BIN_KEYS    = (
-    "regime_trending",
-    "regime_ranging",
+    "regime_uptrend",
+    "regime_dwtrend",
     "regime_neutral",
 )
 

@@ -311,10 +311,10 @@ let currentRegimeTimeframe = '4H';
 
 function getRegimeBadgeStyle(family) {
     const styles = {
-        'trending': { bg: '#58a6ff', color: '#ffffff', text: 'TRENDING' },
-        'volatile': { bg: '#f85149', color: '#ffffff', text: 'VOLATILE' },
-        'ranging':  { bg: '#9ca3af', color: '#ffffff', text: 'RANGING'  },
-        'default':  { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN'  },
+        'uptrend': { bg: '#3fb950', color: '#ffffff', text: 'UPTREND' },
+        'dwtrend': { bg: '#f85149', color: '#ffffff', text: 'DWTREND' },
+        'neutral': { bg: '#8b949e', color: '#ffffff', text: 'NEUTRAL' },
+        'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' },
     };
     return styles[family] || styles['default'];
 }
@@ -376,18 +376,18 @@ async function loadRegimeData() {
         }
 
         updateRegimeUI(data);
-        loadRegimeSymbols(data.indicators_cfg);
+        loadRegimeSymbols(data.ma_window);
 
     } catch (error) {
         console.error('Error loading regime data:', error);
     }
 }
-function updateRegimeUI(data) {
-    const family    = data.family   || 'default';
-    const timeframe = data.timeframe || currentRegimeTimeframe;
-    const refTrend  = data.ref_trend;
 
-    // Header stat card
+
+function updateRegimeUI(data) {
+    const family    = data.family    || 'default';
+    const timeframe = data.timeframe || '1Dutc';
+
     const badgeStyle = getRegimeBadgeStyle(family);
     const regimeText = document.getElementById('regime-text');
     if (regimeText) {
@@ -395,38 +395,15 @@ function updateRegimeUI(data) {
         regimeText.style.color = badgeStyle.bg;
     }
 
-    const regimeDirection = document.getElementById('regime-direction');
-    if (regimeDirection && refTrend) {
-        const map = {
-            uptrend:   { sym: '▲', label: 'UP', color: '#3fb950' },
-            downtrend: { sym: '▼', label: 'DW', color: '#f85149' },
-            dwtrend:   { sym: '▼', label: 'DW', color: '#f85149' },
-        };
-        const d = map[refTrend] || { sym: '•', label: '--', color: '#8b949e' };
-        regimeDirection.textContent = d.sym + d.label;
-        regimeDirection.style.color = d.color;
-    }
-
     const regimeTimeframeEl = document.getElementById('regime-timeframe');
     if (regimeTimeframeEl) regimeTimeframeEl.textContent = timeframe;
 
-    // Config pills
     const cfgContainer = document.getElementById('regime-config-pills');
     if (cfgContainer) {
-        const indicatorsCfg = data.indicators_cfg || {};
-        const metricPills   = Object.entries(indicatorsCfg)
-            .filter(([, cfg]) => cfg.enabled)
-            .map(([key, cfg]) => {
-                return { label: cfg.label || key, value: `w=${cfg.window} th=${cfg.threshold}` };
-            });
-
         const pills = [
-            { label: 'Combine',   value: data.combine_mode  || '-' },
-            { label: 'Analysis',  value: data.analysis_mode || '-' },
-            { label: 'Timeframe', value: data.tf_mode        || '-' },
-            ...metricPills,
+            { label: 'Timeframe', value: timeframe },
+            { label: 'MA Window', value: data.ma_window || '-' },
         ];
-
         cfgContainer.innerHTML = pills.map(p =>
             `<span style="background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:13px;color:#8b949e;">
                 <span style="color:#6b7280;">${p.label}:</span>
@@ -439,7 +416,7 @@ function updateRegimeUI(data) {
 // /api/regime/symbols  →  symbols metrics grid (one request per symbol)
 // -----------------------------------------------------------------------------
 
-async function loadRegimeSymbols(indicatorsCfg) {
+async function loadRegimeSymbols(maWindow) {
     const container = document.getElementById('regime-symbols-container');
     if (!container) return;
 
@@ -457,17 +434,17 @@ async function loadRegimeSymbols(indicatorsCfg) {
         return;
     }
 
-    const enabledMetrics = Object.entries(indicatorsCfg || {}).filter(([, cfg]) => cfg.enabled);
-    const firstLoad = !document.getElementById(`sym-card-${symbols[0]}`);
-    if (firstLoad) {
-        container.innerHTML = symbols.map(sym => _buildSymbolCardSkeleton(sym, enabledMetrics)).join('');
+    const alreadyLoaded = container.dataset.timeframe === currentRegimeTimeframe;
+    if (!alreadyLoaded) {
+        container.dataset.timeframe = currentRegimeTimeframe;
+        container.innerHTML = symbols.map(sym => _buildSymbolCardSkeleton(sym, maWindow)).join('');
     }
 
     for (const sym of symbols) {
         try {
-            const res  = await fetch(`/api/regime/symbols?timeframe=${currentRegimeTimeframe}&symbol=${sym}`);
+            const res  = await fetch(`/api/regime/symbols?symbol=${sym}&timeframe=${currentRegimeTimeframe}`);
             const data = await res.json();
-            _updateSymbolCard(sym, data, enabledMetrics);
+            _updateSymbolCard(sym, data);
         } catch (e) {
             console.error(`Error loading regime for ${sym}:`, e);
             _updateSymbolCardError(sym);
@@ -475,35 +452,35 @@ async function loadRegimeSymbols(indicatorsCfg) {
     }
 }
 
-function _buildSymbolCardSkeleton(symbol, enabledMetrics) {
-    const metricCols = enabledMetrics.map(([key, cfg]) => {
-        return `
-            <div style="flex:1;text-align:center;">
-                <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">${cfg.label || key}</div>
-                <div id="sym-metric-${symbol}-${key}" style="font-size:26px;font-weight:700;color:#8b949e;">-</div>
-                <div id="sym-bar-${symbol}-${key}" style="font-family:monospace;font-size:13px;margin-top:6px;">
-                    <span style="color:#2d333b;">████████████████████</span>
-                </div>
-                <div id="sym-th-${symbol}-${key}" style="font-size:12px;color:#6b7280;margin-top:4px;">th: -</div>
-            </div>`;
-    }).join('');
+function _buildSymbolCardSkeleton(symbol, maWindow) {
     return `
         <div id="sym-card-${symbol}" style="background:#1c2128;border:2px solid #21262d;border-radius:10px;padding:20px;margin-bottom:14px;">
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-                <span style="font-size:20px;font-weight:700;color:#c9d1d9;">${symbol.replace('USDT','')}<span style="font-size:14px;color:#8b949e;">/USDT</span></span>
+                <span style="font-size:20px;font-weight:700;color:#c9d1d9;">
+                    ${symbol.replace('USDT','')}<span style="font-size:14px;color:#8b949e;">/USDT</span>
+                </span>
                 <span id="sym-family-${symbol}" style="font-size:14px;font-weight:600;padding:3px 12px;border-radius:20px;background:#21262d;color:#8b949e;">...</span>
             </div>
-            <div style="display:flex;gap:20px;">${metricCols}</div>
+            <div style="display:flex;gap:40px;">
+                <div style="text-align:center;">
+                    <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">Close</div>
+                    <div id="sym-close-${symbol}" style="font-size:22px;font-weight:700;color:#8b949e;">-</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">MA(${maWindow || '-'})</div>
+                    <div id="sym-ma-${symbol}" style="font-size:22px;font-weight:700;color:#8b949e;">-</div>
+                </div>
+            </div>
         </div>`;
 }
 
-function _updateSymbolCard(symbol, data, enabledMetrics) {
+function _updateSymbolCard(symbol, data) {
     const family     = data.family  || 'neutral';
     const metrics    = data.metrics || {};
-    const indicators = data.indicators_cfg || {};
-
+    const maWindow   = data.ma_window;
     const badgeStyle = getRegimeBadgeStyle(family);
-    const familyEl   = document.getElementById(`sym-family-${symbol}`);
+
+    const familyEl = document.getElementById(`sym-family-${symbol}`);
     if (familyEl) {
         familyEl.textContent      = badgeStyle.text;
         familyEl.style.background = badgeStyle.bg + '33';
@@ -513,23 +490,20 @@ function _updateSymbolCard(symbol, data, enabledMetrics) {
     const card = document.getElementById(`sym-card-${symbol}`);
     if (card) card.style.border = `2px solid ${badgeStyle.bg}66`;
 
-    enabledMetrics.forEach(([key, cfg]) => {
-            const value    = metrics[key];
-            const metricEl = document.getElementById(`sym-metric-${symbol}-${key}`);
-            const barEl    = document.getElementById(`sym-bar-${symbol}-${key}`);
-            const thEl     = document.getElementById(`sym-th-${symbol}-${key}`);
-            if (thEl && cfg.threshold !== undefined) thEl.textContent = `th: ${cfg.threshold}`;
-            if (value === undefined || value === null || isNaN(value)) {
-                if (metricEl) { metricEl.textContent = '-'; metricEl.style.color = '#8b949e'; }
-                return;
-            }
-            const normalized = Math.min(Math.max(value, 0), 1);
-            if (metricEl) {
-                metricEl.textContent = _fmtMetric(value);
-                metricEl.style.color = _metricColor(normalized, false);
-            }
-            if (barEl) barEl.innerHTML = _buildBar(normalized, false, 20);
-        });
+    const closeEl = document.getElementById(`sym-close-${symbol}`);
+    if (closeEl) {
+        const close = metrics['close'];
+        closeEl.textContent = close != null ? parseFloat(close).toFixed(4) : '-';
+        closeEl.style.color = badgeStyle.bg;
+    }
+
+    const maEl = document.getElementById(`sym-ma-${symbol}`);
+    if (maEl) {
+        const maKey = Object.keys(metrics).find(k => k.startsWith('ma_'));
+        const ma    = maKey ? metrics[maKey] : null;
+        maEl.textContent = ma != null ? parseFloat(ma).toFixed(4) : '-';
+        maEl.style.color = '#c9d1d9';
+    }
 }
 
 function _updateSymbolCardError(symbol) {
@@ -2073,7 +2047,9 @@ async function loadData() {
         });
         
         // Load regime data (non-blocking)
-        loadRegimeData().catch(console.error);
+        if (document.getElementById('tab-regime')?.classList.contains('active')) {
+             loadRegimeData().catch(console.error);
+         }
         
     } catch (error) {
         console.error('Error:', error);

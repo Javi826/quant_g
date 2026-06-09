@@ -10,20 +10,7 @@ Calculates adjusted order amounts by applying multipliers from:
 import logging
 
 class PositionSizer:
-    """
-    Handles position sizing adjustments based on market regime.
 
-    Uses 3 bin flags from strategy config (regime_ranging / regime_trending / regime_neutral)
-    to determine if a strategy is blocked or allowed in the current market condition.
-
-    Usage:
-        sizer = PositionSizer(logger)
-        adjusted_amount, metadata = sizer.calculate_adjusted_amount(
-            base_amount=40.0,
-            strat=strat,
-            market_regime='trending',
-        )
-    """
 
     def __init__(self, logger: logging.Logger):
         self.logger = logger
@@ -34,22 +21,11 @@ class PositionSizer:
         strat:         dict,
         market_regime: str = 'neutral',
     ) -> tuple:
-        """
-        Calculate adjusted order amount based on regime bin flag.
 
-        Constructs bin key as f"regime_{market_regime}",
-        looks up the flag in strat config (0 = blocked, 1 = allowed).
-
-        Args:
-            base_amount   : Base order amount from strategy config
-            strat         : Strategy config dict with 3 bin flags
-            market_regime : Current market regime ('trending' | 'ranging' | 'neutral')
-
-        Returns:
-            Tuple of (adjusted_amount, metadata_dict)
-        """
         bin_key = f"regime_{market_regime}"
-        flag    = strat.get(bin_key, 1)
+        if bin_key not in strat:
+            raise KeyError(f"[SIZING] '{bin_key}' not found in strategy '{strat.get('id')}'")
+        flag = strat[bin_key]
         blocked = flag == 0
 
         adjusted_amount = 0.0 if blocked else base_amount
@@ -66,16 +42,7 @@ class PositionSizer:
         return adjusted_amount, metadata
 
     def format_log_message(self, strategy_id: str, metadata: dict) -> str:
-        """
-        Format standardized log message for sizing decision.
 
-        Args:
-            strategy_id: Strategy identifier
-            metadata   : Metadata dict from calculate_adjusted_amount()
-
-        Returns:
-            Formatted log string
-        """
         if metadata['blocked']:
             return (
                 f"[SIZING] Skip {strategy_id}: "
