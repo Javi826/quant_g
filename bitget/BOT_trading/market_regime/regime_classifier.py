@@ -55,7 +55,7 @@ def get_symbol_regime(
         df_norm   = normalize_live_ohlcv(df)
         arr_daily = df_to_arrays_live(df_norm)
         close_arr = arr_daily['close']
-        close     = float(close_arr[-1])
+        close     = float(arr['close'][-1]) if arr is not None else float(close_arr[-1])
         ma        = _calc_ma(close_arr, REGIME_MA_WINDOW)
 
         if ma is None:
@@ -63,7 +63,7 @@ def get_symbol_regime(
             return 'neutral'
 
         regime = _classify_ma(close, ma)
-        logger.info(f"[REGIME] {symbol} → {regime.upper()} | close={close:.4f} MA({REGIME_MA_WINDOW})={ma:.4f}")
+        logger.debug(f"[REGIME] {symbol} → {regime.upper()} | close={close:.4f} MA({REGIME_MA_WINDOW})={ma:.4f}")
         return regime
 
     except Exception as e:

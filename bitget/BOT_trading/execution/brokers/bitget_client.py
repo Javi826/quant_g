@@ -27,24 +27,7 @@ logger = logging.getLogger('BOT_trading.execution.bitget_client')
 
 
 class BitgetClient:
-    """
-    Professional HTTP client for Bitget Futures API.
-    
-    Replaces 7x duplicated functions from ZX_connect_live.py with a single,
-    reusable class that handles authentication and requests for any account.
-    
-    Attributes:
-        api_key (str): Bitget API key
-        api_secret (str): Bitget API secret
-        api_passphrase (str): Bitget API passphrase
-        base_url (str): Base URL for API requests
-        timeout (int): Request timeout in seconds
-    
-    Example:
-        >>> client = BitgetClient(api_key, api_secret, api_passphrase)
-        >>> balance = client.get_usdt_balance()
-        >>> positions = client.get_open_positions()
-    """
+
     
     def __init__(
         self,
@@ -84,19 +67,7 @@ class BitgetClient:
         query_string: str,
         body_str: str
     ) -> str:
-        """
-        Generate HMAC SHA256 signature for request authentication.
-        
-        Args:
-            timestamp: Request timestamp in milliseconds
-            method: HTTP method (GET/POST)
-            path: API endpoint path
-            query_string: URL query parameters
-            body_str: Request body as JSON string
-        
-        Returns:
-            Base64 encoded signature
-        """
+
         # Build string to sign
         to_sign = timestamp + method.upper() + path
         if query_string:
@@ -113,16 +84,7 @@ class BitgetClient:
         return base64.b64encode(digest).decode()
     
     def _build_headers(self, timestamp: str, signature: str) -> Dict[str, str]:
-        """
-        Build request headers with authentication.
-        
-        Args:
-            timestamp: Request timestamp
-            signature: Request signature
-        
-        Returns:
-            Dictionary of HTTP headers
-        """
+
         return {
             "ACCESS-KEY": self.api_key,
             "ACCESS-SIGN": signature,
@@ -138,30 +100,7 @@ class BitgetClient:
         params: Optional[Dict[str, Any]] = None,
         body: Optional[Dict[str, Any]] = None
     ) -> Tuple[int, Any]:
-        """
-        Send authenticated request to Bitget API.
-        
-        This is the core method that handles authentication, request building,
-        and response parsing. Compatible with original send_request_XX functions.
-        
-        Args:
-            method: HTTP method ('GET' or 'POST')
-            path: API endpoint path (e.g., '/api/v2/mix/market/ticker')
-            params: Query parameters (for GET requests)
-            body: Request body (for POST requests)
-        
-        Returns:
-            Tuple of (status_code, response_data)
-            - status_code: HTTP status code (0 if error)
-            - response_data: Parsed JSON or error dict
-        
-        Example:
-            >>> code, resp = client.send_request(
-            ...     'GET',
-            ...     '/api/v2/mix/market/ticker',
-            ...     params={'symbol': 'BTCUSDT', 'productType': 'USDT-FUTURES'}
-            ... )
-        """
+
         timestamp = self._get_timestamp()
         
         # Build query string and body
@@ -207,25 +146,7 @@ class BitgetClient:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Simplified GET request.
-        
-        Args:
-            endpoint: API endpoint path
-            params: Query parameters
-        
-        Returns:
-            Response data as dictionary
-        
-        Raises:
-            Exception: If request fails or returns error
-        
-        Example:
-            >>> positions = client.get(
-            ...     '/api/v2/mix/position/all-position',
-            ...     {'productType': 'USDT-FUTURES'}
-            ... )
-        """
+
         code, resp = self.send_request("GET", endpoint, params=params)
         
         if code == 200 and isinstance(resp, dict):
@@ -238,25 +159,7 @@ class BitgetClient:
         endpoint: str,
         body: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """
-        Simplified POST request.
-        
-        Args:
-            endpoint: API endpoint path
-            body: Request body
-        
-        Returns:
-            Response data as dictionary
-        
-        Raises:
-            Exception: If request fails or returns error
-        
-        Example:
-            >>> order = client.post(
-            ...     '/api/v2/mix/order/place-order',
-            ...     {'symbol': 'BTCUSDT', 'side': 'buy', ...}
-            ... )
-        """
+
         code, resp = self.send_request("POST", endpoint, body=body)
         
         if code == 200 and isinstance(resp, dict):
@@ -272,20 +175,7 @@ class BitgetClient:
         self,
         product_type: str = "USDT-FUTURES"
     ) -> List[Dict[str, Any]]:
-        """
-        Get all open positions.
-        
-        Args:
-            product_type: Product type (default: USDT-FUTURES)
-        
-        Returns:
-            List of position dictionaries
-        
-        Example:
-            >>> positions = client.get_open_positions()
-            >>> for pos in positions:
-            ...     print(f"{pos['symbol']}: {pos['total']}")
-        """
+
         try:
             response = self.get(
                 "/api/v2/mix/position/all-position",
@@ -297,21 +187,7 @@ class BitgetClient:
             return []
     
     def get_usdt_balance(self, exchange=None) -> float:
-        """
-        Get USDT balance using CCXT exchange object.
-        
-        Note: This method is kept for backward compatibility with the original
-        get_usdt_balance_XX functions. It requires a CCXT exchange instance.
-        
-        Args:
-            exchange: CCXT exchange instance (required)
-        
-        Returns:
-            Free USDT balance
-        
-        Example:
-            >>> balance = client.get_usdt_balance(exchange)
-        """
+
         if exchange is None:
             logger.error("Exchange object required for get_usdt_balance")
             return 0.0

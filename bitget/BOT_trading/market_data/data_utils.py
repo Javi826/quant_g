@@ -24,19 +24,7 @@ logger = logging.getLogger('BOT_trading.market_data.data_utils')
 
 
 def normalize_live_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Normalize OHLCV DataFrame for live trading.
-    
-    Ensures:
-    - DatetimeIndex
-    - Numeric columns (open, high, low, close, volume)
-    
-    Args:
-        df: Raw OHLCV DataFrame
-    
-    Returns:
-        Normalized DataFrame with DatetimeIndex
-    """
+
     logger.debug(f"Normalizing OHLCV DataFrame with {len(df)} rows")
     
     # Ensure datetime index
@@ -55,18 +43,7 @@ def normalize_live_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def df_to_arrays_live(df: pd.DataFrame) -> dict:
-    """
-    Convert OHLCV DataFrame to numpy arrays for signal detection.
-    
-    Args:
-        df: Normalized OHLCV DataFrame
-    
-    Returns:
-        Dictionary with numpy arrays:
-            - ts: timestamps
-            - open, high, low, close: OHLC prices
-            - volume_quote: volume
-    """
+
     logger.debug(f"Converting DataFrame to arrays ({len(df)} rows)")
     
     if not is_datetime64_any_dtype(df.index):
@@ -94,24 +71,7 @@ def load_final_symbols(
     timeframe: str = "4H",
     account_number: str = None
 ) -> list:
-    """
-    Load filtered symbols for a specific strategy and timeframe.
-    
-    Reads from CSV file in symbols_live/ directory and filters
-    the provided list of all symbols.
-    
-    Args:
-        all_symbols: List of all available symbols
-        strategy: Strategy name (e.g., 'reversal_long')
-        timeframe: Timeframe (e.g., '4H', '1H', '2m')
-    
-    Returns:
-        Sorted list of filtered symbols
-    
-    Raises:
-        FileNotFoundError: If symbol file doesn't exist
-        ValueError: If file is empty or invalid
-    """
+
     folder = os.path.join(os.path.dirname(__file__), "..", "symbols_live", account_number)
     folder = os.path.abspath(folder)
     path_live = os.path.join(folder, f"symbols_live_{strategy}_{timeframe}.csv")
@@ -167,32 +127,8 @@ def load_final_symbols(
         logger.error(error_msg)
         raise RuntimeError(error_msg)
         
-        
-
-
-
 def fetch_ohlcv_data(symbols: list, timeframe: str) -> dict:
-    """
-    Fetch OHLCV data for multiple symbols.
-    
-    Downloads recent candle data from API and converts to DataFrame.
-    
-    Args:
-        symbols: List of symbols to fetch
-        timeframe: Timeframe (e.g., '2m', '5m', '1H', '4H')
-    
-    Returns:
-        Dictionary mapping symbol to DataFrame
-        {
-            'BTCUSDT': DataFrame(...),
-            'ETHUSDT': DataFrame(...),
-            ...
-        }
-    
-    Example:
-        >>> ohlcv = fetch_ohlcv_data(['BTCUSDT', 'ETHUSDT'], '4H')
-        >>> btc_df = ohlcv['BTCUSDT']
-    """
+
     logger.debug(f"Fetching OHLCV data for {len(symbols)} symbols ({timeframe})")
     
     ohlcv_data = {}

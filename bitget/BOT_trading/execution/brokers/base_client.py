@@ -13,18 +13,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 
 class BaseBrokerClient(ABC):
-    """
-    Abstract base class for exchange API clients.
-    
-    This allows the bot to support multiple exchanges in the future
-    by implementing this interface for each exchange.
-    
-    Example:
-        >>> class BinanceClient(BaseBrokerClient):
-        ...     def send_request(self, method, path, params, body):
-        ...         # Binance-specific implementation
-        ...         pass
-    """
+
     
     @abstractmethod
     def send_request(
@@ -34,18 +23,7 @@ class BaseBrokerClient(ABC):
         params: Optional[Dict[str, Any]] = None,
         body: Optional[Dict[str, Any]] = None
     ) -> Tuple[int, Any]:
-        """
-        Send authenticated request to exchange API.
-        
-        Args:
-            method: HTTP method (GET/POST)
-            path: API endpoint path
-            params: Query parameters
-            body: Request body
-        
-        Returns:
-            Tuple of (status_code, response_data)
-        """
+
         pass
     
     @abstractmethod
@@ -53,26 +31,10 @@ class BaseBrokerClient(ABC):
         self,
         product_type: str = "USDT-FUTURES"
     ) -> List[Dict[str, Any]]:
-        """
-        Get all open positions.
-        
-        Args:
-            product_type: Product type
-        
-        Returns:
-            List of position dictionaries
-        """
+
         pass
     
     @abstractmethod
     def get_usdt_balance(self, exchange=None) -> float:
-        """
-        Get USDT balance.
-        
-        Args:
-            exchange: Exchange object (optional, for compatibility)
-        
-        Returns:
-            USDT balance
-        """
+
         pass

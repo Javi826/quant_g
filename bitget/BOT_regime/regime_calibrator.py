@@ -43,11 +43,10 @@ BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_
 # =============================================================================
 AUTO_SAVE_BINS  = True
 OPTIMIZE_METRIC = "calmar"   # "profit" | "win_rate" | "calmar"
-RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
+RANKING_MODE    = "combo_delta"  # "weighted_delta" | "combo_delta"
 
 # =============================================================================
 # INDICATOR GRID
-# MA window over REGIME_TIMEFRAME close — determines uptrend/downtrend boundary
 # =============================================================================
 MA_WINDOWS: list[int] = [2,3,4]
 
@@ -257,7 +256,6 @@ def run() -> None:
     print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
     del baselines, cache_map, ranking
     gc.collect()
-
 
 if __name__ == "__main__":
     run()

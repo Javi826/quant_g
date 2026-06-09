@@ -1,40 +1,28 @@
 #BOT_trading/core/orchestator.py
-"""
-Main orchestration class for the trading bot.
-Encapsulates all bot state and execution logic.
-"""
 import os
 import sys
 import time
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
-
 # Ensure BOT_trading is in path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir  = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_trading_data", "broker_api")))
-
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
 from market_regime import  PositionSizer, configure_regime
 from risk_control import RiskLimiter, ExposureCalculator
 from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
-
 from api.backend import DashboardServer, create_dashboard_template
-
 from execution import configure_paths, get_current_price, get_usdt_balance_ws, BitgetClient
 from state import  check_candles_timeout_for_strategy
-
 from bot_utils import calculate_next_candle_time, group_strategies_by_timeframe
 from bot_utils import get_unique_timeframes
-
 from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
-
 from config.utils.utils import get_account_config
 from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
 from config.settings import LEVERAGE
@@ -376,6 +364,7 @@ class BotOrchestrator:
             )
         
         self.last_tpsl_check = time.time()
+        
     def _initialize_position_sizing(self) -> None:
         """Initialize position sizing based on market regime."""
         from market_regime import PositionSizer
@@ -453,7 +442,6 @@ class BotOrchestrator:
         # ========================================================================
         self._process_candle_timeouts(strategies_to_process)
     
-
         # ========================================================================
         # SIGNAL SEARCH: + BTC WINDOW Look for new entries in strategies without positions
         # ========================================================================
@@ -462,17 +450,14 @@ class BotOrchestrator:
             self._search_signals(strategies_to_process)
         else:
             self.logger.info("[GAP] BTC 1D consolidation window (00-03 UTC)-skipping signal search")
-        
-        
+              
         self.logger.info("Signal cycle completed")
         self.logger.info(f"{'=' * 48}\n")
         
         # Recalculate next candle times
-        self._update_next_candle_times(closed_timeframes)
-        
+        self._update_next_candle_times(closed_timeframes)        
         self.last_tpsl_check = time.time()
-
-    
+   
     def _process_candle_timeouts(self, strategies_to_process: List[Dict]) -> None:
 
         for strat in strategies_to_process:
@@ -506,27 +491,70 @@ class BotOrchestrator:
                     )
                 else:
                     self.operative.monitor_exits()
+                    
+    def _detect_and_execute(
+        self,
+        strat:          Dict,
+        final_symbols:  List[str],
+        adjusted_amount: float,
+    ) -> None:
+        strat_id = strat['id']
+        
+        strat_id = strat['id']
+        self.logger.debug(f"[D&E] {strat_id} | symbols={len(final_symbols)} | regime={self.account_flags.get('regime_enabled')}")
+  
+        signals = self.strategy_processor.detect_signals(
+            strat         = strat,
+            final_symbols = final_symbols,
+            exchange      = self.exchange,
+        )
+    
+        if self.account_flags.get('regime_enabled', True):
+            approved_signals = []
+            last_metadata    = None
+            for sig in signals:
+                _, metadata  = self.position_sizer.calculate_adjusted_amount(
+                    base_amount   = adjusted_amount,
+                    strat         = strat,
+                    market_regime = sig.get('regime', 'neutral'),
+                )
+                last_metadata = metadata
+                if not metadata['blocked']:
+                    approved_signals.append(sig)
+            if last_metadata is not None:
+                log_msg = self.position_sizer.format_log_message(strat_id, last_metadata, len(signals), len(approved_signals))
+                self.logger.info(log_msg)
+        else:
+            approved_signals = signals
+    
+        self.strategy_processor.execute_signals(
+            strat            = strat,
+            signals          = approved_signals,
+            open_positions   = self.open_positions,
+            strategy_candles = self.strategy_candles,
+            order_amount     = adjusted_amount,
+        )
     
     def _search_signals(self, strategies_to_process: List[Dict]) -> None:
 
         for strat in strategies_to_process:
             strat_id = strat['id']
-
+    
             # ====================================================================
             # STRATEGY PRE-CHECKS: Skip if deprecated or has positions
             # ====================================================================
             if not strat.get('active', True):
                 continue
-
+    
             num_positions = len(self.open_positions.get(strat_id, []))
             if num_positions > 0:
                 continue
-
+    
             # ====================================================================
-            # REGIME LAYER 01
+            # REGIME LAYER
             # ====================================================================
             adjusted_amount = strat['order_amount']
-
+    
             # ====================================================================
             # RISK CHECK
             # ====================================================================
@@ -540,128 +568,61 @@ class BotOrchestrator:
                 blocked, reason, risk_metadata = self.risk_limiter.is_at_limit(
                     current_gross_pct=current_exposure['gross_exposure_pct']
                 )
-                if blocked:
-                    log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
-                    self.logger.info(log_msg)
-                    continue
                 log_msg = self.risk_limiter.format_log_message(strat_id, risk_metadata)
                 self.logger.info(log_msg)
-
+                if blocked:
+                    continue
+    
             # ====================================================================
-            # SIGNAL PROCESSING: REGIME
+            # SIGNAL PROCESSING: DETECT + SIZING + EXECUTE
             # ====================================================================
             try:
-                signals = self.strategy_processor.detect_signals(
-                    strat         = strat,
-                    final_symbols = self.final_by_strat.get(strat['id'], []),
-                    exchange      = self.exchange,
-                )
-                
-                if self.account_flags.get('regime_enabled', True):
-                    approved_signals = []
-                    for sig in signals:
-                        _, metadata = self.position_sizer.calculate_adjusted_amount(
-                            base_amount   = adjusted_amount,
-                            strat         = strat,
-                            market_regime = sig.get('regime', 'neutral'),
-                        )
-                        log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                        self.logger.info(log_msg)
-                        if not metadata['blocked']:
-                            approved_signals.append(sig)
-                else:
-                    approved_signals = signals
-                
-                self.strategy_processor.execute_signals(
-                    strat            = strat,
-                    signals          = approved_signals,
-                    open_positions   = self.open_positions,
-                    strategy_candles = self.strategy_candles,
-                    order_amount     = adjusted_amount,
+                self._detect_and_execute(
+                    strat           = strat,
+                    final_symbols   = self.final_by_strat.get(strat_id, []),
+                    adjusted_amount = adjusted_amount,
                 )
             except Exception as e:
                 self.logger.warning(f"WAR-first try processing {strat_id}: {e}")
-
                 opened_symbols = [pos['symbol'] for pos in self.open_positions.get(strat_id, [])]
-
+    
+                # ================================================================
+                # RETRY: Some positions already opened — skip those symbols
+                # ================================================================
                 if opened_symbols:
                     self.logger.info(
                         f"Retrying {strat_id} after 3 seconds... "
                         f"({len(opened_symbols)} positions already opened, will skip those symbols)"
                     )
                     time.sleep(3)
-
                     remaining_symbols = [
-                        s for s in self.final_by_strat.get(strat['id'], [])
+                        s for s in self.final_by_strat.get(strat_id, [])
                         if s not in opened_symbols
                     ]
-
                     if remaining_symbols:
                         try:
-                            signals = self.strategy_processor.detect_signals(
-                                strat         = strat,
-                                final_symbols = self.final_by_strat.get(strat['id'], []),
-                                exchange      = self.exchange,
-                            )
-                            
-                            if self.account_flags.get('regime_enabled', True):
-                                approved_signals = []
-                                for sig in signals:
-                                    _, metadata = self.position_sizer.calculate_adjusted_amount(
-                                        base_amount   = adjusted_amount,
-                                        strat         = strat,
-                                        market_regime = sig.get('regime', 'neutral'),
-                                    )
-                                    log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                                    self.logger.info(log_msg)
-                                    if not metadata['blocked']:
-                                        approved_signals.append(sig)
-                            else:
-                                approved_signals = signals
-                            
-                            self.strategy_processor.execute_signals(
-                                strat            = strat,
-                                signals          = approved_signals,
-                                open_positions   = self.open_positions,
-                                strategy_candles = self.strategy_candles,
-                                order_amount     = adjusted_amount,
+                            self._detect_and_execute(
+                                strat           = strat,
+                                final_symbols   = remaining_symbols,
+                                adjusted_amount = adjusted_amount,
                             )
                             self.logger.info(f"Retry successful for {strat_id} ({len(remaining_symbols)} remaining symbols processed)")
                         except Exception as e2:
                             self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
                     else:
                         self.logger.info(f"No remaining symbols to retry for {strat_id}")
+    
+                # ================================================================
+                # RETRY: No positions opened yet — full retry
+                # ================================================================
                 else:
                     self.logger.info(f"Retrying {strat_id} after 3 seconds... (no positions opened yet)")
                     time.sleep(3)
                     try:
-                        signals = self.strategy_processor.detect_signals(
-                            strat         = strat,
-                            final_symbols = self.final_by_strat.get(strat['id'], []),
-                            exchange      = self.exchange,
-                        )
-                        
-                        if self.account_flags.get('regime_enabled', True):
-                            approved_signals = []
-                            for sig in signals:
-                                _, metadata = self.position_sizer.calculate_adjusted_amount(
-                                    base_amount   = adjusted_amount,
-                                    strat         = strat,
-                                    market_regime = sig.get('regime', 'neutral'),
-                                )
-                                log_msg = self.position_sizer.format_log_message(strat_id, metadata)
-                                self.logger.info(log_msg)
-                                if not metadata['blocked']:
-                                    approved_signals.append(sig)
-                        else:
-                            approved_signals = signals
-                        
-                        self.strategy_processor.execute_signals(
-                            strat            = strat,
-                            signals          = approved_signals,
-                            open_positions   = self.open_positions,
-                            strategy_candles = self.strategy_candles,
-                            order_amount     = adjusted_amount,
+                        self._detect_and_execute(
+                            strat           = strat,
+                            final_symbols   = self.final_by_strat.get(strat_id, []),
+                            adjusted_amount = adjusted_amount,
                         )
                         self.logger.info(f"Retry successful for {strat_id}")
                     except Exception as e2:

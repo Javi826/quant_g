@@ -16,15 +16,12 @@ logger = logging.getLogger("shared_batch.regime.regime_module")
 # =============================================================================
 # CONFIGURATION  (populated by load_config_from_bins)
 # =============================================================================
-REGIME_ENABLED = True
+REGIME_ENABLED = None
 MA_WINDOW      = None
-
 # =============================================================================
 # INDICATOR CACHE  (MA over daily close, keyed by symbol)
 # =============================================================================
-
 _indicator_cache: dict = {}
-
 
 def load_config_from_bins(bins_path: str) -> None:
     """Load MA_WINDOW from a regime_bins file. Validates MA_TIMEFRAME against REGIME_TIMEFRAME."""
@@ -57,8 +54,6 @@ def _get_indicator_cache(symbol: str) -> tuple | None:
             return None
         _indicator_cache[symbol] = precompute_indicators(df, MA_WINDOW)
     return _indicator_cache[symbol]
-
-
 # =============================================================================
 # LOAD REGIME BINS
 # =============================================================================

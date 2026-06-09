@@ -46,7 +46,7 @@ logger.debug(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
 LONG_KEYWORD                   = "long"
 ORDER_AMOUNT                   = 80
 DEBUG_TF_FILTER: list[str]     = []
-FILTER_NEGATIVE_BASELINE: bool = True
+FILTER_NEGATIVE_BASELINE: bool = False
 
 BINS: list[str] = ["uptrend", "dwtrend"]
 

@@ -30,7 +30,7 @@ logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = False
+SHOW_PLOTS    = True
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
@@ -80,9 +80,9 @@ N_PATHS_IS           = 1
 # ELITE -- MA3
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 27
-OOS_MAX_DD_TH        = 14
-OOS_R2_TH            = 0.47
+OOS_NETGAIN_TH       = 19
+OOS_MAX_DD_TH        = 15
+OOS_R2_TH            = 0.43
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -92,11 +92,11 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = True
+REGIME_ENABLED    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = False
+UPDATE_OUTPUTS  = True
 SAVE_TRADES     = False
 
 

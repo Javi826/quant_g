@@ -11,7 +11,6 @@ import logging
 
 class PositionSizer:
 
-
     def __init__(self, logger: logging.Logger):
         self.logger = logger
 
@@ -41,16 +40,16 @@ class PositionSizer:
 
         return adjusted_amount, metadata
 
-    def format_log_message(self, strategy_id: str, metadata: dict) -> str:
-
+    def format_log_message(self, strategy_id: str, metadata: dict, total: int = 1, approved: int = 1) -> str:
         if metadata['blocked']:
             return (
                 f"[SIZING] Skip {strategy_id}: "
-                f"bin={metadata['bin_key']} → BLOCKED"
+                f"bin={metadata['bin_key']} → BLOCKED ({total} signals)"
             )
         else:
             return (
                 f"[SIZING] {strategy_id}: "
                 f"bin={metadata['bin_key']} | "
-                f"Base=${metadata['base_amount']:.0f} → ${metadata['adjusted_amount']:.0f}"
+                f"Base=${metadata['base_amount']:.0f} → ${metadata['adjusted_amount']:.0f} | "
+                f"{approved}/{total} approved"
             )
