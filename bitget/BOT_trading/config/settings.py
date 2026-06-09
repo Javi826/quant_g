@@ -21,8 +21,9 @@ ACCOUNTS = {
         "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
+        "regime_ma_window":3,
+        "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
-        "regime_ma_window": 3,
     },
     "00": {
         "initial_capital": 4000,
@@ -32,8 +33,9 @@ ACCOUNTS = {
         "regime_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
+        "regime_ma_window":3,
+        "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
-        "regime_ma_window": 3,
     },
     
     
@@ -45,8 +47,9 @@ ACCOUNTS = {
         "regime_enabled": False,
         "risk_control_enabled": False,
         "postgresql_enabled": False,
+        "regime_ma_window":3,
+        "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
-        "regime_ma_window": 3,
     },
 }
 

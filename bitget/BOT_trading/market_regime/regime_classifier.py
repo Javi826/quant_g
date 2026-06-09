@@ -11,19 +11,16 @@ from config.settings import ACCOUNTS
 
 logger = logging.getLogger('BOT_trading.market_regime.regime_classifier')
 
-REGIME_MA_WINDOW        = 3
-REGIME_TIMEFRAME        = "1Dutc"
-REGIME_REFERENCE_SYMBOL = "BTCUSDT"
+REGIME_MA_WINDOW        = None
+REGIME_TIMEFRAME        = None
+REGIME_REFERENCE_SYMBOL = None
 
 def configure_regime(account_number: str) -> None:
-    global REGIME_MA_WINDOW, REGIME_REFERENCE_SYMBOL
+    global REGIME_MA_WINDOW, REGIME_TIMEFRAME, REGIME_REFERENCE_SYMBOL
     config                  = ACCOUNTS.get(account_number, {})
     REGIME_MA_WINDOW        = config.get('regime_ma_window', 3)
+    REGIME_TIMEFRAME        = config.get('regime_timeframe', '1Dutc')
     REGIME_REFERENCE_SYMBOL = config.get('regime_reference_symbol', 'BTCUSDT')
-
-
-
-
 
 # =============================================================================
 # PUBLIC API
