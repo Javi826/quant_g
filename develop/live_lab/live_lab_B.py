@@ -16,14 +16,14 @@ SYMBOLS_LIVE_DIR = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", "E1"
 # =============================================================================
 SELECTED_STRATEGIES = [
     #"05_reversal_long_1H",
-   # "31_orderblocks_long_15m",
+    #"31_orderblocks_long_15m",
 ]
 
 # =============================================================================
 # ACCOUNT CONFIG
 # =============================================================================
-ACCOUNT_NUMBER   = "E1"
-REGIME_TIMEFRAME = "1Dutc"
+ACCOUNT_NUMBER = "E1"
+STRATEGIES_SET = "00"
 
 # =============================================================================
 # SYS PATH
@@ -55,16 +55,24 @@ import pandas as pd
 
 # --- Trading pipeline ---
 from strategies.strategy_registry    import detect_signals_for_strategy
-from market_regime.regime_classifier import configure_regime, get_symbol_regime
+from market_regime.regime_classifier import get_symbol_regime
 from market_regime.position_sizer    import PositionSizer
 from market_data.data_utils          import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
 
 # --- Batch pipeline ---
-from shared_batch_regime.regime_GE_core import load_ohlcv_raw, precompute_indicators, lookup_indicators, is_trending
+from shared_batch_regime.regime_core        import REGIME_TIMEFRAME
+from shared_batch_regime.regime_core        import precompute_indicators, lookup_ma_batch, classify_market_regime
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 
 # --- Shared ---
-from config.strategies_00 import STRATEGIES
+from config.strategies_00        import STRATEGIES
+from config.settings             import ACCOUNTS
+from market_regime.regime_classifier import configure_regime
+
+# =============================================================================
+# REGIME CONFIG — from ACCOUNTS settings (single source of truth)
+# =============================================================================
+MA_WINDOW = ACCOUNTS[ACCOUNT_NUMBER]["regime_ma_window"]
 
 # =============================================================================
 # INIT
@@ -89,11 +97,11 @@ def load_symbols(strategy_id: str, timeframe: str) -> list:
 
 
 # =============================================================================
-# HELPERS — signal key
+# HELPERS — signal key / params
 # =============================================================================
 
 def _signal_key(strat: dict) -> str:
-    """Extract SIGNAL_REGISTRY key from strategy name. e.g. 'reversal_long_1H' → 'reversal_long'"""
+    """Extract SIGNAL_REGISTRY key from strategy name. e.g. 'reversal_long_1H' -> 'reversal_long'"""
     return "_".join(strat["name"].split("_")[:-1])
 
 
@@ -103,21 +111,24 @@ def _signal_params(strat: dict, registry_entry: dict) -> dict:
 
 
 # =============================================================================
-# HELPERS — trading pipeline signal
+# HELPERS — trading pipeline
 # =============================================================================
 
-def trading_get_signal(strat: dict, symbol: str) -> int:
-    """Call detect_signals_for_strategy (broker fetch internally). Returns 0 or 1."""
+def trading_get_signal_and_regime(strat: dict, symbol: str, arr: dict) -> tuple[int, str]:
+    """Compute baseline signal and regime independently.
+    Returns (base_signal, regime)."""
     signals = detect_signals_for_strategy(strat, [symbol], None, regime_enabled=False)
-    return 1 if signals else 0
+    regime  = get_symbol_regime(symbol, strat["timeframe"], arr)
+    base    = 1 if signals else 0
+    return base, regime
 
 
 # =============================================================================
-# HELPERS — batch pipeline signal
+# HELPERS — batch pipeline
 # =============================================================================
 
 def load_ohlcv_from_dir(symbol: str, timeframe: str, data_dir: str) -> pd.DataFrame:
-    """Clone of load_ohlcv_raw but reading from a custom directory."""
+    """Load OHLCV parquet from a custom directory."""
     path = os.path.join(data_dir, f"{symbol}_{timeframe}.parquet")
     if not os.path.exists(path):
         return pd.DataFrame()
@@ -126,8 +137,10 @@ def load_ohlcv_from_dir(symbol: str, timeframe: str, data_dir: str) -> pd.DataFr
     if df.index.name and df.index.name.lower() in ("timestamp", "ts", "date", "time"):
         df.index.name = "ts"
         df = df.reset_index()
-    rename_map = {"timestamp": "ts", "open_time": "ts", "date": "ts", "time": "ts",
-                  "volume_quote": "volume", "vol": "volume"}
+    rename_map = {
+        "timestamp": "ts", "open_time": "ts", "date": "ts", "time": "ts",
+        "volume_quote": "volume", "vol": "volume",
+    }
     df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}, inplace=True)
     if "volume_base" in df.columns:
         df.drop(columns=["volume_base"], inplace=True)
@@ -143,15 +156,16 @@ def load_ohlcv_from_dir(symbol: str, timeframe: str, data_dir: str) -> pd.DataFr
     return df
 
 
-def batch_get_signal(strat: dict, symbol: str) -> int:
-    """Load raw parquet data and compute signal on last candle. Returns 0 or 1."""
+def batch_get_signal_and_arr(strat: dict, symbol: str) -> tuple[int, dict | None]:
+    """Load raw parquet and compute signal on last candle.
+    Returns (signal, arr) where arr is the ohlcv array."""
     df = load_ohlcv_from_dir(symbol, strat["timeframe"], RAW_DIR)
     if df.empty:
-        return -1
+        return -1, None
     key   = _signal_key(strat)
     entry = SIGNAL_REGISTRY.get(key)
     if entry is None:
-        return -1
+        return -1, None
     arr = {
         "open":   df["open"].values.astype(np.float32),
         "high":   df["high"].values.astype(np.float32),
@@ -163,39 +177,32 @@ def batch_get_signal(strat: dict, symbol: str) -> int:
     params  = _signal_params(strat, entry)
     signals = entry["fn"](arr, **params, live_trading=True)
     if signals is None or len(signals) == 0:
-        return 0
-    last = int(signals[-1])
-    return 1 if last != 0 else 0
+        return 0, arr
+    return (1 if int(signals[-1]) != 0 else 0), arr
 
 
-# =============================================================================
-# HELPERS — batch pipeline regime
-# =============================================================================
-
-def batch_get_regime(symbol: str, signal_ts: pd.Timestamp) -> tuple:
-    """Batch pipeline: precompute_indicators + lookup_indicators + is_trending.
+def batch_get_regime(symbol: str, signal_ts: pd.Timestamp, close_signal: float) -> tuple[str, pd.Timestamp | None]:
+    """Batch pipeline: lookup MA on daily candle D-1, classify regime using strategy candle close.
     Returns (regime_str, ts_of_daily_candle_used)."""
-    from config.settings import ACCOUNTS
-    config     = ACCOUNTS[ACCOUNT_NUMBER]
-    windows    = {k: v["window"]    for k, v in config["regime_indicators"].items() if v.get("enabled")}
-    thresholds = {k: v["threshold"] for k, v in config["regime_indicators"].items() if v.get("enabled")}
-    mode       = config["regime_combine_mode"]
-
     df = load_ohlcv_from_dir(symbol, REGIME_TIMEFRAME, RAW_DIR)
     if df.empty:
         return "no_data", None
 
-    ts_arr, values_arr = precompute_indicators(df, windows)
+    ts_arr, ma_arr = precompute_indicators(df, MA_WINDOW)
     if len(ts_arr) == 0:
         return "no_data", None
 
-    indicator_values, idx = lookup_indicators(ts_arr, values_arr, signal_ts, timeframe=REGIME_TIMEFRAME, return_idx=True)
-    if all(v is None for v in indicator_values.values()):
-        return "no_data", None
+    signal_ts_arr = np.array([signal_ts], dtype="datetime64[ns]")
+    lookups       = lookup_ma_batch(ts_arr, ma_arr, signal_ts_arr)
+    ma_daily      = float(lookups[0]) if not np.isnan(lookups[0]) else None
 
-    ts_regime = pd.Timestamp(ts_arr[idx]) if idx >= 0 else None
-    trending  = is_trending(indicator_values, thresholds, mode)
-    return ("trending" if trending else "ranging"), ts_regime
+    idx       = np.searchsorted(ts_arr, signal_ts_arr, side="right") - 1
+    ts_regime = pd.Timestamp(ts_arr[idx[0]]) if idx[0] >= 0 else None
+
+    if ma_daily is None:
+        return "no_data", ts_regime
+
+    return classify_market_regime(close_signal, ma_daily), ts_regime
 
 
 # =============================================================================
@@ -221,9 +228,10 @@ def apply_regime_filter(strat: dict, baseline_signal: int, regime: str) -> int:
 def main():
     df_test_1h = load_ohlcv_from_dir("BTCUSDT", "1H", RAW_DIR)
     df_test_1d = load_ohlcv_from_dir("BTCUSDT", REGIME_TIMEFRAME, RAW_DIR)
-    print(f"RAW_DIR         : {RAW_DIR}")
-    print(f"BTCUSDT 1H       last candle — raw : {df_test_1h['ts'].iloc[-1]}")
-    print(f"BTCUSDT {REGIME_TIMEFRAME} last candle — raw : {df_test_1d['ts'].iloc[-1]}")
+    print(f"RAW_DIR                  : {RAW_DIR}")
+    print(f"BTCUSDT 1H  last candle  : {df_test_1h['ts'].iloc[-1]}")
+    print(f"BTCUSDT {REGIME_TIMEFRAME} last candle  : {df_test_1d['ts'].iloc[-1]}")
+    print(f"MA_WINDOW                : {MA_WINDOW}  TF={REGIME_TIMEFRAME}")
 
     strategies = [s for s in STRATEGIES if s.get("active", False)]
     if SELECTED_STRATEGIES:
@@ -231,11 +239,16 @@ def main():
 
     print(f"\n{'='*160}")
     print(f"  SIGNAL VALIDATION — Broker (trading) vs Parquet (batch)")
-    print(f"  Strategies : {[s['id'] for s in strategies]}")
-    print(f"  Regime TF  : {REGIME_TIMEFRAME} | Account: {ACCOUNT_NUMBER}")
+    print(f"  Strategies     : {[s['id'] for s in strategies]}")
+    print(f"  Regime TF      : {REGIME_TIMEFRAME} | MA_W={MA_WINDOW} | Account: {ACCOUNT_NUMBER} | Set: {STRATEGIES_SET}")
     print(f"{'='*160}\n")
 
-    col = f"  {'STRATEGY':<30} {'SYMBOL':<14} | {'TS_BROKER':<22} {'BASE':>5} {'REGIME':<10} {'FINAL':>6} | {'TS_PARQUET':<22} {'BASE':>5} {'TS_REG_PARQUET':<22} {'REGIME':<10} {'FINAL':>6} | {'MATCH'}"
+    col = (
+        f"  {'STRATEGY':<30} {'SYMBOL':<14} | "
+        f"{'TS_BROKER':<22} {'BASE':>5} {'REGIME':<10} {'FINAL':>6} | "
+        f"{'TS_PARQUET':<22} {'BASE':>5} {'TS_REG_PARQUET':<22} {'REGIME':<10} {'FINAL':>6} | "
+        f"{'MATCH'}"
+    )
     print(col)
     print(f"  {'-'*155}")
 
@@ -252,17 +265,7 @@ def main():
             print(f"  {sid:<30} ⚠️  no symbols file")
             continue
 
-        # Pre-fetch broker data once per strategy (reused per symbol inside detect_signals_for_strategy)
-        broker_data   = fetch_ohlcv_data(symbols, timeframe)
-        _sample_sym   = symbols[0]
-        _df_broker_s  = broker_data.get(_sample_sym)
-        _df_raw_s     = load_ohlcv_from_dir(_sample_sym, timeframe, RAW_DIR)
-        _df_broker_r  = fetch_ohlcv_data([_sample_sym], REGIME_TIMEFRAME).get(_sample_sym)
-        _df_raw_r     = load_ohlcv_from_dir(_sample_sym, REGIME_TIMEFRAME, RAW_DIR)
-        _ts_broker_s  = normalize_live_ohlcv(_df_broker_s).index[-1] if _df_broker_s is not None and not _df_broker_s.empty else "N/A"
-        _ts_broker_r  = normalize_live_ohlcv(_df_broker_r).index[-1] if _df_broker_r is not None and not _df_broker_r.empty else "N/A"
-        _ts_raw_s     = pd.Timestamp(_df_raw_s["ts"].iloc[-1])        if not _df_raw_s.empty  else "N/A"
-        _ts_raw_r     = pd.Timestamp(_df_raw_r["ts"].iloc[-1])        if not _df_raw_r.empty  else "N/A"
+        broker_data = fetch_ohlcv_data(symbols, timeframe)
 
         for symbol in symbols:
 
@@ -274,22 +277,22 @@ def main():
                 continue
 
             df_norm    = normalize_live_ohlcv(df_broker)
-            ts_trading = pd.Timestamp(df_to_arrays_live(df_norm)["ts"][-1])
+            arr_trading = df_to_arrays_live(df_norm)
+            ts_trading  = pd.Timestamp(arr_trading["ts"][-1])
 
-            base_trading = trading_get_signal(strat, symbol)
-            reg_trading  = get_symbol_regime(symbol, timeframe) if base_trading >= 0 else "no_data"
-            fin_trading  = apply_regime_filter(strat, base_trading, reg_trading)
+            base_trading, reg_trading = trading_get_signal_and_regime(strat, symbol, arr_trading)
+            fin_trading               = apply_regime_filter(strat, base_trading, reg_trading)
 
             # ── BATCH: raw ───────────────────────────────────────────────
-            df_raw = load_ohlcv_from_dir(symbol, timeframe, RAW_DIR)
-            if df_raw.empty:
+            base_batch, arr_batch = batch_get_signal_and_arr(strat, symbol)
+            if arr_batch is None:
                 print(f"  {sid:<30} {symbol:<14} | ⚠️  no raw data")
                 n_nodata += 1
                 continue
 
-            ts_batch                = pd.Timestamp(df_raw["ts"].iloc[-1])
-            base_batch              = batch_get_signal(strat, symbol)
-            reg_batch, ts_reg_batch = batch_get_regime(symbol, ts_batch)
+            ts_batch                = pd.Timestamp(arr_batch["ts"][-1])
+            close_batch             = float(arr_batch["close"][-1])
+            reg_batch, ts_reg_batch = batch_get_regime(symbol, ts_batch, close_batch)
             fin_batch               = apply_regime_filter(strat, base_batch, reg_batch)
 
             # ── COMPARE ───────────────────────────────────────────────────

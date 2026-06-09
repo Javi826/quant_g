@@ -26,10 +26,10 @@ def configure_regime(account_number: str) -> None:
 # PUBLIC API
 # =============================================================================
 
-def _classify_ma(close: float, ma: float) -> str:
-    if close > ma:
+def _classify_ma(close_signal: float, ma_daily: float) -> str:
+    if close_signal > ma_daily:
         return 'uptrend'
-    elif close < ma:
+    elif close_signal < ma_daily:
         return 'dwtrend'
     return 'neutral'
 
@@ -43,7 +43,7 @@ def _calc_ma(close_arr: np.ndarray, window: int) -> Optional[float]:
 def get_symbol_regime(
     symbol:    str,
     timeframe: str,
-    arr:       Optional[dict] = None,
+    arr_strategy: Optional[dict] = None,
 ) -> str:
     try:
         ohlcv_data = fetch_ohlcv_data([symbol], REGIME_TIMEFRAME)
@@ -53,17 +53,17 @@ def get_symbol_regime(
             return 'neutral'
 
         df_norm   = normalize_live_ohlcv(df)
-        arr_daily = df_to_arrays_live(df_norm)
-        close_arr = arr_daily['close']
-        close     = float(arr['close'][-1]) if arr is not None else float(close_arr[-1])
-        ma        = _calc_ma(close_arr, REGIME_MA_WINDOW)
+        arr_daily        = df_to_arrays_live(df_norm)
+        close_daily      = arr_daily['close']
+        close_signal     = float(arr_strategy['close'][-1]) if arr_strategy is not None else float(close_daily[-1])
+        ma_daily         = _calc_ma(close_daily, REGIME_MA_WINDOW)
 
-        if ma is None:
+        if ma_daily is None:
             logger.warning(f"[REGIME] Not enough data for MA({REGIME_MA_WINDOW}) on {symbol} — defaulting to neutral")
             return 'neutral'
 
-        regime = _classify_ma(close, ma)
-        logger.debug(f"[REGIME] {symbol} → {regime.upper()} | close={close:.4f} MA({REGIME_MA_WINDOW})={ma:.4f}")
+        regime = _classify_ma(close_signal, ma_daily)
+        logger.debug(f"[REGIME] {symbol} → {regime.upper()} | close_signal={close_signal:.4f} MA({REGIME_MA_WINDOW})={ma_daily:.4f}")
         return regime
 
     except Exception as e:
@@ -75,33 +75,31 @@ def get_symbol_regime(
 # =============================================================================
 
 def _get_regime_for_symbol(sym: str, close_timeframe: str = None) -> Dict:
-    # Fetch daily data for MA
     daily_data = fetch_ohlcv_data([sym], REGIME_TIMEFRAME)
     df_daily   = daily_data.get(sym)
     if df_daily is None or df_daily.empty:
         return {'family': 'neutral', 'metrics': {}}
 
-    arr_daily = df_to_arrays_live(normalize_live_ohlcv(df_daily))
-    ma        = _calc_ma(arr_daily['close'], REGIME_MA_WINDOW)
-    if ma is None:
+    arr_daily   = df_to_arrays_live(normalize_live_ohlcv(df_daily))
+    close_daily = arr_daily['close']
+    ma_daily    = _calc_ma(close_daily, REGIME_MA_WINDOW)
+    if ma_daily is None:
         return {'family': 'neutral', 'metrics': {}}
 
-    # Fetch close from requested timeframe (or fall back to daily)
     tf = close_timeframe if close_timeframe and close_timeframe != REGIME_TIMEFRAME else REGIME_TIMEFRAME
     if tf != REGIME_TIMEFRAME:
         tf_data = fetch_ohlcv_data([sym], tf)
         df_tf   = tf_data.get(sym)
         if df_tf is None or df_tf.empty:
-            tf = REGIME_TIMEFRAME
-            close = float(arr_daily['close'][-1])
+            close_signal = float(close_daily[-1])
         else:
-            arr_tf = df_to_arrays_live(normalize_live_ohlcv(df_tf))
-            close  = float(arr_tf['close'][-1])
+            arr_tf       = df_to_arrays_live(normalize_live_ohlcv(df_tf))
+            close_signal = float(arr_tf['close'][-1])
     else:
-        close = float(arr_daily['close'][-1])
+        close_signal = float(close_daily[-1])
 
-    family  = _classify_ma(close, ma)
-    metrics = {'close': close, f'ma_{REGIME_MA_WINDOW}': ma}
+    family  = _classify_ma(close_signal, ma_daily)
+    metrics = {'close': close_signal, f'ma_{REGIME_MA_WINDOW}': ma_daily}
     return {'family': family, 'metrics': metrics}
 
 

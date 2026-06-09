@@ -28,7 +28,7 @@ logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 logging.getLogger("shared_batch_regime.regime_core").setLevel(logging.INFO)
 
-N_JOBS = 1
+N_JOBS = -1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -43,7 +43,7 @@ BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_
 # =============================================================================
 AUTO_SAVE_BINS  = True
 OPTIMIZE_METRIC = "calmar"   # "profit" | "win_rate" | "calmar"
-RANKING_MODE    = "combo_delta"  # "weighted_delta" | "combo_delta"
+RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
 
 # =============================================================================
 # INDICATOR GRID

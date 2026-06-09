@@ -424,10 +424,6 @@ class BotOrchestrator:
         # ========================================================================
         self.operative.sync_broker()
         
-        # ========================================================================
-        # REGIME UPDATE: Calculate market regime & direction for closed timeframes
-        # ========================================================================
-        
         now = datetime.now(HOUR_ZONE).strftime('%Y-%m-%d %H:%M:%S')
         self.logger.info(f"Searching Signals... - {now}")
         self.logger.info(f"{'-' * 48}")
@@ -443,13 +439,13 @@ class BotOrchestrator:
         self._process_candle_timeouts(strategies_to_process)
     
         # ========================================================================
-        # SIGNAL SEARCH: + BTC WINDOW Look for new entries in strategies without positions
+        # SIGNAL SEARCH: + SYMBOL WINDOW
         # ========================================================================
-        btc_consolidation = datetime.now(HOUR_ZONE).hour < 3
-        if not btc_consolidation:
+        night_consolidation = datetime.now(HOUR_ZONE).hour < 3
+        if not night_consolidation:
             self._search_signals(strategies_to_process)
         else:
-            self.logger.info("[GAP] BTC 1D consolidation window (00-03 UTC)-skipping signal search")
+            self.logger.info("[GAP] 1D consolidation window (00-03 UTC)-skipping signal search")
               
         self.logger.info("Signal cycle completed")
         self.logger.info(f"{'=' * 48}\n")
@@ -497,9 +493,7 @@ class BotOrchestrator:
         strat:          Dict,
         final_symbols:  List[str],
         adjusted_amount: float,
-    ) -> None:
-        strat_id = strat['id']
-        
+    ) -> None:     
         strat_id = strat['id']
         self.logger.debug(f"[D&E] {strat_id} | symbols={len(final_symbols)} | regime={self.account_flags.get('regime_enabled')}")
   
@@ -508,6 +502,9 @@ class BotOrchestrator:
             final_symbols = final_symbols,
             exchange      = self.exchange,
         )
+        # ====================================================================
+        # REGIME FILTER: Apply regime sizing per signal
+        # ====================================================================
     
         if self.account_flags.get('regime_enabled', True):
             approved_signals = []
@@ -551,7 +548,7 @@ class BotOrchestrator:
                 continue
     
             # ====================================================================
-            # REGIME LAYER
+            # ORDER AMOUNT
             # ====================================================================
             adjusted_amount = strat['order_amount']
     
@@ -627,8 +624,7 @@ class BotOrchestrator:
                         self.logger.info(f"Retry successful for {strat_id}")
                     except Exception as e2:
                         self.logger.error(f"Error-Retry failed for {strat_id}: {e2}")
-
-    
+  
     def _periodic_tpsl_check(self, current_time: float) -> None:
 
         if current_time - self.last_tpsl_check >= CHECK_INTERVAL:
@@ -648,12 +644,10 @@ class BotOrchestrator:
             self.logger.info(
                 f"Next for {tf}: "
                 f"{self.next_candle_times[tf].strftime('%Y-%m-%d %H:%M:%S')} UTC"
-            )
-    
+            )  
     # ======================================================================
     # HELPER METHODS (Private)
-    # ======================================================================
-       
+    # ======================================================================      
     def _send_request_wrapper(
         self,
         method: str,
@@ -662,8 +656,7 @@ class BotOrchestrator:
         body: Optional[Dict] = None
     ) -> Any:
 
-        return self.bitget_client.send_request(method, path, params, body)
-    
+        return self.bitget_client.send_request(method, path, params, body)  
     def _log_startup(self) -> None:
         """Log bot startup information."""
         self.logger.info(f"{'=' * 48}")

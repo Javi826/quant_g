@@ -67,14 +67,10 @@ def compute_ma(close: np.ndarray, window: int) -> np.ndarray:
         result[i] = close[i - window + 1: i + 1].mean()
     return result
 
-
-def classify_market_regime(close: float, ma: float) -> str:
-
-    if close is None or ma is None or np.isnan(close) or np.isnan(ma):
+def classify_market_regime(close_signal: float, ma_daily: float) -> str:
+    if close_signal is None or ma_daily is None or np.isnan(close_signal) or np.isnan(ma_daily):
         return "dwtrend"
-    return "uptrend" if close > ma else "dwtrend"
-
-
+    return "uptrend" if close_signal > ma_daily else "dwtrend"
 # =============================================================================
 # COMBO LABEL
 # =============================================================================
@@ -422,9 +418,9 @@ def run_filtered_combo(
                     lookups         = lookup_ma_batch(ts_arr, ma_arr, signal_ts, close_arr=_close_arr, debug_n=_debug_this_sym)
 
                     for i, idx in enumerate(signal_idxs):
-                        close_val = float(arr['close'][idx]) if 'close' in arr else None
-                        ma_val    = float(lookups[i]) if not np.isnan(lookups[i]) else None
-                        regime    = classify_market_regime(close_val, ma_val)
+                        close_signal = float(arr['close'][idx]) if 'close' in arr else None
+                        ma_daily     = float(lookups[i]) if not np.isnan(lookups[i]) else None
+                        regime       = classify_market_regime(close_signal, ma_daily)
                         bin_signals[regime][idx] = signals[idx]
                         bin_counts[regime] += 1
 

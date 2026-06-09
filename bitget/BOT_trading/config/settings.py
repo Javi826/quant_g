@@ -36,9 +36,7 @@ ACCOUNTS = {
         "regime_ma_window":3,
         "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
-    },
-    
-    
+    },  
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,

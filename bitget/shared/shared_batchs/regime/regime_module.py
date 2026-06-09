@@ -100,9 +100,9 @@ def run_oos_backtest_with_regime(
                     lookups   = lookup_ma_batch(ts_arr, ma_arr, signal_ts)
 
                     for i, idx in enumerate(signal_idxs):
-                        close_val = float(arr['close'][idx])
-                        ma_val    = float(lookups[i]) if not np.isnan(lookups[i]) else None
-                        regime    = classify_market_regime(close_val, ma_val)
+                        close_signal = float(arr['close'][idx])
+                        ma_daily     = float(lookups[i]) if not np.isnan(lookups[i]) else None
+                        regime       = classify_market_regime(close_signal, ma_daily)
                         if regime != bins_to_filter:
                             signals[idx] = 0
 

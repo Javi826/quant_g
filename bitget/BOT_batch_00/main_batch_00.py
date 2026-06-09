@@ -80,9 +80,9 @@ N_PATHS_IS           = 1
 # ELITE -- MA3
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = 19
-OOS_MAX_DD_TH        = 15
-OOS_R2_TH            = 0.43
+OOS_NETGAIN_TH       = 32
+OOS_MAX_DD_TH        = 8
+OOS_R2_TH            = 0.82
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -92,11 +92,11 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = False
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = True
+UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
 
