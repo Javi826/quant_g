@@ -508,18 +508,17 @@ class BotOrchestrator:
     
         if self.account_flags.get('regime_enabled', True):
             approved_signals = []
-            last_metadata    = None
             for sig in signals:
                 _, metadata  = self.position_sizer.calculate_adjusted_amount(
                     base_amount   = adjusted_amount,
                     strat         = strat,
                     market_regime = sig.get('regime', 'neutral'),
                 )
-                last_metadata = metadata
                 if not metadata['blocked']:
                     approved_signals.append(sig)
-            if last_metadata is not None:
-                log_msg = self.position_sizer.format_log_message(strat_id, last_metadata, len(signals), len(approved_signals))
+                    
+            if signals:
+                log_msg = self.position_sizer.format_summary(strat_id, len(signals), len(approved_signals))
                 self.logger.info(log_msg)
         else:
             approved_signals = signals

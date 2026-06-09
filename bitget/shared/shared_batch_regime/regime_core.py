@@ -73,7 +73,6 @@ def classify_market_regime(close_signal: float, ma_daily: float) -> str:
 def combo_label(ma_window: int) -> str:
     return f"MA_W={ma_window}"
 
-
 # =============================================================================
 # CONFIG LOADERS
 # =============================================================================
@@ -110,7 +109,6 @@ def load_strategies_config(strategies_set_name: str) -> list[dict]:
         })
     return strategies
 
-
 def load_symbols(strategy_id: str, timeframe: str, strategies_set_name: str) -> list[str]:
     symbols_folder = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", strategies_set_name)
     filepath       = os.path.join(symbols_folder, f"symbols_live_{strategy_id}_{timeframe}.csv")
@@ -118,7 +116,6 @@ def load_symbols(strategy_id: str, timeframe: str, strategies_set_name: str) -> 
         return []
     df = pd.read_csv(filepath, header=None)
     return df.iloc[:, 0].dropna().astype(str).tolist()
-
 
 # =============================================================================
 # OHLCV LOADERS
@@ -366,7 +363,6 @@ def combined_metrics(results: dict) -> tuple[float, float]:
 # =============================================================================
 # FILTERED BACKTEST FOR A SINGLE COMBO
 # =============================================================================
-
 def run_filtered_combo(
     baselines:       dict,
     strategies:      list[dict],
@@ -440,7 +436,6 @@ def run_filtered_combo(
             }
 
     return results
-
 # =============================================================================
 # PERSISTENCE
 # =============================================================================
@@ -492,7 +487,6 @@ def save_bins(
 # =============================================================================
 # TIME-SERIES PRECOMPUTATION
 # =============================================================================
-
 def precompute_indicators(df: pd.DataFrame, ma_window: int) -> tuple[np.ndarray, np.ndarray]:
 
     close = df["close"].values
@@ -503,7 +497,6 @@ def precompute_indicators(df: pd.DataFrame, ma_window: int) -> tuple[np.ndarray,
     ts_arr = np.array(ts[valid], dtype="datetime64[ns]")
     ma_arr = ma[valid]
     return ts_arr, ma_arr
-
 
 # =============================================================================
 # LOOKUP

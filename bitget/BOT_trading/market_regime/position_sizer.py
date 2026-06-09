@@ -1,11 +1,4 @@
 #BOT_trading/market_regime/position_sizer.py
-"""
-Position sizing based on market regime and direction alignment.
-
-Calculates adjusted order amounts by applying multipliers from:
-- regime_trending/ranging/volatile: Strategy's own regime multipliers
-- DIRECTION_MATRIX: Strategy direction mode vs market direction alignment
-"""
 
 import logging
 
@@ -40,16 +33,9 @@ class PositionSizer:
 
         return adjusted_amount, metadata
 
-    def format_log_message(self, strategy_id: str, metadata: dict, total: int = 1, approved: int = 1) -> str:
-        if metadata['blocked']:
-            return (
-                f"[SIZING] Skip {strategy_id}: "
-                f"bin={metadata['bin_key']} → BLOCKED ({total} signals)"
-            )
-        else:
-            return (
-                f"[SIZING] {strategy_id}: "
-                f"bin={metadata['bin_key']} | "
-                f"Base=${metadata['base_amount']:.0f} → ${metadata['adjusted_amount']:.0f} | "
-                f"{approved}/{total} approved"
-            )
+def format_summary(self, strategy_id: str, total: int, approved: int) -> str:
+    blocked = total - approved
+    msg     = f"[SIZING] {strategy_id}: {approved}/{total} approved"
+    if blocked:
+        msg += f" | {blocked} blocked"
+    return msg
