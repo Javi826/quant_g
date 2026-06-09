@@ -48,6 +48,7 @@ from shared_batchs.regime import regime_module
 from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
+from shared_batch_regime.regime_core import REGIME_TIMEFRAME
 
 regime_module._indicator_cache = {}
 # Global accumulators
@@ -83,7 +84,9 @@ OOS_NETGAIN_TH       = 19
 OOS_MAX_DD_TH        = 15
 OOS_R2_TH            = 0.43
 
-
+OOS_NETGAIN_TH       = 1
+OOS_MAX_DD_TH        = 30
+OOS_R2_TH            = 0.043
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
@@ -180,7 +183,6 @@ OOS3_FOR_VALIDATION = True
 RUN_MC_OOS          = False
 N_PATHS_OOS1        = 500
 
-
 # Correlation analysis
 #------------------------------------------------------------------------------
 CORRELATION_DD_THRESHOLD = 0.75
@@ -207,21 +209,7 @@ from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1, D
 # =============================================================================
 
 def run_batch(strategy_config: dict) -> None:
-    """
-    Run the full batch pipeline for a single strategy.
 
-    strategy_config keys:
-        id               : str   e.g. "03_parity_long_4H"
-        name             : str
-        direction        : str   "long" | "short"
-        timeframe        : str   e.g. "4H"
-        n_symbols        : int
-        order_amount     : int
-        order_amount_prod: int
-        direction_mode   : str
-        sell_after_ncandles: int
-        param_grid       : dict  {PARAM_NAME: [values], ...}
-    """
     start_time = time.time()
 
     STRATEGY_ID       = strategy_config["id"]
@@ -718,7 +706,7 @@ if __name__ == "__main__":
     logger.info(f"  Outputs update : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
-    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}")
+    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}  TF={REGIME_TIMEFRAME}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
