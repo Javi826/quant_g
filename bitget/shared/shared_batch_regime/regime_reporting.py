@@ -83,24 +83,24 @@ def print_combo_summary(
     base_dd:          float,
     label:            str,
 ) -> None:
-    logger.info(f"\n  COMBO SUMMARY — {label}")
+    logger.debug(f"\n  COMBO SUMMARY — {label}")
     header = f"  {'PERIOD':<8} {'B_PROF':>10}" + "".join(f"  {b.upper():>12} {'Δ%':>7}" for b in BINS) + f"  {'UP%':>7}"
-    logger.info(header)
-    logger.info(f"  {'─'*90}")
+    logger.debug(header)
+    logger.debug(f"  {'─'*90}")
     for pk, s in period_summaries.items():
         row = f"  {pk:<8} {s['sys_b']:>10.1f}"
         for b in BINS:
             color = "\033[92m" if s[f'pct_{b}'] > 0 else "\033[91m"
             row  += f"  {s[f'sys_{b}']:>12.1f} {color}{s[f'pct_{b}']:>+6.1f}%\033[0m"
         row += f"  {s['avg_up_pct']:>6.1f}%"
-        logger.info(row)
-    logger.info(f"  {'─'*90}")
+        logger.debug(row)
+    logger.debug(f"  {'─'*90}")
     comb_pct = pct_improvement(comb_p, base_p)
     color    = "\033[92m" if comb_pct > 0 else "\033[91m"
     cls_str  = "  ".join(f"{b.upper()}:{bin_counts.get(b, 0)}" for b in BINS)
-    logger.info(f"  Classifications — {cls_str}  NEUTRAL:{n_neutral}")
-    logger.info(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
-    logger.info(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {color}Delta={comb_pct:>+6.1f}%\033[0m")
+    logger.debug(f"  Classifications — {cls_str}  NEUTRAL:{n_neutral}")
+    logger.debug(f"  Baseline  profit={base_p:>10.1f}  avg_dd={base_dd:>6.1f}%")
+    logger.debug(f"  Combined  profit={comb_p:>10.1f}  avg_dd={comb_dd:>6.1f}%  {color}Delta={comb_pct:>+6.1f}%\033[0m")
 
 
 # =============================================================================

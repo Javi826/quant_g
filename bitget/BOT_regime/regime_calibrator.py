@@ -28,7 +28,7 @@ logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
 logging.getLogger("shared_batch_regime.regime_core").setLevel(logging.INFO)
 
-N_JOBS = -1
+N_JOBS = 1
 PERIOD_WEIGHTS = {
     "OOS1": 0.50,
     "OOS2": 0.25,
@@ -97,7 +97,7 @@ def _process_combo(
 ) -> dict:
     label   = combo_label(ma_window)
     results = run_filtered_combo(
-        baselines, strategies, indicator_cache, ma_window,
+        baselines, strategies, indicator_cache, ma_window
     )
 
     for sid in results:
@@ -203,7 +203,7 @@ def run() -> None:
     )
 
     for row in sorted(ranking, key=lambda x: x['combo_idx']):
-        logger.info(f"\n  COMBO {row['combo_idx']}/{total_combos}")
+        logger.debug(f"\n  COMBO {row['combo_idx']}/{total_combos}")
         print_combo_summary(
             row['period_summaries'],
             row['bin_counts'],
