@@ -45,6 +45,8 @@ AUTO_SAVE_BINS  = True
 OPTIMIZE_METRIC = "calmar"   # "profit" | "win_rate" | "calmar"
 RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
 
+FILTER_NEGATIVE_BASELINE: bool = False
+
 # =============================================================================
 # INDICATOR GRID
 # =============================================================================
@@ -162,7 +164,7 @@ def run() -> None:
         logger.info("  No strategies found — aborting.")
         return
 
-    baselines, strategies_filtered = precompute_baselines(strategies_all, STRATEGIES_SET_NAME)
+    baselines, strategies_filtered = precompute_baselines(strategies_all, STRATEGIES_SET_NAME, FILTER_NEGATIVE_BASELINE)
     if not strategies_filtered:
         logger.info("  No strategies passed the baseline filter — aborting.")
         return
@@ -238,7 +240,8 @@ def run() -> None:
                 optimize_metric = OPTIMIZE_METRIC,
             )
 
-    print_classification_summary(top1_results)
+    excluded_ids = [s['id'] for s in strategies_all if s['id'] not in top1_results]
+    print_classification_summary(top1_results, excluded_ids)
 
     if AUTO_SAVE_BINS:
         save_bins(

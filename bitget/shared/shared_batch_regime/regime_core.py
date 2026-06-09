@@ -1,5 +1,4 @@
 #shared/shared_batch_regime/regime_core.py
-
 import os
 import logging
 import numpy as np
@@ -12,12 +11,9 @@ from importlib.util import spec_from_file_location, module_from_spec
 from sklearn.linear_model import LinearRegression
 
 logger = logging.getLogger(__name__)
-
-
 # =============================================================================
 # PATHS
 # =============================================================================
-
 from shared_batch_regime.config_paths import BITGET_ROOT, DATA_FOLDER_IS, DATA_FOLDER_OOS1, DATA_FOLDER_OOS2, DATA_FOLDER_OOS3, CRYPTO_FULL_DIR
 
 PERIODS = {
@@ -27,7 +23,6 @@ PERIODS = {
     "OOS3": DATA_FOLDER_OOS3,
 }
 EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
-
 # =============================================================================
 # REGIME CONSTANTS — edit here to change global behaviour
 # =============================================================================
@@ -46,7 +41,7 @@ logger.debug(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
 LONG_KEYWORD                   = "long"
 ORDER_AMOUNT                   = 80
 DEBUG_TF_FILTER: list[str]     = []
-FILTER_NEGATIVE_BASELINE: bool = False
+
 
 BINS: list[str] = ["uptrend", "dwtrend"]
 
@@ -245,8 +240,8 @@ def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
 # BASELINE PRECOMPUTATION
 # =============================================================================
 
-def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -> tuple[dict, list[dict]]:
-    label = "excluding strategies with B_PROF <= 0 in any period" if FILTER_NEGATIVE_BASELINE else "including all strategies"
+def precompute_baselines(strategies_all: list[dict], strategies_set_name: str, filter_negative_baseline: bool = True) -> tuple[dict, list[dict]]:
+    label = "excluding strategies with B_PROF <= 0 in any period" if filter_negative_baseline else "including all strategies"
     print(f"\n{'='*120}")
     print(f"  PRECOMPUTING BASELINES — {label}")
     print(f"{'='*120}")
@@ -276,7 +271,7 @@ def precompute_baselines(strategies_all: list[dict], strategies_set_name: str) -
             baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
             for pk in EVAL_KEYS
         )
-        if not FILTER_NEGATIVE_BASELINE or all_positive:
+        if not filter_negative_baseline or all_positive:
             print(f"  ✓ {sid}")
         else:
             del baselines[sid]

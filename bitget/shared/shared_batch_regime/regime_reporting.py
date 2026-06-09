@@ -143,20 +143,27 @@ def print_ranking(ranking: list[dict]) -> None:
 # CLASSIFICATION SUMMARY
 # =============================================================================
 
-def print_classification_summary(strategy_results: dict) -> None:
+def print_classification_summary(strategy_results: dict, excluded_ids: list[str] | None = None) -> None:
     print(f"\n{'='*120}")
     print(f"  STRATEGY CLASSIFICATION SUMMARY  [MA UPTREND MODE]")
     print(f"{'='*120}")
     print(f"  {'STRATEGY':<35} {'DIR':<6} {'BIN'}")
     print(f"  {'─'*70}")
     bin_colors = {
-        "uptrend":   "\033[92m",
+        "uptrend": "\033[92m",
         "dwtrend": "\033[91m",
-        "neutral":   "\033[90m",
+        "neutral": "\033[90m",
     }
-    for sid, data in sorted(strategy_results.items()):
-        direction = "LONG" if data.get('is_long') else "SHORT"
-        cls       = data.get('classification', 'neutral')
-        color     = bin_colors.get(cls, "")
-        print(f"  {sid:<35} {direction:<6} {color}{cls.upper()}\033[0m")
+    excluded_set = set(excluded_ids or [])
+    all_entries  = {
+        **{sid: (data.get('is_long'), data.get('classification', 'neutral'), False) for sid, data in strategy_results.items()},
+        **{sid: ("long" in sid, "neutral", True) for sid in excluded_set},
+    }
+    for sid, (is_long, cls, excluded) in sorted(all_entries.items()):
+        direction = "LONG" if is_long else "SHORT"
+        if excluded:
+            print(f"  {sid:<35} {direction:<6} \033[90mNEUTRAL (excluded)\033[0m")
+        else:
+            color = bin_colors.get(cls, "")
+            print(f"  {sid:<35} {direction:<6} {color}{cls.upper()}\033[0m")
     print(f"  {'─'*70}\n")
