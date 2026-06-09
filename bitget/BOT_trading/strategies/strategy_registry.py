@@ -1,18 +1,4 @@
 #BOT_trading/strategies/strategy_registry.py
-"""
-Strategy Registry - Explicit strategy implementation with elif structure.
-
-This module provides:
-- detect_signals_for_strategy(): Main signal detection function
-- get_implemented_strategies(): Returns set of implemented strategies
-- IMPLEMENTED_STRATEGIES: Set of all implemented strategy names
-
-This is the SINGLE SOURCE OF TRUTH for strategy implementations.
-
-To add a new strategy:
-1. Add elif in detect_signals_for_strategy() below
-3. Add strategy name to get_implemented_strategies()
-"""
 
 import sys
 import os
@@ -521,20 +507,12 @@ def detect_signals_for_strategy(
     
     return all_signals
 
-
 # ==============================================================
 # IMPLEMENTED STRATEGIES - For validation
 # ==============================================================
 
 def get_implemented_strategies() -> set:
-    """
-    Returns set of all implemented strategy IDs.
-    
-    
-    are actually implemented.
-    
-    IMPORTANT: When adding a new strategy, add its ID here!
-    """
+
     strategies = {
        #'01_reversal_long_15m',
        #'02_reversal_short_15m',
