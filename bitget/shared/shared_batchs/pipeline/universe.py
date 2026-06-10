@@ -8,24 +8,12 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
+N_SYMBOLS_MCIS            = 6
+MY_SYMBOLS                = False
+FIX_SYMBOLS_MCIS_TRAINING = True
+OOS23_MATCH_SYMBOLS       = True
 
-symbols_to_exclude = {}
-
-# =============================================================================
-# symbols_to_include = [
-#     "NVDAUSDT",   # NVIDIA        - corr 0.77, 202 rows
-#     "PLTRUSDT",   # Palantir      - corr 0.73, 181 rows
-#     "HOODUSDT",   # Robinhood     - corr 0.71, 194 rows
-#     "ASMLUSDT",   # ASML          - corr 0.70, 182 rows
-#     "GOOGLUSDT",  # Alphabet      - corr 0.65, 195 rows
-#     "AMZNUSDT",   # Amazon        - corr 0.65, 195 rows
-#     "TSLAUSDT",   # Tesla         - corr 0.64, 202 rows
-#     "COINUSDT",   # Coinbase      - corr 0.63, 194 rows
-#     "MRVLUSDT",   # Marvell       - corr 0.63, 180 rows
-#     "METAUSDT",   # Meta          - corr 0.59, 195 rows
-#     "MSFTUSDT",   # Microsoft     - corr 0.48, 168 rows
-# ]
-# =============================================================================
+symbols_to_exclude        = {}
 
 symbols_to_include = [
     "BTCUSDT",   # Bitcoin       - corr 1.00, 133 rows
@@ -33,23 +21,18 @@ symbols_to_include = [
     "SOLUSDT",   # Solana        - corr 0.91, 133 rows
     "LINKUSDT",  # Chainlink     - corr 0.90, 133 rows
     "BNBUSDT",   # BNB           - corr 0.90, 133 rows
-    "XRPUSDT",   # XRP           - corr 0.88, 133 rows
-    "AVAXUSDT",  # Avalanche     - corr 0.87, 133 rows
-    "ADAUSDT",   # Cardano       - corr 0.83, 133 rows
-    "SUIUSDT",   # Sui           - corr 0.80, 133 rows
-    "DOGEUSDT",  # Dogecoin      - corr 0.79, 133 rows
-    "AAVEUSDT",  # Aave          - corr 0.75, 133 rows
+
 ]
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
-                   min_price=None, vol_window=50, my_symbols=False, custom_symbols=None):
+                   min_price=None, vol_window=50, custom_symbols=None):
     ohlcv_data         = {}
     filtered_symbols   = []
     removed_symbols    = []
     removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
     
     #Inclusion
-    if my_symbols:
+    if MY_SYMBOLS:
         inclusion_list = custom_symbols if custom_symbols is not None else symbols_to_include
         symbols = [s for s in symbols if s in inclusion_list]
         
@@ -60,7 +43,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
             continue
         
         #Si my_symbols=True, solo cargar sin filtros
-        if my_symbols:
+        if MY_SYMBOLS:
             file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
             if os.path.exists(file_path):
                 df = pd.read_parquet(file_path)
@@ -132,15 +115,12 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
 # =============================================================================
 
 def select_universe(
-    data_folder_is: str,
-    data_folder_oos: str,
-    timeframe: str,
-    n_symbols: int,
-    min_price: float,
+    data_folder_is:    str,
+    data_folder_oos:   str,
+    timeframe:         str,
+    n_symbols:         int,
+    min_price:         float,
     filter_symbols_fn: callable,
-    my_symbols: bool = False,
-    fix_symbols_mcis: bool = False,
-    n_symbols_mcis: int = 20,
 ) -> tuple:
     """
     Select OOS universe (top N by volume) and match IS universe.
@@ -152,8 +132,8 @@ def select_universe(
     raw_is  = sorted([f.split("_")[0] for f in os.listdir(data_folder_is)  if f.endswith(f"_{timeframe}.parquet")])
     raw_oos = sorted([f.split("_")[0] for f in os.listdir(data_folder_oos) if f.endswith(f"_{timeframe}.parquet")])
 
-    ohlcv_oos, filtered_oos = filter_symbols_fn(raw_oos, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_oos, min_price=min_price, vol_window=50, my_symbols=my_symbols)
-    ohlcv_is,  filtered_is  = filter_symbols_fn(raw_is,  min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is,  min_price=min_price, vol_window=50, my_symbols=my_symbols)
+    ohlcv_oos, filtered_oos = filter_symbols_fn(raw_oos, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_oos, min_price=min_price, vol_window=50)
+    ohlcv_is,  filtered_is  = filter_symbols_fn(raw_is,  min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is,  min_price=min_price, vol_window=50)
 
     def _vol_1d(sym, folder):
         path = os.path.join(folder, f"{sym}_1Dutc.parquet")
@@ -166,11 +146,11 @@ def select_universe(
     oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
     symbols_oos_final = oos_ranked[:n_symbols]
 
-    if fix_symbols_mcis:
+    if FIX_SYMBOLS_MCIS_TRAINING:
         vol_is           = {sym: _vol_1d(sym, data_folder_is) for sym in filtered_is}
         is_ranked        = sorted(filtered_is, key=lambda s: vol_is.get(s, 0), reverse=True)
-        symbols_is_final = is_ranked[:n_symbols_mcis]
-        logger.debug(f"FIX_SYMBOLS_MCIS_TRAINING=True — IS top {n_symbols_mcis} by volume: {symbols_is_final}")
+        symbols_is_final = is_ranked[:N_SYMBOLS_MCIS]
+        logger.debug(f"FIX_SYMBOLS_MCIS_TRAINING=True — IS top {N_SYMBOLS_MCIS} by volume: {symbols_is_final}")
     else:
         syms_is  = set(filtered_is)
         syms_oos = set(symbols_oos_final)
@@ -189,14 +169,13 @@ def select_universe(
     logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
 
-    fix_str = "FIX=True" if fix_symbols_mcis else "FIX=False"
+    fix_str = "FIX=True" if FIX_SYMBOLS_MCIS_TRAINING else "FIX=False"
     #logger.info(f"STAGE 0 ── Universe Selection     ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
 
-    if fix_symbols_mcis:
-        if len(symbols_is_final) < n_symbols_mcis:
-            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS_MCIS ({n_symbols_mcis}). Proceeding with available.")
+    if FIX_SYMBOLS_MCIS_TRAINING:
+        if len(symbols_is_final) < N_SYMBOLS_MCIS:
+            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS_MCIS ({N_SYMBOLS_MCIS}). Proceeding with available.")
     else:
         if len(symbols_is_final) < n_symbols:
             logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
-
     return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos

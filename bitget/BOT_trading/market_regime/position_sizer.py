@@ -33,9 +33,9 @@ class PositionSizer:
 
         return adjusted_amount, metadata
 
-def format_summary(self, strategy_id: str, total: int, approved: int) -> str:
-    blocked = total - approved
-    msg     = f"[SIZING] {strategy_id}: {approved}/{total} approved"
-    if blocked:
-        msg += f" | {blocked} blocked"
-    return msg
+    def format_summary(self, strategy_id: str, total: int, approved: int) -> str:
+        blocked = total - approved
+        msg     = f"[SIZING] {strategy_id}: {approved}/{total} approved"
+        if blocked:
+            msg += f" | {blocked} blocked"
+        return msg

@@ -80,6 +80,7 @@ def combo_label(ma_window: int) -> str:
 def load_strategies_config(strategies_set_name: str) -> list[dict]:
     loop_name = f"strategies_loop_{strategies_set_name}_01"
     loop_path = os.path.join(BITGET_ROOT, f"BOT_batch_{strategies_set_name}", "strategies_files", f"{loop_name}.py")
+    logger.debug(f"  [load_strategies_config] Loading: {loop_path}")
     spec      = spec_from_file_location(loop_name, loop_path)
     module    = module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -129,7 +130,7 @@ def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: 
         ohlcv_data, _ = filter_symbols(
             symbols, min_vol_usdt=0, timeframe=strategy['timeframe'],
             data_folder=PERIODS[period_key], min_price=None, vol_window=50,
-            my_symbols=True, custom_symbols=symbols,
+            custom_symbols=symbols,
         )
         return ohlcv_data
 
@@ -140,7 +141,6 @@ def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: 
         n_symbols         = strategy['n_symbols'],
         min_price         = None,
         filter_symbols_fn = filter_symbols,
-        my_symbols        = False,
     )
     ohlcv_oos = {sym: ohlcv_oos[sym] for sym in symbols_oos_final if sym in ohlcv_oos}
     logger.debug(f"[symbols] {strategy['id']} {period_key}: {sorted(ohlcv_oos.keys())}")

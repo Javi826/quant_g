@@ -33,7 +33,7 @@ ACCOUNTS = {
         "regime_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
-        "regime_ma_window":4,
+        "regime_ma_window":3,
         "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
     },  

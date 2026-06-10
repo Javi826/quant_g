@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_E1.py
+#BOT_batch/main_batch_00.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -30,11 +30,12 @@ logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = False
+SHOW_PLOTS    = True
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
+import shared_batchs.pipeline.universe as universe_cfg
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.is_period import run_backtest_is
 from shared_batchs.pipeline.oos_period import run_oos_period
@@ -67,9 +68,6 @@ _best_params_results           : dict = {}
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
-# SYMBOLS
-#------------------------------------------------------------------------------
-MY_SYMBOLS = False
 
 # BATCH 
 #------------------------------------------------------------------------------
@@ -77,16 +75,13 @@ STRATEGIES_SET_NAME  = "E1"
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 N_PATHS_IS           = 1
 
-# ELITE -- MA4
+# ELITE -- MA3
 #------------------------------------------------------------------------------
 
 OOS_NETGAIN_TH       = 19
 OOS_MAX_DD_TH        = 15
 OOS_R2_TH            = 0.43
 
-OOS_NETGAIN_TH       = 1
-OOS_MAX_DD_TH        = 30
-OOS_R2_TH            = 0.043
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
@@ -95,7 +90,7 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = True
+REGIME_ENABLED    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -153,10 +148,7 @@ SELECTED_STRATEGIES = [
 # =============================================================================
 # IS
 #------------------------------------------------------------------------------
-N_SYMBOLS_MCIS            = 6
-FIX_SYMBOLS_MCIS_TRAINING = True
 MC_SELECTION_PERCENTILE   = None  
-OOS23_MATCH_SYMBOLS       = True 
 
 # =============================================================================
 # PIPELINES
@@ -182,6 +174,7 @@ OOS3_FOR_VALIDATION = True
 #------------------------------------------------------------------------------
 RUN_MC_OOS          = False
 N_PATHS_OOS1        = 500
+
 
 # Correlation analysis
 #------------------------------------------------------------------------------
@@ -234,16 +227,13 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 0 — Universe Selection
     # -------------------------------------------------------------------------
     symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos1 = select_universe(
-        data_folder_is     = DATA_FOLDER_IS,
-        data_folder_oos    = DATA_FOLDER_OOS1,
-        timeframe          = TIMEFRAME,
-        n_symbols          = N_SYMBOLS,
-        min_price          = MIN_PRICE,
-        filter_symbols_fn  = filter_symbols,
-        my_symbols         = MY_SYMBOLS,
-        fix_symbols_mcis   = FIX_SYMBOLS_MCIS_TRAINING,
-        n_symbols_mcis     = N_SYMBOLS_MCIS,
-    )
+            data_folder_is    = DATA_FOLDER_IS,
+            data_folder_oos   = DATA_FOLDER_OOS1,
+            timeframe         = TIMEFRAME,
+            n_symbols         = N_SYMBOLS,
+            min_price         = MIN_PRICE,
+            filter_symbols_fn = filter_symbols,
+        )
 
     # -------------------------------------------------------------------------
     # BLOCK 1 — Monte Carlo IS
@@ -379,20 +369,19 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 6 — OOS2
     # -------------------------------------------------------------------------
     if OOS2_RUN_ANALYSIS:
-        if OOS23_MATCH_SYMBOLS:
+        if universe_cfg.OOS23_MATCH_SYMBOLS:
             logging.disable(logging.INFO)
             _, _oos2_syms, _, ohlcv_oos2_all = select_universe(
                 data_folder_is=DATA_FOLDER_IS, data_folder_oos=DATA_FOLDER_OOS2,
                 timeframe=TIMEFRAME, n_symbols=N_SYMBOLS, min_price=MIN_PRICE,
-                filter_symbols_fn=filter_symbols, my_symbols=MY_SYMBOLS,
-                fix_symbols_mcis=FIX_SYMBOLS_MCIS_TRAINING, n_symbols_mcis=N_SYMBOLS_MCIS,
+                filter_symbols_fn=filter_symbols,
             )
             logging.disable(logging.NOTSET)
             ohlcv_oos2_data = {sym: ohlcv_oos2_all[sym] for sym in _oos2_syms if sym in ohlcv_oos2_all}
         else:
             ohlcv_oos2_raw, _ = filter_symbols(
                 symbols_oos_final, min_vol_usdt=0, timeframe=TIMEFRAME,
-                data_folder=DATA_FOLDER_OOS2, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS,
+                data_folder=DATA_FOLDER_OOS2, min_price=MIN_PRICE, vol_window=50,
             )
             ohlcv_oos2_data = ohlcv_oos2_raw
 
@@ -437,20 +426,19 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 7 — OOS3
     # -------------------------------------------------------------------------
     if OOS3_RUN_ANALYSIS:
-        if OOS23_MATCH_SYMBOLS:
+        if universe_cfg.OOS23_MATCH_SYMBOLS:
             logging.disable(logging.INFO)
             _, _oos3_syms, _, ohlcv_oos3_all = select_universe(
                 data_folder_is=DATA_FOLDER_IS, data_folder_oos=DATA_FOLDER_OOS3,
                 timeframe=TIMEFRAME, n_symbols=N_SYMBOLS, min_price=MIN_PRICE,
-                filter_symbols_fn=filter_symbols, my_symbols=MY_SYMBOLS,
-                fix_symbols_mcis=FIX_SYMBOLS_MCIS_TRAINING, n_symbols_mcis=N_SYMBOLS_MCIS,
+                filter_symbols_fn=filter_symbols,
             )
             logging.disable(logging.NOTSET)
             ohlcv_oos3_data = {sym: ohlcv_oos3_all[sym] for sym in _oos3_syms if sym in ohlcv_oos3_all}
         else:
             ohlcv_oos3_raw, _ = filter_symbols(
                 symbols_oos_final, min_vol_usdt=0, timeframe=TIMEFRAME,
-                data_folder=DATA_FOLDER_OOS3, min_price=MIN_PRICE, vol_window=50, my_symbols=MY_SYMBOLS,
+                data_folder=DATA_FOLDER_OOS3, min_price=MIN_PRICE, vol_window=50,
             )
             ohlcv_oos3_data = ohlcv_oos3_raw
 

@@ -43,29 +43,7 @@ def detect_signals_for_strategy(
     use_hardcoded:  bool = False,
     regime_enabled: bool = True,
 ) -> list:
-    """
-    Args:
-        strat: Strategy configuration dictionary from  containing:
-            - id: Strategy identifier
-            - name: Strategy name (e.g., 'reversal_long_4H')
-            - timeframe: Timeframe (e.g., '4H', '1H', '6Hutc')
-            - lookback: Lookback period
-            - tolerance: Price tolerance
-            - ... (strategy-specific parameters)
-        final_symbols: List of symbols to analyze
-        exchange: Exchange connection (not used, kept for compatibility)
-        use_hardcoded: Whether to use hardcoded signals (not used here)
-    
-    Returns:
-        List of detected signals:
-        [
-            {'symbol': 'BTCUSDT', 'close': 91167.7, 'timestamp': ...},
-            {'symbol': 'ETHUSDT', 'close': 3245.2, 'timestamp': ...},
-            ...
-        ]
 
-        >>> signals = detect_signals_for_strategy(strat, ['BTCUSDT', 'ETHUSDT'], None)
-    """
     strategy_id = strat['id']
     timeframe   = strat['timeframe']
     
@@ -520,7 +498,7 @@ def get_implemented_strategies() -> set:
        #'04_reversal_short_30m',
        '05_reversal_long_1H',
        #'06_reversal_short_1H',
-       '07_reversal_long_4H',
+       #'07_reversal_long_4H',
        #'08_reversal_short_4H',
        #'09_reversal_long_6Hutc',
        #'10_reversal_short_6Hutc',
@@ -529,15 +507,15 @@ def get_implemented_strategies() -> set:
        #'13_parity_long_30m',
        #'14_parity_short_30m',
        #'15_parity_long_1H',
-       '16_parity_short_1H',
-       '17_parity_long_4H',
+       #'16_parity_short_1H',
+       #'17_parity_long_4H',
        #'18_parity_short_4H',
        #'19_parity_long_6Hutc',
        '20_parity_short_6Hutc',
-       '21_flag_long_15m',
+       #'21_flag_long_15m',
        '22_flag_short_15m',
        #'23_flag_long_30m',
-       '24_flag_short_30m',
+       #'24_flag_short_30m',
        #'25_flag_long_1H',
        #'26_flag_short_1H',
        #'27_flag_long_4H',

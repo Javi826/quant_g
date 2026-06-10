@@ -35,22 +35,22 @@ PERIOD_WEIGHTS = {
     "OOS3": 0.25,
 }
 
-STRATEGIES_SET_NAME = "E1"
+STRATEGIES_SET_NAME = "00"
 BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}","strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py",)
 
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
 AUTO_SAVE_BINS  = False
-OPTIMIZE_METRIC = "profit"   # "profit" | "win_rate" | "calmar"
-RANKING_MODE    = "weighted_delta"  # "weighted_delta" | "combo_delta"
+OPTIMIZE_METRIC = "calmar"            # "profit" | "win_rate" | "calmar"
+RANKING_MODE    = "weighted_delta"    # "weighted_delta" | "combo_delta"
 
 FILTER_NEGATIVE_BASELINE: bool = False
 
 # =============================================================================
 # INDICATOR GRID
 # =============================================================================
-MA_WINDOWS: list[int] = [2,3,4,5]
+MA_WINDOWS: list[int] = [2,3,4]
 
 # =============================================================================
 # COMBINED METRIC FOR A SINGLE PERIOD
@@ -139,7 +139,6 @@ def _process_combo(
         'period_summaries': period_summaries,
         'label':            label,
     }
-
 # =============================================================================
 # MAIN RUN
 # =============================================================================
