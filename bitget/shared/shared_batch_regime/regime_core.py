@@ -38,7 +38,24 @@ INDICATOR_COMPUTERS: dict[str, callable] = {
 
 assert [b for b, _ in BIN_CONDITIONS] == BINS, \
     f"BIN_CONDITIONS keys must match BINS exactly. Got {[b for b,_ in BIN_CONDITIONS]} vs {BINS}"
+    
 
+# =============================================================================
+# BINS: list[str] = ["uptrend_volatile", "uptrend_quiet", "dwtrend_volatile", "dwtrend_quiet"]
+# 
+# BIN_CONDITIONS: list[tuple[str, callable]] = [
+#     ("uptrend_volatile", lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
+#     ("uptrend_quiet",    lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
+#     ("dwtrend_volatile", lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
+#     ("dwtrend_quiet",    lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
+# ]
+# 
+# INDICATOR_COMPUTERS: dict[str, callable] = {
+#     "ma":      lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
+#     "atr_pct": lambda df, cfg: compute_atr_pct(df, cfg["atr_period"]),
+# }
+# 
+# =============================================================================
 # =============================================================================
 # HELPERS
 # =============================================================================
@@ -153,3 +170,15 @@ def lookup_indicator_batch(
             print(f"  {sig_ts:<30} {candle_ts}")
 
     return out
+
+def compute_atr_pct(df: pd.DataFrame, period: int) -> np.ndarray:
+    high, low, close = df["high"].values, df["low"].values, df["close"].values
+    prev_close = np.roll(close, 1)
+    prev_close[0] = close[0]
+    tr  = np.maximum(high - low, np.maximum(np.abs(high - prev_close), np.abs(low - prev_close)))
+    atr = np.full(len(tr), np.nan)
+    atr[period - 1] = tr[:period].mean()
+    for i in range(period, len(tr)):
+        atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(close > 0, atr / close, np.nan)
