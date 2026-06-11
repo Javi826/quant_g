@@ -27,7 +27,7 @@ from BOT_regime.regime_engine import save_bins, _metric_value, _METRIC_MAP, _DD_
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
-logging.getLogger("regime_reporting").setLevel(logging.DEBUG)
+logging.getLogger("regime_reporting").setLevel(logging.INFO)
 
 N_JOBS = -1
 PERIOD_WEIGHTS = {
@@ -55,11 +55,13 @@ INDICATOR_GRID: dict = {
     "ma_window": [2, 3, 4],
 }
 
-INDICATOR_GRID: dict = {
-    "ma_window":     [2, 3, 4],
-    "atr_period":    [7, 14, 21],
-    "atr_threshold": [0.02, 0.04, 0.06],
-}
+# =============================================================================
+# INDICATOR_GRID: dict = {
+#     "ma_window":     [2, 3, 4],
+#     "atr_period":    [7, 14, 21],
+#     "atr_threshold": [0.02, 0.04, 0.06],
+# }
+# =============================================================================
 
 INDICATOR_CFGS: list[dict] = [
     dict(zip(INDICATOR_GRID.keys(), values))

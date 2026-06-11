@@ -25,37 +25,37 @@ logger.debug(f"  [regime_core] REGIME_TIMEFRAME={REGIME_TIMEFRAME}")
 # CONSTANTS
 # =============================================================================
 
-# =============================================================================
-# BINS: list[str] = ["uptrend", "dwtrend"]
-# 
-# BIN_CONDITIONS: list[tuple[str, callable]] = [
-#     ("uptrend", lambda ctx: ctx["close"] > ctx["ma"]),
-#     ("dwtrend", lambda ctx: ctx["close"] <= ctx["ma"]),
-# ]
-# 
-# INDICATOR_COMPUTERS: dict[str, callable] = {
-#     "ma": lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
-# }
-# 
-# assert [b for b, _ in BIN_CONDITIONS] == BINS, \
-#     f"BIN_CONDITIONS keys must match BINS exactly. Got {[b for b,_ in BIN_CONDITIONS]} vs {BINS}"
-#     
-# 
-# =============================================================================
-BINS: list[str] = ["uptrend_volatile", "uptrend_quiet", "dwtrend_volatile", "dwtrend_quiet"]
+BINS: list[str] = ["uptrend", "dwtrend"]
 
 BIN_CONDITIONS: list[tuple[str, callable]] = [
-    ("uptrend_volatile", lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
-    ("uptrend_quiet",    lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
-    ("dwtrend_volatile", lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
-    ("dwtrend_quiet",    lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
+    ("uptrend", lambda ctx: ctx["close"] > ctx["ma"]),
+    ("dwtrend", lambda ctx: ctx["close"] <= ctx["ma"]),
 ]
 
 INDICATOR_COMPUTERS: dict[str, callable] = {
-    "ma":      lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
-    "atr_pct": lambda df, cfg: compute_atr_pct(df, cfg["atr_period"]),
+    "ma": lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
 }
 
+assert [b for b, _ in BIN_CONDITIONS] == BINS, \
+    f"BIN_CONDITIONS keys must match BINS exactly. Got {[b for b,_ in BIN_CONDITIONS]} vs {BINS}"
+    
+
+# =============================================================================
+# BINS: list[str] = ["uptrend_volatile", "uptrend_quiet", "dwtrend_volatile", "dwtrend_quiet"]
+# 
+# BIN_CONDITIONS: list[tuple[str, callable]] = [
+#     ("uptrend_volatile", lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
+#     ("uptrend_quiet",    lambda ctx: ctx["close"] > ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
+#     ("dwtrend_volatile", lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] >  ctx["atr_threshold"]),
+#     ("dwtrend_quiet",    lambda ctx: ctx["close"] <= ctx["ma"] and ctx["atr_pct"] <= ctx["atr_threshold"]),
+# ]
+# 
+# INDICATOR_COMPUTERS: dict[str, callable] = {
+#     "ma":      lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
+#     "atr_pct": lambda df, cfg: compute_atr_pct(df, cfg["atr_period"]),
+# }
+# 
+# =============================================================================
 # =============================================================================
 # HELPERS
 # =============================================================================
