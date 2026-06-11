@@ -73,19 +73,20 @@ def run_oos_backtest_with_regime(
     signal_params:   dict,
     best_params:     dict,
     order_amount:    int,
-    bins_to_filter:  str,
+    bins_to_filter:  str | list[str],
     initial_balance: float,
 ) -> tuple:
+    _bins_to_filter = [bins_to_filter] if isinstance(bins_to_filter, str) else bins_to_filter
 
     ohlcv_arrays_regime: dict = {}
 
     for sym, arr in ohlcv_arrays.items():
         signals = signal_fn(arr, **signal_params, live_trading=False)
 
-        if REGIME_ENABLED and bins_to_filter and bins_to_filter != "neutral":
+        if REGIME_ENABLED and _bins_to_filter and _bins_to_filter != ["neutral"]:
             sym_cache = _get_indicator_cache(sym)
 
-        if sym_cache is not None:
+            if sym_cache is not None:
                 signal_idxs = np.nonzero(signals)[0]
 
                 if signal_idxs.size > 0:
@@ -98,7 +99,7 @@ def run_oos_backtest_with_regime(
                         context = {"close": float(arr['close'][idx])}
                         for key, values in lookups.items():
                             context[key] = float(values[i]) if not np.isnan(values[i]) else None
-                        if classify_market_regime(context) != bins_to_filter:
+                        if classify_market_regime(context) not in _bins_to_filter:
                             signals[idx] = 0
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}

@@ -1,9 +1,4 @@
-"""
-backend.py
-Módulo de dashboard web para el bot de trading.
-Se ejecuta en un thread separado y proporciona visualización en tiempo real.
-"""
-
+#BOT_trading/api/backend.py
 import os
 import json
 import re
@@ -1330,232 +1325,47 @@ class DashboardServer:
             
         @self.app.route('/api/risk/exposure')
         def get_risk_exposure():
-
             try:
                 state = self._load_state()
-                
-                # Calculate available capital (initial + closed P&L)
+        
                 df = self._load_trades_dataframe()
                 closed_pnl = df['PROFIT'].sum() if df is not None and not df.empty else 0
                 available_capital = self.initial_capital + closed_pnl
-                
-                # Calculate exposure from open positions
+        
                 total_long_usdt = 0
                 total_short_usdt = 0
-                positions_by_strategy = []
-                
+        
                 for strategy_id, positions in state.get('positions', {}).items():
                     for pos in positions:
-                        usdt_amount = float(pos.get('usdt_amount', 0))
-                        real_exposure = usdt_amount / LEVERAGE  # Divide by leverage
-                        direction = pos['direction'].lower()
-                        
-                        if direction == 'long':
+                        real_exposure = float(pos.get('usdt_amount', 0)) / LEVERAGE
+                        if pos['direction'].lower() == 'long':
                             total_long_usdt += real_exposure
                         else:
                             total_short_usdt += real_exposure
-                        
-                        positions_by_strategy.append({
-                            'strategy': strategy_id,
-                            'symbol': pos['symbol'],
-                            'side': direction.upper(),
-                            'usdt': real_exposure 
-                        })
-                
-                # Calculate exposure percentages
-                gross_exposure_pct = ((total_long_usdt + total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
-                net_exposure_pct = ((total_long_usdt - total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
-                long_exposure_pct = (total_long_usdt / available_capital * 100) if available_capital > 0 else 0
-                short_exposure_pct = (total_short_usdt / available_capital * 100) if available_capital > 0 else 0
-                
-                # Aggregate by strategy
-                strategy_exposure = {}
-                for pos in positions_by_strategy:
-                    strat = pos['strategy']
-                    if strat not in strategy_exposure:
-                        strategy_exposure[strat] = {
-                            'side': pos['side'],
-                            'usdt': 0,
-                            'pct': 0
-                        }
-                    strategy_exposure[strat]['usdt'] += pos['usdt']
-                
-                # Calculate percentages
-                for strat, data in strategy_exposure.items():
-                    data['pct'] = (data['usdt'] / available_capital * 100) if available_capital > 0 else 0
-                
-                # Sort by exposure DESC
-                strategy_list = [
-                    {'strategy': k, **v} 
-                    for k, v in sorted(strategy_exposure.items(), key=lambda x: x[1]['usdt'], reverse=True)
-                ]
-                
+        
+                cap = available_capital if available_capital > 0 else 1
+        
                 return jsonify({
                     'success': True,
                     'metrics': {
-                        'gross_exposure_pct': round(gross_exposure_pct, 2),
-                        'net_exposure_pct': round(net_exposure_pct, 2),
-                        'long_exposure_pct': round(long_exposure_pct, 2),
-                        'short_exposure_pct': round(short_exposure_pct, 2),
-                        'num_positions': sum(len(positions) for positions in state.get('positions', {}).values()),
-                        'available_capital': round(available_capital, 2)
+                        'gross_exposure_pct': round((total_long_usdt + total_short_usdt) / cap * 100, 2),
+                        'net_exposure_pct':   round((total_long_usdt - total_short_usdt) / cap * 100, 2),
+                        'long_exposure_pct':  round(total_long_usdt / cap * 100, 2),
+                        'short_exposure_pct': round(total_short_usdt / cap * 100, 2),
+                        'long_usdt':          round(total_long_usdt, 2),
+                        'short_usdt':         round(total_short_usdt, 2),
                     },
-                    'strategies': strategy_list,
+                    'strategies': [],
                     'limits': {
                         'max_gross': RISK_LIMITS['max_gross_exposure_pct'],
-                        'max_net': RISK_LIMITS['max_net_exposure_pct']
+                        'max_net':   RISK_LIMITS['max_net_exposure_pct']
                     }
                 })
-                
+        
             except Exception as e:
                 logger.error(f"Error getting risk exposure: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
-            
-        @self.app.route('/api/risk/exposure-history')
-        def get_risk_exposure_history():
 
-            try:
-                from datetime import date, datetime, timedelta
-                
-                # Get filter parameters
-                days = int(request.args.get('days', 30))
-                date_from_str = request.args.get('date_from')
-                date_to_str = request.args.get('date_to')
-                
-                # Check if we need to capture today's snapshot
-                conn = psycopg2.connect(**self.postgres_config)
-                cursor = conn.cursor()
-                
-                today = date.today()
-                
-                cursor.execute("""
-                    SELECT date FROM exposure_history 
-                    WHERE account = %s AND date = %s
-                """, [self.account_number, today])
-                
-                exists = cursor.fetchone()
-                
-                if not exists:
-                    # Capture today's snapshot
-                    state = self._load_state()
-                    df = self._load_trades_dataframe()
-                    closed_pnl = df['PROFIT'].sum() if df is not None and not df.empty else 0
-                    available_capital = self.initial_capital + closed_pnl
-                    
-                    total_long_usdt = 0
-                    total_short_usdt = 0
-                    num_positions = 0
-                    
-                    for strategy_id, positions in state.get('positions', {}).items():
-                        num_positions += len(positions)
-                        for pos in positions:
-                            usdt_amount = float(pos.get('usdt_amount', 0))
-                            real_exposure = usdt_amount / LEVERAGE  # Divide by leverage
-                            if pos['direction'].lower() == 'long':
-                                total_long_usdt += real_exposure
-                            else:
-                                total_short_usdt += real_exposure
-                    
-                    gross_pct = ((total_long_usdt + total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
-                    net_pct = ((total_long_usdt - total_short_usdt) / available_capital * 100) if available_capital > 0 else 0
-                    long_pct = (total_long_usdt / available_capital * 100) if available_capital > 0 else 0
-                    short_pct = (total_short_usdt / available_capital * 100) if available_capital > 0 else 0
-                    
-                    cursor.execute("""
-                        INSERT INTO exposure_history 
-                        (date, account, gross_exposure_pct, net_exposure_pct, long_exposure_pct, short_exposure_pct, num_positions)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (date, account) DO NOTHING
-                    """, [today, self.account_number, 
-                          float(gross_pct), float(net_pct), float(long_pct), float(short_pct), int(num_positions)])
-                    
-                    conn.commit()
-                
-                # Build query based on filters
-                if date_from_str and date_to_str:
-                    # Use explicit date range
-                    query = """
-                        SELECT date, gross_exposure_pct, net_exposure_pct, 
-                               long_exposure_pct, short_exposure_pct, num_positions
-                        FROM exposure_history
-                        WHERE account = %s AND date >= %s AND date <= %s
-                        ORDER BY date ASC
-                    """
-                    params = [self.account_number, date_from_str, date_to_str]
-                elif date_from_str:
-                    # From date to today
-                    query = """
-                        SELECT date, gross_exposure_pct, net_exposure_pct, 
-                               long_exposure_pct, short_exposure_pct, num_positions
-                        FROM exposure_history
-                        WHERE account = %s AND date >= %s
-                        ORDER BY date ASC
-                    """
-                    params = [self.account_number, date_from_str]
-                elif date_to_str:
-                    # From 30 days ago to date_to
-                    query = """
-                        SELECT date, gross_exposure_pct, net_exposure_pct, 
-                               long_exposure_pct, short_exposure_pct, num_positions
-                        FROM exposure_history
-                        WHERE account = %s AND date <= %s AND date >= %s
-                        ORDER BY date ASC
-                    """
-                    date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date()
-                    date_from = date_to - timedelta(days=days)
-                    params = [self.account_number, date_to_str, date_from]
-                else:
-                    # Default: last N days
-                    query = """
-                        SELECT date, gross_exposure_pct, net_exposure_pct, 
-                               long_exposure_pct, short_exposure_pct, num_positions
-                        FROM exposure_history
-                        WHERE account = %s AND date >= CURRENT_DATE - INTERVAL '%s days'
-                        ORDER BY date ASC
-                    """
-                    params = [self.account_number, days]
-                
-                cursor.execute(query, params)
-                rows = cursor.fetchall()
-                cursor.close()
-                conn.close()
-                
-                if not rows:
-                    return jsonify({
-                        'success': True,
-                        'history': {
-                            'dates': [],
-                            'gross': [],
-                            'net': [],
-                            'long': [],
-                            'short': [],
-                            'positions': []
-                        }
-                    })
-                
-                dates = [row[0].strftime('%Y-%m-%d') for row in rows]
-                gross = [float(row[1]) if row[1] else 0 for row in rows]
-                net = [float(row[2]) if row[2] else 0 for row in rows]
-                long_exp = [float(row[3]) if row[3] else 0 for row in rows]
-                short_exp = [float(row[4]) if row[4] else 0 for row in rows]
-                positions = [int(row[5]) if row[5] else 0 for row in rows]
-                
-                return jsonify({
-                    'success': True,
-                    'history': {
-                        'dates': dates,
-                        'gross': gross,
-                        'net': net,
-                        'long': long_exp,
-                        'short': short_exp,
-                        'positions': positions
-                    }
-                })
-                
-            except Exception as e:
-                logger.error(f"Error getting exposure history: {e}")
-                return jsonify({'success': False, 'error': str(e)}), 500
-            
         @self.app.route('/api/quality/drift-binomial')
         def get_quality_drift_binomial():
 
@@ -1841,30 +1651,29 @@ class DashboardServer:
             logger.error(f"[REF SNAPSHOT] Error capturing snapshot: {e}")
 
     def _schedule_daily_snapshot(self):
-            """
-            Scheduler loop that runs in separate thread.
-            Captures exposure and reference symbol snapshots daily at 00:05 UTC.
-            """
-            if self.regime_reference_symbol:
-                logger.info(f"[SNAPSHOT] Scheduler started-captures exposure + {self.regime_reference_symbol} daily at 00:05 UTC")
+        """
+        Scheduler loop that runs in separate thread.
+        Captures reference symbol price snapshot daily at 00:05 UTC.
+        """
+        if self.regime_reference_symbol:
+            logger.info(f"[SNAPSHOT] Scheduler started - captures {self.regime_reference_symbol} price daily at 00:05 UTC")
+        else:
+            logger.info("[SNAPSHOT] Scheduler started - no reference symbol configured, nothing to capture")
+    
+        triggered_today = False
+    
+        while self.snapshot_running:
+            now_utc = datetime.utcnow()
+            if now_utc.hour == 0 and now_utc.minute == 5:
+                if not triggered_today:
+                    if self.regime_reference_symbol:
+                        self._capture_ref_snapshot()
+                    triggered_today = True
             else:
-                logger.info("[SNAPSHOT] Scheduler started-captures exposure daily at 00:05 UTC")
+                triggered_today = False
+            time_module.sleep(30)
     
-            triggered_today = False
-    
-            while self.snapshot_running:
-                now_utc = datetime.utcnow()
-                if now_utc.hour == 0 and now_utc.minute == 5:
-                    if not triggered_today:
-                        self._capture_snapshot()
-                        if self.regime_reference_symbol:
-                            self._capture_ref_snapshot()
-                        triggered_today = True
-                else:
-                    triggered_today = False
-                time_module.sleep(30)
-    
-            logger.info("[SNAPSHOT] Scheduler stopped")
+        logger.info("[SNAPSHOT] Scheduler stopped")
     
     def _start_snapshot_scheduler(self):
         """Start snapshot scheduler thread"""

@@ -176,20 +176,6 @@ function getComposeDateParams() {
     return params;
 }
 
-function clearRiskDates() {
-    document.getElementById('risk-date-from').value = '';
-    document.getElementById('risk-date-to').value = '';
-}
-
-function getRiskDateParams() {
-    const dateFrom = document.getElementById('risk-date-from').value;
-    const dateTo = document.getElementById('risk-date-to').value;
-    let params = '';
-    if (dateFrom) params += '&date_from=' + dateFrom;
-    if (dateTo) params += '&date_to=' + dateTo;
-    return params;
-}
-
 async function waitForBackend() {
     const maxAttempts = 30;
     let attempts = 0;
@@ -255,9 +241,7 @@ let drawdownChart = null;
 let allStrategiesList = [];
 let isStoppingBot = false;
 let currentRegimeAnalyticsMode = 'regime';
-let riskExposureChart = null;
-let MAX_GROSS_EXPOSURE = 30.0;  // Default, overwritten by backend
-let MAX_NET_EXPOSURE = 20.0;     // Default, overwritten by backend
+
 // ═══════════════════════════════════════════════════════════════════════════
 // POSITION SORT FEATURE (NEW)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1974,12 +1958,7 @@ async function loadData() {
             if (exposureRes.ok) {
                 const exposureData = await exposureRes.json();
                 if (exposureData.success) {
-                    // Update global limits from backend
-                    if (exposureData.limits) {
-                        MAX_GROSS_EXPOSURE = exposureData.limits.max_gross;
-                        MAX_NET_EXPOSURE = exposureData.limits.max_net;
-                    }
-                    
+
                     const grossPct = exposureData.metrics.gross_exposure_pct;
                     const netPct = exposureData.metrics.net_exposure_pct;
                     
@@ -2296,7 +2275,6 @@ function renderHighCorrelationPairs(pairs) {
 
 async function loadRiskTab() {
     try {
-        // Fetch current exposure
         const exposureRes = await fetch('/api/risk/exposure');
         const exposureData = await exposureRes.json();
         
@@ -2305,23 +2283,17 @@ async function loadRiskTab() {
             return;
         }
         
-        // Update global limits
-        if (exposureData.limits) {
-            MAX_GROSS_EXPOSURE = exposureData.limits.max_gross;
-            MAX_NET_EXPOSURE = exposureData.limits.max_net;
-        }
-        
-        const metrics = exposureData.metrics;
+        const metrics   = exposureData.metrics;
         const strategies = exposureData.strategies;
-        
-        // Update cards with dynamic colors
+
+        if (exposureData.limits) {
+            const configGrossEl = document.getElementById('risk-config-max-gross');
+            const configNetEl   = document.getElementById('risk-config-max-net');
+            if (configGrossEl) configGrossEl.textContent = exposureData.limits.max_gross.toFixed(1) + '%';
+            if (configNetEl)   configNetEl.textContent   = exposureData.limits.max_net.toFixed(1) + '%';
+        }
+
         updateRiskCards(metrics, strategies);
-        
-        // Render strategy table
-        renderRiskStrategyTable(strategies, metrics.available_capital);
-        
-        // Load and render history chart
-        await loadRiskHistoryChart();
         
     } catch (error) {
         console.error('Error loading risk tab:', error);
@@ -2628,15 +2600,14 @@ function renderTargetDeviationTable(data) {
 // END QUALITY CONTROL TAB
 // =============================================================================
 
-function updateRiskCards(metrics, strategies) {
+async function updateRiskCards(metrics, strategies) {
     const grossPct  = metrics.gross_exposure_pct;
     const netPct    = metrics.net_exposure_pct;
     const longPct   = metrics.long_exposure_pct;
     const shortPct  = metrics.short_exposure_pct;
 
-    // Calculate USDT totals by side
-    const longUsdt  = (strategies || []).filter(s => s.side === 'LONG').reduce((sum, s) => sum + s.usdt, 0);
-    const shortUsdt = (strategies || []).filter(s => s.side === 'SHORT').reduce((sum, s) => sum + s.usdt, 0);
+    const longUsdt  = metrics.long_usdt  || 0;
+    const shortUsdt = metrics.short_usdt || 0;
 
     const grossEl = document.getElementById('risk-gross-exp');
     if (grossEl) {
@@ -2656,235 +2627,6 @@ function updateRiskCards(metrics, strategies) {
 
     const shortEl = document.getElementById('risk-short-exp');
     if (shortEl) shortEl.textContent = shortPct.toFixed(1) + '% | $' + shortUsdt.toFixed(0);
-
-    const configGrossEl = document.getElementById('risk-config-max-gross');
-    const configNetEl   = document.getElementById('risk-config-max-net');
-    if (configGrossEl) configGrossEl.textContent = MAX_GROSS_EXPOSURE.toFixed(1) + '%';
-    if (configNetEl)   configNetEl.textContent   = MAX_NET_EXPOSURE.toFixed(1) + '%';
-}
-
-function renderRiskStrategyTable(strategies, availableCapital) {
-    const container = document.getElementById('risk-strategy-table');
-    
-    if (!strategies || strategies.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #8b949e; padding: 40px;">No open positions</div>';
-        return;
-    }
-    
-    // Calculate total gross exposure (sum of all strategy exposures)
-    const totalGrossExposure = strategies.reduce((sum, strat) => sum + strat.pct, 0);
-    
-    const html = '<table><thead><tr>' +
-        '<th>#</th>' +
-        '<th>Strategy</th>' +
-        '<th>Side</th>' +
-        '<th>USDT</th>' +
-        '<th>% Exposure</th>' +
-        '<th>% of Total</th>' +
-        '</tr></thead><tbody>' +
-        strategies.map((strat, idx) => {
-            const num = String(idx + 1).padStart(2, '0');
-            const sideClass = strat.side === 'LONG' ? 'direction-long' : 'direction-short';
-            
-            // Calculate % of total gross exposure
-            const pctOfTotal = totalGrossExposure > 0 
-                ? (strat.pct / totalGrossExposure * 100) 
-                : 0;
-            
-            return '<tr>' +
-                '<td style="color: #8b949e; font-weight: 600;">' + num + '</td>' +
-                '<td>' + strat.strategy + '</td>' +
-                '<td class="' + sideClass + '">' + strat.side + '</td>' +
-                '<td>$' + strat.usdt.toFixed(2) + '</td>' +
-                '<td>' + strat.pct.toFixed(2) + '%</td>' +
-                '<td>' + pctOfTotal.toFixed(1) + '%</td>' +
-                '</tr>';
-        }).join('') +
-        '</tbody></table>';
-    
-    container.innerHTML = html;
-}
-
-async function loadRiskHistoryChart() {
-    try {
-        const dateParams = getRiskDateParams();
-        const res = await fetch('/api/risk/exposure-history?days=30' + dateParams);
-        const data = await res.json();
-        
-        if (!data.success || !data.history || data.history.dates.length === 0) {
-            console.log('No risk history data available yet');
-            return;
-        }
-        
-        const history = data.history;
-        
-        // Destroy existing chart
-        if (riskExposureChart) {
-            riskExposureChart.destroy();
-            riskExposureChart = null;
-        }
-        
-        // Fetch BTC data for overlay
-        let refPrices = [];
-        let btcData = { symbol: null };
-        try {
-            const btcRes = await fetch('/api/ref/history' + dateParams);
-            btcData = await btcRes.json();
-            
-            if (btcData.success && btcData.dates && btcData.dates.length > 0) {
-                // Create map: date -> price
-                const btcMap = {};
-                btcData.dates.forEach((date, idx) => {
-                    btcMap[date] = btcData.prices[idx];
-                });
-                
-                // Align with exposure dates
-                refPrices = history.dates.map(date => btcMap[date] || null);
-            }
-        } catch (error) {
-            console.error('Error loading BTC data for risk chart:', error);
-        }
-        
-        // Calculate Y2 axis range for BTC (min/max with 5% padding)
-        let btcMin = Math.min(...refPrices.filter(p => p !== null));
-        let btcMax = Math.max(...refPrices.filter(p => p !== null));
-        const btcPadding = (btcMax - btcMin) * 0.05;
-        btcMin -= btcPadding;
-        btcMax += btcPadding;
-        
-        // Gross Exposure always blue
-        const grossColor = '#58a6ff';  // Blue
-        
-        const ctx = document.getElementById('riskExposureChart').getContext('2d');
-        riskExposureChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: history.dates,
-                datasets: [
-                    {
-                        label: 'Gross Exposure (%)',
-                        data: history.gross,
-                        borderColor: grossColor,
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        pointRadius: 3,
-                        pointBackgroundColor: grossColor,
-                        tension: 0.1,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Net Exposure (%)',
-                        data: history.net,
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'transparent',
-                        borderWidth: 1.5,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#22d3ee',
-                        tension: 0.1,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: (btcData.symbol || 'BTC') + ' Price',
-                        data: refPrices,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        pointRadius: 0,
-                        tension: 0.1,
-                        yAxisID: 'y2',
-                        spanGaps: true
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#ffffff',
-                            font: { size: 14 }
-                        }
-                    },
-                    title: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: '#ffffff',
-                            font: { size: 14 }
-                        },
-                        grid: {
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        }
-                    },
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Exposure (%)',
-                            color: '#ffffff',
-                            font: { size: 14 }
-                        },
-                        ticks: {
-                            color: '#ffffff',
-                            font: { size: 14 },
-                            callback: function(value) {
-                                return value.toFixed(1) + '%';
-                            }
-                        },
-                        grid: {
-                            color: '#21262d',
-                            drawBorder: true,
-                            borderColor: '#facc15',
-                            borderWidth: 1
-                        }
-                    },
-                    y2: {
-                        type: 'linear',
-                        position: 'right',
-                        min: btcMin,
-                        max: btcMax,
-                        title: {
-                            display: true,
-                            text: (btcData.symbol || 'BTC') + ' Price ($)',
-                            color: '#f59e0b',
-                            font: { size: 14 }
-                        },
-                        ticks: {
-                            color: '#f59e0b',
-                            font: { size: 14 },
-                            callback: function(value) {
-                                return '$' + value.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                });
-                            }
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    }
-                }
-            }
-        });
-        
-    } catch (error) {
-        console.error('Error loading risk history chart:', error);
-    }
 }
 
 // =============================================================================

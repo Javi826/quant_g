@@ -14,14 +14,15 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
 
-from shared_batch_regime.regime_core import EVAL_KEYS, BINS, REGIME_TIMEFRAME
-from shared_batch_regime.regime_core import pct_improvement, combo_label, classify_strategy
-from shared_batch_regime.regime_core import load_strategies_config, precompute_baselines
-from shared_batch_regime.regime_core import build_indicator_cache, combined_metrics
-from shared_batch_regime.regime_core import save_bins, run_filtered_combo
-from shared_batch_regime.regime_core import _metric_value, _METRIC_MAP, _DD_KEY_MAP
-from shared_batch_regime.regime_reporting import print_combo_period_table, print_combo_summary
-from shared_batch_regime.regime_reporting import print_ranking, print_classification_summary
+from shared_batch_regime.regime_core import BINS, REGIME_TIMEFRAME
+from shared_batch_regime.regime_core import pct_improvement, combo_label
+from regime_reporting import print_combo_period_table, print_combo_summary
+from regime_reporting import print_ranking, print_classification_summary
+from BOT_regime.regime_engine import EVAL_KEYS
+from BOT_regime.regime_engine import classify_strategy, combined_metrics
+from BOT_regime.regime_engine import load_strategies_config, precompute_baselines
+from BOT_regime.regime_engine import build_indicator_cache, run_filtered_combo
+from BOT_regime.regime_engine import save_bins, _metric_value, _METRIC_MAP, _DD_KEY_MAP
 
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
@@ -55,8 +56,6 @@ INDICATOR_CFGS: list[dict] = [
     {"ma_window": 3},
     {"ma_window": 4},
 ]
-
-
 # =============================================================================
 # COMBINED METRIC FOR A SINGLE PERIOD
 # =============================================================================
