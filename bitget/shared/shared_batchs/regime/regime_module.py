@@ -99,7 +99,7 @@ def run_oos_backtest_with_regime(
                         context = {"close": float(arr['close'][idx])}
                         for key, values in lookups.items():
                             context[key] = float(values[i]) if not np.isnan(values[i]) else None
-                        if classify_market_regime(context) not in _bins_to_filter:
+                        if classify_market_regime(context, cfg=INDICATOR_CFG) not in _bins_to_filter:
                             signals[idx] = 0
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}

@@ -1,4 +1,4 @@
-#develop/market_regime/regime_calibration.py
+#develop/market_regime/main_regime.py
 import gc
 import os
 import sys
@@ -96,7 +96,7 @@ def _process_combo(
     baseline_dd:     float,
 ) -> dict:
     label   = combo_label(indicator_cfg)
-    results = run_filtered_combo(baselines, strategies, indicator_cache)
+    results = run_filtered_combo(baselines, strategies, indicator_cache, indicator_cfg)
 
     for sid in results:
         if sid != 'is_long':

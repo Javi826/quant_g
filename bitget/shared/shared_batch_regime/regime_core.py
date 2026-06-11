@@ -57,9 +57,11 @@ def compute_ma(close: np.ndarray, window: int) -> np.ndarray:
     return result
 
 
-def classify_market_regime(context: dict) -> str:
-    if context.get("close") is None or context.get("ma") is None \
-            or np.isnan(context["close"]) or np.isnan(context["ma"]):
+def classify_market_regime(context: dict, cfg: dict | None = None) -> str:
+    if cfg:
+        context = {**context, **cfg}
+    required_indicators = list(INDICATOR_COMPUTERS.keys())
+    if any(context.get(k) is None or (isinstance(context.get(k), float) and np.isnan(context[k])) for k in required_indicators):
         return BINS[-1]
     for bin_name, condition in BIN_CONDITIONS:
         if condition(context):

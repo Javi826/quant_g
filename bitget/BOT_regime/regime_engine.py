@@ -283,8 +283,10 @@ def _assign_regime_signals(
     arr:             dict,
     cached:          dict,
     indicator_cache: dict,
+    indicator_cfg:   dict,
     debug_n:         int = 0,
 ) -> tuple[dict[str, np.ndarray], dict[str, int]]:
+    
     signals     = cached['signal_cache'][sym]
     signal_idxs = np.nonzero(signals)[0]
 
@@ -309,7 +311,7 @@ def _assign_regime_signals(
         context = {"close": float(arr['close'][idx]) if 'close' in arr else None}
         for key, values in lookups.items():
             context[key] = float(values[i]) if not np.isnan(values[i]) else None
-        regime                   = classify_market_regime(context)
+        regime                   = classify_market_regime(context, cfg=indicator_cfg)
         bin_signals[regime][idx] = signals[idx]
         bin_counts[regime]      += 1
 
@@ -321,6 +323,7 @@ def _build_period_metrics(
     strategy:        dict,
     cached:          dict,
     indicator_cache: dict,
+    indicator_cfg:   dict,
     debug_n:         int = 0,
 ) -> dict:
     m_base      = cached['metrics']
@@ -328,7 +331,7 @@ def _build_period_metrics(
     bin_arrays: dict[str, dict] = {b: {} for b in BINS}
 
     for sym, arr in cached['ohlcv_arrays'].items():
-        bin_signals, sym_counts = _assign_regime_signals(sym, arr, cached, indicator_cache, debug_n)
+        bin_signals, sym_counts = _assign_regime_signals(sym, arr, cached, indicator_cache, indicator_cfg, debug_n)
         for b in BINS:
             bin_counts[b]      += sym_counts[b]
             bin_arrays[b][sym]  = {**arr, 'signal': bin_signals[b]}
@@ -353,6 +356,7 @@ def run_filtered_combo(
     baselines:       dict,
     strategies:      list[dict],
     indicator_cache: dict,
+    indicator_cfg:   dict,
     debug_n:         int = 0,
 ) -> dict:
     results: dict = {}
@@ -368,7 +372,7 @@ def run_filtered_combo(
             if period_key not in baselines[sid]:
                 continue
             results[sid][period_key] = _build_period_metrics(
-                sid, strategy, baselines[sid][period_key], indicator_cache, debug_n
+                sid, strategy, baselines[sid][period_key], indicator_cache, indicator_cfg, debug_n
             )
 
     return results
