@@ -7,8 +7,8 @@ from importlib.util import spec_from_file_location, module_from_spec
 import os
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batch_regime.regime_core import REGIME_TIMEFRAME, load_ohlcv_raw
-from shared_batch_regime.regime_core import precompute_indicators, lookup_ma_batch
+from shared_batch_regime.regime_core import load_ohlcv_raw
+from shared_batch_regime.regime_core import precompute_indicators, lookup_indicator_batch
 from shared_batch_regime.regime_core import classify_market_regime
 
 logger = logging.getLogger("shared_batch.regime.regime_module")
@@ -16,49 +16,42 @@ logger = logging.getLogger("shared_batch.regime.regime_module")
 # =============================================================================
 # CONFIGURATION  (populated by load_config_from_bins)
 # =============================================================================
-REGIME_ENABLED = None
-MA_WINDOW      = None
+REGIME_ENABLED  = None
+INDICATOR_CFG:  dict = {}
 # =============================================================================
 # INDICATOR CACHE  (MA over daily close, keyed by symbol)
 # =============================================================================
 _indicator_cache: dict = {}
 
 def load_config_from_bins(bins_path: str) -> None:
-    """Load MA_WINDOW from a regime_bins file. Validates MA_TIMEFRAME against REGIME_TIMEFRAME."""
-    global MA_WINDOW, _indicator_cache
+    """Load indicator config from a regime_bins file. Validates MA_TIMEFRAME against REGIME_TIMEFRAME."""
+    global INDICATOR_CFG, _indicator_cache
 
     spec   = spec_from_file_location("regime_bins", bins_path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
 
-    bins_timeframe = getattr(module, "MA_TIMEFRAME", None)
-    if bins_timeframe and bins_timeframe != REGIME_TIMEFRAME:
-        raise ValueError(
-            f"❌ Bins MA_TIMEFRAME='{bins_timeframe}' does not match "
-            f"regime_core REGIME_TIMEFRAME='{REGIME_TIMEFRAME}'. "
-            f"Re-calibrate or update REGIME_TIMEFRAME."
-        )
+    if not hasattr(module, "INDICATOR_CFG"):
+        raise ValueError("❌ regime_bins file must contain INDICATOR_CFG. Re-run regime_calibration.py to regenerate.")
 
-    if hasattr(module, "MA_WINDOW"):
-        MA_WINDOW = module.MA_WINDOW
-
+    INDICATOR_CFG    = module.INDICATOR_CFG
     _indicator_cache = {}
-    logger.debug(f"  [regime_module] config loaded — MA_WINDOW={MA_WINDOW} MA_TIMEFRAME={REGIME_TIMEFRAME}")
+    logger.debug(f"  [regime_module] config loaded — INDICATOR_CFG={INDICATOR_CFG}")
 
-
-def _get_indicator_cache(symbol: str) -> tuple | None:
-    """Lazily load and cache (ts_arr, ma_arr) for a symbol on REGIME_TIMEFRAME."""
+def _get_indicator_cache(symbol: str) -> dict | None:
     if symbol not in _indicator_cache:
         df = load_ohlcv_raw(symbol)
         if df.empty:
             return None
-        _indicator_cache[symbol] = precompute_indicators(df, MA_WINDOW)
+        _indicator_cache[symbol] = precompute_indicators(df, INDICATOR_CFG)
     return _indicator_cache[symbol]
+
 # =============================================================================
 # LOAD REGIME BINS
 # =============================================================================
 
 def load_regime_bins(bins_path: str, strategy_id: str) -> str:
+    
     if not os.path.exists(bins_path):
         logger.warning(f"regime_bins file not found: {bins_path} — defaulting to neutral.")
         return "neutral"
@@ -66,6 +59,7 @@ def load_regime_bins(bins_path: str, strategy_id: str) -> str:
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     bins = getattr(module, "REGIME_BINS", {})
+    
     return bins.get(strategy_id, "neutral")
 
 # =============================================================================
@@ -91,19 +85,20 @@ def run_oos_backtest_with_regime(
         if REGIME_ENABLED and bins_to_filter and bins_to_filter != "neutral":
             sym_cache = _get_indicator_cache(sym)
 
-            if sym_cache is not None:
-                ts_arr, ma_arr = sym_cache
-                signal_idxs    = np.nonzero(signals)[0]
+        if sym_cache is not None:
+                signal_idxs = np.nonzero(signals)[0]
 
                 if signal_idxs.size > 0:
                     signal_ts = arr['ts'][signal_idxs]
-                    lookups   = lookup_ma_batch(ts_arr, ma_arr, signal_ts)
-
+                    lookups   = {
+                        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
+                        for key in sym_cache if key != "ts"
+                    }
                     for i, idx in enumerate(signal_idxs):
-                        close_signal = float(arr['close'][idx])
-                        ma_daily     = float(lookups[i]) if not np.isnan(lookups[i]) else None
-                        regime       = classify_market_regime(close_signal, ma_daily)
-                        if regime != bins_to_filter:
+                        context = {"close": float(arr['close'][idx])}
+                        for key, values in lookups.items():
+                            context[key] = float(values[i]) if not np.isnan(values[i]) else None
+                        if classify_market_regime(context) != bins_to_filter:
                             signals[idx] = 0
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}

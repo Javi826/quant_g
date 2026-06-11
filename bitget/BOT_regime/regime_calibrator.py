@@ -17,9 +17,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from shared_batch_regime.regime_core import EVAL_KEYS, BINS, REGIME_TIMEFRAME
 from shared_batch_regime.regime_core import pct_improvement, combo_label, classify_strategy
 from shared_batch_regime.regime_core import load_strategies_config, precompute_baselines
-from shared_batch_regime.regime_core import build_indicator_cache, combined_metrics, _calmar
+from shared_batch_regime.regime_core import build_indicator_cache, combined_metrics
 from shared_batch_regime.regime_core import save_bins, run_filtered_combo
-
+from shared_batch_regime.regime_core import _metric_value, _METRIC_MAP, _DD_KEY_MAP
 from shared_batch_regime.regime_reporting import print_combo_period_table, print_combo_summary
 from shared_batch_regime.regime_reporting import print_ranking, print_classification_summary
 
@@ -41,7 +41,7 @@ BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-AUTO_SAVE_BINS  = False
+AUTO_SAVE_BINS  = True
 OPTIMIZE_METRIC = "calmar"            # "profit" | "win_rate" | "calmar"
 RANKING_MODE    = "weighted_delta"    # "weighted_delta" | "combo_delta"
 
@@ -50,7 +50,12 @@ FILTER_NEGATIVE_BASELINE: bool = False
 # =============================================================================
 # INDICATOR GRID
 # =============================================================================
-MA_WINDOWS: list[int] = [2,3,4]
+INDICATOR_CFGS: list[dict] = [
+    {"ma_window": 2},
+    {"ma_window": 3},
+    {"ma_window": 4},
+]
+
 
 # =============================================================================
 # COMBINED METRIC FOR A SINGLE PERIOD
@@ -68,18 +73,13 @@ def _combined_metric_for_period(
         d   = data[period_key]
         cls = data.get("classification", "neutral")
 
-        if optimize_metric == "calmar":
-            base += _calmar(d["b_prof"], d["b_dd"])
-            if cls in BINS:
-                comb += _calmar(d[f"{cls}_prof"], d[f"{cls}_dd"])
-            else:
-                comb += _calmar(d["b_prof"], d["b_dd"])
+        base += _metric_value(d, "b_prof", "b_dd", optimize_metric)
+        if cls in BINS:
+            val_key = _METRIC_MAP[cls][optimize_metric]
+            dd_key  = _DD_KEY_MAP[cls]
+            comb   += _metric_value(d, val_key, dd_key, optimize_metric)
         else:
-            base += d["b_prof"]
-            if cls in BINS:
-                comb += d[f"{cls}_prof"]
-            else:
-                comb += d["b_prof"]
+            comb += _metric_value(d, "b_prof", "b_dd", optimize_metric)
 
     return comb, base
 
@@ -89,18 +89,15 @@ def _combined_metric_for_period(
 
 def _process_combo(
     combo_idx:       int,
-    ma_window:       int,
-    total_combos:    int,
     baselines:       dict,
     strategies:      list[dict],
     indicator_cache: dict,
+    indicator_cfg:   dict,
     baseline_profit: float,
     baseline_dd:     float,
 ) -> dict:
-    label   = combo_label(ma_window)
-    results = run_filtered_combo(
-        baselines, strategies, indicator_cache, ma_window
-    )
+    label   = combo_label(indicator_cfg)
+    results = run_filtered_combo(baselines, strategies, indicator_cache)
 
     for sid in results:
         if sid != 'is_long':
@@ -118,7 +115,6 @@ def _process_combo(
     n_neutral  = all_cls.count('neutral')
 
     comb_p, comb_d = combined_metrics(results)
-    avg_up         = sum(ps['avg_up_pct'] for ps in period_summaries.values()) / max(len(period_summaries), 1)
 
     weighted_delta = sum(
         pct_improvement(*_combined_metric_for_period(results, pk, OPTIMIZE_METRIC)) * PERIOD_WEIGHTS.get(pk, 0)
@@ -126,19 +122,21 @@ def _process_combo(
     ) / sum(PERIOD_WEIGHTS.get(pk, 0) for pk in period_summaries)
 
     return {
-        'ma_window':        ma_window,
         'combo_idx':        combo_idx,
         'combined_profit':  comb_p,
         'combined_dd':      comb_d,
         'weighted_delta':   weighted_delta,
         'baseline_profit':  baseline_profit,
         'baseline_dd':      baseline_dd,
-        'avg_up_pct':       avg_up,
         'bin_counts':       bin_counts,
         'n_neutral':        n_neutral,
         'period_summaries': period_summaries,
         'label':            label,
+        'results':          results,
+        'indicator_cfg':    indicator_cfg,
     }
+
+
 # =============================================================================
 # MAIN RUN
 # =============================================================================
@@ -147,11 +145,9 @@ def run() -> None:
     _t0 = time.time()
     gc.collect()
 
-    total_combos = len(MA_WINDOWS)
-
     logger.info(f"\n{'='*120}")
-    logger.info(f"  REGIME CALIBRATION — {total_combos} combinations")
-    logger.info(f"  MA windows ({REGIME_TIMEFRAME}): {MA_WINDOWS}")
+    logger.info(f"  REGIME CALIBRATION — {len(INDICATOR_CFGS)} combinations")
+    logger.info(f"  INDICATOR_CFGS ({REGIME_TIMEFRAME}): {INDICATOR_CFGS}")
     logger.info(f"  BINS: {' | '.join(BINS)}")
     logger.info(f"  OPTIMIZE_METRIC={OPTIMIZE_METRIC} | RANKING_MODE={RANKING_MODE}")
     logger.info(f"  Lookahead fix: D-1 daily candle")
@@ -181,30 +177,26 @@ def run() -> None:
     baseline_profit = sum(base_profits)
     baseline_dd     = sum(base_dds) / len(base_dds) if base_dds else 0.0
 
-    cache_map: dict[int, dict] = {}
-    for ma_w in MA_WINDOWS:
-        if ma_w not in cache_map:
-            cache_map[ma_w] = build_indicator_cache(
-                baselines, strategies_filtered,
-                ma_window = ma_w,
-            )
+    combos: list[tuple[dict, dict]] = [
+        build_indicator_cache(baselines, strategies_filtered, indicator_cfg=cfg)
+        for cfg in INDICATOR_CFGS
+    ]
 
     ranking: list[dict] = Parallel(n_jobs=N_JOBS)(
         delayed(_process_combo)(
             combo_idx       = combo_idx,
-            ma_window       = ma_w,
-            total_combos    = total_combos,
             baselines       = baselines,
             strategies      = strategies_filtered,
-            indicator_cache = cache_map[ma_w],
+            indicator_cache = cache,
+            indicator_cfg   = indicator_cfg,
             baseline_profit = baseline_profit,
             baseline_dd     = baseline_dd,
         )
-        for combo_idx, ma_w in enumerate(MA_WINDOWS, 1)
+        for combo_idx, (cache, indicator_cfg) in enumerate(combos, 1)
     )
 
     for row in sorted(ranking, key=lambda x: x['combo_idx']):
-        logger.debug(f"\n  COMBO {row['combo_idx']}/{total_combos}")
+        logger.debug(f"\n  COMBO {row['combo_idx']}/{len(INDICATOR_CFGS)}")
         print_combo_summary(
             row['period_summaries'],
             row['bin_counts'],
@@ -224,28 +216,17 @@ def run() -> None:
     # =========================================================================
     # TOP1 CLASSIFICATION & BINS
     # =========================================================================
-    top1 = ranking[0]
+    top1         = ranking[0]
+    top1_results = top1['results']
+
     logger.info(f"\n  TOP1 COMBO — {top1['label']}")
-
-    top1_results = run_filtered_combo(
-        baselines, strategies_filtered,
-        cache_map[top1['ma_window']],
-        top1['ma_window'],
-    )
-    for sid in top1_results:
-        if sid != 'is_long':
-            top1_results[sid]['classification'] = classify_strategy(
-                top1_results, sid,
-                optimize_metric = OPTIMIZE_METRIC,
-            )
-
     excluded_ids = [s['id'] for s in strategies_all if s['id'] not in top1_results]
     print_classification_summary(top1_results, excluded_ids)
 
     if AUTO_SAVE_BINS:
         save_bins(
             strategy_results    = top1_results,
-            ma_window           = top1['ma_window'],
+            indicator_cfg       = top1['indicator_cfg'],
             output_path         = BINS_OUTPUT_PATH,
             strategies_set_name = STRATEGIES_SET_NAME,
             all_strategies      = strategies_all,
@@ -256,7 +237,7 @@ def run() -> None:
 
     elapsed = int(time.time() - _t0)
     print(f"\n  Completed in {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s\n")
-    del baselines, cache_map, ranking
+    del baselines, combos, ranking
     gc.collect()
 
 if __name__ == "__main__":

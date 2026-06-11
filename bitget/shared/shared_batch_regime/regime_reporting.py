@@ -17,7 +17,7 @@ def print_combo_period_table(results: dict, strategies: list[dict], period_key: 
     logger.debug(
         f"  {'STRATEGY':<35} {'B_PROF':>8}"
         + "  ".join(f"  {b.upper()[:10]:>12} {'Δ%':>6}" for b in BINS)
-        + f"  {'UP%':>7}"
+        + f"  {(BINS[0].upper()[:3] + '%'):>7}"
     )
     logger.debug(f"  {'─'*120}")
 
@@ -35,24 +35,25 @@ def print_combo_period_table(results: dict, strategies: list[dict], period_key: 
             continue
         d = results[sid][period_key]
 
-        bin_cols = ""
+        bin_cols      = ""
+        first_bin_pct = d.get(f"{BINS[0]}_pct", 0.0)
         for b in BINS:
             delta = pct_improvement(d[f"{b}_prof"], d['b_prof'])
             color = "\033[92m" if delta > 0 else "\033[91m"
             bin_cols += f"  {d[f'{b}_prof']:>12.1f} {color}{delta:>+5.1f}%\033[0m"
 
-        logger.debug(f"  {sid:<35} {d['b_prof']:>8.1f}{bin_cols}  {d['uptrend_pct']:>6.1f}%")
+        logger.debug(f"  {sid:<35} {d['b_prof']:>8.1f}{bin_cols}  {first_bin_pct:>6.1f}%")
 
         sys_b += d['b_prof']
         dd_b.append(d['b_dd'])
-        up_pcts.append(d['uptrend_pct'])
+        up_pcts.append(first_bin_pct)
         for b in BINS:
             sys_bin[b] += d[f"{b}_prof"]
             dd_bin[b].append(d[f"{b}_dd"])
 
     logger.debug(f"  {'─'*120}")
-    sys_cols = ""
     avg_up   = sum(up_pcts) / len(up_pcts) if up_pcts else 0.0
+    sys_cols = ""
     for b in BINS:
         delta = pct_improvement(sys_bin[b], sys_b)
         color = "\033[92m" if delta > 0 else "\033[91m"
@@ -60,12 +61,12 @@ def print_combo_period_table(results: dict, strategies: list[dict], period_key: 
     logger.debug(f"  {'SYSTEM TOTAL':<35} {sys_b:>8.1f}{sys_cols}  {avg_up:>6.1f}%")
 
     return {
-        'sys_b':       sys_b,
-        'avg_dd_b':    sum(dd_b) / len(dd_b) if dd_b else 0.0,
-        'avg_up_pct':  avg_up,
-        **{f"sys_{b}":    sys_bin[b]                             for b in BINS},
-        **{f"pct_{b}":    pct_improvement(sys_bin[b], sys_b)     for b in BINS},
-        **{f"avg_dd_{b}": sum(dd_bin[b]) / len(dd_bin[b]) if dd_bin[b] else 0.0 for b in BINS},
+        'sys_b':      sys_b,
+        'avg_dd_b':   sum(dd_b) / len(dd_b) if dd_b else 0.0,
+        'avg_up_pct': avg_up,
+        **{f"sys_{b}":    sys_bin[b]                                                  for b in BINS},
+        **{f"pct_{b}":    pct_improvement(sys_bin[b], sys_b)                          for b in BINS},
+        **{f"avg_dd_{b}": sum(dd_bin[b]) / len(dd_bin[b]) if dd_bin[b] else 0.0      for b in BINS},
     }
 
 
@@ -84,7 +85,7 @@ def print_combo_summary(
     label:            str,
 ) -> None:
     logger.debug(f"\n  COMBO SUMMARY — {label}")
-    header = f"  {'PERIOD':<8} {'B_PROF':>10}" + "".join(f"  {b.upper():>12} {'Δ%':>7}" for b in BINS) + f"  {'UP%':>7}"
+    header = f"  {'PERIOD':<8} {'B_PROF':>10}" + "".join(f"  {b.upper():>12} {'Δ%':>7}" for b in BINS) + f"  {(BINS[0].upper()[:3] + '%'):>7}"
     logger.debug(header)
     logger.debug(f"  {'─'*90}")
     for pk, s in period_summaries.items():
@@ -110,14 +111,14 @@ def print_combo_summary(
 def print_ranking(ranking: list[dict]) -> None:
     bin_headers = "  ".join(f"{b.upper()[:8]:>8}" for b in BINS)
     header_line = (
-        f"  {'#':>3}  {'COMBO':>5}  {'MA_W':>5}  "
+        f"  {'#':>3}  {'COMBO':>5}  {'CFG':<25}  "
         f"{bin_headers}  {'NEUT':>5}  "
         f"{'BASELINE':>10} {'COMB_PROF':>10} {'COMB_Δ%':>8} {'W_DELTA%':>9}  "
         f"{'BASE_DD%':>8} {'COMB_DD%':>8}"
     )
     total_w = len(header_line) - 2
     logger.info(f"\n\n{'='*total_w}")
-    logger.info(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE  [MA UPTREND MODE]")
+    logger.info(f"  FINAL RANKING — ALL COMBOS BY WEIGHTED DELTA VS BASELINE")
     logger.info(f"{'='*total_w}")
     logger.info(header_line)
     logger.info(f"  {'─'*total_w}")
@@ -128,9 +129,10 @@ def print_ranking(ranking: list[dict]) -> None:
         wc      = "\033[92m" if w_delta > 0 else "\033[91m"
         ddc     = "\033[92m" if row['combined_dd'] > row['baseline_dd'] else "\033[91m"
         rs      = "\033[0m"
+        cfg_str  = ", ".join(f"{k}={v}" for k, v in row['indicator_cfg'].items())
         bin_cols = "  ".join(f"{row['bin_counts'].get(b, 0):>8}" for b in BINS)
         logger.info(
-            f"  {i:>3}  {row['combo_idx']:>5}  {row['ma_window']:>5}  "
+            f"  {i:>3}  {row['combo_idx']:>5}  {cfg_str:<25}  "
             f"{bin_cols}  {row['n_neutral']:>5}  "
             f"{row['baseline_profit']:>10.1f} {cc}{row['combined_profit']:>10.1f}{rs} "
             f"{cc}{pct:>+7.1f}%{rs} {wc}{w_delta:>+8.1f}%{rs}  "
@@ -145,15 +147,13 @@ def print_ranking(ranking: list[dict]) -> None:
 
 def print_classification_summary(strategy_results: dict, excluded_ids: list[str] | None = None) -> None:
     print(f"\n{'='*120}")
-    print(f"  STRATEGY CLASSIFICATION SUMMARY  [MA UPTREND MODE]")
+    print(f"  STRATEGY CLASSIFICATION SUMMARY")
     print(f"{'='*120}")
     print(f"  {'STRATEGY':<35} {'DIR':<6} {'BIN'}")
     print(f"  {'─'*70}")
-    bin_colors = {
-        "uptrend": "\033[92m",
-        "dwtrend": "\033[91m",
-        "neutral": "\033[90m",
-    }
+    _color_cycle = ["\033[92m", "\033[91m", "\033[93m", "\033[94m", "\033[95m"]
+    bin_colors   = {b: _color_cycle[i % len(_color_cycle)] for i, b in enumerate(BINS)}
+    bin_colors["neutral"] = "\033[90m"
     excluded_set = set(excluded_ids or [])
     all_entries  = {
         **{sid: (data.get('is_long'), data.get('classification', 'neutral'), False) for sid, data in strategy_results.items()},

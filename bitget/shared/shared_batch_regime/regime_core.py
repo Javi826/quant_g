@@ -42,8 +42,19 @@ LONG_KEYWORD                   = "long"
 ORDER_AMOUNT                   = 80
 DEBUG_TF_FILTER: list[str]     = []
 
-
 BINS: list[str] = ["uptrend", "dwtrend"]
+
+BIN_CONDITIONS: list[tuple[str, callable]] = [
+    ("uptrend", lambda ctx: ctx["close"] > ctx["ma"]),
+    ("dwtrend", lambda ctx: ctx["close"] <= ctx["ma"]),
+]
+
+INDICATOR_COMPUTERS: dict[str, callable] = {
+    "ma": lambda df, cfg: compute_ma(df["close"].values, cfg["ma_window"]),
+}
+
+assert [b for b, _ in BIN_CONDITIONS] == BINS, \
+    f"BIN_CONDITIONS keys must match BINS exactly. Got {[b for b,_ in BIN_CONDITIONS]} vs {BINS}"
 
 # =============================================================================
 # HELPERS
@@ -62,16 +73,20 @@ def compute_ma(close: np.ndarray, window: int) -> np.ndarray:
         result[i] = close[i - window + 1: i + 1].mean()
     return result
 
-def classify_market_regime(close_signal: float, ma_daily: float) -> str:
-    if close_signal is None or ma_daily is None or np.isnan(close_signal) or np.isnan(ma_daily):
-        return "dwtrend"
-    return "uptrend" if close_signal > ma_daily else "dwtrend"
+def classify_market_regime(context: dict) -> str:
+    if context.get("close") is None or context.get("ma") is None \
+            or np.isnan(context["close"]) or np.isnan(context["ma"]):
+        return BINS[-1]
+    for bin_name, condition in BIN_CONDITIONS:
+        if condition(context):
+            return bin_name
+    return BINS[-1]
 # =============================================================================
 # COMBO LABEL
 # =============================================================================
 
-def combo_label(ma_window: int) -> str:
-    return f"MA_W={ma_window}"
+def combo_label(indicator_cfg: dict) -> str:
+    return ", ".join(f"{k}={v}" for k, v in indicator_cfg.items())
 
 # =============================================================================
 # CONFIG LOADERS
@@ -182,13 +197,16 @@ def load_ohlcv_raw(symbol: str) -> pd.DataFrame:
 # =============================================================================
 
 def build_indicator_cache(
-    baselines:  dict,
-    strategies: list[dict],
-    ma_window:  int,
-) -> dict:
+    baselines:     dict,
+    strategies:    list[dict],
+    indicator_cfg: dict,
+) -> tuple[dict, dict]:
+    cache:       dict = {}
+    keys_needed: set  = set()
 
-    cache: dict      = {}
-    keys_needed: set = set()
+    cache:         dict = {}
+    keys_needed:   set  = set()
+
 
     for strategy in strategies:
         for period_key in EVAL_KEYS:
@@ -201,9 +219,9 @@ def build_indicator_cache(
             continue
         df = load_ohlcv_raw(sym)
         if not df.empty:
-            cache[sym] = precompute_indicators(df, ma_window)
+            cache[sym] = precompute_indicators(df, indicator_cfg)
 
-    return cache
+    return cache, indicator_cfg
 
 
 # =============================================================================
@@ -310,28 +328,22 @@ def classify_strategy(
     sid:             str,
     optimize_metric: str = "profit",
 ) -> str:
-
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
         return "neutral"
 
     def _beats_baseline(pk: str, bin_name: str) -> bool:
-        d       = data[pk]
-        val_key = _METRIC_MAP[bin_name][optimize_metric]
-        dd_key  = _DD_KEY_MAP[bin_name]
-        return _metric_value(d, val_key, dd_key, optimize_metric) > _metric_value(d, "b_prof", "b_dd", optimize_metric)
+        d = data[pk]
+        return _metric_value(d, _METRIC_MAP[bin_name][optimize_metric], _DD_KEY_MAP[bin_name], optimize_metric) \
+             > _metric_value(d, "b_prof", "b_dd", optimize_metric)
 
-    up_passes   = all(_beats_baseline(pk, "uptrend")   for pk in periods_with_data)
-    down_passes = all(_beats_baseline(pk, "dwtrend") for pk in periods_with_data)
+    winning_bins = [
+        b for b in BINS
+        if all(_beats_baseline(pk, b) for pk in periods_with_data)
+    ]
 
-    if up_passes and down_passes:
-        return "neutral"
-    if up_passes:
-        return "uptrend"
-    if down_passes:
-        return "dwtrend"
-    return "neutral"
+    return winning_bins[0] if len(winning_bins) == 1 else "neutral"
 
 
 # =============================================================================
@@ -348,12 +360,9 @@ def combined_metrics(results: dict) -> tuple[float, float]:
             if pk not in data or not isinstance(data[pk], dict):
                 continue
             d = data[pk]
-            if cls == 'uptrend':
-                profits.append(d['uptrend_prof'])
-                dds.append(d['uptrend_dd'])
-            elif cls == 'dwtrend':
-                profits.append(d['dwtrend_prof'])
-                dds.append(d['dwtrend_dd'])
+            if cls in BINS:
+                profits.append(d[f'{cls}_prof'])
+                dds.append(d[f'{cls}_dd'])
             else:
                 profits.append(d['b_prof'])
                 dds.append(d['b_dd'])
@@ -363,14 +372,82 @@ def combined_metrics(results: dict) -> tuple[float, float]:
 # =============================================================================
 # FILTERED BACKTEST FOR A SINGLE COMBO
 # =============================================================================
+def _assign_regime_signals(
+    sym:             str,
+    arr:             dict,
+    cached:          dict,
+    indicator_cache: dict,
+    debug_n:         int = 0,
+) -> tuple[dict[str, np.ndarray], dict[str, int]]:
+    signals     = cached['signal_cache'][sym]
+    signal_idxs = np.nonzero(signals)[0]
+
+    bin_signals: dict[str, np.ndarray] = {b: np.zeros_like(signals) for b in BINS}
+    bin_counts:  dict[str, int]        = {b: 0 for b in BINS}
+
+    sym_cache = indicator_cache.get(sym)
+    if sym_cache is None:
+        raise KeyError(f"Missing indicator cache for symbol '{sym}' — check that the daily parquet file exists.")
+
+    if signal_idxs.size == 0:
+        return bin_signals, bin_counts
+
+    signal_ts = arr['ts'][signal_idxs]
+    _debug_n  = debug_n if (debug_n > 0 and not any(bin_counts.values())) else 0
+    lookups   = {
+        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts, debug_n=_debug_n if key == "ma" else 0)
+        for key in sym_cache if key != "ts"
+    }
+
+    for i, idx in enumerate(signal_idxs):
+        context = {"close": float(arr['close'][idx]) if 'close' in arr else None}
+        for key, values in lookups.items():
+            context[key] = float(values[i]) if not np.isnan(values[i]) else None
+        regime                   = classify_market_regime(context)
+        bin_signals[regime][idx] = signals[idx]
+        bin_counts[regime]      += 1
+
+    return bin_signals, bin_counts
+
+
+def _build_period_metrics(
+    sid:        str,
+    strategy:   dict,
+    cached:     dict,
+    indicator_cache: dict,
+    debug_n:    int = 0,
+) -> dict:
+    m_base      = cached['metrics']
+    bin_counts: dict[str, int]  = {b: 0 for b in BINS}
+    bin_arrays: dict[str, dict] = {b: {} for b in BINS}
+
+    for sym, arr in cached['ohlcv_arrays'].items():
+        bin_signals, sym_counts = _assign_regime_signals(sym, arr, cached, indicator_cache, debug_n)
+        for b in BINS:
+            bin_counts[b]          += sym_counts[b]
+            bin_arrays[b][sym]      = {**arr, 'signal': bin_signals[b]}
+
+    bin_metrics: dict[str, dict] = {b: run_backtest(bin_arrays[b], strategy['best_params']) for b in BINS}
+    total = sum(bin_counts.values())
+
+    return {
+        'b_prof': m_base['profit'],
+        'b_dd':   m_base['max_dd'],
+        'b_wr':   m_base['win_rate'],
+        'b_r2':   m_base['r2'],
+        **{f"{b}_prof": bin_metrics[b]['profit']                    for b in BINS},
+        **{f"{b}_dd":   bin_metrics[b]['max_dd']                    for b in BINS},
+        **{f"{b}_wr":   bin_metrics[b]['win_rate']                  for b in BINS},
+        **{f"{b}_r2":   bin_metrics[b]['r2']                        for b in BINS},
+        **{f"{b}_pct":  bin_counts[b] / max(total, 1) * 100  for b in BINS},
+    }
+
 def run_filtered_combo(
     baselines:       dict,
     strategies:      list[dict],
     indicator_cache: dict,
-    ma_window:       int,
     debug_n:         int = 0,
 ) -> dict:
-
     results: dict = {}
 
     for strategy in strategies:
@@ -383,57 +460,9 @@ def run_filtered_combo(
         for period_key in EVAL_KEYS:
             if period_key not in baselines[sid]:
                 continue
-
-            cached = baselines[sid][period_key]
-            m_base = cached['metrics']
-
-            bin_counts: dict[str, int]  = {b: 0 for b in BINS}
-            bin_arrays: dict[str, dict] = {b: {} for b in BINS}
-
-            for sym, arr in cached['ohlcv_arrays'].items():
-                signals     = cached['signal_cache'][sym]
-                signal_idxs = np.nonzero(signals)[0]
-
-                bin_signals: dict[str, np.ndarray] = {b: np.zeros_like(signals) for b in BINS}
-
-                sym_cache = indicator_cache.get(sym)
-
-                if sym_cache is None or signal_idxs.size == 0:
-                    bin_signals["dwtrend"] = signals.copy()
-                    bin_counts["dwtrend"] += int(signals.sum())
-                else:
-                    ts_arr, ma_arr  = sym_cache
-                    signal_ts       = arr['ts'][signal_idxs]
-                    _close_arr      = arr['close'] if 'close' in arr else None
-                    _debug_this_sym = debug_n if (debug_n > 0 and not any(bin_counts.values())) else 0
-                    lookups         = lookup_ma_batch(ts_arr, ma_arr, signal_ts, close_arr=_close_arr, debug_n=_debug_this_sym)
-
-                    for i, idx in enumerate(signal_idxs):
-                        close_signal = float(arr['close'][idx]) if 'close' in arr else None
-                        ma_daily     = float(lookups[i]) if not np.isnan(lookups[i]) else None
-                        regime       = classify_market_regime(close_signal, ma_daily)
-                        bin_signals[regime][idx] = signals[idx]
-                        bin_counts[regime] += 1
-
-                for b in BINS:
-                    bin_arrays[b][sym] = {**arr, 'signal': bin_signals[b]}
-
-            bin_metrics: dict[str, dict] = {b: run_backtest(bin_arrays[b], strategy['best_params']) for b in BINS}
-            total       = sum(bin_counts.values())
-            uptrend_pct = bin_counts["uptrend"] / max(total, 1) * 100
-
-            results[sid][period_key] = {
-                'b_prof': m_base['profit'],
-                'b_dd':   m_base['max_dd'],
-                'b_wr':   m_base['win_rate'],
-                'b_r2':   m_base['r2'],
-                'uptrend_pct': uptrend_pct,
-                **{f"{b}_prof": bin_metrics[b]['profit']   for b in BINS},
-                **{f"{b}_dd":   bin_metrics[b]['max_dd']   for b in BINS},
-                **{f"{b}_wr":   bin_metrics[b]['win_rate'] for b in BINS},
-                **{f"{b}_r2":   bin_metrics[b]['r2']       for b in BINS},
-                **{f"{b}_pct":  bin_counts[b] / max(total, 1) * 100 for b in BINS},
-            }
+            results[sid][period_key] = _build_period_metrics(
+                sid, strategy, baselines[sid][period_key], indicator_cache, debug_n
+            )
 
     return results
 # =============================================================================
@@ -442,7 +471,7 @@ def run_filtered_combo(
 
 def save_bins(
     strategy_results:    dict,
-    ma_window:           int,
+    indicator_cfg:       dict,
     output_path:         str,
     strategies_set_name: str = "E1",
     all_strategies:      list[dict] | None = None,
@@ -452,13 +481,12 @@ def save_bins(
     generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     header_lines = [
         '"""',
-        f"regime_bins_{strategies_set_name}.py — MA uptrend regime classification. Do not edit manually.",
-        f"Generated by regime_calibration.py — MA({ma_window}) on {REGIME_TIMEFRAME}",
+        f"regime_bins_{strategies_set_name}.py — auto-generated regime classification. Do not edit manually.",
+        f"Generated by regime_calibration.py on {REGIME_TIMEFRAME}",
         f"Auto-generated on {generated_at} UTC.",
         '"""',
         "",
-        f'MA_WINDOW    = {ma_window}',
-        f'MA_TIMEFRAME = "{REGIME_TIMEFRAME}"',
+        f'INDICATOR_CFG = {indicator_cfg}',
         "",
     ]
     if optimize_metric:
@@ -487,26 +515,24 @@ def save_bins(
 # =============================================================================
 # TIME-SERIES PRECOMPUTATION
 # =============================================================================
-def precompute_indicators(df: pd.DataFrame, ma_window: int) -> tuple[np.ndarray, np.ndarray]:
-
-    close = df["close"].values
-    ts    = df["ts"].values
-    ma    = compute_ma(close, ma_window)
-
-    valid  = ~np.isnan(ma)
-    ts_arr = np.array(ts[valid], dtype="datetime64[ns]")
-    ma_arr = ma[valid]
-    return ts_arr, ma_arr
+def precompute_indicators(df: pd.DataFrame, cfg: dict) -> dict:
+    ts         = df["ts"].values
+    indicators = {key: fn(df, cfg) for key, fn in INDICATOR_COMPUTERS.items()}
+    valid      = np.ones(len(ts), dtype=bool)
+    for arr in indicators.values():
+        valid &= ~np.isnan(arr)
+    return {
+        "ts": np.array(ts[valid], dtype="datetime64[ns]"),
+        **{key: arr[valid] for key, arr in indicators.items()},
+    }
 
 # =============================================================================
 # LOOKUP
 # =============================================================================
-
-def lookup_ma_batch(
+def lookup_indicator_batch(
     ts_arr:        np.ndarray,
-    ma_arr:        np.ndarray,
+    indicator_arr: np.ndarray,
     signal_ts_arr: np.ndarray,
-    close_arr:     np.ndarray | None = None,
     debug_n:       int = 0,
 ) -> np.ndarray:
 
@@ -516,7 +542,7 @@ def lookup_ma_batch(
 
     valid = idxs >= 0
     out   = np.full(len(idxs), np.nan)
-    out[valid] = ma_arr[idxs[valid]]
+    out[valid] = indicator_arr[idxs[valid]]
 
     if debug_n > 0:
         print(f"\n  [LOOKUP DEBUG] first {min(debug_n, len(idxs))} signals — raw timestamps only")
