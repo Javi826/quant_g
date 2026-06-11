@@ -13,7 +13,7 @@ for _key in list(sys.modules.keys()):
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batchs")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
-
+from itertools import product as _product
 from shared_batch_regime.regime_core import BINS, REGIME_TIMEFRAME
 from shared_batch_regime.regime_core import pct_improvement, combo_label
 from regime_reporting import print_combo_period_table, print_combo_summary
@@ -27,7 +27,7 @@ from BOT_regime.regime_engine import save_bins, _metric_value, _METRIC_MAP, _DD_
 LOG_LEVEL = logging.INFO
 logging.basicConfig(format="%(message)s", level=LOG_LEVEL, force=True)
 logger = logging.getLogger(__name__)
-logging.getLogger("shared_batch_regime.regime_core").setLevel(logging.INFO)
+logging.getLogger("regime_reporting").setLevel(logging.DEBUG)
 
 N_JOBS = -1
 PERIOD_WEIGHTS = {
@@ -51,19 +51,20 @@ FILTER_NEGATIVE_BASELINE: bool = False
 # =============================================================================
 # INDICATOR GRID
 # =============================================================================
-INDICATOR_CFGS: list[dict] = [
-    {"ma_window": 2},
-    {"ma_window": 3},
-    {"ma_window": 4},
-]
+INDICATOR_GRID: dict = {
+    "ma_window": [2, 3, 4],
+}
 
-# =============================================================================
-# INDICATOR_CFGS: list[dict] = [
-#     {"ma_window": 2, "atr_period": 7, "atr_threshold": 0.02},
-#     {"ma_window": 3, "atr_period": 14, "atr_threshold": 0.04},
-#     {"ma_window": 4, "atr_period": 21, "atr_threshold": 0.06},
-# ]
-# =============================================================================
+INDICATOR_GRID: dict = {
+    "ma_window":     [2, 3, 4],
+    "atr_period":    [7, 14, 21],
+    "atr_threshold": [0.02, 0.04, 0.06],
+}
+
+INDICATOR_CFGS: list[dict] = [
+    dict(zip(INDICATOR_GRID.keys(), values))
+    for values in _product(*INDICATOR_GRID.values())
+]
 # =============================================================================
 # COMBINED METRIC FOR A SINGLE PERIOD
 # =============================================================================
@@ -78,13 +79,13 @@ def _combined_metric_for_period(
         if sid == "is_long" or period_key not in data or not isinstance(data[period_key], dict):
             continue
         d   = data[period_key]
-        cls = data.get("classification", "neutral")
-
+        cls = data.get("classification", [])
         base += _metric_value(d, "b_prof", "b_dd", optimize_metric)
-        if cls in BINS:
-            val_key = _METRIC_MAP[cls][optimize_metric]
-            dd_key  = _DD_KEY_MAP[cls]
-            comb   += _metric_value(d, val_key, dd_key, optimize_metric)
+        if cls:
+            for b in cls:
+                val_key = _METRIC_MAP[b][optimize_metric]
+                dd_key  = _DD_KEY_MAP[b]
+                comb   += _metric_value(d, val_key, dd_key, optimize_metric) / len(cls)
         else:
             comb += _metric_value(d, "b_prof", "b_dd", optimize_metric)
 
@@ -115,11 +116,11 @@ def _process_combo(
 
     period_summaries: dict[str, dict] = {}
     for pk in EVAL_KEYS:
-        period_summaries[pk] = print_combo_period_table(results, strategies, pk, label)
+        period_summaries[pk] = print_combo_period_table(results, strategies, pk, label, combo_idx=combo_idx, n_combos=len(INDICATOR_CFGS))
 
-    all_cls    = [data.get('classification', 'neutral') for sid, data in results.items() if sid != 'is_long']
+    all_cls    = [b for sid, data in results.items() if sid != 'is_long' for b in data.get('classification', [])]
     bin_counts = {b: all_cls.count(b) for b in BINS}
-    n_neutral  = all_cls.count('neutral')
+    n_neutral  = sum(1 for sid, data in results.items() if sid != 'is_long' and not data.get('classification'))
 
     comb_p, comb_d = combined_metrics(results)
 
@@ -154,7 +155,7 @@ def run() -> None:
 
     logger.info(f"\n{'='*120}")
     logger.info(f"  REGIME CALIBRATION — {len(INDICATOR_CFGS)} combinations")
-    logger.info(f"  INDICATOR_CFGS ({REGIME_TIMEFRAME}): {INDICATOR_CFGS}")
+    logger.info(f"  INDICATOR_CFGS ({REGIME_TIMEFRAME}): {len(INDICATOR_CFGS)} combos — GRID: {INDICATOR_GRID}")
     logger.info(f"  BINS: {' | '.join(BINS)}")
     logger.info(f"  OPTIMIZE_METRIC={OPTIMIZE_METRIC} | RANKING_MODE={RANKING_MODE}")
     logger.info(f"  Lookahead fix: D-1 daily candle")
@@ -203,15 +204,16 @@ def run() -> None:
     )
 
     for row in sorted(ranking, key=lambda x: x['combo_idx']):
-        logger.debug(f"\n  COMBO {row['combo_idx']}/{len(INDICATOR_CFGS)}")
         print_combo_summary(
-            row['period_summaries'],
-            row['bin_counts'],
-            row['n_neutral'],
-            row['combined_profit'], row['combined_dd'],
-            row['baseline_profit'], row['baseline_dd'],
-            row['label'],
-        )
+                row['period_summaries'],
+                row['bin_counts'],
+                row['n_neutral'],
+                row['combined_profit'], row['combined_dd'],
+                row['baseline_profit'], row['baseline_dd'],
+                row['label'],
+                combo_idx = row['combo_idx'],
+                n_combos  = len(INDICATOR_CFGS),
+            )
 
     if RANKING_MODE == "combo_delta":
         ranking.sort(key=lambda x: pct_improvement(x['combined_profit'], x['baseline_profit']), reverse=True)

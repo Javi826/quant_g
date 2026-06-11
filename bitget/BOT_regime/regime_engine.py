@@ -234,11 +234,11 @@ def classify_strategy(
     results:         dict,
     sid:             str,
     optimize_metric: str = "profit",
-) -> str:
+) -> list[str]:
     data              = results.get(sid, {})
     periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
     if not periods_with_data:
-        return "neutral"
+        return []
 
     def _beats_baseline(pk: str, bin_name: str) -> bool:
         d = data[pk]
@@ -250,7 +250,9 @@ def classify_strategy(
         if all(_beats_baseline(pk, b) for pk in periods_with_data)
     ]
 
-    return winning_bins[0] if len(winning_bins) == 1 else "neutral"
+    if len(BINS) <= 2:
+        return [winning_bins[0]] if len(winning_bins) == 1 else []
+    return winning_bins if winning_bins else []
 
 # =============================================================================
 # COMBINED METRICS
@@ -261,14 +263,15 @@ def combined_metrics(results: dict) -> tuple[float, float]:
     for sid, data in results.items():
         if sid == 'is_long':
             continue
-        cls = data.get('classification', 'neutral')
+        cls = data.get('classification', [])
         for pk in EVAL_KEYS:
             if pk not in data or not isinstance(data[pk], dict):
                 continue
             d = data[pk]
-            if cls in BINS:
-                profits.append(d[f'{cls}_prof'])
-                dds.append(d[f'{cls}_dd'])
+            if cls:
+                for b in cls:
+                    profits.append(d[f'{b}_prof'] / len(cls))
+                    dds.append(d[f'{b}_dd'])
             else:
                 profits.append(d['b_prof'])
                 dds.append(d['b_dd'])
@@ -408,15 +411,15 @@ def save_bins(
     all_ids = {s['id'] for s in all_strategies} if all_strategies else set()
     missing = all_ids - set(strategy_results.keys())
 
-    all_entries: dict[str, str] = {
-        sid: data.get('classification', 'neutral')
+    all_entries: dict[str, list[str]] = {
+        sid: data.get('classification', [])
         for sid, data in strategy_results.items()
     }
     for sid in missing:
-        all_entries[sid] = "neutral"
+        all_entries[sid] = []
 
     bin_lines = [
-        f'    "{sid}": "{cls}",{"  # excluded from calibration" if sid in missing else ""}'
+        f'    "{sid}": {cls},{"  # excluded from calibration" if sid in missing else ""}'
         for sid, cls in sorted(all_entries.items())
     ]
 

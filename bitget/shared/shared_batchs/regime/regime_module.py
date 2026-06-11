@@ -50,17 +50,17 @@ def _get_indicator_cache(symbol: str) -> dict | None:
 # LOAD REGIME BINS
 # =============================================================================
 
-def load_regime_bins(bins_path: str, strategy_id: str) -> str:
-    
+def load_regime_bins(bins_path: str, strategy_id: str) -> list[str]:
+
     if not os.path.exists(bins_path):
         logger.warning(f"regime_bins file not found: {bins_path} — defaulting to neutral.")
-        return "neutral"
+        return []
     spec   = spec_from_file_location("regime_bins", bins_path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     bins = getattr(module, "REGIME_BINS", {})
-    
-    return bins.get(strategy_id, "neutral")
+
+    return bins.get(strategy_id, [])
 
 # =============================================================================
 # RUN OOS BACKTEST WITH REGIME
