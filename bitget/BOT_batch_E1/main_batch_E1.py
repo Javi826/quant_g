@@ -90,7 +90,7 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = False
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -687,7 +687,7 @@ if __name__ == "__main__":
     logger.info(f"  Outputs update : {'🟢 enabled' if UPDATE_OUTPUTS else '⚪ disabled'}")
     regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
-    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  MA_W={regime_module.MA_WINDOW}  TF={REGIME_TIMEFRAME}")
+    logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  CFG={regime_module.INDICATOR_CFG}  TF={REGIME_TIMEFRAME}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")

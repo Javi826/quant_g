@@ -83,9 +83,9 @@ OOS_MAX_DD_TH        = 8
 OOS_R2_TH            = 0.82
 
 #PRODUCTION
-OOS_NETGAIN_TH       = 1
-OOS_MAX_DD_TH        = 80
-OOS_R2_TH            = 0.082
+#OOS_NETGAIN_TH       = 1
+#OOS_MAX_DD_TH        = 80
+#OOS_R2_TH            = 0.082
 # RUNS
 #------------------------------------------------------------------------------
 RUN_SUMMARY        = True
