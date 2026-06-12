@@ -472,7 +472,7 @@ function _updateSymbolCard(symbol, data) {
     }
 
     const card = document.getElementById(`sym-card-${symbol}`);
-    if (card) card.style.border = `2px solid ${badgeStyle.bg}66`;
+    if (card) card.style.border = `2px solid #58a6ff`;
 
     const closeEl = document.getElementById(`sym-close-${symbol}`);
     if (closeEl) {
