@@ -1,3 +1,4 @@
+#shared/shared_batch_regime/regime_engine.py
 import os
 import logging
 import numpy as np
@@ -12,7 +13,7 @@ from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batch_regime.config_paths import BITGET_ROOT, DATA_FOLDER_IS, DATA_FOLDER_OOS1, DATA_FOLDER_OOS2, DATA_FOLDER_OOS3
 from shared_batch_regime.regime_core import BINS, REGIME_TIMEFRAME, classify_market_regime
 from shared_batch_regime.regime_core import precompute_indicators, lookup_indicator_batch
-from shared_batch_regime.regime_core import load_ohlcv_raw, pct_improvement, combo_label
+from shared_batch_regime.regime_core import load_ohlcv_raw
 
 logger = logging.getLogger(__name__)
 
@@ -393,7 +394,7 @@ def save_bins(
     optimize_metric:     str = "",
 ) -> None:
     from datetime import datetime
-    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     header_lines = [
         '"""',
         f"regime_bins_{strategies_set_name}.py — auto-generated regime classification. Do not edit manually.",

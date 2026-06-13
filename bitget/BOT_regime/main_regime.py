@@ -36,7 +36,7 @@ PERIOD_WEIGHTS = {
     "OOS3": 0.25,
 }
 
-STRATEGIES_SET_NAME = "E1"
+STRATEGIES_SET_NAME = "00"
 BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_{STRATEGIES_SET_NAME}","strategies_files", f"regime_bins_{STRATEGIES_SET_NAME}.py",)
 
 # =============================================================================

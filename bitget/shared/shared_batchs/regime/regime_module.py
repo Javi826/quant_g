@@ -1,10 +1,9 @@
 #shared/shared_batchs/regime/regime_module.py
-
+import os
 import logging
 import numpy as np
 import pandas as pd
 from importlib.util import spec_from_file_location, module_from_spec
-import os
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batch_regime.regime_core import load_ohlcv_raw
