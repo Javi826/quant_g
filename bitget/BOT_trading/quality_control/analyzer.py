@@ -38,36 +38,7 @@ def configure_account(account_number: str) -> None:
 logger = logging.getLogger('BOT_trading.quality_control.analyzer')
 
 def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
-    """
-    Analyze execution quality (slippage, latency) for all strategies.
-    
-    Calculates:
-    - Close slippage: difference between order price and actual execution price
-    - TP slippage: difference between TP target and actual close price (TP trades only)
-    - SL slippage: difference between SL target and actual close price (SL trades only)
-    - Latency: time between order submission and execution
-    
-    Args:
-        df_trades: DataFrame with trades (columns: STRATEGY, order_price_close, PRICE_CLOSE, 
-                   order_ts_close, exec_ts_close, TP_TARGET, SL_TARGET, REASON_OUT)
-        strategies_config: List of strategy configurations
-    
-    Returns:
-        Dict with execution quality per strategy:
-        {
-            'strategy_id': {
-                'total_trades': 145,
-                'avg_close_slippage_pct': 0.02,
-                'close_slippage_status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA',
-                'avg_tp_slippage_pct': -0.15,
-                'tp_slippage_status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA',
-                'avg_sl_slippage_pct': 0.25,
-                'sl_slippage_status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA',
-                'avg_latency_sec': 0.8,
-                'latency_status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'NO_DATA'
-            }
-        }
-    """
+
     results = {}
     
     for strat_config in strategies_config:
@@ -226,28 +197,7 @@ def analyze_execution_quality(df_trades: pd.DataFrame, strategies_config: List[D
     return results
 
 def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
-    """
-    Analyze target deviation (TP/SL real vs configured) for all strategies.
-    
-    Args:
-        df_trades: DataFrame with trades (columns: STRATEGY, PROFIT_PCT, REASON_OUT)
-        strategies_config: List of strategy configurations with tp_pct and sl_pct
-    
-    Returns:
-        Dict with target deviation per strategy:
-        {
-            'strategy_id': {
-                'tp_trades': 45,
-                'tp_real_pct': 2.8,
-                'tp_target_pct': 3.0,
-                'tp_deviation': -0.2,
-                'sl_trades': 12,
-                'sl_real_pct': -9.5,
-                'sl_target_pct': -10.0,
-                'sl_deviation': 0.5
-            }
-        }
-    """
+
     results = {}
     
     for strat_config in strategies_config:
@@ -315,33 +265,7 @@ def analyze_target_deviation(df_trades: pd.DataFrame, strategies_config: List[Di
     return results
 
 def analyze_drift_binomial(df_trades: pd.DataFrame, strategies_config: List[Dict]) -> Dict[str, Any]:
-    """
-    Analyze drift status using binomial distribution with double confirmation.
-    
-    Uses statistical thresholds (P_target ± σ) instead of fixed Montecarlo percentiles.
-    Requires both current and lagged windows to be in DANGER zone for confirmation.
-    
-    Args:
-        df_trades: DataFrame with all closed trades (columns: STRATEGY, PROFIT, etc.)
-        strategies_config: List of strategy configurations
-    
-    Returns:
-        Dict with binomial drift analysis per strategy:
-        {
-            'strategy_id': {
-                'status': 'HEALTHY' | 'WARNING' | 'DANGER' | 'INSUFFICIENT_DATA',
-                'trades_count': 203,
-                'winrate_current': 69.0,
-                'winrate_l30': 65.0,
-                'p_target': 82.0,
-                'limit_warning': 73.6,
-                'limit_danger': 69.1,
-                'sigma': 3.84,
-                'z_score': -3.39,
-                'z_score_l30': -4.43
-            }
-        }
-    """
+
     results = {}
     
     for strategy in strategies_config:

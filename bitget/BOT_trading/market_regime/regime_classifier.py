@@ -52,11 +52,11 @@ def get_symbol_regime(
             logger.warning(f"[REGIME] No data for {symbol} {REGIME_TIMEFRAME} — defaulting to neutral")
             return 'neutral'
 
-        df_norm   = normalize_live_ohlcv(df)
-        arr_daily        = df_to_arrays_live(df_norm)
-        close_daily      = arr_daily['close']
-        close_signal     = float(arr_strategy['close'][-1]) if arr_strategy is not None else float(close_daily[-1])
-        ma_daily         = _calc_ma(close_daily, REGIME_MA_WINDOW)
+        df_norm      = normalize_live_ohlcv(df)
+        arr_daily    = df_to_arrays_live(df_norm)
+        close_daily  = arr_daily['close']
+        close_signal = float(arr_strategy['close'][-1]) if arr_strategy is not None else float(close_daily[-1])
+        ma_daily     = _calc_ma(close_daily, REGIME_MA_WINDOW)
 
         if ma_daily is None:
             logger.warning(f"[REGIME] Not enough data for MA({REGIME_MA_WINDOW}) on {symbol} — defaulting to neutral")

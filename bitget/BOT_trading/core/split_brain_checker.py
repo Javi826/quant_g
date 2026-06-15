@@ -16,20 +16,7 @@ logger = logging.getLogger('BOT_trading.core.split_brain_checker')
 
 
 def check_vps_status() -> Tuple[bool, str]:
-    """
-    Check if VPS PostgreSQL is in recovery mode (standby).
-    
-    Returns:
-        Tuple[bool, str]: (is_safe_to_run, message)
-            - is_safe_to_run: True if VPS is standby, False if VPS is primary
-            - message: Descriptive message about the check result
-    
-    Examples:
-        >>> is_safe, msg = check_vps_status()
-        >>> if not is_safe:
-        ...     logger.critical(msg)
-        ...     sys.exit(1)
-    """
+
     if IS_VPS:
         # Running on VPS - no need to check
         return True, "Running on VPS - no split-brain check needed"
@@ -77,25 +64,7 @@ def check_vps_status() -> Tuple[bool, str]:
 
 
 def check_split_brain(orchestrator_instance=None) -> None:
-    """
-    Check for split-brain condition and shutdown gracefully if VPS is primary.
-    
-    This function should be called at the beginning of each orchestrator cycle.
-    If VPS is detected as primary, it will log critical error, save state, and exit.
-    
-    Args:
-        orchestrator_instance: Optional BotOrchestrator instance for graceful shutdown.
-                              If None, performs hard exit.
-    
-    Usage:
-        >>> # In orchestrator main loop
-        >>> while self._running:
-        ...     check_split_brain(self)  # Pass self for graceful shutdown
-        ...     # ... rest of loop logic
-    
-    Raises:
-        SystemExit: If VPS is primary (exits with code 1)
-    """
+
     if IS_VPS:
         # Running on VPS - no check needed
         return

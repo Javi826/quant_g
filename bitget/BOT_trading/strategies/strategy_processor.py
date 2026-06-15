@@ -53,12 +53,7 @@ class StrategyProcessor:
         final_symbols: List[str],
         exchange,
     ) -> List[Dict]:
-        """
-        Detect signals for a strategy across all symbols.
 
-        Returns:
-            List of signal dicts: [{'symbol': ..., 'close': ..., 'regime': ..., 'timestamp': ...}]
-        """
         strat_id = strat['id']
 
         if self.use_hardcoded:
