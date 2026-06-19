@@ -61,7 +61,7 @@ from market_data.data_utils          import fetch_ohlcv_data, normalize_live_ohl
 
 # --- Batch pipeline ---
 from shared_batch_regime.regime_core        import REGIME_TIMEFRAME
-from shared_batch_regime.regime_core        import precompute_indicators, lookup_ma_batch, classify_market_regime
+from shared_batch_regime.regime_core        import precompute_indicators, lookup_indicator_batch, classify_market_regime
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 
 # --- Shared ---
@@ -72,7 +72,8 @@ from market_regime.regime_classifier import configure_regime
 # =============================================================================
 # REGIME CONFIG — from ACCOUNTS settings (single source of truth)
 # =============================================================================
-MA_WINDOW = ACCOUNTS[ACCOUNT_NUMBER]["regime_ma_window"]
+MA_WINDOW     = ACCOUNTS[ACCOUNT_NUMBER]["regime_ma_window"]
+INDICATOR_CFG = {"ma_window": MA_WINDOW}
 
 # =============================================================================
 # INIT
@@ -188,12 +189,13 @@ def batch_get_regime(symbol: str, signal_ts: pd.Timestamp, close_signal: float) 
     if df.empty:
         return "no_data", None
 
-    ts_arr, ma_arr = precompute_indicators(df, MA_WINDOW)
+    cache  = precompute_indicators(df, INDICATOR_CFG)
+    ts_arr = cache["ts"]
     if len(ts_arr) == 0:
         return "no_data", None
 
     signal_ts_arr = np.array([signal_ts], dtype="datetime64[ns]")
-    lookups       = lookup_ma_batch(ts_arr, ma_arr, signal_ts_arr)
+    lookups       = lookup_indicator_batch(ts_arr, cache["ma"], signal_ts_arr)
     ma_daily      = float(lookups[0]) if not np.isnan(lookups[0]) else None
 
     idx       = np.searchsorted(ts_arr, signal_ts_arr, side="right") - 1
@@ -202,7 +204,8 @@ def batch_get_regime(symbol: str, signal_ts: pd.Timestamp, close_signal: float) 
     if ma_daily is None:
         return "no_data", ts_regime
 
-    return classify_market_regime(close_signal, ma_daily), ts_regime
+    context = {"close": close_signal, "ma": ma_daily}
+    return classify_market_regime(context), ts_regime
 
 
 # =============================================================================
@@ -276,7 +279,7 @@ def main():
                 n_nodata += 1
                 continue
 
-            df_norm    = normalize_live_ohlcv(df_broker)
+            df_norm     = normalize_live_ohlcv(df_broker)
             arr_trading = df_to_arrays_live(df_norm)
             ts_trading  = pd.Timestamp(arr_trading["ts"][-1])
 

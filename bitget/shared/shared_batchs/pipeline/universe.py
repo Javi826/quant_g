@@ -9,19 +9,23 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # FILTER SYMBOLS
 # =============================================================================
 N_SYMBOLS_MCIS            = 6
-MY_SYMBOLS                = False
+MY_SYMBOLS                = True
 FIX_SYMBOLS_MCIS_TRAINING = True
 OOS23_MATCH_SYMBOLS       = True
 
 symbols_to_exclude        = {}
 
 symbols_to_include = [
-    "BTCUSDT",   # Bitcoin       - corr 1.00, 133 rows
-    "ETHUSDT",   # Ethereum      - corr 0.93, 133 rows
-    "SOLUSDT",   # Solana        - corr 0.91, 133 rows
-    "LINKUSDT",  # Chainlink     - corr 0.90, 133 rows
-    "BNBUSDT",   # BNB           - corr 0.90, 133 rows
-
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "SUIUSDT",
+    "HYPEUSDT",
+    "ADAUSDT",
+    "TAOUSDT",
+    "PIPPINUSDT",
 ]
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,

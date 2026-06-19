@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_00.py
+#BOT_batch/main_batch_E1.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -90,12 +90,12 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = True
+REGIME_ENABLED    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
-SAVE_TRADES     = False
+SAVE_TRADES     = True
 
 
 # STRATEGY SELECTION

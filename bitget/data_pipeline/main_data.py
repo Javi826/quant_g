@@ -1,23 +1,5 @@
 # data_pipline/main_data.py
-# =============================================================================
-# Data Pipeline Orchestrator — single execution mode.
-# Runs all steps sequentially: extraction → highlow → split.
-# Extraction is incremental: only new candles are downloaded each run.
-# -----------------------------------------------------------------------------
-# SYMBOL SELECTION
-# -----------------------------------------------------------------------------
-# "manual" → use SELECTED_SYMBOLS list
-# "auto"   → rank all symbols by avg daily volume
-# only used when SYMBOL_MODE = "manual"
-# only used when SYMBOL_MODE = "auto"
-# and pick top N_SYMBOLS_DOWNLOAD
-# -----------------------------------------------------------------------------
-# EXTRACTION
-# -----------------------------------------------------------------------------
- # Controls how far data is downloaded (step 1 only).
- # None  → download up to today
- # "YYYY-MM-DD" → stop download at this date (useful for testing incremental append)
- # Example: END_DATE = "2025-06-01" downloads data up to June 2025 only
+
 import os
 import sys
 import time
@@ -61,10 +43,10 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = ["PIPPINUSDT"]
+SELECTED_SYMBOLS   = ["BTCUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
-N_SYMBOLS_DOWNLOAD = 20
+N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        
@@ -84,7 +66,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 0
+WINDOW_OOS_MONTHS    = 2
 SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"

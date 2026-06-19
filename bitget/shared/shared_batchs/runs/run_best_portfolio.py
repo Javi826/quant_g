@@ -37,7 +37,7 @@ RANKING_CRITERIA = [
 # =============================================================================
 
 TOP_N    = 2
-N_SPLITS = 4  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
+N_SPLITS = 12  # 1=annual, 2=semesters, 3=quadrimesters, 4=quarters, 6=bimesters, 12=months
 
 # =============================================================================
 # PRIVATE HELPERS — Identity
@@ -233,20 +233,17 @@ def _apply_weighted_scoring(
     subperiods: list[tuple],
     ranking_criteria: list[tuple[str, bool]],
 ) -> pd.DataFrame:
-    """
-    Aggregate precomputed primary metric as weighted average across subperiods.
-    Secondary criteria are carried from df_metrics if present, else set to NaN.
-    """
     subperiod_keys = [f"{p}_{q}" for p, q, _, _ in subperiods]
     weights        = {f"{p}_{q}": w for p, q, _, w in subperiods}
     primary_key    = ranking_criteria[0][0]
-    total_weight   = sum(weights[key] for key in subperiod_keys)
 
     df = df_metrics.copy()
 
     df[primary_key] = df[subperiod_keys].apply(
-        lambda row: sum(row[key] * weights[key] for key in subperiod_keys
-                        if not np.isnan(row[key])) / total_weight,
+        lambda row: (
+            sum(row[key] * weights[key] for key in subperiod_keys if not np.isnan(row[key])) /
+            sum(weights[key] for key in subperiod_keys if not np.isnan(row[key]))
+        ) if any(not np.isnan(row[key]) for key in subperiod_keys) else np.nan,
         axis=1,
     ).round(3)
 
@@ -268,10 +265,6 @@ def _apply_ranking_scoring(
     subperiods: list[tuple],
     ranking_criteria: list[tuple[str, bool]],
 ) -> pd.DataFrame:
-    """
-    Rank combos within each subperiod, then compute normalized weighted average rank.
-    Lower weighted_rank = more consistently good combo.
-    """
     subperiod_keys = [f"{p}_{q}" for p, q, _, _ in subperiods]
     weights        = {f"{p}_{q}": w for p, q, _, w in subperiods}
     primary_key    = ranking_criteria[0][0]
@@ -298,8 +291,10 @@ def _apply_ranking_scoring(
     df = _add_subperiod_stats(df, subperiod_keys)
 
     df[primary_key] = df[subperiod_keys].apply(
-        lambda row: sum(row[key] * weights[key] for key in subperiod_keys
-                        if not np.isnan(row[key])) / total_weight,
+        lambda row: (
+            sum(row[key] * weights[key] for key in subperiod_keys if not np.isnan(row[key])) /
+            sum(weights[key] for key in subperiod_keys if not np.isnan(row[key]))
+        ) if any(not np.isnan(row[key]) for key in subperiod_keys) else np.nan,
         axis=1,
     ).round(3)
 
