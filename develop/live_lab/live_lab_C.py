@@ -45,12 +45,13 @@ SELECTED_STRATEGIES = [
 # Strategy to plot individually (None to skip)
 PLOT_STRATEGY = "05_reversal_long_1H"
 
-# Tolerance to consider a production trade and a batch trade as the same event
-MATCH_TOLERANCE_MINUTES = 5
+# A production trade matches a batch trade if it opens within this many minutes
+# AFTER the batch trade (never before): batch_time <= prod_time <= batch_time + window
+MATCH_FORWARD_MINUTES = 3
 
 # Symbols to exclude from production trades before comparison
 EXCLUDE_SYMBOLS = [
-    "PIPPINUSDT",
+   # "PIPPINUSDT",
 ]
 
 # =============================================================================
@@ -192,101 +193,196 @@ def print_report(
 
 
 # =============================================================================
-# TRADE MATCHING
+# TRADE MATCHING — anchor + sequential chain walk per strategy
 # =============================================================================
 
-def match_trades(
-    df_prod:           pd.DataFrame,
-    df_batch:           pd.DataFrame,
-    tolerance_minutes: int,
-) -> dict:
+def _timeframe_to_offset(strategy_id: str) -> pd.Timedelta:
+    """Extract candle size from strategy_id suffix (e.g. '_15m', '_1H', '_6Hutc')."""
+    suffix = strategy_id.split("_")[-1].replace("utc", "")
+    unit   = suffix[-1]
+    value  = int(suffix[:-1])
+    if unit == "m":
+        return pd.Timedelta(minutes=value)
+    if unit == "H":
+        return pd.Timedelta(hours=value)
+    if unit == "D":
+        return pd.Timedelta(days=value)
+    raise ValueError(f"Unknown timeframe in strategy_id: {strategy_id}")
+
+
+def _match_chain(p: pd.DataFrame, b: pd.DataFrame, window: pd.Timedelta) -> dict:
     """
-    Match production trades to batch trades by (strategy, symbol, buy_time ± tolerance).
-    Returns counts of matched / prod_only / batch_only per strategy and totals.
+    1. Find the first anchor where prod and batch share a trade (same symbol,
+       batch_time <= prod_time <= batch_time + window).
+    2. From the anchor, walk both chains forward and check each prod trade
+       matches a batch trade. Report matched / divergences / wr agreement.
     """
-    tol = pd.Timedelta(minutes=tolerance_minutes)
+    p = p.sort_values("buy_time").reset_index(drop=True)
+    b = b.sort_values("buy_time").reset_index(drop=True)
+
+    def _is_match(prow, brow) -> bool:
+        if prow["symbol"] != brow["symbol"]:
+            return False
+        delta = prow["buy_time"] - brow["buy_time"]
+        return pd.Timedelta(0) <= delta <= window
+
+    # 1 — find anchor
+    anchor_p = anchor_b = None
+    for bi in range(len(b)):
+        for pi in range(len(p)):
+            if _is_match(p.iloc[pi], b.iloc[bi]):
+                anchor_p, anchor_b = pi, bi
+                break
+        if anchor_p is not None:
+            break
+
+    if anchor_p is None:
+        return {
+            "synced":      False,
+            "anchor_ts":   None,
+            "matched":     0,
+            "prod_only":   len(p),
+            "batch_only":  len(b),
+            "wr_agree":    0,
+            "chain_len":   0,
+        }
+
+    p_sync = p.iloc[anchor_p:].reset_index(drop=True)
+    b_sync = b.iloc[anchor_b:].reset_index(drop=True)
+    anchor_ts = p_sync.iloc[0]["buy_time"]
+
+    # 2 — sequential walk from anchor
+    matched  = 0
+    wr_agree = 0
+    used_b   = set()
+
+    for _, prow in p_sync.iterrows():
+        for bj in range(len(b_sync)):
+            if bj in used_b:
+                continue
+            if _is_match(prow, b_sync.iloc[bj]):
+                used_b.add(bj)
+                matched += 1
+                if (prow["profit"] > 0) == (b_sync.iloc[bj]["profit"] > 0):
+                    wr_agree += 1
+                break
+
+    return {
+        "synced":     True,
+        "anchor_ts":  anchor_ts,
+        "matched":    matched,
+        "prod_only":  len(p_sync) - matched,
+        "batch_only": len(b_sync) - len(used_b),
+        "wr_agree":   wr_agree,
+        "chain_len":  max(len(p_sync), len(b_sync)),
+    }
+
+
+def match_trades(df_prod: pd.DataFrame, df_batch: pd.DataFrame, forward_minutes: int) -> dict:
+    window = pd.Timedelta(minutes=forward_minutes)
     strategies = sorted(set(df_prod["strategy"].unique()) | set(df_batch["strategy"].unique()))
 
     per_strategy = []
-    total_matched    = 0
-    total_prod_only   = 0
-    total_batch_only  = 0
-    total_wr_agree    = 0
+    tot = {"matched": 0, "prod_only": 0, "batch_only": 0, "wr_agree": 0}
 
     for sid in strategies:
-        p = df_prod[df_prod["strategy"] == sid].copy()
-        b = df_batch[df_batch["strategy"] == sid].copy()
+        p = df_prod[df_prod["strategy"] == sid]
+        b = df_batch[df_batch["strategy"] == sid]
+        r = _match_chain(p, b, window)
+        r["strategy_id"]  = sid
+        r["wr_agree_pct"] = round(r["wr_agree"] / r["matched"] * 100, 1) if r["matched"] else None
+        r["match_pct"]    = round(r["matched"] / r["chain_len"] * 100, 1) if r["chain_len"] else None
+        per_strategy.append(r)
+        for k in tot:
+            tot[k] += r[k]
 
-        matched_batch_idx = set()
-        n_matched  = 0
-        n_wr_agree = 0
-
-        for _, prow in p.iterrows():
-            candidates = b[
-                (b["symbol"] == prow["symbol"]) &
-                (~b.index.isin(matched_batch_idx)) &
-                ((b["buy_time"] - prow["buy_time"]).abs() <= tol)
-            ]
-            if not candidates.empty:
-                match_idx = candidates.index[0]
-                matched_batch_idx.add(match_idx)
-                n_matched += 1
-                prod_win  = prow["profit"] > 0
-                batch_win = b.loc[match_idx, "profit"] > 0
-                if prod_win == batch_win:
-                    n_wr_agree += 1
-
-        n_prod_only  = len(p) - n_matched
-        n_batch_only = len(b) - len(matched_batch_idx)
-
-        per_strategy.append({
-            "strategy_id": sid,
-            "matched":     n_matched,
-            "prod_only":   n_prod_only,
-            "batch_only":  n_batch_only,
-            "wr_agree":    n_wr_agree,
-            "wr_agree_pct": round(n_wr_agree / n_matched * 100, 1) if n_matched else None,
-        })
-
-        total_matched   += n_matched
-        total_prod_only  += n_prod_only
-        total_batch_only += n_batch_only
-        total_wr_agree   += n_wr_agree
-
-    totals = {
-        "matched":     total_matched,
-        "prod_only":   total_prod_only,
-        "batch_only":  total_batch_only,
-        "wr_agree":    total_wr_agree,
-        "wr_agree_pct": round(total_wr_agree / total_matched * 100, 1) if total_matched else None,
-    }
-    return {"per_strategy": per_strategy, "totals": totals}
+    tot["wr_agree_pct"] = round(tot["wr_agree"] / tot["matched"] * 100, 1) if tot["matched"] else None
+    return {"per_strategy": per_strategy, "totals": tot}
 
 
-def print_match_report(match_result: dict, tolerance_minutes: int) -> None:
-    logger.info(f"\n{'='*110}")
-    logger.info(f"  TRADE MATCHING — tolerance ±{tolerance_minutes} min (symbol + buy_time)")
-    logger.info(f"{'='*110}")
+def print_match_report(match_result: dict, forward_minutes: int) -> None:
+    logger.info(f"\n{'='*120}")
+    logger.info(f"  TRADE MATCHING — anchor-synced per strategy | window +{forward_minutes} min (prod after batch)")
+    logger.info(f"{'='*120}")
     logger.info(
-        f"  {'STRATEGY':<32} {'MATCHED':>8} {'PROD_ONLY':>10} {'BATCH_ONLY':>11} {'WR_AGREE':>9} {'WR_AGREE%':>10}"
+        f"  {'STRATEGY':<32} {'ANCHOR':<20} {'MATCHED':>8} {'P_ONLY':>7} {'B_ONLY':>7} "
+        f"{'MATCH%':>7} {'WR_OK':>6} {'WR_OK%':>7}"
     )
-    logger.info(f"  {'-'*90}")
+    logger.info(f"  {'-'*100}")
 
     for r in match_result["per_strategy"]:
+        anchor = str(r["anchor_ts"])[:19] if r["anchor_ts"] is not None else "✗ no sync"
         wr_pct = f"{r['wr_agree_pct']}" if r["wr_agree_pct"] is not None else "—"
+        m_pct  = f"{r['match_pct']}"    if r["match_pct"]    is not None else "—"
         logger.info(
-            f"  {r['strategy_id']:<32} {r['matched']:>8} {r['prod_only']:>10} {r['batch_only']:>11} "
-            f"{r['wr_agree']:>9} {wr_pct:>10}"
+            f"  {r['strategy_id']:<32} {anchor:<20} {r['matched']:>8} {r['prod_only']:>7} {r['batch_only']:>7} "
+            f"{m_pct:>7} {r['wr_agree']:>6} {wr_pct:>7}"
         )
 
     t = match_result["totals"]
     wr_pct = f"{t['wr_agree_pct']}" if t["wr_agree_pct"] is not None else "—"
-    logger.info(f"  {'-'*90}")
+    logger.info(f"  {'-'*100}")
     logger.info(
-        f"  {'SYSTEM TOTAL':<32} {t['matched']:>8} {t['prod_only']:>10} {t['batch_only']:>11} "
-        f"{t['wr_agree']:>9} {wr_pct:>10}"
+        f"  {'SYSTEM TOTAL':<32} {'':<20} {t['matched']:>8} {t['prod_only']:>7} {t['batch_only']:>7} "
+        f"{'':>7} {t['wr_agree']:>6} {wr_pct:>7}"
     )
-    logger.info(f"  {'='*110}\n")
+    logger.info(f"  {'='*120}\n")
+
+
+def print_post_anchor_report(
+    df_prod:      pd.DataFrame,
+    df_batch:     pd.DataFrame,
+    match_result: dict,
+) -> None:
+    """Recompute the N_TR / WR% / PNL table using only trades from each
+    strategy's anchor timestamp onward (post-sync window)."""
+    logger.info(f"\n{'='*110}")
+    logger.info(f"  POST-ANCHOR COMPARISON — metrics computed from sync point onward")
+    logger.info(f"{'='*110}")
+    logger.info(
+        f"  {'STRATEGY':<32} {'ANCHOR':<20} "
+        f"{'N_TR prod':>9} {'N_TR btch':>9} {'Δ':>6} | "
+        f"{'WR% prod':>9} {'WR% btch':>9} {'Δ':>6} | "
+        f"{'PNL prod':>10} {'PNL btch':>10} {'Δ':>8}"
+    )
+    logger.info(f"  {'-'*115}")
+
+    for r in match_result["per_strategy"]:
+        sid       = r["strategy_id"]
+        anchor_ts = r["anchor_ts"]
+        anchor_str = str(anchor_ts)[:19] if anchor_ts is not None else "✗ no sync"
+
+        if anchor_ts is None:
+            logger.info(f"  {sid:<32} {anchor_str:<20} {'—':>9} {'—':>9} {'—':>6} | {'—':>9} {'—':>9} {'—':>6} | {'—':>10} {'—':>10} {'—':>8}")
+            continue
+
+        p_post = df_prod[(df_prod["strategy"] == sid) & (df_prod["buy_time"] >= anchor_ts)]
+        b_post = df_batch[(df_batch["strategy"] == sid) & (df_batch["buy_time"] >= anchor_ts)]
+
+        p = compute_metrics(p_post)
+        b = compute_metrics(b_post)
+
+        dn = (b["n_trades"] - p["n_trades"]) if (p["n_trades"] and b["n_trades"]) else None
+        dw = round(b["win_rate"]     - p["win_rate"],     1) if not (np.isnan(p["win_rate"])     or np.isnan(b["win_rate"]))     else None
+        dp = round(b["total_profit"] - p["total_profit"], 2) if not (np.isnan(p["total_profit"]) or np.isnan(b["total_profit"])) else None
+
+        def _fmt(val, fmt=".1f"):
+            return f"{val:{fmt}}" if val is not None and not (isinstance(val, float) and np.isnan(val)) else "—"
+
+        def _delta(val, fmt=".1f"):
+            if val is None:
+                return "—"
+            sign = "+" if val > 0 else ""
+            return f"{sign}{val:{fmt}}"
+
+        logger.info(
+            f"  {sid:<32} {anchor_str:<20} "
+            f"{_fmt(p['n_trades'], 'd'):>9} {_fmt(b['n_trades'], 'd'):>9} {_delta(dn, 'd'):>6} | "
+            f"{_fmt(p['win_rate']):>9} {_fmt(b['win_rate']):>9} {_delta(dw):>6} | "
+            f"{_fmt(p['total_profit'], '.2f'):>10} {_fmt(b['total_profit'], '.2f'):>10} {_delta(dp, '.2f'):>8}"
+        )
+
+    logger.info(f"  {'='*115}\n")
 
 
 # =============================================================================
@@ -331,8 +427,8 @@ def main() -> None:
 
     print_report(results, OOS_PERIOD, BATCH_MODE, effective_from, DATE_TO)
 
-    match_result = match_trades(df_prod, df_batch, MATCH_TOLERANCE_MINUTES)
-    print_match_report(match_result, MATCH_TOLERANCE_MINUTES)
+    match_result = match_trades(df_prod, df_batch, MATCH_FORWARD_MINUTES)
+    print_post_anchor_report(df_prod, df_batch, match_result)
 
     plot_portfolio(df_prod, df_batch)
     if PLOT_STRATEGY:

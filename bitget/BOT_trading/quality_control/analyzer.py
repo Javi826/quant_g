@@ -2,14 +2,6 @@
 """
 Quality Control Analyzer - Drift detection and execution quality metrics.
 
-FIXED: Changed to use CLOSE execution data (order_price_close, order_ts_close, exec_ts_close)
-       in lowercase to match PostgreSQL column names.
-
-UPDATED: Adaptive window size - calculates with available trades (no minimum required).
-
-Calculates:
-1. Drift status per strategy (HEALTHY, WARNING, DANGER)
-2. Execution quality per strategy (slippage, latency)
 """
 
 import pandas as pd
