@@ -46,21 +46,21 @@ EXPORT_CSV = False
 SELECTED_SYMBOLS   = ["PIPPINUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
-N_SYMBOLS_DOWNLOAD = 20
+N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc","6Hutc","4H","1H","30m","15m","5m","1m"]
+TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","30m","15m","5m","1m"]
 START_DATE = "2021-01-01"
 END_DATE   = None 
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
 
 # =============================================================================
 # SPLIT DATA

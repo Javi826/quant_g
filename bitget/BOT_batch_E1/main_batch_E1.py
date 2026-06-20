@@ -72,14 +72,14 @@ _best_params_results           : dict = {}
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
+N_PATHS_IS           = 100
 
 # ELITE -- MA3
 #------------------------------------------------------------------------------
 
-OOS_NETGAIN_TH       = -10
-OOS_MAX_DD_TH        = 30
+OOS_NETGAIN_TH       = 20
+OOS_MAX_DD_TH        = 20
 OOS_R2_TH            = 0.043
 
 # RUNS
