@@ -10,8 +10,10 @@ from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison
 from shared_batchs.utils.io import accumulate_strategy_trades
 from shared_batchs.regime.regime_module import run_oos_backtest_with_regime
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, apply_night_consolidation_filter, NIGHT_CONSOLIDATION_FILTER_ENABLED
 
 logger = logging.getLogger("BOT_batch.pipeline.oos_period")
+
 
 # =============================================================================
 # RUN OOS PERIOD — GENERIC
@@ -54,9 +56,12 @@ def run_oos_period(
     if run_baseline:
         if run_report_backtesting:
             logger.info(f"{stage_baseline} ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
+        #FILTER-NIGHT
         ohlcv_baseline = {}
         for sym, arr in ohlcv_arrays.items():
-            signals             = signal_fn(arr, **signal_params, live_trading=False)
+            signals = signal_fn(arr, **signal_params, live_trading=False)
+            if NIGHT_CONSOLIDATION_FILTER_ENABLED:
+                signals = apply_night_consolidation_filter(arr["ts"], signals)
             ohlcv_baseline[sym] = {**arr, "signal": signals}
 
         result_baseline = run_grid_backtest(

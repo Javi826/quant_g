@@ -9,6 +9,7 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batch_regime.regime_core import load_ohlcv_raw
 from shared_batch_regime.regime_core import precompute_indicators, lookup_indicator_batch
 from shared_batch_regime.regime_core import classify_market_regime
+from shared_batchs.utils.ohlcv_utils import apply_night_consolidation_filter, NIGHT_CONSOLIDATION_FILTER_ENABLED
 
 logger = logging.getLogger("shared_batch.regime.regime_module")
 
@@ -78,9 +79,11 @@ def run_oos_backtest_with_regime(
     _bins_to_filter = [bins_to_filter] if isinstance(bins_to_filter, str) else bins_to_filter
 
     ohlcv_arrays_regime: dict = {}
-
+    #FILTER-NIGHT
     for sym, arr in ohlcv_arrays.items():
         signals = signal_fn(arr, **signal_params, live_trading=False)
+        if NIGHT_CONSOLIDATION_FILTER_ENABLED:
+            signals = apply_night_consolidation_filter(arr["ts"], signals)
 
         if REGIME_ENABLED and _bins_to_filter and _bins_to_filter != ["neutral"]:
             sym_cache = _get_indicator_cache(sym)

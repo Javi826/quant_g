@@ -9,7 +9,7 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # FILTER SYMBOLS
 # =============================================================================
 N_SYMBOLS_MCIS            = 6
-MY_SYMBOLS                = True
+MY_SYMBOLS                = False
 FIX_SYMBOLS_MCIS_TRAINING = True
 OOS23_MATCH_SYMBOLS       = True
 

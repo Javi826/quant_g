@@ -160,19 +160,11 @@ def generate_regime_bins():
     ]
 
     for s in PROD_STRATEGIES:
-        active_bins = [k for k in REGIME_BIN_KEYS if s.get(k, 1.0) == 1.0]
-
-        if len(active_bins) == len(REGIME_BIN_KEYS):
-            bin_value = "neutral"
-        elif len(active_bins) == 1:
-            bin_value = active_bins[0].replace("regime_", "")
-        else:
-            raise ValueError(
-                f"Strategy '{s['id']}' has multiple regime bins set to 1.0 "
-                f"({active_bins}) but not all — ambiguous assignment."
-            )
-
-        lines.append(f'    "{s["id"]}": "{bin_value}",')
+        active_bins = [
+            k.replace("regime_", "") for k in REGIME_BIN_KEYS
+            if s.get(k, 0) == 1 and k != "regime_neutral"
+        ]
+        lines.append(f'    "{s["id"]}": {active_bins},')
 
     lines.append("}")
     _write(OUTPUT_REGIME_BINS, lines)

@@ -19,7 +19,7 @@ logger = logging.getLogger("live_lab.compare")
 # =============================================================================
 
 PRODUCTION_XLSX = os.path.expanduser(
-    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_E1/bot_trades_E1.xlsx"
+    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_E1/bot_trades_E1.csv"
 )
 BATCH_TRADES_DIR = os.path.expanduser(
     "~/projects/quant/quant_b/develop/brief_trades"
@@ -30,20 +30,33 @@ OOS_PERIOD  = "oos1"       # "oos1" | "oos2" | "oos3"
 BATCH_MODE  = "baseline"   # "baseline" | "regime"
 
 # Time window filter (None = no filter)
-DATE_FROM = "2026-06-09"
+DATE_FROM = "2026-04-09"
 DATE_TO   = "2026-06-18"
 
 # Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
     "05_reversal_long_1H",
-   # "20_parity_short_6Hutc",
+   #"20_parity_short_6Hutc",
     "22_flag_short_15m",
     "31_orderblocks_long_15m",
     "34_orderblocks_short_30m",
 ]
 
 # Strategy to plot individually (None to skip)
+PLOT_STRATEGY = "22_flag_short_15m"
 PLOT_STRATEGY = "05_reversal_long_1H"
+
+# Strategy for entry-rounds inspection, post-anchor (None to skip)
+ENTRY_ROUNDS_STRATEGY ="05_reversal_long_1H"
+
+# Max gap (seconds) between consecutive buy_times to consider them the same
+# simultaneous-open round (signals fired together when the system was flat)
+ROUND_GAP_SECONDS = 5
+
+# The batch backtester needs this many future candles to resolve a trade
+# (see DEFAULT_CANDLES in ZX_compute.py) — signals within this many candles of
+# the end of the data are silently skipped, regardless of sell_after_ncandles.
+EDGE_CANDLES = 50
 
 # A production trade matches a batch trade if it opens within this many minutes
 # AFTER the batch trade (never before): batch_time <= prod_time <= batch_time + window
@@ -59,7 +72,7 @@ EXCLUDE_SYMBOLS = [
 # =============================================================================
 
 def load_production(path: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
+    df = pd.read_csv(path)
     df.columns = [c.strip().upper() for c in df.columns]
     df["OPEN_AT"]  = pd.to_datetime(df["OPEN_AT"],  errors="coerce", utc=True)
     df["CLOSE_AT"] = pd.to_datetime(df["CLOSE_AT"], errors="coerce", utc=True)
@@ -210,6 +223,14 @@ def _timeframe_to_offset(strategy_id: str) -> pd.Timedelta:
     raise ValueError(f"Unknown timeframe in strategy_id: {strategy_id}")
 
 
+def _is_match(prow: pd.Series, brow: pd.Series, window: pd.Timedelta) -> bool:
+    """True if symbols match and prod opens within [0, window] after batch."""
+    if prow["symbol"] != brow["symbol"]:
+        return False
+    delta = prow["buy_time"] - brow["buy_time"]
+    return pd.Timedelta(0) <= delta <= window
+
+
 def _match_chain(p: pd.DataFrame, b: pd.DataFrame, window: pd.Timedelta) -> dict:
     """
     1. Find the first anchor where prod and batch share a trade (same symbol,
@@ -220,17 +241,11 @@ def _match_chain(p: pd.DataFrame, b: pd.DataFrame, window: pd.Timedelta) -> dict
     p = p.sort_values("buy_time").reset_index(drop=True)
     b = b.sort_values("buy_time").reset_index(drop=True)
 
-    def _is_match(prow, brow) -> bool:
-        if prow["symbol"] != brow["symbol"]:
-            return False
-        delta = prow["buy_time"] - brow["buy_time"]
-        return pd.Timedelta(0) <= delta <= window
-
     # 1 — find anchor
     anchor_p = anchor_b = None
     for bi in range(len(b)):
         for pi in range(len(p)):
-            if _is_match(p.iloc[pi], b.iloc[bi]):
+            if _is_match(p.iloc[pi], b.iloc[bi], window):
                 anchor_p, anchor_b = pi, bi
                 break
         if anchor_p is not None:
@@ -260,7 +275,7 @@ def _match_chain(p: pd.DataFrame, b: pd.DataFrame, window: pd.Timedelta) -> dict
         for bj in range(len(b_sync)):
             if bj in used_b:
                 continue
-            if _is_match(prow, b_sync.iloc[bj]):
+            if _is_match(prow, b_sync.iloc[bj], window):
                 used_b.add(bj)
                 matched += 1
                 if (prow["profit"] > 0) == (b_sync.iloc[bj]["profit"] > 0):
@@ -385,17 +400,231 @@ def print_post_anchor_report(
     logger.info(f"  {'='*115}\n")
 
 
-# =============================================================================
-# MAIN
-# =============================================================================
+def print_trade_pairs(
+    df_prod:     pd.DataFrame,
+    df_batch:    pd.DataFrame,
+    strategy_id: str,
+    anchor_ts:   pd.Timestamp,
+    window:      pd.Timedelta,
+) -> None:
+    """Entry-by-entry comparison for one strategy, from its anchor onward.
+    Pairs each production trade with its matching batch trade (same symbol,
+    batch_time <= prod_time <= batch_time + window) or flags it as unmatched."""
+    p = (
+        df_prod[(df_prod["strategy"] == strategy_id) & (df_prod["buy_time"] >= anchor_ts)]
+        .sort_values("buy_time")
+        .reset_index(drop=True)
+    )
+    b = (
+        df_batch[(df_batch["strategy"] == strategy_id) & (df_batch["buy_time"] >= anchor_ts)]
+        .sort_values("buy_time")
+        .reset_index(drop=True)
+    )
+
+    logger.info(f"\n{'='*100}")
+    logger.info(f"  TRADE-BY-TRADE COMPARISON — {strategy_id} | anchor {anchor_ts} | window +{int(window.total_seconds() / 60)} min")
+    logger.info(f"{'='*100}")
+    logger.info(
+        f"  {'SYMBOL':<14} {'PROD_TIME':<20} {'BATCH_TIME':<20} {'PROD_P':>9} {'BATCH_P':>9} {'MATCH':>6}"
+    )
+    logger.info(f"  {'-'*100}")
+
+    used_b = set()
+    for _, prow in p.iterrows():
+        match_idx = None
+        for bj in range(len(b)):
+            if bj in used_b:
+                continue
+            if _is_match(prow, b.iloc[bj], window):
+                match_idx = bj
+                used_b.add(bj)
+                break
+
+        if match_idx is not None:
+            brow = b.iloc[match_idx]
+            ok = "✓" if (prow["profit"] > 0) == (brow["profit"] > 0) else "✗"
+            logger.info(
+                f"  {prow['symbol']:<14} {str(prow['buy_time'])[:19]:<20} {str(brow['buy_time'])[:19]:<20} "
+                f"{prow['profit']:>9.2f} {brow['profit']:>9.2f} {ok:>6}"
+            )
+        else:
+            logger.info(
+                f"  {prow['symbol']:<14} {str(prow['buy_time'])[:19]:<20} {'— no match —':<20} "
+                f"{prow['profit']:>9.2f} {'—':>9} {'✗':>6}"
+            )
+
+    for bi in (bi for bi in range(len(b)) if bi not in used_b):
+        brow = b.iloc[bi]
+        logger.info(
+            f"  {brow['symbol']:<14} {'— no match —':<20} {str(brow['buy_time'])[:19]:<20} "
+            f"{'—':>9} {brow['profit']:>9.2f} {'✗':>6}"
+        )
+
+    logger.info(f"  {'='*100}\n")
+
+
+def _group_into_rounds(df: pd.DataFrame, gap_seconds: int) -> list[dict]:
+    """Group consecutive trades into 'rounds': a round is a set of trades that
+    opened together (system was flat, all matching signals fired at once).
+    A new round starts when the gap to the previous buy_time exceeds gap_seconds.
+    round_end is the latest sell_time among the round's trades — the moment that
+    actually frees the slot for the next round (not round_start)."""
+    df = df.sort_values("buy_time").reset_index(drop=True)
+    if df.empty:
+        return []
+
+    rounds = []
+    round_start    = df.loc[0, "buy_time"]
+    round_symbols  = [df.loc[0, "symbol"]]
+    round_sell_max = df.loc[0, "sell_time"]
+
+    for i in range(1, len(df)):
+        gap = (df.loc[i, "buy_time"] - df.loc[i - 1, "buy_time"]).total_seconds()
+        if gap > gap_seconds:
+            rounds.append({"round_start": round_start, "round_end": round_sell_max, "symbols": round_symbols})
+            round_start    = df.loc[i, "buy_time"]
+            round_symbols  = []
+            round_sell_max = df.loc[i, "sell_time"]
+        round_symbols.append(df.loc[i, "symbol"])
+        round_sell_max = max(round_sell_max, df.loc[i, "sell_time"])
+
+    rounds.append({"round_start": round_start, "round_end": round_sell_max, "symbols": round_symbols})
+    return rounds
+
+
+def _nearest_round_delta(ts: pd.Timestamp, other_rounds: list[dict]) -> float | None:
+    """Signed delta in minutes (ts - nearest.round_start) to the closest round
+    in other_rounds, regardless of distance. None if other_rounds is empty."""
+    if not other_rounds:
+        return None
+    deltas = [(ts - r["round_start"]).total_seconds() / 60.0 for r in other_rounds]
+    return min(deltas, key=abs)
+
+
+def _is_other_side_busy(other_df: pd.DataFrame, ts: pd.Timestamp) -> bool:
+    """True if other_df (that strategy's trades on the other side) has any
+    trade open at ts (buy_time <= ts < sell_time) — i.e. the other side
+    couldn't have opened a new round here because it was still mid-trade."""
+    if other_df.empty:
+        return False
+    mask = (other_df["buy_time"] <= ts) & (other_df["sell_time"] > ts)
+    return bool(mask.any())
+
+
+def print_entry_rounds_report(
+    df_prod:      pd.DataFrame,
+    df_batch:     pd.DataFrame,
+    strategy_id:  str,
+    anchor_ts:    pd.Timestamp,
+    window:       pd.Timedelta,
+    gap_seconds:  int,
+    data_end_ts:  pd.Timestamp,
+    edge_candles: int = 50,
+) -> None:
+    """Compare entry rounds (simultaneous-open events) for one strategy, from
+    its anchor onward. A prod round matches a batch round if their round_start
+    falls within [0, window] of each other, regardless of which symbols opened.
+    Unmatched rounds get a NEAREST_Δ column: signed minutes to the closest round
+    on the other side, to spot systematic offsets (e.g. a full candle shift).
+
+    Prod-only rounds within `edge_candles` candles of data_end_ts are flagged
+    as EDGE rather than counted as real mismatches: the batch backtester skips
+    any signal that doesn't have edge_candles of future data to resolve the
+    trade (see ZX_compute.py candle-count guard), so it structurally cannot
+    open a trade there even if the signal exists."""
+    p = df_prod[(df_prod["strategy"] == strategy_id) & (df_prod["buy_time"] >= anchor_ts)]
+    b = df_batch[(df_batch["strategy"] == strategy_id) & (df_batch["buy_time"] >= anchor_ts)]
+
+    p_rounds = _group_into_rounds(p, gap_seconds)
+    b_rounds = _group_into_rounds(b, gap_seconds)
+    timeframe     = _timeframe_to_offset(strategy_id)
+    timeframe_min = timeframe.total_seconds() / 60.0
+    edge_cutoff   = data_end_ts - edge_candles * timeframe
+
+    logger.info(f"\n{'='*110}")
+    logger.info(f"  ENTRY ROUNDS COMPARISON — {strategy_id} | anchor {anchor_ts} | window +{int(window.total_seconds() / 60)} min")
+    logger.info(f"  Edge cutoff: rounds >= {edge_cutoff} flagged (batch needs {edge_candles} future candles to close a trade)")
+    logger.info(f"{'='*110}")
+    logger.info(f"  {'PROD_ROUND':<20} {'BATCH_ROUND':<20} {'N_PROD':>7} {'N_BATCH':>8} {'MATCH':>6} {'NEAREST_Δ(min)':>15} {'STATUS':>9} {'CLOSE_PROD':<20} {'CLOSE_BATCH':<20} {'Δclose(min)':>12}")
+    logger.info(f"  {'-'*110}")
+
+    near_timeframe_count = 0
+    unmatched_count      = 0
+    edge_count           = 0
+    busy_count           = 0
+    used_b = set()
+
+    for pr in p_rounds:
+        match_idx = None
+        for bi, br in enumerate(b_rounds):
+            if bi in used_b:
+                continue
+            delta = pr["round_start"] - br["round_start"]
+            if pd.Timedelta(0) <= delta <= window:
+                match_idx = bi
+                used_b.add(bi)
+                break
+
+        if match_idx is not None:
+            br = b_rounds[match_idx]
+            close_delta = (pr["round_end"] - br["round_end"]).total_seconds() / 60.0
+            logger.info(
+                f"  {str(pr['round_start'])[:19]:<20} {str(br['round_start'])[:19]:<20} "
+                f"{len(pr['symbols']):>7} {len(br['symbols']):>8} {'✓':>6} {'—':>15} {'—':>9} "
+                f"{str(pr['round_end'])[:19]:<20} {str(br['round_end'])[:19]:<20} {close_delta:>+12.1f}"
+            )
+        elif pr["round_start"] >= edge_cutoff:
+            logger.info(
+                f"  {str(pr['round_start'])[:19]:<20} {'— no match —':<20} "
+                f"{len(pr['symbols']):>7} {'—':>8} {'⚠️ edge':>6} {'—':>15} {'—':>9} "
+                f"{'—':<20} {'—':<20} {'—':>12}"
+            )
+            edge_count += 1
+        else:
+            nearest_delta = _nearest_round_delta(pr["round_start"], b_rounds)
+            delta_str = f"{nearest_delta:+.1f}" if nearest_delta is not None else "—"
+            status = "OCUPADO" if _is_other_side_busy(b, pr["round_start"]) else "LIBRE"
+            if status == "OCUPADO":
+                busy_count += 1
+            logger.info(
+                f"  {str(pr['round_start'])[:19]:<20} {'— no match —':<20} "
+                f"{len(pr['symbols']):>7} {'—':>8} {'✗':>6} {delta_str:>15} {status:>9} "
+                f"{'—':<20} {'—':<20} {'—':>12}"
+            )
+            unmatched_count += 1
+            if nearest_delta is not None and abs(abs(nearest_delta) % timeframe_min) <= 5:
+                near_timeframe_count += 1
+
+    for bi in (bi for bi in range(len(b_rounds)) if bi not in used_b):
+        br = b_rounds[bi]
+        nearest_delta = _nearest_round_delta(br["round_start"], p_rounds)
+        delta_str = f"{nearest_delta:+.1f}" if nearest_delta is not None else "—"
+        status = "OCUPADO" if _is_other_side_busy(p, br["round_start"]) else "LIBRE"
+        if status == "OCUPADO":
+            busy_count += 1
+        logger.info(
+            f"  {'— no match —':<20} {str(br['round_start'])[:19]:<20} "
+            f"{'—':>7} {len(br['symbols']):>8} {'✗':>6} {delta_str:>15} {status:>9} "
+            f"{'—':<20} {'—':<20} {'—':>12}"
+        )
+        unmatched_count += 1
+        if nearest_delta is not None and abs(abs(nearest_delta) % timeframe_min) <= 5:
+            near_timeframe_count += 1
+
+    n_matched = len(used_b)
+    logger.info(f"  {'-'*110}")
+    logger.info(f"  Rounds matched: {n_matched} | prod rounds: {len(p_rounds)} | batch rounds: {len(b_rounds)} | edge-flagged: {edge_count}")
+    logger.info(f"  Unmatched rounds where the other side was busy (OCUPADO): {busy_count}/{unmatched_count}")
+    logger.info(f"  Unmatched rounds near a multiple of the {timeframe_min:.0f}-min timeframe (±5 min): "
+                f"{near_timeframe_count}/{unmatched_count}")
+    logger.info(f"  {'='*110}\n")
+
 
 def main() -> None:
     strategy_ids = SELECTED_STRATEGIES or []
-
     logger.info("  Loading production trades...")
     df_prod = load_production(PRODUCTION_XLSX)
     df_prod = apply_filters(df_prod, None, DATE_TO, strategy_ids, EXCLUDE_SYMBOLS)
-
     # Use first production trade date as effective start for both sources
     if df_prod.empty:
         logger.warning("  ⚠️  No production trades found.")
@@ -405,18 +634,15 @@ def main() -> None:
         effective_from = DATE_FROM
     df_prod = apply_filters(df_prod, effective_from, DATE_TO, strategy_ids, EXCLUDE_SYMBOLS)
     logger.info(f"  Effective start : {effective_from}")
-
     logger.info("  Loading batch trades...")
     df_batch = load_batch(BATCH_TRADES_DIR, OOS_PERIOD, BATCH_MODE, strategy_ids)
     df_batch = apply_filters(df_batch, effective_from, DATE_TO, strategy_ids)
-
     all_strategies = sorted(
         set(df_prod["strategy"].unique()) | set(df_batch["strategy"].unique())
     )
     if not all_strategies:
         logger.warning("  ⚠️  No trades found for the given filters.")
         return
-
     results = []
     for sid in all_strategies:
         results.append({
@@ -424,15 +650,31 @@ def main() -> None:
             "prod":        compute_metrics(df_prod[df_prod["strategy"]   == sid]),
             "batch":       compute_metrics(df_batch[df_batch["strategy"] == sid]),
         })
-
     print_report(results, OOS_PERIOD, BATCH_MODE, effective_from, DATE_TO)
-
     match_result = match_trades(df_prod, df_batch, MATCH_FORWARD_MINUTES)
     print_post_anchor_report(df_prod, df_batch, match_result)
+
+    if ENTRY_ROUNDS_STRATEGY:
+        anchor = next(
+            (r["anchor_ts"] for r in match_result["per_strategy"] if r["strategy_id"] == ENTRY_ROUNDS_STRATEGY),
+            None,
+        )
+        if anchor is not None:
+            print_entry_rounds_report(
+                df_prod, df_batch, ENTRY_ROUNDS_STRATEGY, anchor,
+                pd.Timedelta(minutes=MATCH_FORWARD_MINUTES), ROUND_GAP_SECONDS,
+                data_end_ts=pd.Timestamp(DATE_TO, tz="UTC"), edge_candles=EDGE_CANDLES,
+            )
+        else:
+            logger.warning(f"  ⚠️  No anchor found for strategy: {ENTRY_ROUNDS_STRATEGY}")
 
     plot_portfolio(df_prod, df_batch)
     if PLOT_STRATEGY:
         plot_strategy(df_prod, df_batch, PLOT_STRATEGY)
+
+    plot_portfolio_post_anchor(df_prod, df_batch, match_result)
+    if PLOT_STRATEGY:
+        plot_strategy_post_anchor(df_prod, df_batch, PLOT_STRATEGY, match_result)
 
 
 # =============================================================================
@@ -503,6 +745,110 @@ def plot_strategy(df_prod: pd.DataFrame, df_batch: pd.DataFrame, strategy_id: st
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
     fig.suptitle(f"Strategy: {strategy_id} — Production vs Batch", fontsize=13, fontweight="bold")
+
+    if daily_prod is not None:
+        ax1.plot(daily_prod["date"],  daily_prod["cum_profit"],  label="Production", color="#2196F3", linewidth=2)
+        ax2.plot(daily_prod["date"],  daily_prod["win_rate"],    label="Production", color="#2196F3", linewidth=2)
+    if daily_batch is not None:
+        ax1.plot(daily_batch["date"], daily_batch["cum_profit"], label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
+        ax2.plot(daily_batch["date"], daily_batch["win_rate"],   label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
+
+    ax1.axhline(0, color="gray", linewidth=0.8, linestyle=":")
+    ax1.set_ylabel("Cumulative Profit (USDT)")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
+    ax2.set_ylabel("Win Rate % (daily)")
+    ax2.set_ylim(0, 100)
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+    ax2.xaxis.set_major_locator(mdates.DayLocator())
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+def build_post_anchor_df(df: pd.DataFrame, match_result: dict) -> pd.DataFrame:
+    frames = []
+    for r in match_result["per_strategy"]:
+        if r["anchor_ts"] is None:
+            continue
+        sid = r["strategy_id"]
+        frames.append(df[(df["strategy"] == sid) & (df["buy_time"] >= r["anchor_ts"])])
+    return pd.concat(frames, ignore_index=True) if frames else df.iloc[0:0]
+
+
+def plot_portfolio_post_anchor(
+    df_prod:      pd.DataFrame,
+    df_batch:     pd.DataFrame,
+    match_result: dict,
+) -> None:
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+
+    prod_post  = build_post_anchor_df(df_prod, match_result)
+    batch_post = build_post_anchor_df(df_batch, match_result)
+
+    daily_prod  = _daily_portfolio(prod_post)
+    daily_batch = _daily_portfolio(batch_post)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    fig.suptitle("Portfolio (post-anchor) — Production vs Batch", fontsize=13, fontweight="bold")
+
+    ax1.plot(daily_prod["date"],  daily_prod["cum_profit"],  label="Production", color="#2196F3", linewidth=2)
+    ax1.plot(daily_batch["date"], daily_batch["cum_profit"], label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
+    ax1.axhline(0, color="gray", linewidth=0.8, linestyle=":")
+    ax1.set_ylabel("Cumulative Profit (USDT)")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    ax2.plot(daily_prod["date"],  daily_prod["win_rate"],  label="Production", color="#2196F3", linewidth=2)
+    ax2.plot(daily_batch["date"], daily_batch["win_rate"], label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
+    ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
+    ax2.set_ylabel("Win Rate % (daily)")
+    ax2.set_ylim(0, 100)
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+    ax2.xaxis.set_major_locator(mdates.DayLocator())
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_strategy_post_anchor(
+    df_prod:      pd.DataFrame,
+    df_batch:     pd.DataFrame,
+    strategy_id:  str,
+    match_result: dict,
+) -> None:
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+
+    anchor_ts = next(
+        (r["anchor_ts"] for r in match_result["per_strategy"] if r["strategy_id"] == strategy_id),
+        None,
+    )
+    if anchor_ts is None:
+        logger.warning(f"  ⚠️  No anchor found for strategy: {strategy_id}")
+        return
+
+    prod_s  = df_prod[(df_prod["strategy"]   == strategy_id) & (df_prod["buy_time"]  >= anchor_ts)]
+    batch_s = df_batch[(df_batch["strategy"] == strategy_id) & (df_batch["buy_time"] >= anchor_ts)]
+
+    if prod_s.empty and batch_s.empty:
+        logger.warning(f"  ⚠️  No post-anchor trades found for strategy: {strategy_id}")
+        return
+
+    daily_prod  = _daily_portfolio(prod_s)  if not prod_s.empty  else None
+    daily_batch = _daily_portfolio(batch_s) if not batch_s.empty else None
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    fig.suptitle(f"Strategy (post-anchor): {strategy_id} — Production vs Batch", fontsize=13, fontweight="bold")
 
     if daily_prod is not None:
         ax1.plot(daily_prod["date"],  daily_prod["cum_profit"],  label="Production", color="#2196F3", linewidth=2)
