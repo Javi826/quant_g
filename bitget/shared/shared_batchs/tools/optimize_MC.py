@@ -97,42 +97,6 @@ def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=4
     return paths_array.astype(DTYPE, copy=False)
 
 
-def derive_major_from_minor(paths_minor: np.ndarray, factor: int = 6) -> np.ndarray:
-    n_paths, n_obs, n_features = paths_minor.shape
-    n_obs_major = n_obs // factor
-    paths_major = np.empty((n_paths, n_obs_major, n_features), dtype=paths_minor.dtype)
-
-    for p in range(n_paths):
-        path = paths_minor[p]
-        for j in range(n_obs_major):
-            start_idx = j * factor
-            end_idx = (j + 1) * factor
-            block = path[start_idx:end_idx]
-
-            open_ = block[0, 0]
-            close = block[-1, 3]
-
-            # High y low con timestamps CORRECTOS
-            high_idx = np.argmax(block[:, 2])
-            high = block[high_idx, 2]
-            high_t = block[high_idx, 5]  # Ya es timestamp absoluto
-
-            low_idx = np.argmin(block[:, 1])
-            low = block[low_idx, 1]
-            low_t = block[low_idx, 4]  # Ya es timestamp absoluto
-
-            # Timestamp del major = timestamp de inicio del bloque
-            major_timestamp = block[0, 6]  # Nueva columna 6
-
-            paths_major[p, j, 0] = open_
-            paths_major[p, j, 1] = low
-            paths_major[p, j, 2] = high
-            paths_major[p, j, 3] = close
-            paths_major[p, j, 4] = low_t
-            paths_major[p, j, 5] = high_t
-            paths_major[p, j, 6] = major_timestamp  # Timestamp del major
-
-    return paths_major
 
 def generate_paths_for_all_symbols_functional(ohlcv_data, n_paths, n_obs, raw_columns=[]):
     paths_per_symbol = {}

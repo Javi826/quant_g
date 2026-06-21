@@ -3,19 +3,24 @@ import logging
 from functools import partial
 
 import numpy as np
+import pandas as pd
 
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
-from shared_batchs.tools.wfo import walk_forward_optimization
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
+from shared_batchs.tools.wfo_ST import walk_forward_optimization
+from shared_batchs.tools.wfo_MC import walk_forward_optimization_mc
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year, get_n_obs, extract_ohlcv_from_path
 
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-TRAIN_MONTHS = 6
-TEST_MONTHS  = 2
-ANCHORED     = False
+TRAIN_MONTHS         = 12
+TEST_MONTHS          = 3
+ANCHORED             = False
+METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
+PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
+WFO_MC_N_PATHS       = 100              # MC paths per train window, WFO_MC mode only
 
 
 # =============================================================================
@@ -45,7 +50,7 @@ def _compute_metric(results: dict) -> float:
     net_gain     = float(np.sum(trades)) if trades else 0.0
     net_gain_pct = (net_gain / INITIAL_BALANCE) * 100.0
 
-    if METRIC_MODE == "NET_GAIN":
+    if METRIC_MODE == "NET_GAIN_PCT":
         return net_gain_pct
 
     if METRIC_MODE == "CALMAR":
@@ -75,6 +80,60 @@ def _evaluate_fn(
     return _compute_metric(results), params
 
 
+def _evaluate_fn_mc_paths(
+    params: dict,
+    paths_per_symbol: dict,
+    signal_fn: callable,
+    signal_params_keys: list,
+    order_amount: int,
+    dtype,
+) -> tuple:
+    """Single param combination evaluated across all MC paths of one WFO-MC train window."""
+    n_paths = next(iter(paths_per_symbol.values())).shape[0] if paths_per_symbol else 0
+    metrics = []
+
+    for path_idx in range(n_paths):
+        ohlcv_arrays = extract_ohlcv_from_path(paths_per_symbol, path_idx, dtype=dtype)
+        ohlcv_arrays = _build_ohlcv_with_signal(ohlcv_arrays, signal_fn, signal_params_keys, params, dtype)
+        results = run_grid_backtest(
+            ohlcv_arrays,
+            sell_after   = params["SELL_AFTER"],
+            tp_pct       = params["TP_PCT"],
+            sl_pct       = params["SL_PCT"],
+            order_amount = order_amount,
+        )
+        metrics.append(_compute_metric(results))
+
+    avg_metric = float(np.mean(metrics)) if metrics else -np.inf
+    return avg_metric, params
+
+
+# =============================================================================
+# APPROVAL CRITERION
+# =============================================================================
+
+def _evaluate_wfo_approval(
+    df_results: pd.DataFrame,
+    th_rate: float,
+    win_rate_th: float,
+    mean_th: float,
+) -> tuple:
+    """
+    Approval criterion based on WFO per-window out-of-sample (test) performance.
+    Excludes the aggregated summary row (last row of df_results).
+
+    Returns:
+        tuple: (approved, win_rate, mean_criterion)
+    """
+    criteria = df_results.iloc[:-1]["best_criterion"]
+
+    win_rate       = float((criteria > th_rate).mean())
+    mean_criterion = float(criteria.mean())
+    approved       = (win_rate >= win_rate_th) and (mean_criterion >= mean_th)
+
+    return approved, win_rate, mean_criterion
+
+
 # =============================================================================
 # RUN WFO IS
 # =============================================================================
@@ -87,14 +146,18 @@ def run_wfo_is(
     signal_params_keys: list,
     order_amount: int,
     timeframe: str,
+    th_rate: float,
+    win_rate_th: float,
+    mean_th: float,
     dtype,
     n_jobs: int = -1,
+    show_progress: bool = False,
 ) -> tuple:
     """
-    Run Walk-Forward Optimization on IS data.
+    Run Walk-Forward Optimization on IS data and evaluate the window-based approval criterion.
 
     Returns:
-        tuple: (best_params, None)
+        tuple: (best_params, approved_wfo)
     """
     ohlcv_arr        = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges     = dict(zip(param_names, lists_for_grid))
@@ -111,17 +174,110 @@ def run_wfo_is(
         dtype               = dtype,
     )
 
-    best_params = walk_forward_optimization(
-        ohlcv_arr        = ohlcv_arr,
-        param_ranges     = param_ranges,
-        length_train_set = length_train_set,
-        pct_train_set    = pct_train_set,
-        anchored         = ANCHORED,
-        evaluate_fn      = evaluate_fn,
-        n_jobs           = n_jobs,
+    best_params, df_results = walk_forward_optimization(
+        ohlcv_arr             = ohlcv_arr,
+        param_ranges          = param_ranges,
+        length_train_set      = length_train_set,
+        pct_train_set         = pct_train_set,
+        anchored              = ANCHORED,
+        evaluate_fn           = evaluate_fn,
+        param_selection_mode  = PARAM_SELECTION_MODE,
+        n_jobs                = n_jobs,
+        show_progress         = show_progress,
+    )
+
+    approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(
+        df_results  = df_results,
+        th_rate     = th_rate,
+        win_rate_th = win_rate_th,
+        mean_th     = mean_th,
     )
 
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 1 ── WFO Best params        ── {params_str}")
+    verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
+    logger.info(
+        f"STAGE 1 ── WFO Best params        ── {params_str} | "
+        f"{verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}"
+    )
 
-    return best_params, None
+    return best_params, approved_wfo
+
+
+# =============================================================================
+# RUN WFO-MC IS
+# =============================================================================
+
+def run_wfo_mc_is(
+    ohlcv_data: dict,
+    param_names: list,
+    lists_for_grid: list,
+    signal_fn: callable,
+    signal_params_keys: list,
+    order_amount: int,
+    timeframe: str,
+    th_rate: float,
+    win_rate_th: float,
+    mean_th: float,
+    dtype,
+    n_jobs: int = -1,
+    show_progress: bool = False,
+) -> tuple:
+    """
+    Run WFO-MC on IS data: Monte Carlo evaluation on train windows,
+    real-data evaluation on test windows. Evaluates the window-based approval criterion.
+
+    Returns:
+        tuple: (best_params, approved_wfo)
+    """
+    param_ranges = dict(zip(param_names, lists_for_grid))
+
+    bars_per_month   = get_bars_per_year(timeframe) / 12
+    length_train_set = int(TRAIN_MONTHS * bars_per_month)
+    pct_train_set    = TRAIN_MONTHS / (TRAIN_MONTHS + TEST_MONTHS)
+    n_obs            = get_n_obs(timeframe)
+
+    train_evaluate_fn = partial(
+        _evaluate_fn_mc_paths,
+        signal_fn           = signal_fn,
+        signal_params_keys  = signal_params_keys,
+        order_amount        = order_amount,
+        dtype               = dtype,
+    )
+    test_evaluate_fn = partial(
+        _evaluate_fn,
+        signal_fn           = signal_fn,
+        signal_params_keys  = signal_params_keys,
+        order_amount        = order_amount,
+        dtype               = dtype,
+    )
+
+    best_params, df_results = walk_forward_optimization_mc(
+        ohlcv_data            = ohlcv_data,
+        param_ranges          = param_ranges,
+        length_train_set      = length_train_set,
+        pct_train_set         = pct_train_set,
+        anchored              = ANCHORED,
+        train_evaluate_fn     = train_evaluate_fn,
+        test_evaluate_fn      = test_evaluate_fn,
+        n_paths               = WFO_MC_N_PATHS,
+        n_obs                 = n_obs,
+        param_selection_mode  = PARAM_SELECTION_MODE,
+        n_jobs                = n_jobs,
+        show_progress         = show_progress,
+    )
+
+    approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(
+        df_results  = df_results,
+        th_rate     = th_rate,
+        win_rate_th = win_rate_th,
+        mean_th     = mean_th,
+    )
+
+    params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
+    verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
+    logger.info(
+        f"STAGE 1 ── WFO-MC Best params     ── {params_str} | "
+        f"{verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}"
+    )
+
+    return best_params, approved_wfo

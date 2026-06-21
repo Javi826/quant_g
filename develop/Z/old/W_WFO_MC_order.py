@@ -1,3 +1,4 @@
+#WFO_MC_MAIN
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))

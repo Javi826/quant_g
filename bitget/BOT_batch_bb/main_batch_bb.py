@@ -50,7 +50,7 @@ from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
-from shared_batchs.pipeline.wfo import run_wfo_is
+from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is
 
 regime_module._indicator_cache = {}
 # Global accumulators
@@ -74,7 +74,7 @@ _best_params_results           : dict = {}
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "bb"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
-SELECTION_MODE       = "WFO"   # "MC" or "WFO"
+SELECTION_MODE       = "WFO_MC"   # "MC" or "WFO WFO_MC"
 N_PATHS_IS           = 100
 
 # ELITE -- MA3
@@ -83,6 +83,10 @@ N_PATHS_IS           = 100
 OOS_NETGAIN_TH       = 1
 OOS_MAX_DD_TH        = 20
 OOS_R2_TH            = 0.043
+
+WFO_TH_RATE     = 0
+WFO_WIN_RATE_TH = 0.6
+WFO_MEAN_TH     = 0.5
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -103,46 +107,46 @@ SAVE_TRADES     = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "01_reversal_long_1H",
-    "02_reversal_short_1H",
-    "03_reversal_long_4H",
-    "04_reversal_short_4H",
-    "05_reversal_long_6Hutc",
-    "06_reversal_short_6Hutc",
-    "07_reversal_long_12Hutc",
-    "08_reversal_short_12Hutc",
-    "09_reversal_long_1Dutc",
-    "10_reversal_short_1Dutc",
-    "11_parity_long_1H",
-    "12_parity_short_1H",
-    "13_parity_long_4H",
-    "14_parity_short_4H",
+    #"01_reversal_long_1H",
+    #"02_reversal_short_1H",
+    #"03_reversal_long_4H",
+    #"04_reversal_short_4H",
+    #"05_reversal_long_6Hutc",
+    #"06_reversal_short_6Hutc",
+    #"07_reversal_long_12Hutc",
+    #"08_reversal_short_12Hutc",
+    #"09_reversal_long_1Dutc",
+    #"10_reversal_short_1Dutc",
+    #"11_parity_long_1H",
+    #"12_parity_short_1H",
+    #"13_parity_long_4H",
+    #"14_parity_short_4H",
     "15_parity_long_6Hutc",
     "16_parity_short_6Hutc",
-    "17_parity_long_12Hutc",
-    "18_parity_short_12Hutc",
-    "19_parity_long_1Dutc",
-    "20_parity_short_1Dutc",
-    "21_flag_long_1H",
-    "22_flag_short_1H",
-    "23_flag_long_4H",
-    "24_flag_short_4H",
-    "25_flag_long_6Hutc",
-    "26_flag_short_6Hutc",
-    "27_flag_long_12Hutc",
-    "28_flag_short_12Hutc",
-    "29_flag_long_1Dutc",
-    "30_flag_short_1Dutc",
-    "31_orderblocks_long_1H",
-    "32_orderblocks_short_1H",
-    "33_orderblocks_long_4H",
-    "34_orderblocks_short_4H",
-    "35_orderblocks_long_6Hutc",
-    "36_orderblocks_short_6Hutc",
-    "37_orderblocks_long_12Hutc",
-    "38_orderblocks_short_12Hutc",
-    "39_orderblocks_long_1Dutc",
-    "40_orderblocks_short_1Dutc",
+    #"17_parity_long_12Hutc",
+    #"18_parity_short_12Hutc",
+    #"19_parity_long_1Dutc",
+    #"20_parity_short_1Dutc",
+    #"21_flag_long_1H",
+    #"22_flag_short_1H",
+    #"23_flag_long_4H",
+    #"24_flag_short_4H",
+    #"25_flag_long_6Hutc",
+    #"26_flag_short_6Hutc",
+    #"27_flag_long_12Hutc",
+    #"28_flag_short_12Hutc",
+    #"29_flag_long_1Dutc",
+    #"30_flag_short_1Dutc",
+    #"31_orderblocks_long_1H",
+    #"32_orderblocks_short_1H",
+    #"33_orderblocks_long_4H",
+    #"34_orderblocks_short_4H",
+    #"35_orderblocks_long_6Hutc",
+    #"36_orderblocks_short_6Hutc",
+    #"37_orderblocks_long_12Hutc",
+    #"38_orderblocks_short_12Hutc",
+   # "39_orderblocks_long_1Dutc",
+   # "40_orderblocks_short_1Dutc",
 ]
 # =============================================================================
 # MONTECARLOS IS + OOS
@@ -231,10 +235,9 @@ def run_batch(strategy_config: dict) -> None:
         )
 
 # -------------------------------------------------------------------------
-    # BLOCK 1 — Parameter Selection IS (MC or WFO)
+    # BLOCK 1 — Parameter Selection IS (MC, WFO or WFO_MC)
     # -------------------------------------------------------------------------
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
-
     if SELECTION_MODE == "MC":
         best_params, _ = run_montecarlo_is(
             ohlcv_data           = ohlcv_data_minor,
@@ -251,8 +254,9 @@ def run_batch(strategy_config: dict) -> None:
             show_progress        = SHOW_PROGRESS,
             selection_percentile = MC_SELECTION_PERCENTILE,
         )
+        approved_wfo = True
     elif SELECTION_MODE == "WFO":
-        best_params, _ = run_wfo_is(
+        best_params, approved_wfo = run_wfo_is(
             ohlcv_data          = ohlcv_data_minor,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -260,13 +264,32 @@ def run_batch(strategy_config: dict) -> None:
             signal_params_keys  = signal_params_keys,
             order_amount        = ORDER_AMOUNT,
             timeframe           = TIMEFRAME,
+            th_rate             = WFO_TH_RATE,
+            win_rate_th         = WFO_WIN_RATE_TH,
+            mean_th             = WFO_MEAN_TH,
             dtype               = DTYPE,
             n_jobs              = N_JOBS,
+            show_progress       = SHOW_PROGRESS,
+        )
+    elif SELECTION_MODE == "WFO_MC":
+        best_params, approved_wfo = run_wfo_mc_is(
+            ohlcv_data          = ohlcv_data_minor,
+            param_names         = param_names,
+            lists_for_grid      = lists_for_grid,
+            signal_fn           = signal_fn,
+            signal_params_keys  = signal_params_keys,
+            order_amount        = ORDER_AMOUNT,
+            timeframe           = TIMEFRAME,
+            th_rate             = WFO_TH_RATE,
+            win_rate_th         = WFO_WIN_RATE_TH,
+            mean_th             = WFO_MEAN_TH,
+            dtype               = DTYPE,
+            n_jobs              = N_JOBS,
+            show_progress       = SHOW_PROGRESS,
         )
     else:
         raise ValueError(f"Unknown SELECTION_MODE: {SELECTION_MODE}")
     bt_signal_params = {k: best_params[k.upper()] for k in signal_params_keys if k.upper() in best_params}
-
     # -------------------------------------------------------------------------
     # BLOCK 2 — Backtest IS + Regime Analysis
     # -------------------------------------------------------------------------
@@ -315,7 +338,7 @@ def run_batch(strategy_config: dict) -> None:
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE M ── MC OOS1                ── ProbNeg={prob_negative_oos1:.1f}%")
 
-    # -------------------------------------------------------------------------
+# -------------------------------------------------------------------------
     # BLOCK 4  — OOS1 (baseline + regime + validation)
     # -------------------------------------------------------------------------
     ohlcv_data_oos1 = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
@@ -338,7 +361,7 @@ def run_batch(strategy_config: dict) -> None:
         max_dd_th              = OOS_MAX_DD_TH,
         r2_th                  = OOS_R2_TH,
         for_validation         = True,
-        approved               = True,
+        approved               = approved_wfo,
         validation_record      = {},
         trades_baseline_accum  = _strategy_trades_oos1_baseline,
         trades_regime_accum    = _strategy_trades_oos1_regime,
