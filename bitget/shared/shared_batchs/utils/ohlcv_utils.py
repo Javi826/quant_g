@@ -36,6 +36,18 @@ def get_n_obs(timeframe: str) -> int:
         raise ValueError(f"Timeframe no in Mapping: {timeframe}")
     return mapping[timeframe]
 
+def get_bars_per_year(timeframe: str) -> int:
+    mapping = {
+        '1H'     : 365 * 24,
+        '4H'     : 365 * 6,
+        '6Hutc'  : 365 * 4,
+        '12Hutc' : 365 * 2,
+        '1Dutc'  : 365,
+    }
+    if timeframe not in mapping:
+        raise ValueError(f"Timeframe not in mapping: {timeframe}")
+    return mapping[timeframe]
+
 def prepare_ohlcv_arrays(ohlcv_data):
     ohlcv_arr = {}
     for sym, df in ohlcv_data.items():

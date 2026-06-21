@@ -1,3 +1,4 @@
+#shared/shared_batchs/tools/wfo.py
 import numpy as np
 import pandas as pd
 import itertools
@@ -76,14 +77,29 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
             t0, t1 = train_indices[ref_sym]
             test0, test1 = test_indices[ref_sym]
         
-        # -----------------------------------------------------------
-        # Prepare base arrays
+# -----------------------------------------------------------
+        # Prepare base arrays (train + test)
         # -----------------------------------------------------------
         base_arrays = {}
         for sym, (t0_sym, t1_sym) in train_indices.items():
             arr_dict = ohlcv_arr[sym]
         
             base_arrays[sym] = {
+                'ts': arr_dict['ts'][t0_sym:t1_sym],
+                'open': arr_dict['open'][t0_sym:t1_sym],
+                'high': arr_dict['high'][t0_sym:t1_sym],
+                'low': arr_dict['low'][t0_sym:t1_sym],
+                'close': arr_dict['close'][t0_sym:t1_sym],
+                VOLUME_COL: arr_dict.get(VOLUME_COL, arr_dict['close']*0)[t0_sym:t1_sym],
+                'low_time': arr_dict['low_time'][t0_sym:t1_sym],
+                'high_time': arr_dict['high_time'][t0_sym:t1_sym],
+            }
+
+        base_arrays_test = {}
+        for sym, (t0_sym, t1_sym) in test_indices.items():
+            arr_dict = ohlcv_arr[sym]
+
+            base_arrays_test[sym] = {
                 'ts': arr_dict['ts'][t0_sym:t1_sym],
                 'open': arr_dict['open'][t0_sym:t1_sym],
                 'high': arr_dict['high'][t0_sym:t1_sym],
@@ -108,9 +124,18 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         # -----------------------------------------------------------
         # Select the best result
         # -----------------------------------------------------------
-        best_criterion, best_params = max(results, key=lambda x: x[0])
+        # -----------------------------------------------------------
+        # Select the best result (on train) and validate it on test
+        # -----------------------------------------------------------
+        _, best_params = max(results, key=lambda x: x[0])
+
+        if base_arrays_test:
+            test_criterion, _ = evaluate_fn(best_params, base_arrays_test)
+        else:
+            test_criterion = np.nan
+
         best_params_list.append(best_params)
-        best_criteria_list.append(best_criterion)
+        best_criteria_list.append(test_criterion)
 
         # Store train/test dates
         train_start_dates.append(ref_ts[t0] if t0 < len(ref_ts) else None)
@@ -158,15 +183,15 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     df_results.insert(0, 'train_start', train_start_dates)
     df_results.insert(1, 'train_end', train_end_dates)
 # =============================================================================
-#     df_results.insert(2, 'test_start', test_start_dates)
-#     df_results.insert(3, 'test_end', test_end_dates)
+    df_results.insert(2, 'test_start', test_start_dates)
+    df_results.insert(3, 'test_end', test_end_dates)
 # =============================================================================
     df_results['best_criterion'] = best_criteria_list
 
     # -----------------------------------------------------------
     # ➕ Add a row with the mean of best_params
     # -----------------------------------------------------------
-    mean_row = df_results.drop(columns=['train_start', 'train_end', 'best_criterion'], errors='ignore').mean(numeric_only=True)
+    mean_row = df_results.drop(columns=['train_start', 'train_end', 'test_start', 'test_end', 'best_criterion'], errors='ignore').mean(numeric_only=True)
     mean_row = mean_row.to_dict()
     
     # Fill descriptive fields for date and criterion

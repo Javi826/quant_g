@@ -1,4 +1,4 @@
-# Z_WFO_backtest_multi_tf.py (MAIN - Multi-Timeframe Strategy)
+#WFO_template.py 
 import os
 import sys
 import time
