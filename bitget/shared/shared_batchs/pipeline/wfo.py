@@ -13,9 +13,9 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-TRAIN_MONTHS = 12
-TEST_MONTHS  = 3
-ANCHORED     = True
+TRAIN_MONTHS = 6
+TEST_MONTHS  = 2
+ANCHORED     = False
 
 
 # =============================================================================
@@ -39,11 +39,20 @@ def _build_ohlcv_with_signal(
 
 
 def _compute_metric(results: dict) -> float:
-    """Selection metric for WFO window optimization: Net Gain %."""
-    port     = results.get("__PORTFOLIO__", {})
-    trades   = port.get("trades", [])
-    net_gain = float(np.sum(trades)) if trades else 0.0
-    return (net_gain / INITIAL_BALANCE) * 100.0
+    """Selection metric for WFO window optimization: Net Gain % or Calmar ratio."""
+    port         = results.get("__PORTFOLIO__", {})
+    trades       = port.get("trades", [])
+    net_gain     = float(np.sum(trades)) if trades else 0.0
+    net_gain_pct = (net_gain / INITIAL_BALANCE) * 100.0
+
+    if METRIC_MODE == "NET_GAIN":
+        return net_gain_pct
+
+    if METRIC_MODE == "CALMAR":
+        max_dd_pct = float(port.get("max_dd", 0.0)) * 100.0
+        return net_gain_pct / max_dd_pct if max_dd_pct > 0 else net_gain_pct
+
+    raise ValueError(f"Unknown METRIC_MODE: {METRIC_MODE}")
 
 
 def _evaluate_fn(
