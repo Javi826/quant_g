@@ -157,7 +157,7 @@ def run_wfo_is(
     Run Walk-Forward Optimization on IS data and evaluate the window-based approval criterion.
 
     Returns:
-        tuple: (best_params, approved_wfo)
+        tuple: (best_params, approved_wfo, win_rate, mean_criterion)
     """
     ohlcv_arr        = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges     = dict(zip(param_names, lists_for_grid))
@@ -200,7 +200,7 @@ def run_wfo_is(
         f"{verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}"
     )
 
-    return best_params, approved_wfo
+    return best_params, approved_wfo, win_rate, mean_criterion
 
 
 # =============================================================================
@@ -227,7 +227,7 @@ def run_wfo_mc_is(
     real-data evaluation on test windows. Evaluates the window-based approval criterion.
 
     Returns:
-        tuple: (best_params, approved_wfo)
+        tuple: (best_params, approved_wfo, win_rate, mean_criterion)
     """
     param_ranges = dict(zip(param_names, lists_for_grid))
 
@@ -280,4 +280,4 @@ def run_wfo_mc_is(
         f"{verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}"
     )
 
-    return best_params, approved_wfo
+    return best_params, approved_wfo, win_rate, mean_criterion

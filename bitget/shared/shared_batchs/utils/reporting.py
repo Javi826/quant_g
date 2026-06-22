@@ -211,3 +211,28 @@ def print_strategies_summary(validation_results: list) -> None:
         )
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
+    
+# =============================================================================
+# WFO SUMMARY
+# =============================================================================
+
+def print_wfo_summary(wfo_results: list) -> None:
+    """Print WFO approval summary table for all strategies."""
+    if not wfo_results:
+        return
+    n_pass         = sum(1 for w in wfo_results if "PASS" in w["verdict"])
+    mean_win_rate  = round(np.mean([w["win_rate"]       for w in wfo_results]) * 100, 1)
+    mean_criterion = round(np.mean([w["mean_criterion"] for w in wfo_results]), 2)
+
+    lines = [
+        f"\n{'─'*115}",
+        f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanWinRate: {mean_win_rate}% | MeanCriterion: {mean_criterion}",
+        f"{'─'*115}",
+    ]
+    for w in wfo_results:
+        lines.append(
+            f"  {w['strategy_id']:<27} {w['verdict']:<14} "
+            f"{w['win_rate']*100:>9.1f}% {w['mean_criterion']:>15.2f}"
+        )
+    lines.append(f" {'─'*115}")
+    logger.info("\n".join(lines))

@@ -1,4 +1,4 @@
-#BOT_batch/main_batch_E1.py
+#BOT_batch/main_batch_bb.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -51,6 +51,7 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
 from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_wfo_summary, print_all_curves_table, print_robustness_table
 
 regime_module._indicator_cache = {}
 # Global accumulators
@@ -63,6 +64,7 @@ _strategy_trades_oos2_regime   : list = []
 _strategy_trades_oos3_baseline : list = []
 _strategy_trades_oos3_regime   : list = []
 _validation_results            : list = []
+_wfo_results                   : list = []
 _drift_results                 : list = []
 _best_params_results           : dict = {}
 
@@ -74,7 +76,7 @@ _best_params_results           : dict = {}
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "bb"  
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
-SELECTION_MODE       = "WFO_MC"   # "MC" or "WFO WFO_MC"
+SELECTION_MODE       = "WFO"   # "MC" or "WFO WFO_MC"
 N_PATHS_IS           = 100
 
 # ELITE -- MA3
@@ -107,44 +109,44 @@ SAVE_TRADES     = False
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    #"01_reversal_long_1H",
-    #"02_reversal_short_1H",
-    #"03_reversal_long_4H",
-    #"04_reversal_short_4H",
-    #"05_reversal_long_6Hutc",
-    #"06_reversal_short_6Hutc",
-    #"07_reversal_long_12Hutc",
-    #"08_reversal_short_12Hutc",
+    "01_reversal_long_1H",
+    "02_reversal_short_1H",
+    "03_reversal_long_4H",
+    "04_reversal_short_4H",
+    "05_reversal_long_6Hutc",
+    "06_reversal_short_6Hutc",
+    "07_reversal_long_12Hutc",
+    "08_reversal_short_12Hutc",
     #"09_reversal_long_1Dutc",
     #"10_reversal_short_1Dutc",
-    #"11_parity_long_1H",
-    #"12_parity_short_1H",
-    #"13_parity_long_4H",
-    #"14_parity_short_4H",
+    "11_parity_long_1H",
+    "12_parity_short_1H",
+    "13_parity_long_4H",
+    "14_parity_short_4H",
     "15_parity_long_6Hutc",
     "16_parity_short_6Hutc",
-    #"17_parity_long_12Hutc",
-    #"18_parity_short_12Hutc",
+    "17_parity_long_12Hutc",
+    "18_parity_short_12Hutc",
     #"19_parity_long_1Dutc",
     #"20_parity_short_1Dutc",
-    #"21_flag_long_1H",
-    #"22_flag_short_1H",
-    #"23_flag_long_4H",
-    #"24_flag_short_4H",
-    #"25_flag_long_6Hutc",
-    #"26_flag_short_6Hutc",
-    #"27_flag_long_12Hutc",
-    #"28_flag_short_12Hutc",
+    "21_flag_long_1H",
+    "22_flag_short_1H",
+    "23_flag_long_4H",
+    "24_flag_short_4H",
+    "25_flag_long_6Hutc",
+    "26_flag_short_6Hutc",
+    "27_flag_long_12Hutc",
+    "28_flag_short_12Hutc",
     #"29_flag_long_1Dutc",
     #"30_flag_short_1Dutc",
-    #"31_orderblocks_long_1H",
-    #"32_orderblocks_short_1H",
-    #"33_orderblocks_long_4H",
-    #"34_orderblocks_short_4H",
-    #"35_orderblocks_long_6Hutc",
-    #"36_orderblocks_short_6Hutc",
-    #"37_orderblocks_long_12Hutc",
-    #"38_orderblocks_short_12Hutc",
+    "31_orderblocks_long_1H",
+    "32_orderblocks_short_1H",
+    "33_orderblocks_long_4H",
+    "34_orderblocks_short_4H",
+    "35_orderblocks_long_6Hutc",
+    "36_orderblocks_short_6Hutc",
+    "37_orderblocks_long_12Hutc",
+    "38_orderblocks_short_12Hutc",
    # "39_orderblocks_long_1Dutc",
    # "40_orderblocks_short_1Dutc",
 ]
@@ -256,7 +258,7 @@ def run_batch(strategy_config: dict) -> None:
         )
         approved_wfo = True
     elif SELECTION_MODE == "WFO":
-        best_params, approved_wfo = run_wfo_is(
+        best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion = run_wfo_is(
             ohlcv_data          = ohlcv_data_minor,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -271,8 +273,14 @@ def run_batch(strategy_config: dict) -> None:
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
         )
+        _wfo_results.append({
+            "strategy_id":    STRATEGY_ID,
+            "verdict":        "🟢 PASS" if approved_wfo else "🔴 FAIL",
+            "win_rate":       wfo_win_rate,
+            "mean_criterion": wfo_mean_criterion,
+        })
     elif SELECTION_MODE == "WFO_MC":
-        best_params, approved_wfo = run_wfo_mc_is(
+        best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion = run_wfo_mc_is(
             ohlcv_data          = ohlcv_data_minor,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -287,6 +295,12 @@ def run_batch(strategy_config: dict) -> None:
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
         )
+        _wfo_results.append({
+            "strategy_id":    STRATEGY_ID,
+            "verdict":        "🟢 PASS" if approved_wfo else "🔴 FAIL",
+            "win_rate":       wfo_win_rate,
+            "mean_criterion": wfo_mean_criterion,
+        })
     else:
         raise ValueError(f"Unknown SELECTION_MODE: {SELECTION_MODE}")
     bt_signal_params = {k: best_params[k.upper()] for k in signal_params_keys if k.upper() in best_params}
@@ -555,6 +569,7 @@ def run_summary():
     """Compute combined portfolio metrics. Call after all run_batch() calls."""
     if not RUN_SUMMARY:
         print_strategies_summary(_validation_results)
+        print_wfo_summary(_wfo_results)
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
         return
 
@@ -567,6 +582,7 @@ def run_summary():
                    for sid, df in _strategy_trades_oos1_regime}
 
     print_strategies_summary(_validation_results)
+    print_wfo_summary(_wfo_results)
 
     if _strategy_trades_oos1_baseline:
         logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
