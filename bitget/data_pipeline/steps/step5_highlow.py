@@ -158,7 +158,7 @@ def _process_pair(
             errors += 1
 
     return errors
-
+MIN_CANDLES_1DUTC = 365
 # =============================================================================
 # RUN
 # =============================================================================
@@ -170,7 +170,6 @@ def run(config: dict) -> bool:
     export_csv: bool = config.get("export_csv", False)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Support both single pair ["4H","1H"] and list of pairs [["4H","1H"],["1H","15m"]]
     if tf_pairs and not isinstance(tf_pairs[0], list):
         tf_pairs = [tf_pairs]
 
@@ -200,11 +199,41 @@ def run(config: dict) -> bool:
             continue
         total_errors += _process_pair(pair[0], pair[1], file_index, output_dir, export_csv)
 
+    logger.info("✅ High/Low timestamps complete")
+
+    # Filter symbols with fewer than MIN_CANDLES_1DUTC daily candles
+    removed_symbols = []
+    for filename in os.listdir(output_dir):
+        if not filename.endswith(".parquet"):
+            continue
+        sym, tf = _parse_filename(filename)
+        if tf != "1Dutc":
+            continue
+        try:
+            df = pd.read_parquet(os.path.join(output_dir, filename))
+            if len(df) < MIN_CANDLES_1DUTC:
+                removed_symbols.append(sym)
+        except Exception:
+            continue
+
+    if removed_symbols:
+        for filename in os.listdir(output_dir):
+            if not filename.endswith(".parquet"):
+                continue
+            sym, _ = _parse_filename(filename)
+            if sym in removed_symbols:
+                os.remove(os.path.join(output_dir, filename))
+        config["removed_symbols"] = removed_symbols
+        logger.info(f"\n🗑 Symbols removed (< {MIN_CANDLES_1DUTC} daily candles): {len(removed_symbols)}")
+        for sym in sorted(removed_symbols):
+            logger.info(f"   - {sym}")
+    else:
+        logger.info(f"✅ All symbols passed minimum candle filter ({MIN_CANDLES_1DUTC} days)")
+
     if total_errors:
         logger.warning(f"⚠ Step 5 completed with {total_errors} error(s)")
         return False
 
-    logger.info("✅ High/Low timestamps complete")
     return True
 
 # =============================================================================

@@ -133,10 +133,10 @@ SELECTED_STRATEGIES = [
     "34_orderblocks_short_30m",
     "35_orderblocks_long_1H",
     "36_orderblocks_short_1H",
-    "37_orderblocks_long_4H",
-    "38_orderblocks_short_4H",
-    "39_orderblocks_long_6Hutc",
-    "40_orderblocks_short_6Hutc",
+   # "37_orderblocks_long_4H",
+   # "38_orderblocks_short_4H",
+   # "39_orderblocks_long_6Hutc",
+   ## "40_orderblocks_short_6Hutc",
 ]
 
 # =============================================================================

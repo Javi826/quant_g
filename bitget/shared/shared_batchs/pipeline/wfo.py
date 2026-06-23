@@ -18,7 +18,7 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # WFO EXECUTION CONFIG
 # =============================================================================
 TRAIN_MONTHS         = 6
-TEST_MONTHS          = 1
+TEST_MONTHS          = 2
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"

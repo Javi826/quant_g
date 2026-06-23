@@ -95,7 +95,7 @@ REGIME_ENABLED    = False
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
-SAVE_TRADES     = False
+SAVE_TRADES     = True
 
 
 # STRATEGY SELECTION

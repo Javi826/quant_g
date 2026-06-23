@@ -43,7 +43,16 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = ["PIPPINUSDT"]
+SELECTED_SYMBOLS   = ["BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "SUIUSDT",
+    "HYPEUSDT",
+    "ADAUSDT",
+    "TAOUSDT",
+    "PIPPINUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
 N_SYMBOLS_DOWNLOAD = 40
@@ -66,7 +75,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 4
+WINDOW_OOS_MONTHS    = 0
 SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
@@ -174,6 +183,14 @@ def _run_pipeline() -> None:
     if not ok:
         logger.info("❌ Pipeline aborted at STEP 7.")
         integrity.print_summary(collector)
+        removed = config.get("removed_symbols", [])
+        if removed:
+            logger.info(f"\n{'='*60}")
+            logger.info(f"  SYMBOLS REMOVED (< {step5_highlow.MIN_CANDLES_1DUTC} daily candles)")
+            logger.info(f"{'='*60}")
+            for sym in sorted(removed):
+                logger.info(f"  - {sym}")
+            logger.info(f"{'='*60}")
         return
 
     for d in [CLEAN_DIR, HIGHLOW_DIR]:
@@ -182,6 +199,14 @@ def _run_pipeline() -> None:
             logger.info(f"🗑 Cleaned up: {os.path.basename(d)}/")
 
     integrity.print_summary(collector)
+    removed = config.get("removed_symbols", [])
+    if removed:
+        logger.info(f"\n{'='*60}")
+        logger.info(f"  SYMBOLS REMOVED (< {step5_highlow.MIN_CANDLES_1DUTC} daily candles)")
+        logger.info(f"{'='*60}")
+        for sym in sorted(removed):
+            logger.info(f"  - {sym}")
+        logger.info(f"{'='*60}")
 # =============================================================================
 # MAIN
 # =============================================================================

@@ -22,7 +22,7 @@ PRODUCTION_XLSX = os.path.expanduser(
     "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_E1/bot_trades_E1.csv"
 )
 BATCH_TRADES_DIR = os.path.expanduser(
-    "~/projects/quant/quant_b/develop/brief_trades"
+    "~/projects/quant/quant_b/develop/brief_trades_bb"
 )
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
@@ -31,7 +31,7 @@ BATCH_MODE  = "baseline"   # "baseline" | "regime"
 
 # Time window filter (None = no filter)
 DATE_FROM = "2026-04-09"
-DATE_TO   = "2026-06-18"
+DATE_TO   = "2026-06-28"
 
 # Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
@@ -43,11 +43,11 @@ SELECTED_STRATEGIES = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "22_flag_short_15m"
-PLOT_STRATEGY = "05_reversal_long_1H"
+PLOT_STRATEGY = "34_orderblocks_short_30m"
+#PLOT_STRATEGY = "05_reversal_long_1H"
 
 # Strategy for entry-rounds inspection, post-anchor (None to skip)
-ENTRY_ROUNDS_STRATEGY ="05_reversal_long_1H"
+ENTRY_ROUNDS_STRATEGY ="34_orderblocks_short_30m"
 
 # Max gap (seconds) between consecutive buy_times to consider them the same
 # simultaneous-open round (signals fired together when the system was flat)
@@ -654,6 +654,12 @@ def main() -> None:
     match_result = match_trades(df_prod, df_batch, MATCH_FORWARD_MINUTES)
     print_post_anchor_report(df_prod, df_batch, match_result)
 
+    print_wr_score_report(df_prod, df_batch, match_result, label="GLOBAL")
+
+    prod_post  = build_post_anchor_df(df_prod,  match_result)
+    batch_post = build_post_anchor_df(df_batch, match_result)
+    print_wr_score_report(prod_post, batch_post, match_result, label="POST-ANCHOR")
+
     if ENTRY_ROUNDS_STRATEGY:
         anchor = next(
             (r["anchor_ts"] for r in match_result["per_strategy"] if r["strategy_id"] == ENTRY_ROUNDS_STRATEGY),
@@ -667,15 +673,12 @@ def main() -> None:
             )
         else:
             logger.warning(f"  ⚠️  No anchor found for strategy: {ENTRY_ROUNDS_STRATEGY}")
-
     plot_portfolio(df_prod, df_batch)
     if PLOT_STRATEGY:
         plot_strategy(df_prod, df_batch, PLOT_STRATEGY)
-
     plot_portfolio_post_anchor(df_prod, df_batch, match_result)
     if PLOT_STRATEGY:
         plot_strategy_post_anchor(df_prod, df_batch, PLOT_STRATEGY, match_result)
-
 
 # =============================================================================
 # PLOTS — portfolio daily evolution
@@ -718,7 +721,7 @@ def plot_portfolio(df_prod: pd.DataFrame, df_batch: pd.DataFrame) -> None:
     ax2.plot(daily_batch["date"], daily_batch["win_rate"], label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
     ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
     ax2.set_ylabel("Win Rate % (daily)")
-    ax2.set_ylim(0, 100)
+    ax2.set_ylim(0, 110)
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
@@ -760,7 +763,7 @@ def plot_strategy(df_prod: pd.DataFrame, df_batch: pd.DataFrame, strategy_id: st
 
     ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
     ax2.set_ylabel("Win Rate % (daily)")
-    ax2.set_ylim(0, 100)
+    ax2.set_ylim(0, 110)
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
@@ -809,7 +812,7 @@ def plot_portfolio_post_anchor(
     ax2.plot(daily_batch["date"], daily_batch["win_rate"], label="Batch",      color="#FF9800", linewidth=2, linestyle="--")
     ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
     ax2.set_ylabel("Win Rate % (daily)")
-    ax2.set_ylim(0, 100)
+    ax2.set_ylim(0, 110)
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
@@ -864,7 +867,7 @@ def plot_strategy_post_anchor(
 
     ax2.axhline(50, color="gray", linewidth=0.8, linestyle=":")
     ax2.set_ylabel("Win Rate % (daily)")
-    ax2.set_ylim(0, 100)
+    ax2.set_ylim(0, 110)
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
@@ -873,7 +876,60 @@ def plot_strategy_post_anchor(
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
+    
+    
+def compute_wr_daily_score(df_prod: pd.DataFrame, df_batch: pd.DataFrame) -> dict:
+    """% of days where rounded daily win rate matches between prod and batch."""
+    def daily_wr(df):
+        df = df.copy()
+        df["date"] = df["buy_time"].dt.tz_localize(None).dt.normalize()
+        return df.groupby("date").apply(
+            lambda x: round((x["profit"] > 0).sum() / len(x) * 100, 0),
+            include_groups=False,
+        ).rename("wr")
 
+    prod_wr  = daily_wr(df_prod)
+    batch_wr = daily_wr(df_batch)
+    merged   = prod_wr.to_frame().join(batch_wr.to_frame(), lsuffix="_prod", rsuffix="_batch", how="inner")
+    if merged.empty:
+        return {"days_common": 0, "days_match": 0, "score_pct": None}
+    days_match = (merged["wr_prod"] == merged["wr_batch"]).sum()
+    return {
+        "days_common": len(merged),
+        "days_match":  int(days_match),
+        "score_pct":   round(days_match / len(merged) * 100, 1),
+    }
+
+def print_wr_score_report(
+    df_prod:      pd.DataFrame,
+    df_batch:     pd.DataFrame,
+    match_result: dict,
+    label:        str = "GLOBAL",
+) -> None:
+    """Print WR daily score table: per strategy + system total."""
+    strategies = sorted(set(df_prod["strategy"].unique()) | set(df_batch["strategy"].unique()))
+
+    logger.info(f"\n{'='*80}")
+    logger.info(f"  WR DAILY SCORE ({label}) — % days where round(WR,0) matches prod vs batch")
+    logger.info(f"{'='*80}")
+    logger.info(f"  {'STRATEGY':<32} {'DAYS_COMMON':>12} {'DAYS_MATCH':>11} {'SCORE%':>8}")
+    logger.info(f"  {'-'*65}")
+
+    total_common = total_match = 0
+    for sid in strategies:
+        p = df_prod[df_prod["strategy"]   == sid]
+        b = df_batch[df_batch["strategy"] == sid]
+        r = compute_wr_daily_score(p, b)
+        score_str = f"{r['score_pct']}" if r["score_pct"] is not None else "—"
+        logger.info(f"  {sid:<32} {r['days_common']:>12} {r['days_match']:>11} {score_str:>8}")
+        total_common += r["days_common"]
+        total_match  += r["days_match"]
+
+    total_score = round(total_match / total_common * 100, 1) if total_common else None
+    score_str   = f"{total_score}" if total_score is not None else "—"
+    logger.info(f"  {'-'*65}")
+    logger.info(f"  {'SYSTEM TOTAL':<32} {total_common:>12} {total_match:>11} {score_str:>8}")
+    logger.info(f"  {'='*80}\n")
 
 if __name__ == "__main__":
     main()
