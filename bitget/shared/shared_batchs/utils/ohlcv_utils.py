@@ -38,6 +38,8 @@ def get_n_obs(timeframe: str) -> int:
 
 def get_bars_per_year(timeframe: str) -> int:
     mapping = {
+        '15m'    : 365 * 96,
+        '30m'    : 365 * 48,
         '1H'     : 365 * 24,
         '4H'     : 365 * 6,
         '6Hutc'  : 365 * 4,

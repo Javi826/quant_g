@@ -10,7 +10,7 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 N_SYMBOLS_MCIS            = 6
 MY_SYMBOLS                = False
-FIX_SYMBOLS_MCIS_TRAINING = True
+FIX_SYMBOLS_MCIS_TRAINING = False
 OOS23_MATCH_SYMBOLS       = True
 
 symbols_to_exclude        = {}
@@ -80,26 +80,22 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-            if df is not None:
-                n_rows = len(df)            
-                if timeframe == "1Dutc":
-                    min_bars = 300
-                elif timeframe == "12Hutc":
-                    min_bars = 600
-                elif timeframe == "6Hutc":
-                    min_bars = 1200
-                elif timeframe == "4H":
-                    min_bars = 1800
-                elif timeframe == "1H":
-                    min_bars = 7200
-                elif timeframe == "30m":
-                    min_bars = 14400                    
-                elif timeframe == "15m":
-                    min_bars = 28800
-                else:
-                    min_bars = 999999999                 
-                if n_rows < min_bars:
-                    reasons.append("Not enough bars")
+            # if df is not None:
+            #     n_rows = len(df)
+            #     min_bars_map = {
+            #         "1Dutc":  365,
+            #         "12Hutc": 730,
+            #         "6Hutc":  1460,
+            #         "4H":     2190,
+            #         "1H":     8760,
+            #         "30m":    17520,
+            #         "15m":    35040,
+            #     }
+                # min_bars = min_bars_map.get(timeframe, 999999)
+                # min_bars = 50
+                # if n_rows < min_bars:
+                #     reasons.append("Not enough bars")
+                min_bars = 50
                     
         if reasons:
             removed_symbols.append(sym)

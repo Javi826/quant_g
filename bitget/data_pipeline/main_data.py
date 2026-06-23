@@ -46,7 +46,7 @@ EXPORT_CSV = False
 SELECTED_SYMBOLS   = ["PIPPINUSDT"]
 SYMBOL_MODE        = "auto"   #manual o auto
 
-N_SYMBOLS_DOWNLOAD = 20
+N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        
@@ -66,7 +66,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 12
+WINDOW_OOS_MONTHS    = 4
 SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"

@@ -9,14 +9,16 @@ from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_B
 from shared_batchs.tools.wfo_ST import walk_forward_optimization
 from shared_batchs.tools.wfo_MC import walk_forward_optimization_mc
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year, get_n_obs, extract_ohlcv_from_path
+from shared_batchs.regime import regime_module
+from shared_batch_regime.regime_core import lookup_indicator_batch, classify_market_regime
 
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-TRAIN_MONTHS         = 12
-TEST_MONTHS          = 3
+TRAIN_MONTHS         = 6
+TEST_MONTHS          = 1
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
@@ -108,6 +110,54 @@ def _evaluate_fn_mc_paths(
     return avg_metric, params
 
 
+def _evaluate_fn_with_regime(
+    params: dict,
+    base_arrays: dict,
+    signal_fn: callable,
+    signal_params_keys: list,
+    order_amount: int,
+    dtype,
+    bins_to_filter,
+    regime_enabled: bool = False,
+    indicator_cache: dict = None,
+) -> tuple:
+    """Single param combination evaluation with regime signal filtering for WFO test windows."""
+    _bins = [bins_to_filter] if isinstance(bins_to_filter, str) else list(bins_to_filter)
+
+    ohlcv_arrays = {}
+    for sym, arr in base_arrays.items():
+        sig_kwargs = {k: params[k.upper()] for k in signal_params_keys if k.upper() in params}
+        signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
+
+        if regime_enabled and _bins and _bins != ["neutral"] and indicator_cache:
+            sym_cache = indicator_cache.get(sym)
+            if sym_cache is not None:
+                signal_idxs = np.nonzero(signals)[0]
+                if signal_idxs.size > 0:
+                    signal_ts = arr["ts"][signal_idxs]
+                    lookups   = {
+                        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
+                        for key in sym_cache if key != "ts"
+                    }
+                    for i, idx in enumerate(signal_idxs):
+                        context = {"close": float(arr["close"][idx])}
+                        for key, values in lookups.items():
+                            context[key] = float(values[i]) if not np.isnan(values[i]) else None
+                        if classify_market_regime(context, cfg=regime_module.INDICATOR_CFG) not in _bins:
+                            signals[idx] = 0
+
+        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
+
+    results = run_grid_backtest(
+        ohlcv_arrays,
+        sell_after   = params["SELL_AFTER"],
+        tp_pct       = params["TP_PCT"],
+        sl_pct       = params["SL_PCT"],
+        order_amount = order_amount,
+    )
+    return _compute_metric(results), params
+
+
 # =============================================================================
 # APPROVAL CRITERION
 # =============================================================================
@@ -152,6 +202,9 @@ def run_wfo_is(
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
+    n_symbols: int = None,
+    bins_to_filter = None,
+    regime_enabled: bool = False,
 ) -> tuple:
     """
     Run Walk-Forward Optimization on IS data and evaluate the window-based approval criterion.
@@ -162,28 +215,48 @@ def run_wfo_is(
     ohlcv_arr        = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges     = dict(zip(param_names, lists_for_grid))
 
-    bars_per_month    = get_bars_per_year(timeframe) / 12
-    length_train_set  = int(TRAIN_MONTHS * bars_per_month)
-    pct_train_set     = TRAIN_MONTHS / (TRAIN_MONTHS + TEST_MONTHS)
+    bars_per_month   = get_bars_per_year(timeframe) / 12
+    length_train_set = int(TRAIN_MONTHS * bars_per_month)
+    pct_train_set    = TRAIN_MONTHS / (TRAIN_MONTHS + TEST_MONTHS)
 
     evaluate_fn = partial(
         _evaluate_fn,
-        signal_fn           = signal_fn,
-        signal_params_keys  = signal_params_keys,
-        order_amount        = order_amount,
-        dtype               = dtype,
+        signal_fn          = signal_fn,
+        signal_params_keys = signal_params_keys,
+        order_amount       = order_amount,
+        dtype              = dtype,
     )
 
+    test_evaluate_fn = None
+    if regime_enabled and bins_to_filter:
+        indicator_cache = {}
+        for sym in ohlcv_data:
+            cache = regime_module._get_indicator_cache(sym)
+            if cache is not None:
+                indicator_cache[sym] = cache
+        test_evaluate_fn = partial(
+            _evaluate_fn_with_regime,
+            signal_fn          = signal_fn,
+            signal_params_keys = signal_params_keys,
+            order_amount       = order_amount,
+            dtype              = dtype,
+            bins_to_filter     = bins_to_filter,
+            regime_enabled     = regime_enabled,
+            indicator_cache    = indicator_cache,
+        )
+
     best_params, df_results = walk_forward_optimization(
-        ohlcv_arr             = ohlcv_arr,
-        param_ranges          = param_ranges,
-        length_train_set      = length_train_set,
-        pct_train_set         = pct_train_set,
-        anchored              = ANCHORED,
-        evaluate_fn           = evaluate_fn,
-        param_selection_mode  = PARAM_SELECTION_MODE,
-        n_jobs                = n_jobs,
-        show_progress         = show_progress,
+        ohlcv_arr            = ohlcv_arr,
+        param_ranges         = param_ranges,
+        length_train_set     = length_train_set,
+        pct_train_set        = pct_train_set,
+        anchored             = ANCHORED,
+        evaluate_fn          = evaluate_fn,
+        param_selection_mode = PARAM_SELECTION_MODE,
+        n_jobs               = n_jobs,
+        show_progress        = show_progress,
+        n_symbols            = n_symbols,
+        test_evaluate_fn     = test_evaluate_fn,
     )
 
     approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(
@@ -238,32 +311,32 @@ def run_wfo_mc_is(
 
     train_evaluate_fn = partial(
         _evaluate_fn_mc_paths,
-        signal_fn           = signal_fn,
-        signal_params_keys  = signal_params_keys,
-        order_amount        = order_amount,
-        dtype               = dtype,
+        signal_fn          = signal_fn,
+        signal_params_keys = signal_params_keys,
+        order_amount       = order_amount,
+        dtype              = dtype,
     )
     test_evaluate_fn = partial(
         _evaluate_fn,
-        signal_fn           = signal_fn,
-        signal_params_keys  = signal_params_keys,
-        order_amount        = order_amount,
-        dtype               = dtype,
+        signal_fn          = signal_fn,
+        signal_params_keys = signal_params_keys,
+        order_amount       = order_amount,
+        dtype              = dtype,
     )
 
     best_params, df_results = walk_forward_optimization_mc(
-        ohlcv_data            = ohlcv_data,
-        param_ranges          = param_ranges,
-        length_train_set      = length_train_set,
-        pct_train_set         = pct_train_set,
-        anchored              = ANCHORED,
-        train_evaluate_fn     = train_evaluate_fn,
-        test_evaluate_fn      = test_evaluate_fn,
-        n_paths               = WFO_MC_N_PATHS,
-        n_obs                 = n_obs,
-        param_selection_mode  = PARAM_SELECTION_MODE,
-        n_jobs                = n_jobs,
-        show_progress         = show_progress,
+        ohlcv_data           = ohlcv_data,
+        param_ranges         = param_ranges,
+        length_train_set     = length_train_set,
+        pct_train_set        = pct_train_set,
+        anchored             = ANCHORED,
+        train_evaluate_fn    = train_evaluate_fn,
+        test_evaluate_fn     = test_evaluate_fn,
+        n_paths              = WFO_MC_N_PATHS,
+        n_obs                = n_obs,
+        param_selection_mode = PARAM_SELECTION_MODE,
+        n_jobs               = n_jobs,
+        show_progress        = show_progress,
     )
 
     approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(

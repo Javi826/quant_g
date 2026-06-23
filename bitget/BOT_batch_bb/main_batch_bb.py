@@ -30,7 +30,7 @@ logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 DTYPE         = np.float32
 N_JOBS        = -1
 SHOW_PROGRESS = False
-SHOW_PLOTS    = True
+SHOW_PLOTS    = False
 
 if not SHOW_PLOTS:
     matplotlib.use("Agg")
@@ -42,7 +42,7 @@ from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.pipeline.montecarlo import run_montecarlo_is, run_montecarlo_oos
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_all_curves_table, print_robustness_table
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_wfo_summary, print_all_curves_table, print_robustness_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison
 from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, compare_and_generate_csv, update_strategies_symbols, print_update_status
 from shared_batchs.regime import regime_module
@@ -51,18 +51,14 @@ from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
 from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is
-from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_strategies_summary, print_wfo_summary, print_all_curves_table, print_robustness_table
 
 regime_module._indicator_cache = {}
+
 # Global accumulators
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
 _strategy_trades_oos1_baseline : list = []
 _strategy_trades_oos1_regime   : list = []
-_strategy_trades_oos2_baseline : list = []
-_strategy_trades_oos2_regime   : list = []
-_strategy_trades_oos3_baseline : list = []
-_strategy_trades_oos3_regime   : list = []
 _validation_results            : list = []
 _wfo_results                   : list = []
 _drift_results                 : list = []
@@ -72,23 +68,16 @@ _best_params_results           : dict = {}
 # RUN CONFIGURATION
 # =============================================================================
 
-# BATCH 
+# BATCH
 #------------------------------------------------------------------------------
-STRATEGIES_SET_NAME  = "bb"  
+STRATEGIES_SET_NAME  = "bb"
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
-SELECTION_MODE       = "WFO"   # "MC" or "WFO WFO_MC"
+SELECTION_MODE       = "WFO"   # "MC", "WFO" or "WFO_MC"
 N_PATHS_IS           = 100
 
-# ELITE -- MA3
-#------------------------------------------------------------------------------
-
-OOS_NETGAIN_TH       = 1
-OOS_MAX_DD_TH        = 20
-OOS_R2_TH            = 0.043
-
-WFO_TH_RATE     = 0
-WFO_WIN_RATE_TH = 0.6
-WFO_MEAN_TH     = 0.5
+WFO_TH_RATE          = 0
+WFO_WIN_RATE_TH      = 0.50
+WFO_MEAN_TH          = 0.5
 
 # RUNS
 #------------------------------------------------------------------------------
@@ -98,84 +87,68 @@ RUN_BEST_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = False
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
 SAVE_TRADES     = False
 
-
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
-    "01_reversal_long_1H",
-    "02_reversal_short_1H",
-    "03_reversal_long_4H",
-    "04_reversal_short_4H",
-    "05_reversal_long_6Hutc",
-    "06_reversal_short_6Hutc",
-    "07_reversal_long_12Hutc",
-    "08_reversal_short_12Hutc",
-    #"09_reversal_long_1Dutc",
-    #"10_reversal_short_1Dutc",
-    "11_parity_long_1H",
-    "12_parity_short_1H",
-    "13_parity_long_4H",
-    "14_parity_short_4H",
-    "15_parity_long_6Hutc",
-    "16_parity_short_6Hutc",
-    "17_parity_long_12Hutc",
-    "18_parity_short_12Hutc",
-    #"19_parity_long_1Dutc",
-    #"20_parity_short_1Dutc",
-    "21_flag_long_1H",
-    "22_flag_short_1H",
-    "23_flag_long_4H",
-    "24_flag_short_4H",
-    "25_flag_long_6Hutc",
-    "26_flag_short_6Hutc",
-    "27_flag_long_12Hutc",
-    "28_flag_short_12Hutc",
-    #"29_flag_long_1Dutc",
-    #"30_flag_short_1Dutc",
-    "31_orderblocks_long_1H",
-    "32_orderblocks_short_1H",
-    "33_orderblocks_long_4H",
-    "34_orderblocks_short_4H",
-    "35_orderblocks_long_6Hutc",
-    "36_orderblocks_short_6Hutc",
-    "37_orderblocks_long_12Hutc",
-    "38_orderblocks_short_12Hutc",
-   # "39_orderblocks_long_1Dutc",
-   # "40_orderblocks_short_1Dutc",
+    "01_reversal_long_15m",
+    "02_reversal_short_15m",
+    "03_reversal_long_30m",
+    "04_reversal_short_30m",
+    "05_reversal_long_1H",
+    "06_reversal_short_1H",
+    "07_reversal_long_4H",
+    "08_reversal_short_4H",
+    "09_reversal_long_6Hutc",
+    "10_reversal_short_6Hutc",
+    "11_parity_long_15m",
+    "12_parity_short_15m",
+    "13_parity_long_30m",
+    "14_parity_short_30m",
+    "15_parity_long_1H",
+    "16_parity_short_1H",
+    "17_parity_long_4H",
+    "18_parity_short_4H",
+    "19_parity_long_6Hutc",
+    "20_parity_short_6Hutc",
+    "21_flag_long_15m",
+    "22_flag_short_15m",
+    "23_flag_long_30m",
+    "24_flag_short_30m",
+    "25_flag_long_1H",
+    "26_flag_short_1H",
+    "27_flag_long_4H",
+    "28_flag_short_4H",
+    "29_flag_long_6Hutc",
+    "30_flag_short_6Hutc",
+    "31_orderblocks_long_15m",
+    "32_orderblocks_short_15m",
+    "33_orderblocks_long_30m",
+    "34_orderblocks_short_30m",
+    "35_orderblocks_long_1H",
+    "36_orderblocks_short_1H",
+    "37_orderblocks_long_4H",
+    "38_orderblocks_short_4H",
+    "39_orderblocks_long_6Hutc",
+    "40_orderblocks_short_6Hutc",
 ]
-# =============================================================================
-# MONTECARLOS IS + OOS
-# =============================================================================
 
-MC_SELECTION_PERCENTILE = None  
+# =============================================================================
+# MONTE CARLO IS + OOS
+# =============================================================================
+MC_SELECTION_PERCENTILE = None
 RUN_MC_OOS              = False
 N_PATHS_OOS1            = 500
+
 # =============================================================================
 # PIPELINES
 # =============================================================================
-
-# OOS2
-#------------------------------------------------------------------------------
-R_NETGAIN_OOS2      = OOS_NETGAIN_TH
-R_MAX_DD_OOS2       = OOS_MAX_DD_TH
-R_R2_OOS2           = OOS_R2_TH
-OOS2_RUN_ANALYSIS   = False
-OOS2_FOR_VALIDATION = False
-
-# OOS3
-#------------------------------------------------------------------------------
-R_NETGAIN_OOS3      = OOS_NETGAIN_TH
-R_MAX_DD_OOS3       = OOS_MAX_DD_TH
-R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = False
-OOS3_FOR_VALIDATION = False
 
 # Correlation analysis
 #------------------------------------------------------------------------------
@@ -196,7 +169,7 @@ REGIME_BINS_PATH           = os.path.join(os.path.dirname(__file__), "strategies
 
 # DATA
 #------------------------------------------------------------------------------
-from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1, DATA_FOLDER_OOS2, DATA_FOLDER_OOS3
+from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
 
 # =============================================================================
 # MAIN FUNCTION
@@ -228,18 +201,21 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 0 — Universe Selection
     # -------------------------------------------------------------------------
     symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos1 = select_universe(
-            data_folder_is    = DATA_FOLDER_IS,
-            data_folder_oos   = DATA_FOLDER_OOS1,
-            timeframe         = TIMEFRAME,
-            n_symbols         = N_SYMBOLS,
-            min_price         = MIN_PRICE,
-            filter_symbols_fn = filter_symbols,
-        )
+        data_folder_is    = DATA_FOLDER_IS,
+        data_folder_oos   = DATA_FOLDER_OOS1,
+        timeframe         = TIMEFRAME,
+        n_symbols         = N_SYMBOLS,
+        min_price         = MIN_PRICE,
+        filter_symbols_fn = filter_symbols,
+    )
+    logger.debug(f"IS full pool: {len(ohlcv_is)} symbols: {sorted(ohlcv_is.keys())}")
 
-# -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # BLOCK 1 — Parameter Selection IS (MC, WFO or WFO_MC)
     # -------------------------------------------------------------------------
     ohlcv_data_minor = {sym: ohlcv_is[sym] for sym in symbols_is_final}
+    bins_to_filter_wfo = regime_module.load_regime_bins(REGIME_BINS_PATH, STRATEGY_ID) if REGIME_ENABLED else "neutral"
+
     if SELECTION_MODE == "MC":
         best_params, _ = run_montecarlo_is(
             ohlcv_data           = ohlcv_data_minor,
@@ -257,9 +233,10 @@ def run_batch(strategy_config: dict) -> None:
             selection_percentile = MC_SELECTION_PERCENTILE,
         )
         approved_wfo = True
+
     elif SELECTION_MODE == "WFO":
         best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion = run_wfo_is(
-            ohlcv_data          = ohlcv_data_minor,
+            ohlcv_data          = ohlcv_is,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
             signal_fn           = signal_fn,
@@ -272,13 +249,17 @@ def run_batch(strategy_config: dict) -> None:
             dtype               = DTYPE,
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
-        )
+            n_symbols           = N_SYMBOLS,
+            bins_to_filter      = bins_to_filter_wfo,
+            regime_enabled      = REGIME_ENABLED,
+            )
         _wfo_results.append({
             "strategy_id":    STRATEGY_ID,
             "verdict":        "🟢 PASS" if approved_wfo else "🔴 FAIL",
             "win_rate":       wfo_win_rate,
             "mean_criterion": wfo_mean_criterion,
         })
+
     elif SELECTION_MODE == "WFO_MC":
         best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion = run_wfo_mc_is(
             ohlcv_data          = ohlcv_data_minor,
@@ -301,9 +282,12 @@ def run_batch(strategy_config: dict) -> None:
             "win_rate":       wfo_win_rate,
             "mean_criterion": wfo_mean_criterion,
         })
+
     else:
         raise ValueError(f"Unknown SELECTION_MODE: {SELECTION_MODE}")
+
     bt_signal_params = {k: best_params[k.upper()] for k in signal_params_keys if k.upper() in best_params}
+
     # -------------------------------------------------------------------------
     # BLOCK 2 — Backtest IS + Regime Analysis
     # -------------------------------------------------------------------------
@@ -322,14 +306,14 @@ def run_batch(strategy_config: dict) -> None:
         trades_is_baseline    = _strategy_trades_is_baseline,
         trades_is_regime      = _strategy_trades_is_regime,
         brief_trades_folder   = brief_trades_folder,
-        regime_bins_path          = REGIME_BINS_PATH,
-        regime_enabled            = REGIME_ENABLED
+        regime_bins_path      = REGIME_BINS_PATH,
+        regime_enabled        = REGIME_ENABLED,
     )
 
     # -------------------------------------------------------------------------
     # BLOCK 3 — Monte Carlo OOS1 (informational)
     # -------------------------------------------------------------------------
-    ohlcv_data_oos1    = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
+    ohlcv_data_oos1       = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
     p_target_winrate_oos1 = 0.0
     prob_negative_oos1    = 0.0
 
@@ -351,13 +335,13 @@ def run_batch(strategy_config: dict) -> None:
         path_grouped["Net_Gain_pct"] = (path_grouped["Portfolio_Final_Balance"] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
         prob_negative_oos1         = (path_grouped["Net_Gain_pct"] < 0).mean() * 100
         logger.info(f"STAGE M ── MC OOS1                ── ProbNeg={prob_negative_oos1:.1f}%")
-
-# -------------------------------------------------------------------------
-    # BLOCK 4  — OOS1 (baseline + regime + validation)
     # -------------------------------------------------------------------------
+    # BLOCK 4 — OOS1 (baseline + regime) — informational only
+    # -------------------------------------------------------------------------
+
     ohlcv_data_oos1 = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
-    approved, trades_df_oos1_baseline, trades_df_oos1_regime, _metrics_baseline_oos1, _metrics_regime_oos1 = run_oos_period(
-    
+
+    _, trades_df_oos1_baseline, trades_df_oos1_regime, _metrics_baseline_oos1, _metrics_regime_oos1 = run_oos_period(
         strategy_id            = STRATEGY_ID,
         label                  = "OOS1",
         stage_baseline         = "STAGE 3",
@@ -371,10 +355,10 @@ def run_batch(strategy_config: dict) -> None:
         timeframe              = TIMEFRAME,
         data_folder            = DATA_FOLDER_OOS1,
         bins_to_filter         = bins_to_filter,
-        netgain_th             = OOS_NETGAIN_TH,
-        max_dd_th              = OOS_MAX_DD_TH,
-        r2_th                  = OOS_R2_TH,
-        for_validation         = True,
+        netgain_th             = 0,
+        max_dd_th              = 100,
+        r2_th                  = 0,
+        for_validation         = False,
         approved               = approved_wfo,
         validation_record      = {},
         trades_baseline_accum  = _strategy_trades_oos1_baseline,
@@ -385,14 +369,12 @@ def run_batch(strategy_config: dict) -> None:
         run_report_backtesting = True,
     )
     
-
-
     # -------------------------------------------------------------------------
     # BLOCK 5 — Build validation record
     # -------------------------------------------------------------------------
     _val_record = {
         "strategy_id":     STRATEGY_ID,
-        "verdict":         "🟢 VALIDATED" if approved else "🔴 REJECTED",
+        "verdict":         "🟢 VALIDATED" if approved_wfo else "🔴 REJECTED",
         "round":           "—",
         "net_gain_pct":    round(trades_df_oos1_regime["profit"].sum() / INITIAL_BALANCE * 100, 1) if len(trades_df_oos1_regime) > 0 else round(trades_df_oos1_baseline["profit"].sum() / INITIAL_BALANCE * 100, 1),
         "dd_pct":          0.0,
@@ -402,7 +384,7 @@ def run_batch(strategy_config: dict) -> None:
         "symbols_changed": False,
         "bins_to_filter":  bins_to_filter,
     }
-    
+
     _m = compute_metrics(trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline, capital=INITIAL_BALANCE, name="")
     _val_record.update({
         "net_gain_pct": round(_m["Net_Gain_pct"], 1),
@@ -412,124 +394,8 @@ def run_batch(strategy_config: dict) -> None:
     })
     _validation_results.append(_val_record)
 
-
     # -------------------------------------------------------------------------
-    # BLOCK 6 — OOS2
-    # -------------------------------------------------------------------------
-    if OOS2_RUN_ANALYSIS:
-        if universe_cfg.OOS23_MATCH_SYMBOLS:
-            logging.disable(logging.INFO)
-            _, _oos2_syms, _, ohlcv_oos2_all = select_universe(
-                data_folder_is=DATA_FOLDER_IS, data_folder_oos=DATA_FOLDER_OOS2,
-                timeframe=TIMEFRAME, n_symbols=N_SYMBOLS, min_price=MIN_PRICE,
-                filter_symbols_fn=filter_symbols,
-            )
-            logging.disable(logging.NOTSET)
-            ohlcv_oos2_data = {sym: ohlcv_oos2_all[sym] for sym in _oos2_syms if sym in ohlcv_oos2_all}
-        else:
-            ohlcv_oos2_raw, _ = filter_symbols(
-                symbols_oos_final, min_vol_usdt=0, timeframe=TIMEFRAME,
-                data_folder=DATA_FOLDER_OOS2, min_price=MIN_PRICE, vol_window=50,
-            )
-            ohlcv_oos2_data = ohlcv_oos2_raw
-
-        approved, trades_df_oos2_baseline, trades_df_oos2_regime, _, _ = run_oos_period(
-            strategy_id            = STRATEGY_ID,
-            label                  = "OOS2",
-            stage_baseline         = "STAGE 5",
-            stage_regime           = "STAGE 5",
-            ohlcv_data             = ohlcv_oos2_data,
-            signal_fn              = signal_fn,
-            signal_params          = bt_signal_params,
-            best_params            = best_params,
-            param_names            = param_names,
-            order_amount           = ORDER_AMOUNT,
-            timeframe              = TIMEFRAME,
-            data_folder            = DATA_FOLDER_OOS2,
-            bins_to_filter         = bins_to_filter,
-            netgain_th             = OOS_NETGAIN_TH,
-            max_dd_th              = OOS_MAX_DD_TH,
-            r2_th                  = OOS_R2_TH,
-            for_validation         = OOS2_FOR_VALIDATION,
-            approved               = approved,
-            validation_record      = _validation_results[-1],
-            trades_baseline_accum  = _strategy_trades_oos2_baseline,
-            trades_regime_accum    = _strategy_trades_oos2_regime,
-            save_trades            = SAVE_TRADES,
-            show_plots             = SHOW_PLOTS,
-            brief_trades_folder    = brief_trades_folder,
-            run_report_backtesting = False,
-            run_baseline           = SHOW_PLOTS or SAVE_TRADES,
-        )
-        _df_oos2 = trades_df_oos2_regime if len(trades_df_oos2_regime) > 0 else trades_df_oos2_baseline
-        if len(_df_oos2) > 0:
-            _m_oos2 = compute_metrics(_df_oos2, capital=INITIAL_BALANCE, name="")
-            _validation_results[-1].update({
-                "net_gain_pct_oos2": round(_m_oos2["Net_Gain_pct"], 1),
-                "dd_pct_oos2":       round(_m_oos2["Max_DD_pct"], 1),
-                "r2_oos2":           _m_oos2["R_Squared"],
-            })
-
-    # -------------------------------------------------------------------------
-    # BLOCK 7 — OOS3
-    # -------------------------------------------------------------------------
-    if OOS3_RUN_ANALYSIS:
-        if universe_cfg.OOS23_MATCH_SYMBOLS:
-            logging.disable(logging.INFO)
-            _, _oos3_syms, _, ohlcv_oos3_all = select_universe(
-                data_folder_is=DATA_FOLDER_IS, data_folder_oos=DATA_FOLDER_OOS3,
-                timeframe=TIMEFRAME, n_symbols=N_SYMBOLS, min_price=MIN_PRICE,
-                filter_symbols_fn=filter_symbols,
-            )
-            logging.disable(logging.NOTSET)
-            ohlcv_oos3_data = {sym: ohlcv_oos3_all[sym] for sym in _oos3_syms if sym in ohlcv_oos3_all}
-        else:
-            ohlcv_oos3_raw, _ = filter_symbols(
-                symbols_oos_final, min_vol_usdt=0, timeframe=TIMEFRAME,
-                data_folder=DATA_FOLDER_OOS3, min_price=MIN_PRICE, vol_window=50,
-            )
-            ohlcv_oos3_data = ohlcv_oos3_raw
-
-        approved, trades_df_oos3_baseline, trades_df_oos3_regime, _, _ = run_oos_period(
-            strategy_id            = STRATEGY_ID,
-            label                  = "OOS3",
-            stage_baseline         = "STAGE 6",
-            stage_regime           = "STAGE 6",
-            ohlcv_data             = ohlcv_oos3_data,
-            signal_fn              = signal_fn,
-            signal_params          = bt_signal_params,
-            best_params            = best_params,
-            param_names            = param_names,
-            order_amount           = ORDER_AMOUNT,
-            timeframe              = TIMEFRAME,
-            data_folder            = DATA_FOLDER_OOS3,
-            bins_to_filter         = bins_to_filter,
-            netgain_th             = OOS_NETGAIN_TH,
-            max_dd_th              = OOS_MAX_DD_TH,
-            r2_th                  = OOS_R2_TH,
-            for_validation         = OOS3_FOR_VALIDATION,
-            approved               = approved,
-            validation_record      = _validation_results[-1],
-            trades_baseline_accum  = _strategy_trades_oos3_baseline,
-            trades_regime_accum    = _strategy_trades_oos3_regime,
-            save_trades            = SAVE_TRADES,
-            show_plots             = SHOW_PLOTS,
-            brief_trades_folder    = brief_trades_folder,
-            run_report_backtesting = False,
-            run_baseline           = SHOW_PLOTS or SAVE_TRADES,
-        )
-        _df_oos3 = trades_df_oos3_regime if len(trades_df_oos3_regime) > 0 else trades_df_oos3_baseline
-        if len(_df_oos3) > 0:
-            _m_oos3 = compute_metrics(_df_oos3, capital=INITIAL_BALANCE, name="")
-            _validation_results[-1].update({
-                "net_gain_pct_oos3": round(_m_oos3["Net_Gain_pct"], 1),
-                "dd_pct_oos3":       round(_m_oos3["Max_DD_pct"], 1),
-                "r2_oos3":           _m_oos3["R_Squared"],
-            })
-
-
-    # -------------------------------------------------------------------------
-    # BLOCK 8 — Update & Compare
+    # BLOCK 6 — Update & Compare
     # -------------------------------------------------------------------------
     _symbols_result = update_strategies_symbols(
         strategy_id          = STRATEGY_ID,
@@ -545,12 +411,12 @@ def run_batch(strategy_config: dict) -> None:
 
     df_regime = trades_df_oos1_regime if len(trades_df_oos1_regime) > 0 else trades_df_oos1_baseline
     p_target_winrate_oos1 = round((df_regime["profit"] > 0).mean() * 100, 1) if len(df_regime) > 0 else 0.0
-    
+
     _drift_results.append({
-        "strategy_id":        STRATEGY_ID,
-        "p_target_winrate":   p_target_winrate_oos1,
-        })
-    
+        "strategy_id":      STRATEGY_ID,
+        "p_target_winrate": p_target_winrate_oos1,
+    })
+
     _best_params_results[STRATEGY_ID] = best_params
 
     if _validation_results:
@@ -560,7 +426,8 @@ def run_batch(strategy_config: dict) -> None:
 
     elapsed = int(time.time() - start_time)
     logger.info(f"DONE  🏁 ── {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
-    
+
+
 # =============================================================================
 # RUN SUMMARY
 # =============================================================================
@@ -591,9 +458,10 @@ def run_summary():
         if _strategy_trades_oos1_regime:
             print_all_curves_table(_strategy_trades_oos1_regime, "Regime 0+1", INITIAL_BALANCE)
 
-    validated_ids         = {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
+    # Validated = strategies that passed WFO
+    validated_ids         = {w["strategy_id"] for w in _wfo_results if "PASS" in w["verdict"]} if _wfo_results else {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
     validated_baseline    = [(sid, df) for sid, df in _strategy_trades_oos1_baseline if sid in validated_ids]
-    validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime if sid in validated_ids]
+    validated_oos1_regime = [(sid, df) for sid, df in _strategy_trades_oos1_regime    if sid in validated_ids]
 
     if validated_baseline:
         if logger.isEnabledFor(logging.DEBUG):
@@ -601,70 +469,44 @@ def run_summary():
     if validated_oos1_regime:
         print_all_curves_table(validated_oos1_regime, "Regime 0+1 — Validated only", INITIAL_BALANCE)
 
-    validated_oos2_regime = [(sid, df) for sid, df in _strategy_trades_oos2_regime if sid in validated_ids]
-    validated_oos3_regime = [(sid, df) for sid, df in _strategy_trades_oos3_regime if sid in validated_ids]
     print_robustness_table(
-        strategy_trades_per_period=[
-            ("OOS1", validated_oos1_regime),
-            ("OOS2", validated_oos2_regime),
-            ("OOS3", validated_oos3_regime),
-        ],
+        strategy_trades_per_period=[("OOS1", validated_oos1_regime)],
         initial_balance=INITIAL_BALANCE,
     )
 
     if _strategy_trades_oos1_baseline:
         plot_portfolio_comparison(
-            strategy_trades_baseline=_strategy_trades_oos1_baseline,
-            strategy_trades_regime01=_strategy_trades_oos1_regime,
-            data_folder=DATA_FOLDER_OOS1,
-            initial_balance=INITIAL_BALANCE,
-            title="Portfolio — All strategies",
+            strategy_trades_baseline = _strategy_trades_oos1_baseline,
+            strategy_trades_regime01 = _strategy_trades_oos1_regime,
+            data_folder              = DATA_FOLDER_OOS1,
+            initial_balance          = INITIAL_BALANCE,
+            title                    = "Portfolio — All strategies",
         )
 
     if validated_baseline:
         plot_portfolio_comparison(
-            strategy_trades_baseline=validated_baseline,
-            strategy_trades_regime01=validated_oos1_regime,
-            data_folder=DATA_FOLDER_OOS1,
-            initial_balance=INITIAL_BALANCE,
-            title="Portfolio — Validated only",
+            strategy_trades_baseline = validated_baseline,
+            strategy_trades_regime01 = validated_oos1_regime,
+            data_folder              = DATA_FOLDER_OOS1,
+            initial_balance          = INITIAL_BALANCE,
+            title                    = "Portfolio — Validated only",
         )
 
-    if validated_oos2_regime:
-        plot_portfolio_comparison(
-            strategy_trades_baseline=validated_oos2_regime,
-            strategy_trades_regime01=validated_oos2_regime,
-            data_folder=DATA_FOLDER_OOS2,
-            initial_balance=INITIAL_BALANCE,
-            title="Portfolio OOS2 — Validated only",
-        )
-
-    if validated_oos3_regime:
-        plot_portfolio_comparison(
-            strategy_trades_baseline=validated_oos3_regime,
-            strategy_trades_regime01=validated_oos3_regime,
-            data_folder=DATA_FOLDER_OOS3,
-            initial_balance=INITIAL_BALANCE,
-            title="Portfolio OOS3 — Validated only",
-        )
-        
 # =============================================================================
 # RUNS
-# =============================================================================        
-    # CORRELATION ANALYSIS 
+# =============================================================================
+
+    # CORRELATION ANALYSIS
     # -------------------------------------------------------------------------
     if RUN_CORRELATION:
         logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOSs — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
         survivors_profit = decorrelate_by_profit(
-            strategy_trades_oos1     = validated_oos1_regime,
-            #strategy_trades_oos1     = [],
-            #strategy_trades_oos2     = validated_oos2_regime,
-            #strategy_trades_oos3     = validated_oos3_regime,
-            strategy_trades_oos2     = [],
-            strategy_trades_oos3     = [],
-            initial_balance          = INITIAL_BALANCE,
-            threshold                = CORRELATION_DD_THRESHOLD,
-            precomputed_metrics      = r01_metrics,
+            strategy_trades_oos1 = validated_oos1_regime,
+            strategy_trades_oos2 = [],
+            strategy_trades_oos3 = [],
+            initial_balance      = INITIAL_BALANCE,
+            threshold            = CORRELATION_DD_THRESHOLD,
+            precomputed_metrics  = r01_metrics,
         )
         if survivors_profit:
             print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
@@ -675,40 +517,36 @@ def run_summary():
                 initial_balance          = INITIAL_BALANCE,
                 title                    = "Portfolio — Decorrelated Validated (Profit filter)",
             )
-    
             survivors_ids = {sid for sid, _ in survivors_profit}
             print_robustness_table(
                 strategy_trades_per_period=[
                     ("OOS1", [(sid, df) for sid, df in validated_oos1_regime if sid in survivors_ids]),
-                    ("OOS2", [(sid, df) for sid, df in validated_oos2_regime if sid in survivors_ids]),
-                    ("OOS3", [(sid, df) for sid, df in validated_oos3_regime if sid in survivors_ids]),
                 ],
                 initial_balance=INITIAL_BALANCE,
-            )   
-    # BEST PORTFOLIO 
+            )
+
+    # BEST PORTFOLIO
     # -------------------------------------------------------------------------
     if RUN_BEST_PORTFOLIO:
         if RUN_CORRELATION and survivors_profit:
             survivor_ids          = {sid for sid, _ in survivors_profit}
             portfolio_trades_oos1 = [(sid, df) for sid, df in validated_oos1_regime if sid in survivor_ids]
-            portfolio_trades_oos2 = [(sid, df) for sid, df in validated_oos2_regime if sid in survivor_ids]
-            portfolio_trades_oos3 = [(sid, df) for sid, df in validated_oos3_regime if sid in survivor_ids]
         else:
             portfolio_trades_oos1 = validated_oos1_regime
-            portfolio_trades_oos2 = validated_oos2_regime
-            portfolio_trades_oos3 = validated_oos3_regime
 
         find_best_portfolio_combination(
             validated_trades_oos1 = portfolio_trades_oos1,
-            validated_trades_oos2 = portfolio_trades_oos2,
-            validated_trades_oos3 = portfolio_trades_oos3,
+            validated_trades_oos2 = [],
+            validated_trades_oos3 = [],
             initial_balance       = INITIAL_BALANCE,
             data_folder_oos1      = DATA_FOLDER_OOS1,
-            data_folder_oos2      = DATA_FOLDER_OOS2,
-            data_folder_oos3      = DATA_FOLDER_OOS3,
+            data_folder_oos2      = DATA_FOLDER_OOS1,
+            data_folder_oos3      = DATA_FOLDER_OOS1,
             show_plots            = SHOW_PLOTS,
             validation_results    = _validation_results,
         )
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -731,11 +569,12 @@ if __name__ == "__main__":
             logger.warning(f"⚠️  {s['id']} not found in strategies_loop — skipping.")
             continue
         STRATEGIES.append({**s, **loop})
-        
+
     strategies_to_run = (
         [s for s in STRATEGIES if s["id"] in SELECTED_STRATEGIES]
         if SELECTED_STRATEGIES else STRATEGIES
     )
+
     logger.info(f"\n{'='*115}")
     logger.info(f"  BATCH START")
     logger.info(f"{'='*115}")
@@ -745,13 +584,12 @@ if __name__ == "__main__":
     regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
     logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  CFG={regime_module.INDICATOR_CFG}  TF={REGIME_TIMEFRAME}")
+    logger.info(f"  Selection mode : {SELECTION_MODE}")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS1      : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
-    logger.info(f"  Data OOS2      : {'🔵' if OOS2_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS2)}")
-    logger.info(f"  Data OOS3      : {'🔵' if OOS3_FOR_VALIDATION else '⚪'} {_short_path(DATA_FOLDER_OOS3)}")
-    logger.info(f"  Validation     : NetGain>{OOS_NETGAIN_TH}%  MaxDD<{OOS_MAX_DD_TH}%  R2>{OOS_R2_TH}")
+   # logger.info(f"  Validation     : NetGain>{OOS_NETGAIN_TH}%  MaxDD<{OOS_MAX_DD_TH}%  R2>{OOS_R2_TH}")
     logger.info(f"{'='*115}\n")
-    
+
     for strategy in strategies_to_run:
         logger.info(f"\n{'─'*115}\n  Running: {strategy['id']}\n{'─'*115}")
         run_batch(strategy)
@@ -759,20 +597,20 @@ if __name__ == "__main__":
     if UPDATE_OUTPUTS:
         save_drift_reference(_drift_results, DRIFT_BATCH_PATH)
         save_strategies_pr(
-            strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
-            module_name=STRATEGIES_BT_BATCH_MODULE,
-            output_path=STRATEGIES_PR_BATCH_PATH,
-            validation_results=_validation_results,
-            best_params_map=_best_params_results,
-            strategy_ids_to_run=[s["id"] for s in strategies_to_run],
+            strategies_batch_path = STRATEGIES_BT_BATCH_PATH,
+            module_name           = STRATEGIES_BT_BATCH_MODULE,
+            output_path           = STRATEGIES_PR_BATCH_PATH,
+            validation_results    = _validation_results,
+            best_params_map       = _best_params_results,
+            strategy_ids_to_run   = [s["id"] for s in strategies_to_run],
         )
         compare_and_generate_csv(
-            strategies_batch_path=STRATEGIES_BT_BATCH_PATH,
-            pr_batch_path=STRATEGIES_PR_BATCH_PATH,
-            csv_path=CSV_PARAMS,
+            strategies_batch_path = STRATEGIES_BT_BATCH_PATH,
+            pr_batch_path         = STRATEGIES_PR_BATCH_PATH,
+            csv_path              = CSV_PARAMS,
         )
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
-    
+
     run_summary()
 
     elapsed = int(time.time() - start)
