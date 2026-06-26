@@ -28,7 +28,7 @@ logging.getLogger("BOT_batch.runs.run_best_portfolio").setLevel(logging.INFO)
 # COMPUTE CONFIGURATION
 #------------------------------------------------------------------------------
 DTYPE         = np.float32
-N_JOBS        = -1
+N_JOBS        = 1
 SHOW_PROGRESS = False
 SHOW_PLOTS    = True
 
@@ -83,8 +83,8 @@ OOS_MAX_DD_TH        = 8
 OOS_R2_TH            = 0.82
 
 #PRODUCTION
-OOS_NETGAIN_TH       = 1
-OOS_MAX_DD_TH        = 80
+OOS_NETGAIN_TH       = 10
+OOS_MAX_DD_TH        = 8
 OOS_R2_TH            = 0.082
 
 # RUNS
@@ -100,7 +100,7 @@ REGIME_ENABLED    = True
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
-SAVE_TRADES     = False
+SAVE_TRADES     = True
 
 
 # STRATEGY SELECTION
@@ -175,16 +175,16 @@ N_PATHS_OOS1            = 500
 R_NETGAIN_OOS2      = OOS_NETGAIN_TH
 R_MAX_DD_OOS2       = OOS_MAX_DD_TH
 R_R2_OOS2           = OOS_R2_TH
-OOS2_RUN_ANALYSIS   = True
-OOS2_FOR_VALIDATION = True
+OOS2_RUN_ANALYSIS   = False
+OOS2_FOR_VALIDATION = False
 
 # OOS3
 #------------------------------------------------------------------------------
 R_NETGAIN_OOS3      = OOS_NETGAIN_TH
 R_MAX_DD_OOS3       = OOS_MAX_DD_TH
 R_R2_OOS3           = OOS_R2_TH
-OOS3_RUN_ANALYSIS   = True
-OOS3_FOR_VALIDATION = True
+OOS3_RUN_ANALYSIS   = False
+OOS3_FOR_VALIDATION = False
 
 # Correlation analysis
 #------------------------------------------------------------------------------

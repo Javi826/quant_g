@@ -98,7 +98,8 @@ def run_oos_backtest_with_regime(
                         for key in sym_cache if key != "ts"
                     }
                     for i, idx in enumerate(signal_idxs):
-                        context = {"close": float(arr['close'][idx])}
+                        close_idx = idx - 1 if idx > 0 else idx
+                        context = {"close": float(arr['close'][close_idx])}
                         for key, values in lookups.items():
                             context[key] = float(values[i]) if not np.isnan(values[i]) else None
                         if classify_market_regime(context, cfg=INDICATOR_CFG) not in _bins_to_filter:

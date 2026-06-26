@@ -28,6 +28,11 @@ symbols_to_include = [
     "PIPPINUSDT",
 ]
 
+symbols_to_include = [
+    "BTCUSDT",
+
+]
+
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, custom_symbols=None):
     ohlcv_data         = {}
@@ -80,21 +85,21 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-            # if df is not None:
-            #     n_rows = len(df)
-            #     min_bars_map = {
-            #         "1Dutc":  365,
-            #         "12Hutc": 730,
-            #         "6Hutc":  1460,
-            #         "4H":     2190,
-            #         "1H":     8760,
-            #         "30m":    17520,
-            #         "15m":    35040,
-            #     }
-                # min_bars = min_bars_map.get(timeframe, 999999)
-                # min_bars = 50
-                # if n_rows < min_bars:
-                #     reasons.append("Not enough bars")
+            if df is not None:
+                n_rows = len(df)
+                min_bars_map = {
+                    "1Dutc":  365,
+                    "12Hutc": 730,
+                    "6Hutc":  1460,
+                    "4H":     2190,
+                    "1H":     8760,
+                    "30m":    17520,
+                    "15m":    35040,
+                }
+                min_bars = min_bars_map.get(timeframe, 999999)
+                min_bars = 50
+                if n_rows < min_bars:
+                    reasons.append("Not enough bars")
                 min_bars = 50
                     
         if reasons:

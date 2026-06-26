@@ -374,9 +374,6 @@ def _backtest_core(
         t_int = ts_all_mv[tick_i]
 
         # ── 1. Close expired / intrabar-exit positions ──
-        was_empty_before = not open_heap
-        closed_reasons   = []
-
         while open_heap and open_heap[0][0] <= t_int:
             exp_time, _, pos = heapq.heappop(open_heap)
             if pos.get('closed', False):
@@ -406,126 +403,118 @@ def _backtest_core(
                 cash_bank, blocked_cash
             )
             pos['closed'] = True
-            closed_reasons.append(reason_code)
 
         # ── 2. Open new positions if heap empty ──
         if not open_heap:
-            if was_empty_before:
-                search_signals = True
-            else:
-                search_signals = not any(r in (1, 2) for r in closed_reasons)
+            ev_start = _searchsorted_left(ev_col0, t_int, n_events)
+            ev_scan  = ev_start
 
-            if search_signals:
-                ev_start = _searchsorted_left(ev_col0, t_int, n_events)
-                ev_scan  = ev_start
+            while ev_scan < n_events and ev_mv[ev_scan, 0] == t_int:
+                sid     = <int>ev_mv[ev_scan, 1]
+                buy_idx = <int>ev_mv[ev_scan, 2]
+                ev_scan += 1
 
-                while ev_scan < n_events and ev_mv[ev_scan, 0] == t_int:
-                    sid     = <int>ev_mv[ev_scan, 1]
-                    buy_idx = <int>ev_mv[ev_scan, 2]
-                    ev_scan += 1
+                n_bars = <int>sym_len_mv[sid]
 
-                    n_bars = <int>sym_len_mv[sid]
-
-                    if sell_after > 0:
-                        if buy_idx + sell_after > n_bars:
-                            continue
-                    else:
-                        if buy_idx + default_candles >= n_bars:
-                            continue
-
-                    free_cash = cash_bank - blocked_cash
-                    if free_cash < order_amount:
-                        break
-
-                    sig_val  = <int>signal_mv[sid, buy_idx]
-                    is_short = sig_val < 0
-
-                    if is_short and sl_pct == 0.0:
+                if sell_after > 0:
+                    if buy_idx + sell_after > n_bars:
+                        continue
+                else:
+                    if buy_idx + default_candles >= n_bars:
                         continue
 
-                    if is_short:
-                        if free_cash < order_amount * (sl_pct / 100.0) + order_amount * comi_factor:
-                            continue
+                free_cash = cash_bank - blocked_cash
+                if free_cash < order_amount:
+                    break
 
-                    price_t  = open_mv[sid, buy_idx]
-                    qty      = order_amount / price_t
-                    comm_buy = order_amount * comi_factor
+                sig_val  = <int>signal_mv[sid, buy_idx]
+                is_short = sig_val < 0
 
-                    if sell_after == 0:
-                        exit_idx = buy_idx + default_candles
-                    else:
-                        exit_idx = buy_idx + sell_after
-                    if exit_idx >= n_bars:
-                        exit_idx = n_bars - 1
+                if is_short and sl_pct == 0.0:
+                    continue
 
-                    sell_time_int = ts_int_mv[sid, exit_idx]
+                if is_short:
+                    if free_cash < order_amount * (sl_pct / 100.0) + order_amount * comi_factor:
+                        continue
 
-                    if is_short:
-                        tp_price = price_t * (1.0 - tp_pct / 100.0) if tp_pct != 0.0 else -HUGE_VAL
-                        sl_price = price_t * (1.0 + sl_pct / 100.0) if sl_pct != 0.0 else  HUGE_VAL
-                    else:
-                        tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else  HUGE_VAL
-                        sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -HUGE_VAL
+                price_t  = open_mv[sid, buy_idx]
+                qty      = order_amount / price_t
+                comm_buy = order_amount * comi_factor
 
-                    if is_short:
-                        proceeds       = order_amount - comm_buy
-                        margin_req     = order_amount * (sl_pct / 100.0) if sl_pct != 0.0 else HUGE_VAL
-                        blocked_amount = proceeds + margin_req
-                        cash_bank     += proceeds
-                        blocked_cash  += blocked_amount
-                    else:
-                        blocked_amount = 0.0
-                        cash_bank     -= (order_amount + comm_buy)
+                if sell_after == 0:
+                    exit_idx = buy_idx + default_candles
+                else:
+                    exit_idx = buy_idx + sell_after
+                if exit_idx >= n_bars:
+                    exit_idx = n_bars - 1
 
-                    pos = {
-                        'sym_id':            sid,
-                        'qty':               qty,
-                        'buy_price':         price_t,
-                        'buy_time_int':      ts_int_mv[sid, buy_idx],
-                        'sell_time_int':     sell_time_int,
-                        'commission_buy':    comm_buy,
-                        'is_short':          is_short,
-                        'blocked_amount':    blocked_amount,
-                        'closed':            False,
-                    }
+                sell_time_int = ts_int_mv[sid, exit_idx]
 
-                    intra, chosen_idx, reason_code, exec_price_intra = _detect_intrabar_exit_cy(
-                        high_mv[sid], low_mv[sid],
-                        high_time_mv[sid], low_time_mv[sid],
-                        buy_idx, exit_idx, tp_price, sl_price, is_short
-                    )
+                if is_short:
+                    tp_price = price_t * (1.0 - tp_pct / 100.0) if tp_pct != 0.0 else -HUGE_VAL
+                    sl_price = price_t * (1.0 + sl_pct / 100.0) if sl_pct != 0.0 else  HUGE_VAL
+                else:
+                    tp_price = price_t * (1.0 + tp_pct / 100.0) if tp_pct != 0.0 else  HUGE_VAL
+                    sl_price = price_t * (1.0 - sl_pct / 100.0) if sl_pct != 0.0 else -HUGE_VAL
 
-                    if intra:
-                        exec_time_int = ts_int_mv[sid, chosen_idx]
-                        pos['exec_price']       = exec_price_intra
-                        pos['exec_time_int']    = exec_time_int
-                        pos['exit_reason_code'] = reason_code
-                        heapq.heappush(open_heap, (exec_time_int, counter, pos))
-                    else:
-                        heapq.heappush(open_heap, (sell_time_int, counter, pos))
+                if is_short:
+                    proceeds       = order_amount - comm_buy
+                    margin_req     = order_amount * (sl_pct / 100.0) if sl_pct != 0.0 else HUGE_VAL
+                    blocked_amount = proceeds + margin_req
+                    cash_bank     += proceeds
+                    blocked_cash  += blocked_amount
+                else:
+                    blocked_amount = 0.0
+                    cash_bank     -= (order_amount + comm_buy)
 
-                    counter += 1
+                pos = {
+                    'sym_id':            sid,
+                    'qty':               qty,
+                    'buy_price':         price_t,
+                    'buy_time_int':      ts_int_mv[sid, buy_idx],
+                    'sell_time_int':     sell_time_int,
+                    'commission_buy':    comm_buy,
+                    'is_short':          is_short,
+                    'blocked_amount':    blocked_amount,
+                    'closed':            False,
+                }
+
+                intra, chosen_idx, reason_code, exec_price_intra = _detect_intrabar_exit_cy(
+                    high_mv[sid], low_mv[sid],
+                    high_time_mv[sid], low_time_mv[sid],
+                    buy_idx, exit_idx, tp_price, sl_price, is_short
+                )
+
+                if intra:
+                    exec_time_int = ts_int_mv[sid, chosen_idx]
+                    pos['exec_price']       = exec_price_intra
+                    pos['exec_time_int']    = exec_time_int
+                    pos['exit_reason_code'] = reason_code
+                    heapq.heappush(open_heap, (exec_time_int, counter, pos))
+                else:
+                    heapq.heappush(open_heap, (sell_time_int, counter, pos))
+
+                counter += 1
 
         # ── 3. Snapshot sim_balance ──
         sb_timestamp[tick_i] = t_int
         if open_heap:
-            total_val  = cash_bank
-            # Single pass: accumulate qty and track is_short per symbol
-            seen_qty   = {}   # sid -> net qty
-            seen_short = {}   # sid -> is_short (all positions per sid share direction)
+            total_val = cash_bank
+            seen_sids = {}
             for _, _, p in open_heap:
                 if p.get('closed', False):
                     continue
                 s = p['sym_id']
-                seen_qty[s]   = seen_qty.get(s, 0.0) + p['qty']
-                seen_short[s] = p['is_short']
+                seen_sids[s] = seen_sids.get(s, 0.0) + p['qty']
 
-            for s, qty_sum in seen_qty.items():
-                idx = _searchsorted_right(ts_int_mv[s], t_int, <int>sym_len_mv[s]) - 1
+            for s, qty_sum in seen_sids.items():
+                n_sym = sym_len_mv[s]
+                idx   = _searchsorted_right(ts_int_mv[s], t_int, <int>sym_len_mv[s]) - 1
                 if idx < 0:
                     idx = 0
                 price = close_mv[s, idx]
-                if seen_short[s]:
+                if any(p['sym_id'] == s and p.get('is_short') and not p.get('closed')
+                       for _, _, p in open_heap):
                     total_val -= qty_sum * price
                 else:
                     total_val += qty_sum * price

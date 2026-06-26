@@ -72,8 +72,8 @@ _best_params_results           : dict = {}
 # BATCH 
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"  
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-N_PATHS_IS           = 1
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
+N_PATHS_IS           = 100
 
 # ELITE -- MA3
 #------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ REGIME_ENABLED    = False
 # OUTPUTS
 #------------------------------------------------------------------------------
 UPDATE_OUTPUTS  = False
-SAVE_TRADES     = True
+SAVE_TRADES     = False
 
 
 # STRATEGY SELECTION

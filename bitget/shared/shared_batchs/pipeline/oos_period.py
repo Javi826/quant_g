@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/oss_period.py
+#shared_batchs/pipeline/oos_period.py
 import logging
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
@@ -22,8 +22,6 @@ logger = logging.getLogger("BOT_batch.pipeline.oos_period")
 def run_oos_period(
     strategy_id: str,
     label: str,
-    stage_baseline: str,
-    stage_regime: str,
     ohlcv_data: dict,
     signal_fn: callable,
     signal_params: dict,
@@ -33,19 +31,12 @@ def run_oos_period(
     timeframe: str,
     data_folder: str,
     bins_to_filter: set,
-    netgain_th: float,
-    max_dd_th: float,
-    r2_th: float,
-    for_validation: bool,
-    approved: bool,
-    validation_record: dict,
     trades_baseline_accum: list,
     trades_regime_accum: list,
     save_trades: bool,
-    show_plots: bool,
     brief_trades_folder: str,
+    run_baseline: bool = True,
     run_report_backtesting: bool = False,
-    run_baseline:           bool = True,
 ) -> tuple:
 
     ohlcv_arrays     = prepare_ohlcv_arrays(ohlcv_data)
@@ -54,9 +45,8 @@ def run_oos_period(
 
     # Baseline
     if run_baseline:
-        if run_report_backtesting:
-            logger.info(f"{stage_baseline} ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
-        #FILTER-NIGHT
+        logger.info(f"STAGE 2 ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
+
         ohlcv_baseline = {}
         for sym, arr in ohlcv_arrays.items():
             signals = signal_fn(arr, **signal_params, live_trading=False)
@@ -86,7 +76,6 @@ def run_oos_period(
         trades_baseline             = result_baseline["__PORTFOLIO__"]["trade_log"].copy()
         trades_baseline.columns     = trades_baseline.columns.str.lower().str.strip()
         trades_baseline["buy_time"] = pd.to_datetime(trades_baseline["buy_time"])
-        
 
         if save_trades:
             accumulate_strategy_trades(
@@ -100,9 +89,11 @@ def run_oos_period(
 
     # Regime
     _symbols_str = f"{len(ohlcv_data)} symbols — " if run_baseline else ""
-    logger.debug(f"{stage_regime} ── Backtest {label} Regime   ── {_symbols_str}bins: {bins_to_filter if bins_to_filter else 'none'}")
+    logger.debug(f"STAGE 3 ── Backtest {label} Regime   ── {_symbols_str}bins: {bins_to_filter if bins_to_filter else 'none'}")
 
-    trades_regime, metrics_regime = run_oos_backtest_with_regime(
+    from shared_batchs.regime.regime_module import REGIME_ENABLED as _REGIME_ENABLED
+    if _REGIME_ENABLED:
+        trades_regime, metrics_regime = run_oos_backtest_with_regime(
             strategy_id     = f"{strategy_id}_{label.lower()}_regime",
             ohlcv_arrays    = ohlcv_arrays,
             signal_fn       = signal_fn,
@@ -112,11 +103,14 @@ def run_oos_period(
             bins_to_filter  = bins_to_filter,
             initial_balance = INITIAL_BALANCE,
         )
+    else:
+        trades_regime  = trades_baseline.copy() if not trades_baseline.empty else pd.DataFrame()
+        metrics_regime = metrics_baseline
 
     _b_profit = "N/A" if trades_baseline.empty else f"{trades_baseline['profit'].sum():.1f}"
     logger.debug(f"  [DEBUG {label}] baseline profit={_b_profit} | regime profit={trades_regime['profit'].sum():.1f}")
     logger.debug(
-        f"{stage_regime} ── Filter results         ── "
+        f"STAGE 3 ── Filter results         ── "
         f"baseline={len(trades_baseline)} | regime={len(trades_regime)} | diff={len(trades_baseline) - len(trades_regime)}"
     )
 
@@ -130,7 +124,7 @@ def run_oos_period(
         else:
             trades_regime_accum.append((strategy_id, trades_regime.copy()))
 
-    if (show_plots or save_trades) and run_baseline and len(trades_baseline) > 0:
+    if run_baseline and len(trades_baseline) > 0:
         plot_filter_comparison(
             strategy_id        = f"{strategy_id}_{label.lower()}",
             trades_df_baseline = trades_baseline,
@@ -139,33 +133,4 @@ def run_oos_period(
             initial_balance    = INITIAL_BALANCE,
         )
 
-    # Validation
-    approved_period        = False
-    metrics_for_validation = metrics_regime if len(trades_regime) > 0 else metrics_baseline
-
-    if metrics_for_validation is not None:
-        approved_period = (
-            metrics_for_validation["Net_Gain_pct"]    >= netgain_th and
-            abs(metrics_for_validation["Max_DD_pct"]) <= max_dd_th  and
-            metrics_for_validation["R_Squared"]       >= r2_th
-        )
-        _v = ("VALIDATED" if approved_period else "REJECTED").ljust(12)
-        logger.info(
-            f"{stage_regime} ── Validation {label}        ── "
-            f"{'🟢' if approved_period else '🔴'} {_v}"
-            f"NetGain={metrics_for_validation['Net_Gain_pct']:.2f}% "
-            f"DD={metrics_for_validation['Max_DD_pct']:.2f}% "
-            f"R2={metrics_for_validation['R_Squared']:.2f}  "
-            f"trades={len(trades_regime) if len(trades_regime) > 0 else len(trades_baseline)}  "
-            f"symbols={len(ohlcv_data)}"
-        )
-    else:
-        logger.info(f"{stage_baseline} ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
-
-    if for_validation and approved:
-        approved = approved and approved_period
-        if not approved_period:
-            validation_record["verdict"] = "🔴 REJECTED"
-            validation_record["round"]   = "—"
-
-    return approved, trades_baseline, trades_regime, metrics_baseline, metrics_regime
+    return trades_baseline, trades_regime, metrics_baseline, metrics_regime

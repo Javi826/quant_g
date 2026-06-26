@@ -30,12 +30,7 @@ def run_backtest_is(
     regime_bins_path: str,
     regime_enabled:   bool = True
 ) -> tuple:
-    """
-    Run IS backtest, regime analysis and optionally IS regime backtest.
 
-    Returns:
-        tuple: (bins_to_filter, trades_df_is)
-    """
 
     ohlcv_data_is = {sym: ohlcv_is[sym] for sym in symbols_oos_final if sym in ohlcv_is}
     ohlcv_arr_is  = prepare_ohlcv_arrays(ohlcv_data_is)

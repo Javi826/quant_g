@@ -45,6 +45,7 @@ def _build_robustness_rows(
         })
     return rows
 
+
 def _print_robustness_df(rows: list, title: str) -> None:
     """Render robustness rows as a formatted table. Shared by all robustness print functions."""
     if not rows:
@@ -66,6 +67,8 @@ def _print_robustness_df(rows: list, title: str) -> None:
         f"{'─'*115}",
     ]
     logger.info("\n".join(lines))
+
+
 # =============================================================================
 # PRINT HELPERS
 # =============================================================================
@@ -155,7 +158,7 @@ def print_all_curves_table(
 
     n     = len(named)
     lines = [
-        f"\n{'─'*115}\n📊 ALL CURVES COMBINED OOS1 ({n}) — {label}\n{'─'*115}\n",
+        f"\n{'─'*115}\n📊 ALL CURVES COMBINED ({n}) — {label}\n{'─'*115}\n",
         df_out.to_string(index=False),
     ]
     logger.info("\n".join(lines))
@@ -189,50 +192,52 @@ def print_best_r2_robustness_table(
 
 
 # =============================================================================
-# STRATEGIES SUMMARY
+# WFO SUMMARY (fused with strategy metrics)
 # =============================================================================
 
-def print_strategies_summary(validation_results: list) -> None:
-    """Print validation summary table for all strategies."""
-    if not validation_results:
-        return
-    lines = [
-        f"\n{'─'*115}",
-        f"  STRATEGIES SUMMARY",
-        f"{'─'*115}",
-        f"  {'Strategy':<27} {'Verdict':<14} {'Round':<16} {'NetGain%':>10} {'DD%':>8} {'WinRate%':>10} {'R2':>7} {'ProbNeg%':>10}",
-        f"  {'-'*115}",
-    ]
-    for v in validation_results:
-        lines.append(
-            f"  {v['strategy_id']:<27} {v['verdict']:<14} {v['round']:<16} "
-            f"{v['net_gain_pct']:>9.2f}% {v['dd_pct']:>7.2f}% {v['win_ratio']:>9.1f}% "
-            f"{v['r2']:>7.3f} {v['prob_neg_pct']:>9.2f}%"
-        )
-    lines.append(f" {'─'*115}")
-    logger.info("\n".join(lines))
-    
-# =============================================================================
-# WFO SUMMARY
-# =============================================================================
-
-def print_wfo_summary(wfo_results: list) -> None:
-    """Print WFO approval summary table for all strategies."""
+def print_wfo_summary(wfo_results: list, validation_results: list = None) -> None:
+    """Print fused WFO approval + strategy metrics table."""
     if not wfo_results:
         return
+
     n_pass         = sum(1 for w in wfo_results if "PASS" in w["verdict"])
     mean_win_rate  = round(np.mean([w["win_rate"]       for w in wfo_results]) * 100, 1)
     mean_criterion = round(np.mean([w["mean_criterion"] for w in wfo_results]), 2)
+
+    val_map = {v["strategy_id"]: v for v in validation_results} if validation_results else {}
+    has_metrics = bool(val_map)
+
+    header = (
+        f"  {'Strategy':<27} {'Verdict':<10} {'WinRate%':>9} {'MeanCrit':>10}"
+        + (f"  {'NetGain%':>9} {'DD%':>7} {'WinRate%':>9} {'R2':>7} {'Trades':>7}" if has_metrics else "")
+    )
+    sep = f"  {'-'*27} {'-'*10} {'-'*9} {'-'*10}" + (f"  {'-'*9} {'-'*7} {'-'*9} {'-'*7} {'-'*7}" if has_metrics else "")
 
     lines = [
         f"\n{'─'*115}",
         f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanWinRate: {mean_win_rate}% | MeanCriterion: {mean_criterion}",
         f"{'─'*115}",
+        header,
+        sep,
     ]
+
     for w in wfo_results:
-        lines.append(
-            f"  {w['strategy_id']:<27} {w['verdict']:<14} "
-            f"{w['win_rate']*100:>9.1f}% {w['mean_criterion']:>15.2f}"
+        sid  = w["strategy_id"]
+        line = (
+            f"  {sid:<27} {w['verdict']:<10} "
+            f"{w['win_rate']*100:>8.1f}% {w['mean_criterion']:>10.2f}"
         )
+        if has_metrics and sid in val_map:
+            v     = val_map[sid]
+            n_trades = v.get("tn_trades", 0)
+            line += (
+                f"  {v['net_gain_pct']:>8.2f}%"
+                f" {v['dd_pct']:>6.2f}%"
+                f" {v['win_ratio']:>8.1f}%"
+                f" {v['r2']:>7.3f}"
+                f" {n_trades:>7}"
+            )
+        lines.append(line)
+
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))

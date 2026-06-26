@@ -8,6 +8,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from collections import Counter
+from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
 
 logger = logging.getLogger("BOT_batch.tools.wfo_ST")
@@ -79,8 +80,11 @@ def _find_window_indices(
 ) -> tuple | None:
     """
     Find date-aligned train/test indices for a symbol using timestamp search.
-    Returns (t0, t1, test0, test1) or None if insufficient data in either period.
+    Returns (t0, t1, test0, test1) or None if symbol doesn't cover the full train+test period.
     """
+    if sym_ts[0] > train_start_ts or sym_ts[-1] < test_end_ts:
+        return None
+
     t0    = int(np.searchsorted(sym_ts, train_start_ts, side="left"))
     t1    = int(np.searchsorted(sym_ts, test_start_ts,  side="left"))
     test0 = t1
@@ -114,19 +118,72 @@ def _select_window_symbols(
 
 
 # =============================================================================
+# SHARED MEMORY HELPERS
+# =============================================================================
+
+def _arrays_to_shared_memory(base_arrays: dict) -> tuple:
+    """Copy base_arrays numpy arrays to shared memory. Returns (shm_list, metadata)."""
+    shm_list = []
+    metadata = {}
+    for sym, arr_dict in base_arrays.items():
+        metadata[sym] = {}
+        for key, arr in arr_dict.items():
+            if isinstance(arr, np.ndarray):
+                shm      = SharedMemory(create=True, size=max(arr.nbytes, 1))
+                buf      = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf)
+                buf[:]   = arr
+                shm_list.append(shm)
+                metadata[sym][key] = {"name": shm.name, "shape": arr.shape, "dtype": str(arr.dtype)}
+            else:
+                metadata[sym][key] = {"value": arr}
+    return shm_list, metadata
+
+
+def _arrays_from_shared_memory(metadata: dict) -> tuple:
+    """Reconstruct base_arrays from shared memory metadata. Returns (base_arrays, shm_handles)."""
+    base_arrays = {}
+    shm_handles = []
+    for sym, fields in metadata.items():
+        base_arrays[sym] = {}
+        for key, info in fields.items():
+            if "name" in info:
+                shm = SharedMemory(name=info["name"], create=False)
+                shm_handles.append(shm)
+                base_arrays[sym][key] = np.ndarray(info["shape"], dtype=np.dtype(info["dtype"]), buffer=shm.buf)
+            else:
+                base_arrays[sym][key] = info["value"]
+    return base_arrays, shm_handles
+
+
+def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
+    """Worker: reconstruct base_arrays from shared memory and evaluate."""
+    base_arrays, shm_handles = _arrays_from_shared_memory(shm_metadata)
+    try:
+        return evaluate_fn(params, base_arrays)
+    finally:
+        for shm in shm_handles:
+            shm.close()
+
+
+# =============================================================================
 # WALK FORWARD OPTIMIZATION
 # =============================================================================
 
-def walk_forward_optimization(ohlcv_arr, param_ranges,
-                              length_train_set, pct_train_set,
-                              anchored,
-                              evaluate_fn,
-                              param_selection_mode="MODE",
-                              n_jobs=-1,
-                              show_progress=False,
-                              n_symbols=None,
-                              test_evaluate_fn=None):
-
+def walk_forward_optimization(
+    ohlcv_arr,
+    param_ranges,
+    length_train_set,
+    pct_train_set,
+    anchored,
+    evaluate_fn,
+    param_selection_mode="MODE",
+    n_jobs=-1,
+    show_progress=False,
+    n_symbols=None,
+    test_evaluate_fn=None,
+    collect_train_trades_fn=None,
+    collect_test_trades_fn=None,
+):
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
 
@@ -141,6 +198,7 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     best_params_list   = []
     best_criteria_list = []
     window_idx         = 1
+    last_test_end_ref  = length_train_set + length_test
 
     train_start_dates  = []
     train_end_dates    = []
@@ -148,6 +206,11 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     test_end_dates     = []
     train_symbols_list = []
     test_symbols_list  = []
+
+    # Trade accumulators per window
+    train_trades_list    = []
+    test_trades_list     = []
+    test_n_trades_list   = []
 
     start = 0
     end   = length_train_set
@@ -164,16 +227,19 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
         # Define window date boundaries from ref_sym
         # -----------------------------------------------------------------
         if is_last_window:
-            train_size_ref = int(remaining_data * pct_train_set)
-            if train_size_ref < int(length_train_set * 0.8):
+            remaining_from_last = max_length - last_test_end_ref
+            if remaining_from_last < int(length_test * 0.5):
                 break
-            t0_ref, t1_ref       = start, start + train_size_ref
-            test0_ref, test1_ref = t1_ref, max_length
+            t0_ref    = 0 if anchored else start
+            t1_ref    = last_test_end_ref
+            test0_ref = t1_ref
+            test1_ref = max_length
         else:
             t0_ref    = 0 if anchored else start
             t1_ref    = end if anchored else start + length_train_set
             test0_ref = t1_ref
             test1_ref = min(t1_ref + length_test, max_length)
+            last_test_end_ref = test1_ref
 
         train_start_ts = ref_ts[t0_ref]
         test_start_ts  = ref_ts[t1_ref] if t1_ref < max_length else ref_ts[-1]
@@ -248,17 +314,24 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
                 break
 
         # -----------------------------------------------------------
-        # Parallel evaluation
+        # Parallel evaluation via shared memory
         # -----------------------------------------------------------
-        with (tqdm_joblib(
-            tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
-        ) if show_progress else contextlib.nullcontext()):
-            results = Parallel(n_jobs=n_jobs)(
-                delayed(evaluate_fn)(params, base_arrays) for params in dict_combinations
-            )
+        shm_list, shm_metadata = _arrays_to_shared_memory(base_arrays)
+        try:
+            with (tqdm_joblib(
+                tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
+            ) if show_progress else contextlib.nullcontext()):
+                results = Parallel(n_jobs=n_jobs)(
+                    delayed(_evaluate_with_shm)(params, shm_metadata, evaluate_fn)
+                    for params in dict_combinations
+                )
+        finally:
+            for shm in shm_list:
+                shm.close()
+                shm.unlink()
 
         # -----------------------------------------------------------
-        # Select best result (on train) and validate on test
+        # Select best result (on train) and evaluate on test
         # -----------------------------------------------------------
         _, best_params = max(results, key=lambda x: x[0])
 
@@ -270,6 +343,28 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
 
         best_params_list.append(best_params)
         best_criteria_list.append(test_criterion)
+
+        # -----------------------------------------------------------
+        # Collect trades for this window (optional)
+        # -----------------------------------------------------------
+        window_test_n_trades = 0
+
+        if collect_train_trades_fn is not None and base_arrays:
+            df_train = collect_train_trades_fn(best_params, base_arrays)
+            if df_train is not None and not df_train.empty:
+                df_train = df_train.copy()
+                df_train["wfo_window"] = window_idx
+                train_trades_list.append(df_train)
+
+        if collect_test_trades_fn is not None and base_arrays_test:
+            df_test = collect_test_trades_fn(best_params, base_arrays_test)
+            if df_test is not None and not df_test.empty:
+                df_test = df_test.copy()
+                df_test["wfo_window"] = window_idx
+                test_trades_list.append(df_test)
+                window_test_n_trades = len(df_test)
+
+        test_n_trades_list.append(window_test_n_trades)
 
         train_start_dates.append(ref_ts[t0]       if t0       < len(ref_ts) else None)
         train_end_dates.append(ref_ts[t1 - 1]     if t1 - 1   < len(ref_ts) else None)
@@ -305,20 +400,31 @@ def walk_forward_optimization(ohlcv_arr, param_ranges,
     df_results.insert(1, 'train_end',   train_end_dates)
     df_results.insert(2, 'test_start',  test_start_dates)
     df_results.insert(3, 'test_end',    test_end_dates)
-    df_results['best_criterion'] = best_criteria_list
-    df_results['train_symbols']  = [len(s) for s in train_symbols_list]
-    df_results['test_symbols']   = [len(s) for s in test_symbols_list]
+    df_results['best_crite']  = best_criteria_list
+    df_results['tn_trades']   = test_n_trades_list
+    df_results['tr_symbols']  = [len(s) for s in train_symbols_list]
+    df_results['ts_symbols']  = [len(s) for s in test_symbols_list]
 
     summary_row = dict(final_params)
     summary_row['train_start']    = param_selection_mode
     summary_row['train_end']      = ''
     summary_row['test_start']     = ''
     summary_row['test_end']       = ''
-    summary_row['best_criterion'] = df_results['best_criterion'].mean() if 'best_criterion' in df_results else None
+    summary_row['best_crite'] = df_results['best_crite'].mean() if 'best_crite' in df_results else None
 
     df_results = pd.concat([df_results, pd.DataFrame([summary_row])], ignore_index=True)
 
     logger.info(f"WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)")
-    logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_results}")
 
-    return final_params, df_results
+    sep_row = {col: "·" * min(8, len(str(col))) for col in df_results.columns}
+    sep_row["train_start"] = "·" * 10
+    df_display = pd.concat([df_results.iloc[:-1], pd.DataFrame([sep_row]), df_results.iloc[[-1]]], ignore_index=True)
+    logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display}\n{'─'*115}")
+
+    # -----------------------------------------------------------
+    # Concatenate per-window trade logs
+    # -----------------------------------------------------------
+    wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
+    wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
+
+    return final_params, df_results, wfo_train_trades, wfo_test_trades

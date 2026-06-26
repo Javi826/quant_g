@@ -8,8 +8,8 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
-MIN_PRICE       = 0.0001
-INITIAL_BALANCE = 800
+MIN_PRICE       = 0.00001
+INITIAL_BALANCE = 1000
 COMISION        = 0.1
 DEFAULT_CANDLES = 50
 
