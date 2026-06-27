@@ -52,7 +52,7 @@ from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combinatio
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
 
 regime_module._indicator_cache = {}
-# Global accumulators
+# Global accumulators3
 _strategy_trades_is_baseline   : list = []
 _strategy_trades_is_regime     : list = []
 _strategy_trades_oos1_baseline : list = []

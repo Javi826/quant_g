@@ -44,40 +44,28 @@ def _equity_series(strategy_trades, capital: float) -> pd.Series:
 
 
 def _decorrelate(
-    strategy_trades_oos1: list,
-    strategy_trades_oos2: list,
+    strategy_trades_wfo_test: list,
     initial_balance: float,
     threshold: float,
     precomputed_metrics: dict,
-    strategy_trades_oos3: list,
     series_fn,
     label: str,
 ) -> list:
-    metrics  = precomputed_metrics or {
+    metrics    = precomputed_metrics or {
         sid: compute_metrics(df, capital=initial_balance, name=sid)
-        for sid, df in strategy_trades_oos1
+        for sid, df in strategy_trades_wfo_test
     }
-    oos1_map = {sid: df for sid, df in strategy_trades_oos1}
-    oos2_map = {sid: df for sid, df in strategy_trades_oos2}
-    oos3_map = {sid: df for sid, df in (strategy_trades_oos3 or [])}
-    all_sids = [sid for sid, _ in strategy_trades_oos1]
+    trades_map = {sid: df for sid, df in strategy_trades_wfo_test}
+    all_sids   = [sid for sid, _ in strategy_trades_wfo_test]
 
     series_combined = {}
     for sid in all_sids:
-        parts = []
-        if sid in oos1_map:
-            parts.append(series_fn(oos1_map[sid], initial_balance))
-        if sid in oos2_map:
-            parts.append(series_fn(oos2_map[sid], initial_balance))
-        if sid in oos3_map:
-            parts.append(series_fn(oos3_map[sid], initial_balance))
-        if parts:
-            combined             = pd.concat(parts).sort_index()
-            series_combined[sid] = combined.groupby(level=0).mean()
+        s = series_fn(trades_map[sid], initial_balance)
+        series_combined[sid] = s.groupby(level=0).mean()
 
     if len(series_combined) < 2:
         logger.info("  Not enough strategies for correlation analysis.")
-        return strategy_trades_oos1
+        return strategy_trades_wfo_test
 
     num_map = {sid: f"{_num(sid):02d}" for sid in series_combined}
     df_     = pd.DataFrame({num_map[sid]: s for sid, s in series_combined.items()}).fillna(0)
@@ -112,20 +100,18 @@ def _decorrelate(
     lines.append(f"  {'─'*85}")
     logger.info("\n".join(lines))
 
-    return [(sid, oos1_map[sid]) for sid in sorted(selected, key=_num) if sid in oos1_map]
+    return [(sid, trades_map[sid]) for sid in sorted(selected, key=_num) if sid in trades_map]
 
 
 def decorrelate_by_profit(
-    strategy_trades_oos1: list,
-    strategy_trades_oos2: list,
+    strategy_trades_wfo_test: list,
     initial_balance: float,
     threshold: float = 0.7,
     precomputed_metrics: dict = None,
-    strategy_trades_oos3: list = None,
 ) -> list:
     """Greedy profit-correlation filter. Keeps best NetGain from each correlated pair."""
     return _decorrelate(
-        strategy_trades_oos1, strategy_trades_oos2, initial_balance,
-        threshold, precomputed_metrics, strategy_trades_oos3,
+        strategy_trades_wfo_test, initial_balance,
+        threshold, precomputed_metrics,
         series_fn=_profit_series, label="Profit",
     )

@@ -22,11 +22,11 @@ PRODUCTION_XLSX = os.path.expanduser(
     "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
 )
 BATCH_TRADES_DIR = os.path.expanduser(
-    "~/projects/quant/quant_b/develop/brief_trades_00_bb"
+    "~/projects/quant/quant_b/develop/brief_trades_BB"
 )
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
-OOS_PERIOD  = "oos1"     # "oos1" | "oos2" | "oos3"
+OOS_PERIOD  = "oos"     # "oos1" | "oos2" | "oos3"
 BATCH_MODE  = "regime"   # "baseline" | "regime"
 
 # Time window filter (None = no filter)
@@ -52,11 +52,11 @@ EXCLUDE_SYMBOLS = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "31_orderblocks_long_15m"
+PLOT_STRATEGY = "22_flag_short_15m"
 #PLOT_STRATEGY = "05_reversal_long_1H"
 
 # Strategy for entry-rounds inspection (None to skip)
-ENTRY_ROUNDS_STRATEGY = "31_orderblocks_long_15m"
+ENTRY_ROUNDS_STRATEGY = "22_flag_short_15m"
 
 # Max gap (seconds) between consecutive buy_times to consider them the same
 # simultaneous-open round (signals fired together when the system was flat)

@@ -47,8 +47,9 @@ from shared_batchs.utils.io import save_drift_reference, save_strategies_pr, com
 from shared_batchs.regime import regime_module
 from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
-from shared_batchs.runs.run_best_portfolio import find_best_portfolio_combination
+from shared_batchs.runs.run_best_wfo_portfolio import find_best_portfolio_combination_wfo
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is
 
 regime_module._indicator_cache = {}
@@ -70,29 +71,29 @@ _best_params_results           : dict = {}
 # BATCH
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "bb"
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 SELECTION_MODE       = "WFO"   # "WFO" or "WFO_MC"
 
 WFO_TH_RATE          = 0
-WFO_WIN_RATE_TH      = 0.50
-WFO_MEAN_TH          = 0.5
+WFO_WIN_RATE_TH      = 0.5
 
 # RUNS
 #------------------------------------------------------------------------------
-RUN_SUMMARY        = True
-RUN_OOS            = False
-RUN_CORRELATION    = True
-RUN_BEST_PORTFOLIO = True
+RUN_SUMMARY            = True
+RUN_OOS                = True
+RUN_CORRELATION        = True
+RUN_BEST_WFO_PORTFOLIO = True
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = False
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
-UPDATE_OUTPUTS  = False
-SAVE_TRADES     = False
-
+UPDATE_OUTPUTS    = False
+SAVE_TRADES       = True
+SHOW_PLOTS        = False
+DEBUG_WFO_WINDOW  = None  # int to debug a specific WFO test window, None to disable
 
 # STRATEGY SELECTION
 #------------------------------------------------------------------------------
@@ -209,7 +210,7 @@ def run_batch(strategy_config: dict) -> None:
     # BLOCK 1 — Parameter Selection + Train/Test Trades (WFO or WFO_MC)
     # -------------------------------------------------------------------------
     if SELECTION_MODE == "WFO":
-        best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion, wfo_train_trades, wfo_test_trades = run_wfo_is(
+        best_params, approved_wfo, wfo_win_rate, wfo_train_trades, wfo_test_trades, wfo_df_results = run_wfo_is(
             ohlcv_data          = ohlcv_is,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -219,7 +220,6 @@ def run_batch(strategy_config: dict) -> None:
             timeframe           = TIMEFRAME,
             th_rate             = WFO_TH_RATE,
             win_rate_th         = WFO_WIN_RATE_TH,
-            mean_th             = WFO_MEAN_TH,
             dtype               = DTYPE,
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
@@ -229,7 +229,7 @@ def run_batch(strategy_config: dict) -> None:
         )
 
     elif SELECTION_MODE == "WFO_MC":
-        best_params, approved_wfo, wfo_win_rate, wfo_mean_criterion = run_wfo_mc_is(
+        best_params, approved_wfo, wfo_win_rate = run_wfo_mc_is(
             ohlcv_data          = ohlcv_is,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -239,22 +239,21 @@ def run_batch(strategy_config: dict) -> None:
             timeframe           = TIMEFRAME,
             th_rate             = WFO_TH_RATE,
             win_rate_th         = WFO_WIN_RATE_TH,
-            mean_th             = WFO_MEAN_TH,
             dtype               = DTYPE,
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
         )
         wfo_train_trades = None
         wfo_test_trades  = None
+        wfo_df_results   = None
 
     else:
         raise ValueError(f"Unknown SELECTION_MODE: {SELECTION_MODE}")
 
     _wfo_results.append({
-        "strategy_id":    STRATEGY_ID,
-        "verdict":        "🟢 PASS" if approved_wfo else "🔴 FAIL",
-        "win_rate":       wfo_win_rate,
-        "mean_criterion": wfo_mean_criterion,
+        "strategy_id": STRATEGY_ID,
+        "verdict":     "🟢 PASS" if approved_wfo else "🔴 FAIL",
+        "win_rate":    wfo_win_rate,
     })
 
     if wfo_train_trades is not None and not wfo_train_trades.empty:
@@ -280,6 +279,54 @@ def run_batch(strategy_config: dict) -> None:
     bt_signal_params = {k: best_params[k.upper()] for k in signal_params_keys if k.upper() in best_params}
 
     # -------------------------------------------------------------------------
+    # BLOCK 1b — DEBUG: reproduce a specific WFO test window via OOS pipeline
+    # -------------------------------------------------------------------------
+    if DEBUG_WFO_WINDOW is not None and wfo_df_results is not None:
+        _widx      = DEBUG_WFO_WINDOW
+        _n_windows = len(wfo_df_results) - 1
+        if _widx < _n_windows:
+            _row        = wfo_df_results.iloc[_widx]
+            _test_start = pd.Timestamp(_row["_test_start_ts"])
+            _test_end   = pd.Timestamp(_row["_test_end_ts"])
+            _syms       = _row["ts_syms"]
+            _wfo_window_trades = wfo_test_trades[wfo_test_trades["wfo_window"] == _widx + 1] if wfo_test_trades is not None and not wfo_test_trades.empty else pd.DataFrame()
+
+            logger.info(f"\n{'─'*115}\n  DEBUG WFO WINDOW {_widx} — {_test_start} → {_test_end} | symbols: {_syms}\n{'─'*115}")
+            logger.info(f"  WFO test window trades : {len(_wfo_window_trades)} | best_crite={_row['best_crite']:.4f}")
+
+            _ohlcv_debug = {}
+            for sym in _syms:
+                if sym not in ohlcv_is:
+                    continue
+                df   = ohlcv_is[sym]
+                mask = (df.index >= _test_start) & (df.index <= _test_end)
+                _ohlcv_debug[sym] = df.loc[mask]
+
+            _debug_accum_baseline = []
+            _debug_accum_regime   = []
+            run_oos_period(
+                strategy_id            = f"{STRATEGY_ID}_debug_w{_widx}",
+                label                  = f"DEBUG_W{_widx}",
+                ohlcv_data             = _ohlcv_debug,
+                signal_fn              = signal_fn,
+                signal_params          = bt_signal_params,
+                best_params            = best_params,
+                param_names            = param_names,
+                order_amount           = ORDER_AMOUNT,
+                timeframe              = TIMEFRAME,
+                data_folder            = DATA_FOLDER_IS,
+                bins_to_filter         = bins_to_filter,
+                trades_baseline_accum  = _debug_accum_baseline,
+                trades_regime_accum    = _debug_accum_regime,
+                save_trades            = False,
+                brief_trades_folder    = brief_trades_folder,
+                run_report_backtesting = False,
+                debug_mode             = True,
+            )
+        else:
+            logger.warning(f"⚠️  DEBUG_WFO_WINDOW={_widx} out of range (0-{_n_windows-1})")
+
+    # -------------------------------------------------------------------------
     # BLOCK 2 — OOS (baseline + regime) — informational only
     # -------------------------------------------------------------------------
     trades_df_oos_baseline = pd.DataFrame()
@@ -287,6 +334,23 @@ def run_batch(strategy_config: dict) -> None:
 
     if RUN_OOS:
         ohlcv_data_oos = {sym: ohlcv_oos1[sym] for sym in symbols_oos_final}
+
+        if DEBUG_WFO_WINDOW is not None and wfo_df_results is not None:
+            _widx = DEBUG_WFO_WINDOW
+            if _widx < len(wfo_df_results) - 1:
+                _row        = wfo_df_results.iloc[_widx]
+                _test_start = pd.Timestamp(_row["_test_start_ts"])
+                _test_end   = pd.Timestamp(_row["_test_end_ts"])
+                _syms       = _row["ts_syms"]
+                ohlcv_data_oos = {
+                    sym: ohlcv_is[sym].loc[
+                        (ohlcv_is[sym].index >= _test_start) &
+                        (ohlcv_is[sym].index <= _test_end)
+                    ]
+                    for sym in _syms if sym in ohlcv_is
+                }
+                logger.info(f"  OOS aligned to WFO window {_widx} — {_test_start} → {_test_end} | symbols: {_syms}")
+
         trades_df_oos_baseline, trades_df_oos_regime, _metrics_baseline_oos, _metrics_regime_oos = run_oos_period(
             strategy_id            = STRATEGY_ID,
             label                  = "OOS",
@@ -304,6 +368,7 @@ def run_batch(strategy_config: dict) -> None:
             save_trades            = SAVE_TRADES,
             brief_trades_folder    = brief_trades_folder,
             run_report_backtesting = True,
+            debug_mode             = DEBUG_WFO_WINDOW is not None,
         )
 
     # -------------------------------------------------------------------------
@@ -331,6 +396,13 @@ def run_batch(strategy_config: dict) -> None:
             "r2":           _m["R_Squared"],
             "tn_trades":    len(wfo_test_trades),
         })
+        _verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
+        _params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
+        logger.info(
+            f"STAGE 1 ── WFO results    ── {_verdict} WinRate={wfo_win_rate*100:.1f}% | "
+            f"NetGain={_m['Net_Gain_pct']:.1f}% DD={_m['Max_DD_pct']:.1f}% WinRate%={_m['Win_Rate']:.1f}% R2={_m['R_Squared']:.3f} PF={_m['Profit_Factor']:.2f} Calmar={_m['Calmar']:.2f} Trades={len(wfo_test_trades)}"
+        )
+        logger.info(f"STAGE 1 ── WFO params     ── {_params_str}")
     _validation_results.append(_val_record)
 
     # -------------------------------------------------------------------------
@@ -373,57 +445,43 @@ def run_batch(strategy_config: dict) -> None:
 def run_summary():
     """Compute combined portfolio metrics. Call after all run_batch() calls."""
     if not RUN_SUMMARY:
-        #print_strategies_summary(_validation_results)
-        print_wfo_summary(_wfo_results)
+        print_wfo_summary(_wfo_results, _validation_results)
         print_update_status(CSV_PARAMS, SYMBOLS_LIVE_FOLDER, _validation_results)
         return
 
-    for label, strategy_trades in [("Baseline", _strategy_trades_oos_baseline), ("Regime 0+1", _strategy_trades_oos_regime)]:
-        if not strategy_trades:
-            continue
-        print_portfolio_metrics_table(strategy_trades, label, INITIAL_BALANCE)
-
-    r_oos_metrics = {sid: compute_metrics(df, capital=INITIAL_BALANCE, name=sid)
-                     for sid, df in _strategy_trades_oos_regime}
-
     print_wfo_summary(_wfo_results, _validation_results)
 
-    # Validated = strategies that passed WFO
-    validated_ids      = {w["strategy_id"] for w in _wfo_results if "PASS" in w["verdict"]} if _wfo_results else {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
-    validated_baseline = [(sid, df) for sid, df in _strategy_trades_oos_baseline if sid in validated_ids]
+    validated_ids        = {w["strategy_id"] for w in _wfo_results if "PASS" in w["verdict"]} if _wfo_results else {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
+    validated_baseline   = [(sid, df) for sid, df in _strategy_trades_oos_baseline if sid in validated_ids]
     validated_oos_regime = [(sid, df) for sid, df in _strategy_trades_oos_regime   if sid in validated_ids]
 
-    if _strategy_trades_oos_baseline:
-        logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
-        if logger.isEnabledFor(logging.DEBUG):
-            print_all_curves_table(_strategy_trades_oos_baseline, "Baseline", INITIAL_BALANCE)
-        if _strategy_trades_oos_regime:
-            print_all_curves_table(_strategy_trades_oos_regime, "Regime 0+1", INITIAL_BALANCE)
+    # -------------------------------------------------------------------------
+    # OOS ANALYSIS
+    # -------------------------------------------------------------------------
+    if RUN_OOS:
+        for label, strategy_trades in [("Baseline", _strategy_trades_oos_baseline), ("Regime 0+1", _strategy_trades_oos_regime)]:
+            if not strategy_trades:
+                continue
+            print_portfolio_metrics_table(strategy_trades, label, INITIAL_BALANCE)
 
-    if validated_baseline:
-        if logger.isEnabledFor(logging.DEBUG):
-            print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
-    if validated_oos_regime:
-        print_all_curves_table(validated_oos_regime, "Regime 0+1 — Validated only", INITIAL_BALANCE)
+        if _strategy_trades_oos_baseline:
+            logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
+            if logger.isEnabledFor(logging.DEBUG):
+                print_all_curves_table(_strategy_trades_oos_baseline, "Baseline", INITIAL_BALANCE)
+            if _strategy_trades_oos_regime:
+                print_all_curves_table(_strategy_trades_oos_regime, "Regime 0+1", INITIAL_BALANCE)
 
-    # WFO train/test summary
-    if _strategy_trades_wfo_train:
-        logger.info(f"\n{'='*115}\n  WFO TRAIN TRADES\n{'='*115}")
-        print_all_curves_table(_strategy_trades_wfo_train, "WFO Train", INITIAL_BALANCE)
+        if validated_baseline:
+            if logger.isEnabledFor(logging.DEBUG):
+                print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
+        if validated_oos_regime:
+            print_all_curves_table(validated_oos_regime, "Regime 0+1 — Validated only", INITIAL_BALANCE)
 
-    if _strategy_trades_wfo_test:
-        logger.info(f"\n{'='*115}\n  WFO TEST TRADES\n{'='*115}")
-        validated_wfo_test = [(sid, df) for sid, df in _strategy_trades_wfo_test if sid in validated_ids]
-        print_all_curves_table(_strategy_trades_wfo_test,  "WFO Test — All",       INITIAL_BALANCE)
-        if validated_wfo_test:
-            print_all_curves_table(validated_wfo_test, "WFO Test — Validated only", INITIAL_BALANCE)
+        print_robustness_table(
+            strategy_trades_per_period=[("OOS", validated_oos_regime)],
+            initial_balance=INITIAL_BALANCE,
+        )
 
-    print_robustness_table(
-        strategy_trades_per_period=[("OOS", validated_oos_regime)],
-        initial_balance=INITIAL_BALANCE,
-    )
-
-    if RUN_OOS and validated_baseline:
         plot_portfolio_comparison(
             strategy_trades_baseline = validated_baseline,
             strategy_trades_regime01 = validated_oos_regime,
@@ -432,61 +490,39 @@ def run_summary():
             title                    = "Portfolio OOS — Validated only",
         )
 
-# =============================================================================
-# RUNS
-# =============================================================================
-
-    # CORRELATION ANALYSIS
     # -------------------------------------------------------------------------
+    # WFO TRADES
+    # -------------------------------------------------------------------------
+    if _strategy_trades_wfo_train:
+        logger.info(f"\n{'='*115}\n  WFO TRAIN TRADES\n{'='*115}")
+        print_all_curves_table(_strategy_trades_wfo_train, "WFO Train", INITIAL_BALANCE)
+
+    if _strategy_trades_wfo_test:
+        logger.info(f"\n{'='*115}\n  WFO TEST TRADES\n{'='*115}")
+        _all_validated_wfo_test = [(sid, df) for sid, df in _strategy_trades_wfo_test if sid in validated_ids]
+        print_all_curves_table(_strategy_trades_wfo_test, "WFO Test — All", INITIAL_BALANCE)
+        if _all_validated_wfo_test:
+            print_all_curves_table(_all_validated_wfo_test, "WFO Test — Validated only", INITIAL_BALANCE)
+
+    # -------------------------------------------------------------------------
+    # CORRELATION + BEST WFO PORTFOLIO
+    # -------------------------------------------------------------------------
+    validated_wfo_test = [(sid, df) for sid, df in _strategy_trades_wfo_test if sid in validated_ids]
+
     if RUN_CORRELATION:
-        logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS OOS — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
-        survivors_profit = decorrelate_by_profit(
-            strategy_trades_oos1 = validated_oos_regime,
-            strategy_trades_oos2 = [],
-            strategy_trades_oos3 = [],
+        logger.info(f"\n{'─'*115}\n  CORRELATION ANALYSIS WFO Test — Profit (threshold={CORRELATION_DD_THRESHOLD})\n{'─'*115}")
+        validated_wfo_test = decorrelate_by_profit(
+            strategy_trades_wfo_test = validated_wfo_test,
+            initial_balance          = INITIAL_BALANCE,
+            threshold                = CORRELATION_DD_THRESHOLD,
+        )
+
+    if RUN_BEST_WFO_PORTFOLIO:
+        find_best_portfolio_combination_wfo(
+            validated_wfo_trades = validated_wfo_test,
             initial_balance      = INITIAL_BALANCE,
-            threshold            = CORRELATION_DD_THRESHOLD,
-            precomputed_metrics  = r_oos_metrics,
+            show_plots           = SHOW_PLOTS,
         )
-        if survivors_profit:
-            print_all_curves_table(survivors_profit, "Decorrelated by Profit — Validated only", INITIAL_BALANCE)
-            if RUN_OOS:
-                plot_portfolio_comparison(
-                    strategy_trades_baseline = survivors_profit,
-                    strategy_trades_regime01 = survivors_profit,
-                    data_folder              = DATA_FOLDER_OOS1,
-                    initial_balance          = INITIAL_BALANCE,
-                    title                    = "Portfolio OOS — Decorrelated Validated (Profit filter)",
-                )
-            survivors_ids = {sid for sid, _ in survivors_profit}
-            print_robustness_table(
-                strategy_trades_per_period=[
-                    ("OOS", [(sid, df) for sid, df in validated_oos_regime if sid in survivors_ids]),
-                ],
-                initial_balance=INITIAL_BALANCE,
-            )
-
-    # BEST PORTFOLIO
-    # -------------------------------------------------------------------------
-    if RUN_BEST_PORTFOLIO:
-        if RUN_CORRELATION and survivors_profit:
-            survivor_ids          = {sid for sid, _ in survivors_profit}
-            portfolio_trades_oos  = [(sid, df) for sid, df in validated_oos_regime if sid in survivor_ids]
-        else:
-            portfolio_trades_oos  = validated_oos_regime
-
-        find_best_portfolio_combination(
-            validated_trades_oos1 = portfolio_trades_oos,
-            validated_trades_oos2 = [],
-            validated_trades_oos3 = [],
-            initial_balance       = INITIAL_BALANCE,
-            data_folder_oos1      = DATA_FOLDER_OOS1,
-            data_folder_oos2      = DATA_FOLDER_OOS1,
-            data_folder_oos3      = DATA_FOLDER_OOS1,
-            show_plots            = SHOW_PLOTS,
-            validation_results    = _validation_results,
-        )
-
 
 # =============================================================================
 # MAIN

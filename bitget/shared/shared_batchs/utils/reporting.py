@@ -192,7 +192,7 @@ def print_best_r2_robustness_table(
 
 
 # =============================================================================
-# WFO SUMMARY (fused with strategy metrics)
+# WFO SUMMARY
 # =============================================================================
 
 def print_wfo_summary(wfo_results: list, validation_results: list = None) -> None:
@@ -200,22 +200,24 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
     if not wfo_results:
         return
 
-    n_pass         = sum(1 for w in wfo_results if "PASS" in w["verdict"])
-    mean_win_rate  = round(np.mean([w["win_rate"]       for w in wfo_results]) * 100, 1)
-    mean_criterion = round(np.mean([w["mean_criterion"] for w in wfo_results]), 2)
+    n_pass        = sum(1 for w in wfo_results if "PASS" in w["verdict"])
+    mean_win_rate = round(np.mean([w["win_rate"] for w in wfo_results]) * 100, 1)
 
-    val_map = {v["strategy_id"]: v for v in validation_results} if validation_results else {}
+    val_map     = {v["strategy_id"]: v for v in validation_results} if validation_results else {}
     has_metrics = bool(val_map)
 
     header = (
-        f"  {'Strategy':<27} {'Verdict':<10} {'WinRate%':>9} {'MeanCrit':>10}"
+        f"  {'Strategy':<27} {'Verdict':<10} {'WinRate%':>9}"
         + (f"  {'NetGain%':>9} {'DD%':>7} {'WinRate%':>9} {'R2':>7} {'Trades':>7}" if has_metrics else "")
     )
-    sep = f"  {'-'*27} {'-'*10} {'-'*9} {'-'*10}" + (f"  {'-'*9} {'-'*7} {'-'*9} {'-'*7} {'-'*7}" if has_metrics else "")
+    sep = (
+        f"  {'-'*27} {'-'*10} {'-'*9}"
+        + (f"  {'-'*9} {'-'*7} {'-'*9} {'-'*7} {'-'*7}" if has_metrics else "")
+    )
 
     lines = [
         f"\n{'─'*115}",
-        f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanWinRate: {mean_win_rate}% | MeanCriterion: {mean_criterion}",
+        f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanWinRate: {mean_win_rate}%",
         f"{'─'*115}",
         header,
         sep,
@@ -223,12 +225,9 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
 
     for w in wfo_results:
         sid  = w["strategy_id"]
-        line = (
-            f"  {sid:<27} {w['verdict']:<10} "
-            f"{w['win_rate']*100:>8.1f}% {w['mean_criterion']:>10.2f}"
-        )
+        line = f"  {sid:<27} {w['verdict']:<10} {w['win_rate']*100:>8.1f}%"
         if has_metrics and sid in val_map:
-            v     = val_map[sid]
+            v        = val_map[sid]
             n_trades = v.get("tn_trades", 0)
             line += (
                 f"  {v['net_gain_pct']:>8.2f}%"

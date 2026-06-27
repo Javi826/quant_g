@@ -17,8 +17,8 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-TRAIN_MONTHS         = 12
-TEST_MONTHS          = 3
+TRAIN_MONTHS         = 6
+TEST_MONTHS          = 2
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
@@ -242,22 +242,19 @@ def _evaluate_wfo_approval(
     df_results: pd.DataFrame,
     th_rate: float,
     win_rate_th: float,
-    mean_th: float,
 ) -> tuple:
     """
     Approval criterion based on WFO per-window out-of-sample (test) performance.
     Excludes the aggregated summary row (last row of df_results).
 
     Returns:
-        tuple: (approved, win_rate, mean_criterion)
+        tuple: (approved, win_rate)
     """
     criteria = df_results.iloc[:-1]["best_crite"]
+    win_rate = float((criteria > th_rate).mean())
+    approved = win_rate >= win_rate_th
 
-    win_rate       = float((criteria > th_rate).mean())
-    mean_criterion = float(criteria.mean())
-    approved       = (win_rate >= win_rate_th) and (mean_criterion >= mean_th)
-
-    return approved, win_rate, mean_criterion
+    return approved, win_rate
 
 
 # =============================================================================
@@ -274,7 +271,6 @@ def run_wfo_is(
     timeframe: str,
     th_rate: float,
     win_rate_th: float,
-    mean_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -287,7 +283,7 @@ def run_wfo_is(
     Collects trade logs for each train and test window.
 
     Returns:
-        tuple: (best_params, approved_wfo, win_rate, mean_criterion, wfo_train_trades, wfo_test_trades)
+        tuple: (best_params, approved_wfo, win_rate, wfo_train_trades, wfo_test_trades, df_results)
     """
     ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges = dict(zip(param_names, lists_for_grid))
@@ -361,19 +357,13 @@ def run_wfo_is(
         collect_test_trades_fn  = collect_test_fn,
     )
 
-    approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(
+    approved_wfo, win_rate = _evaluate_wfo_approval(
         df_results  = df_results,
         th_rate     = th_rate,
         win_rate_th = win_rate_th,
-        mean_th     = mean_th,
     )
 
-    verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
-    params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 1 ── WFO results    ── {verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}")
-    logger.info(f"STAGE 1 ── WFO params     ── {params_str}")
-
-    return best_params, approved_wfo, win_rate, mean_criterion, wfo_train_trades, wfo_test_trades
+    return best_params, approved_wfo, win_rate, wfo_train_trades, wfo_test_trades, df_results
 
 
 # =============================================================================
@@ -390,7 +380,6 @@ def run_wfo_mc_is(
     timeframe: str,
     th_rate: float,
     win_rate_th: float,
-    mean_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -433,16 +422,15 @@ def run_wfo_mc_is(
         show_progress        = show_progress,
     )
 
-    approved_wfo, win_rate, mean_criterion = _evaluate_wfo_approval(
+    approved_wfo, win_rate = _evaluate_wfo_approval(
         df_results  = df_results,
         th_rate     = th_rate,
         win_rate_th = win_rate_th,
-        mean_th     = mean_th,
     )
 
     verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 1 ── WFO_MC results    ── {verdict} WinRate={win_rate*100:.1f}% MeanCriterion={mean_criterion:.2f}")
-    logger.info(f"STAGE 1 ── WFO_MC params     ── {params_str}")
+    logger.info(f"STAGE 1 ── WFO-MC results ── {verdict} WinRate={win_rate*100:.1f}%")
+    logger.info(f"STAGE 1 ── WFO-MC params  ── {params_str}")
 
-    return best_params, approved_wfo, win_rate, mean_criterion
+    return best_params, approved_wfo, win_rate

@@ -37,6 +37,7 @@ def run_oos_period(
     brief_trades_folder: str,
     run_baseline: bool = True,
     run_report_backtesting: bool = False,
+    debug_mode: bool = False,
 ) -> tuple:
 
     ohlcv_arrays     = prepare_ohlcv_arrays(ohlcv_data)
@@ -115,6 +116,15 @@ def run_oos_period(
     )
 
     if len(trades_regime) > 0:
+        if debug_mode:
+            for _lbl, _df in [(f"{label} Baseline", trades_baseline), (f"{label} Regime", trades_regime)]:
+                if len(_df) > 0:
+                    _m = compute_metrics(_df, capital=INITIAL_BALANCE, name="")
+                    logger.info(
+                        f"  DEBUG {_lbl} — trades={len(_df)} | "
+                        f"NetGain={_m['Net_Gain_pct']:.2f}% DD={_m['Max_DD_pct']:.2f}% "
+                        f"WinRate={_m['Win_Rate']:.1f}% R2={_m['R_Squared']:.3f}"
+                    )
         print_metrics_table([metrics_regime], f"  Metrics — {strategy_id} ({label} Regime)")
         if save_trades:
             accumulate_strategy_trades(

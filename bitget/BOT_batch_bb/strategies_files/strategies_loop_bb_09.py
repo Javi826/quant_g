@@ -17,8 +17,8 @@ STRATEGIES_LOOP = [
             "LOOKBACK": [6, 8, 10],
             "TOLERANCE": [10, 20, 30],
             "MA_PERIOD": [10, 25],
-            "TP_PCT": [2,3,4,5,6,7,8,9],
-            "SL_PCT": [2,3,4,5,6,7,8,9],
+            "TP_PCT": [2],
+            "SL_PCT": [9],
         },
     },
     {

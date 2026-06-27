@@ -390,6 +390,10 @@ def walk_forward_optimization(
     # -----------------------------------------------------------
     # Final DataFrame with train/test dates, params, and criterion
     # -----------------------------------------------------------
+    # Raw timestamps for exact alignment (used by debug)
+    test_start_ts_raw = list(test_start_dates)
+    test_end_ts_raw   = list(test_end_dates)
+
     train_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_start_dates]
     train_end_dates   = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
     test_start_dates  = [pd.to_datetime(d).date() if d is not None else None for d in test_start_dates]
@@ -404,6 +408,10 @@ def walk_forward_optimization(
     df_results['tn_trades']   = test_n_trades_list
     df_results['tr_symbols']  = [len(s) for s in train_symbols_list]
     df_results['ts_symbols']  = [len(s) for s in test_symbols_list]
+    df_results['tr_syms']     = train_symbols_list
+    df_results['ts_syms']     = test_symbols_list
+    df_results['_test_start_ts'] = test_start_ts_raw
+    df_results['_test_end_ts']   = test_end_ts_raw
 
     summary_row = dict(final_params)
     summary_row['train_start']    = param_selection_mode
@@ -419,7 +427,8 @@ def walk_forward_optimization(
     sep_row = {col: "·" * min(8, len(str(col))) for col in df_results.columns}
     sep_row["train_start"] = "·" * 10
     df_display = pd.concat([df_results.iloc[:-1], pd.DataFrame([sep_row]), df_results.iloc[[-1]]], ignore_index=True)
-    logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display}\n{'─'*115}")
+    display_cols = [c for c in df_display.columns if not c.startswith("_") and c not in ("tr_syms", "ts_syms")]
+    logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display[display_cols].to_string()}\n{'─'*115}")
 
     # -----------------------------------------------------------
     # Concatenate per-window trade logs

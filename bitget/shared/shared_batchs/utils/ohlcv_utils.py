@@ -6,7 +6,7 @@ from shared_config import VOLUME_COL
 import logging
 logger = logging.getLogger("shared.utils.ohlcv_utils")
 
-NIGHT_CONSOLIDATION_FILTER_ENABLED = False  # toggle to compare with/without
+NIGHT_CONSOLIDATION_FILTER_ENABLED = True  # toggle to compare with/without
 
 def apply_night_consolidation_filter(ts, signals, hour_start: int = 0, hour_end: int = 3):
     """Zero out signals whose candle timestamp falls within [hour_start, hour_end) UTC,

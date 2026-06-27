@@ -80,6 +80,8 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
     net_gain = (eq[-1] - capital) / capital * 100
     profit_abs = round(float(eq[-1] - capital), 2)
 
+    calmar = round(float(net_gain / abs(max_dd)), 3) if max_dd < 0 else np.nan
+
     daily_returns = eq_series.pct_change().dropna()
     weekly        = eq_series.resample("W").last().pct_change().dropna()
     weekly_pct    = (weekly > 0).mean() * 100
@@ -106,6 +108,7 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
         "Win_Rate":      win_rate,
         "R_Squared":     r2,
         "Profit_Factor": pf,
+        "Calmar":        calmar,
         "Profit_abs":    profit_abs,
         "Sharpe":        sharpe,
         "Duration_d":    duration_d,
