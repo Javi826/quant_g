@@ -10,10 +10,12 @@ from tqdm_joblib import tqdm_joblib
 from collections import Counter
 from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 
 logger = logging.getLogger("BOT_batch.tools.wfo_ST")
 
-EMA_ALPHA = 0.3
+EMA_ALPHA   = 0.3
+WARMUP_BARS = 100
 
 
 # =============================================================================
@@ -180,7 +182,6 @@ def walk_forward_optimization(
     n_jobs=-1,
     show_progress=False,
     n_symbols=None,
-    test_evaluate_fn=None,
     collect_train_trades_fn=None,
     collect_test_trades_fn=None,
 ):
@@ -208,9 +209,9 @@ def walk_forward_optimization(
     test_symbols_list  = []
 
     # Trade accumulators per window
-    train_trades_list    = []
-    test_trades_list     = []
-    test_n_trades_list   = []
+    train_trades_list  = []
+    test_trades_list   = []
+    test_n_trades_list = []
 
     start = 0
     end   = length_train_set
@@ -220,7 +221,7 @@ def walk_forward_optimization(
     max_length = len(ref_ts)
 
     while start < max_length:
-        remaining_data = max_length - start
+        remaining_data = max_length - (end if anchored else start)
         is_last_window = remaining_data < (length_train_set + length_test)
 
         # -----------------------------------------------------------------
@@ -278,34 +279,36 @@ def walk_forward_optimization(
             t0, t1, test0, test1 = t0_ref, t1_ref, test0_ref, test1_ref
 
         # -----------------------------------------------------------
-        # Prepare base arrays (train + test)
+        # Prepare base arrays (train + test) with warmup prefix
         # -----------------------------------------------------------
         base_arrays = {}
         for sym, (t0_sym, t1_sym) in train_indices.items():
-            arr_dict = ohlcv_arr[sym]
+            arr_dict   = ohlcv_arr[sym]
+            warm_start = max(0, t0_sym - WARMUP_BARS)
             base_arrays[sym] = {
-                'ts':        arr_dict['ts'][t0_sym:t1_sym],
-                'open':      arr_dict['open'][t0_sym:t1_sym],
-                'high':      arr_dict['high'][t0_sym:t1_sym],
-                'low':       arr_dict['low'][t0_sym:t1_sym],
-                'close':     arr_dict['close'][t0_sym:t1_sym],
-                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[t0_sym:t1_sym],
-                'low_time':  arr_dict['low_time'][t0_sym:t1_sym],
-                'high_time': arr_dict['high_time'][t0_sym:t1_sym],
+                'ts':        arr_dict['ts'][warm_start:t1_sym],
+                'open':      arr_dict['open'][warm_start:t1_sym],
+                'high':      arr_dict['high'][warm_start:t1_sym],
+                'low':       arr_dict['low'][warm_start:t1_sym],
+                'close':     arr_dict['close'][warm_start:t1_sym],
+                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[warm_start:t1_sym],
+                'low_time':  arr_dict['low_time'][warm_start:t1_sym],
+                'high_time': arr_dict['high_time'][warm_start:t1_sym],
             }
 
         base_arrays_test = {}
         for sym, (t0_sym, t1_sym) in test_indices.items():
-            arr_dict = ohlcv_arr[sym]
+            arr_dict   = ohlcv_arr[sym]
+            warm_start = max(0, t0_sym - WARMUP_BARS)
             base_arrays_test[sym] = {
-                'ts':        arr_dict['ts'][t0_sym:t1_sym],
-                'open':      arr_dict['open'][t0_sym:t1_sym],
-                'high':      arr_dict['high'][t0_sym:t1_sym],
-                'low':       arr_dict['low'][t0_sym:t1_sym],
-                'close':     arr_dict['close'][t0_sym:t1_sym],
-                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[t0_sym:t1_sym],
-                'low_time':  arr_dict['low_time'][t0_sym:t1_sym],
-                'high_time': arr_dict['high_time'][t0_sym:t1_sym],
+                'ts':        arr_dict['ts'][warm_start:t1_sym],
+                'open':      arr_dict['open'][warm_start:t1_sym],
+                'high':      arr_dict['high'][warm_start:t1_sym],
+                'low':       arr_dict['low'][warm_start:t1_sym],
+                'close':     arr_dict['close'][warm_start:t1_sym],
+                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[warm_start:t1_sym],
+                'low_time':  arr_dict['low_time'][warm_start:t1_sym],
+                'high_time': arr_dict['high_time'][warm_start:t1_sym],
             }
 
         if window_idx == 1:
@@ -331,39 +334,36 @@ def walk_forward_optimization(
                 shm.unlink()
 
         # -----------------------------------------------------------
-        # Select best result (on train) and evaluate on test
+        # Select best result (on train)
         # -----------------------------------------------------------
         _, best_params = max(results, key=lambda x: x[0])
 
-        _test_fn = test_evaluate_fn if test_evaluate_fn is not None else evaluate_fn
-        if base_arrays_test:
-            test_criterion, _ = _test_fn(best_params, base_arrays_test)
-        else:
-            test_criterion = np.nan
-
         best_params_list.append(best_params)
-        best_criteria_list.append(test_criterion)
 
         # -----------------------------------------------------------
-        # Collect trades for this window (optional)
+        # Collect trades for this window — filter out warmup trades
+        # best_crite is derived from filtered test trades for consistency
         # -----------------------------------------------------------
         window_test_n_trades = 0
+        test_criterion       = np.nan
 
         if collect_train_trades_fn is not None and base_arrays:
             df_train = collect_train_trades_fn(best_params, base_arrays)
             if df_train is not None and not df_train.empty:
-                df_train = df_train.copy()
+                df_train = df_train[df_train["buy_time"] >= pd.Timestamp(train_start_ts)].copy()
                 df_train["wfo_window"] = window_idx
                 train_trades_list.append(df_train)
 
         if collect_test_trades_fn is not None and base_arrays_test:
             df_test = collect_test_trades_fn(best_params, base_arrays_test)
             if df_test is not None and not df_test.empty:
-                df_test = df_test.copy()
+                df_test = df_test[df_test["buy_time"] >= pd.Timestamp(test_start_ts)].copy()
                 df_test["wfo_window"] = window_idx
                 test_trades_list.append(df_test)
                 window_test_n_trades = len(df_test)
+                test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
 
+        best_criteria_list.append(test_criterion)
         test_n_trades_list.append(window_test_n_trades)
 
         train_start_dates.append(ref_ts[t0]       if t0       < len(ref_ts) else None)
@@ -381,7 +381,7 @@ def walk_forward_optimization(
             start += length_test
             end = start + length_train_set
 
-    # -----------------------------------------------------------
+# -----------------------------------------------------------
     # Final parameter summary (aggregated via param_selection_mode)
     # -----------------------------------------------------------
     df_params    = pd.DataFrame(best_params_list)
@@ -391,8 +391,9 @@ def walk_forward_optimization(
     # Final DataFrame with train/test dates, params, and criterion
     # -----------------------------------------------------------
     # Raw timestamps for exact alignment (used by debug)
-    test_start_ts_raw = list(test_start_dates)
-    test_end_ts_raw   = list(test_end_dates)
+    train_start_ts_raw = list(train_start_dates)
+    test_start_ts_raw  = list(test_start_dates)
+    test_end_ts_raw    = list(test_end_dates)
 
     train_start_dates = [pd.to_datetime(d).date() if d is not None else None for d in train_start_dates]
     train_end_dates   = [pd.to_datetime(d).date() if d is not None else None for d in train_end_dates]
@@ -404,21 +405,22 @@ def walk_forward_optimization(
     df_results.insert(1, 'train_end',   train_end_dates)
     df_results.insert(2, 'test_start',  test_start_dates)
     df_results.insert(3, 'test_end',    test_end_dates)
-    df_results['best_crite']  = best_criteria_list
-    df_results['tn_trades']   = test_n_trades_list
-    df_results['tr_symbols']  = [len(s) for s in train_symbols_list]
-    df_results['ts_symbols']  = [len(s) for s in test_symbols_list]
-    df_results['tr_syms']     = train_symbols_list
-    df_results['ts_syms']     = test_symbols_list
-    df_results['_test_start_ts'] = test_start_ts_raw
-    df_results['_test_end_ts']   = test_end_ts_raw
+    df_results['best_crite']      = best_criteria_list
+    df_results['tn_trades']       = test_n_trades_list
+    df_results['tr_symbols']      = [len(s) for s in train_symbols_list]
+    df_results['ts_symbols']      = [len(s) for s in test_symbols_list]
+    df_results['tr_syms']         = train_symbols_list
+    df_results['ts_syms']         = test_symbols_list
+    df_results['_train_start_ts'] = train_start_ts_raw
+    df_results['_test_start_ts']  = test_start_ts_raw
+    df_results['_test_end_ts']    = test_end_ts_raw
 
     summary_row = dict(final_params)
-    summary_row['train_start']    = param_selection_mode
-    summary_row['train_end']      = ''
-    summary_row['test_start']     = ''
-    summary_row['test_end']       = ''
-    summary_row['best_crite'] = df_results['best_crite'].mean() if 'best_crite' in df_results else None
+    summary_row['train_start'] = param_selection_mode
+    summary_row['train_end']   = ''
+    summary_row['test_start']  = ''
+    summary_row['test_end']    = ''
+    summary_row['best_crite']  = df_results['best_crite'].mean() if 'best_crite' in df_results else None
 
     df_results = pd.concat([df_results, pd.DataFrame([summary_row])], ignore_index=True)
 
@@ -426,7 +428,7 @@ def walk_forward_optimization(
 
     sep_row = {col: "·" * min(8, len(str(col))) for col in df_results.columns}
     sep_row["train_start"] = "·" * 10
-    df_display = pd.concat([df_results.iloc[:-1], pd.DataFrame([sep_row]), df_results.iloc[[-1]]], ignore_index=True)
+    df_display   = pd.concat([df_results.iloc[:-1], pd.DataFrame([sep_row]), df_results.iloc[[-1]]], ignore_index=True)
     display_cols = [c for c in df_display.columns if not c.startswith("_") and c not in ("tr_syms", "ts_syms")]
     logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display[display_cols].to_string()}\n{'─'*115}")
 

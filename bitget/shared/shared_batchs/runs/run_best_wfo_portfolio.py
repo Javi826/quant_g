@@ -15,9 +15,9 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # CONFIGURATION
 # =============================================================================
 
-WFO_METRIC            = "NET_GAIN_PCT"         # NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
+WFO_METRIC            = "R_SQUARED"         # NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
 WFO_N_SPLITS          = 4
-WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.30, 0.40]  # must match WFO_N_SPLITS, recency-weighted
+WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]  # must match WFO_N_SPLITS, recency-weighted
 
 MIN_STRATEGIES     = 2
 MAX_STRATEGIES     = 5
@@ -243,25 +243,16 @@ def _plot_wfo_portfolio(
     eq_pct = (eq - total_capital) / total_capital * 100
     ts     = pd.to_datetime(tl["sell_time"]).values
 
-    split_labels  = [label for label, _, _, _ in subperiods]
-    split_scores  = [subperiod_scores.get(lbl, np.nan) for lbl in split_labels]
-    split_mids    = [t_start + (t_end - t_start) / 2 for _, t_start, t_end, _ in subperiods]
-    weighted_mean = float(np.nanmean(split_scores)) if split_scores else 0.0
-
     _BG          = "#F8F9FA"
     _COLORS_BAND = ["#EBF5FB", "#EAFAF1", "#FEF9E7", "#FDEDEC"]
     _COLOR_EQ    = "#2E86C1"
-    _COLOR_MEAN  = "#E67E22"
-    _COLOR_POS   = "#2E86C1"
-    _COLOR_NEG   = "#C0392B"
 
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5), gridspec_kw={"width_ratios": [2, 1.2, 1]})
+    fig, ax1 = plt.subplots(figsize=(8, 5))
     fig.patch.set_facecolor(_BG)
     combo_str = " | ".join(sorted(combo, key=lambda s: int(s.split("_")[0])))
     fig.suptitle(title or f"Best WFO Portfolio — {combo_str}", fontsize=10, fontweight="bold")
 
     # ── Panel 1: Equity curve ─────────────────────────────────────────────────
-    ax1 = axes[0]
     ax1.set_facecolor(_BG)
 
     for i, (_, t_start, t_end, _) in enumerate(subperiods):
@@ -276,8 +267,10 @@ def _plot_wfo_portfolio(
         f"DD={m['Max_DD_pct']:.1f}%  "
         f"R²={m['R_Squared']:.3f}"
     )
-    ax1.legend([legend_label], loc="upper left", fontsize=8, framealpha=0.9,
-               facecolor="white", edgecolor="#AAAAAA", fontfamily="monospace")
+    _legend = ax1.legend([legend_label], loc="upper left", fontsize=8, framealpha=0.9,
+                         facecolor="white", edgecolor="#AAAAAA")
+    for _text in _legend.get_texts():
+        _text.set_fontfamily("monospace")
     ax1.set_title("Equity Curve (WFO Test)", fontsize=9, fontweight="bold")
     ax1.set_ylabel("Net Gain (%)", fontsize=9)
     ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
@@ -286,65 +279,6 @@ def _plot_wfo_portfolio(
     ax1.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
     ax1.spines["top"].set_visible(False)
     ax1.spines["right"].set_visible(False)
-
-    # ── Panel 2: Metric per subperiod bar chart ───────────────────────────────
-    ax2 = axes[1]
-    ax2.set_facecolor(_BG)
-
-    x_idx    = list(range(len(split_labels)))
-    x_labels = [
-        f"{lbl}\n{split_mids[i].strftime('%Y-%m')}"
-        for i, lbl in enumerate(split_labels)
-    ]
-    bar_colors = [
-        _COLOR_POS if (not np.isnan(v) and v >= 0) else _COLOR_NEG
-        for v in split_scores
-    ]
-
-    ax2.bar(x_idx, split_scores, color=bar_colors, alpha=0.75, edgecolor="white")
-    ax2.axhline(weighted_mean, color=_COLOR_MEAN, linewidth=1.0, linestyle="--",
-                label=f"Weighted mean={weighted_mean:.2f}")
-
-    for i, (xi, yi) in enumerate(zip(x_idx, split_scores)):
-        if not np.isnan(yi):
-            offset = abs(yi) * 0.03 if yi >= 0 else -abs(yi) * 0.08
-            ax2.text(xi, yi + offset, f"w={weights[i]:.2f}", ha="center", fontsize=7, color="#444444")
-
-    ax2.set_title(f"{metric} per Subperiod", fontsize=9, fontweight="bold")
-    ax2.set_ylabel(metric, fontsize=9)
-    ax2.set_xticks(x_idx)
-    ax2.set_xticklabels(x_labels, fontsize=8)
-    ax2.tick_params(axis="y", labelsize=7)
-    ax2.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
-    ax2.spines["top"].set_visible(False)
-    ax2.spines["right"].set_visible(False)
-    ax2.legend(fontsize=8, framealpha=0.9, facecolor="white", edgecolor="#AAAAAA")
-
-    # ── Panel 3: Distribution of all combos ───────────────────────────────────
-    ax3 = axes[2]
-    ax3.set_facecolor(_BG)
-
-    all_scores = df_scored["weighted_score"].dropna().values
-    best_score = float(df_scored["weighted_score"].iloc[0])
-    mean_score = float(np.mean(all_scores))
-    std_score  = float(np.std(all_scores))
-
-    ax3.hist(all_scores, bins=20, color=_COLOR_POS, alpha=0.65, edgecolor="white", linewidth=0.5)
-    ax3.axvline(best_score, color="#0D3B6E", linewidth=1.5, linestyle="-",
-                label=f"Best={best_score:.2f}")
-    ax3.axvline(mean_score, color=_COLOR_MEAN, linewidth=1.2, linestyle="--",
-                label=f"Mean={mean_score:.2f}")
-    ax3.axvspan(mean_score - std_score, mean_score + std_score,
-                alpha=0.1, color=_COLOR_MEAN, label=f"±1σ={std_score:.2f}")
-
-    ax3.set_title(f"Combo Distribution ({len(df_scored)} combos)", fontsize=9, fontweight="bold")
-    ax3.set_xlabel(f"{metric} (weighted)", fontsize=8)
-    ax3.set_ylabel("Count", fontsize=8)
-    ax3.tick_params(axis="both", labelsize=7)
-    ax3.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
-    ax3.spines["top"].set_visible(False)
-    ax3.spines["right"].set_visible(False)
-    ax3.legend(fontsize=7, framealpha=0.9, facecolor="white", edgecolor="#AAAAAA")
 
     fig.autofmt_xdate()
     plt.tight_layout()
@@ -367,28 +301,7 @@ def find_best_portfolio_combination_wfo(
     require_long_short: bool = REQUIRE_LONG_SHORT,
     show_plots: bool         = False,
 ) -> list:
-    """
-    Find best portfolio combination from WFO test trades of validated strategies.
 
-    Splits the WFO test period into n_splits temporal subperiods, applies
-    recency weights (subperiod_weights[-1] = most recent), and selects the
-    combination that maximizes the weighted metric score.
-
-    Args:
-        validated_wfo_trades : list of (strategy_id, trades_df) — validated strategies only
-        initial_balance      : capital per strategy
-        metric               : metric to maximize — NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
-        n_splits             : number of equal temporal subperiods
-        subperiod_weights    : weight per subperiod — len must equal n_splits
-        min_strategies       : minimum strategies per combo
-        max_strategies       : maximum strategies per combo
-        top_n                : number of top combos to display
-        require_long_short   : combo must include at least one long and one short strategy
-        show_plots           : render equity curve, subperiod bars, and combo distribution
-
-    Returns:
-        list of top_n dicts with keys: combo, weighted_score, S1..SN
-    """
     _validate_config(n_splits, subperiod_weights, metric)
 
     if not validated_wfo_trades:

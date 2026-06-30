@@ -1,18 +1,37 @@
 #shared_batchs/pipeline/oos_period.py
 import logging
+import os
 import pandas as pd
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_grid_backtest
-from shared_batchs.utils.analysis import report_backtesting
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.utils.backtest_compiler import compile_grid_results
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, apply_night_consolidation_filter, NIGHT_CONSOLIDATION_FILTER_ENABLED
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_metrics_table
 from shared_batchs.utils.plotting import plot_filter_comparison
-from shared_batchs.utils.io import accumulate_strategy_trades
 from shared_batchs.regime.regime_module import run_oos_backtest_with_regime
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, apply_night_consolidation_filter, NIGHT_CONSOLIDATION_FILTER_ENABLED
 
 logger = logging.getLogger("BOT_batch.pipeline.oos_period")
+
+
+# =============================================================================
+# PRIVATE HELPERS
+# =============================================================================
+
+def _accumulate_strategy_trades(
+    registry: list,
+    strategy_id: str,
+    trade_log: pd.DataFrame,
+    csv_folder: str = None,
+    label: str = "",
+) -> None:
+    """Accumulate trades into a registry list, optionally saving to CSV."""
+    registry.append((strategy_id, trade_log.copy()))
+    if csv_folder and label:
+        os.makedirs(csv_folder, exist_ok=True)
+        path               = os.path.join(csv_folder, f"trades_{label}_{strategy_id}.csv")
+        df_out             = trade_log.copy()
+        df_out["strategy"] = strategy_id
+        df_out.to_csv(path, index=False)
+        logger.debug(f"trades saved → {path}")
 
 
 # =============================================================================
@@ -35,62 +54,46 @@ def run_oos_period(
     trades_regime_accum: list,
     save_trades: bool,
     brief_trades_folder: str,
-    run_baseline: bool = True,
-    run_report_backtesting: bool = False,
-    debug_mode: bool = False,
-) -> tuple:
+) -> None:
 
-    ohlcv_arrays     = prepare_ohlcv_arrays(ohlcv_data)
-    trades_baseline  = pd.DataFrame()
-    metrics_baseline = None
+    ohlcv_arrays = prepare_ohlcv_arrays(ohlcv_data)
 
+    # -------------------------------------------------------------------------
     # Baseline
-    if run_baseline:
-        logger.info(f"STAGE 2 ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
+    # -------------------------------------------------------------------------
+    logger.info(f"STAGE 2 ── Backtest {label} Baseline ── bins: {bins_to_filter if bins_to_filter else 'none'}")
 
-        ohlcv_baseline = {}
-        for sym, arr in ohlcv_arrays.items():
-            signals = signal_fn(arr, **signal_params, live_trading=False)
-            if NIGHT_CONSOLIDATION_FILTER_ENABLED:
-                signals = apply_night_consolidation_filter(arr["ts"], signals)
-            ohlcv_baseline[sym] = {**arr, "signal": signals}
+    ohlcv_baseline = {}
+    for sym, arr in ohlcv_arrays.items():
+        signals = signal_fn(arr, **signal_params, live_trading=False)
+        if NIGHT_CONSOLIDATION_FILTER_ENABLED:
+            signals = apply_night_consolidation_filter(arr["ts"], signals)
+        ohlcv_baseline[sym] = {**arr, "signal": signals}
 
-        result_baseline = run_grid_backtest(
-            ohlcv_baseline,
-            sell_after   = best_params["SELL_AFTER"],
-            tp_pct       = best_params["TP_PCT"],
-            sl_pct       = best_params["SL_PCT"],
-            order_amount = order_amount,
+    result_baseline = run_grid_backtest(
+        ohlcv_baseline,
+        sell_after   = best_params["SELL_AFTER"],
+        tp_pct       = best_params["TP_PCT"],
+        sl_pct       = best_params["SL_PCT"],
+        order_amount = order_amount,
+    )
+
+    trades_baseline             = result_baseline["__PORTFOLIO__"]["trade_log"].copy()
+    trades_baseline.columns     = trades_baseline.columns.str.lower().str.strip()
+    trades_baseline["buy_time"] = pd.to_datetime(trades_baseline["buy_time"])
+
+    if save_trades:
+        _accumulate_strategy_trades(
+            trades_baseline_accum, strategy_id, trades_baseline,
+            csv_folder=brief_trades_folder, label=f"{label.lower()}_baseline",
         )
+    else:
+        trades_baseline_accum.append((strategy_id, trades_baseline.copy()))
 
-        if run_report_backtesting:
-            best_comb = tuple(best_params[p] for p in param_names)
-            oos_df    = pd.DataFrame(compile_grid_results([(best_comb, result_baseline)], param_names, INITIAL_BALANCE))
-            _, _ = report_backtesting(
-                df              = oos_df,
-                parameters      = param_names,
-                data_folder     = data_folder,
-                initial_capital = INITIAL_BALANCE,
-                strategy_id     = strategy_id,
-            )
-
-        trades_baseline             = result_baseline["__PORTFOLIO__"]["trade_log"].copy()
-        trades_baseline.columns     = trades_baseline.columns.str.lower().str.strip()
-        trades_baseline["buy_time"] = pd.to_datetime(trades_baseline["buy_time"])
-
-        if save_trades:
-            accumulate_strategy_trades(
-                trades_baseline_accum, strategy_id, trades_baseline,
-                csv_folder=brief_trades_folder, label=f"{label.lower()}_baseline",
-            )
-        else:
-            trades_baseline_accum.append((strategy_id, trades_baseline.copy()))
-
-        metrics_baseline = compute_metrics(trades_baseline, capital=INITIAL_BALANCE, name=strategy_id)
-
+    # -------------------------------------------------------------------------
     # Regime
-    _symbols_str = f"{len(ohlcv_data)} symbols — " if run_baseline else ""
-    logger.debug(f"STAGE 3 ── Backtest {label} Regime   ── {_symbols_str}bins: {bins_to_filter if bins_to_filter else 'none'}")
+    # -------------------------------------------------------------------------
+    logger.debug(f"STAGE 3 ── Backtest {label} Regime   ── {len(ohlcv_data)} symbols — bins: {bins_to_filter if bins_to_filter else 'none'}")
 
     from shared_batchs.regime.regime_module import REGIME_ENABLED as _REGIME_ENABLED
     if _REGIME_ENABLED:
@@ -106,7 +109,7 @@ def run_oos_period(
         )
     else:
         trades_regime  = trades_baseline.copy() if not trades_baseline.empty else pd.DataFrame()
-        metrics_regime = metrics_baseline
+        metrics_regime = compute_metrics(trades_baseline, capital=INITIAL_BALANCE, name=strategy_id)
 
     _b_profit = "N/A" if trades_baseline.empty else f"{trades_baseline['profit'].sum():.1f}"
     logger.debug(f"  [DEBUG {label}] baseline profit={_b_profit} | regime profit={trades_regime['profit'].sum():.1f}")
@@ -116,25 +119,16 @@ def run_oos_period(
     )
 
     if len(trades_regime) > 0:
-        if debug_mode:
-            for _lbl, _df in [(f"{label} Baseline", trades_baseline), (f"{label} Regime", trades_regime)]:
-                if len(_df) > 0:
-                    _m = compute_metrics(_df, capital=INITIAL_BALANCE, name="")
-                    logger.info(
-                        f"  DEBUG {_lbl} — trades={len(_df)} | "
-                        f"NetGain={_m['Net_Gain_pct']:.2f}% DD={_m['Max_DD_pct']:.2f}% "
-                        f"WinRate={_m['Win_Rate']:.1f}% R2={_m['R_Squared']:.3f}"
-                    )
         print_metrics_table([metrics_regime], f"  Metrics — {strategy_id} ({label} Regime)")
         if save_trades:
-            accumulate_strategy_trades(
+            _accumulate_strategy_trades(
                 trades_regime_accum, strategy_id, trades_regime,
                 csv_folder=brief_trades_folder, label=f"{label.lower()}_regime",
             )
         else:
             trades_regime_accum.append((strategy_id, trades_regime.copy()))
 
-    if run_baseline and len(trades_baseline) > 0:
+    if len(trades_baseline) > 0:
         plot_filter_comparison(
             strategy_id        = f"{strategy_id}_{label.lower()}",
             trades_df_baseline = trades_baseline,
@@ -142,5 +136,3 @@ def run_oos_period(
             data_folder        = data_folder,
             initial_balance    = INITIAL_BALANCE,
         )
-
-    return trades_baseline, trades_regime, metrics_baseline, metrics_regime

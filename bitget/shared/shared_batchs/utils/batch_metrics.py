@@ -114,12 +114,3 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
         "Duration_d":    duration_d,
         "Weekly_pct":    round(float(weekly_pct), 2),
     }
-
-
-def calc_r2_from_equity_hist(equity_hist: dict) -> float:
-    """Compute R² of equity curve vs straight line from sim_balance_history dict."""
-    if not equity_hist or len(equity_hist.get("balance", [])) < 2:
-        return np.nan
-    y = np.array(equity_hist["balance"]).reshape(-1, 1)
-    X = np.arange(len(y)).reshape(-1, 1)
-    return round(LinearRegression().fit(X, y).score(X, y), 3)

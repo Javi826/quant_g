@@ -9,6 +9,7 @@ from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_B
 from shared_batchs.tools.wfo_ST import walk_forward_optimization
 from shared_batchs.tools.wfo_MC import walk_forward_optimization_mc
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year, get_n_obs, extract_ohlcv_from_path
+from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.regime import regime_module
 from shared_batch_regime.regime_core import lookup_indicator_batch, classify_market_regime
 
@@ -17,8 +18,13 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-TRAIN_MONTHS         = 6
-TEST_MONTHS          = 2
+WFO_WINDOW_CONFIG = {
+    "15m":   {"train_months": 4, "test_months": 1},
+    "30m":   {"train_months": 4, "test_months": 1},
+    "1H":    {"train_months": 4, "test_months": 1},
+    "4H":    {"train_months": 9, "test_months":2},
+    "6Hutc": {"train_months": 9, "test_months":2},
+}
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
@@ -121,7 +127,7 @@ def _evaluate_fn_with_regime(
     regime_enabled: bool = False,
     indicator_cache: dict = None,
 ) -> tuple:
-    """Single param combination evaluation with regime signal filtering for WFO test windows."""
+    """Single param combination evaluation with regime signal filtering for WFO train windows."""
     _bins = [bins_to_filter] if isinstance(bins_to_filter, str) else list(bins_to_filter)
 
     ohlcv_arrays = {}
@@ -233,29 +239,25 @@ def _collect_trades_fn_with_regime(
     trades["buy_time"] = pd.to_datetime(trades["buy_time"])
     return trades
 
-
 # =============================================================================
 # APPROVAL CRITERION
 # =============================================================================
 
 def _evaluate_wfo_approval(
-    df_results: pd.DataFrame,
-    th_rate: float,
-    win_rate_th: float,
+    wfo_test_trades: pd.DataFrame,
+    net_gain_th: float,
+    dd_th: float,
 ) -> tuple:
-    """
-    Approval criterion based on WFO per-window out-of-sample (test) performance.
-    Excludes the aggregated summary row (last row of df_results).
 
-    Returns:
-        tuple: (approved, win_rate)
-    """
-    criteria = df_results.iloc[:-1]["best_crite"]
-    win_rate = float((criteria > th_rate).mean())
-    approved = win_rate >= win_rate_th
+    if wfo_test_trades.empty:
+        return False, 0.0, 0.0
 
-    return approved, win_rate
+    m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
+    net_gain_pct = m["Net_Gain_pct"]
+    max_dd_pct   = m["Max_DD_pct"]
+    approved     = net_gain_pct > net_gain_th and abs(max_dd_pct) < dd_th
 
+    return approved, net_gain_pct, max_dd_pct
 
 # =============================================================================
 # RUN WFO IS
@@ -269,8 +271,8 @@ def run_wfo_is(
     signal_params_keys: list,
     order_amount: int,
     timeframe: str,
-    th_rate: float,
-    win_rate_th: float,
+    net_gain_th: float,
+    dd_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -278,19 +280,16 @@ def run_wfo_is(
     bins_to_filter=None,
     regime_enabled: bool = False,
 ) -> tuple:
-    """
-    Run Walk-Forward Optimization on IS data and evaluate the window-based approval criterion.
-    Collects trade logs for each train and test window.
 
-    Returns:
-        tuple: (best_params, approved_wfo, win_rate, wfo_train_trades, wfo_test_trades, df_results)
-    """
     ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges = dict(zip(param_names, lists_for_grid))
 
+    _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe)
+    if _wfo_cfg is None:
+        raise ValueError(f"No WFO window config for timeframe: {timeframe}")
     bars_per_month   = get_bars_per_year(timeframe) / 12
-    length_train_set = int(TRAIN_MONTHS * bars_per_month)
-    pct_train_set    = TRAIN_MONTHS / (TRAIN_MONTHS + TEST_MONTHS)
+    length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
+    pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
 
     evaluate_fn = partial(
         _evaluate_fn,
@@ -308,8 +307,7 @@ def run_wfo_is(
         dtype              = dtype,
     )
 
-    test_evaluate_fn = None
-    collect_test_fn  = None
+    collect_test_fn = None
 
     if regime_enabled and bins_to_filter:
         indicator_cache = {}
@@ -318,16 +316,6 @@ def run_wfo_is(
             if cache is not None:
                 indicator_cache[sym] = cache
 
-        test_evaluate_fn = partial(
-            _evaluate_fn_with_regime,
-            signal_fn          = signal_fn,
-            signal_params_keys = signal_params_keys,
-            order_amount       = order_amount,
-            dtype              = dtype,
-            bins_to_filter     = bins_to_filter,
-            regime_enabled     = regime_enabled,
-            indicator_cache    = indicator_cache,
-        )
         collect_test_fn = partial(
             _collect_trades_fn_with_regime,
             signal_fn          = signal_fn,
@@ -352,18 +340,17 @@ def run_wfo_is(
         n_jobs                  = n_jobs,
         show_progress           = show_progress,
         n_symbols               = n_symbols,
-        test_evaluate_fn        = test_evaluate_fn,
         collect_train_trades_fn = collect_train_fn,
         collect_test_trades_fn  = collect_test_fn,
     )
 
-    approved_wfo, win_rate = _evaluate_wfo_approval(
-        df_results  = df_results,
-        th_rate     = th_rate,
-        win_rate_th = win_rate_th,
+    approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
+        wfo_test_trades = wfo_test_trades,
+        net_gain_th     = net_gain_th,
+        dd_th           = dd_th,
     )
 
-    return best_params, approved_wfo, win_rate, wfo_train_trades, wfo_test_trades, df_results
+    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results
 
 
 # =============================================================================
@@ -378,8 +365,8 @@ def run_wfo_mc_is(
     signal_params_keys: list,
     order_amount: int,
     timeframe: str,
-    th_rate: float,
-    win_rate_th: float,
+    net_gain_th: float,
+    dd_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -387,9 +374,12 @@ def run_wfo_mc_is(
 
     param_ranges = dict(zip(param_names, lists_for_grid))
 
+    _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe)
+    if _wfo_cfg is None:
+        raise ValueError(f"No WFO window config for timeframe: {timeframe}")
     bars_per_month   = get_bars_per_year(timeframe) / 12
-    length_train_set = int(TRAIN_MONTHS * bars_per_month)
-    pct_train_set    = TRAIN_MONTHS / (TRAIN_MONTHS + TEST_MONTHS)
+    length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
+    pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
     n_obs            = get_n_obs(timeframe)
 
     train_evaluate_fn = partial(
@@ -422,15 +412,15 @@ def run_wfo_mc_is(
         show_progress        = show_progress,
     )
 
-    approved_wfo, win_rate = _evaluate_wfo_approval(
-        df_results  = df_results,
-        th_rate     = th_rate,
-        win_rate_th = win_rate_th,
+    approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
+        wfo_test_trades = pd.DataFrame(),
+        net_gain_th     = net_gain_th,
+        dd_th           = dd_th,
     )
 
     verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
     params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 1 ── WFO-MC results ── {verdict} WinRate={win_rate*100:.1f}%")
+    logger.info(f"STAGE 1 ── WFO-MC results ── {verdict} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")
     logger.info(f"STAGE 1 ── WFO-MC params  ── {params_str}")
 
-    return best_params, approved_wfo, win_rate
+    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd

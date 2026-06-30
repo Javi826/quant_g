@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute_oo.py
+#shared/shared_batchs/backtesters/ZX_compute.py
 import heapq
 import logging
 import warnings
@@ -257,6 +257,8 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor,
 def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arrays,
                                   comi_factor, trades, trade_times, trade_log_cols, cash_bank, blocked_cash):
 
+    closed_reasons = []
+
     while open_heap and open_heap[0][0] <= t_int:
         _, _, pos = heapq.heappop(open_heap)
         if pos.get('closed', False):
@@ -267,6 +269,7 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
                                                      comi_factor, trades, trade_times, trade_log_cols,
                                                      cash_bank, blocked_cash)
             pos['closed'] = True
+            closed_reasons.append(pos['exit_reason'])
         else:
             sym = pos['symbol']
             sell_ts_int = pos.get('sell_time_int', int(sym_data[sym]['ts_int'][-1]))
@@ -283,8 +286,9 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
                                                      comi_factor, trades, trade_times, trade_log_cols,
                                                      cash_bank, blocked_cash)
             pos['closed'] = True
+            closed_reasons.append('SELL_AFTER')
             
-    return cash_bank, blocked_cash
+    return cash_bank, blocked_cash, closed_reasons
 
 
 # ============================
@@ -428,17 +432,16 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
 # Bucle principal - MODIFICADO PARA SHORT
 # cash_bank = efectivo total de la cuenta; blocked_cash = suma de los ingresos de shorts reservados
 # free_cash = cash_bank - blocked_cash (disponible para abrir nuevas posiciones)
-# ============================
 def run_backtest_loop(
     all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
     cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
     trades, trade_times, trade_log_cols, sim_balance_cols
 ):
-
+ 
     num_signals_executed = 0
     open_heap = []
     counter = 0
-    
+ 
     # Alias locales para velocidad
     sd = sym_data
     tia = ts_int_arrays
@@ -449,66 +452,80 @@ def run_backtest_loop(
     sa = sell_after
     tp = tp_pct
     sp = sl_pct
-    
+ 
     for t_int in all_timestamps_int:
-        
-        # Cerrar posiciones expiradas -> ahora devuelve cash_bank y blocked_cash actualizados
-        cash_bank, blocked_cash = close_expired_positions(
+ 
+        # Guardar si el heap ya estaba vacío ANTES de cerrar posiciones en esta vela
+        was_empty_before = not open_heap
+ 
+        # Cerrar posiciones expiradas -> devuelve cash_bank, blocked_cash y los motivos de cierre
+        cash_bank, blocked_cash, closed_reasons = close_expired_positions(
             t_int, open_heap, sd, tia, ca, cf, trades, trade_times, trade_log_cols, cash_bank, blocked_cash
         )
-        
-        # Si no hay posiciones abiertas, buscar nuevas señales
+ 
         if not open_heap:
-            events = sbt.get(int(t_int))
-            if events:
-                events_sorted = sorted(events, key=lambda x: x[0])
-                
-                for sym, buy_idx in events_sorted:
-                    # --- Validación inline mejorada ---
-                    if sa > 0:
-                        if buy_idx + sa > len(ca[sym]):
-                            continue
-                    else:
-                        if buy_idx + DEFAULT_CANDLES >= len(ca[sym]):
-                            continue
-                    
-
-                    # Calcular cash libre (no incluir ingresos bloqueados por shorts)
-                    free_cash = cash_bank - blocked_cash
-                    # Verificar saldo suficiente usando free_cash
-                    if free_cash < oa:
-                        break
-                    
-                    # Determinar dirección según la señal: 1 → long, -1 → short
-                    signal_value = sd[sym]['signal'][buy_idx]
-                    if signal_value == 0:
-                        continue  # ignorar si no hay señal
-                    is_short = signal_value < 0
-
-                    # VALIDACIÓN ADICIONAL PARA SHORTS: si no hay SL (sp == 0) rechazamos porque riesgo ilimitado
-                    if is_short:
-                        if sp == 0.0:
-                            continue
-
-                        # pérdida máxima esperada = order_amount * (sl_pct/100)
-                        potential_max_loss = oa * (sp / 100.0)
-                        commission_buy = oa * cf
-                        # requerimos que free_cash cubra la pérdida máxima + comision de entrada
-                        if free_cash < (potential_max_loss + commission_buy):
-                            # no hay suficiente capital libre para cubrir la pérdida máxima estimada
-                            continue
-
-                    # Ejecutar señal (ahora devuelve cash_bank y blocked_cash)
-                    cash_bank, blocked_cash, counter = execute_signal(
-                        sym, buy_idx, cash_bank, blocked_cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
-                    )
-                    num_signals_executed += 1
-        
+            if was_empty_before:
+                # El heap ya estaba vacío antes de esta vela -> buscar señales normalmente
+                search_signals = True
+            else:
+                # El heap se vació justo en esta vela. Si hubo algún cierre por TP/SL
+                # intravela, se retrasa la búsqueda a la vela siguiente (n+1). Si todos los
+                # cierres fueron por timeout, se busca en la misma vela (igual que producción).
+                had_intrabar_exit = any(r in ('TP', 'SL') for r in closed_reasons)
+                search_signals = not had_intrabar_exit
+ 
+            if search_signals:
+                events = sbt.get(int(t_int))
+                if events:
+                    events_sorted = sorted(events, key=lambda x: x[0])
+ 
+                    for sym, buy_idx in events_sorted:
+                        # --- Validación inline mejorada ---
+# =============================================================================
+#                         if sa > 0:
+#                             if buy_idx + sa > len(ca[sym]):
+#                                 continue
+#                         else:
+#                             if buy_idx + DEFAULT_CANDLES >= len(ca[sym]):
+#                                 continue
+# =============================================================================
+ 
+                        # Calcular cash libre (no incluir ingresos bloqueados por shorts)
+                        free_cash = cash_bank - blocked_cash
+                        # Verificar saldo suficiente usando free_cash
+                        if free_cash < oa:
+                            break
+ 
+                        # Determinar dirección según la señal: 1 -> long, -1 -> short
+                        signal_value = sd[sym]['signal'][buy_idx]
+                        if signal_value == 0:
+                            continue  # ignorar si no hay señal
+                        is_short = signal_value < 0
+ 
+                        # VALIDACIÓN ADICIONAL PARA SHORTS: si no hay SL (sp == 0) rechazamos porque riesgo ilimitado
+                        if is_short:
+                            if sp == 0.0:
+                                continue
+ 
+                            # pérdida máxima esperada = order_amount * (sl_pct/100)
+                            potential_max_loss = oa * (sp / 100.0)
+                            commission_buy = oa * cf
+                            # requerimos que free_cash cubra la pérdida máxima + comision de entrada
+                            if free_cash < (potential_max_loss + commission_buy):
+                                # no hay suficiente capital libre para cubrir la pérdida máxima estimada
+                                continue
+ 
+                        # Ejecutar señal (ahora devuelve cash_bank y blocked_cash)
+                        cash_bank, blocked_cash, counter = execute_signal(
+                            sym, buy_idx, cash_bank, blocked_cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
+                        )
+                        num_signals_executed += 1
+ 
         # Actualizar balance simulado (usa cash_bank para calcular equity)
         sim_balance_cols = update_sim_balance(
             t_int, open_heap, cash_bank, tia, ca, sim_balance_cols
         )
-    
+ 
     return cash_bank, blocked_cash, num_signals_executed
 
 # ============================

@@ -58,7 +58,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 from shared_batch_regime.regime_core        import REGIME_TIMEFRAME, precompute_indicators, lookup_indicator_batch, classify_market_regime
 from shared_batch_regime.config_paths       import DATA_FOLDER_OOS1
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
-from shared_batchs.utils.io                 import load_regime_bins
+from shared_batchs.regime.regime_module     import load_regime_bins
 from market_regime.position_sizer           import PositionSizer
 from market_regime.regime_classifier        import configure_regime
 

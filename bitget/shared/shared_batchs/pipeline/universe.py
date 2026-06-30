@@ -28,11 +28,6 @@ symbols_to_include = [
     "PIPPINUSDT",
 ]
 
-symbols_to_include = [
-    "BTCUSDT",
-
-]
-
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, custom_symbols=None):
     ohlcv_data         = {}

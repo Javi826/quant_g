@@ -42,8 +42,8 @@ BINS_OUTPUT_PATH    = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch_
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-AUTO_SAVE_BINS  = True
-OPTIMIZE_METRIC = "calmar"            # "profit" | "win_rate" | "calmar"
+AUTO_SAVE_BINS  = False
+OPTIMIZE_METRIC = "profit"            # "profit" | "win_rate" | "calmar"
 RANKING_MODE    = "weighted_delta"    # "weighted_delta" | "combo_delta"
 
 FILTER_NEGATIVE_BASELINE: bool = False
@@ -52,7 +52,7 @@ FILTER_NEGATIVE_BASELINE: bool = False
 # INDICATOR GRID
 # =============================================================================
 INDICATOR_GRID: dict = {
-    "ma_window": [2, 3, 4],
+    "ma_window": [2,4,6,8,10,12,14],
 }
 
 # =============================================================================

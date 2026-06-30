@@ -199,33 +199,29 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
     """Print fused WFO approval + strategy metrics table."""
     if not wfo_results:
         return
-
     n_pass        = sum(1 for w in wfo_results if "PASS" in w["verdict"])
-    mean_win_rate = round(np.mean([w["win_rate"] for w in wfo_results]) * 100, 1)
-
+    mean_net_gain = round(np.mean([w["net_gain"] for w in wfo_results]), 1)
+    mean_max_dd   = round(np.mean([w["max_dd"] for w in wfo_results]), 1)
     val_map     = {v["strategy_id"]: v for v in validation_results} if validation_results else {}
     has_metrics = bool(val_map)
-
     header = (
-        f"  {'Strategy':<27} {'Verdict':<10} {'WinRate%':>9}"
+        f"  {'Strategy':<27} {'Verdict':<10} {'NetGain%':>9} {'DD%':>7}"
         + (f"  {'NetGain%':>9} {'DD%':>7} {'WinRate%':>9} {'R2':>7} {'Trades':>7}" if has_metrics else "")
     )
     sep = (
-        f"  {'-'*27} {'-'*10} {'-'*9}"
+        f"  {'-'*27} {'-'*10} {'-'*9} {'-'*7}"
         + (f"  {'-'*9} {'-'*7} {'-'*9} {'-'*7} {'-'*7}" if has_metrics else "")
     )
-
     lines = [
         f"\n{'─'*115}",
-        f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanWinRate: {mean_win_rate}%",
+        f"  WFO SUMMARY — Pass: {n_pass}/{len(wfo_results)} | MeanNetGain: {mean_net_gain}% | MeanDD: {mean_max_dd}%",
         f"{'─'*115}",
         header,
         sep,
     ]
-
     for w in wfo_results:
         sid  = w["strategy_id"]
-        line = f"  {sid:<27} {w['verdict']:<10} {w['win_rate']*100:>8.1f}%"
+        line = f"  {sid:<27} {w['verdict']:<10} {w['net_gain']:>8.1f}% {w['max_dd']:>6.1f}%"
         if has_metrics and sid in val_map:
             v        = val_map[sid]
             n_trades = v.get("tn_trades", 0)
@@ -237,6 +233,5 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
                 f" {n_trades:>7}"
             )
         lines.append(line)
-
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
