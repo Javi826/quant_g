@@ -10,7 +10,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
-from shared_batchs.tools.optimize_MC import generate_paths_for_all_symbols_functional
+from shared_batchs.engines.optimize_MC import generate_paths_for_all_symbols_functional
 from shared_batchs.utils.ohlcv_utils import get_n_obs, extract_ohlcv_from_path
 from shared_batchs.utils.backtest_compiler import compile_MC_results
 

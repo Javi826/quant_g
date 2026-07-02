@@ -12,10 +12,9 @@ import time
 import logging
 import matplotlib
 import numpy as np
-import pandas as pd
 from itertools import product
 from importlib import import_module
-
+from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is, ANCHORED, METRIC_MODE, PARAM_SELECTION_MODE
 # LOGGING CONFIGURATION
 #------------------------------------------------------------------------------
 LOG_LEVEL = logging.INFO
@@ -40,14 +39,14 @@ from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.oos_period import run_oos_period
 from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_wfo_summary, print_all_curves_table, print_robustness_table
+from shared_batchs.utils.reporting import print_portfolio_metrics_table, print_wfo_summary, print_all_curves_table
 from shared_batchs.utils.plotting import plot_portfolio_comparison, plot_filter_comparison
 from shared_batchs.regime import regime_module
 from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_wfo_portfolio import find_best_portfolio_combination_wfo
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
-from shared_batchs.pipeline.wfo import run_wfo_is, run_wfo_mc_is
+
 
 regime_module._indicator_cache = {}
 
@@ -73,19 +72,18 @@ STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
 SELECTION_MODE       = "WFO"   # "WFO" or "WFO_MC"
 
 WFO_NET_GAIN_TH = 10
-WFO_DD_TH       = 50
+WFO_DD_TH       = 20
 
 # RUNS
 #------------------------------------------------------------------------------
-RUN_SUMMARY            = True
-RUN_CORRELATION        = False
-RUN_BEST_WFO_PORTFOLIO = False
+RUN_CORRELATION        = True
+RUN_BEST_WFO_PORTFOLIO = True
 RUN_DEPLOY             = False
-RUN_OOS                = True
+RUN_OOS                = False
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = False
+REGIME_ENABLED    = True
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -96,34 +94,32 @@ DEBUG_WFO_WINDOW  = None  # int to debug a specific WFO test window, None to dis
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
     # 15m
-# =============================================================================
-#     "01_reversal_long_15m",
-#     "02_reversal_short_15m",
-#     "11_parity_long_15m",
-#     "12_parity_short_15m",
-#     "21_flag_long_15m",
-#     "22_flag_short_15m",
-#     "31_orderblocks_long_15m",
-#     "32_orderblocks_short_15m",
-#     # 30m
-#     "03_reversal_long_30m",
-#     "04_reversal_short_30m",
-#     "13_parity_long_30m",
-#     "14_parity_short_30m",
-#     "23_flag_long_30m",
-#     "24_flag_short_30m",
-#     "33_orderblocks_long_30m",
-#     "34_orderblocks_short_30m",
-#     # 1H
-#     "05_reversal_long_1H",
-#     "06_reversal_short_1H",
-#     "15_parity_long_1H",
-#     "16_parity_short_1H",
-#     "25_flag_long_1H",
-#     "26_flag_short_1H",
-#     "35_orderblocks_long_1H",
-#     "36_orderblocks_short_1H",
-# =============================================================================
+    "01_reversal_long_15m",
+    "02_reversal_short_15m",
+    "11_parity_long_15m",
+    "12_parity_short_15m",
+    "21_flag_long_15m",
+    "22_flag_short_15m",
+    "31_orderblocks_long_15m",
+    "32_orderblocks_short_15m",
+    # 30m
+    "03_reversal_long_30m",
+    "04_reversal_short_30m",
+    "13_parity_long_30m",
+    "14_parity_short_30m",
+    "23_flag_long_30m",
+    "24_flag_short_30m",
+    "33_orderblocks_long_30m",
+    "34_orderblocks_short_30m",
+    # 1H
+    "05_reversal_long_1H",
+    "06_reversal_short_1H",
+    "15_parity_long_1H",
+    "16_parity_short_1H",
+    "25_flag_long_1H",
+    "26_flag_short_1H",
+    "35_orderblocks_long_1H",
+    "36_orderblocks_short_1H",
     # 4H
     "07_reversal_long_4H",
     "08_reversal_short_4H",
@@ -180,9 +176,9 @@ def run_batch(strategy_config: dict) -> None:
     STRATEGY_ID       = strategy_config["id"]
     SIDE              = strategy_config["direction"]
     TIMEFRAME         = strategy_config["timeframe"]
-    N_SYMBOLS         = strategy_config["n_symbols"]
-    ORDER_AMOUNT      = strategy_config["order_amount"]
-    ORDER_AMOUNT_PROD = strategy_config.get("order_amount_prod", strategy_config["order_amount"])
+    N_SYMBOLS         = strategy_config["N_SYMBOLS"]
+    ORDER_AMOUNT      = strategy_config["ORDER_AMOUNT"]
+    ORDER_AMOUNT_PROD = strategy_config.get("order_amount_prod", strategy_config["ORDER_AMOUNT"])
     param_grid        = strategy_config["param_grid"]
 
     signal_key         = "_".join(strategy_config["name"].split("_")[:-1])
@@ -209,6 +205,8 @@ def run_batch(strategy_config: dict) -> None:
     logger.debug(f"IS full pool: {len(ohlcv_is)} symbols: {sorted(ohlcv_is.keys())}")
 
     bins_to_filter = regime_module.load_regime_bins(REGIME_BINS_PATH, STRATEGY_ID) if REGIME_ENABLED else "neutral"
+    if REGIME_ENABLED:
+        logger.info(f"STAGE 1 ── Regime bins    ── bins: {[bins_to_filter] if isinstance(bins_to_filter, str) else bins_to_filter}")
 
     # -------------------------------------------------------------------------
     # BLOCK 1 — Parameter Selection + Train/Test Trades (WFO or WFO_MC)
@@ -233,7 +231,7 @@ def run_batch(strategy_config: dict) -> None:
         )
 
     elif SELECTION_MODE == "WFO_MC":
-        best_params, approved_wfo, wfo_net_gain, wfo_max_dd = run_wfo_mc_is(
+        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, wfo_df_results = run_wfo_mc_is(
             ohlcv_data          = ohlcv_is,
             param_names         = param_names,
             lists_for_grid      = lists_for_grid,
@@ -246,10 +244,10 @@ def run_batch(strategy_config: dict) -> None:
             dtype               = DTYPE,
             n_jobs              = N_JOBS,
             show_progress       = SHOW_PROGRESS,
+            n_symbols           = N_SYMBOLS,
+            bins_to_filter      = bins_to_filter,
+            regime_enabled      = REGIME_ENABLED,
         )
-        wfo_train_trades = None
-        wfo_test_trades  = None
-        wfo_df_results   = None
 
     else:
         raise ValueError(f"Unknown SELECTION_MODE: {SELECTION_MODE}")
@@ -279,6 +277,7 @@ def run_batch(strategy_config: dict) -> None:
                 trades_df_r01      = None,
                 data_folder        = DATA_FOLDER_IS,
                 initial_balance    = INITIAL_BALANCE,
+                regime_enabled     = REGIME_ENABLED,
             )
 
     # STAGE 1 metrics + log — moved here so it prints before STAGE 2 (OOS)
@@ -417,11 +416,6 @@ def run_batch(strategy_config: dict) -> None:
 # =============================================================================
 
 def run_summary():
-    """Compute combined portfolio metrics. Call after all run_batch() calls."""
-    if not RUN_SUMMARY:
-        print_wfo_summary(_wfo_results, _validation_results)
-        return
-
     print_wfo_summary(_wfo_results, _validation_results)
 
     validated_ids        = {w["strategy_id"] for w in _wfo_results if "PASS" in w["verdict"]} if _wfo_results else {v["strategy_id"] for v in _validation_results if "VALIDATED" in v["verdict"]}
@@ -432,29 +426,23 @@ def run_summary():
     # OOS ANALYSIS
     # -------------------------------------------------------------------------
     if RUN_OOS:
-        for label, strategy_trades in [("Baseline", _strategy_trades_oos_baseline), ("Regime 0+1", _strategy_trades_oos_regime)]:
+        _regime_label = "REGIME" if REGIME_ENABLED else "BASELINE"
+
+        for label, strategy_trades in [("OOS — BASELINE (best WFO params)", _strategy_trades_oos_baseline), (f"OOS — {_regime_label} (best WFO params)", _strategy_trades_oos_regime)]:
             if not strategy_trades:
                 continue
             print_portfolio_metrics_table(strategy_trades, label, INITIAL_BALANCE)
-
         if _strategy_trades_oos_baseline:
             logger.info(f"\n{'='*115}\n  PORTFOLIO ANALYSIS\n{'='*115}")
             if logger.isEnabledFor(logging.DEBUG):
-                print_all_curves_table(_strategy_trades_oos_baseline, "Baseline", INITIAL_BALANCE)
+                print_all_curves_table(_strategy_trades_oos_baseline, "OOS — BASELINE (best WFO params)", INITIAL_BALANCE)
             if _strategy_trades_oos_regime:
-                print_all_curves_table(_strategy_trades_oos_regime, "Regime 0+1", INITIAL_BALANCE)
-
+                print_all_curves_table(_strategy_trades_oos_regime, f"OOS — {_regime_label} (best WFO params)", INITIAL_BALANCE)
         if validated_baseline:
             if logger.isEnabledFor(logging.DEBUG):
-                print_all_curves_table(validated_baseline, "Baseline — Validated only", INITIAL_BALANCE)
+                print_all_curves_table(validated_baseline, "OOS — BASELINE (best WFO params) — Validated only", INITIAL_BALANCE)
         if validated_oos_regime:
-            print_all_curves_table(validated_oos_regime, "Regime 0+1 — Validated only", INITIAL_BALANCE)
-
-        print_robustness_table(
-            strategy_trades_per_period=[("OOS", validated_oos_regime)],
-            initial_balance=INITIAL_BALANCE,
-        )
-
+            print_all_curves_table(validated_oos_regime, f"OOS — {_regime_label} (best WFO params) — Validated only", INITIAL_BALANCE)
         plot_portfolio_comparison(
             strategy_trades_baseline = validated_baseline,
             strategy_trades_regime01 = validated_oos_regime,
@@ -473,9 +461,9 @@ def run_summary():
     if _strategy_trades_wfo_test:
         logger.info(f"\n{'='*115}\n  WFO TEST TRADES\n{'='*115}")
         _all_validated_wfo_test = [(sid, df) for sid, df in _strategy_trades_wfo_test if sid in validated_ids]
-        print_all_curves_table(_strategy_trades_wfo_test, "WFO Test — All", INITIAL_BALANCE)
+        print_all_curves_table(_strategy_trades_wfo_test, "IS — WFO Test windows concatenated (per-window best params) — All", INITIAL_BALANCE)
         if _all_validated_wfo_test:
-            print_all_curves_table(_all_validated_wfo_test, "WFO Test — Validated only", INITIAL_BALANCE)
+            print_all_curves_table(_all_validated_wfo_test, "IS — WFO Test windows concatenated (per-window best params) — Validated only", INITIAL_BALANCE)
 
     # -------------------------------------------------------------------------
     # CORRELATION + BEST WFO PORTFOLIO
@@ -489,6 +477,15 @@ def run_summary():
             initial_balance          = INITIAL_BALANCE,
             threshold                = CORRELATION_DD_THRESHOLD,
         )
+        
+    if SHOW_PLOTS and validated_wfo_test:
+        plot_portfolio_comparison(
+            strategy_trades_baseline = validated_wfo_test,
+            strategy_trades_regime01 = None,
+            data_folder              = DATA_FOLDER_IS,
+            initial_balance          = INITIAL_BALANCE,
+            title                    = "Portfolio WFO Test — Validated only",
+        )
 
     if RUN_BEST_WFO_PORTFOLIO:
         find_best_portfolio_combination_wfo(
@@ -496,7 +493,6 @@ def run_summary():
             initial_balance      = INITIAL_BALANCE,
             show_plots           = SHOW_PLOTS,
         )
-
 
 # =============================================================================
 # MAIN
@@ -531,11 +527,11 @@ if __name__ == "__main__":
     logger.info(f"{'='*115}")
     logger.info(f"  Strategies set : {STRATEGIES_SET_NAME}-{len(strategies_to_run)} strategies")
     logger.info(f"  Loop config    : {STRATEGIES_LOOP_NAME}")
-    logger.info(f"  Deploy         : {'🟢 enabled' if RUN_DEPLOY else '⚪ disabled'}")
+    logger.info(f"  Selection mode : {SELECTION_MODE}  |  Anchored={'🟢' if ANCHORED else '⚪'}  Metric={METRIC_MODE}  Selection={PARAM_SELECTION_MODE}")
     regime_module.REGIME_ENABLED = REGIME_ENABLED
     load_config_from_bins(REGIME_BINS_PATH)
     logger.info(f"  Regime         : {'🟢 enabled' if REGIME_ENABLED else '⚪ disabled'}  CFG={regime_module.INDICATOR_CFG}  TF={REGIME_TIMEFRAME}")
-    logger.info(f"  Selection mode : {SELECTION_MODE}")
+    logger.info(f"  Runs           : {'🟢' if RUN_CORRELATION else '⚪'} Correlation  {'🟢' if RUN_BEST_WFO_PORTFOLIO else '⚪'} BestPortfolio  {'🟢' if RUN_DEPLOY else '⚪'} Deploy  {'🟢' if RUN_OOS else '⚪'} OOS")
     logger.info(f"  Data IS        : 🔵 {_short_path(DATA_FOLDER_IS)}")
     logger.info(f"  Data OOS       : 🔵 {_short_path(DATA_FOLDER_OOS1)}")
     logger.info(f"{'='*115}\n")

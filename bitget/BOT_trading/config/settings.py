@@ -14,14 +14,14 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 40000,
+        "initial_capital": 2000,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime_enabled": False,
+        "regime_enabled": True,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime_ma_window":3,
+        "regime_ma_window":4,
         "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
     },

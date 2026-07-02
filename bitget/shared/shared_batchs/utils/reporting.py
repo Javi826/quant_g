@@ -2,71 +2,8 @@
 import logging
 import numpy as np
 import pandas as pd
-from shared_batchs.utils.batch_metrics import compute_metrics, _weekly_returns, _cvar, _neg_streak_stats
+from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.utils.reporting")
-
-
-# =============================================================================
-# PRIVATE HELPERS — ROBUSTNESS TABLE
-# =============================================================================
-
-def _build_robustness_rows(
-    strategy_trades_per_period: list,
-    initial_balance: float,
-) -> list:
-    """Compute robustness metrics for each OOS period. Shared by all robustness print functions."""
-    rows = []
-    for label, strategy_trades in strategy_trades_per_period:
-        if not strategy_trades:
-            continue
-
-        all_tl        = pd.concat([df for _, df in strategy_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-        total_capital = initial_balance * len(strategy_trades)
-        m             = compute_metrics(all_tl, capital=total_capital, name="")
-        pf            = m["Profit_Factor"]
-
-        weekly           = _weekly_returns(strategy_trades, initial_balance)
-        cvar10           = _cvar(weekly, pct=10)
-        avg_neg, max_neg = _neg_streak_stats(weekly)
-        weekly_avg       = round(float(weekly.mean()), 1) if len(weekly) > 0 else np.nan
-
-        rows.append({
-            "Period":       label,
-            "NetGain%":     round(m["Net_Gain_pct"], 1),
-            "MaxDD%":       round(m["Max_DD_pct"], 1),
-            "R2":           round(m["R_Squared"], 2),
-            "ProfitFactor": round(pf if pf != float("inf") else 0, 1),
-            "CVaR10%":      round(cvar10, 2),
-            "AvgNegStreak": round(avg_neg, 1),
-            "MaxNegStreak": max_neg,
-            "Weekly_pct":   round(float((weekly > 0).mean() * 100), 1),
-            "Weekly_avg%":  weekly_avg,
-            "MinWeekly%":   round(float(weekly.min()), 1) if len(weekly) > 0 else np.nan,
-        })
-    return rows
-
-
-def _print_robustness_df(rows: list, title: str) -> None:
-    """Render robustness rows as a formatted table. Shared by all robustness print functions."""
-    if not rows:
-        logger.info("  No data for robustness table.")
-        return
-
-    df                = pd.DataFrame(rows)
-    sep_row           = {col: "─" * 8 for col in df.columns}
-    sep_row["Period"] = "─" * 6
-    mean_row          = df.drop(columns="Period").mean().round(2).to_dict()
-    mean_row["Period"] = "MEAN"
-    df                = pd.concat([df, pd.DataFrame([sep_row, mean_row])], ignore_index=True)
-
-    lines = [
-        f"\n{'─'*115}",
-        f"  {title}",
-        f"{'─'*115}",
-        df.to_string(index=False),
-        f"{'─'*115}",
-    ]
-    logger.info("\n".join(lines))
 
 
 # =============================================================================
@@ -162,33 +99,6 @@ def print_all_curves_table(
         df_out.to_string(index=False),
     ]
     logger.info("\n".join(lines))
-
-
-# =============================================================================
-# ROBUSTNESS TABLES
-# =============================================================================
-
-def print_robustness_table(
-    strategy_trades_per_period: list,
-    initial_balance: float,
-) -> None:
-    """Print robustness table with one row per OOS period (combined portfolio metrics)."""
-    rows = _build_robustness_rows(strategy_trades_per_period, initial_balance)
-    _print_robustness_df(rows, "ROBUSTNESS TABLE — Validated Combined Portfolio")
-
-
-def print_best_r2_robustness_table(
-    combo_ids: list,
-    strategy_trades_per_period: list,
-    initial_balance: float,
-) -> None:
-    """Evaluate a fixed strategy combination (selected on IS) across OOS periods."""
-    filtered_per_period = [
-        (label, [(sid, df) for sid, df in trades if sid in combo_ids])
-        for label, trades in strategy_trades_per_period
-    ]
-    rows = _build_robustness_rows(filtered_per_period, initial_balance)
-    _print_robustness_df(rows, "ROBUSTNESS TABLE — Validated Combined Portfolio")
 
 
 # =============================================================================

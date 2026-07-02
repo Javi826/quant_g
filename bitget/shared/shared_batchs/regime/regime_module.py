@@ -1,16 +1,14 @@
 #shared/shared_batchs/regime/regime_module.py
 import os
 import logging
-import numpy as np
 import pandas as pd
 from importlib.util import spec_from_file_location, module_from_spec
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batch_regime.regime_core import load_ohlcv_raw
-from shared_batch_regime.regime_core import precompute_indicators, lookup_indicator_batch
-from shared_batch_regime.regime_core import classify_market_regime
+from shared_batch_regime.regime_core import precompute_indicators
 from shared_batchs.utils.ohlcv_utils import apply_night_consolidation_filter, NIGHT_CONSOLIDATION_FILTER_ENABLED
-
+from shared_batch_regime.regime_core import  apply_regime_filter
 logger = logging.getLogger("shared_batch.regime.regime_module")
 
 # =============================================================================
@@ -38,9 +36,9 @@ def load_config_from_bins(bins_path: str) -> None:
     _indicator_cache = {}
     logger.debug(f"  [regime_module] config loaded — INDICATOR_CFG={INDICATOR_CFG}")
 
-def _get_indicator_cache(symbol: str) -> dict | None:
+def _get_indicator_cache(symbol: str, data_folder: str) -> dict | None:
     if symbol not in _indicator_cache:
-        df = load_ohlcv_raw(symbol)
+        df = load_ohlcv_raw(symbol, data_folder)
         if df.empty:
             return None
         _indicator_cache[symbol] = precompute_indicators(df, INDICATOR_CFG)
@@ -75,6 +73,7 @@ def run_oos_backtest_with_regime(
     order_amount:    int,
     bins_to_filter:  str | list[str],
     initial_balance: float,
+    data_folder:     str,
 ) -> tuple:
     _bins_to_filter = [bins_to_filter] if isinstance(bins_to_filter, str) else bins_to_filter
 
@@ -86,24 +85,14 @@ def run_oos_backtest_with_regime(
             signals = apply_night_consolidation_filter(arr["ts"], signals)
 
         if REGIME_ENABLED and _bins_to_filter and _bins_to_filter != ["neutral"]:
-            sym_cache = _get_indicator_cache(sym)
-
-            if sym_cache is not None:
-                signal_idxs = np.nonzero(signals)[0]
-
-                if signal_idxs.size > 0:
-                    signal_ts = arr['ts'][signal_idxs]
-                    lookups   = {
-                        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
-                        for key in sym_cache if key != "ts"
-                    }
-                    for i, idx in enumerate(signal_idxs):
-                        close_idx = idx - 1 if idx > 0 else idx
-                        context = {"close": float(arr['close'][close_idx])}
-                        for key, values in lookups.items():
-                            context[key] = float(values[i]) if not np.isnan(values[i]) else None
-                        if classify_market_regime(context, cfg=INDICATOR_CFG) not in _bins_to_filter:
-                            signals[idx] = 0
+            sym_cache = _get_indicator_cache(sym, data_folder)
+            signals   = apply_regime_filter(
+                signals        = signals,
+                arr            = arr,
+                sym_cache      = sym_cache,
+                cfg            = INDICATOR_CFG,
+                bins_to_filter = _bins_to_filter,
+            )
 
         ohlcv_arrays_regime[sym] = {**arr, "signal": signals}
 

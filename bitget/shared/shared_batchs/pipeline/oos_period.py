@@ -106,6 +106,7 @@ def run_oos_period(
             order_amount    = order_amount,
             bins_to_filter  = bins_to_filter,
             initial_balance = INITIAL_BALANCE,
+            data_folder     = data_folder,
         )
     else:
         trades_regime  = trades_baseline.copy() if not trades_baseline.empty else pd.DataFrame()

@@ -1,4 +1,4 @@
-#shared/shared_batchs/tools/wfo_ST.py
+#shared/shared_batchs/engines/wfo_WF.py
 import logging
 import contextlib
 import numpy as np
@@ -12,7 +12,7 @@ from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 
-logger = logging.getLogger("BOT_batch.tools.wfo_ST")
+logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
 EMA_ALPHA   = 0.3
 WARMUP_BARS = 100
@@ -424,13 +424,12 @@ def walk_forward_optimization(
 
     df_results = pd.concat([df_results, pd.DataFrame([summary_row])], ignore_index=True)
 
-    logger.info(f"WFO completed: {window_idx} windows processed (parallelized with {n_jobs} threads)")
 
     sep_row = {col: "·" * min(8, len(str(col))) for col in df_results.columns}
     sep_row["train_start"] = "·" * 10
     df_display   = pd.concat([df_results.iloc[:-1], pd.DataFrame([sep_row]), df_results.iloc[[-1]]], ignore_index=True)
     display_cols = [c for c in df_display.columns if not c.startswith("_") and c not in ("tr_syms", "ts_syms")]
-    logger.info(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display[display_cols].to_string()}\n{'─'*115}")
+    logger.debug(f"WFO Final summary — parameters, criterion, and train/test dates per window:\n{df_display[display_cols].to_string()}\n{'─'*115}")
 
     # -----------------------------------------------------------
     # Concatenate per-window trade logs
@@ -438,4 +437,4 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    return final_params, df_results, wfo_train_trades, wfo_test_trades
+    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx

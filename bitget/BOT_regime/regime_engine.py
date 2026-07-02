@@ -1,385 +1,416 @@
-#shared/shared_batch_regime/regime_engine.py
+#shared/BOT_regime/regime_engine.py
 import os
 import logging
-import numpy as np
-import pandas as pd
-from sklearn.linear_model import LinearRegression
 from importlib.util import spec_from_file_location, module_from_spec
 
-from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
-from shared_batchs.pipeline.universe import filter_symbols, select_universe
-from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
+import numpy as np
+import pandas as pd
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batch_regime.config_paths import BITGET_ROOT, DATA_FOLDER_IS, DATA_FOLDER_OOS1, DATA_FOLDER_OOS2, DATA_FOLDER_OOS3
-from shared_batch_regime.regime_core import BINS, REGIME_TIMEFRAME, classify_market_regime
-from shared_batch_regime.regime_core import precompute_indicators, lookup_indicator_batch
+from shared_batchs.engines.wfo_WF import WARMUP_BARS
+from shared_config import VOLUME_COL
+from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE, MIN_PRICE
+from shared_batchs.pipeline.universe import filter_symbols, select_universe
+from shared_batchs.pipeline.wfo import run_wfo_is
+from shared_batchs.registry.signal_registry import SIGNAL_REGISTRY
+from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batch_regime.config_paths import BITGET_ROOT, DATA_FOLDER_IS, DATA_FOLDER_OOS1
+from shared_batch_regime.regime_core import BINS, REGIME_TIMEFRAME, combo_label
+from shared_batch_regime.regime_core import precompute_indicators
 from shared_batch_regime.regime_core import load_ohlcv_raw
-
+from shared_batch_regime.regime_core import  classify_signal_regimes
 logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CONSTANTS
 # =============================================================================
 
-LONG_KEYWORD               = "long"
-ORDER_AMOUNT               = 80
-DEBUG_TF_FILTER: list[str] = []
-
-PERIODS = {
-    "IS":   DATA_FOLDER_IS,
-    "OOS1": DATA_FOLDER_OOS1,
-    "OOS2": DATA_FOLDER_OOS2,
-    "OOS3": DATA_FOLDER_OOS3,
-}
-EVAL_KEYS = ["OOS2", "OOS3", "OOS1"]
+LONG_KEYWORD = "long"
 
 # =============================================================================
-# CONFIG LOADERS
+# CONFIG LOADER — full param_grid (needed to re-run WFO), same pattern as main_batch_E1.py
 # =============================================================================
 
 def load_strategies_config(strategies_set_name: str) -> list[dict]:
-    loop_name = f"strategies_loop_{strategies_set_name}_01"
-    loop_path = os.path.join(BITGET_ROOT, f"BOT_batch_{strategies_set_name}", "strategies_files", f"{loop_name}.py")
-    logger.debug(f"  [load_strategies_config] Loading: {loop_path}")
-    spec   = spec_from_file_location(loop_name, loop_path)
-    module = module_from_spec(spec)
-    spec.loader.exec_module(module)
+    strategies_files_dir = os.path.join(BITGET_ROOT, f"BOT_batch_{strategies_set_name}", "strategies_files")
+
+    batch_name   = f"strategies_BT_{strategies_set_name}_batch"
+    batch_path   = os.path.join(strategies_files_dir, f"{batch_name}.py")
+    spec         = spec_from_file_location(batch_name, batch_path)
+    batch_module = module_from_spec(spec)
+    spec.loader.exec_module(batch_module)
+    strategies_batch = batch_module.STRATEGIES
+
+    loop_name   = f"strategies_loop_{strategies_set_name}_09"
+    loop_path   = os.path.join(strategies_files_dir, f"{loop_name}.py")
+    spec        = spec_from_file_location(loop_name, loop_path)
+    loop_module = module_from_spec(spec)
+    spec.loader.exec_module(loop_module)
+    loop_map = {s["id"]: s for s in loop_module.STRATEGIES_LOOP}
 
     strategies = []
-    for entry in module.STRATEGIES_LOOP:
-        strategy_id = entry["id"]
-        signal_key  = "_".join(strategy_id.split("_")[1:-1])
-        if signal_key not in SIGNAL_REGISTRY:
-            signal_key = "_".join(strategy_id.split("_")[:-1])
+    for s in strategies_batch:
+        loop = loop_map.get(s["id"])
+        if not loop:
+            logger.warning(f"⚠️  {s['id']} not found in strategies_loop — skipping.")
+            continue
+
+        merged      = {**s, **loop}
+        signal_key  = "_".join(merged["name"].split("_")[:-1])
         if signal_key not in SIGNAL_REGISTRY:
             continue
 
-        registry      = SIGNAL_REGISTRY[signal_key]
-        param_grid    = entry["param_grid"]
-        best_params   = {k.upper(): v[0] for k, v in param_grid.items()}
-        signal_params = {k: best_params[k.upper()] for k in registry["params"] if k.upper() in best_params}
-
+        registry = SIGNAL_REGISTRY[signal_key]
         strategies.append({
-            "id":            strategy_id,
-            "timeframe":     strategy_id.split("_")[-1],
-            "signal_fn":     registry["fn"],
-            "signal_params": signal_params,
-            "best_params":   best_params,
-            "is_long":       LONG_KEYWORD in strategy_id,
-            "n_symbols":     entry.get("n_symbols", 10),
+            "id":                 merged["id"],
+            "timeframe":          merged["timeframe"],
+            "n_symbols":          merged["N_SYMBOLS"],
+            "order_amount":       merged["ORDER_AMOUNT"],
+            "param_grid":         merged["param_grid"],
+            "param_names":        list(merged["param_grid"].keys()),
+            "lists_for_grid":     [merged["param_grid"][k] for k in merged["param_grid"].keys()],
+            "signal_fn":          registry["fn"],
+            "signal_params_keys": registry["params"],
+            "is_long":            LONG_KEYWORD in merged["id"],
         })
     return strategies
 
-
-def load_symbols(strategy_id: str, timeframe: str, strategies_set_name: str) -> list[str]:
-    symbols_folder = os.path.join(BITGET_ROOT, "BOT_trading", "symbols_live", strategies_set_name)
-    filepath       = os.path.join(symbols_folder, f"symbols_live_{strategy_id}_{timeframe}.csv")
-    if not os.path.exists(filepath):
-        return []
-    df = pd.read_csv(filepath, header=None)
-    return df.iloc[:, 0].dropna().astype(str).tolist()
-
 # =============================================================================
-# OHLCV LOADERS
+# UNIVERSE LOADING
 # =============================================================================
 
-def load_ohlcv_for_period(strategy: dict, period_key: str, strategies_set_name: str) -> dict:
-    if period_key == "OOS1":
-        symbols = load_symbols(strategy['id'], strategy['timeframe'], strategies_set_name)
-        if not symbols:
-            return {}
-        ohlcv_data, _ = filter_symbols(
-            symbols, min_vol_usdt=0, timeframe=strategy['timeframe'],
-            data_folder=PERIODS[period_key], min_price=None, vol_window=50,
-            custom_symbols=symbols,
-        )
-        return ohlcv_data
-
-    _, symbols_oos_final, _, ohlcv_oos = select_universe(
+def load_ohlcv_is(strategy: dict) -> dict:
+    _, _, ohlcv_is, _ = select_universe(
         data_folder_is    = DATA_FOLDER_IS,
-        data_folder_oos   = PERIODS[period_key],
-        timeframe         = strategy['timeframe'],
-        n_symbols         = strategy['n_symbols'],
-        min_price         = None,
+        data_folder_oos   = DATA_FOLDER_OOS1,
+        timeframe         = strategy["timeframe"],
+        n_symbols         = strategy["n_symbols"],
+        min_price         = MIN_PRICE,
         filter_symbols_fn = filter_symbols,
     )
-    ohlcv_oos = {sym: ohlcv_oos[sym] for sym in symbols_oos_final if sym in ohlcv_oos}
-    logger.debug(f"[symbols] {strategy['id']} {period_key}: {sorted(ohlcv_oos.keys())}")
-    return ohlcv_oos
+    return ohlcv_is
 
 # =============================================================================
-# INDICATOR CACHE
+# INDICATOR CACHE (daily regime indicator, precomputed once per symbol)
 # =============================================================================
 
-def build_indicator_cache(
-    baselines:     dict,
-    strategies:    list[dict],
-    indicator_cfg: dict,
-) -> tuple[dict, dict]:
-    cache:       dict = {}
-    keys_needed: set  = set()
-
-    for strategy in strategies:
-        for period_key in EVAL_KEYS:
-            if period_key in baselines.get(strategy['id'], {}):
-                for sym in baselines[strategy['id']][period_key]['ohlcv_arrays']:
-                    keys_needed.add(sym)
-
-    for sym in sorted(keys_needed):
-        if sym in cache:
-            continue
-        df = load_ohlcv_raw(sym)
+def build_indicator_cache(ohlcv_data: dict, indicator_cfg: dict, data_folder: str) -> dict:
+    cache = {}
+    for sym in sorted(ohlcv_data.keys()):
+        df = load_ohlcv_raw(sym, data_folder)
         if not df.empty:
             cache[sym] = precompute_indicators(df, indicator_cfg)
-
-    return cache, indicator_cfg
+    return cache
 
 # =============================================================================
-# BACKTEST
+# BASELINE WFO — no regime filtering
 # =============================================================================
 
-def run_backtest(ohlcv_arrays: dict, best_params: dict) -> dict:
-    result = run_grid_backtest(
-        ohlcv_arrays,
-        sell_after=best_params['SELL_AFTER'], tp_pct=best_params['TP_PCT'],
-        sl_pct=best_params['SL_PCT'], order_amount=ORDER_AMOUNT,
+def run_baseline_wfo(strategy: dict, ohlcv_is: dict, dtype, n_jobs: int = -1, show_progress: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run WFO once, no regime filtering. Returns (wfo_test_trades, df_results)."""
+    _, _, _, _, _, wfo_test_trades, df_results = run_wfo_is(
+        ohlcv_data          = ohlcv_is,
+        param_names         = strategy["param_names"],
+        lists_for_grid      = strategy["lists_for_grid"],
+        signal_fn           = strategy["signal_fn"],
+        signal_params_keys  = strategy["signal_params_keys"],
+        order_amount        = strategy["order_amount"],
+        timeframe           = strategy["timeframe"],
+        net_gain_th         = 0,
+        dd_th               = 100,
+        dtype               = dtype,
+        n_jobs              = n_jobs,
+        show_progress       = show_progress,
+        n_symbols           = strategy["n_symbols"],
     )
-    trades = result['__PORTFOLIO__']['trade_log']
-    if len(trades) == 0:
-        return {'profit': 0.0, 'win_rate': 0.0, 'n_trades': 0, 'max_dd': 0.0, 'r2': 0.0}
-    profits = trades['profit']
-    equity  = INITIAL_BALANCE + profits.cumsum()
-    eq_arr  = equity.values.reshape(-1, 1)
-    x_arr   = np.arange(len(eq_arr)).reshape(-1, 1)
-    r2      = float(round(LinearRegression().fit(x_arr, eq_arr).score(x_arr, eq_arr), 3))
-    return {
-        'profit':   float(profits.sum()),
-        'win_rate': float((profits > 0).mean() * 100),
-        'n_trades': len(profits),
-        'max_dd':   float(((equity - equity.cummax()) / equity.cummax()).min() * 100),
-        'r2':       r2,
-    }
+    return wfo_test_trades, df_results
 
 # =============================================================================
-# BASELINE PRECOMPUTATION
+# PER-WINDOW BIN SPLIT + BACKTEST
 # =============================================================================
 
-def precompute_baselines(strategies_all: list[dict], strategies_set_name: str, filter_negative_baseline: bool = True) -> tuple[dict, list[dict]]:
-    label = "excluding strategies with B_PROF <= 0 in any period" if filter_negative_baseline else "including all strategies"
-    print(f"\n{'='*120}")
-    print(f"  PRECOMPUTING BASELINES — {label}")
-    print(f"{'='*120}")
-    baselines: dict[str, dict] = {}
-    for strategy in strategies_all:
-        if DEBUG_TF_FILTER and strategy['timeframe'] not in DEBUG_TF_FILTER:
-            continue
-        sid            = strategy['id']
-        baselines[sid] = {}
-        for period_key in EVAL_KEYS:
-            ohlcv_data = load_ohlcv_for_period(strategy, period_key, strategies_set_name)
-            if not ohlcv_data:
-                continue
-            ohlcv_arrays    = prepare_ohlcv_arrays(ohlcv_data)
-            signal_cache    = {}
-            baseline_arrays = {}
-            for sym, arr in ohlcv_arrays.items():
-                signals              = strategy['signal_fn'](arr, **strategy['signal_params'], live_trading=False)
-                signal_cache[sym]    = signals
-                baseline_arrays[sym] = {**arr, 'signal': signals}
-            baselines[sid][period_key] = {
-                'metrics':      run_backtest(baseline_arrays, strategy['best_params']),
-                'signal_cache': signal_cache,
-                'ohlcv_arrays': ohlcv_arrays,
+def _split_signals_by_bin(
+    sym: str,
+    arr: dict,
+    signals: np.ndarray,
+    indicator_cache: dict,
+    indicator_cfg: dict,
+) -> dict[str, np.ndarray]:
+    """Split one symbol's signal array into one zero-filled array per bin."""
+    bin_signals = {b: np.zeros_like(signals) for b in BINS}
+
+    sym_cache = indicator_cache.get(sym)
+    regimes   = classify_signal_regimes(signals, arr, sym_cache, indicator_cfg)
+
+    for idx, regime in regimes.items():
+        bin_signals[regime][idx] = signals[idx]
+
+    return bin_signals
+
+
+def _make_collect_all_bins_fn(
+    signal_fn: callable,
+    signal_params_keys: list,
+    order_amount: int,
+    dtype,
+    indicator_cache: dict,
+    indicator_cfg: dict,
+    window_bin_trades: list,
+) -> callable:
+
+    def _collect_all_bins_fn(params: dict, base_arrays_test: dict) -> pd.DataFrame:
+        bin_arrays = {b: {} for b in BINS}
+
+        for sym, arr in base_arrays_test.items():
+            sig_kwargs = {k: params[k.upper()] for k in signal_params_keys if k.upper() in params}
+            signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
+            bin_signals = _split_signals_by_bin(sym, arr, signals, indicator_cache, indicator_cfg)
+            for b in BINS:
+                bin_arrays[b][sym] = {**arr, "signal": np.asarray(bin_signals[b], dtype=dtype)}
+
+        for b in BINS:
+            results = run_grid_backtest(
+                bin_arrays[b],
+                sell_after   = params["SELL_AFTER"],
+                tp_pct       = params["TP_PCT"],
+                sl_pct       = params["SL_PCT"],
+                order_amount = order_amount,
+            )
+            trades = results["__PORTFOLIO__"]["trade_log"].copy()
+            if not trades.empty:
+                trades.columns    = trades.columns.str.lower().str.strip()
+                trades["buy_time"] = pd.to_datetime(trades["buy_time"])
+            window_bin_trades.append({"bin": b, "trades": trades})
+
+        return pd.DataFrame()
+
+    return _collect_all_bins_fn
+
+# =============================================================================
+# COMBO WFO — regime filtering per bin
+# =============================================================================
+
+def run_combo_from_baseline(
+    strategy: dict,
+    ohlcv_is: dict,
+    df_results: pd.DataFrame,
+    indicator_cache: dict,
+    indicator_cfg: dict,
+    dtype,
+    order_amount: int,
+) -> dict[str, pd.DataFrame]:
+
+    ohlcv_arr   = prepare_ohlcv_arrays(ohlcv_is)
+    param_names = strategy["param_names"]
+    bin_trades: dict[str, list] = {b: [] for b in BINS}
+
+    window_rows = df_results.iloc[:-1]  # drop the trailing MODE/MEAN/EMA summary row
+
+    for _, row in window_rows.iterrows():
+        test_start_ts = np.datetime64(pd.Timestamp(row["_test_start_ts"]))
+        test_end_ts   = np.datetime64(pd.Timestamp(row["_test_end_ts"]))
+        test_syms     = row["ts_syms"]
+        best_params   = {k: row[k] for k in param_names}
+
+        bin_arrays = {b: {} for b in BINS}
+        for sym in test_syms:
+            arr_dict = ohlcv_arr[sym]
+            t0       = int(np.searchsorted(arr_dict["ts"], test_start_ts, side="left"))
+            t1       = int(np.searchsorted(arr_dict["ts"], test_end_ts,   side="right"))
+            warm_start = max(0, t0 - WARMUP_BARS)
+
+            arr = {
+                "ts":        arr_dict["ts"][warm_start:t1],
+                "open":      arr_dict["open"][warm_start:t1],
+                "high":      arr_dict["high"][warm_start:t1],
+                "low":       arr_dict["low"][warm_start:t1],
+                "close":     arr_dict["close"][warm_start:t1],
+                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict["close"] * 0)[warm_start:t1],
+                "low_time":  arr_dict["low_time"][warm_start:t1],
+                "high_time": arr_dict["high_time"][warm_start:t1],
             }
-        all_positive = all(
-            baselines[sid].get(pk, {}).get('metrics', {}).get('profit', 0.0) > 0
-            for pk in EVAL_KEYS
-        )
-        if not filter_negative_baseline or all_positive:
-            print(f"  ✓ {sid}")
-        else:
-            del baselines[sid]
-            print(f"  ✗ {sid}  (excluded)")
-    strategies_filtered = [s for s in strategies_all if s['id'] in baselines]
-    print(f"\n  {len(strategies_filtered)} kept | {len(strategies_all) - len(strategies_filtered)} excluded\n")
-    return baselines, strategies_filtered
 
-# =============================================================================
-# CLASSIFICATION
-# =============================================================================
+            sig_kwargs = {k: best_params[k.upper()] for k in strategy["signal_params_keys"] if k.upper() in best_params}
+            signals    = strategy["signal_fn"](arr, **sig_kwargs, live_trading=False)
+            signals    = np.asarray(signals, dtype=dtype)
 
-_METRIC_MAP: dict[str, dict[str, str]] = {
-    bin_name: {
-        "profit":   f"{bin_name}_prof",
-        "win_rate": f"{bin_name}_wr",
-        "calmar":   f"{bin_name}_prof",
-        "r2":       f"{bin_name}_r2",
+            bin_signals = _split_signals_by_bin(sym, arr, signals, indicator_cache, indicator_cfg)
+            for b in BINS:
+                bin_arrays[b][sym] = {**arr, "signal": np.asarray(bin_signals[b], dtype=dtype)}
+
+        for b in BINS:
+            results = run_grid_backtest(
+                bin_arrays[b],
+                sell_after   = best_params["SELL_AFTER"],
+                tp_pct       = best_params["TP_PCT"],
+                sl_pct       = best_params["SL_PCT"],
+                order_amount = order_amount,
+            )
+            trades = results["__PORTFOLIO__"]["trade_log"].copy()
+            if not trades.empty:
+                trades.columns     = trades.columns.str.lower().str.strip()
+                trades["buy_time"] = pd.to_datetime(trades["buy_time"])
+                trades              = trades[trades["buy_time"] >= pd.Timestamp(test_start_ts)]
+                bin_trades[b].append(trades)
+
+    result = {
+        b: pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+        for b, dfs in bin_trades.items()
     }
-    for bin_name in BINS
-}
+    counts_str = " | ".join(f"{b}={len(result[b])}" for b in BINS)
+    logger.info(f"  run_combo_from_baseline [{strategy['id']}] {combo_label(indicator_cfg)} — {counts_str}")
 
-_DD_KEY_MAP: dict[str, str] = {bin_name: f"{bin_name}_dd" for bin_name in BINS}
+    return result
 
+# =============================================================================
+# METRICS — baseline + per-bin, using compute_metrics naming
+# =============================================================================
 
-def _calmar(prof: float, dd: float) -> float:
-    return prof / abs(dd) if dd != 0 else 0.0
+def compute_metrics_per_bin(bin_trades: dict[str, pd.DataFrame], baseline_trades: pd.DataFrame) -> dict:
 
+    metrics: dict = {}
 
-def _metric_value(d: dict, val_key: str, dd_key: str, optimize_metric: str) -> float:
-    if optimize_metric == "calmar":
-        return _calmar(d[val_key], d[dd_key])
-    return d[val_key]
+    if baseline_trades is not None and not baseline_trades.empty:
+        m = compute_metrics(baseline_trades, capital=INITIAL_BALANCE, name="baseline")
+        for k, v in m.items():
+            if k != "Curve":
+                metrics[f"b_{k}"] = v
+        _verdict = "🟢 PASS" if m["Net_Gain_pct"] > 0 else "🔴 FAIL"
+        logger.info(
+            f"STAGE 1 ── WFO results [baseline ] ── {_verdict} NetGain={m['Net_Gain_pct']:.1f}% DD={m['Max_DD_pct']:.1f}% "
+            f"WinRate%={m['Win_Rate']:.1f}% R2={m['R_Squared']:.3f} PF={m['Profit_Factor']:.2f} "
+            f"Calmar={m['Calmar']:.2f} Trades={len(baseline_trades)}"
+        )
+    else:
+        for k in ("Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Calmar"):
+            metrics[f"b_{k}"] = 0.0
 
+    for b in BINS:
+        trades = bin_trades.get(b)
+        if trades is not None and not trades.empty:
+            m = compute_metrics(trades, capital=INITIAL_BALANCE, name=b)
+            for k, v in m.items():
+                if k != "Curve":
+                    metrics[f"{b}_{k}"] = v
+            metrics[f"{b}_n_trades"] = len(trades)
+            _verdict = "🟢 PASS" if m["Net_Gain_pct"] > 0 else "🔴 FAIL"
+            logger.info(
+                f"STAGE 1 ── WFO results [{b:<9}] ── {_verdict} NetGain={m['Net_Gain_pct']:.1f}% DD={m['Max_DD_pct']:.1f}% "
+                f"WinRate%={m['Win_Rate']:.1f}% R2={m['R_Squared']:.3f} PF={m['Profit_Factor']:.2f} "
+                f"Calmar={m['Calmar']:.2f} Trades={len(trades)}"
+            )
+        else:
+            for k in ("Net_Gain_pct", "Max_DD_pct", "Win_Rate", "R_Squared", "Profit_Factor", "Calmar"):
+                metrics[f"{b}_{k}"] = 0.0
+            metrics[f"{b}_n_trades"] = 0
 
-def classify_strategy(
-    results:         dict,
-    sid:             str,
-    optimize_metric: str = "profit",
-) -> list[str]:
-    data              = results.get(sid, {})
-    periods_with_data = [pk for pk in EVAL_KEYS if pk in data and isinstance(data[pk], dict)]
-    if not periods_with_data:
+    return metrics
+
+# =============================================================================
+# CLASSIFICATION — partitioning helper (split mode only)
+# =============================================================================
+
+def _split_trades_by_buy_time(
+    baseline_trades: pd.DataFrame,
+    bin_trades:      dict[str, pd.DataFrame],
+    n_splits:        int,
+) -> list[tuple[pd.DataFrame, dict[str, pd.DataFrame]]]:
+    """
+    Split baseline and bin trades into n_splits equal time buckets based on the
+    baseline's buy_time range. Same date boundaries are applied to baseline and
+    every bin, so each partition compares like-for-like periods.
+    Returns a list of (baseline_subset, {bin: subset}) per partition.
+    """
+    if baseline_trades is None or baseline_trades.empty:
         return []
 
-    def _beats_baseline(pk: str, bin_name: str) -> bool:
-        d = data[pk]
-        return _metric_value(d, _METRIC_MAP[bin_name][optimize_metric], _DD_KEY_MAP[bin_name], optimize_metric) \
-             > _metric_value(d, "b_prof", "b_dd", optimize_metric)
+    t_min      = pd.Timestamp(baseline_trades["buy_time"].min())
+    t_max      = pd.Timestamp(baseline_trades["buy_time"].max())
+    total_days = (t_max - t_min).days
+    split_len  = total_days / n_splits
+
+    partitions = []
+    for i in range(n_splits):
+        t_start = t_min + pd.Timedelta(days=i * split_len)
+        t_end   = t_min + pd.Timedelta(days=(i + 1) * split_len)
+
+        baseline_subset = baseline_trades[
+            (baseline_trades["buy_time"] >= t_start) & (baseline_trades["buy_time"] < t_end)
+        ]
+        bin_subset = {
+            b: trades[(trades["buy_time"] >= t_start) & (trades["buy_time"] < t_end)]
+            for b, trades in bin_trades.items()
+            if trades is not None and not trades.empty
+        }
+        partitions.append((baseline_subset, bin_subset))
+
+    return partitions
+
+# =============================================================================
+# CLASSIFICATION — integro mode (aggregate over the full period)
+# =============================================================================
+
+def classify_strategy_integro(combo_metrics: dict, optimize_metric: str = "Net_Gain_pct") -> list[str]:
+    """Classify a strategy's winning bin using the full-period aggregate metrics."""
+
+    baseline_val = combo_metrics.get(f"b_{optimize_metric}", 0.0)
 
     winning_bins = [
         b for b in BINS
-        if all(_beats_baseline(pk, b) for pk in periods_with_data)
+        if combo_metrics.get(f"{b}_{optimize_metric}", 0.0) > baseline_val
     ]
 
-    if len(BINS) <= 2:
-        return [winning_bins[0]] if len(winning_bins) == 1 else []
-    return winning_bins if winning_bins else []
+    if not winning_bins:
+        return []
+
+    best_bin = max(winning_bins, key=lambda b: combo_metrics.get(f"{b}_{optimize_metric}", 0.0))
+    return [best_bin]
 
 # =============================================================================
-# COMBINED METRICS
+# CLASSIFICATION — split mode (must win in every valid time partition)
 # =============================================================================
 
-def combined_metrics(results: dict) -> tuple[float, float]:
-    profits, dds = [], []
-    for sid, data in results.items():
-        if sid == 'is_long':
-            continue
-        cls = data.get('classification', [])
-        for pk in EVAL_KEYS:
-            if pk not in data or not isinstance(data[pk], dict):
+def classify_strategy_split(
+    baseline_trades: pd.DataFrame,
+    bin_trades:      dict[str, pd.DataFrame],
+    combo_metrics:   dict,
+    n_splits:        int,
+    optimize_metric: str = "Net_Gain_pct",
+) -> list[str]:
+    """
+    Classify a strategy's winning bin by requiring the bin to beat the baseline
+    in every time partition that has trades for both. Partitions with no trades
+    for the bin or the baseline are skipped (neither confirm nor disqualify).
+    """
+    partitions = _split_trades_by_buy_time(baseline_trades, bin_trades, n_splits)
+
+    winning_bins = []
+    for b in BINS:
+        valid_partitions = 0
+        wins              = 0
+
+        for baseline_subset, bin_subset in partitions:
+            bin_subset_trades = bin_subset.get(b)
+
+            if baseline_subset is None or baseline_subset.empty:
                 continue
-            d = data[pk]
-            if cls:
-                for b in cls:
-                    profits.append(d[f'{b}_prof'] / len(cls))
-                    dds.append(d[f'{b}_dd'])
-            else:
-                profits.append(d['b_prof'])
-                dds.append(d['b_dd'])
-    return sum(profits), (sum(dds) / len(dds) if dds else 0.0)
-
-# =============================================================================
-# FILTERED BACKTEST FOR A SINGLE COMBO
-# =============================================================================
-
-def _assign_regime_signals(
-    sym:             str,
-    arr:             dict,
-    cached:          dict,
-    indicator_cache: dict,
-    indicator_cfg:   dict,
-    debug_n:         int = 0,
-) -> tuple[dict[str, np.ndarray], dict[str, int]]:
-    
-    signals     = cached['signal_cache'][sym]
-    signal_idxs = np.nonzero(signals)[0]
-
-    bin_signals: dict[str, np.ndarray] = {b: np.zeros_like(signals) for b in BINS}
-    bin_counts:  dict[str, int]        = {b: 0 for b in BINS}
-
-    sym_cache = indicator_cache.get(sym)
-    if sym_cache is None:
-        raise KeyError(f"Missing indicator cache for symbol '{sym}' — check that the daily parquet file exists.")
-
-    if signal_idxs.size == 0:
-        return bin_signals, bin_counts
-
-    signal_ts = arr['ts'][signal_idxs]
-    _debug_n  = debug_n if (debug_n > 0 and not any(bin_counts.values())) else 0
-    lookups   = {
-        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts, debug_n=_debug_n if key == "ma" else 0)
-        for key in sym_cache if key != "ts"
-    }
-
-    for i, idx in enumerate(signal_idxs):
-        context = {"close": float(arr['close'][idx]) if 'close' in arr else None}
-        for key, values in lookups.items():
-            context[key] = float(values[i]) if not np.isnan(values[i]) else None
-        regime                   = classify_market_regime(context, cfg=indicator_cfg)
-        bin_signals[regime][idx] = signals[idx]
-        bin_counts[regime]      += 1
-
-    return bin_signals, bin_counts
-
-
-def _build_period_metrics(
-    sid:             str,
-    strategy:        dict,
-    cached:          dict,
-    indicator_cache: dict,
-    indicator_cfg:   dict,
-    debug_n:         int = 0,
-) -> dict:
-    m_base      = cached['metrics']
-    bin_counts: dict[str, int]  = {b: 0 for b in BINS}
-    bin_arrays: dict[str, dict] = {b: {} for b in BINS}
-
-    for sym, arr in cached['ohlcv_arrays'].items():
-        bin_signals, sym_counts = _assign_regime_signals(sym, arr, cached, indicator_cache, indicator_cfg, debug_n)
-        for b in BINS:
-            bin_counts[b]      += sym_counts[b]
-            bin_arrays[b][sym]  = {**arr, 'signal': bin_signals[b]}
-
-    bin_metrics: dict[str, dict] = {b: run_backtest(bin_arrays[b], strategy['best_params']) for b in BINS}
-    total = sum(bin_counts.values())
-
-    return {
-        'b_prof': m_base['profit'],
-        'b_dd':   m_base['max_dd'],
-        'b_wr':   m_base['win_rate'],
-        'b_r2':   m_base['r2'],
-        **{f"{b}_prof": bin_metrics[b]['profit']               for b in BINS},
-        **{f"{b}_dd":   bin_metrics[b]['max_dd']               for b in BINS},
-        **{f"{b}_wr":   bin_metrics[b]['win_rate']             for b in BINS},
-        **{f"{b}_r2":   bin_metrics[b]['r2']                   for b in BINS},
-        **{f"{b}_pct":  bin_counts[b] / max(total, 1) * 100    for b in BINS},
-    }
-
-
-def run_filtered_combo(
-    baselines:       dict,
-    strategies:      list[dict],
-    indicator_cache: dict,
-    indicator_cfg:   dict,
-    debug_n:         int = 0,
-) -> dict:
-    results: dict = {}
-
-    for strategy in strategies:
-        sid = strategy['id']
-        if sid not in baselines:
-            continue
-
-        results[sid] = {'is_long': strategy['is_long']}
-
-        for period_key in EVAL_KEYS:
-            if period_key not in baselines[sid]:
+            if bin_subset_trades is None or bin_subset_trades.empty:
                 continue
-            results[sid][period_key] = _build_period_metrics(
-                sid, strategy, baselines[sid][period_key], indicator_cache, indicator_cfg, debug_n
-            )
 
-    return results
+            base_m = compute_metrics(baseline_subset, capital=INITIAL_BALANCE, name="baseline")
+            bin_m  = compute_metrics(bin_subset_trades, capital=INITIAL_BALANCE, name=b)
+
+            valid_partitions += 1
+            if bin_m[optimize_metric] > base_m[optimize_metric]:
+                wins += 1
+
+        if valid_partitions > 0 and wins == valid_partitions:
+            winning_bins.append(b)
+
+    if not winning_bins:
+        return []
+
+    best_bin = max(winning_bins, key=lambda b: combo_metrics.get(f"{b}_{optimize_metric}", 0.0))
+    return [best_bin]
 
 # =============================================================================
 # PERSISTENCE
@@ -398,22 +429,22 @@ def save_bins(
     header_lines = [
         '"""',
         f"regime_bins_{strategies_set_name}.py — auto-generated regime classification. Do not edit manually.",
-        f"Generated by regime_calibration.py on {REGIME_TIMEFRAME}",
+        f"Generated by main_regime.py (WFO mode) on {REGIME_TIMEFRAME}",
         f"Auto-generated on {generated_at} UTC.",
         '"""',
         "",
-        f'INDICATOR_CFG = {indicator_cfg}',
+        f"INDICATOR_CFG = {indicator_cfg}",
         "",
     ]
     if optimize_metric:
         header_lines.append(f'OPTIMIZE_METRIC = "{optimize_metric}"')
     header_lines += ["", "REGIME_BINS = {"]
 
-    all_ids = {s['id'] for s in all_strategies} if all_strategies else set()
+    all_ids = {s["id"] for s in all_strategies} if all_strategies else set()
     missing = all_ids - set(strategy_results.keys())
 
     all_entries: dict[str, list[str]] = {
-        sid: data.get('classification', [])
+        sid: data.get("classification", [])
         for sid, data in strategy_results.items()
     }
     for sid in missing:

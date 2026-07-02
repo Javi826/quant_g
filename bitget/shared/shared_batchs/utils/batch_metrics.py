@@ -7,52 +7,6 @@ logger = logging.getLogger("BOT_batch.utils.batch_metrics")
 
 
 # =============================================================================
-# PRIVATE HELPERS — WEEKLY STATS
-# =============================================================================
-
-def _weekly_returns(strategy_trades: list, capital_per_strategy: float) -> pd.Series:
-    if not strategy_trades:
-        return pd.Series(dtype=float)
-    all_tl = pd.concat(
-        [df for _, df in strategy_trades], ignore_index=True
-    ).sort_values("sell_time").reset_index(drop=True)
-    total_capital   = capital_per_strategy * len(strategy_trades)
-    all_tl["_date"] = pd.to_datetime(all_tl["sell_time"]).dt.normalize()
-    daily           = all_tl.groupby("_date")["profit"].sum()
-    date_range      = pd.date_range(start=daily.index.min(), end=daily.index.max(), freq="1D")
-    daily           = daily.reindex(date_range, fill_value=0.0)
-    eq              = total_capital + daily.cumsum()
-    eq_series       = pd.Series(eq.values, index=date_range)
-    return eq_series.resample("W").last().diff().dropna() / total_capital * 100
-
-
-def _neg_streak_stats(weekly: pd.Series) -> tuple:
-    if len(weekly) == 0:
-        return np.nan, np.nan
-    streaks, current = [], 0
-    for val in weekly:
-        if val < 0:
-            current += 1
-        else:
-            if current > 0:
-                streaks.append(current)
-            current = 0
-    if current > 0:
-        streaks.append(current)
-    if not streaks:
-        return 0.0, 0
-    return round(float(np.mean(streaks)), 2), int(np.max(streaks))
-
-
-def _cvar(weekly: pd.Series, pct: int = 10) -> float:
-    if len(weekly) == 0:
-        return np.nan
-    threshold = np.percentile(weekly, pct)
-    tail      = weekly[weekly <= threshold]
-    return round(float(tail.mean()), 2) if len(tail) > 0 else np.nan
-
-
-# =============================================================================
 # COMPUTE METRICS
 # =============================================================================
 

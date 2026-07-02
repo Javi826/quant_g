@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
-from shared_batchs.tools.wfo_ST import walk_forward_optimization
-from shared_batchs.tools.wfo_MC import walk_forward_optimization_mc
+from shared_batchs.engines.wfo_WF import walk_forward_optimization
+from shared_batchs.engines.wfo_MC import walk_forward_optimization_mc
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year, get_n_obs, extract_ohlcv_from_path
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.regime import regime_module
-from shared_batch_regime.regime_core import lookup_indicator_batch, classify_market_regime
-
+from shared_batch_regime.config_paths import DATA_FOLDER_IS
+from shared_batch_regime.regime_core import apply_regime_filter
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
@@ -21,10 +21,11 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 WFO_WINDOW_CONFIG = {
     "15m":   {"train_months": 4, "test_months": 1},
     "30m":   {"train_months": 4, "test_months": 1},
-    "1H":    {"train_months": 4, "test_months": 1},
+    "1H":    {"train_months": 9, "test_months": 2},
     "4H":    {"train_months": 9, "test_months":2},
     "6Hutc": {"train_months": 9, "test_months":2},
 }
+
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
@@ -136,22 +137,13 @@ def _evaluate_fn_with_regime(
         signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
 
         if regime_enabled and _bins and _bins != ["neutral"] and indicator_cache:
-            sym_cache = indicator_cache.get(sym)
-            if sym_cache is not None:
-                signal_idxs = np.nonzero(signals)[0]
-                if signal_idxs.size > 0:
-                    signal_ts = arr["ts"][signal_idxs]
-                    lookups   = {
-                        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
-                        for key in sym_cache if key != "ts"
-                    }
-                    for i, idx in enumerate(signal_idxs):
-                        close_idx = idx - 1 if idx > 0 else idx
-                        context = {"close": float(arr["close"][close_idx])}
-                        for key, values in lookups.items():
-                            context[key] = float(values[i]) if not np.isnan(values[i]) else None
-                        if classify_market_regime(context, cfg=regime_module.INDICATOR_CFG) not in _bins:
-                            signals[idx] = 0
+            signals = apply_regime_filter(
+                signals        = signals,
+                arr            = arr,
+                sym_cache      = indicator_cache.get(sym),
+                cfg            = regime_module.INDICATOR_CFG,
+                bins_to_filter = _bins,
+            )
 
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
 
@@ -208,22 +200,13 @@ def _collect_trades_fn_with_regime(
         signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
 
         if regime_enabled and _bins and _bins != ["neutral"] and indicator_cache:
-            sym_cache = indicator_cache.get(sym)
-            if sym_cache is not None:
-                signal_idxs = np.nonzero(signals)[0]
-                if signal_idxs.size > 0:
-                    signal_ts = arr["ts"][signal_idxs]
-                    lookups   = {
-                        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
-                        for key in sym_cache if key != "ts"
-                    }
-                    for i, idx in enumerate(signal_idxs):
-                        close_idx = idx - 1 if idx > 0 else idx
-                        context = {"close": float(arr["close"][close_idx])}
-                        for key, values in lookups.items():
-                            context[key] = float(values[i]) if not np.isnan(values[i]) else None
-                        if classify_market_regime(context, cfg=regime_module.INDICATOR_CFG) not in _bins:
-                            signals[idx] = 0
+            signals = apply_regime_filter(
+                signals        = signals,
+                arr            = arr,
+                sym_cache      = indicator_cache.get(sym),
+                cfg            = regime_module.INDICATOR_CFG,
+                bins_to_filter = _bins,
+            )
 
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
 
@@ -279,6 +262,7 @@ def run_wfo_is(
     n_symbols: int = None,
     bins_to_filter=None,
     regime_enabled: bool = False,
+    collect_test_fn_override: callable = None,
 ) -> tuple:
 
     ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
@@ -309,10 +293,12 @@ def run_wfo_is(
 
     collect_test_fn = None
 
-    if regime_enabled and bins_to_filter:
+    if collect_test_fn_override is not None:
+        collect_test_fn = collect_test_fn_override
+    elif regime_enabled and bins_to_filter:
         indicator_cache = {}
         for sym in ohlcv_data:
-            cache = regime_module._get_indicator_cache(sym)
+            cache = regime_module._get_indicator_cache(sym, DATA_FOLDER_IS)
             if cache is not None:
                 indicator_cache[sym] = cache
 
@@ -329,7 +315,7 @@ def run_wfo_is(
     else:
         collect_test_fn = collect_train_fn
 
-    best_params, df_results, wfo_train_trades, wfo_test_trades = walk_forward_optimization(
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,
         param_ranges            = param_ranges,
         length_train_set        = length_train_set,
@@ -342,6 +328,11 @@ def run_wfo_is(
         n_symbols               = n_symbols,
         collect_train_trades_fn = collect_train_fn,
         collect_test_trades_fn  = collect_test_fn,
+    )
+    
+    logger.info(
+    f"STAGE 1 ── WFO completed  ── {n_windows} windows | "
+    f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 
     approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
@@ -370,8 +361,12 @@ def run_wfo_mc_is(
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
+    n_symbols: int = None,
+    bins_to_filter=None,
+    regime_enabled: bool = False,
 ) -> tuple:
 
+    ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges = dict(zip(param_names, lists_for_grid))
 
     _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe)
@@ -382,45 +377,44 @@ def run_wfo_mc_is(
     pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
     n_obs            = get_n_obs(timeframe)
 
-    train_evaluate_fn = partial(
-        _evaluate_fn_mc_paths,
-        signal_fn          = signal_fn,
-        signal_params_keys = signal_params_keys,
-        order_amount       = order_amount,
-        dtype              = dtype,
-    )
-    test_evaluate_fn = partial(
-        _evaluate_fn,
-        signal_fn          = signal_fn,
-        signal_params_keys = signal_params_keys,
-        order_amount       = order_amount,
-        dtype              = dtype,
+    indicator_cache = None
+    if regime_enabled and bins_to_filter:
+        indicator_cache = {}
+        for sym in ohlcv_data:
+            cache = regime_module._get_indicator_cache(sym, DATA_FOLDER_IS)
+            if cache is not None:
+                indicator_cache[sym] = cache
+
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows = walk_forward_optimization_mc(
+        ohlcv_arr             = ohlcv_arr,
+        param_ranges          = param_ranges,
+        length_train_set      = length_train_set,
+        pct_train_set         = pct_train_set,
+        anchored              = ANCHORED,
+        signal_fn             = signal_fn,
+        signal_params_keys    = signal_params_keys,
+        order_amount          = order_amount,
+        dtype                 = dtype,
+        n_paths               = WFO_MC_N_PATHS,
+        n_obs                 = n_obs,
+        param_selection_mode  = PARAM_SELECTION_MODE,
+        n_jobs                = n_jobs,
+        show_progress         = show_progress,
+        n_symbols             = n_symbols,
+        bins_to_filter        = bins_to_filter,
+        regime_enabled        = regime_enabled,
+        indicator_cache       = indicator_cache,
     )
 
-    best_params, df_results = walk_forward_optimization_mc(
-        ohlcv_data           = ohlcv_data,
-        param_ranges         = param_ranges,
-        length_train_set     = length_train_set,
-        pct_train_set        = pct_train_set,
-        anchored             = ANCHORED,
-        train_evaluate_fn    = train_evaluate_fn,
-        test_evaluate_fn     = test_evaluate_fn,
-        n_paths              = WFO_MC_N_PATHS,
-        n_obs                = n_obs,
-        param_selection_mode = PARAM_SELECTION_MODE,
-        n_jobs               = n_jobs,
-        show_progress        = show_progress,
+    logger.info(
+        f"STAGE 1 ── WFO-MC completed ── {n_windows} windows | "
+        f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 
     approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
-        wfo_test_trades = pd.DataFrame(),
+        wfo_test_trades = wfo_test_trades,
         net_gain_th     = net_gain_th,
         dd_th           = dd_th,
     )
 
-    verdict    = "🟢 PASS" if approved_wfo else "🔴 FAIL"
-    params_str = " | ".join(f"{k}={v}" for k, v in best_params.items() if k not in ("SELL_AFTER",))
-    logger.info(f"STAGE 1 ── WFO-MC results ── {verdict} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")
-    logger.info(f"STAGE 1 ── WFO-MC params  ── {params_str}")
-
-    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd
+    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results

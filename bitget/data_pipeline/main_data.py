@@ -53,6 +53,7 @@ SELECTED_SYMBOLS   = ["BTCUSDT",
     "ADAUSDT",
     "TAOUSDT",
     "PIPPINUSDT"]
+
 SYMBOL_MODE        = "auto"   #manual o auto
 
 N_SYMBOLS_DOWNLOAD = 40
@@ -63,7 +64,7 @@ REFERENCE_SYMBOL   = "BTCUSDT"
 # EXTRACTION
 # =============================================================================
 TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","30m","15m","5m","1m"]
-START_DATE = "2024-01-01"
+START_DATE = "2022-01-01"
 END_DATE   = None 
 
 # =============================================================================
@@ -75,7 +76,7 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m
 # SPLIT DATA
 # =============================================================================
 SPLIT_MODE           = "expanding"
-WINDOW_OOS_MONTHS    = 17
+WINDOW_OOS_MONTHS    = 0
 SPLIT_REFERENCE_DATE = None
 
 # IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"

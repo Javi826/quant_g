@@ -26,7 +26,8 @@ BATCH_TRADES_DIR = os.path.expanduser(
 )
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
-OOS_PERIOD  = "oos"     # "oos1" | "oos2" | "oos3"
+#OOS_PERIOD  = "oos"      # "oos" | "oos2" | "oos3"
+OOS_PERIOD  = "wfo_test"   
 BATCH_MODE  = "regime"   # "baseline" | "regime"
 
 # Time window filter (None = no filter)
@@ -52,11 +53,11 @@ EXCLUDE_SYMBOLS = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "22_flag_short_15m"
+PLOT_STRATEGY = "05_reversal_long_1H"
 #PLOT_STRATEGY = "05_reversal_long_1H"
 
 # Strategy for entry-rounds inspection (None to skip)
-ENTRY_ROUNDS_STRATEGY = "22_flag_short_15m"
+ENTRY_ROUNDS_STRATEGY = "05_reversal_long_1H"
 
 # Max gap (seconds) between consecutive buy_times to consider them the same
 # simultaneous-open round (signals fired together when the system was flat)
@@ -90,10 +91,11 @@ def load_production(path: str) -> pd.DataFrame:
 
 def load_batch(trades_dir: str, oos_period: str, mode: str, strategy_ids: list[str]) -> pd.DataFrame:
     frames = []
-    pattern = os.path.join(trades_dir, f"trades_{oos_period}_{mode}_*.csv")
+    has_mode = not oos_period.startswith("wfo")
+    prefix   = f"trades_{oos_period}_{mode}_" if has_mode else f"trades_{oos_period}_"
+    pattern  = os.path.join(trades_dir, f"{prefix}*.csv")
     for path in glob.glob(pattern):
         fname    = os.path.basename(path)
-        prefix   = f"trades_{oos_period}_{mode}_"
         strat_id = fname.replace(prefix, "").replace(".csv", "")
         if strategy_ids and strat_id not in strategy_ids:
             continue

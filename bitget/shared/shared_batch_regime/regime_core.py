@@ -5,12 +5,6 @@ import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# PATHS
-# =============================================================================
-from shared_batch_regime.config_paths import CRYPTO_FULL_DIR
-
 # =============================================================================
 # REGIME CONSTANTS — edit here to change global behaviour
 # =============================================================================
@@ -97,9 +91,9 @@ def combo_label(indicator_cfg: dict) -> str:
 # OHLCV LOADER
 # =============================================================================
 
-def load_ohlcv_raw(symbol: str) -> pd.DataFrame:
-    """Load raw OHLCV data for a symbol on REGIME_TIMEFRAME."""
-    path = os.path.join(CRYPTO_FULL_DIR, f"{symbol}_{REGIME_TIMEFRAME}.parquet")
+def load_ohlcv_raw(symbol: str, data_folder: str) -> pd.DataFrame:
+    """Load raw OHLCV data for a symbol on REGIME_TIMEFRAME from the given data folder."""
+    path = os.path.join(data_folder, f"{symbol}_{REGIME_TIMEFRAME}.parquet")
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_parquet(path)
@@ -171,6 +165,75 @@ def lookup_indicator_batch(
             print(f"  {sig_ts:<30} {candle_ts}")
 
     return out
+def apply_regime_filter(
+    signals: np.ndarray,
+    arr: dict,
+    sym_cache: dict | None,
+    cfg: dict,
+    bins_to_filter: list[str],
+) -> np.ndarray:
+    """
+    Zero out signals whose D-1 market regime is not in bins_to_filter.
+    Returns the same array, mutated in place, for convenience.
+    """
+    if sym_cache is None:
+        return signals
+
+    signal_idxs = np.nonzero(signals)[0]
+    if signal_idxs.size == 0:
+        return signals
+
+    signal_ts = arr["ts"][signal_idxs]
+    lookups   = {
+        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
+        for key in sym_cache if key != "ts"
+    }
+
+    for i, idx in enumerate(signal_idxs):
+        close_idx = idx - 1 if idx > 0 else idx
+        context   = {"close": float(arr["close"][close_idx])}
+        for key, values in lookups.items():
+            context[key] = float(values[i]) if not np.isnan(values[i]) else None
+        if classify_market_regime(context, cfg=cfg) not in bins_to_filter:
+            signals[idx] = 0
+
+    return signals
+
+
+def classify_signal_regimes(
+    signals: np.ndarray,
+    arr: dict,
+    sym_cache: dict | None,
+    cfg: dict,
+) -> dict[int, str]:
+    """
+    Classify the market regime for each non-zero signal index (D-1 lookup).
+    Returns {signal_idx: regime_label}. Used when signals must be split per
+    bin rather than filtered out (e.g. regime calibration).
+    """
+    if sym_cache is None:
+        return {}
+
+    signal_idxs = np.nonzero(signals)[0]
+    if signal_idxs.size == 0:
+        return {}
+
+    signal_ts = arr["ts"][signal_idxs]
+    lookups   = {
+        key: lookup_indicator_batch(sym_cache["ts"], sym_cache[key], signal_ts)
+        for key in sym_cache if key != "ts"
+    }
+
+    regimes = {}
+    for i, idx in enumerate(signal_idxs):
+        close_idx = idx - 1 if idx > 0 else idx
+        context   = {"close": float(arr["close"][close_idx])}
+        for key, values in lookups.items():
+            context[key] = float(values[i]) if not np.isnan(values[i]) else None
+        regimes[int(idx)] = classify_market_regime(context, cfg=cfg)
+
+    return regimes
+
 
 def compute_atr_pct(df: pd.DataFrame, period: int) -> np.ndarray:
     high, low, close = df["high"].values, df["low"].values, df["close"].values

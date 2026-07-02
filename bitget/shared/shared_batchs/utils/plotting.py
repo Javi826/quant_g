@@ -34,6 +34,7 @@ def _render_comparison_plot(
     ts_r01, eq_r01, m_r01,
     ref_ts, ref_pct,
     title: str,
+    regime_enabled: bool = False,
 ) -> None:
     """Core rendering function for equity curve comparison plots."""
     fig, ax = plt.subplots(figsize=(14, 5))
@@ -51,8 +52,9 @@ def _render_comparison_plot(
         ax.fill_between(ts_r01, eq_r01, 0, where=above, alpha=0.35, color="#00897B", interpolate=True)
         ax.fill_between(ts_r01, eq_r01, 0, where=below, alpha=0.35, color="#C62828", interpolate=True)
 
-    lbl_base = (f"Baseline    NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
-                f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
+    base_name = "Regime" if regime_enabled else "Baseline"
+    lbl_base  = (f"{base_name:<11} NetGain={m_base['Net_Gain_pct']:>6.1f}%  "
+                 f"DD={m_base['Max_DD_pct']:>6.1f}%  R²={m_base['R_Squared']:.3f}")
     ax.plot(ts_base, eq_base, color="#2E86C1", linewidth=0.8, label=lbl_base)
 
     if ts_r01 is not None:
@@ -87,16 +89,13 @@ def _render_comparison_plot(
     plt.show()
 
 
-# =============================================================================
-# PUBLIC PLOT FUNCTIONS
-# =============================================================================
-
 def plot_filter_comparison(
     strategy_id: str,
     trades_df_baseline: pd.DataFrame,
     trades_df_r01,
     data_folder: str,
     initial_balance: float,
+    regime_enabled: bool = False,
 ) -> None:
     """Plot equity curves for a single strategy: baseline vs regime 0+1 vs BTC."""
     def _equity_pct(tl, t_start):
@@ -120,8 +119,7 @@ def plot_filter_comparison(
     )
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
-    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, strategy_id)
-    
+    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, strategy_id, regime_enabled=regime_enabled) 
 
 def plot_portfolio_comparison(
     strategy_trades_baseline: list,
