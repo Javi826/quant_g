@@ -1,9 +1,3 @@
-"""
-Production vs Batch trade comparison tool.
-
-Compares trade metrics between live production trades (xlsx) and batch backtest
-trades (csv) over a configurable time window and strategy selection.
-"""
 
 import os
 import glob
@@ -19,10 +13,10 @@ logger = logging.getLogger("live_lab.compare")
 # =============================================================================
 
 PRODUCTION_XLSX = os.path.expanduser(
-    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
+    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_E1/bot_trades_E1.csv"
 )
 BATCH_TRADES_DIR = os.path.expanduser(
-    "~/projects/quant/quant_b/develop/brief_trades_BB"
+    "~/projects/quant/quant_b/develop/brief_trades"
 )
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
@@ -30,14 +24,14 @@ BATCH_TRADES_DIR = os.path.expanduser(
 OOS_PERIOD  = "wfo_test"   
 BATCH_MODE  = "regime"   # "baseline" | "regime"
 
-# Time window filter (None = no filter)
-DATE_FROM = "2026-04-09"
-DATE_TO   = "2026-06-28"
+# Time window filte (None = no filter)
+DATE_FROM = "2026-04-08"
+DATE_TO   = "2026-06-30"
 
 # Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
     "05_reversal_long_1H",
-   #"20_parity_short_6Hutc",
+   "20_parity_short_6Hutc",
     "22_flag_short_15m",
     "31_orderblocks_long_15m",
     "34_orderblocks_short_30m",
@@ -53,11 +47,11 @@ EXCLUDE_SYMBOLS = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "05_reversal_long_1H"
+PLOT_STRATEGY = "22_flag_short_15m"
 #PLOT_STRATEGY = "05_reversal_long_1H"
 
 # Strategy for entry-rounds inspection (None to skip)
-ENTRY_ROUNDS_STRATEGY = "05_reversal_long_1H"
+ENTRY_ROUNDS_STRATEGY = PLOT_STRATEGY 
 
 # Max gap (seconds) between consecutive buy_times to consider them the same
 # simultaneous-open round (signals fired together when the system was flat)
@@ -74,7 +68,7 @@ EDGE_CANDLES = 50
 # =============================================================================
 
 def load_production(path: str) -> pd.DataFrame:
-    df = pd.read_excel(path)
+    df = pd.read_csv(path)
     df.columns = [c.strip().upper() for c in df.columns]
     df["OPEN_AT"]  = pd.to_datetime(df["OPEN_AT"],  errors="coerce", utc=True)
     df["CLOSE_AT"] = pd.to_datetime(df["CLOSE_AT"], errors="coerce", utc=True)
@@ -85,6 +79,10 @@ def load_production(path: str) -> pd.DataFrame:
         "SYMBOL":   "symbol",
         "PROFIT":   "profit",
     })
+    # Convert European-style decimal comma ("7,25" -> "7.25") before numeric parsing
+    df["profit"] = (
+        df["profit"].astype(str).str.replace(",", ".", regex=False)
+    )
     df["profit"] = pd.to_numeric(df["profit"], errors="coerce")
     return df[["buy_time", "sell_time", "strategy", "symbol", "profit"]].dropna(subset=["buy_time"])
 

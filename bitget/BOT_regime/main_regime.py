@@ -40,21 +40,21 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-AUTO_SAVE_BINS  = True
-OPTIMIZE_METRIC = "Net_Gain_pct"      # any numeric key from compute_metrics (e.g. "Net_Gain_pct", "Calmar")
+AUTO_SAVE_BINS  = False
+OPTIMIZE_METRIC = "Calmar"      # any numeric key from compute_metrics (e.g. "Net_Gain_pct", "Calmar")
 RANKING_MODE    = "weighted_delta"    # "weighted_delta" | "combo_delta"
 
 # Bin classification strategy:
 #   "integro" — bin must beat baseline on the full-period aggregate metrics
 #   "split"   — bin must beat baseline in every valid REGIME_N_SPLITS time partition
-CLASSIFICATION_MODE = "integro"       # "integro" | "split"
-REGIME_N_SPLITS      = 3              # only used when CLASSIFICATION_MODE == "split"
+CLASSIFICATION_MODE = "split"   # "integro" | "split"
+REGIME_N_SPLITS      = 3        # only used when CLASSIFICATION_MODE == "split"
 
 # =============================================================================
 # INDICATOR GRID
 # =============================================================================
 INDICATOR_GRID: dict = {
-    "ma_window": [10,12,14],
+    "ma_window": [2,4,6,8,10,12],
 }
 
 INDICATOR_CFGS: list[dict] = [
@@ -63,25 +63,23 @@ INDICATOR_CFGS: list[dict] = [
 ]
 SELECTED_STRATEGIES = [
     # 15m
-# =============================================================================
-#     "01_reversal_long_15m",
-#     "02_reversal_short_15m",
-#     "11_parity_long_15m",
-#     "12_parity_short_15m",
-#     "21_flag_long_15m",
-#     "22_flag_short_15m",
-#     "31_orderblocks_long_15m",
-#     "32_orderblocks_short_15m",
-#     # 30m
-#     "03_reversal_long_30m",
-#     "04_reversal_short_30m",
-#     "13_parity_long_30m",
-#     "14_parity_short_30m",
-#     "23_flag_long_30m",
-#     "24_flag_short_30m",
-#     "33_orderblocks_long_30m",
-#     "34_orderblocks_short_30m",
-# =============================================================================
+    "01_reversal_long_15m",
+    "02_reversal_short_15m",
+    "11_parity_long_15m",
+    "12_parity_short_15m",
+    "21_flag_long_15m",
+    "22_flag_short_15m",
+    "31_orderblocks_long_15m",
+    "32_orderblocks_short_15m",
+    # 30m
+    "03_reversal_long_30m",
+    "04_reversal_short_30m",
+    "13_parity_long_30m",
+    "14_parity_short_30m",
+    "23_flag_long_30m",
+    "24_flag_short_30m",
+    "33_orderblocks_long_30m",
+    "34_orderblocks_short_30m",
     # 1H
     "05_reversal_long_1H",
     "06_reversal_short_1H",

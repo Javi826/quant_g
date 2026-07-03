@@ -14,23 +14,23 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 2000,
+        "initial_capital": 10000,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime_enabled": True,
+        "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime_ma_window":4,
+        "regime_ma_window":3,
         "regime_timeframe":"1Dutc",
         "regime_reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 4000,
+        "initial_capital": 10000,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",
-        "regime_enabled": True,
+        "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
         "regime_ma_window":3,
@@ -102,14 +102,14 @@ STRATEGY_TYPE_REQUIRED_PARAMS = {
 }
 
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 40
-MAX_ORDER_AMOUNT = 80
+MIN_ORDER_AMOUNT = 200
+MAX_ORDER_AMOUNT = 500
 
 # TP/SL limits (%)
 MIN_TP_PCT = 2
-MAX_TP_PCT = 9
+MAX_TP_PCT = 10
 MIN_SL_PCT = 2
-MAX_SL_PCT = 9
+MAX_SL_PCT = 10
 
 # Candles timeout limits
 MIN_CANDLES = 50

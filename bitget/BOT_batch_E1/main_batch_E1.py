@@ -46,7 +46,7 @@ from shared_batchs.regime.regime_module import load_config_from_bins
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_best_wfo_portfolio import find_best_portfolio_combination_wfo
 from shared_batch_regime.regime_core import REGIME_TIMEFRAME
-
+from shared_batchs.runs.run_deploy import run_deploy_train
 
 regime_module._indicator_cache = {}
 
@@ -68,22 +68,22 @@ _deploy_map                    : dict = {}
 # BATCH
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
 SELECTION_MODE       = "WFO"   # "WFO" or "WFO_MC"
 
 WFO_NET_GAIN_TH = 10
-WFO_DD_TH       = 20
+WFO_DD_TH       = 50
 
 # RUNS
 #------------------------------------------------------------------------------
-RUN_CORRELATION        = True
+RUN_CORRELATION        = False
 RUN_BEST_WFO_PORTFOLIO = True
 RUN_DEPLOY             = False
 RUN_OOS                = False
 
 # REGIME
 #------------------------------------------------------------------------------
-REGIME_ENABLED    = True
+REGIME_ENABLED    = False
 
 # OUTPUTS
 #------------------------------------------------------------------------------
@@ -94,23 +94,25 @@ DEBUG_WFO_WINDOW  = None  # int to debug a specific WFO test window, None to dis
 #------------------------------------------------------------------------------
 SELECTED_STRATEGIES = [
     # 15m
-    "01_reversal_long_15m",
-    "02_reversal_short_15m",
-    "11_parity_long_15m",
-    "12_parity_short_15m",
-    "21_flag_long_15m",
-    "22_flag_short_15m",
-    "31_orderblocks_long_15m",
-    "32_orderblocks_short_15m",
-    # 30m
-    "03_reversal_long_30m",
-    "04_reversal_short_30m",
-    "13_parity_long_30m",
-    "14_parity_short_30m",
-    "23_flag_long_30m",
-    "24_flag_short_30m",
-    "33_orderblocks_long_30m",
-    "34_orderblocks_short_30m",
+# =============================================================================
+#     "01_reversal_long_15m",
+#     "02_reversal_short_15m",
+#     "11_parity_long_15m",
+#     "12_parity_short_15m",
+#     "21_flag_long_15m",
+#     "22_flag_short_15m",
+#     "31_orderblocks_long_15m",
+#     "32_orderblocks_short_15m",
+#     # 30m
+#     "03_reversal_long_30m",
+#     "04_reversal_short_30m",
+#     "13_parity_long_30m",
+#     "14_parity_short_30m",
+#     "23_flag_long_30m",
+#     "24_flag_short_30m",
+#     "33_orderblocks_long_30m",
+#     "34_orderblocks_short_30m",
+# =============================================================================
     # 1H
     "05_reversal_long_1H",
     "06_reversal_short_1H",
@@ -377,7 +379,7 @@ def run_batch(strategy_config: dict) -> None:
     # -------------------------------------------------------------------------
     symbols_changed = False
     if RUN_DEPLOY:
-        from shared_batchs.runs.run_deploy import run_deploy_train
+        
         symbols_changed = run_deploy_train(
             strategy_id           = STRATEGY_ID,
             ohlcv_is              = ohlcv_is,
@@ -398,6 +400,7 @@ def run_batch(strategy_config: dict) -> None:
             regime_bins_path      = REGIME_BINS_PATH,
             deploy_map            = _deploy_map,
             strategy_ids_to_run   = [s["id"] for s in strategies_to_run],
+            regime_enabled        = REGIME_ENABLED,
         )
         _icon = "🔵" if symbols_changed else "⚪"
         logger.debug(f"STAGE 4  ── Update & Compare       ── {_icon} {'symbols' if symbols_changed else 'no changes'}")
@@ -454,8 +457,8 @@ def run_summary():
     # -------------------------------------------------------------------------
     # WFO TRADES
     # -------------------------------------------------------------------------
-    if _strategy_trades_wfo_train:
-        logger.info(f"\n{'='*115}\n  WFO TRAIN TRADES\n{'='*115}")
+    if _strategy_trades_wfo_train and logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"\n{'='*115}\n  WFO TRAIN TRADES\n{'='*115}")
         print_all_curves_table(_strategy_trades_wfo_train, "WFO Train", INITIAL_BALANCE)
 
     if _strategy_trades_wfo_test:

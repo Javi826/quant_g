@@ -1,17 +1,4 @@
-"""
-Historical signal + regime inspector.
 
-For a given strategy and timestamp, shows for each symbol:
-  - Baseline signal live_trading=True  (production mode)
-  - Baseline signal live_trading=False (batch mode)
-  - Regime classification (uptrend / dwtrend / neutral)
-  - MA value and close price used for regime
-  - Whether the regime passes the strategy's bins_to_filter
-  - Final signal after regime filter (both modes)
-
-DEBUG_SYMBOLS: if set, prints raw indicator values (ma50, rsi, adx, plus_di,
-minus_di) at inspect_ts for those symbols, to diagnose why live vs batch differ.
-"""
 
 import os
 import sys

@@ -180,6 +180,7 @@ def _save_deploy_batch(
     deploy_map: dict,
     regime_bins_path: str,
     strategy_ids_to_run: list,
+    regime_enabled: bool = True,
 ) -> None:
 
     if not os.path.exists(strategies_batch_path):
@@ -235,7 +236,7 @@ def _save_deploy_batch(
         active = entry.get("approved", False)
 
         # Resolve regime from bins
-        bins           = regime_bins.get(sid, [])
+        bins           = regime_bins.get(sid, []) if regime_enabled else []
         classification = bins[0] if len(bins) == 1 else "neutral"
         regime_values  = _REGIME_MAP.get(classification, _REGIME_MAP["neutral"])
 
@@ -293,6 +294,7 @@ def run_deploy_train(
     regime_bins_path: str,
     deploy_map: dict,
     strategy_ids_to_run: list,
+    regime_enabled: bool = True,
 ) -> bool:
 
 
@@ -345,6 +347,7 @@ def run_deploy_train(
         deploy_map            = deploy_map,
         regime_bins_path      = regime_bins_path,
         strategy_ids_to_run   = strategy_ids_to_run,
+        regime_enabled        = regime_enabled,
     )
 
     return symbols_changed

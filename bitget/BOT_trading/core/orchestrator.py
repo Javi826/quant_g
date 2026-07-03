@@ -441,7 +441,8 @@ class BotOrchestrator:
         # ========================================================================
         # SIGNAL SEARCH: + SYMBOL WINDOW
         # ========================================================================
-        night_consolidation = datetime.now(HOUR_ZONE).hour < 3
+        #night_consolidation = datetime.now(HOUR_ZONE).hour < 3
+        night_consolidation = False
         if not night_consolidation:
             self._search_signals(strategies_to_process)
         else:

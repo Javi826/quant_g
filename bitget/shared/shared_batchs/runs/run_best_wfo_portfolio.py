@@ -15,13 +15,13 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # CONFIGURATION
 # =============================================================================
 
-WFO_METRIC            = "MAX_DD_PCT"         # NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
+WFO_METRIC            = "R_SQUARED"         # NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
 WFO_N_SPLITS          = 4
-WFO_SUBPERIOD_WEIGHTS = [0.20, 0.20, 0.20, 0.40]  # must match WFO_N_SPLITS, recency-weighted
+WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]  # must match WFO_N_SPLITS, recency-weighted
 #WFO_SUBPERIOD_WEIGHTS = [1] 
 
 MIN_STRATEGIES     = 2
-MAX_STRATEGIES     = 9
+MAX_STRATEGIES     = 6
 TOP_N              = 2
 REQUIRE_LONG_SHORT = True
 

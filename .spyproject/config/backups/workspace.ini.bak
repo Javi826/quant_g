@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_regime/main_regime.py', 'bitget/BOT_batch_E1/main_batch_E1.py', 'bitget/data_pipeline/main_data.py', 'bitget/shared/shared_batch_regime/regime_core.py', 'bitget/BOT_regime/regime_engine.py', 'bitget/BOT_batch_E1/strategies_files/regime_bins_E1.py']
+recent_files = ['bitget/BOT_batch_E1/main_batch_E1.py', 'bitget/BOT_regime/main_regime.py']
 
 [main]
 version = 0.2.0
