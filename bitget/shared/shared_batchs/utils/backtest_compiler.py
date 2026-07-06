@@ -26,9 +26,9 @@ def compile_grid_results(grid_results_list, param_names, initial_balance):
         num_trades = len(trades)
         
         if num_trades > 0:
-            trades_arr = np.array(trades, dtype=np.float64)
-            net_gain = float(np.sum(trades_arr))
-            avg_trade = float(np.mean(trades_arr))
+            trades_arr   = np.array(trades, dtype=np.float64)
+            net_gain     = float(np.sum(trades_arr))
+            avg_trade    = float(np.mean(trades_arr))
             median_trade = float(np.median(trades_arr))
         else:
             net_gain = 0.0

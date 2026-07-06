@@ -31,7 +31,7 @@ DATE_TO   = "2026-06-30"
 # Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
     "05_reversal_long_1H",
-   "20_parity_short_6Hutc",
+    #"20_parity_short_6Hutc",
     "22_flag_short_15m",
     "31_orderblocks_long_15m",
     "34_orderblocks_short_30m",
@@ -47,7 +47,7 @@ EXCLUDE_SYMBOLS = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "22_flag_short_15m"
+PLOT_STRATEGY = "05_reversal_long_1H"
 #PLOT_STRATEGY = "05_reversal_long_1H"
 
 # Strategy for entry-rounds inspection (None to skip)

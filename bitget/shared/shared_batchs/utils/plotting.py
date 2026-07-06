@@ -157,6 +157,3 @@ def plot_portfolio_comparison(
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
     _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, title)
-    
-
-    

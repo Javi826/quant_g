@@ -40,8 +40,8 @@ BINS_OUTPUT_PATH     = os.path.join(os.path.dirname(__file__), "..", f"BOT_batch
 # =============================================================================
 # REGIME CONFIGURATION
 # =============================================================================
-AUTO_SAVE_BINS  = False
-OPTIMIZE_METRIC = "Calmar"      # any numeric key from compute_metrics (e.g. "Net_Gain_pct", "Calmar")
+AUTO_SAVE_BINS  = True
+OPTIMIZE_METRIC = "Net_Gain_pct"      # any numeric key from compute_metrics (e.g. "Net_Gain_pct", "Calmar")
 RANKING_MODE    = "weighted_delta"    # "weighted_delta" | "combo_delta"
 
 # Bin classification strategy:
@@ -54,7 +54,7 @@ REGIME_N_SPLITS      = 3        # only used when CLASSIFICATION_MODE == "split"
 # INDICATOR GRID
 # =============================================================================
 INDICATOR_GRID: dict = {
-    "ma_window": [2,4,6,8,10,12],
+    "ma_window": [12],
 }
 
 INDICATOR_CFGS: list[dict] = [

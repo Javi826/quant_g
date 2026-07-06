@@ -68,15 +68,15 @@ _deploy_map                    : dict = {}
 # BATCH
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"
-STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_01"
-SELECTION_MODE       = "WFO"   # "WFO" or "WFO_MC"
+STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
+SELECTION_MODE       = "WFO_MC"   # "WFO" or "WFO_MC"
 
-WFO_NET_GAIN_TH = 10
-WFO_DD_TH       = 50
+WFO_NET_GAIN_TH = 12
+WFO_DD_TH       = 25
 
 # RUNS
 #------------------------------------------------------------------------------
-RUN_CORRELATION        = False
+RUN_CORRELATION        = True
 RUN_BEST_WFO_PORTFOLIO = True
 RUN_DEPLOY             = False
 RUN_OOS                = False
@@ -114,14 +114,16 @@ SELECTED_STRATEGIES = [
 #     "34_orderblocks_short_30m",
 # =============================================================================
     # 1H
-    "05_reversal_long_1H",
-    "06_reversal_short_1H",
-    "15_parity_long_1H",
-    "16_parity_short_1H",
-    "25_flag_long_1H",
-    "26_flag_short_1H",
-    "35_orderblocks_long_1H",
-    "36_orderblocks_short_1H",
+# =============================================================================
+#     "05_reversal_long_1H",
+#     "06_reversal_short_1H",
+#     "15_parity_long_1H",
+#     "16_parity_short_1H",
+#     "25_flag_long_1H",
+#     "26_flag_short_1H",
+#     "35_orderblocks_long_1H",
+#     "36_orderblocks_short_1H",
+# =============================================================================
     # 4H
     "07_reversal_long_4H",
     "08_reversal_short_4H",

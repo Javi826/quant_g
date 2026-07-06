@@ -172,10 +172,7 @@ def apply_regime_filter(
     cfg: dict,
     bins_to_filter: list[str],
 ) -> np.ndarray:
-    """
-    Zero out signals whose D-1 market regime is not in bins_to_filter.
-    Returns the same array, mutated in place, for convenience.
-    """
+
     if sym_cache is None:
         return signals
 
@@ -206,11 +203,7 @@ def classify_signal_regimes(
     sym_cache: dict | None,
     cfg: dict,
 ) -> dict[int, str]:
-    """
-    Classify the market regime for each non-zero signal index (D-1 lookup).
-    Returns {signal_idx: regime_label}. Used when signals must be split per
-    bin rather than filtered out (e.g. regime calibration).
-    """
+
     if sym_cache is None:
         return {}
 
