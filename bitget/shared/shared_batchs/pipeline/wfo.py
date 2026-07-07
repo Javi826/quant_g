@@ -28,11 +28,11 @@ WFO_WINDOW_CONFIG = {
 
 # =============================================================================
 # WFO_WINDOW_CONFIG = {
-#     "15m":   {"train_months": 12, "test_months": 3},
-#     "30m":   {"train_months": 12, "test_months": 3},
-#     "1H":    {"train_months": 12, "test_months": 3},
-#     "4H":    {"train_months": 12, "test_months":3},
-#     "6Hutc": {"train_months": 12, "test_months":3},
+#     "15m":   {"train_months": 6, "test_months": 2},
+#     "30m":   {"train_months": 6, "test_months": 2},
+#     "1H":    {"train_months": 6, "test_months": 2},
+#     "4H":    {"train_months": 6, "test_months": 2},
+#     "6Hutc": {"train_months": 6, "test_months": 2},
 # }
 # =============================================================================
 

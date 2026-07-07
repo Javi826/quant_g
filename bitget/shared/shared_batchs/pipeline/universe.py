@@ -13,6 +13,7 @@ MY_SYMBOLS                = False
 FIX_SYMBOLS_MCIS_TRAINING = False
 OOS23_MATCH_SYMBOLS       = True
 
+#symbols_to_exclude        = {"BTCUSDT","ETHUSDT"}
 symbols_to_exclude        = {}
 
 symbols_to_include = [
@@ -122,13 +123,7 @@ def select_universe(
     min_price:         float,
     filter_symbols_fn: callable,
 ) -> tuple:
-    """
-    Select OOS universe (top N by volume) and match IS universe.
-    If fix_symbols_mcis=True, IS universe is top n_symbols_mcis from IS by volume directly.
 
-    Returns:
-        tuple: (symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos)
-    """
     raw_is  = sorted([f.split("_")[0] for f in os.listdir(data_folder_is)  if f.endswith(f"_{timeframe}.parquet")])
     raw_oos = sorted([f.split("_")[0] for f in os.listdir(data_folder_oos) if f.endswith(f"_{timeframe}.parquet")])
 

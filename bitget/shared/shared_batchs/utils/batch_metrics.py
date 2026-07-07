@@ -42,6 +42,18 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
 
     sharpe = (round(float(profits.mean() / profits.std() * np.sqrt(252)), 3)
               if profits.std() > 0 else np.nan)
+    
+    running_max_w   = weekly.add(1).cumprod().cummax()
+    equity_w        = weekly.add(1).cumprod()
+    is_underwater   = equity_w < running_max_w
+    recovery_weeks  = 0
+    max_weeks_to_recovery = 0
+    for underwater in is_underwater:
+        if underwater:
+            recovery_weeks += 1
+            max_weeks_to_recovery = max(max_weeks_to_recovery, recovery_weeks)
+        else:
+            recovery_weeks = 0
 
     if "buy_time" in tl.columns and "sell_time" in tl.columns:
         duration_d = round(float(
@@ -67,4 +79,5 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
         "Sharpe":        sharpe,
         "Duration_d":    duration_d,
         "Weekly_pct":    round(float(weekly_pct), 2),
+        "Max_Weeks_to_Recovery": int(max_weeks_to_recovery),
     }

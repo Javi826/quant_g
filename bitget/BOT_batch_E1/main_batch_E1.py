@@ -69,9 +69,9 @@ _deploy_map                    : dict = {}
 #------------------------------------------------------------------------------
 STRATEGIES_SET_NAME  = "E1"
 STRATEGIES_LOOP_NAME = f"strategies_loop_{STRATEGIES_SET_NAME}_09"
-SELECTION_MODE       = "WFO_MC"   # "WFO" or "WFO_MC"
+SELECTION_MODE       = "WFO"   # "WFO" or "WFO_MC"
 
-WFO_NET_GAIN_TH = 12
+WFO_NET_GAIN_TH = 5
 WFO_DD_TH       = 25
 
 # RUNS
@@ -414,7 +414,6 @@ def run_batch(strategy_config: dict) -> None:
 
     elapsed = int(time.time() - start_time)
     logger.info(f"DONE  🏁 ── {elapsed//3600}h {(elapsed%3600)//60}m {elapsed%60}s")
-
 
 # =============================================================================
 # RUN SUMMARY

@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 from joblib import Parallel, delayed
 
-from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
+from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, _build_ohlcv_with_signal, _compute_metric
 from shared_batchs.engines.wfo_WF import WARMUP_BARS, _select_window_symbols
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
