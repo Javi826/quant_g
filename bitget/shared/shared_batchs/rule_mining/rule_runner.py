@@ -54,7 +54,7 @@ def _run_single_rule(
     logging.getLogger("joblib").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-    rule_id = f"{i:04d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
+    rule_id = f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
     best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results = run_wfo_is(
         ohlcv_data          = ohlcv_data,

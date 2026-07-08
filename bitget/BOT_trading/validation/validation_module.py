@@ -337,10 +337,10 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     for strat in strategies:
         strat_id = strat.get('id', '')
         
-        if not re.match(r'^\d{2}_\w+', strat_id):
+        if not re.match(r'^\d{5}_\w+', strat_id):
             errors.append(
                 f"Strategy '{strat_id}' has invalid ID format. "
-                f"Expected: 'NN_strategy_name' (e.g., '02_reversal_long_4H')"
+                f"Expected: 'NNNNN_strategy_name' (e.g., '00053_rule_mining_id')"
             )
             validation_y10_errors += 1
             continue
@@ -348,18 +348,18 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         id_parts = strat_id.split('_', 1)
         id_number = id_parts[0]
         
-        if len(id_number) != 2:
+        if len(id_number) != 5:
             errors.append(
-                f"Strategy '{strat_id}' numeric prefix must be exactly 2 digits "
-                f"(e.g., '02_name', not '2_name' or '002_name')"
+                f"Strategy '{strat_id}' numeric prefix must be exactly 5 digits "
+                f"(e.g., '00053_name', not '0053_name' or '053_name')"
             )
             validation_y10_errors += 1
         
         try:
             num_value = int(id_number)
-            if num_value < 1 or num_value > 99:
+            if num_value < 1:
                 errors.append(
-                    f"Strategy '{strat_id}' numeric prefix must be 01-99 "
+                    f"Strategy '{strat_id}' numeric prefix must be a positive number "
                     f"(found: {id_number})"
                 )
                 validation_y10_errors += 1
@@ -370,7 +370,6 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y10_errors += 1
     
     if validation_y10_errors == 0:
-        logger.debug("Val Y10: All IDs have correct prefix format (NN_name)")
+        logger.debug("Val Y10: All IDs have correct prefix format (NNNNN_name)")
     
-        
     return errors, warnings

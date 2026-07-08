@@ -1,8 +1,8 @@
 #shared/shared_batchs/rule_mining/rule_generator.py
 from itertools import combinations
 
-from signals.rule_engine.condition_bank import ConditionBank
-from signals.rule_engine.signal_builder import build_signal_fn, describe_rule
+from signals.condition_bank import ConditionBank
+from signals.signal_builder import build_signal_fn, describe_rule
 
 MAX_DEPTH = 3
 SIDES     = ("long", "short")

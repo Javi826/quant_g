@@ -1,7 +1,7 @@
 #signals/rule_engine/signal_builder.py
 import numpy as np
 
-from signals.rule_engine.condition_bank import ConditionBank
+from signals.condition_bank import ConditionBank
 
 
 def describe_rule(bank: ConditionBank, rule_specs: list) -> str:

@@ -1,9 +1,8 @@
 """
-Quality Control module - Drift detection and execution quality analysis.
+Quality Control module - Execution quality analysis.
 """
-from .analyzer import analyze_drift_binomial, analyze_execution_quality
-
+from .analyzer import analyze_execution_quality, analyze_target_deviation
 __all__ = [
-    'analyze_drift_binomial',
     'analyze_execution_quality',
+    'analyze_target_deviation',
 ]

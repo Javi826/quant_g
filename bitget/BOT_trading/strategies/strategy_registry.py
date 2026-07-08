@@ -22,7 +22,7 @@ if bitget_dir not in sys.path:
 #===========================================================================
 
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from signals.rule_engine.signal_builder import build_signal_fn
+from signals.signal_builder import build_signal_fn
 
 
 #===========================================================================

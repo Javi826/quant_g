@@ -17,7 +17,8 @@ ACCOUNTS = {
         "initial_capital": 10000,
         "dashboard_port": 5001,
         "description": "Elite Account",
-        "type": "production",
+        #"type": "production",
+        "type": "demo",
         "risk_control_enabled": True,
         "postgresql_enabled": True,
         "reference_symbol": "BTCUSDT",
@@ -57,11 +58,6 @@ LEVERAGE = 10
 # QUALITY CONTROL PARAMETERS
 # =============================================================================
 
-# Drift detection
-DRIFT_BINOMIAL_WINDOW  = 100
-DRIFT_CHECK_INTERVAL   = 15
-DRIFT_BINOMIAL_DEFAULT = 0.55
-
 # Execution quality
 EXECUTION_WINDOW_SIZE  = 100
 SLIPPAGE_WARNING_PCT   = 0.2
@@ -80,7 +76,7 @@ COMMON_REQUIRED_PARAMS = [
 ]
 
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 200
+MIN_ORDER_AMOUNT = 100
 MAX_ORDER_AMOUNT = 500
 
 # TP/SL limits (%)

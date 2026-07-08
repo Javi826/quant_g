@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
 from risk_control import RiskLimiter, ExposureCalculator
-from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
 from api.backend import DashboardServer, create_dashboard_template
 from execution import configure_paths, get_current_price, get_usdt_balance_ws, BitgetClient
@@ -56,7 +55,6 @@ class BotOrchestrator:
         sm_configure_postgres(self.account_number)
         sm_configure_demo(self.account_number)
         tl_configure_postgres(self.account_number)
-        qc_configure_account(self.account_number)
         
         # API clients
         self.bitget_client = bitget_client
