@@ -103,14 +103,12 @@
 
     
     /* Alinear columnas de tablas de estrategias */
-    #strategies-table th:nth-child(1),
-    #regime-strategy-matrix th:nth-child(1) {
+    #strategies-table th:nth-child(1) {
         width: 50px;
         min-width: 50px;
     }
     
-    #strategies-table th:nth-child(2),
-    #regime-strategy-matrix th:nth-child(2) {
+    #strategies-table th:nth-child(2) {
         width: 250px;
         min-width: 250px;
     }
@@ -213,15 +211,6 @@
                 <div class="stat-label" id="ref-symbol-label">REF Price</div>
                 <div class="stat-value warning" id="btc-price">$-</div>
             </div>       
-            <!-- Card 10: Market Regime -->
-            <div class="stat-card" id="regime-card">
-                <div class="stat-label">Market Regime</div>
-                <div class="stat-value neutral" id="regime-badge" style="font-size: 24px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;">
-                    <span id="regime-text">-</span>
-                    <span id="regime-direction" style="font-size: 24px; line-height: 1; vertical-align: middle;">•</span>
-                </div>
-                <div style="font-size: 13px; color: #8b949e; margin-top: 8px;" id="regime-timeframe">Loading...</div>
-            </div>
         </div>
         
         <div class="tabs-container">
@@ -229,7 +218,6 @@
             <button class="tab-btn" onclick="switchTab('analysis')">Strategy Analysis</button>
             <button class="tab-btn" onclick="switchTab('trades')">Recent Trades</button>
             <button class="tab-btn" onclick="switchTab('equity')">Analytics</button>
-            <button class="tab-btn" onclick="switchTab('regime')">Market Regime</button>
             <button class="tab-btn" onclick="switchTab('risk')">Risk Control</button>
             <button class="tab-btn" onclick="switchTab('quality')">Quality Control</button>
             <button class="tab-btn" onclick="switchTab('config')">Configuration</button>
@@ -559,27 +547,6 @@
             </div>  
         </div>
         
-<div id="tab-regime" class="tab-content">
-            <div class="content-section">
-                <h2>
-                    <span>Market Regime Analysis</span>
-                    <div class="view-selector">
-                        <div id="regime-timeframe-tabs"></div>
-                    </div>
-                </h2>
-
-                
-                <!-- Symbols Regime Metrics -->
-                <div class="config-card">
-                    <h3>Symbols Regime Metrics</h3>
-                    <div id="regime-config-pills" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
-                    <div id="regime-symbols-container" style="margin-top: 20px;">
-                        <div style="text-align: center; color: #8b949e; padding: 40px;">Loading...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         <div id="tab-risk" class="tab-content">
             <div class="content-section">
                 <h2>Risk Control</h2>
@@ -750,19 +717,6 @@
                     </div>
                 </div>
                 
-                <!-- 2. MARKET REGIME STRATEGY MATRIX -->
-                <div class="config-card">
-                    <h3>Market Regime Strategy Matrix</h3>
-                    <div style="overflow-x: auto;">
-                        <table id="regime-strategy-matrix">
-                            <thead id="regime-strategy-matrix-head">
-                            </thead>
-                            <tbody id="regime-strategy-matrix-body">
-                                <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>               
                 <!-- 4. WEBSOCKET (moved here) -->
                 <div class="config-card">
                     <h3>WebSocket Connections</h3>

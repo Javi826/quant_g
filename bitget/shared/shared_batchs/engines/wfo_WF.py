@@ -80,10 +80,7 @@ def _find_window_indices(
     test_start_ts,
     test_end_ts,
 ) -> tuple | None:
-    """
-    Find date-aligned train/test indices for a symbol using timestamp search.
-    Returns (t0, t1, test0, test1) or None if symbol doesn't cover the full train+test period.
-    """
+
     if sym_ts[0] > train_start_ts or sym_ts[-1] < test_end_ts:
         return None
 
@@ -102,10 +99,7 @@ def _select_window_symbols(
     ohlcv_arr: dict,
     n_symbols: int | None,
 ) -> dict:
-    """
-    Select exactly n_symbols for a WFO window, ranked by avg train-window volume (descending).
-    If n_symbols is None, returns all candidates (backward-compatible).
-    """
+
     if n_symbols is None:
         return candidate_indices
 
@@ -310,11 +304,6 @@ def walk_forward_optimization(
                 'low_time':  arr_dict['low_time'][warm_start:t1_sym],
                 'high_time': arr_dict['high_time'][warm_start:t1_sym],
             }
-
-        if window_idx == 1:
-            for sym, arr in base_arrays_test.items():
-                logger.debug(f"[DEBUG WFO test] {sym}: {len(arr['ts'])} bars | {arr['ts'][0]} → {arr['ts'][-1]}")
-                break
 
         # -----------------------------------------------------------
         # Parallel evaluation via shared memory

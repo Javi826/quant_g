@@ -75,8 +75,12 @@ def _decorrelate(
     ranked    = sorted(all_sids, key=lambda s: metrics.get(s, {}).get("Net_Gain_pct", 0), reverse=True)
     selected  = []
     discarded = []
-    lines     = [f"\n  {'Rank':<6} {'Strategy':<30} {'NetGain%':>10} {'Action':<20} {'Reason'}"]
-    lines.append(f"  {'─'*85}")
+
+    id_width = max(len(sid) for sid in ranked) + 2
+    sep_width = 6 + id_width + 10 + 20 + 40
+
+    lines = [f"\n  {'Rank':<6} {'Strategy':<{id_width}} {'NetGain%':>10} {'Action':<20} {'Reason'}"]
+    lines.append(f"  {'─' * sep_width}")
 
     for sid in ranked:
         ng         = metrics.get(sid, {}).get("Net_Gain_pct", 0)
@@ -92,12 +96,12 @@ def _decorrelate(
                 discarded.append(sid)
                 break
         if correlated:
-            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'❌ DISCARDED':<20} {reason}")
+            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<{id_width}} {ng:>9.2f}%  {'❌ DISCARDED':<20} {reason}")
         else:
             selected.append(sid)
-            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<30} {ng:>9.2f}%  {'✅ SELECTED':<20}")
+            lines.append(f"  {ranked.index(sid)+1:<6} {sid:<{id_width}} {ng:>9.2f}%  {'✅ SELECTED':<20}")
 
-    lines.append(f"  {'─'*85}")
+    lines.append(f"  {'─' * sep_width}")
     logger.info("\n".join(lines))
 
     return [(sid, trades_map[sid]) for sid in sorted(selected, key=_num) if sid in trades_map]

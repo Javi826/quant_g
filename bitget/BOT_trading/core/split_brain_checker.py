@@ -1,9 +1,4 @@
-"""
-Split-Brain Protection Module
-
-Prevents LOCAL and VPS from operating simultaneously by checking VPS PostgreSQL status.
-This module should be called at the beginning of each orchestrator cycle.
-"""
+#BOT_trading/core/split_brain_checker.py
 
 import sys
 import logging

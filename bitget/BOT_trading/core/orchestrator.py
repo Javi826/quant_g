@@ -13,7 +13,6 @@ if parent_dir not in sys.path:
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_trading_data", "broker_api")))
 from api_client import get_futures_symbols_from_api
 from market_data import load_final_symbols, init_websocket
-from market_regime import  PositionSizer, configure_regime
 from risk_control import RiskLimiter, ExposureCalculator
 from quality_control.analyzer import configure_account as qc_configure_account
 from validation import validate_strategy_configuration,validate_settings,validate_postgresql_connection
@@ -24,7 +23,7 @@ from bot_utils import calculate_next_candle_time, group_strategies_by_timeframe
 from bot_utils import get_unique_timeframes
 from strategies import StrategyProcessor, IMPLEMENTED_STRATEGIES,load_strategies
 from config.utils.utils import get_account_config
-from config.settings import PRODUCT_TYPE, CHECK_INTERVAL, USE_HARDCODED_SIGNALS,HOUR_ZONE
+from config.settings import PRODUCT_TYPE, CHECK_INTERVAL,HOUR_ZONE
 from config.settings import LEVERAGE
 from core.split_brain_checker import check_split_brain
 from state.state_manager import BotState, configure_postgres as sm_configure_postgres, configure_demo as sm_configure_demo
@@ -58,7 +57,6 @@ class BotOrchestrator:
         sm_configure_demo(self.account_number)
         tl_configure_postgres(self.account_number)
         qc_configure_account(self.account_number)
-        configure_regime(self.account_number)
         
         # API clients
         self.bitget_client = bitget_client
@@ -90,9 +88,7 @@ class BotOrchestrator:
         # Control flags
         self._running = False
         self._initialized = False
-        
-        #Marke regime
-        self.position_sizer: Optional[PositionSizer] = None
+
         #Risk
         self.risk_limiter: Optional[RiskLimiter] = None
         self.exposure_calculator: Optional[ExposureCalculator] = None
@@ -123,8 +119,7 @@ class BotOrchestrator:
         self._setup_directories()
         self._log_account_flags()
         self._load_bot_state()
-        self._load_and_validate_strategies()
-        self._initialize_position_sizing()     
+        self._load_and_validate_strategies() 
         self._initialize_risk_management() 
         self._load_market_symbols()
         self._initialize_connections()
@@ -183,12 +178,10 @@ class BotOrchestrator:
     def _log_account_flags(self) -> None:
         """Log account configuration flags at startup."""
         capital_str = f"${self.initial_capital:,.0f}"
-        regime01    = self.account_flags.get('regime_enabled', True)
         risk        = self.account_flags.get('risk_control_enabled', True)
         pg          = self.account_flags.get('postgresql_enabled', True)
         self.logger.info(f"[{self.account_number}] ════ Account Configuration ════")
         self.logger.info(f"[{self.account_number}] Initial capital:  {capital_str}")
-        self.logger.info(f"[{self.account_number}] Regime  :         {'✅ enabled' if regime01 else '❌ disabled'}")
         self.logger.info(f"[{self.account_number}] Risk control:     {'✅ enabled' if risk else '❌ disabled'}")
         self.logger.info(f"[{self.account_number}] PostgreSQL:       {'✅ enabled' if pg else '❌ disabled'}") 
         
@@ -214,7 +207,10 @@ class BotOrchestrator:
     def _load_and_validate_strategies(self) -> None:
         # Load strategies
         self.strategies = load_strategies(self.account_number)
-        self.strategies = [s for s in self.strategies if s['id'] in IMPLEMENTED_STRATEGIES]
+        self.strategies = [
+            s for s in self.strategies
+            if s['id'] in IMPLEMENTED_STRATEGIES or 'specs' in s
+        ]
         
         # Apply --set-active
         if self.active_strategy_ids:
@@ -300,8 +296,6 @@ class BotOrchestrator:
             hour_zone=HOUR_ZONE,
             account_number=self.account_number,
             state_file=self.state_file,
-            use_hardcoded=USE_HARDCODED_SIGNALS,
-            regime_enabled=self.account_flags.get('regime_enabled', True),
         )
 
         self.strategy_processor.operative = self.operative
@@ -365,12 +359,6 @@ class BotOrchestrator:
         
         self.last_tpsl_check = time.time()
         
-    def _initialize_position_sizing(self) -> None:
-        """Initialize position sizing based on market regime."""
-        from market_regime import PositionSizer
-        
-        self.position_sizer = PositionSizer(self.logger)
-
     def _initialize_risk_management(self) -> None:
         """Initialize risk management components."""
         from risk_control import ExposureCalculator, RiskLimiter
@@ -496,33 +484,14 @@ class BotOrchestrator:
         adjusted_amount: float,
     ) -> None:     
         strat_id = strat['id']
-        self.logger.debug(f"[D&E] {strat_id} | symbols={len(final_symbols)} | regime={self.account_flags.get('regime_enabled')}")
+        self.logger.debug(f"[D&E] {strat_id} | symbols={len(final_symbols)}")
   
         signals = self.strategy_processor.detect_signals(
             strat         = strat,
             final_symbols = final_symbols,
             exchange      = self.exchange,
         )
-        # ====================================================================
-        # REGIME FILTER: Apply regime sizing per signal
-        # ====================================================================
-    
-        if self.account_flags.get('regime_enabled', True):
-            approved_signals = []
-            for sig in signals:
-                _, metadata  = self.position_sizer.calculate_adjusted_amount(
-                    base_amount   = adjusted_amount,
-                    strat         = strat,
-                    market_regime = sig.get('regime', 'neutral'),
-                )
-                if not metadata['blocked']:
-                    approved_signals.append(sig)
-                    
-            if signals:
-                log_msg = self.position_sizer.format_summary(strat_id, len(signals), len(approved_signals))
-                self.logger.info(log_msg)
-        else:
-            approved_signals = signals
+        approved_signals = signals
     
         self.strategy_processor.execute_signals(
             strat            = strat,

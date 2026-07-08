@@ -1,16 +1,4 @@
 #BOT_trading/execution/trade_logger.py
-"""
-execution.trade_logger.py - Handles trade logging to Excel.
-
-This module is responsible for:
-- Logging closed positions to Excel file
-- Calculating profit and fees
-- Managing trade history
-- Tracking market regime at position open
-
-This module is intentionally separated from order_manager and position_tracker
-to avoid circular dependencies. It does not import from any execution submodules.
-"""
 
 import os
 import pandas as pd
@@ -258,7 +246,7 @@ def log_closed_position(opened_at,
         # Calculate duration
         delta_days = (closed_at - opened_at_dt).total_seconds() / (3600 * 24)
 
-        # Build record with regime tracking
+
         new_record = {
             'OPEN_AT': opened_at_dt.strftime('%Y-%m-%d %H:%M:%S'),
             'CLOSE_AT': closed_at.strftime('%Y-%m-%d %H:%M:%S'),

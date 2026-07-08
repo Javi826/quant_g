@@ -1,3 +1,4 @@
+#signals/rule_engine/condition_bank.py
 import numpy as np
 from numba import njit
 
@@ -121,39 +122,60 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> n
 
 class ConditionBank:
 
-    RSI_PERIOD       = 14
-    ADX_PERIOD       = 14
-    RSI_THRESHOLDS   = (30, 50, 70)
-    ADX_THRESHOLDS   = (20, 25)
-    MA_PERIODS       = (20, 50, 100)
-    MOMENTUM_N       = (5, 10)
+    DEFAULT_RSI_PERIOD     = 14
+    DEFAULT_ADX_PERIOD     = 14
+    DEFAULT_RSI_THRESHOLDS = [30, 50, 70]
+    DEFAULT_ADX_THRESHOLDS = [20, 25]
+    DEFAULT_MA_PERIODS     = [20, 50, 100]
+    DEFAULT_MOMENTUM_N     = [5, 10]
 
-    def __init__(self, arr: dict):
+    def __init__(
+        self,
+        arr: dict,
+        rsi_period: int      = DEFAULT_RSI_PERIOD,
+        adx_period: int      = DEFAULT_ADX_PERIOD,
+        rsi_thresholds: list = None,
+        adx_thresholds: list = None,
+        ma_periods: list     = None,
+        momentum_n: list     = None,
+    ):
+        rsi_thresholds = rsi_thresholds if rsi_thresholds is not None else self.DEFAULT_RSI_THRESHOLDS
+        adx_thresholds = adx_thresholds if adx_thresholds is not None else self.DEFAULT_ADX_THRESHOLDS
+        ma_periods     = ma_periods     if ma_periods     is not None else self.DEFAULT_MA_PERIODS
+        momentum_n     = momentum_n     if momentum_n     is not None else self.DEFAULT_MOMENTUM_N
+
         self.open  = np.ascontiguousarray(arr["open"],  dtype=np.float64)
         self.high  = np.ascontiguousarray(arr["high"],  dtype=np.float64)
         self.low   = np.ascontiguousarray(arr["low"],   dtype=np.float64)
         self.close = np.ascontiguousarray(arr["close"], dtype=np.float64)
         self.n     = len(self.close)
 
-        self._rsi_cache = _rsi(self.close, self.RSI_PERIOD)
-        self._adx_cache = _adx(self.high, self.low, self.close, self.ADX_PERIOD)
-        self._ma_cache  = {period: _sma(self.close, period) for period in self.MA_PERIODS}
+        self.rsi_period     = rsi_period
+        self.adx_period     = adx_period
+        self.rsi_thresholds = rsi_thresholds
+        self.adx_thresholds = adx_thresholds
+        self.ma_periods     = ma_periods
+        self.momentum_n     = momentum_n
+
+        self._rsi_cache = _rsi(self.close, self.rsi_period)
+        self._adx_cache = _adx(self.high, self.low, self.close, self.adx_period)
+        self._ma_cache  = {period: _sma(self.close, period) for period in self.ma_periods}
 
     def build_condition_specs(self) -> list:
         specs = []
 
-        for th in self.RSI_THRESHOLDS:
+        for th in self.rsi_thresholds:
             specs.append({"type": "rsi", "op": ">", "value": th})
             specs.append({"type": "rsi", "op": "<", "value": th})
 
-        for th in self.ADX_THRESHOLDS:
+        for th in self.adx_thresholds:
             specs.append({"type": "adx", "op": ">", "value": th})
 
-        for period in self.MA_PERIODS:
+        for period in self.ma_periods:
             specs.append({"type": "ma", "op": ">", "value": period})
             specs.append({"type": "ma", "op": "<", "value": period})
 
-        for nbar in self.MOMENTUM_N:
+        for nbar in self.momentum_n:
             specs.append({"type": "momentum", "op": ">", "value": nbar})
             specs.append({"type": "momentum", "op": "<", "value": nbar})
 
@@ -187,16 +209,15 @@ class ConditionBank:
 
         raise ValueError(f"Unknown condition type: {ctype}")
 
-    @staticmethod
-    def describe(spec: dict) -> str:
+    def describe(self, spec: dict) -> str:
         ctype = spec["type"]
         op    = spec["op"]
         value = spec["value"]
 
         if ctype == "rsi":
-            return f"RSI{ConditionBank.RSI_PERIOD}{op}{value}"
+            return f"RSI{self.rsi_period}{op}{value}"
         if ctype == "adx":
-            return f"ADX{ConditionBank.ADX_PERIOD}{op}{value}"
+            return f"ADX{self.adx_period}{op}{value}"
         if ctype == "ma":
             return f"CLOSE{op}MA{value}"
         if ctype == "momentum":

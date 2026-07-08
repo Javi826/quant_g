@@ -1,19 +1,4 @@
 #core/demo_operative.py
-"""
- Simulation Trading Mode
-
-PERSISTENCE MODEL:
-- ✅ JSON for state (open positions)
-- ✅ Excel for closed trades
-- ❌ NO PostgreSQL
-- ❌ NO broker API calls
-
-REGIME LAYERS:
-- Respects regime0_enabled / regime1_enabled flags from ACCOUNTS config
-- Applies commission per trade (COMMISSION_PCT from settings)
-
-For LAB validation without touching PostgreSQL or broker.
-"""
 
 import os
 import json
@@ -29,30 +14,11 @@ logger = logging.getLogger('BOT_trading.demo_operative')
 from config.settings import HOUR_ZONE, COMMISSION_PCT
 
 class DemoOperative:
-    """
-    Simulated trading with JSON + Excel persistence.
-    
-    Attributes:
-        account_number: Account identifier
-        ws_manager: WebSocket manager for prices
-        excel_path: Path to Excel file for trades
-        json_path: Path to JSON file for state
-        open_positions: Simulated positions (shared with orchestrator)
-        strategy_candles: Candle counters (shared with orchestrator)
-        strategy_configs: Strategy configurations
-    """
+
     
     def __init__(self, account_number: str, ws_manager, excel_path: str, 
                  strategy_configs: List[Dict]):
-        """
-        Initialize demo operative.
-        
-        Args:
-            account_number: Account number
-            ws_manager: WebSocket manager
-            excel_path: Path to Excel file
-            strategy_configs: Strategy configurations
-        """
+
         self.account_number = account_number
         self.ws_manager = ws_manager
         self.excel_path = excel_path
@@ -73,13 +39,11 @@ class DemoOperative:
         logger.info(f"[DEMO] Excel path: {excel_path}")
         logger.info(f"[DEMO] NO PostgreSQL writes")
         logger.info(f"[DEMO] NO broker API calls")
-        logger.info(f"[DEMO] REGIME layers DISABLED")
     
     
     def place_simulated_order(self, symbol: str, direction: str,
                          usdt_amount: float, tp_pct: float,
-                         sl_pct: float, strategy_id: str,
-                         regime: str = 'unknown') -> Optional[Dict]:
+                         sl_pct: float, strategy_id: str) -> Optional[Dict]:
         try:
             current_price = get_current_price(symbol, max_cache_age=0.5)
             if not current_price:
@@ -120,8 +84,7 @@ class DemoOperative:
     
             logger.info(
                 f"[DEMO] ENTRY {direction.upper()} {symbol} @ ${entry_price:.4f} | "
-                f"${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f} | "
-                f"Regime: {regime}"
+                f"${usdt_amount:.2f} | TP: ${tp_price:.4f} | SL: ${sl_price:.4f}"
             )
     
             return position
@@ -328,11 +291,7 @@ class DemoOperative:
     
     
     def _save_state_json(self) -> None:
-        """
-        Save state to JSON file ONLY (bypass PostgreSQL).
-        
-        Serializes self.open_positions and self.strategy_candles to JSON.
-        """
+
         try:
             if self.open_positions is None or self.strategy_candles is None:
                 return
@@ -418,15 +377,14 @@ class DemoOperative:
         
     def place_order(self, symbol: str, direction: str, usdt_amount: float,
                     tp_pct: float, sl_pct: float, strategy_id: str,
-                    signal_close: float = 0, regime: str = 'unknown') -> None:
+                    signal_close: float = 0) -> None:
         self.place_simulated_order(
             symbol=symbol,
             direction=direction,
             usdt_amount=usdt_amount,
             tp_pct=tp_pct,
             sl_pct=sl_pct,
-            strategy_id=strategy_id,
-            regime=regime
+            strategy_id=strategy_id
         )
         
     def sync_broker(self) -> None:

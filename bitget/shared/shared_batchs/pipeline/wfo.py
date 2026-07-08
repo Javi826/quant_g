@@ -7,8 +7,7 @@ import pandas as pd
 
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
-from shared_batchs.engines.wfo_MC import walk_forward_optimization_mc
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year, get_n_obs, extract_ohlcv_from_path
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.regime import regime_module
 from shared_batch_regime.config_paths import DATA_FOLDER_IS
@@ -39,7 +38,7 @@ WFO_WINDOW_CONFIG = {
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
-WFO_MC_N_PATHS       = 100              # MC paths per train window, WFO_MC mode only
+
 
 
 # =============================================================================
@@ -99,32 +98,6 @@ def _evaluate_fn(
     return _compute_metric(results), params
 
 
-def _evaluate_fn_mc_paths(
-    params: dict,
-    paths_per_symbol: dict,
-    signal_fn: callable,
-    signal_params_keys: list,
-    order_amount: int,
-    dtype,
-) -> tuple:
-    """Single param combination evaluated across all MC paths of one WFO-MC train window."""
-    n_paths = next(iter(paths_per_symbol.values())).shape[0] if paths_per_symbol else 0
-    metrics = []
-
-    for path_idx in range(n_paths):
-        ohlcv_arrays = extract_ohlcv_from_path(paths_per_symbol, path_idx, dtype=dtype)
-        ohlcv_arrays = _build_ohlcv_with_signal(ohlcv_arrays, signal_fn, signal_params_keys, params, dtype)
-        results = run_grid_backtest(
-            ohlcv_arrays,
-            sell_after   = params["SELL_AFTER"],
-            tp_pct       = params["TP_PCT"],
-            sl_pct       = params["SL_SEC"],
-            order_amount = order_amount,
-        )
-        metrics.append(_compute_metric(results))
-
-    avg_metric = float(np.mean(metrics)) if metrics else -np.inf
-    return avg_metric, params
 
 
 def _evaluate_fn_with_regime(
@@ -340,84 +313,8 @@ def run_wfo_is(
         collect_test_trades_fn  = collect_test_fn,
     )
     
-    logger.info(
-    f"STAGE 1 ── WFO completed  ── {n_windows} windows | "
-    f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
-    )
-
-    approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
-        wfo_test_trades = wfo_test_trades,
-        net_gain_th     = net_gain_th,
-        dd_th           = dd_th,
-    )
-
-    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results
-
-
-# =============================================================================
-# RUN WFO-MC IS
-# =============================================================================
-
-def run_wfo_mc_is(
-    ohlcv_data: dict,
-    param_names: list,
-    lists_for_grid: list,
-    signal_fn: callable,
-    signal_params_keys: list,
-    order_amount: int,
-    timeframe: str,
-    net_gain_th: float,
-    dd_th: float,
-    dtype,
-    n_jobs: int = -1,
-    show_progress: bool = False,
-    n_symbols: int = None,
-    bins_to_filter=None,
-    regime_enabled: bool = False,
-) -> tuple:
-
-    ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
-    param_ranges = dict(zip(param_names, lists_for_grid))
-
-    _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe)
-    if _wfo_cfg is None:
-        raise ValueError(f"No WFO window config for timeframe: {timeframe}")
-    bars_per_month   = get_bars_per_year(timeframe) / 12
-    length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
-    pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
-    n_obs            = get_n_obs(timeframe)
-
-    indicator_cache = None
-    if regime_enabled and bins_to_filter:
-        indicator_cache = {}
-        for sym in ohlcv_data:
-            cache = regime_module._get_indicator_cache(sym, DATA_FOLDER_IS)
-            if cache is not None:
-                indicator_cache[sym] = cache
-
-    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows = walk_forward_optimization_mc(
-        ohlcv_arr             = ohlcv_arr,
-        param_ranges          = param_ranges,
-        length_train_set      = length_train_set,
-        pct_train_set         = pct_train_set,
-        anchored              = ANCHORED,
-        signal_fn             = signal_fn,
-        signal_params_keys    = signal_params_keys,
-        order_amount          = order_amount,
-        dtype                 = dtype,
-        n_paths               = WFO_MC_N_PATHS,
-        n_obs                 = n_obs,
-        param_selection_mode  = PARAM_SELECTION_MODE,
-        n_jobs                = n_jobs,
-        show_progress         = show_progress,
-        n_symbols             = n_symbols,
-        bins_to_filter        = bins_to_filter,
-        regime_enabled        = regime_enabled,
-        indicator_cache       = indicator_cache,
-    )
-
-    logger.info(
-        f"STAGE 1 ── WFO-MC completed ── {n_windows} windows | "
+    logger.debug(
+        f"STAGE 1 ── WFO completed  ── {n_windows} windows | "
         f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 

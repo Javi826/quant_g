@@ -15,7 +15,6 @@ logger = logging.getLogger('BOT_trading.api.backend')
 from config.settings import SLIPPAGE_WARNING_PCT, SLIPPAGE_CRITICAL_PCT
 import psycopg2
 from api.metrics import MetricsCalculator
-from market_regime.regime_classifier import get_regime_info_front
 from config.settings import POSTGRES_CONFIG, RISK_LIMITS, LEVERAGE
 from config.settings import HOUR_ZONE
 from config.utils.utils import get_account_config
@@ -30,8 +29,7 @@ class DashboardServer:
                  unique_timeframes=None):
 
         self.account_number = account_number
-        self.regime_reference_symbol = ACCOUNTS.get(account_number, {}).get('regime_reference_symbol')
-        self.regime_ma_window        = ACCOUNTS.get(account_number, {}).get('regime_ma_window', 3)
+        self.reference_symbol = ACCOUNTS.get(account_number, {}).get('reference_symbol')
         self.base_dir = base_dir
         self.get_current_price = get_current_price_func
         self.get_balance = get_balance_func
@@ -439,7 +437,7 @@ class DashboardServer:
                 
                 ref_price = 0
                 try:
-                    ref_price = float(self.get_current_price(self.regime_reference_symbol))
+                    ref_price = float(self.get_current_price(self.reference_symbol))
                 except:
                     pass
                 
@@ -457,7 +455,7 @@ class DashboardServer:
                     'trades_pct': float(trades_pct),
                     'ref_price': float(ref_price),
                     'timestamp': datetime.now(HOUR_ZONE).isoformat(),
-                    'ref_symbol': self.regime_reference_symbol,
+                    'ref_symbol': self.reference_symbol,
                     'unique_timeframes': self.unique_timeframes,
                 })
             except Exception as e:
@@ -746,36 +744,6 @@ class DashboardServer:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
             
-        @self.app.route('/api/regime/strategies')
-        def get_regime_strategies():
-
-            try:
-                strategies_info = []
-        
-                for idx, strat in enumerate(self.strategies, 1):
-                        strategies_info.append({
-                                'number':          idx,
-                                'id':              strat['id'],
-                                'direction':       strat.get('direction', 'long'),
-                                'regime_uptrend':  strat.get('regime_uptrend',  1),
-                                'regime_dwtrend':  strat.get('regime_dwtrend',  1),
-                                'regime_neutral':  strat.get('regime_neutral',  1),
-                                'active':          strat.get('active', True)
-                            })
-        
-                return jsonify({
-                    'success': True,
-                    'strategies': strategies_info,
-                })
-        
-            except Exception as e:
-                logger.error(f"Error getting regime strategies: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'strategies': []
-                }), 500
-        
         @self.app.route('/api/compose-analysis')
         def get_compose_analysis():
             try:
@@ -1190,33 +1158,6 @@ class DashboardServer:
 
 
 
-        # ==============================================================================
-        # EXACT LOCATION IN FILE
-        # ==============================================================================
-        
-        @self.app.route('/api/regime/current')
-        def get_regime_current():
-            try:
-                timeframe   = request.args.get('timeframe', '4H')
-                regime_info = get_regime_info_front(timeframe, symbol=None)
-                return jsonify({
-                    'success':   regime_info['success'],
-                    'timeframe': regime_info['timeframe'],
-                    'family':    regime_info['family'],
-                    'metrics':   regime_info['metrics'],
-                    'ma_window': self.regime_ma_window,
-                    'ref_price': float(self.get_current_price(self.regime_reference_symbol)) if self.regime_reference_symbol else None,
-                })
-            except Exception as e:
-                logger.error(f"Error getting regime: {e}")
-                return jsonify({
-                    'success':   False,
-                    'error':     str(e),
-                    'family':    'neutral',
-                    'metrics':   {},
-                    'timeframe': request.args.get('timeframe', '4H'),
-                }), 500
-            
         @self.app.route('/api/symbols/unique')
         def get_unique_symbols():
 
@@ -1246,31 +1187,6 @@ class DashboardServer:
                 logger.error(f"[SYMBOLS] Error getting unique symbols: {e}")
                 return jsonify({'success': False, 'error': str(e)}), 500
 
-        @self.app.route('/api/regime/symbols')
-        def get_regime_symbols():
-            try:
-                timeframe   = request.args.get('timeframe', '4H')
-                symbol      = request.args.get('symbol')
-        
-                if not symbol:
-                    return jsonify({'success': False, 'error': 'symbol param required'}), 400
-        
-                result      = get_regime_info_front(timeframe, symbol=[symbol])
-                symbol_data = result.get('symbols', {}).get(symbol, {})
-        
-                return jsonify({
-                    'success':   result['success'],
-                    'timeframe': result['timeframe'],
-                    'symbol':    symbol,
-                    'family':    symbol_data.get('family', 'neutral'),
-                    'metrics':   symbol_data.get('metrics', {}),
-                    'ma_window': self.regime_ma_window,
-                })
-        
-            except Exception as e:
-                logger.error(f"[REGIME SYMBOLS] Error for {request.args.get('symbol')}: {e}")
-                return jsonify({'success': False, 'error': str(e)}), 500
-
         # ==============================================================================
         # BTC DATA ENDPOINTS
         # ==============================================================================
@@ -1287,7 +1203,7 @@ class DashboardServer:
                     FROM ref_history
                     WHERE symbol = %s
                 """
-                params = [self.regime_reference_symbol]
+                params = [self.reference_symbol]
 
                 if date_from:
                     query += " AND date >= %s"
@@ -1316,7 +1232,7 @@ class DashboardServer:
                     'success': True,
                     'dates':   dates,
                     'prices':  prices,
-                    'symbol':  self.regime_reference_symbol
+                    'symbol':  self.reference_symbol
                 })
 
             except Exception as e:
@@ -1534,7 +1450,7 @@ class DashboardServer:
                 from datetime import date
 
                 today  = date.today()
-                symbol = self.regime_reference_symbol
+                symbol = self.reference_symbol
 
                 conn   = psycopg2.connect(**self.postgres_config)
                 cursor = conn.cursor()
@@ -1639,7 +1555,7 @@ class DashboardServer:
             if response.ok:
                 data = response.json()
                 if data.get('success'):
-                    logger.info(f"[REF SNAPSHOT] Daily {self.regime_reference_symbol} price captured: ${data.get('price')}")
+                    logger.info(f"[REF SNAPSHOT] Daily {self.reference_symbol} price captured: ${data.get('price')}")
                 else:
                     logger.warning(f"[REF SNAPSHOT] Endpoint returned error: {data.get('error')}")
             else:
@@ -1655,8 +1571,8 @@ class DashboardServer:
         Scheduler loop that runs in separate thread.
         Captures reference symbol price snapshot daily at 00:05 UTC.
         """
-        if self.regime_reference_symbol:
-            logger.info(f"[SNAPSHOT] Scheduler started - captures {self.regime_reference_symbol} price daily at 00:05 UTC")
+        if self.reference_symbol:
+            logger.info(f"[SNAPSHOT] Scheduler started - captures {self.reference_symbol} price daily at 00:05 UTC")
         else:
             logger.info("[SNAPSHOT] Scheduler started - no reference symbol configured, nothing to capture")
     
@@ -1666,7 +1582,7 @@ class DashboardServer:
             now_utc = datetime.utcnow()
             if now_utc.hour == 0 and now_utc.minute == 5:
                 if not triggered_today:
-                    if self.regime_reference_symbol:
+                    if self.reference_symbol:
                         self._capture_ref_snapshot()
                     triggered_today = True
             else:

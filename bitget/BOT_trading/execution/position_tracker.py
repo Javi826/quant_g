@@ -1,22 +1,7 @@
 #BOT_trading/execution/position_tracker.py
-"""
-Position Tracker - Manages open positions and TP/SL monitoring.
-
-This module handles:
-- Adding new positions to tracking
-- Calculating TP/SL prices
-- Monitoring positions for TP/SL hits
-- Managing position state
-- Tracking market regime at position open
-
-This module imports from order_manager for closing positions and
-from trade_logger for logging, but neither imports back, avoiding
-circular dependencies.
-"""
-
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 import logging
 from state.state_manager import save_state_local
 logger = logging.getLogger('BOT_trading.execution.position_tracker')
@@ -30,22 +15,7 @@ def calculate_tp_sl_prices(entry_price: Decimal,
                           direction: str, 
                           tp_pct: float, 
                           sl_pct: float) -> tuple[Decimal, Decimal]:
-    """
-    Calculate TP and SL prices based on entry price and percentages.
-    
-    Args:
-        entry_price: Entry price of the position
-        direction: 'long' or 'short'
-        tp_pct: Take profit percentage
-        sl_pct: Stop loss percentage
-    
-    Returns:
-        Tuple of (tp_price, sl_price)
-    
-    Example:
-        >>> calculate_tp_sl_prices(Decimal('100'), 'long', 5.0, 2.0)
-        (Decimal('105'), Decimal('98'))
-    """
+
     entry = Decimal(str(entry_price))
     tp_decimal = Decimal(str(tp_pct)) / Decimal('100')
     sl_decimal = Decimal(str(sl_pct)) / Decimal('100')

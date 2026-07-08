@@ -9,7 +9,7 @@ logger = logging.getLogger('BOT_trading.validation.validation_module')
 from config.settings import MIN_ORDER_AMOUNT, MAX_ORDER_AMOUNT, MIN_TP_PCT, MAX_TP_PCT
 from config.settings import MIN_SL_PCT, MAX_SL_PCT, MIN_CANDLES, MAX_CANDLES
 from config.settings import VALID_TIMEFRAMES
-from config.settings import STRATEGY_TYPE_REQUIRED_PARAMS, COMMON_REQUIRED_PARAMS
+from config.settings import COMMON_REQUIRED_PARAMS
 from config.settings import ACCOUNTS, BASE_URL
 from config.settings import POSTGRES_CONFIG
 import psycopg2
@@ -130,30 +130,6 @@ def validate_settings():
     if validation_s8_errors == 0:
         logger.debug("Val S8: Candles limits valid")
     
-    # ========================================================================
-    # Val S14: REGIME reference symbol
-    # ========================================================================
-    from market_regime.regime_classifier import REGIME_REFERENCE_SYMBOL
-    validation_s14_errors = 0
-    
-    if not isinstance(REGIME_REFERENCE_SYMBOL, str):
-        errors.append(
-            f"REGIME_REFERENCE_SYMBOL must be string, got {type(REGIME_REFERENCE_SYMBOL)}"
-        )
-        validation_s14_errors += 1
-    elif not REGIME_REFERENCE_SYMBOL:
-        errors.append("REGIME_REFERENCE_SYMBOL is empty")
-        validation_s14_errors += 1
-    elif not REGIME_REFERENCE_SYMBOL.endswith('USDT'):
-        warnings.append(
-            f"REGIME_REFERENCE_SYMBOL = '{REGIME_REFERENCE_SYMBOL}' "
-            f"doesn't end with 'USDT'. Ensure it's a valid futures symbol."
-        )
-    
-    if validation_s14_errors == 0:
-        logger.debug(f"Val S14: REGIME_REFERENCE_SYMBOL = '{REGIME_REFERENCE_SYMBOL}'")
-    
-  
     
     # ========================================================================
     # Val S17: Account numbers format
@@ -202,31 +178,13 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         logger.debug("Val Y1: All strategy IDs implemented")
     
     # ========================================================================
-    # Val Y2: Direction coherence with name
+    # Val Y2: Direction is valid
     # ========================================================================
     validation_y2_errors = 0
     for strat in strategies:
-        name = strat.get('name', '')
         direction = strat.get('direction', '')
         strat_id = strat.get('id', 'UNKNOWN')
 
-        name_indicates_long = '_long_' in name.lower()
-        name_indicates_short = '_short_' in name.lower()
-        
-        if name_indicates_long and direction != 'long':
-            errors.append(
-                f"Strategy '{strat_id}' has name='{name}' (indicates LONG) "
-                f"but direction='{direction}'"
-            )
-            validation_y2_errors += 1
-        
-        if name_indicates_short and direction != 'short':
-            errors.append(
-                f"Strategy '{strat_id}' has name='{name}' (indicates SHORT) "
-                f"but direction='{direction}'"
-            )
-            validation_y2_errors += 1
-        
         if direction not in ['long', 'short']:
             errors.append(
                 f"Strategy '{strat_id}' has invalid direction='{direction}' "
@@ -235,7 +193,7 @@ def validate_strategy_configuration(strategies, implemented_strategies):
             validation_y2_errors += 1
     
     if validation_y2_errors == 0:
-        logger.debug("Val Y2: All directions coherent with names")
+        logger.debug("Val Y2: All directions valid")
     
     # ========================================================================
     # Val Y3: Order amount within valid range
@@ -274,45 +232,19 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         logger.debug("Val Y3: All order amounts in range")
     
     # ========================================================================
-    # Val Y4: Required parameters for each strategy type
+    # Val Y4: Common required parameters
     # ========================================================================
     validation_y4_errors = 0
     
     for strat in strategies:
         strat_id = strat.get('id', 'UNKNOWN')
-        strat_name = strat.get('name', '')
         
-        # Check common parameters
         for param in COMMON_REQUIRED_PARAMS:
             if param not in strat:
                 errors.append(
                     f"Strategy '{strat_id}' is missing required parameter: '{param}'"
                 )
                 validation_y4_errors += 1
-        
-        # Determine base strategy type
-        base_type = None
-        for tf in VALID_TIMEFRAMES:
-            suffix = f'_{tf}'
-            if strat_name.endswith(suffix):
-                base_type = strat_name[:-len(suffix)]
-                break
-        
-        # Check strategy-specific parameters
-        if base_type and base_type in STRATEGY_TYPE_REQUIRED_PARAMS:
-            required_params = STRATEGY_TYPE_REQUIRED_PARAMS[base_type]
-            for param in required_params:
-                if param not in strat:
-                    errors.append(
-                        f"Strategy '{strat_id}' (type: {base_type}) is missing "
-                        f"required parameter: '{param}'"
-                    )
-                    validation_y4_errors += 1
-        elif base_type:
-            warnings.append(
-                f"Strategy '{strat_id}' base type '{base_type}' has no parameter "
-                f"requirements defined. Add it to STRATEGY_TYPE_REQUIRED_PARAMS."
-            )
     
     if validation_y4_errors == 0:
         logger.debug("Val Y4: All strategies have required parameters")
@@ -377,19 +309,6 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     if validation_y7_errors == 0:
         logger.debug("Val Y7: All sell_after_ncandles within range")
     
-    # ========================================================================
-    # Y8: Unique strategy names
-    # ========================================================================
-    validation_y8_errors = 0
-    names = [s.get('name') for s in strategies]
-    duplicates = [name for name in set(names) if names.count(name) > 1]
-    
-    if duplicates:
-        errors.append(f"Duplicate strategy names found: {duplicates}")
-        validation_y8_errors += 1
-    
-    if validation_y8_errors == 0:
-        logger.debug("Val Y8: All strategy names are unique")
     
     # ========================================================================
     # Val Y9: Valid timeframes
@@ -453,77 +372,5 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     if validation_y10_errors == 0:
         logger.debug("Val Y10: All IDs have correct prefix format (NN_name)")
     
-    # ========================================================================
-    # Val Y11: regime01 bin flags (6 bins: family x direction)
-    # ========================================================================
-# =============================================================================
-#     validation_y11_errors = 0
-# 
-#     regime01_bins = [p for p in COMMON_REQUIRED_PARAMS if p.startswith('regime_')]
-# 
-#     for strat in strategies:
-#         strat_id = strat.get('id', 'UNKNOWN')
-# 
-#         for bin_key in regime01_bins:
-#             if bin_key not in strat:
-#                 errors.append(
-#                     f"Strategy '{strat_id}' missing required field '{bin_key}'"
-#                 )
-#                 validation_y11_errors += 1
-#             else:
-#                 val = strat[bin_key]
-#                 if not isinstance(val, (int, float)):
-#                     errors.append(
-#                         f"Strategy '{strat_id}' {bin_key} must be numeric, got {type(val)}"
-#                     )
-#                     validation_y11_errors += 1
-#                 elif val < 0:
-#                     errors.append(
-#                         f"Strategy '{strat_id}' {bin_key} = {val} (must be >= 0)"
-#                     )
-#                     validation_y11_errors += 1
-#                 elif val > 5.0:
-#                     warnings.append(
-#                         f"Strategy '{strat_id}' {bin_key} = {val} (>5.0 is very aggressive)"
-#                     )
-# 
-#     if validation_y11_errors == 0:
-#         logger.debug("Val Y11: All regime01 bin flags valid")
-# =============================================================================
-
- # ========================================================================
-    # Val Y13: Coherencia entre direction y dir_mode
-    # ========================================================================
-# =============================================================================
-#     validation_y13_errors = 0
-#     
-#     for strat in strategies:
-#         strat_id = strat.get('id', 'UNKNOWN')
-#         direction = strat.get('direction', '').lower()
-#         dir_mode = strat.get('dir_mode', 'general')
-#         
-#         # Skip if dir_mode is 'general' (always valid)
-#         if dir_mode == 'general':
-#             continue
-#         
-#         # LONG strategies can only use 'uptrend'
-#         if direction == 'long' and dir_mode != 'long_only':
-#             errors.append(
-#                 f"Strategy '{strat_id}' has direction='long' but dir_mode='{dir_mode}'. "
-#                 f"LONG strategies must use dir_mode='uptrend' or 'general'"
-#             )
-#             validation_y13_errors += 1
-#         
-#         # SHORT strategies can only use 'dwtrend'
-#         elif direction == 'short' and dir_mode != 'short_only':
-#             errors.append(
-#                 f"Strategy '{strat_id}' has direction='short' but dir_mode='{dir_mode}'. "
-#                 f"SHORT strategies must use dir_mode='dwtrend' or 'general'"
-#             )
-#             validation_y13_errors += 1
-#     
-#     if validation_y13_errors == 0:
-#         logger.debug("Val Y13: All direction/dir_mode combinations are coherent")
-# =============================================================================
         
     return errors, warnings

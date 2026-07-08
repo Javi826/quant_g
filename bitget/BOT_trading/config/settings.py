@@ -18,36 +18,27 @@ ACCOUNTS = {
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
-        "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": True,
-        "regime_ma_window":3,
-        "regime_timeframe":"1Dutc",
-        "regime_reference_symbol": "BTCUSDT",
+        "reference_symbol": "BTCUSDT",
     },
     "00": {
         "initial_capital": 10000,
         "dashboard_port": 5000,
         "description": "Main Account",
         "type": "demo",
-        "regime_enabled": False,
         "risk_control_enabled": True,
         "postgresql_enabled": False,
-        "regime_ma_window":3,
-        "regime_timeframe":"1Dutc",
-        "regime_reference_symbol": "BTCUSDT",
+        "reference_symbol": "BTCUSDT",
     },  
     "01": {
         "initial_capital": 12000,
         "dashboard_port": 5099,
         "description": "Testing Account",
         "type": "demo,production",
-        "regime_enabled": False,
         "risk_control_enabled": False,
         "postgresql_enabled": False,
-        "regime_ma_window":3,
-        "regime_timeframe":"1Dutc",
-        "regime_reference_symbol": "BTCUSDT",
+        "reference_symbol": "BTCUSDT",
     },
 }
 
@@ -84,22 +75,9 @@ LATENCY_CRITICAL_SEC   = 1.0
 
 # Common parameters required for ALL strategies
 COMMON_REQUIRED_PARAMS = [
-    'id', 'name', 'timeframe', 'active', 'sell_after_ncandles',
+    'id', 'timeframe', 'active', 'sell_after_ncandles',
     'order_amount', 'tp_pct', 'sl_pct', 'direction',
-    #'regime_uptrend', 'regime_dwtrend','regime_neutral',
 ]
-
-# Strategy-specific required parameters by strategy type
-STRATEGY_TYPE_REQUIRED_PARAMS = {
-    'reversal_long':     ['lookback', 'tolerance', 'ma_period'],
-    'reversal_short':    ['lookback', 'tolerance', 'ma_period'],
-    'parity_long':       ['lookback', 'tolerance', 'ma_period'],
-    'parity_short':      ['lookback', 'tolerance', 'ma_period'],
-    'orderblocks_long':  ['lookback', 'tolerance', 'impulse'],
-    'orderblocks_short': ['lookback', 'tolerance', 'impulse'],
-    'flag_long':         ['lookback', 'impulse', 'flag', 'ma_period'],
-    'flag_short':        ['lookback', 'impulse', 'flag', 'ma_period'],
-}
 
 # Order amount limits (USDT)
 MIN_ORDER_AMOUNT = 200
@@ -157,7 +135,6 @@ API_LIMIT_DATA  = 180
 # ==========================================================================
 HOUR_ZONE             = ZoneInfo('UTC')
 CHECK_INTERVAL        = 5
-USE_HARDCODED_SIGNALS = False
 PERSISTENCE_DIR       = "persistence"
 
 # ==========================================================================

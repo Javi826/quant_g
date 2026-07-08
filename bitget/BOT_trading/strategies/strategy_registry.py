@@ -3,11 +3,11 @@
 import sys
 import os
 import logging
-# Setup logger
+
 logger = logging.getLogger('BOT_trading.strategies.registry')
 
 #===========================================================================
-# PATH SETUP 
+# PATH SETUP
 #===========================================================================
 
 current_dir = os.path.dirname(os.path.abspath(__file__))  # strategies/
@@ -18,18 +18,11 @@ if bitget_dir not in sys.path:
     sys.path.insert(0, bitget_dir)
 
 #===========================================================================
-# IMPORTS - Signal generation functions 
+# IMPORTS
 #===========================================================================
 
-from signals.add_signals_reversal import reversal_long, reversal_short
-from signals.add_signals_parity import parity_long, parity_short
-from signals.add_signals_orderblocks import orderblocks_long, orderblocks_short
-from signals.add_signals_flag import flag_long, flag_short
-
-
-# Import market data utilities
 from market_data import fetch_ohlcv_data, normalize_live_ohlcv, df_to_arrays_live
-from market_regime import get_symbol_regime
+from signals.rule_engine.signal_builder import build_signal_fn
 
 
 #===========================================================================
@@ -40,500 +33,66 @@ def detect_signals_for_strategy(
     strat: dict,
     final_symbols: list,
     exchange,
-    use_hardcoded:  bool = False,
-    regime_enabled: bool = True,
 ) -> list:
 
     strategy_id = strat['id']
     timeframe   = strat['timeframe']
-    
+
     logger.info(f"Processing strategy: {strategy_id}")
     logger.info("-" * 48)
-    
-    # Validate symbols
+
     if not final_symbols:
         logger.error(f"No symbols to process for {strategy_id}")
         return []
-    
-    # Fetch OHLCV data for all symbols
-    ohlcv_data  = fetch_ohlcv_data(final_symbols, timeframe)    
+
+    ohlcv_data  = fetch_ohlcv_data(final_symbols, timeframe)
     all_signals = []
-    
-    # Process each symbol
+
     for symbol, df in ohlcv_data.items():
         if df is None or df.empty:
             continue
-        
-        # Normalize data
+
         df_norm = normalize_live_ohlcv(df)
         arr     = df_to_arrays_live(df_norm)
-        #DEBUG
+
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[CANDLE_CHECK] {symbol} {timeframe} — last 50 candles:\n{df_norm[['open','high','low','close','volume_quote']].tail(50).to_string()}")
-            logger.debug(df_norm[['open','high','low','close','volume_quote']].tail(50).to_string())
-        
+            logger.debug(
+                f"[CANDLE_CHECK] {symbol} {timeframe} — last 50 candles:\n"
+                f"{df_norm[['open','high','low','close','volume_quote']].tail(50).to_string()}"
+            )
+
         try:
-            signals = None
-            
-            # ==============================================================
-            # STRATEGY IMPLEMENTATIONS - Add elif for each new strategy
-            # ==============================================================
-
-            if strategy_id == '01_reversal_long_15m':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '02_reversal_short_15m':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '03_reversal_long_30m':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '04_reversal_short_30m':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '05_reversal_long_1H':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '06_reversal_short_1H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '07_reversal_long_4H':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '08_reversal_short_4H':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '09_reversal_long_6Hutc':
-                signals = reversal_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '10_reversal_short_6Hutc':
-                signals = reversal_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '11_parity_long_15m':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '12_parity_short_15m':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '13_parity_long_30m':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '14_parity_short_30m':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '15_parity_long_1H':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '16_parity_short_1H':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '17_parity_long_4H':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '18_parity_short_4H':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '19_parity_long_6Hutc':
-                signals = parity_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '20_parity_short_6Hutc':
-                signals = parity_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '21_flag_long_15m':
-                signals = flag_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '22_flag_short_15m':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '23_flag_long_30m':
-                signals = flag_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '24_flag_short_30m':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '25_flag_long_1H':
-                signals = flag_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '26_flag_short_1H':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '27_flag_long_4H':
-                signals = flag_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '28_flag_short_4H':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '29_flag_long_6Hutc':
-                signals = flag_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '30_flag_short_6Hutc':
-                signals = flag_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    impulse=strat['impulse'],
-                    flag=strat['flag'],
-                    ma_period=strat['ma_period'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '31_orderblocks_long_15m':
-                signals = orderblocks_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '32_orderblocks_short_15m':
-                signals = orderblocks_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '33_orderblocks_long_30m':
-                signals = orderblocks_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '34_orderblocks_short_30m':
-                signals = orderblocks_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '35_orderblocks_long_1H':
-                signals = orderblocks_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '36_orderblocks_short_1H':
-                signals = orderblocks_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '37_orderblocks_long_4H':
-                signals = orderblocks_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '38_orderblocks_short_4H':
-                signals = orderblocks_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '39_orderblocks_long_6Hutc':
-                signals = orderblocks_long(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-
-            elif strategy_id == '40_orderblocks_short_6Hutc':
-                signals = orderblocks_short(
-                    arr,
-                    lookback=strat['lookback'],
-                    tolerance=strat['tolerance'],
-                    impulse=strat['impulse'],
-                    live_trading=True
-                )
-            # ==============================================================
-            # STRATEGY NOT IMPLEMENTED
-            # ==============================================================
-            else:
+            if 'specs' not in strat:
                 logger.warning(
-                    f"WAR-Strategy '{strategy_id}' not implemented in registry. "
-                    f"WAR-Add elif in strategies/strategy_registry.py"
+                    f"WAR-Strategy '{strategy_id}' has no 'specs' (rule-engine format). Skipping."
                 )
                 continue
-            
-            # ==============================================================
-            # VERIFY SIGNAL
-            # ==============================================================
+
+            signal_fn = build_signal_fn(strat['specs'], strat['direction'])
+            signals   = signal_fn(arr, live_trading=True)
+
             if signals is None or len(signals) == 0:
                 continue
-            
-            # Check if last candle has signal
+
             if signals[-1] != 0:
                 last_row = df_norm.iloc[-1]
-                regime = get_symbol_regime(symbol, timeframe, arr_strategy=arr) if regime_enabled else 'neutral'
                 all_signals.append({
                     'symbol':    symbol,
                     'timestamp': last_row.name if 'timestamp' not in df_norm.columns else last_row['timestamp'],
                     'close':     float(arr['close'][-1]),
-                    'regime':    regime,
                 })
-        
+
         except Exception as e:
-            logger.error(
-                f"Error detecting signals for {symbol} ({strategy_id}): {e}"
-            )
+            logger.error(f"Error detecting signals for {symbol} ({strategy_id}): {e}")
             continue
-    
+
     logger.debug(f"Signals detected {strategy_id}: {len(all_signals)}")
-    
+
     return all_signals
 
+
 # ==============================================================
-# IMPLEMENTED STRATEGIES - For validation
+# IMPLEMENTED STRATEGIES - kept for import compatibility
 # ==============================================================
 
-def get_implemented_strategies() -> set:
-
-    strategies = {
-       #'01_reversal_long_15m',
-       #'02_reversal_short_15m',
-       #'03_reversal_long_30m',
-       #'04_reversal_short_30m',
-       '05_reversal_long_1H',
-       #'06_reversal_short_1H',
-       #'07_reversal_long_4H',
-       #'08_reversal_short_4H',
-       #'09_reversal_long_6Hutc',
-       #'10_reversal_short_6Hutc',
-       #'11_parity_long_15m',
-       #'12_parity_short_15m',
-       #'13_parity_long_30m',
-       #'14_parity_short_30m',
-       #'15_parity_long_1H',
-       #'16_parity_short_1H',
-       #'17_parity_long_4H',
-       #'18_parity_short_4H',
-       #'19_parity_long_6Hutc',
-       '20_parity_short_6Hutc',
-       #'21_flag_long_15m',
-       '22_flag_short_15m',
-       #'23_flag_long_30m',
-       #'24_flag_short_30m',
-       #'25_flag_long_1H',
-       #'26_flag_short_1H',
-       '27_flag_long_4H',
-       #'28_flag_short_4H',
-       #'29_flag_long_6Hutc',
-       '30_flag_short_6Hutc',
-       '31_orderblocks_long_15m',
-       #'32_orderblocks_short_15m',
-       #'33_orderblocks_long_30m',
-       '34_orderblocks_short_30m',
-       #'35_orderblocks_long_1H',
-       #'36_orderblocks_short_1H',
-       #'37_orderblocks_long_4H',
-       #'38_orderblocks_short_4H',
-       #'39_orderblocks_long_6Hutc',
-       #'40_orderblocks_short_6Hutc',
-    }
-    return strategies
-
-# Create constant for backward compatibility
-IMPLEMENTED_STRATEGIES = get_implemented_strategies()
+IMPLEMENTED_STRATEGIES = set()

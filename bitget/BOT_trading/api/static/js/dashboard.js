@@ -240,7 +240,6 @@ let equityChart = null;
 let drawdownChart = null;
 let allStrategiesList = [];
 let isStoppingBot = false;
-let currentRegimeAnalyticsMode = 'regime';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // POSITION SORT FEATURE (NEW)
@@ -267,238 +266,6 @@ function sortPositionsBy(type) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // END POSITION SORT FEATURE
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
-// REGIME MATRIX FUNCTIONS (NEW)
-// ═══════════════════════════════════════════════════════════════════════════
-
-function getFamilyColor(family) {
-    const colors = {
-        'trending': '#58a6ff',      // AZUL (cambiado de verde)
-        'ranging': '#9ca3af',        // GRIS CLARO (cambiado de gris oscuro)
-        'volatile': '#f85149',       // ROJO (sin cambios)
-        'general': '#4b5563'
-    };
-    return colors[family] || '#8b949e';
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// MARKET REGIME FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════
-
-let currentRegimeTimeframe = '4H';
-
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-
-function getRegimeBadgeStyle(family) {
-    const styles = {
-        'uptrend': { bg: '#3fb950', color: '#ffffff', text: 'UPTREND' },
-        'dwtrend': { bg: '#f85149', color: '#ffffff', text: 'DWTREND' },
-        'neutral': { bg: '#8b949e', color: '#ffffff', text: 'NEUTRAL' },
-        'default': { bg: '#6b7280', color: '#ffffff', text: 'UNKNOWN' },
-    };
-    return styles[family] || styles['default'];
-}
-
-function _metricColor(value, reverse) {
-    if (reverse) {
-        if (value < 0.33) return '#3fb950';
-        if (value < 0.66) return '#f59e0b';
-        return '#f85149';
-    } else {
-        if (value < 0.33) return '#f85149';
-        if (value < 0.66) return '#f59e0b';
-        return '#3fb950';
-    }
-}
-
-function _buildBar(value, reverse, totalBlocks = 40) {
-    const filled = Math.round(Math.min(Math.max(value, 0), 1) * totalBlocks);
-    const color  = _metricColor(value, reverse);
-    let html = '';
-    for (let i = 0; i < totalBlocks; i++) {
-        html += `<span style="color:${i < filled ? color : '#2d333b'};">█</span>`;
-    }
-    return html;
-}
-
-// Metric display — dynamic, driven by indicators_cfg from backend
-const METRIC_META = {};
-const _fmtMetric = v => v !== null && v !== undefined ? parseFloat(v).toFixed(3) : '-';
-
-// -----------------------------------------------------------------------------
-// Timeframe selector
-// -----------------------------------------------------------------------------
-
-function setRegimeTimeframe(timeframe) {
-    currentRegimeTimeframe = timeframe;
-
-    document.querySelectorAll('#tab-regime .view-selector .view-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.textContent === timeframe) btn.classList.add('active');
-    });
-
-    loadRegimeData();
-}
-
-// -----------------------------------------------------------------------------
-// /api/regime/current  →  header card + family cards
-// -----------------------------------------------------------------------------
-
-async function loadRegimeData() {
-    try {
-        const res  = await fetch('/api/regime/current?timeframe=' + currentRegimeTimeframe);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-
-        if (!data.success) {
-            console.error('Regime API error:', data.error);
-            return;
-        }
-
-        updateRegimeUI(data);
-        loadRegimeSymbols(data.ma_window);
-
-    } catch (error) {
-        console.error('Error loading regime data:', error);
-    }
-}
-
-
-function updateRegimeUI(data) {
-    const family    = data.family    || 'default';
-    const timeframe = data.timeframe || '1Dutc';
-
-    const badgeStyle = getRegimeBadgeStyle(family);
-    const regimeText = document.getElementById('regime-text');
-    if (regimeText) {
-        regimeText.textContent = badgeStyle.text;
-        regimeText.style.color = badgeStyle.bg;
-    }
-
-    const regimeTimeframeEl = document.getElementById('regime-timeframe');
-    if (regimeTimeframeEl) regimeTimeframeEl.textContent = timeframe;
-
-    const cfgContainer = document.getElementById('regime-config-pills');
-    if (cfgContainer) {
-        const pills = [
-            { label: 'Timeframe', value: timeframe },
-            { label: 'MA Window', value: data.ma_window || '-' },
-        ];
-        cfgContainer.innerHTML = pills.map(p =>
-            `<span style="background:#21262d;border:1px solid #30363d;border-radius:20px;padding:4px 12px;font-size:13px;color:#8b949e;">
-                <span style="color:#6b7280;">${p.label}:</span>
-                <span style="color:#c9d1d9;font-weight:600;margin-left:4px;">${p.value}</span>
-            </span>`
-        ).join('');
-    }
-}
-// -----------------------------------------------------------------------------
-// /api/regime/symbols  →  symbols metrics grid (one request per symbol)
-// -----------------------------------------------------------------------------
-
-async function loadRegimeSymbols(maWindow) {
-    const container = document.getElementById('regime-symbols-container');
-    if (!container) return;
-
-    let symbols = [];
-    try {
-        const res  = await fetch('/api/symbols/unique');
-        const data = await res.json();
-        if (data.success) symbols = data.symbols;
-    } catch (e) {
-        console.error('Error fetching symbols:', e);
-    }
-
-    if (!symbols.length) {
-        container.innerHTML = '<div style="text-align:center;color:#8b949e;padding:40px;">No active symbols</div>';
-        return;
-    }
-
-    const alreadyLoaded = container.dataset.timeframe === currentRegimeTimeframe;
-    if (!alreadyLoaded) {
-        container.dataset.timeframe = currentRegimeTimeframe;
-        container.innerHTML = symbols.map(sym => _buildSymbolCardSkeleton(sym, maWindow)).join('');
-    }
-
-    for (const sym of symbols) {
-        try {
-            const res  = await fetch(`/api/regime/symbols?symbol=${sym}&timeframe=${currentRegimeTimeframe}`);
-            const data = await res.json();
-            _updateSymbolCard(sym, data);
-        } catch (e) {
-            console.error(`Error loading regime for ${sym}:`, e);
-            _updateSymbolCardError(sym);
-        }
-    }
-}
-
-function _buildSymbolCardSkeleton(symbol, maWindow) {
-    return `
-        <div id="sym-card-${symbol}" style="background:#1c2128;border:2px solid #21262d;border-radius:10px;padding:20px;margin-bottom:14px;">
-            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-                <span style="font-size:20px;font-weight:700;color:#c9d1d9;">
-                    ${symbol.replace('USDT','')}<span style="font-size:14px;color:#8b949e;">/USDT</span>
-                </span>
-                <span id="sym-family-${symbol}" style="font-size:14px;font-weight:600;padding:3px 12px;border-radius:20px;background:#21262d;color:#8b949e;">...</span>
-            </div>
-            <div style="display:flex;gap:40px;">
-                <div style="text-align:center;">
-                    <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">Close</div>
-                    <div id="sym-close-${symbol}" style="font-size:22px;font-weight:700;color:#8b949e;">-</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:13px;color:#8b949e;text-transform:uppercase;margin-bottom:6px;letter-spacing:0.5px;">MA(${maWindow || '-'})</div>
-                    <div id="sym-ma-${symbol}" style="font-size:22px;font-weight:700;color:#8b949e;">-</div>
-                </div>
-            </div>
-        </div>`;
-}
-
-function _updateSymbolCard(symbol, data) {
-    const family     = data.family  || 'neutral';
-    const metrics    = data.metrics || {};
-    const maWindow   = data.ma_window;
-    const badgeStyle = getRegimeBadgeStyle(family);
-
-    const familyEl = document.getElementById(`sym-family-${symbol}`);
-    if (familyEl) {
-        familyEl.textContent      = badgeStyle.text;
-        familyEl.style.background = badgeStyle.bg + '33';
-        familyEl.style.color      = badgeStyle.bg;
-    }
-
-    const card = document.getElementById(`sym-card-${symbol}`);
-    if (card) card.style.border = `2px solid #58a6ff`;
-
-    const closeEl = document.getElementById(`sym-close-${symbol}`);
-    if (closeEl) {
-        const close = metrics['close'];
-        closeEl.textContent = close != null ? parseFloat(close).toFixed(4) : '-';
-        closeEl.style.color = badgeStyle.bg;
-    }
-
-    const maEl = document.getElementById(`sym-ma-${symbol}`);
-    if (maEl) {
-        const maKey = Object.keys(metrics).find(k => k.startsWith('ma_'));
-        const ma    = maKey ? metrics[maKey] : null;
-        maEl.textContent = ma != null ? parseFloat(ma).toFixed(4) : '-';
-        maEl.style.color = '#c9d1d9';
-    }
-}
-
-function _updateSymbolCardError(symbol) {
-    const familyEl = document.getElementById(`sym-family-${symbol}`);
-    if (familyEl) { familyEl.textContent = 'ERROR'; familyEl.style.color = '#f85149'; }
-}
-// -----------------------------------------------------------------------------
-// REGIME 0 (REF 1D FILTER)
-// -----------------------------------------------------------------------------
-
-// END MARKET REGIME FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function stopBot() {
@@ -596,9 +363,6 @@ function switchTab(tabName) {
     if (tabName === 'analysis') loadStrategyAnalysis();
     if (tabName === 'config') loadBotConfig();
     if (tabName === 'equity') loadEquityTab();
-    if (tabName === 'regime') {
-    loadRegimeData();
-}
     if (tabName === 'risk') loadRiskTab();
     if (tabName === 'quality') loadQualityTab();
 }
@@ -971,79 +735,6 @@ async function loadStrategyAnalysis() {
     }
 }
 
-// =============================================================================
-// REGIME STRATEGY MATRIX
-// =============================================================================
-async function renderRegimeStrategyMatrix() {
-    try {
-        const res  = await fetch('/api/regime/strategies');
-        const data = await res.json();
-        if (!data.success) {
-            console.error('Failed to load regime strategies:', data.error);
-            return;
-        }
-
-        const tbody = document.getElementById('regime-strategy-matrix-body');
-        const thead = document.getElementById('regime-strategy-matrix-head');
-        if (!tbody) return;
-
-        const strategiesData = data.strategies || [];
-        if (strategiesData.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No strategies</td></tr>';
-            return;
-        }
-
-        // Detect regime fields dynamically from first strategy
-        const regimeFields = Object.keys(strategiesData[0])
-            .filter(k => k.startsWith('regime_'))
-            .sort();
-
-        // Update headers dynamically
-        if (thead) {
-            const headerCells = regimeFields.map(f => {
-                const label = f.replace('regime_', '').toUpperCase();
-                return `<th>${label}</th>`;
-            }).join('');
-            thead.innerHTML = `<tr>
-                <th>#</th>
-                <th>ID</th>
-                <th>Direction</th>
-                ${headerCells}
-            </tr>`;
-        }
-
-        const sorted   = strategiesData.sort((a, b) => a.id.localeCompare(b.id));
-        const dirColor = (dir) => dir === 'long' ? '#3fb950' : '#f85149';
-        const cellStyle = (val) => val === 0
-            ? 'color:#8b949e;font-weight:700;'
-            : 'color:#8b949e;font-weight:700;';
-        const cellText = (val) => val === 0 ? '0x' : '1x';
-
-        let html = '';
-        sorted.forEach((strat, idx) => {
-            const num   = String(idx + 1).padStart(2, '0');
-            const cells = regimeFields.map(f => {
-                const val = strat[f];
-                return `<td style="${cellStyle(val)}">${cellText(val)}</td>`;
-            }).join('');
-
-            const rowOpacity = strat.active ? '1' : '0.4';
-            html += `<tr style="opacity:${rowOpacity};">
-                <td style="color:#8b949e;font-weight:600;">${num}</td>
-                <td>${strat.id}</td>
-                <td style="color:${dirColor(strat.direction)};font-weight:600;text-transform:uppercase;">${strat.direction}</td>
-                ${cells}
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-
-    } catch (error) {
-        console.error('Error rendering regime strategy matrix:', error);
-    }
-}
-// =============================================================================
-// END REGIME STRATEGY MATRIX
-
 async function loadBotConfig() {
     try {
         const res = await fetch('/api/bot-config');
@@ -1162,9 +853,6 @@ async function loadBotConfig() {
                 return '<tr>' + fixedCols + commonCols + extraCols + '<td>' + statusBadge + '</td></tr>';
             }).join('');
         }
-        
-        // MODIFIED: Call new regime matrix functions
-        renderRegimeStrategyMatrix(data.strategies);
         
     } catch (error) {
         console.error('Error:', error);
@@ -1683,9 +1371,6 @@ async function loadComposeCharts() {
     }
 }
 
-// =============================================================================
-// END REGIME STRATEGY BREAKDOWN
-// =============================================================================
 async function updateEquityChart() {
     try {
         const selectedStrategies = getSelectedStrategies('strategy-checkboxes');
@@ -1935,21 +1620,6 @@ async function loadData() {
                 if (refLabel) refLabel.textContent = status.ref_symbol.replace('USDT', '') + ' Price';
             }
 
-            if (status.unique_timeframes && status.unique_timeframes.length > 0) {
-                const tabsContainer = document.getElementById('regime-timeframe-tabs');
-                if (tabsContainer && tabsContainer.children.length === 0) {
-                    const timeframes = ['1Dutc', ...status.unique_timeframes.filter(tf => tf !== '1Dutc')];
-                    timeframes.forEach((tf, idx) => {
-                        const btn = document.createElement('button');
-                        btn.className = 'view-btn' + (idx === 0 ? ' active' : '');
-                        btn.textContent = tf;
-                        btn.onclick = () => setRegimeTimeframe(tf);
-                        tabsContainer.appendChild(btn);
-                    });
-                    setRegimeTimeframe(timeframes[0]);
-                    setRegimeTimeframe(status.unique_timeframes[0]);
-                }
-            }
         });
         
         // Load exposure data with dynamic limits from backend
@@ -2024,11 +1694,6 @@ async function loadData() {
                 }).join('');
             }
         });
-        
-        // Load regime data (non-blocking)
-        if (document.getElementById('tab-regime')?.classList.contains('active')) {
-             loadRegimeData().catch(console.error);
-         }
         
     } catch (error) {
         console.error('Error:', error);
