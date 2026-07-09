@@ -20,7 +20,7 @@ ACCOUNTS = {
         #"type": "production",
         "type": "demo",
         "risk_control_enabled": True,
-        "postgresql_enabled": True,
+        "postgresql_enabled": False,
         "reference_symbol": "BTCUSDT",
     },
     "00": {

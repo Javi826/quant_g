@@ -1,8 +1,5 @@
 #BOT_trading/strategies/strategy_loader.py
-"""
-Strategy Loader
-Loads strategy configurations from per-account Python modules.
-"""
+
 import logging
 from typing import List, Dict
 

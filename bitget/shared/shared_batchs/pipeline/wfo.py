@@ -9,9 +9,6 @@ from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_B
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.regime import regime_module
-from shared_batch_regime.config_paths import DATA_FOLDER_IS
-from shared_batch_regime.regime_core import apply_regime_filter
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
@@ -97,49 +94,6 @@ def _evaluate_fn(
     )
     return _compute_metric(results), params
 
-
-
-
-def _evaluate_fn_with_regime(
-    params: dict,
-    base_arrays: dict,
-    signal_fn: callable,
-    signal_params_keys: list,
-    order_amount: int,
-    dtype,
-    bins_to_filter,
-    regime_enabled: bool = False,
-    indicator_cache: dict = None,
-) -> tuple:
-    """Single param combination evaluation with regime signal filtering for WFO train windows."""
-    _bins = [bins_to_filter] if isinstance(bins_to_filter, str) else list(bins_to_filter)
-
-    ohlcv_arrays = {}
-    for sym, arr in base_arrays.items():
-        sig_kwargs = {k: params[k.upper()] for k in signal_params_keys if k.upper() in params}
-        signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
-
-        if regime_enabled and _bins and _bins != ["neutral"] and indicator_cache:
-            signals = apply_regime_filter(
-                signals        = signals,
-                arr            = arr,
-                sym_cache      = indicator_cache.get(sym),
-                cfg            = regime_module.INDICATOR_CFG,
-                bins_to_filter = _bins,
-            )
-
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
-
-    results = run_grid_backtest(
-        ohlcv_arrays,
-        sell_after   = params["SELL_AFTER"],
-        tp_pct       = params["TP_PCT"],
-        sl_pct       = params["SL_PCT"],
-        order_amount = order_amount,
-    )
-    return _compute_metric(results), params
-
-
 def _collect_trades_fn(
     params: dict,
     base_arrays: dict,
@@ -151,49 +105,6 @@ def _collect_trades_fn(
     """Run backtest with best_params on a window and return the trade log."""
     ohlcv_arrays = _build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
     results      = run_grid_backtest(
-        ohlcv_arrays,
-        sell_after   = params["SELL_AFTER"],
-        tp_pct       = params["TP_PCT"],
-        sl_pct       = params["SL_PCT"],
-        order_amount = order_amount,
-    )
-    trades             = results["__PORTFOLIO__"]["trade_log"].copy()
-    trades.columns     = trades.columns.str.lower().str.strip()
-    trades["buy_time"] = pd.to_datetime(trades["buy_time"])
-    return trades
-
-
-def _collect_trades_fn_with_regime(
-    params: dict,
-    base_arrays: dict,
-    signal_fn: callable,
-    signal_params_keys: list,
-    order_amount: int,
-    dtype,
-    bins_to_filter,
-    regime_enabled: bool,
-    indicator_cache: dict,
-) -> pd.DataFrame:
-    """Run backtest with regime filtering on a window and return the trade log."""
-    _bins = [bins_to_filter] if isinstance(bins_to_filter, str) else list(bins_to_filter)
-
-    ohlcv_arrays = {}
-    for sym, arr in base_arrays.items():
-        sig_kwargs = {k: params[k.upper()] for k in signal_params_keys if k.upper() in params}
-        signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
-
-        if regime_enabled and _bins and _bins != ["neutral"] and indicator_cache:
-            signals = apply_regime_filter(
-                signals        = signals,
-                arr            = arr,
-                sym_cache      = indicator_cache.get(sym),
-                cfg            = regime_module.INDICATOR_CFG,
-                bins_to_filter = _bins,
-            )
-
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
-
-    results            = run_grid_backtest(
         ohlcv_arrays,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],
@@ -228,7 +139,6 @@ def _evaluate_wfo_approval(
 # =============================================================================
 # RUN WFO IS
 # =============================================================================
-
 def run_wfo_is(
     ohlcv_data: dict,
     param_names: list,
@@ -243,8 +153,6 @@ def run_wfo_is(
     n_jobs: int = -1,
     show_progress: bool = False,
     n_symbols: int = None,
-    bins_to_filter=None,
-    regime_enabled: bool = False,
     collect_test_fn_override: callable = None,
 ) -> tuple:
 
@@ -274,29 +182,7 @@ def run_wfo_is(
         dtype              = dtype,
     )
 
-    collect_test_fn = None
-
-    if collect_test_fn_override is not None:
-        collect_test_fn = collect_test_fn_override
-    elif regime_enabled and bins_to_filter:
-        indicator_cache = {}
-        for sym in ohlcv_data:
-            cache = regime_module._get_indicator_cache(sym, DATA_FOLDER_IS)
-            if cache is not None:
-                indicator_cache[sym] = cache
-
-        collect_test_fn = partial(
-            _collect_trades_fn_with_regime,
-            signal_fn          = signal_fn,
-            signal_params_keys = signal_params_keys,
-            order_amount       = order_amount,
-            dtype              = dtype,
-            bins_to_filter     = bins_to_filter,
-            regime_enabled     = regime_enabled,
-            indicator_cache    = indicator_cache,
-        )
-    else:
-        collect_test_fn = collect_train_fn
+    collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn
 
     best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,

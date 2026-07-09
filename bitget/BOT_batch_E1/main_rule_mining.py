@@ -17,7 +17,6 @@ LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-logging.getLogger("BOT_batch.runs.run_correlation").setLevel(logging.INFO)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
@@ -35,7 +34,7 @@ DTYPE         = np.float32
 RULES_N_JOBS  = 32
 INNER_N_JOBS  = 1
 
-TIMEFRAMES = ["6Hutc"]
+TIMEFRAMES = ["1H","4H","6Hutc"]
 N_SYMBOLS  = 10
 
 ORDER_AMOUNT = 100
@@ -48,7 +47,7 @@ RULE_MAX_DEPTH = MAX_DEPTH
 SHOW_PLOTS             = True
 RUN_CORRELATION        = True
 RUN_BEST_WFO_PORTFOLIO = True
-RUN_DEPLOY             = True
+RUN_DEPLOY             = False
 SAVE_TRADES            = False
 
 CORRELATION_DD_THRESHOLD = 0.70

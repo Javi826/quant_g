@@ -1,4 +1,3 @@
-#signals/rule_engine/condition_bank.py
 import numpy as np
 from numba import njit
 
@@ -120,107 +119,118 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> n
     return adx_full
 
 
+# =============================================================================
+# INDICATOR REGISTRY
+# =============================================================================
+
+def _build_specs_threshold(entry):
+
+    specs = []
+    for period in entry["periods"]:
+        for th in entry["thresholds"]:
+            for op in entry["ops"]:
+                specs.append({"type": entry["type"], "period": period, "op": op, "value": th})
+    return specs
+
+def _build_specs_own_value(entry):
+
+    specs = []
+    for value in entry["periods"]:
+        for op in entry["ops"]:
+            specs.append({"type": entry["type"], "op": op, "value": value})
+    return specs
+
+
+INDICATOR_REGISTRY = [
+    {
+        "type":        "rsi",
+        "periods":     [7,14,21],
+        "thresholds":  [30,50,70],
+        "ops":         [">", "<"],
+        "build_cache": lambda o, h, l, c, periods: {p: _rsi(c, p) for p in periods},
+        "build_specs": _build_specs_threshold,
+        "evaluate":    lambda bank, spec: (
+            bank._cache["rsi"][spec["period"]] > spec["value"]
+            if spec["op"] == ">"
+            else bank._cache["rsi"][spec["period"]] < spec["value"]
+        ),
+        "describe":    lambda spec: f"RSI{spec['period']}{spec['op']}{spec['value']}",
+    },
+    {
+        "type":        "adx",
+        "periods":     [7,14,21],
+        "thresholds":  [20,25,30],
+        "ops":         [">"],
+        "build_cache": lambda o, h, l, c, periods: {p: _adx(h, l, c, p) for p in periods},
+        "build_specs": _build_specs_threshold,
+        "evaluate":    lambda bank, spec: bank._cache["adx"][spec["period"]] > spec["value"],
+        "describe":    lambda spec: f"ADX{spec['period']}{spec['op']}{spec['value']}",
+    },
+    {
+        "type":        "ma",
+        "periods":     [20,50,100],
+        "ops":         [">", "<"],
+        "build_cache": lambda o, h, l, c, periods: {p: _sma(c, p) for p in periods},
+        "build_specs": _build_specs_own_value,
+        "evaluate":    lambda bank, spec: (
+            bank.close > bank._cache["ma"][spec["value"]]
+            if spec["op"] == ">"
+            else bank.close < bank._cache["ma"][spec["value"]]
+        ),
+        "describe":    lambda spec: f"CLOSE{spec['op']}MA{spec['value']}",
+    },
+    {
+        "type":        "momentum",
+        "periods":     [5,10,15],
+        "ops":         [">", "<"],
+        "build_cache": None,
+        "build_specs": _build_specs_own_value,
+        "evaluate":    lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
+        "describe":    lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
+    },
+]
+
+
 class ConditionBank:
 
-    DEFAULT_RSI_PERIOD     = 14
-    DEFAULT_ADX_PERIOD     = 14
-    DEFAULT_RSI_THRESHOLDS = [30, 50, 70]
-    DEFAULT_ADX_THRESHOLDS = [20, 25]
-    DEFAULT_MA_PERIODS     = [20, 50, 100]
-    DEFAULT_MOMENTUM_N     = [5, 10]
+    _REGISTRY_BY_TYPE = {entry["type"]: entry for entry in INDICATOR_REGISTRY}
 
-    def __init__(
-        self,
-        arr: dict,
-        rsi_period: int      = DEFAULT_RSI_PERIOD,
-        adx_period: int      = DEFAULT_ADX_PERIOD,
-        rsi_thresholds: list = None,
-        adx_thresholds: list = None,
-        ma_periods: list     = None,
-        momentum_n: list     = None,
-    ):
-        rsi_thresholds = rsi_thresholds if rsi_thresholds is not None else self.DEFAULT_RSI_THRESHOLDS
-        adx_thresholds = adx_thresholds if adx_thresholds is not None else self.DEFAULT_ADX_THRESHOLDS
-        ma_periods     = ma_periods     if ma_periods     is not None else self.DEFAULT_MA_PERIODS
-        momentum_n     = momentum_n     if momentum_n     is not None else self.DEFAULT_MOMENTUM_N
-
+    def __init__(self, arr: dict):
         self.open  = np.ascontiguousarray(arr["open"],  dtype=np.float64)
         self.high  = np.ascontiguousarray(arr["high"],  dtype=np.float64)
         self.low   = np.ascontiguousarray(arr["low"],   dtype=np.float64)
         self.close = np.ascontiguousarray(arr["close"], dtype=np.float64)
         self.n     = len(self.close)
 
-        self.rsi_period     = rsi_period
-        self.adx_period     = adx_period
-        self.rsi_thresholds = rsi_thresholds
-        self.adx_thresholds = adx_thresholds
-        self.ma_periods     = ma_periods
-        self.momentum_n     = momentum_n
+        self._cache = {}
+        for entry in INDICATOR_REGISTRY:
+            if entry["build_cache"] is not None:
+                self._cache[entry["type"]] = entry["build_cache"](
+                    self.open, self.high, self.low, self.close, entry["periods"]
+                )
 
-        self._rsi_cache = _rsi(self.close, self.rsi_period)
-        self._adx_cache = _adx(self.high, self.low, self.close, self.adx_period)
-        self._ma_cache  = {period: _sma(self.close, period) for period in self.ma_periods}
+    def _momentum_mask(self, op: str, nbar: int) -> np.ndarray:
+        result = np.zeros(self.n, dtype=bool)
+        if op == ">":
+            result[nbar:] = self.close[nbar:] > self.close[:-nbar]
+        else:
+            result[nbar:] = self.close[nbar:] < self.close[:-nbar]
+        return result
 
     def build_condition_specs(self) -> list:
         specs = []
-
-        for th in self.rsi_thresholds:
-            specs.append({"type": "rsi", "op": ">", "value": th})
-            specs.append({"type": "rsi", "op": "<", "value": th})
-
-        for th in self.adx_thresholds:
-            specs.append({"type": "adx", "op": ">", "value": th})
-
-        for period in self.ma_periods:
-            specs.append({"type": "ma", "op": ">", "value": period})
-            specs.append({"type": "ma", "op": "<", "value": period})
-
-        for nbar in self.momentum_n:
-            specs.append({"type": "momentum", "op": ">", "value": nbar})
-            specs.append({"type": "momentum", "op": "<", "value": nbar})
-
+        for entry in INDICATOR_REGISTRY:
+            specs.extend(entry["build_specs"](entry))
         return specs
 
     def evaluate(self, spec: dict) -> np.ndarray:
-        ctype = spec["type"]
-        op    = spec["op"]
-        value = spec["value"]
-
-        if ctype == "rsi":
-            series = self._rsi_cache
-            return series > value if op == ">" else series < value
-
-        if ctype == "adx":
-            series = self._adx_cache
-            return series > value
-
-        if ctype == "ma":
-            series = self._ma_cache[value]
-            return self.close > series if op == ">" else self.close < series
-
-        if ctype == "momentum":
-            nbar   = value
-            result = np.zeros(self.n, dtype=bool)
-            if op == ">":
-                result[nbar:] = self.close[nbar:] > self.close[:-nbar]
-            else:
-                result[nbar:] = self.close[nbar:] < self.close[:-nbar]
-            return result
-
-        raise ValueError(f"Unknown condition type: {ctype}")
+        entry = self._REGISTRY_BY_TYPE.get(spec["type"])
+        if entry is None:
+            raise ValueError(f"Unknown condition type: {spec['type']}")
+        return entry["evaluate"](self, spec)
 
     def describe(self, spec: dict) -> str:
-        ctype = spec["type"]
-        op    = spec["op"]
-        value = spec["value"]
-
-        if ctype == "rsi":
-            return f"RSI{self.rsi_period}{op}{value}"
-        if ctype == "adx":
-            return f"ADX{self.adx_period}{op}{value}"
-        if ctype == "ma":
-            return f"CLOSE{op}MA{value}"
-        if ctype == "momentum":
-            return f"CLOSE{op}CLOSE[-{value}]"
-
-        raise ValueError(f"Unknown condition type: {ctype}")
+        entry = self._REGISTRY_BY_TYPE.get(spec["type"])
+        if entry is None:
+            raise ValueError(f"Unknown condition type: {spec['type']}")
+        return entry["describe"](spec)

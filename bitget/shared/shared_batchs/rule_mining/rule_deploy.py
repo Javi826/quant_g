@@ -17,6 +17,11 @@ logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 
 
 def _fmt_spec(spec: dict) -> str:
+    if "period" in spec:
+        return (
+            f'{{"type": "{spec["type"]}", "period": {spec["period"]}, '
+            f'"op": "{spec["op"]}", "value": {spec["value"]}}}'
+        )
     return (
         f'{{"type": "{spec["type"]}", "op": "{spec["op"]}", "value": {spec["value"]}}}'
     )
@@ -46,7 +51,7 @@ def _build_window_summary_lines(deploy_map: dict) -> list:
         train_m_str = f"{int(train_m)}m train" if train_m is not None else "?m train"
         test_m_str  = f"+{int(test_m)}m" if test_m is not None else "?"
 
-        lines.append(f'  {tf:<12}: {ts_str} → {te_str}  ({train_m_str})  |  next train: {next_str}  ({test_m_str})')
+        lines.append(f'  {tf:<6}: {ts_str} → {te_str}  ({train_m_str})  |  next train: {next_str}  ({test_m_str})')
 
     return lines
 
@@ -67,7 +72,7 @@ def _save_rule_deploy_batch(
     if window_lines:
         lines += ['', 'Train windows:'] + window_lines
 
-    lines += ['"""', '', 'RULES = [']
+    lines += ['"""', '', 'STRATEGIES = [']
 
     sorted_ids = sorted(deploy_map.keys(), key=lambda rid: int(rid.split("_")[0]))
 
