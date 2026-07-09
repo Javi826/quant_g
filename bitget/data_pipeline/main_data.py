@@ -43,19 +43,19 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
-SELECTED_SYMBOLS   = ["BTCUSDT",
+SELECTED_SYMBOLS = [
+    "BTCUSDT",
     "ETHUSDT",
     "SOLUSDT",
     "XRPUSDT",
     "DOGEUSDT",
     "SUIUSDT",
-    "HYPEUSDT",
+    "BNBUSDT",
     "ADAUSDT",
     "TAOUSDT",
-    "PIPPINUSDT"]
+    "HYPEUSDT"]
 
 SYMBOL_MODE        = "auto"   #manual o auto
-
 N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"

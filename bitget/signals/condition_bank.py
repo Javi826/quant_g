@@ -1,3 +1,4 @@
+#signals/rule_engine/condition_bank.py
 import numpy as np
 from numba import njit
 
