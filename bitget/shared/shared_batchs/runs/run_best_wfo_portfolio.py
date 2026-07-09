@@ -22,7 +22,7 @@ WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
 #WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.25,0.25]  # must match WFO_N_SPLITS, recency-weighted
 #WFO_SUBPERIOD_WEIGHTS = [1] 
 
-MIN_STRATEGIES     = 5
+MIN_STRATEGIES     = 2
 MAX_STRATEGIES     = 6
 TOP_N              = 2
 REQUIRE_LONG_SHORT = True
@@ -104,10 +104,12 @@ def _split_trades_by_time(
 # =============================================================================
 
 def _extract_metric(m: dict, metric: str) -> float:
+    if m.get("Net_Gain_pct", np.nan) <= 0:
+        return np.nan  
+
     col, higher_is_better = _METRIC_MAP[metric]
     val = m.get(col, np.nan)
-    return val if higher_is_better else -abs(val)  # penalize larger magnitude, regardless of sign # negate so we always maximize
-
+    return val if higher_is_better else -abs(val)  
 # =============================================================================
 # PRIVATE HELPERS — Combo scoring (raw metric per subperiod)
 # =============================================================================

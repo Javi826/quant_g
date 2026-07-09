@@ -75,12 +75,8 @@ TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m
 # =============================================================================
 # SPLIT DATA
 # =============================================================================
-SPLIT_MODE           = "expanding"
 WINDOW_OOS_MONTHS    = 0
 SPLIT_REFERENCE_DATE = None
-
-# IS_ROLLING_MONTHS  only used when SPLIT_MODE = "rolling"
-IS_ROLLING_MONTHS    = 3     
 
 # =============================================================================
 # HELPERS
@@ -116,9 +112,7 @@ def _build_config(timeframe: str | None = None, selected_symbols: list | None = 
         "symbol_mode":                   SYMBOL_MODE,
         "n_symbols_download":            N_SYMBOLS_DOWNLOAD,
         "timeframes_highlow":            TIMEFRAMES_HIGHLOW,
-        "split_mode":                    SPLIT_MODE,
         "window_oos_months":             WINDOW_OOS_MONTHS,
-        "is_rolling_months":             IS_ROLLING_MONTHS,
         "split_reference_date":          SPLIT_REFERENCE_DATE,
         "export_csv":                    EXPORT_CSV,
         "raw_dir":                       RAW_DIR,

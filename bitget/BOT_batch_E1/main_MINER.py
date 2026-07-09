@@ -1,4 +1,4 @@
-#BOT_batch/main_rule_mining.py
+#BOT_batch/main_MINER.py
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -34,12 +34,12 @@ DTYPE         = np.float32
 RULES_N_JOBS  = 32
 INNER_N_JOBS  = 1
 
-TIMEFRAMES = ["1H","4H","6Hutc"]
+TIMEFRAMES = ["6Hutc"]
 N_SYMBOLS  = 10
 
 ORDER_AMOUNT = 100
 
-WFO_NET_GAIN_TH = 35
+WFO_NET_GAIN_TH = 50
 WFO_DD_TH       = 20
 
 RULE_MAX_DEPTH = MAX_DEPTH

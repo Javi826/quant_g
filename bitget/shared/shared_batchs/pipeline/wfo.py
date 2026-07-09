@@ -14,29 +14,27 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-WFO_WINDOW_CONFIG = {
-    "15m":   {"train_months": 9, "test_months": 2},
-    "30m":   {"train_months": 9, "test_months": 2},
-    "1H":    {"train_months": 9, "test_months": 2},
-    "4H":    {"train_months": 9, "test_months": 2},
-    "6Hutc": {"train_months": 9, "test_months": 2},
-}
-
 # =============================================================================
 # WFO_WINDOW_CONFIG = {
-#     "15m":   {"train_months": 6, "test_months": 2},
-#     "30m":   {"train_months": 6, "test_months": 2},
-#     "1H":    {"train_months": 6, "test_months": 2},
-#     "4H":    {"train_months": 6, "test_months": 2},
-#     "6Hutc": {"train_months": 6, "test_months": 2},
+#     "15m":   {"train_months": 9, "test_months": 2},
+#     "30m":   {"train_months": 9, "test_months": 2},
+#     "1H":    {"train_months": 9, "test_months": 2},
+#     "4H":    {"train_months": 9, "test_months": 2},
+#     "6Hutc": {"train_months": 9, "test_months": 2},
 # }
 # =============================================================================
+
+WFO_WINDOW_CONFIG = {
+    "15m":   {"train_months": 9, "test_months": 3},
+    "30m":   {"train_months": 9, "test_months": 3},
+    "1H":    {"train_months": 9, "test_months": 3},
+    "4H":    {"train_months": 9, "test_months": 3},
+    "6Hutc": {"train_months": 9, "test_months": 3},
+}
 
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
-
-
 
 # =============================================================================
 # PRIVATE HELPERS

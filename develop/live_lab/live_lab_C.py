@@ -492,10 +492,10 @@ def print_wr_score_report(
 # =============================================================================
 
 def _timeframe_to_offset(strategy_id: str) -> pd.Timedelta:
-    """Extract candle size from strategy_id suffix (e.g. '_15m', '_1H', '_6Hutc')."""
-    suffix = strategy_id.split("_")[-1].replace("utc", "")
-    unit   = suffix[-1]
-    value  = int(suffix[:-1])
+    """Extract candle size from strategy_id timeframe token (e.g. '00041_4H_long_...')."""
+    token = strategy_id.split("_")[1].replace("utc", "")
+    unit  = token[-1]
+    value = int(token[:-1])
     if unit == "m":
         return pd.Timedelta(minutes=value)
     if unit == "H":

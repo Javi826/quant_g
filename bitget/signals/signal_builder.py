@@ -20,7 +20,7 @@ def build_signal_fn(rule_specs: list, side: str):
             signal[mask] = 1
         else:
             signal[mask] = -1
-
+            
         if not live_trading:
             signal = np.roll(signal, 1)
             signal[0] = 0
@@ -28,3 +28,4 @@ def build_signal_fn(rule_specs: list, side: str):
         return signal
 
     return signal_fn
+

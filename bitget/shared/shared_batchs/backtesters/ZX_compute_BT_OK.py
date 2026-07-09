@@ -354,6 +354,9 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
     price_t = float(d['open'][buy_idx]) #OPEN
     qty = order_amount / price_t
 
+   # print(f"[DEBUG] sym={sym} | signal_candle_ts={d['ts'][buy_idx-1]} signal_candle_close={d['close'][buy_idx-1]} "
+      #    f"| exec_candle_ts={d['ts'][buy_idx]} exec_open={price_t}")
+
     commission_buy = float(order_amount * comi_factor)
     
     if is_short:

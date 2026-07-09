@@ -17,10 +17,9 @@ ACCOUNTS = {
         "initial_capital": 10000,
         "dashboard_port": 5001,
         "description": "Elite Account",
-        #"type": "production",
-        "type": "demo",
+        "type": "production",
         "risk_control_enabled": True,
-        "postgresql_enabled": False,
+        "postgresql_enabled": True,
         "reference_symbol": "BTCUSDT",
     },
     "00": {
@@ -86,8 +85,8 @@ MIN_SL_PCT = 2
 MAX_SL_PCT = 10
 
 # Candles timeout limits
-MIN_CANDLES = 50
-MAX_CANDLES = 100
+MIN_CANDLES = 49
+MAX_CANDLES = 51
 
 # Valid timeframes
 VALID_TIMEFRAMES = ['15m','30m','1H','4H','6Hutc']
