@@ -62,6 +62,28 @@ def _aggregate_ema(df_params: pd.DataFrame, param_ranges: dict) -> dict:
         final_params[col] = _round_param(ema_val, decimals)
     return final_params
 
+def _compute_param_stability(df_params: pd.DataFrame, param_ranges: dict) -> float:
+    """
+    Joint entropy (normalized 0-1) of parameter combinations across WFO windows.
+    0 = identical combo chosen in every window (stable).
+    1 = combos maximally scattered across the full grid (unstable).
+    """
+    combos    = list(df_params.itertuples(index=False, name=None))
+    n_windows = len(combos)
+    if n_windows == 0:
+        return np.nan
+
+    counts = Counter(combos)
+    probs  = np.array([c / n_windows for c in counts.values()])
+    entropy = -np.sum(probs * np.log2(probs))
+
+    n_possible_combos = 1
+    for col in df_params.columns:
+        n_possible_combos *= len(param_ranges[col])
+
+    max_entropy = np.log2(n_possible_combos) if n_possible_combos > 1 else 1.0
+    return round(float(entropy / max_entropy), 3) if max_entropy > 0 else 0.0
+
 
 _AGGREGATORS = {
     "MODE": _aggregate_mode,
@@ -375,7 +397,7 @@ def walk_forward_optimization(
     # -----------------------------------------------------------
     df_params    = pd.DataFrame(best_params_list)
     final_params = _AGGREGATORS[param_selection_mode](df_params, param_ranges)
-
+    param_stability  = _compute_param_stability(df_params, param_ranges)
     # -----------------------------------------------------------
     # Final DataFrame with train/test dates, params, and criterion
     # -----------------------------------------------------------
@@ -426,4 +448,4 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx
+    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, param_stability

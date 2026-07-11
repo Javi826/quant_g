@@ -29,7 +29,6 @@ def _slugify_label(label: str) -> str:
     slug = slug.replace("[", "").replace("]", "").replace("-", "m")
     return slug
 
-
 def _run_single_rule(
     i: int,
     total: int,
@@ -41,6 +40,8 @@ def _run_single_rule(
     timeframe: str,
     net_gain_th: float,
     dd_th: float,
+    r2_th: float,
+    stability_th: float,
     dtype,
     inner_n_jobs: int,
     show_progress: bool,
@@ -56,7 +57,7 @@ def _run_single_rule(
 
     rule_id = f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
-    best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results = run_wfo_is(
+    best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, param_stability = run_wfo_is(
         ohlcv_data          = ohlcv_data,
         param_names         = param_names,
         lists_for_grid      = lists_for_grid,
@@ -66,6 +67,8 @@ def _run_single_rule(
         timeframe           = timeframe,
         net_gain_th         = net_gain_th,
         dd_th               = dd_th,
+        r2_th               = r2_th,
+        stability_th        = stability_th,
         dtype               = dtype,
         n_jobs              = inner_n_jobs,
         show_progress       = show_progress,
@@ -104,10 +107,11 @@ def _run_single_rule(
         "win_rate":         metrics["Win_Rate"]      if metrics else 0.0,
         "profit_factor":    metrics["Profit_Factor"] if metrics else 0.0,
         "calmar":           metrics["Calmar"]        if metrics else 0.0,
+        "r_squared":        metrics["R_Squared"]     if metrics else 0.0,
+        "param_stability":  param_stability,
         "best_params":      best_params,
         "wfo_test_trades":  wfo_test_trades,
     }
-
 
 def run_rule_mining(
     ohlcv_data: dict,
@@ -116,6 +120,8 @@ def run_rule_mining(
     order_amount: int,
     net_gain_th: float,
     dd_th: float,
+    r2_th: float,
+    stability_th: float,
     dtype,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -136,6 +142,7 @@ def run_rule_mining(
         "high":  arr_sample["high"],
         "low":   arr_sample["low"],
         "close": arr_sample["close"],
+        "volume_quote": arr_sample["volume_quote"],
     }, max_depth=max_depth)
 
     total_rules = len(all_rules)
@@ -145,7 +152,7 @@ def run_rule_mining(
         raw_results = Parallel(n_jobs=rules_n_jobs)(
             delayed(_run_single_rule)(
                 i, total_rules, rule, ohlcv_data, param_names, lists_for_grid, order_amount,
-                timeframe, net_gain_th, dd_th, dtype, inner_n_jobs, show_progress, n_symbols,
+                timeframe, net_gain_th, dd_th, r2_th, stability_th, dtype, inner_n_jobs, show_progress, n_symbols,
                 log_level, save_trades, brief_trades_folder,
             )
             for i, rule in enumerate(all_rules)
@@ -272,13 +279,13 @@ def _print_ranking(all_raw_results: list, highlight_ids: list, stage_label: str)
     print(f"\n{'=' * 160}")
     print(f"  RULE MINING RESULTS — {stage_label} ── {len(rows)} / {len(all_raw_results)} tested")
     print(f"{'=' * 160}")
-    print(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'TRADES':<8}RULE")
+    print(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'STAB':<8}{'TRADES':<8}RULE")
     print(f"{'-' * 160}")
 
     for r in rows:
         print(
             f"{r['rule_id']:<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
-            f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}"
+            f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}{r['param_stability']:<8.3f}"
             f"{r['n_trades']:<8}{r['label']}"
         )
 

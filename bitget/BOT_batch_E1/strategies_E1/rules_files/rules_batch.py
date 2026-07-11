@@ -65,4 +65,3 @@ STRATEGIES = [
         "sl_pct": 6,
     },
 ]
-

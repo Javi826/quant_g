@@ -1,8 +1,4 @@
 #BOT_trading/config/settings.py
-"""
-Centralizes all bot configuration including exchange settings,
-validation limits, paths, and account-specific settings.
-"""
 import sys, os
 import socket
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))

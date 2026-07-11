@@ -20,17 +20,8 @@ WFO_WINDOW_CONFIG = {
     "1H":    {"train_months": 9, "test_months": 2},
     "4H":    {"train_months": 9, "test_months": 2},
     "6Hutc": {"train_months": 9, "test_months": 2},
+    "12Hutc": {"train_months": 9, "test_months": 2},
 }
-
-# =============================================================================
-# WFO_WINDOW_CONFIG = {
-#     "15m":   {"train_months": 12, "test_months": 4},
-#     "30m":   {"train_months": 12, "test_months": 4},
-#     "1H":    {"train_months": 12, "test_months": 4},
-#     "4H":    {"train_months": 12, "test_months": 4},
-#     "6Hutc": {"train_months": 12, "test_months": 4},
-# }
-# =============================================================================
 
 ANCHORED             = False
 METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
@@ -40,21 +31,41 @@ PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
 # PRIVATE HELPERS
 # =============================================================================
 
+def _window_cache_key(base_arrays: dict) -> tuple:
+
+    return tuple(
+        (sym, int(arr["ts"][0]), int(arr["ts"][-1]), len(arr["ts"]))
+        for sym, arr in sorted(base_arrays.items())
+    )
+
 def _build_ohlcv_with_signal(
     base_arrays: dict,
     signal_fn: callable,
     signal_params_keys: list,
     param_dict: dict,
     dtype,
+    _signal_cache: dict = None,
 ) -> dict:
-    """Attach generated signals to each symbol's OHLCV arrays for one WFO window."""
+
+    signal_independent_of_params = not signal_params_keys
+    cache_key = None
+    if signal_independent_of_params and _signal_cache is not None:
+        cache_key = _window_cache_key(base_arrays)
+        cached    = _signal_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     ohlcv_arrays = {}
     for sym, arr in base_arrays.items():
         sig_kwargs = {k: param_dict[k.upper()] for k in signal_params_keys if k.upper() in param_dict}
         signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
-    return ohlcv_arrays
 
+    if cache_key is not None:
+        _signal_cache.clear()  # only one window's signals need to live at a time
+        _signal_cache[cache_key] = ohlcv_arrays
+
+    return ohlcv_arrays
 
 def _compute_metric(results: dict) -> float:
     """Selection metric for WFO window optimization: Net Gain % or Calmar ratio."""
@@ -72,7 +83,6 @@ def _compute_metric(results: dict) -> float:
 
     raise ValueError(f"Unknown METRIC_MODE: {METRIC_MODE}")
 
-
 def _evaluate_fn(
     params: dict,
     base_arrays: dict,
@@ -80,9 +90,12 @@ def _evaluate_fn(
     signal_params_keys: list,
     order_amount: int,
     dtype,
+    _signal_cache: dict = None,
 ) -> tuple:
     """Single param combination evaluation for one WFO train window."""
-    ohlcv_arrays = _build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
+    ohlcv_arrays = _build_ohlcv_with_signal(
+        base_arrays, signal_fn, signal_params_keys, params, dtype, _signal_cache=_signal_cache
+    )
     results = run_grid_backtest(
         ohlcv_arrays,
         sell_after   = params["SELL_AFTER"],
@@ -122,6 +135,9 @@ def _evaluate_wfo_approval(
     wfo_test_trades: pd.DataFrame,
     net_gain_th: float,
     dd_th: float,
+    r2_th: float,
+    stability_th: float,
+    param_stability: float,
 ) -> tuple:
 
     if wfo_test_trades.empty:
@@ -130,7 +146,13 @@ def _evaluate_wfo_approval(
     m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
     net_gain_pct = m["Net_Gain_pct"]
     max_dd_pct   = m["Max_DD_pct"]
-    approved     = net_gain_pct > net_gain_th and abs(max_dd_pct) < dd_th
+    r_squared    = m["R_Squared"]
+    approved     = (
+        net_gain_pct > net_gain_th
+        and abs(max_dd_pct) < dd_th
+        and r_squared > r2_th
+        and param_stability < stability_th
+    )
 
     return approved, net_gain_pct, max_dd_pct
 
@@ -147,6 +169,8 @@ def run_wfo_is(
     timeframe: str,
     net_gain_th: float,
     dd_th: float,
+    r2_th: float,
+    stability_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -164,12 +188,18 @@ def run_wfo_is(
     length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
     pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
 
+    # Shared per-window signal cache: when the signal is independent of the exit
+    # grid (signal_params_keys empty), signals are computed once per window and
+    # reused across all param combinations. Bit-exact vs. per-combo recomputation.
+    _signal_cache = {}
+
     evaluate_fn = partial(
         _evaluate_fn,
         signal_fn          = signal_fn,
         signal_params_keys = signal_params_keys,
         order_amount       = order_amount,
         dtype              = dtype,
+        _signal_cache      = _signal_cache,
     )
 
     collect_train_fn = partial(
@@ -182,7 +212,7 @@ def run_wfo_is(
 
     collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn
 
-    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows = walk_forward_optimization(
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, param_stability = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,
         param_ranges            = param_ranges,
         length_train_set        = length_train_set,
@@ -206,6 +236,9 @@ def run_wfo_is(
         wfo_test_trades = wfo_test_trades,
         net_gain_th     = net_gain_th,
         dd_th           = dd_th,
+        r2_th           = r2_th,
+        stability_th    = stability_th,
+        param_stability = param_stability,
     )
 
-    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results
+    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, param_stability

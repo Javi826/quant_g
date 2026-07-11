@@ -36,8 +36,10 @@ INNER_N_JOBS = 1
 
 N_SYMBOLS = 10
 
-WFO_NET_GAIN_TH = -10
-WFO_DD_TH       = 50
+WFO_NET_GAIN_TH  = -10
+WFO_DD_TH        = 50
+WFO_R2_TH        = -1.0
+WFO_STABILITY_TH = 1.0   # 1.0 = disabled (no rule discarded)
 
 SAVE_TRADES = True
 
@@ -109,8 +111,8 @@ if __name__ == "__main__":
 
             result = _run_single_rule(
                 i, len(tf_strategies), rule, ohlcv_is, param_names, lists_for_grid,
-                entry["order_amount"], timeframe, WFO_NET_GAIN_TH, WFO_DD_TH, DTYPE,
-                INNER_N_JOBS, False, N_SYMBOLS, LOG_LEVEL, SAVE_TRADES, BRIEF_TRADES_FOLDER,
+                entry["order_amount"], timeframe, WFO_NET_GAIN_TH, WFO_DD_TH, WFO_R2_TH, WFO_STABILITY_TH,
+                DTYPE, INNER_N_JOBS, False, N_SYMBOLS, LOG_LEVEL, SAVE_TRADES, BRIEF_TRADES_FOLDER,
             )
             tf_results.append(result)
 

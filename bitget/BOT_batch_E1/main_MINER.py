@@ -24,38 +24,45 @@ from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
-from shared_batchs.rule_mining.rule_generator import MAX_DEPTH
+from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
 
-DTYPE         = np.float32
-RULES_N_JOBS  = 32
-INNER_N_JOBS  = 1
+DTYPE        = np.float32
+RULES_N_JOBS = -1
+INNER_N_JOBS = 1
 
-TIMEFRAMES = ["1H","4H","6Hutc"]
-N_SYMBOLS  = 10
-
+TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["4H","6Hutc"]
+N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
-WFO_NET_GAIN_TH = 50
-WFO_DD_TH       = 20
+WFO_NET_GAIN_TH  = 54
+WFO_DD_TH        = 20
+WFO_R2_TH        = 0.6
+WFO_STABILITY_TH = 0.7
 
-RULE_MAX_DEPTH = MAX_DEPTH
+# =============================================================================
+# WFO_NET_GAIN_TH  = 50
+# WFO_DD_TH        = 20
+# WFO_R2_TH        = 0.8
+# WFO_STABILITY_TH = 0.6
+# =============================================================================
 
 SHOW_PLOTS             = True
 RUN_CORRELATION        = True
 RUN_BEST_WFO_PORTFOLIO = True
-RUN_DEPLOY             = True
+RUN_DEPLOY             = False
 SAVE_TRADES            = False
 
-CORRELATION_DD_THRESHOLD = 0.70
+CORRELATION_DD_THRESHOLD = 0.60
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
-SYMBOLS_LIVE_FOLDER   = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
-BRIEF_TRADES_FOLDER   = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
-DEPLOY_OUTPUT_PATH    = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
+SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
+BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
+DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -73,17 +80,18 @@ if __name__ == "__main__":
     logger.info(f"\n{'=' * 115}")
     logger.info(f"  RULE MINING START")
     logger.info(f"{'=' * 115}")
-    logger.info(f"  TIMEFRAMES      : {TIMEFRAMES}")
-    logger.info(f"  N_SYMBOLS       : {N_SYMBOLS}")
-    logger.debug(f"  MAX DEPTH      : {RULE_MAX_DEPTH}")
-    logger.info(f"  PARAM GRID      : {PARAM_GRID}")
+    logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
+    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
+    logger.info(f"  VALIDATION  : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  STABILITY_TH={WFO_STABILITY_TH}")
+    logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
+    logger.info(f"  PARAM GRID  : {PARAM_GRID}")
     _windows_str = "  |  ".join(
         f"{tf}: train={WFO_WINDOW_CONFIG.get(tf, {}).get('train_months')}m test={WFO_WINDOW_CONFIG.get(tf, {}).get('test_months')}m"
         for tf in TIMEFRAMES
     )
-    logger.info(f"  WFO WINDOWS     : {_windows_str}")
+    logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(
-        f"  RUNS            : CORRELATION : {'🟢' if RUN_CORRELATION else '⚪'}  "
+        f"  RUNS        : CORRELATION : {'🟢' if RUN_CORRELATION else '⚪'}  "
         f"BEST PORTFOLIO: {'🟢' if RUN_BEST_WFO_PORTFOLIO else '⚪'}  "
         f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"
     )
@@ -112,6 +120,8 @@ if __name__ == "__main__":
             order_amount         = ORDER_AMOUNT,
             net_gain_th          = WFO_NET_GAIN_TH,
             dd_th                = WFO_DD_TH,
+            r2_th                = WFO_R2_TH,
+            stability_th         = WFO_STABILITY_TH,
             dtype                = DTYPE,
             rules_n_jobs         = RULES_N_JOBS,
             inner_n_jobs         = INNER_N_JOBS,

@@ -16,16 +16,15 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 
 WFO_METRIC            = "R_SQUARED" 
-#WFO_METRIC            = "MAX_DD_PCT"        # NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
+#NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
 WFO_N_SPLITS          = 4
 WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
-#WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.05,0.25,0.25]  # must match WFO_N_SPLITS, recency-weighted
-#WFO_SUBPERIOD_WEIGHTS = [1] 
 
 MIN_STRATEGIES     = 2
 MAX_STRATEGIES     = 6
 TOP_N              = 2
 REQUIRE_LONG_SHORT = True
+REQUIRE_ALL_TIMEFRAMES = True
 
 # Metric extraction: (column_in_compute_metrics_output, higher_is_better)
 _METRIC_MAP = {
@@ -62,9 +61,8 @@ def _is_long(strategy_id: str) -> bool:
 def _is_short(strategy_id: str) -> bool:
     return "_short_" in strategy_id
 
-def _has_long_and_short(combo: tuple) -> bool:
-    return any(_is_long(s) for s in combo) and any(_is_short(s) for s in combo)
-
+def _get_timeframe(strategy_id: str) -> str:
+    return strategy_id.split("_")[1]
 # =============================================================================
 # PRIVATE HELPERS — Splitting
 # =============================================================================
@@ -177,6 +175,34 @@ def _weighted_rank_score(
     split_labels = [label for label, _, _, _ in subperiods]
     return sum(entry[f"{label}_rank"] * w for label, w in zip(split_labels, weights))
 
+def _generate_combos(
+    all_ids: list,
+    min_strategies: int,
+    max_strategies: int,
+    require_long_short: bool,
+) -> list:
+    """Generate strategy combinations, avoiding long-only/short-only combos upfront when required."""
+    if not require_long_short:
+        return [
+            combo
+            for size in range(min_strategies, max_strategies + 1)
+            for combo in combinations(all_ids, size)
+        ]
+
+    longs  = [s for s in all_ids if _is_long(s)]
+    shorts = [s for s in all_ids if _is_short(s)]
+
+    combos = []
+    for size in range(min_strategies, max_strategies + 1):
+        min_longs = max(1, size - len(shorts))
+        max_longs = min(size - 1, len(longs))
+        for n_longs in range(min_longs, max_longs + 1):
+            n_shorts = size - n_longs
+            for long_combo in combinations(longs, n_longs):
+                for short_combo in combinations(shorts, n_shorts):
+                    combos.append(long_combo + short_combo)
+
+    return combos
 # =============================================================================
 # PRIVATE HELPERS — Printing
 # =============================================================================
@@ -388,12 +414,7 @@ def find_best_portfolio_combination_wfo(
             f"weight={subperiod_weights[i]:.2f}  strategies={n_strats}"
         )
 
-    combos = [
-        combo
-        for size in range(min_strategies, max_strategies + 1)
-        for combo in combinations(all_ids, size)
-        if not require_long_short or _has_long_and_short(combo)
-    ]
+    combos = _generate_combos(all_ids, min_strategies, max_strategies, require_long_short)
     if not combos:
         logger.warning("No valid combinations found — check require_long_short or strategy count.")
         return []

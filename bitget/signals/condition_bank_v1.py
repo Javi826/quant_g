@@ -1,33 +1,7 @@
+#signals/rule_engine/condition_bank.py
 import numpy as np
 from numba import njit
 
-# =============================================================================
-# CONFIG
-# =============================================================================
-
-RSI_PERIODS                = [14]
-RSI_THRESHOLDS             = [50]
-
-ADX_PERIODS                = [14]
-ADX_THRESHOLDS             = [25]
-
-MA_PERIODS                 = [20]
-
-MOMENTUM_PERIODS           = [10]
-
-ATR_BASE_PERIODS           = [14]
-ATR_REGIME_SMA_PERIODS     = [20]
-
-HISTVOL_BASE_PERIODS       = [20]
-HISTVOL_REGIME_SMA_PERIODS = [20]
-
-AROON_PERIODS              = [14]
-AROON_THRESHOLDS           = [50]
-
-
-# =============================================================================
-# CORE INDICATORS
-# =============================================================================
 
 @njit(cache=True)
 def _sma(close: np.ndarray, window: int) -> np.ndarray:
@@ -42,22 +16,6 @@ def _sma(close: np.ndarray, window: int) -> np.ndarray:
     for i in range(window, n):
         cumsum += close[i] - close[i - window]
         out[i] = cumsum / window
-    return out
-
-
-@njit(cache=True)
-def _rolling_mean_skipnan(values: np.ndarray, window: int) -> np.ndarray:
-    n   = len(values)
-    out = np.full(n, np.nan)
-    for i in range(window - 1, n):
-        total = 0.0
-        count = 0
-        for j in range(i - window + 1, i + 1):
-            if not np.isnan(values[j]):
-                total += values[j]
-                count += 1
-        if count > 0:
-            out[i] = total / count
     return out
 
 
@@ -162,67 +120,12 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> n
     return adx_full
 
 
-@njit(cache=True)
-def _true_range(high: np.ndarray, low: np.ndarray, close: np.ndarray) -> np.ndarray:
-    n   = len(close)
-    out = np.full(n, np.nan)
-    out[0] = high[0] - low[0]
-    for i in range(1, n):
-        tr1    = high[i] - low[i]
-        tr2    = abs(high[i] - close[i - 1])
-        tr3    = abs(low[i] - close[i - 1])
-        out[i] = max(tr1, tr2, tr3)
-    return out
-
-
-@njit(cache=True)
-def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
-    tr  = _true_range(high, low, close)
-    n   = len(tr)
-    out = np.full(n, np.nan)
-
-    seed = 0.0
-    for i in range(window):
-        seed += tr[i]
-    out[window - 1] = seed / window
-
-    for i in range(window, n):
-        out[i] = (out[i - 1] * (window - 1) + tr[i]) / window
-
-    return out
-
-
-@njit(cache=True)
-def _historical_volatility(close: np.ndarray, window: int) -> np.ndarray:
-    n           = len(close)
-    log_returns = np.full(n, np.nan)
-    for i in range(1, n):
-        log_returns[i] = np.log(close[i] / close[i - 1])
-
-    out = np.full(n, np.nan)
-    for i in range(window, n):
-        out[i] = np.std(log_returns[i - window + 1:i + 1])
-    return out
-
-
-@njit(cache=True)
-def _aroon_oscillator(high: np.ndarray, low: np.ndarray, window: int) -> np.ndarray:
-    n   = len(high)
-    out = np.full(n, np.nan)
-    for i in range(window, n):
-        idx_max = np.argmax(high[i - window:i + 1])
-        idx_min = np.argmin(low[i - window:i + 1])
-        aroon_up   = 100.0 * idx_max / window
-        aroon_down = 100.0 * idx_min / window
-        out[i]     = aroon_up - aroon_down
-    return out
-
-
 # =============================================================================
 # INDICATOR REGISTRY
 # =============================================================================
 
 def _build_specs_threshold(entry):
+
     specs = []
     for period in entry["periods"]:
         for th in entry["thresholds"]:
@@ -230,8 +133,8 @@ def _build_specs_threshold(entry):
                 specs.append({"type": entry["type"], "period": period, "op": op, "value": th})
     return specs
 
-
 def _build_specs_own_value(entry):
+
     specs = []
     for value in entry["periods"]:
         for op in entry["ops"]:
@@ -239,22 +142,13 @@ def _build_specs_own_value(entry):
     return specs
 
 
-def _build_specs_two_periods(entry):
-    specs = []
-    for period in entry["periods"]:
-        for sma_period in entry["sma_periods"]:
-            for op in entry["ops"]:
-                specs.append({"type": entry["type"], "period": period, "sma_period": sma_period, "op": op})
-    return specs
-
-
 INDICATOR_REGISTRY = [
     {
         "type":        "rsi",
-        "periods":     RSI_PERIODS,
-        "thresholds":  RSI_THRESHOLDS,
+        "periods":     [7,14,21],
+        "thresholds":  [30,50,70],
         "ops":         [">", "<"],
-        "build_cache": lambda o, h, l, c, entry: {p: _rsi(c, p) for p in entry["periods"]},
+        "build_cache": lambda o, h, l, c, periods: {p: _rsi(c, p) for p in periods},
         "build_specs": _build_specs_threshold,
         "evaluate":    lambda bank, spec: (
             bank._cache["rsi"][spec["period"]] > spec["value"]
@@ -265,19 +159,19 @@ INDICATOR_REGISTRY = [
     },
     {
         "type":        "adx",
-        "periods":     ADX_PERIODS,
-        "thresholds":  ADX_THRESHOLDS,
+        "periods":     [7,14,21],
+        "thresholds":  [20,25,30],
         "ops":         [">"],
-        "build_cache": lambda o, h, l, c, entry: {p: _adx(h, l, c, p) for p in entry["periods"]},
+        "build_cache": lambda o, h, l, c, periods: {p: _adx(h, l, c, p) for p in periods},
         "build_specs": _build_specs_threshold,
         "evaluate":    lambda bank, spec: bank._cache["adx"][spec["period"]] > spec["value"],
         "describe":    lambda spec: f"ADX{spec['period']}{spec['op']}{spec['value']}",
     },
     {
         "type":        "ma",
-        "periods":     MA_PERIODS,
+        "periods":     [20,50,100],
         "ops":         [">", "<"],
-        "build_cache": lambda o, h, l, c, entry: {p: _sma(c, p) for p in entry["periods"]},
+        "build_cache": lambda o, h, l, c, periods: {p: _sma(c, p) for p in periods},
         "build_specs": _build_specs_own_value,
         "evaluate":    lambda bank, spec: (
             bank.close > bank._cache["ma"][spec["value"]]
@@ -288,63 +182,65 @@ INDICATOR_REGISTRY = [
     },
     {
         "type":        "momentum",
-        "periods":     MOMENTUM_PERIODS,
+        "periods":     [5,10,15],
         "ops":         [">", "<"],
         "build_cache": None,
         "build_specs": _build_specs_own_value,
         "evaluate":    lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
         "describe":    lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
     },
-    {
-        "type":        "aroon_oscillator",
-        "periods":     AROON_PERIODS,
-        "thresholds":  AROON_THRESHOLDS,
-        "ops":         [">", "<"],
-        "build_cache": lambda o, h, l, c, entry: {p: _aroon_oscillator(h, l, p) for p in entry["periods"]},
-        "build_specs": _build_specs_threshold,
-        "evaluate":    lambda bank, spec: (
-            bank._cache["aroon_oscillator"][spec["period"]] > spec["value"]
-            if spec["op"] == ">"
-            else bank._cache["aroon_oscillator"][spec["period"]] < spec["value"]
-        ),
-        "describe":    lambda spec: f"AROON_OSC{spec['period']}{spec['op']}{spec['value']}",
-    },
-    {
-        "type":        "atr_regime",
-        "periods":     ATR_BASE_PERIODS,
-        "sma_periods": ATR_REGIME_SMA_PERIODS,
-        "ops":         [">", "<"],
-        "build_cache": lambda o, h, l, c, entry: {
-            (ap, sp): (_atr(h, l, c, ap), _rolling_mean_skipnan(_atr(h, l, c, ap), sp))
-            for ap in entry["periods"] for sp in entry["sma_periods"]
-        },
-        "build_specs": _build_specs_two_periods,
-        "evaluate":    lambda bank, spec: (
-            bank._cache["atr_regime"][(spec["period"], spec["sma_period"])][0] > bank._cache["atr_regime"][(spec["period"], spec["sma_period"])][1]
-            if spec["op"] == ">"
-            else bank._cache["atr_regime"][(spec["period"], spec["sma_period"])][0] < bank._cache["atr_regime"][(spec["period"], spec["sma_period"])][1]
-        ),
-        "describe":    lambda spec: f"ATR{spec['period']}{spec['op']}SMA_ATR{spec['sma_period']}",
-    },
-    {
-        "type":        "histvol_regime",
-        "periods":     HISTVOL_BASE_PERIODS,
-        "sma_periods": HISTVOL_REGIME_SMA_PERIODS,
-        "ops":         [">", "<"],
-        "build_cache": lambda o, h, l, c, entry: {
-            (hp, sp): (_historical_volatility(c, hp), _rolling_mean_skipnan(_historical_volatility(c, hp), sp))
-            for hp in entry["periods"] for sp in entry["sma_periods"]
-        },
-        "build_specs": _build_specs_two_periods,
-        "evaluate":    lambda bank, spec: (
-            bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] > bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
-            if spec["op"] == ">"
-            else bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] < bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
-        ),
-        "describe":    lambda spec: f"HISTVOL{spec['period']}{spec['op']}SMA_HISTVOL{spec['sma_period']}",
-    },
 ]
 
+# =============================================================================
+# INDICATOR_REGISTRY = [
+#     {
+#         "type":        "rsi",
+#         "periods":     [14],
+#         "thresholds":  [30,50,70],
+#         "ops":         [">", "<"],
+#         "build_cache": lambda o, h, l, c, periods: {p: _rsi(c, p) for p in periods},
+#         "build_specs": _build_specs_threshold,
+#         "evaluate":    lambda bank, spec: (
+#             bank._cache["rsi"][spec["period"]] > spec["value"]
+#             if spec["op"] == ">"
+#             else bank._cache["rsi"][spec["period"]] < spec["value"]
+#         ),
+#         "describe":    lambda spec: f"RSI{spec['period']}{spec['op']}{spec['value']}",
+#     },
+#     {
+#         "type":        "adx",
+#         "periods":     [14],
+#         "thresholds":  [20,25,30],
+#         "ops":         [">"],
+#         "build_cache": lambda o, h, l, c, periods: {p: _adx(h, l, c, p) for p in periods},
+#         "build_specs": _build_specs_threshold,
+#         "evaluate":    lambda bank, spec: bank._cache["adx"][spec["period"]] > spec["value"],
+#         "describe":    lambda spec: f"ADX{spec['period']}{spec['op']}{spec['value']}",
+#     },
+#     {
+#         "type":        "ma",
+#         "periods":     [20,50],
+#         "ops":         [">", "<"],
+#         "build_cache": lambda o, h, l, c, periods: {p: _sma(c, p) for p in periods},
+#         "build_specs": _build_specs_own_value,
+#         "evaluate":    lambda bank, spec: (
+#             bank.close > bank._cache["ma"][spec["value"]]
+#             if spec["op"] == ">"
+#             else bank.close < bank._cache["ma"][spec["value"]]
+#         ),
+#         "describe":    lambda spec: f"CLOSE{spec['op']}MA{spec['value']}",
+#     },
+#     {
+#         "type":        "momentum",
+#         "periods":     [5,10],
+#         "ops":         [">", "<"],
+#         "build_cache": None,
+#         "build_specs": _build_specs_own_value,
+#         "evaluate":    lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
+#         "describe":    lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
+#     },
+# ]
+# =============================================================================
 
 class ConditionBank:
 
@@ -361,7 +257,7 @@ class ConditionBank:
         for entry in INDICATOR_REGISTRY:
             if entry["build_cache"] is not None:
                 self._cache[entry["type"]] = entry["build_cache"](
-                    self.open, self.high, self.low, self.close, entry
+                    self.open, self.high, self.low, self.close, entry["periods"]
                 )
 
     def _momentum_mask(self, op: str, nbar: int) -> np.ndarray:
