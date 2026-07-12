@@ -35,20 +35,23 @@ RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["4H","6Hutc"]
+TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
 WFO_NET_GAIN_TH  = 54
 WFO_DD_TH        = 20
-WFO_R2_TH        = 0.6
+WFO_R2_TH        = 0.7
 WFO_STABILITY_TH = 0.7
+CORRELATION_DD_THRESHOLD = 0.60
 
 # =============================================================================
 # WFO_NET_GAIN_TH  = 50
 # WFO_DD_TH        = 20
-# WFO_R2_TH        = 0.8
-# WFO_STABILITY_TH = 0.6
+# WFO_R2_TH        = 0.7
+# WFO_STABILITY_TH = 0.65
+# CORRELATION_DD_THRESHOLD = 0.55
 # =============================================================================
 
 SHOW_PLOTS             = True
@@ -56,8 +59,6 @@ RUN_CORRELATION        = True
 RUN_BEST_WFO_PORTFOLIO = True
 RUN_DEPLOY             = False
 SAVE_TRADES            = False
-
-CORRELATION_DD_THRESHOLD = 0.60
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")

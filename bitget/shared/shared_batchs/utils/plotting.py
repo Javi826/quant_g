@@ -157,3 +157,88 @@ def plot_portfolio_comparison(
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
     _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, title)
+
+def plot_wfo_portfolio(
+    combo: tuple,
+    trades_list: list,
+    subperiods: list,
+    subperiod_scores: dict,
+    df_scored: pd.DataFrame,
+    initial_balance: float,
+    metric: str,
+    weights: list,
+    title: str,
+    validated_trades: list = None,
+) -> None:
+    combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
+    if not combo_trades:
+        return
+
+    tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
+    total_capital = initial_balance * len(combo_trades)
+    m             = compute_metrics(tl, capital=total_capital, name="")
+
+    eq     = total_capital + tl["profit"].cumsum().values
+    eq_pct = (eq - total_capital) / total_capital * 100
+    ts     = pd.to_datetime(tl["sell_time"]).values
+
+    ts_val = eq_val_pct = m_val = None
+    if validated_trades:
+        tl_val            = pd.concat([df for _, df in validated_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
+        total_capital_val = initial_balance * len(validated_trades)
+        m_val             = compute_metrics(tl_val, capital=total_capital_val, name="")
+        eq_val            = total_capital_val + tl_val["profit"].cumsum().values
+        eq_val_pct        = (eq_val - total_capital_val) / total_capital_val * 100
+        ts_val            = pd.to_datetime(tl_val["sell_time"]).values
+
+    _BG          = "#F8F9FA"
+    _COLORS_BAND = ["#EBF5FB", "#EAFAF1", "#FEF9E7", "#FDEDEC"]
+    _COLOR_EQ    = "#2E86C1"
+    _COLOR_VAL   = "#00897B"
+
+    fig, ax1 = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor(_BG)
+    combo_str = " | ".join(sorted(combo, key=lambda s: int(s.split("_")[0])))
+    fig.suptitle(title or f"Best WFO Portfolio — {combo_str}", fontsize=10, fontweight="bold")
+
+    # ── Panel 1: Equity curve ─────────────────────────────────────────────────
+    ax1.set_facecolor(_BG)
+
+    for i, (_, t_start, t_end, _) in enumerate(subperiods):
+        ax1.axvspan(t_start, t_end, alpha=0.25, color=_COLORS_BAND[i % len(_COLORS_BAND)])
+        ax1.axvline(t_start, color="#AAAAAA", linewidth=0.5, linestyle="--", alpha=0.4)
+
+    legend_label = (
+        f"Best combo  NetGain={m['Net_Gain_pct']:.1f}%  "
+        f"DD={m['Max_DD_pct']:.1f}%  "
+        f"R²={m['R_Squared']:.3f}"
+    )
+    ax1.plot(ts, eq_pct, color=_COLOR_EQ, linewidth=1.0, label=legend_label)
+
+    if ts_val is not None:
+        legend_label_val = (
+            f"Validated   NetGain={m_val['Net_Gain_pct']:.1f}%  "
+            f"DD={m_val['Max_DD_pct']:.1f}%  "
+            f"R²={m_val['R_Squared']:.3f}"
+        )
+        ax1.plot(ts_val, eq_val_pct, color=_COLOR_VAL, linewidth=0.8, alpha=0.8, label=legend_label_val)
+
+    ax1.axhline(0, color="#888888", linewidth=0.6, linestyle="--", alpha=0.5)
+
+    _legend = ax1.legend(loc="upper left", fontsize=8, framealpha=0.9,
+                         facecolor="white", edgecolor="#AAAAAA")
+    for _text in _legend.get_texts():
+        _text.set_fontfamily("monospace")
+    ax1.set_title("Equity Curve (WFO Test)", fontsize=9, fontweight="bold")
+    ax1.set_ylabel("Net Gain (%)", fontsize=9)
+    _locator = mdates.MonthLocator(interval=2)
+    ax1.xaxis.set_major_locator(_locator)
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax1.tick_params(axis="both", labelsize=7)
+    ax1.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+
+    fig.autofmt_xdate()
+    plt.tight_layout()
+    plt.show()

@@ -17,6 +17,11 @@ logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 
 
 def _fmt_spec(spec: dict) -> str:
+    if "sma_period" in spec:
+        return (
+            f'{{"type": "{spec["type"]}", "period": {spec["period"]}, '
+            f'"op": "{spec["op"]}", "sma_period": {spec["sma_period"]}}}'
+        )
     if "period" in spec:
         return (
             f'{{"type": "{spec["type"]}", "period": {spec["period"]}, '

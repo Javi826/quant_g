@@ -66,6 +66,11 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
     X  = np.arange(len(eq)).reshape(-1, 1)
     y  = eq.reshape(-1, 1)
     r2 = round(LinearRegression().fit(X, y).score(X, y), 3)
+    
+# =============================================================================
+#     X  = np.arange(len(eq), dtype=np.float64)
+#     r2 = round(float(np.corrcoef(X, eq)[0, 1] ** 2), 3)
+# =============================================================================
 
     return {
         "Curve":         name,

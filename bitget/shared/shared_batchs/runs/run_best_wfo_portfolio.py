@@ -2,28 +2,25 @@
 import logging
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from itertools import combinations
 from joblib import Parallel, delayed
-
 from shared_batchs.utils.batch_metrics import compute_metrics
-
+from shared_batchs.utils.reporting import print_best_wfo_portfolio
+from shared_batchs.utils.plotting import plot_wfo_portfolio
 logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
-
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-WFO_METRIC            = "R_SQUARED" 
 #NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
+WFO_METRIC            = "R_SQUARED" 
 WFO_N_SPLITS          = 4
 WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
 
-MIN_STRATEGIES     = 2
+MIN_STRATEGIES     = 3
 MAX_STRATEGIES     = 6
 TOP_N              = 2
-REQUIRE_LONG_SHORT = True
+
+REQUIRE_LONG_SHORT     = True
 REQUIRE_ALL_TIMEFRAMES = True
 
 # Metric extraction: (column_in_compute_metrics_output, higher_is_better)
@@ -35,7 +32,6 @@ _METRIC_MAP = {
     "MAX_DD_PCT":   ("Max_DD_pct",   False),  # lower is better → negated internally
     "CALMAR":       ("Calmar",       True),
 }
-
 # =============================================================================
 # PRIVATE HELPERS — Validation
 # =============================================================================
@@ -66,7 +62,6 @@ def _get_timeframe(strategy_id: str) -> str:
 # =============================================================================
 # PRIVATE HELPERS — Splitting
 # =============================================================================
-
 def _split_trades_by_time(
     trades_list: list,
     n_splits: int,
@@ -100,7 +95,6 @@ def _split_trades_by_time(
 # =============================================================================
 # PRIVATE HELPERS — Metric extraction
 # =============================================================================
-
 def _extract_metric(m: dict, metric: str) -> float:
     if m.get("Net_Gain_pct", np.nan) <= 0:
         return np.nan  
@@ -111,7 +105,6 @@ def _extract_metric(m: dict, metric: str) -> float:
 # =============================================================================
 # PRIVATE HELPERS — Combo scoring (raw metric per subperiod)
 # =============================================================================
-
 def _score_combo(
     combo: tuple,
     subperiods: list,
@@ -136,11 +129,9 @@ def _score_combo(
 
     return {"combo": combo, **scores}
 
-
 # =============================================================================
 # PRIVATE HELPERS — Rank-based scoring across subperiods
 # =============================================================================
-
 def _rank_combos_by_subperiod(
     raw_scores: list,
     subperiods: list,
@@ -180,208 +171,53 @@ def _generate_combos(
     min_strategies: int,
     max_strategies: int,
     require_long_short: bool,
+    require_all_timeframes: bool = False,
 ) -> list:
     """Generate strategy combinations, avoiding long-only/short-only combos upfront when required."""
     if not require_long_short:
-        return [
+        combos = [
             combo
             for size in range(min_strategies, max_strategies + 1)
             for combo in combinations(all_ids, size)
         ]
+    else:
+        longs  = [s for s in all_ids if _is_long(s)]
+        shorts = [s for s in all_ids if _is_short(s)]
 
-    longs  = [s for s in all_ids if _is_long(s)]
-    shorts = [s for s in all_ids if _is_short(s)]
+        combos = []
+        for size in range(min_strategies, max_strategies + 1):
+            min_longs = max(1, size - len(shorts))
+            max_longs = min(size - 1, len(longs))
+            for n_longs in range(min_longs, max_longs + 1):
+                n_shorts = size - n_longs
+                for long_combo in combinations(longs, n_longs):
+                    for short_combo in combinations(shorts, n_shorts):
+                        combos.append(long_combo + short_combo)
 
-    combos = []
-    for size in range(min_strategies, max_strategies + 1):
-        min_longs = max(1, size - len(shorts))
-        max_longs = min(size - 1, len(longs))
-        for n_longs in range(min_longs, max_longs + 1):
-            n_shorts = size - n_longs
-            for long_combo in combinations(longs, n_longs):
-                for short_combo in combinations(shorts, n_shorts):
-                    combos.append(long_combo + short_combo)
+    if require_all_timeframes:
+        required_tfs = {_get_timeframe(s) for s in all_ids}
+        combos = [
+            combo for combo in combos
+            if required_tfs.issubset({_get_timeframe(s) for s in combo})
+        ]
 
     return combos
-# =============================================================================
-# PRIVATE HELPERS — Printing
-# =============================================================================
-
-def _print_results(
-    top: list,
-    subperiods: list,
-    trades_list: list,
-    initial_balance: float,
-    metric: str,
-    weights: list,
-) -> None:
-    W          = 115
-    split_keys = [label for label, _, _, _ in subperiods]
-    logger.info(f"\n{'='*W}")
-    logger.info(f"  BEST WFO PORTFOLIO — metric: {metric} | splits: {len(subperiods)} | weights: {[round(w, 2) for w in weights]}")
-    logger.info(f"{'='*W}")
-    for rank, entry in enumerate(top, start=1):
-        combo      = entry["combo"]
-        score      = entry["weighted_rank_score"]
-        avg_trades = np.mean([len(df) for sid, df in trades_list if sid in combo])
-        logger.info(f"\nBEST #{rank} — Strategies: {len(combo)}  |  AvgTrades/strat={avg_trades:.0f}  |  WeightedRankScore={score:.2f}")
-        logger.info(f"{'─'*W}")
-        for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
-            icon = "🟢" if _is_long(s) else "🔴"
-            logger.info(f"    {icon} {s}")
-        logger.info(f"\n  {'Subperiod':<10} {'Weight':>8} {'Value':>10} {'Rank':>6}  {'Period'}")
-        logger.info(f"  {'─'*65}")
-        for i, (lbl, t_start, t_end, _) in enumerate(subperiods):
-            val      = entry.get(lbl, np.nan)
-            val_str  = f"{val:.3f}" if not np.isnan(val) else "N/A"
-            rank_val = entry.get(f"{lbl}_rank", "-")
-            logger.info(f"  {lbl:<10} {weights[i]:>8.2f} {val_str:>10} {rank_val:>6}  ({t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')})")
-        logger.info(f"  {'─'*65}")
-        logger.info(f"  {'WEIGHTED RANK':<10} {'':>8} {'':>10} {score:>6.2f}")
-
-        combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
-        if combo_trades:
-            tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-            total_capital = initial_balance * len(combo_trades)
-            m             = compute_metrics(tl, capital=total_capital, name="")
-
-            last_label, last_t_start, last_t_end, _ = subperiods[-1]
-            tl_last = tl[(tl["sell_time"] >= last_t_start) & (tl["sell_time"] < last_t_end)]
-            m_last  = compute_metrics(tl_last, capital=total_capital, name="") if len(tl_last) > 0 else None
-
-            _cols = ["NetGain", "DD", "WinRate", "R2", "PF", "Calmar", "Weekly%", "MaxWeeksToRecovery"]
-            logger.info(f"\n  {'Period':<16} {' '.join(f'{c:>10}' for c in _cols)}")
-            logger.info(f"  {'─'*16} {'─'*(10*len(_cols) + len(_cols) - 1)}")
-
-            def _row(label: str, mm: dict) -> str:
-                vals = [
-                    f"{mm['Net_Gain_pct']:.1f}%",
-                    f"{mm['Max_DD_pct']:.1f}%",
-                    f"{mm['Win_Rate']:.1f}%",
-                    f"{mm['R_Squared']:.3f}",
-                    f"{mm['Profit_Factor']:.2f}",
-                    f"{mm['Calmar']:.2f}",
-                    f"{mm['Weekly_pct']:.1f}%",
-                    f"{mm['Max_Weeks_to_Recovery']}",
-                ]
-                return f"  {label:<16} " + " ".join(f"{v:>10}" for v in vals)
-
-            logger.info(_row("Full period", m))
-            if m_last is not None:
-                logger.info(_row(f"Last split ({last_label})", m_last))
-            else:
-                logger.info(f"  {f'Last split ({last_label})':<16} {'N/A':>10}")
-
-            n_months        = max((pd.to_datetime(tl["sell_time"]).max() - pd.to_datetime(tl["sell_time"]).min()).days / 30.44, 1)
-            avg_monthly_pct = round(m["Net_Gain_pct"] / n_months, 2)
-            logger.info(f"\n  Monthly NetGain  ── {avg_monthly_pct:+.2f}% / month  ({n_months:.1f} months)")
-    logger.info(f"\n{'─'*W}")
-
-# =============================================================================
-# PRIVATE HELPERS — Plotting
-# =============================================================================
-
-def _plot_wfo_portfolio(
-    combo: tuple,
-    trades_list: list,
-    subperiods: list,
-    subperiod_scores: dict,
-    df_scored: pd.DataFrame,
-    initial_balance: float,
-    metric: str,
-    weights: list,
-    title: str,
-    validated_trades: list = None,
-) -> None:
-    combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
-    if not combo_trades:
-        return
-
-    tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-    total_capital = initial_balance * len(combo_trades)
-    m             = compute_metrics(tl, capital=total_capital, name="")
-
-    eq     = total_capital + tl["profit"].cumsum().values
-    eq_pct = (eq - total_capital) / total_capital * 100
-    ts     = pd.to_datetime(tl["sell_time"]).values
-
-    ts_val = eq_val_pct = m_val = None
-    if validated_trades:
-        tl_val            = pd.concat([df for _, df in validated_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-        total_capital_val = initial_balance * len(validated_trades)
-        m_val             = compute_metrics(tl_val, capital=total_capital_val, name="")
-        eq_val            = total_capital_val + tl_val["profit"].cumsum().values
-        eq_val_pct        = (eq_val - total_capital_val) / total_capital_val * 100
-        ts_val            = pd.to_datetime(tl_val["sell_time"]).values
-
-    _BG          = "#F8F9FA"
-    _COLORS_BAND = ["#EBF5FB", "#EAFAF1", "#FEF9E7", "#FDEDEC"]
-    _COLOR_EQ    = "#2E86C1"
-    _COLOR_VAL   = "#00897B"
-
-    fig, ax1 = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor(_BG)
-    combo_str = " | ".join(sorted(combo, key=lambda s: int(s.split("_")[0])))
-    fig.suptitle(title or f"Best WFO Portfolio — {combo_str}", fontsize=10, fontweight="bold")
-
-    # ── Panel 1: Equity curve ─────────────────────────────────────────────────
-    ax1.set_facecolor(_BG)
-
-    for i, (_, t_start, t_end, _) in enumerate(subperiods):
-        ax1.axvspan(t_start, t_end, alpha=0.25, color=_COLORS_BAND[i % len(_COLORS_BAND)])
-        ax1.axvline(t_start, color="#AAAAAA", linewidth=0.5, linestyle="--", alpha=0.4)
-
-    legend_label = (
-        f"Best combo  NetGain={m['Net_Gain_pct']:.1f}%  "
-        f"DD={m['Max_DD_pct']:.1f}%  "
-        f"R²={m['R_Squared']:.3f}"
-    )
-    ax1.plot(ts, eq_pct, color=_COLOR_EQ, linewidth=1.0, label=legend_label)
-
-    if ts_val is not None:
-        legend_label_val = (
-            f"Validated   NetGain={m_val['Net_Gain_pct']:.1f}%  "
-            f"DD={m_val['Max_DD_pct']:.1f}%  "
-            f"R²={m_val['R_Squared']:.3f}"
-        )
-        ax1.plot(ts_val, eq_val_pct, color=_COLOR_VAL, linewidth=0.8, alpha=0.8, label=legend_label_val)
-
-    ax1.axhline(0, color="#888888", linewidth=0.6, linestyle="--", alpha=0.5)
-
-    _legend = ax1.legend(loc="upper left", fontsize=8, framealpha=0.9,
-                         facecolor="white", edgecolor="#AAAAAA")
-    for _text in _legend.get_texts():
-        _text.set_fontfamily("monospace")
-    ax1.set_title("Equity Curve (WFO Test)", fontsize=9, fontweight="bold")
-    ax1.set_ylabel("Net Gain (%)", fontsize=9)
-    _locator = mdates.MonthLocator(interval=2)
-    ax1.xaxis.set_major_locator(_locator)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax1.tick_params(axis="both", labelsize=7)
-    ax1.grid(True, linestyle="--", alpha=0.3, linewidth=0.5, color="#CCCCCC")
-    ax1.spines["top"].set_visible(False)
-    ax1.spines["right"].set_visible(False)
-
-    fig.autofmt_xdate()
-    plt.tight_layout()
-    plt.show()
-
 
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
-
 def find_best_portfolio_combination_wfo(
     validated_wfo_trades: list,
     initial_balance: float,
-    metric: str              = WFO_METRIC,
-    n_splits: int            = WFO_N_SPLITS,
-    subperiod_weights: list  = WFO_SUBPERIOD_WEIGHTS,
-    min_strategies: int      = MIN_STRATEGIES,
-    max_strategies: int      = MAX_STRATEGIES,
-    top_n: int               = TOP_N,
-    require_long_short: bool = REQUIRE_LONG_SHORT,
-    show_plots: bool         = False,
+    metric: str                    = WFO_METRIC,
+    n_splits: int                  = WFO_N_SPLITS,
+    subperiod_weights: list        = WFO_SUBPERIOD_WEIGHTS,
+    min_strategies: int            = MIN_STRATEGIES,
+    max_strategies: int            = MAX_STRATEGIES,
+    top_n: int                     = TOP_N,
+    require_long_short: bool       = REQUIRE_LONG_SHORT,
+    require_all_timeframes: bool   = REQUIRE_ALL_TIMEFRAMES,
+    show_plots: bool               = False,
 ) -> list:
 
     _validate_config(n_splits, subperiod_weights, metric)
@@ -414,7 +250,7 @@ def find_best_portfolio_combination_wfo(
             f"weight={subperiod_weights[i]:.2f}  strategies={n_strats}"
         )
 
-    combos = _generate_combos(all_ids, min_strategies, max_strategies, require_long_short)
+    combos = _generate_combos(all_ids, min_strategies, max_strategies, require_long_short, require_all_timeframes)
     if not combos:
         logger.warning("No valid combinations found — check require_long_short or strategy count.")
         return []
@@ -434,7 +270,7 @@ def find_best_portfolio_combination_wfo(
     raw_scores.sort(key=lambda x: x["weighted_rank_score"])  # lower rank = better
 
     top = raw_scores[:top_n]
-    _print_results(top, subperiods, validated_wfo_trades, initial_balance, metric, subperiod_weights)
+    print_best_wfo_portfolio(top, subperiods, validated_wfo_trades, initial_balance, metric, subperiod_weights)
 
     df_scored = pd.DataFrame([
         {"combo": r["combo"], "weighted_rank_score": r["weighted_rank_score"]}
@@ -444,7 +280,7 @@ def find_best_portfolio_combination_wfo(
     if top and show_plots:
         top_entry         = top[0]
         top_subp_scores   = {lbl: top_entry.get(lbl, np.nan) for lbl, _, _, _ in subperiods}
-        _plot_wfo_portfolio(
+        plot_wfo_portfolio(
             combo             = top_entry["combo"],
             trades_list       = validated_wfo_trades,
             subperiods        = subperiods,

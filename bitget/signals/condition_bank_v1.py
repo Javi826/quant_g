@@ -191,56 +191,6 @@ INDICATOR_REGISTRY = [
     },
 ]
 
-# =============================================================================
-# INDICATOR_REGISTRY = [
-#     {
-#         "type":        "rsi",
-#         "periods":     [14],
-#         "thresholds":  [30,50,70],
-#         "ops":         [">", "<"],
-#         "build_cache": lambda o, h, l, c, periods: {p: _rsi(c, p) for p in periods},
-#         "build_specs": _build_specs_threshold,
-#         "evaluate":    lambda bank, spec: (
-#             bank._cache["rsi"][spec["period"]] > spec["value"]
-#             if spec["op"] == ">"
-#             else bank._cache["rsi"][spec["period"]] < spec["value"]
-#         ),
-#         "describe":    lambda spec: f"RSI{spec['period']}{spec['op']}{spec['value']}",
-#     },
-#     {
-#         "type":        "adx",
-#         "periods":     [14],
-#         "thresholds":  [20,25,30],
-#         "ops":         [">"],
-#         "build_cache": lambda o, h, l, c, periods: {p: _adx(h, l, c, p) for p in periods},
-#         "build_specs": _build_specs_threshold,
-#         "evaluate":    lambda bank, spec: bank._cache["adx"][spec["period"]] > spec["value"],
-#         "describe":    lambda spec: f"ADX{spec['period']}{spec['op']}{spec['value']}",
-#     },
-#     {
-#         "type":        "ma",
-#         "periods":     [20,50],
-#         "ops":         [">", "<"],
-#         "build_cache": lambda o, h, l, c, periods: {p: _sma(c, p) for p in periods},
-#         "build_specs": _build_specs_own_value,
-#         "evaluate":    lambda bank, spec: (
-#             bank.close > bank._cache["ma"][spec["value"]]
-#             if spec["op"] == ">"
-#             else bank.close < bank._cache["ma"][spec["value"]]
-#         ),
-#         "describe":    lambda spec: f"CLOSE{spec['op']}MA{spec['value']}",
-#     },
-#     {
-#         "type":        "momentum",
-#         "periods":     [5,10],
-#         "ops":         [">", "<"],
-#         "build_cache": None,
-#         "build_specs": _build_specs_own_value,
-#         "evaluate":    lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
-#         "describe":    lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
-#     },
-# ]
-# =============================================================================
 
 class ConditionBank:
 

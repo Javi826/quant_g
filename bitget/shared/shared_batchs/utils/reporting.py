@@ -145,3 +145,73 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
         lines.append(line)
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
+    
+def print_best_wfo_portfolio(
+    top: list,
+    subperiods: list,
+    trades_list: list,
+    initial_balance: float,
+    metric: str,
+    weights: list,
+) -> None:
+    W          = 115
+    split_keys = [label for label, _, _, _ in subperiods]
+    logger.info(f"\n{'='*W}")
+    logger.info(f"  BEST WFO PORTFOLIO — metric: {metric} | splits: {len(subperiods)} | weights: {[round(w, 2) for w in weights]}")
+    logger.info(f"{'='*W}")
+    for rank, entry in enumerate(top, start=1):
+        combo      = entry["combo"]
+        score      = entry["weighted_rank_score"]
+        avg_trades = np.mean([len(df) for sid, df in trades_list if sid in combo])
+        logger.info(f"\nBEST #{rank} — Strategies: {len(combo)}  |  AvgTrades/strat={avg_trades:.0f}  |  WeightedRankScore={score:.2f}")
+        logger.info(f"{'─'*W}")
+        for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
+            icon = "🟢" if "_long_" in s else "🔴"
+            logger.info(f"    {icon} {s}")
+        logger.info(f"\n  {'Subperiod':<10} {'Weight':>8} {'Value':>10} {'Rank':>6}  {'Period'}")
+        logger.info(f"  {'─'*65}")
+        for i, (lbl, t_start, t_end, _) in enumerate(subperiods):
+            val      = entry.get(lbl, np.nan)
+            val_str  = f"{val:.3f}" if not np.isnan(val) else "N/A"
+            rank_val = entry.get(f"{lbl}_rank", "-")
+            logger.info(f"  {lbl:<10} {weights[i]:>8.2f} {val_str:>10} {rank_val:>6}  ({t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')})")
+        logger.info(f"  {'─'*65}")
+        logger.info(f"  {'WEIGHTED RANK':<10} {'':>8} {'':>10} {score:>6.2f}")
+
+        combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
+        if combo_trades:
+            tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
+            total_capital = initial_balance * len(combo_trades)
+            m             = compute_metrics(tl, capital=total_capital, name="")
+
+            last_label, last_t_start, last_t_end, _ = subperiods[-1]
+            tl_last = tl[(tl["sell_time"] >= last_t_start) & (tl["sell_time"] < last_t_end)]
+            m_last  = compute_metrics(tl_last, capital=total_capital, name="") if len(tl_last) > 0 else None
+
+            _cols = ["NetGain", "DD", "WinRate", "R2", "PF", "Calmar", "Weekly%", "MaxWeeksToRecovery"]
+            logger.info(f"\n  {'Period':<16} {' '.join(f'{c:>10}' for c in _cols)}")
+            logger.info(f"  {'─'*16} {'─'*(10*len(_cols) + len(_cols) - 1)}")
+
+            def _row(label: str, mm: dict) -> str:
+                vals = [
+                    f"{mm['Net_Gain_pct']:.1f}%",
+                    f"{mm['Max_DD_pct']:.1f}%",
+                    f"{mm['Win_Rate']:.1f}%",
+                    f"{mm['R_Squared']:.3f}",
+                    f"{mm['Profit_Factor']:.2f}",
+                    f"{mm['Calmar']:.2f}",
+                    f"{mm['Weekly_pct']:.1f}%",
+                    f"{mm['Max_Weeks_to_Recovery']}",
+                ]
+                return f"  {label:<16} " + " ".join(f"{v:>10}" for v in vals)
+
+            logger.info(_row("Full period", m))
+            if m_last is not None:
+                logger.info(_row(f"Last split ({last_label})", m_last))
+            else:
+                logger.info(f"  {f'Last split ({last_label})':<16} {'N/A':>10}")
+
+            n_months        = max((pd.to_datetime(tl["sell_time"]).max() - pd.to_datetime(tl["sell_time"]).min()).days / 30.44, 1)
+            avg_monthly_pct = round(m["Net_Gain_pct"] / n_months, 2)
+            logger.info(f"\n  Monthly NetGain  ── {avg_monthly_pct:+.2f}% / month  ({n_months:.1f} months)")
+    logger.info(f"\n{'─'*W}")

@@ -8,9 +8,9 @@ from sklearn.feature_selection import mutual_info_regression
 
 FORWARD_N                 = 20
 N_SHUFFLES                = 50
-REDUNDANCY_CORR_THRESHOLD = 0.8
+REDUNDANCY_CORR_THRESHOLD = 0.7
 
-TIMEFRAME = "4H"
+TIMEFRAME = "1H"
 N_SYMBOLS = 10
 
 # =============================================================================

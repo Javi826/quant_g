@@ -195,7 +195,7 @@ def finalize_rule_mining(
     ]
 
     _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "PRE-CORRELATION")
-
+    _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
     if run_correlation and validated_wfo_test:
         logger.info(f"\n{'─' * 115}\n  CORRELATION ANALYSIS RULE MINING — Profit (threshold={correlation_threshold})\n{'─' * 115}")
         validated_wfo_test = decorrelate_by_profit(
@@ -270,11 +270,15 @@ def finalize_rule_mining(
     return validated_wfo_test
 
 
+def _short_id(rule_id: str) -> str:
+    parts = rule_id.split("_")
+    return "_".join(parts[:3])
+
 def _print_ranking(all_raw_results: list, highlight_ids: list, stage_label: str) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     rows.sort(key=lambda r: r["net_gain"], reverse=True)
 
-    id_width = max((len(r["rule_id"]) for r in rows), default=8) + 2
+    id_width = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
 
     print(f"\n{'=' * 160}")
     print(f"  RULE MINING RESULTS — {stage_label} ── {len(rows)} / {len(all_raw_results)} tested")
@@ -284,9 +288,36 @@ def _print_ranking(all_raw_results: list, highlight_ids: list, stage_label: str)
 
     for r in rows:
         print(
-            f"{r['rule_id']:<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
+            f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}{r['param_stability']:<8.3f}"
             f"{r['n_trades']:<8}{r['label']}"
         )
 
     print(f"{'=' * 160}\n")
+    
+def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
+    rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
+    if not rows:
+        return
+
+    metrics = ["net_gain", "max_dd", "win_rate", "profit_factor", "calmar", "r_squared", "param_stability", "n_trades"]
+    groups  = {}
+    for r in rows:
+        key = (r["timeframe"], r["side"])
+        groups.setdefault(key, []).append(r)
+
+    print(f"\n{'=' * 115}")
+    print(f"  MIN METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
+    print(f"{'=' * 115}")
+    print(f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'STAB':<8}{'TRADES':<8}")
+    print(f"{'-' * 115}")
+
+    for (tf, side), group_rows in sorted(groups.items()):
+        mins = {m: min(r[m] for r in group_rows) for m in metrics}
+        print(
+            f"{tf:<12}{side:<8}{len(group_rows):<6}{mins['net_gain']:<12.1f}{mins['max_dd']:<10.1f}"
+            f"{mins['win_rate']:<8.1f}{mins['profit_factor']:<8.2f}{mins['calmar']:<8.2f}"
+            f"{mins['r_squared']:<8.3f}{mins['param_stability']:<8.3f}{mins['n_trades']:<8}"
+        )
+
+    print(f"{'=' * 115}\n")
