@@ -1,10 +1,7 @@
-import os
-import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "signals")))
+from __future__ import annotations
 
 import numpy as np
-from condition_bank import ConditionBank
+
 # =============================================================================
 # CONFIG
 # =============================================================================
@@ -66,7 +63,12 @@ def _is_trivial_pair(spec_a: dict, spec_b: dict) -> bool:
     return all(spec_a.get(k) == spec_b.get(k) for k in keys_to_compare)
 
 
-def find_redundant_pairs(specs: list, corr_matrix: np.ndarray, bank: ConditionBank, threshold: float = REDUNDANCY_CORR_THRESHOLD) -> list:
+def _compute_agreement_pct(x: np.ndarray, y: np.ndarray) -> float:
+    """% of positions where both boolean arrays have the same value (True/True or False/False)."""
+    return float(np.mean(x == y) * 100.0)
+
+
+def find_redundant_pairs(specs: list, corr_matrix: np.ndarray, concatenated_masks: list, bank: ConditionBank, threshold: float = REDUNDANCY_CORR_THRESHOLD) -> list:
     redundant_pairs = []
     n = len(specs)
 
@@ -77,12 +79,14 @@ def find_redundant_pairs(specs: list, corr_matrix: np.ndarray, bank: ConditionBa
 
             corr = corr_matrix[i, j]
             if not np.isnan(corr) and abs(corr) > threshold:
+                agreement_pct = _compute_agreement_pct(concatenated_masks[i], concatenated_masks[j])
                 redundant_pairs.append({
-                    "spec_a":       bank.describe(specs[i]),
-                    "spec_b":       bank.describe(specs[j]),
-                    "type_a":       specs[i]["type"],
-                    "type_b":       specs[j]["type"],
-                    "correlation":  round(float(corr), 3),
+                    "spec_a":         bank.describe(specs[i]),
+                    "spec_b":         bank.describe(specs[j]),
+                    "type_a":         specs[i]["type"],
+                    "type_b":         specs[j]["type"],
+                    "correlation":    round(float(corr), 3),
+                    "agreement_pct":  round(agreement_pct, 1),
                 })
 
     redundant_pairs.sort(key=lambda row: abs(row["correlation"]), reverse=True)
@@ -106,10 +110,12 @@ if __name__ == "__main__":
     import sys
 
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget")))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "signals")))
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared")))
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batch")))
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "bitget", "shared", "shared_batch_regime")))
 
+    from condition_bank import ConditionBank
     from shared_batchs.pipeline.universe import filter_symbols, select_universe
     from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
     from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
@@ -127,7 +133,7 @@ if __name__ == "__main__":
     corr_matrix               = compute_spec_correlation_matrix(concatenated_masks)
 
     sample_bank      = ConditionBank(next(iter(ohlcv_is.values())))
-    redundant_pairs  = find_redundant_pairs(specs, corr_matrix, sample_bank)
+    redundant_pairs  = find_redundant_pairs(specs, corr_matrix, concatenated_masks, sample_bank)
     summary_by_types = summarize_redundancy_by_type_pair(redundant_pairs)
 
     print(f"Redundancy check — timeframe={TIMEFRAME}, n_symbols={N_SYMBOLS}, total_specs={len(specs)}")
@@ -135,7 +141,10 @@ if __name__ == "__main__":
 
     print("Redundant pairs (sorted by |correlation|):")
     for pair in redundant_pairs:
-        print(f"  {pair['correlation']:+.3f}  {pair['spec_a']:<35} <-> {pair['spec_b']:<35} ({pair['type_a']} vs {pair['type_b']})")
+        print(
+            f"  {pair['correlation']:+.3f}  agree={pair['agreement_pct']:>5.1f}%  "
+            f"{pair['spec_a']:<35} <-> {pair['spec_b']:<35} ({pair['type_a']} vs {pair['type_b']})"
+        )
 
     print("\nRedundancy summary by indicator-type pair:")
     for (type_a, type_b), count in summary_by_types.items():

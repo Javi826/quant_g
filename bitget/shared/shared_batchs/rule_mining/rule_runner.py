@@ -300,24 +300,56 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     if not rows:
         return
 
-    metrics = ["net_gain", "max_dd", "win_rate", "profit_factor", "calmar", "r_squared", "param_stability", "n_trades"]
-    groups  = {}
+    threshold_metrics = ["net_gain", "max_dd", "r_squared", "param_stability"]
+    groups = {}
     for r in rows:
         key = (r["timeframe"], r["side"])
         groups.setdefault(key, []).append(r)
 
-    print(f"\n{'=' * 115}")
-    print(f"  MIN METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
-    print(f"{'=' * 115}")
-    print(f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'STAB':<8}{'TRADES':<8}")
-    print(f"{'-' * 115}")
+    group_stats = {}
+    for key, group_rows in groups.items():
+        group_stats[key] = {
+            m: (min(r[m] for r in group_rows), max(r[m] for r in group_rows))
+            for m in threshold_metrics
+        }
+
+    logger.info(f"\n{'=' * 115}")
+    logger.info(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
+    logger.info(f"{'=' * 115}")
+    logger.info(
+        f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
+        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}{'STAB min/max':<16}"
+    )
+    logger.info(f"{'-' * 115}")
 
     for (tf, side), group_rows in sorted(groups.items()):
-        mins = {m: min(r[m] for r in group_rows) for m in metrics}
-        print(
-            f"{tf:<12}{side:<8}{len(group_rows):<6}{mins['net_gain']:<12.1f}{mins['max_dd']:<10.1f}"
-            f"{mins['win_rate']:<8.1f}{mins['profit_factor']:<8.2f}{mins['calmar']:<8.2f}"
-            f"{mins['r_squared']:<8.3f}{mins['param_stability']:<8.3f}{mins['n_trades']:<8}"
+        s = group_stats[(tf, side)]
+        logger.info(
+            f"{tf:<12}{side:<8}{len(group_rows):<6}"
+            f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
+            f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
+            f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
+            f"{f'{s['param_stability'][0]:.3f} / {s['param_stability'][1]:.3f}':<16}"
         )
 
-    print(f"{'=' * 115}\n")
+    logger.info(f"{'-' * 115}")
+
+    # Joint-safe global thresholds: guaranteed to keep at least 1 row per group,
+    # because they're derived from actual per-group anchor rows (same row, all 4 metrics),
+    # not independent per-column extremes (which can mix metrics from different rows).
+    anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
+
+    safe_net_gain  = min(a["net_gain"]        for a in anchors.values())  # higher better → min of anchors
+    safe_max_dd    = max(abs(a["max_dd"])     for a in anchors.values())  # lower |dd| better → max of anchors
+    safe_r2        = min(a["r_squared"]       for a in anchors.values())  # higher better → min of anchors
+    safe_stability = max(a["param_stability"] for a in anchors.values())  # lower better → max of anchors
+
+    logger.info("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
+    for (tf, side), a in sorted(anchors.items()):
+        logger.info(f"    {tf:<10}{side:<8}{a['rule_id']}")
+
+    logger.info(
+        f"\n  JOINT-SAFE THRESHOLDS (guaranteed \u22651 survivor per group, all 4 conditions at once) ── "
+        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  STAB<={safe_stability:.3f}"
+    )
+    logger.info(f"{'=' * 115}\n")

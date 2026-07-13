@@ -24,6 +24,9 @@ from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
 from shared_batchs.rule_mining.rule_runner import _run_single_rule, _print_ranking
+from shared_batchs.runs.run_correlation import decorrelate_by_profit
+from shared_batchs.runs.run_best_wfo_portfolio import find_best_portfolio_combination_wfo
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from signals.signal_builder import build_signal_fn
 
 # =============================================================================
@@ -42,6 +45,11 @@ WFO_R2_TH        = -1.0
 WFO_STABILITY_TH = 1.0   # 1.0 = disabled (no rule discarded)
 
 SAVE_TRADES = True
+
+RUN_CORRELATION           = True
+RUN_BEST_WFO_PORTFOLIO    = True
+CORRELATION_DD_THRESHOLD  = 0.55
+SHOW_PLOTS                = True
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
@@ -123,6 +131,28 @@ if __name__ == "__main__":
 
     all_ids = [r["rule_id"] for r in all_raw_results]
     _print_ranking(all_raw_results, all_ids, "PRODUCTION VALIDATION")
+
+    validated_wfo_test = [
+        (r["rule_id"], r["wfo_test_trades"])
+        for r in all_raw_results
+        if r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
+    ]
+
+    if RUN_CORRELATION and validated_wfo_test:
+        logger.info(f"\n{'─' * 115}\n  CORRELATION ANALYSIS — PRODUCTION VALIDATION (threshold={CORRELATION_DD_THRESHOLD})\n{'─' * 115}")
+        validated_wfo_test = decorrelate_by_profit(
+            strategy_trades_wfo_test = validated_wfo_test,
+            initial_balance          = INITIAL_BALANCE,
+            threshold                = CORRELATION_DD_THRESHOLD,
+        )
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
+
+    if RUN_BEST_WFO_PORTFOLIO and validated_wfo_test:
+        find_best_portfolio_combination_wfo(
+            validated_wfo_trades = validated_wfo_test,
+            initial_balance      = INITIAL_BALANCE,
+            show_plots           = SHOW_PLOTS,
+        )
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

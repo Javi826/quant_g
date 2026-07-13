@@ -41,9 +41,9 @@ N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
 WFO_NET_GAIN_TH  = 50
-WFO_DD_TH        = 20
-WFO_R2_TH        = 0.68
-WFO_STABILITY_TH = 0.62
+WFO_DD_TH        = 19
+WFO_R2_TH        = 0.724
+WFO_STABILITY_TH = 0.701
 CORRELATION_DD_THRESHOLD = 0.55
 
 # =============================================================================

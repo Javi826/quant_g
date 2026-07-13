@@ -58,6 +58,57 @@ CMO_WINDOW            = 14
 PSAR_STEP             = 0.02
 PSAR_MAX              = 0.2
 
+# =============================================================================
+# THRESHOLDS - manual thresholds for binarizing each indicator (interaction analysis)
+#
+# NOTE: ATR_TH, OBV_TH, CHAIKIN_OSC_TH, and FORCE_INDEX_TH default to 0.0
+# (sign-based split) because atr, obv, chaikin_oscillator, and force_index
+# are NOT normalized by price/volume — their absolute scale differs across
+# symbols, so a single fixed threshold isn't meaningful. Treat results for
+# these four with caution, or use atr_pct instead of atr where possible.
+# =============================================================================
+
+RSI_TH                = 70.0
+ADX_TH                = 25.0
+SMA_DISTANCE_TH        = 0.0
+MOMENTUM_TH            = 0.0
+MACD_LINE_TH           = 0.0
+MACD_SIGNAL_TH         = 0.0
+MACD_HISTOGRAM_TH      = 0.0
+ROC_TH                 = 0.0
+EFF_RATIO_TH           = 0.3
+AROON_UP_TH           = 70.0
+AROON_DOWN_TH         = 70.0
+AROON_OSC_TH          = 50.0
+TRIX_TH                = 0.0
+DPO_TH                 = 0.0
+KAMA_DISTANCE_TH       = 0.0
+COPPOCK_TH             = 0.0
+CMO_TH                = 50.0
+BOLLINGER_PCT_B_TH      = 0.8
+BOLLINGER_BANDWIDTH_TH  = 0.04
+ATR_TH                  = 0.0   # scale-dependent, see note above
+ATR_PCT_TH              = 0.02
+HIST_VOL_TH             = 0.02
+DONCHIAN_PCT_B_TH       = 0.8
+DONCHIAN_WIDTH_TH       = 0.05
+KELTNER_PCT_B_TH        = 0.8
+KELTNER_WIDTH_TH        = 0.03
+PSAR_DISTANCE_TH        = 0.0
+MASS_INDEX_TH          = 27.0
+STOCH_K_TH             = 80.0
+STOCH_D_TH             = 80.0
+CCI_TH                = 100.0
+WILLIAMS_R_TH         = -20.0
+ULTOSC_TH              = 70.0
+RVI_TH                  = 0.0
+VORTEX_OSC_TH           = 0.0
+OBV_TH                  = 0.0   # scale-dependent, see note above
+CMF_TH                  = 0.05
+VWAP_DISTANCE_TH        = 0.0
+CHAIKIN_OSC_TH          = 0.0   # scale-dependent, see note above
+FORCE_INDEX_TH          = 0.0   # scale-dependent, see note above
+
 
 # =============================================================================
 # CORE INDICATORS (replicated from condition_bank.py)
@@ -864,4 +915,47 @@ CANDIDATE_INDICATORS = {
     "vwap_distance":         vwap_distance,
     "chaikin_oscillator":    chaikin_oscillator,
     "force_index":           force_index,
+}
+
+INDICATOR_THRESHOLDS = {
+    "rsi_14":                 RSI_TH,
+    "adx_14":                 ADX_TH,
+    "sma_distance_20":        SMA_DISTANCE_TH,
+    "momentum_10":            MOMENTUM_TH,
+    "macd_line":              MACD_LINE_TH,
+    "macd_signal":            MACD_SIGNAL_TH,
+    "macd_histogram":         MACD_HISTOGRAM_TH,
+    "roc":                    ROC_TH,
+    "efficiency_ratio":       EFF_RATIO_TH,
+    "aroon_up":               AROON_UP_TH,
+    "aroon_down":             AROON_DOWN_TH,
+    "aroon_oscillator":       AROON_OSC_TH,
+    "trix":                   TRIX_TH,
+    "dpo":                    DPO_TH,
+    "kama_distance":          KAMA_DISTANCE_TH,
+    "coppock_curve":          COPPOCK_TH,
+    "cmo":                    CMO_TH,
+    "bollinger_percent_b":    BOLLINGER_PCT_B_TH,
+    "bollinger_bandwidth":    BOLLINGER_BANDWIDTH_TH,
+    "atr":                    ATR_TH,
+    "atr_pct":                ATR_PCT_TH,
+    "historical_volatility":  HIST_VOL_TH,
+    "donchian_percent_b":     DONCHIAN_PCT_B_TH,
+    "donchian_width":         DONCHIAN_WIDTH_TH,
+    "keltner_percent_b":      KELTNER_PCT_B_TH,
+    "keltner_width":          KELTNER_WIDTH_TH,
+    "parabolic_sar_distance": PSAR_DISTANCE_TH,
+    "mass_index":             MASS_INDEX_TH,
+    "stochastic_k":           STOCH_K_TH,
+    "stochastic_d":           STOCH_D_TH,
+    "cci":                    CCI_TH,
+    "williams_r":             WILLIAMS_R_TH,
+    "ultimate_oscillator":    ULTOSC_TH,
+    "rvi":                    RVI_TH,
+    "vortex_oscillator":      VORTEX_OSC_TH,
+    "obv":                    OBV_TH,
+    "cmf":                    CMF_TH,
+    "vwap_distance":          VWAP_DISTANCE_TH,
+    "chaikin_oscillator":     CHAIKIN_OSC_TH,
+    "force_index":            FORCE_INDEX_TH,
 }

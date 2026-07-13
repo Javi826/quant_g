@@ -16,12 +16,12 @@ WFO_METRIC            = "R_SQUARED"
 WFO_N_SPLITS          = 4
 WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
 
-MIN_STRATEGIES     = 3
-MAX_STRATEGIES     = 5
+MIN_STRATEGIES     = 2
+MAX_STRATEGIES     = 6
 TOP_N              = 2
 
 REQUIRE_LONG_SHORT     = True
-REQUIRE_ALL_TIMEFRAMES = True
+REQUIRE_ALL_TIMEFRAMES = False
 
 # Metric extraction: (column_in_compute_metrics_output, higher_is_better)
 _METRIC_MAP = {

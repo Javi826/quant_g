@@ -148,10 +148,10 @@ def _evaluate_wfo_approval(
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
     approved     = (
-        net_gain_pct > net_gain_th
-        and abs(max_dd_pct) < dd_th
-        and r_squared > r2_th
-        and param_stability < stability_th
+        net_gain_pct >= net_gain_th
+        and abs(max_dd_pct) <= dd_th
+        and r_squared >= r2_th
+        and param_stability <= stability_th
     )
 
     return approved, net_gain_pct, max_dd_pct

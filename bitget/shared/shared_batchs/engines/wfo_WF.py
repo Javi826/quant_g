@@ -17,7 +17,6 @@ logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 EMA_ALPHA   = 0.3
 WARMUP_BARS = 100
 
-
 # =============================================================================
 # PARAM AGGREGATION HELPERS
 # =============================================================================
@@ -63,11 +62,7 @@ def _aggregate_ema(df_params: pd.DataFrame, param_ranges: dict) -> dict:
     return final_params
 
 def _compute_param_stability(df_params: pd.DataFrame, param_ranges: dict) -> float:
-    """
-    Joint entropy (normalized 0-1) of parameter combinations across WFO windows.
-    0 = identical combo chosen in every window (stable).
-    1 = combos maximally scattered across the full grid (unstable).
-    """
+
     combos    = list(df_params.itertuples(index=False, name=None))
     n_windows = len(combos)
     if n_windows == 0:
@@ -84,18 +79,15 @@ def _compute_param_stability(df_params: pd.DataFrame, param_ranges: dict) -> flo
     max_entropy = np.log2(n_possible_combos) if n_possible_combos > 1 else 1.0
     return round(float(entropy / max_entropy), 3) if max_entropy > 0 else 0.0
 
-
 _AGGREGATORS = {
     "MODE": _aggregate_mode,
     "MEAN": _aggregate_mean,
     "EMA":  _aggregate_ema,
 }
 
-
 # =============================================================================
 # WINDOW SYMBOL SELECTION
 # =============================================================================
-
 def _find_window_indices(
     sym_ts: np.ndarray,
     train_start_ts,
@@ -115,7 +107,6 @@ def _find_window_indices(
         return None
     return t0, t1, test0, test1
 
-
 def _select_window_symbols(
     candidate_indices: dict,
     ohlcv_arr: dict,
@@ -134,11 +125,9 @@ def _select_window_symbols(
     selected_syms = sorted(candidate_indices, key=_avg_train_vol, reverse=True)[:n_symbols]
     return {sym: candidate_indices[sym] for sym in selected_syms}
 
-
 # =============================================================================
 # SHARED MEMORY HELPERS
 # =============================================================================
-
 def _arrays_to_shared_memory(base_arrays: dict) -> tuple:
     """Copy base_arrays numpy arrays to shared memory. Returns (shm_list, metadata)."""
     shm_list = []
@@ -156,7 +145,6 @@ def _arrays_to_shared_memory(base_arrays: dict) -> tuple:
                 metadata[sym][key] = {"value": arr}
     return shm_list, metadata
 
-
 def _arrays_from_shared_memory(metadata: dict) -> tuple:
     """Reconstruct base_arrays from shared memory metadata. Returns (base_arrays, shm_handles)."""
     base_arrays = {}
@@ -172,7 +160,6 @@ def _arrays_from_shared_memory(metadata: dict) -> tuple:
                 base_arrays[sym][key] = info["value"]
     return base_arrays, shm_handles
 
-
 def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
     """Worker: reconstruct base_arrays from shared memory and evaluate."""
     base_arrays, shm_handles = _arrays_from_shared_memory(shm_metadata)
@@ -181,8 +168,6 @@ def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
     finally:
         for shm in shm_handles:
             shm.close()
-
-
 # =============================================================================
 # WALK FORWARD OPTIMIZATION
 # =============================================================================

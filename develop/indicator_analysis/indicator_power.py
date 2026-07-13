@@ -6,11 +6,11 @@ from sklearn.feature_selection import mutual_info_regression
 # CONFIG
 # =============================================================================
 
-FORWARD_N                 = 20
+FORWARD_N                 = 25
 N_SHUFFLES                = 50
-REDUNDANCY_CORR_THRESHOLD = 0.7
+REDUNDANCY_CORR_THRESHOLD = 0.8
 
-TIMEFRAME = "1H"
+TIMEFRAME = "4H"
 N_SYMBOLS = 10
 
 # =============================================================================
@@ -136,6 +136,21 @@ def rank_indicators(indicators_by_name: dict, forward_returns: dict) -> list:
     ranking.sort(key=lambda row: row["score"], reverse=True)
     return ranking
 
+
+def print_ranking_table(ranking: list) -> None:
+    header = f"{'indicator_name':<25} {'ic_mean':>10} {'mi_mean':>10} {'sign_consistency':>18} {'is_above_noise':>15} {'score':>10}"
+    print(header)
+    print("-" * len(header))
+    for row in ranking:
+        print(
+            f"{row['indicator_name']:<25} "
+            f"{row['ic_mean']:>10.4f} "
+            f"{row['mi_mean']:>10.4f} "
+            f"{row['sign_consistency']:>18.4f} "
+            f"{str(row['is_above_noise']):>15} "
+            f"{row['score']:>10.4f}"
+        )
+
 # =============================================================================
 # BLOCK 5 - REDUNDANCY DETECTION
 # =============================================================================
@@ -242,9 +257,8 @@ if __name__ == "__main__":
     indicators_by_name  = build_indicators_by_name(ohlcv_is, CANDIDATE_INDICATORS)
     ranking              = rank_indicators(indicators_by_name, forward_returns)
 
-    print(f"Indicator ranking — timeframe={TIMEFRAME}, n_symbols={N_SYMBOLS}")
-    for row in ranking:
-        print(f"  {row}")
+    print(f"Indicator ranking — timeframe={TIMEFRAME}, n_symbols={N_SYMBOLS}\n")
+    print_ranking_table(ranking)
 
     redundancy_result = remove_redundant_indicators(ranking, indicators_by_name)
 
