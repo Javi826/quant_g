@@ -15,11 +15,11 @@ MA_PERIODS                 = [20,50,100]
 
 MOMENTUM_PERIODS           = [5,10,20]
 
+HISTVOL_BASE_PERIODS       = [10,30]
+HISTVOL_REGIME_SMA_PERIODS = [20,50]
 
 ATR_BASE_PERIODS           = [14]
 ATR_REGIME_SMA_PERIODS     = [10,50]
-HISTVOL_BASE_PERIODS       = [10,30]
-HISTVOL_REGIME_SMA_PERIODS = [20,50]
 
 # =============================================================================
 # CORE INDICATORS
@@ -294,24 +294,24 @@ INDICATOR_REGISTRY = [
 #         ),
 #         "describe":    lambda spec: f"ATR{spec['period']}{spec['op']}SMA_ATR{spec['sma_period']}",
 #     },
-#     {
-#         "type":        "histvol_regime",
-#         "periods":     HISTVOL_BASE_PERIODS,
-#         "sma_periods": HISTVOL_REGIME_SMA_PERIODS,
-#         "ops":         [">", "<"],
-#         "build_cache": lambda o, h, l, c, entry: {
-#             (hp, sp): (_historical_volatility(c, hp), _rolling_mean_skipnan(_historical_volatility(c, hp), sp))
-#             for hp in entry["periods"] for sp in entry["sma_periods"]
-#         },
-#         "build_specs": _build_specs_two_periods,
-#         "evaluate":    lambda bank, spec: (
-#             bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] > bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
-#             if spec["op"] == ">"
-#             else bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] < bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
-#         ),
-#         "describe":    lambda spec: f"HISTVOL{spec['period']}{spec['op']}SMA_HISTVOL{spec['sma_period']}",
-#     },
 # =============================================================================
+    {
+        "type":        "histvol_regime",
+        "periods":     HISTVOL_BASE_PERIODS,
+        "sma_periods": HISTVOL_REGIME_SMA_PERIODS,
+        "ops":         [">", "<"],
+        "build_cache": lambda o, h, l, c, entry: {
+            (hp, sp): (_historical_volatility(c, hp), _rolling_mean_skipnan(_historical_volatility(c, hp), sp))
+            for hp in entry["periods"] for sp in entry["sma_periods"]
+        },
+        "build_specs": _build_specs_two_periods,
+        "evaluate":    lambda bank, spec: (
+            bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] > bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
+            if spec["op"] == ">"
+            else bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][0] < bank._cache["histvol_regime"][(spec["period"], spec["sma_period"])][1]
+        ),
+        "describe":    lambda spec: f"HISTVOL{spec['period']}{spec['op']}SMA_HISTVOL{spec['sma_period']}",
+    },
 ]
 
 

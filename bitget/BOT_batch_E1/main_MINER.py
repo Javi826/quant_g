@@ -35,16 +35,16 @@ RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
-WFO_NET_GAIN_TH  = 54
+WFO_NET_GAIN_TH  = 50
 WFO_DD_TH        = 20
-WFO_R2_TH        = 0.7
-WFO_STABILITY_TH = 0.7
-CORRELATION_DD_THRESHOLD = 0.60
+WFO_R2_TH        = 0.68
+WFO_STABILITY_TH = 0.62
+CORRELATION_DD_THRESHOLD = 0.55
 
 # =============================================================================
 # WFO_NET_GAIN_TH  = 50

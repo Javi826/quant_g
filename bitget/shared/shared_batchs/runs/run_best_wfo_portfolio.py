@@ -17,7 +17,7 @@ WFO_N_SPLITS          = 4
 WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
 
 MIN_STRATEGIES     = 3
-MAX_STRATEGIES     = 6
+MAX_STRATEGIES     = 5
 TOP_N              = 2
 
 REQUIRE_LONG_SHORT     = True
