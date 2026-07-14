@@ -49,8 +49,8 @@ CORRELATION_DD_THRESHOLD = 0.55
 # =============================================================================
 # WFO_NET_GAIN_TH  = 50
 # WFO_DD_TH        = 20
-# WFO_R2_TH        = 0.7
-# WFO_STABILITY_TH = 0.65
+# WFO_R2_TH        = 0.6
+# WFO_STABILITY_TH = 0.7
 # CORRELATION_DD_THRESHOLD = 0.55
 # =============================================================================
 

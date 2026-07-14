@@ -19,6 +19,11 @@ def _num(sid: str) -> int:
     return 0
 
 
+def _short_id(sid: str) -> str:
+    parts = sid.split("_")
+    return "_".join(parts[:3])
+
+
 def _profit_series(df: pd.DataFrame, capital: float) -> pd.Series:
     tl          = df.copy()
     tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
@@ -92,7 +97,7 @@ def _decorrelate(
             val      = corr_mx.loc[num, kept_num] if num in corr_mx.index and kept_num in corr_mx.columns else 0.0
             if pd.notna(val) and val > threshold:
                 correlated = True
-                reason     = f"corr={val:.2f} with {kept}"
+                reason     = f"corr={val:.2f} with {_short_id(kept)}"
                 discarded.append(sid)
                 break
         if correlated:

@@ -16,7 +16,11 @@ WFO_METRIC            = "R_SQUARED"
 WFO_N_SPLITS          = 4
 WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
 
-MIN_STRATEGIES     = 2
+# WFO_N_SPLITS          = 8
+# WFO_SUBPERIOD_WEIGHTS = [0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.20, 0.20]
+
+
+MIN_STRATEGIES     = 3
 MAX_STRATEGIES     = 6
 TOP_N              = 2
 
