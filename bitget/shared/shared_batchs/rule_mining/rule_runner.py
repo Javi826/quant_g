@@ -2,16 +2,18 @@
 import os
 import logging
 
+import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 
 from shared_batchs.pipeline.wfo import run_wfo_is, WFO_WINDOW_CONFIG
+from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_comparison
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from shared_batchs.runs.run_correlation import decorrelate_by_profit
-from shared_batchs.runs.run_best_wfo_portfolio import find_best_portfolio_combination_wfo
+from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, _save_rule_deploy_batch
@@ -41,7 +43,7 @@ def _run_single_rule(
     net_gain_th: float,
     dd_th: float,
     r2_th: float,
-    stability_th: float,
+    wfr_th: float,
     dtype,
     inner_n_jobs: int,
     show_progress: bool,
@@ -57,7 +59,10 @@ def _run_single_rule(
 
     rule_id = f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
-    best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, param_stability = run_wfo_is(
+    (
+        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, wfo_wfr,
+        _window_best_params, _window_test_arrays, _window_test_start_ts,
+    ) = run_wfo_is(
         ohlcv_data          = ohlcv_data,
         param_names         = param_names,
         lists_for_grid      = lists_for_grid,
@@ -68,7 +73,7 @@ def _run_single_rule(
         net_gain_th         = net_gain_th,
         dd_th               = dd_th,
         r2_th               = r2_th,
-        stability_th        = stability_th,
+        wfr_th              = wfr_th,
         dtype               = dtype,
         n_jobs              = inner_n_jobs,
         show_progress       = show_progress,
@@ -108,7 +113,8 @@ def _run_single_rule(
         "profit_factor":    metrics["Profit_Factor"] if metrics else 0.0,
         "calmar":           metrics["Calmar"]        if metrics else 0.0,
         "r_squared":        metrics["R_Squared"]     if metrics else 0.0,
-        "param_stability":  param_stability,
+        "wfr":              wfo_wfr,
+        "sharpe":           metrics["Sharpe"] if metrics else np.nan,
         "best_params":      best_params,
         "wfo_test_trades":  wfo_test_trades,
     }
@@ -121,7 +127,7 @@ def run_rule_mining(
     net_gain_th: float,
     dd_th: float,
     r2_th: float,
-    stability_th: float,
+    wfr_th: float,
     dtype,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -152,7 +158,7 @@ def run_rule_mining(
         raw_results = Parallel(n_jobs=rules_n_jobs)(
             delayed(_run_single_rule)(
                 i, total_rules, rule, ohlcv_data, param_names, lists_for_grid, order_amount,
-                timeframe, net_gain_th, dd_th, r2_th, stability_th, dtype, inner_n_jobs, show_progress, n_symbols,
+                timeframe, net_gain_th, dd_th, r2_th, wfr_th, dtype, inner_n_jobs, show_progress, n_symbols,
                 log_level, save_trades, brief_trades_folder,
             )
             for i, rule in enumerate(all_rules)
@@ -173,6 +179,10 @@ def finalize_rule_mining(
     ohlcv_data_by_timeframe: dict,
     param_grid: dict,
     order_amount: int,
+    net_gain_th: float,
+    dd_th: float,
+    r2_th: float,
+    wfr_th: float,
     dtype,
     data_folder: str,
     inner_n_jobs: int = -1,
@@ -180,6 +190,12 @@ def finalize_rule_mining(
     show_plots: bool = False,
     correlation_threshold: float = 0.75,
     run_correlation: bool = True,
+    pipeline_montecarlo: bool = True,
+    montecarlo_ruin_th: float = 5.0,
+    pipeline_multiverse: bool = True,
+    multiverse_pct_th: float = 90.0,
+    pipeline_bhy: bool = True,
+    bhy_alpha: float = 0.05,
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
     symbols_live_folder: str = None,
@@ -194,17 +210,100 @@ def finalize_rule_mining(
         if r["approved"] and r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
     ]
 
-    _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "PRE-CORRELATION")
+    _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-WFO")
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
+
+
+    if pipeline_bhy and validated_wfo_test:
+
+        from shared_batchs.pipeline.bhy_significance import run_bhy_significance
+
+        candidates_before_bhy = [rid for rid, _ in validated_wfo_test]
+
+        bhy_result      = run_bhy_significance(all_raw_results, alpha=bhy_alpha)
+        significant_ids = bhy_result["significant_ids"]
+        p_values_by_id  = bhy_result["p_values_by_rule_id"]
+
+        for rule_id in candidates_before_bhy:
+            raw_by_id[rule_id]["bhy_p_value"] = p_values_by_id.get(rule_id, 1.0)
+
+        validated_wfo_test = [
+            (rid, trades) for rid, trades in validated_wfo_test if rid in significant_ids
+        ]
+        survivors_bhy = [rid for rid, _ in validated_wfo_test]
+        _print_ranking(all_raw_results, candidates_before_bhy, "POST-BHY", survivor_ids=survivors_bhy)
+    else:
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-BHY")
+
+    # -------------------------------------------------------------------
+    # STAGE 3 ── Correlation (portfolio construction: drop redundant rules)
+    # -------------------------------------------------------------------
     if run_correlation and validated_wfo_test:
-        logger.info(f"\n{'─' * 115}\n  CORRELATION ANALYSIS RULE MINING — Profit (threshold={correlation_threshold})\n{'─' * 115}")
+        candidates_before_corr = [rid for rid, _ in validated_wfo_test]
         validated_wfo_test = decorrelate_by_profit(
             strategy_trades_wfo_test = validated_wfo_test,
             initial_balance          = INITIAL_BALANCE,
             threshold                = correlation_threshold,
         )
+        survivors_corr = [rid for rid, _ in validated_wfo_test]
+        _print_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
+    else:
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
 
-    _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
+    # -------------------------------------------------------------------
+    # STAGE 4 ── Montecarlo (bootstrap of executed trades — validates RISK)
+    # -------------------------------------------------------------------
+    if pipeline_montecarlo and validated_wfo_test:
+        candidates_before_mc = [rid for rid, _ in validated_wfo_test]
+        survivors = []
+        for rule_id, trades in validated_wfo_test:
+            approved_mc, prob_ruin = pipe_montecarlo(
+                wfo_test_trades = trades,
+                initial_balance = INITIAL_BALANCE,
+                prob_ruin_th    = montecarlo_ruin_th,
+            )
+            raw_by_id[rule_id]["montecarlo_prob_ruin"] = prob_ruin
+            if approved_mc:
+                survivors.append((rule_id, trades))
+        validated_wfo_test = survivors
+        survivors_mc = [rid for rid, _ in validated_wfo_test]
+        _print_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
+    else:
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MONTECARLO")
+
+    # -------------------------------------------------------------------
+    # STAGE 5 ── Multiverse (full synthetic WFO re-run — validates EDGE)
+    # -------------------------------------------------------------------
+    if pipeline_multiverse and validated_wfo_test:
+        from shared_batchs.pipeline.multiverse import pipe_multiverse
+
+        candidates_before_mv = [rid for rid, _ in validated_wfo_test]
+        survivors = []
+        for rule_id, trades in validated_wfo_test:
+            rule_info = raw_by_id[rule_id]
+            approved_mv, pct_profitable_mv = pipe_multiverse(
+                ohlcv_data          = ohlcv_data_by_timeframe[rule_info["timeframe"]],
+                timeframe           = rule_info["timeframe"],
+                param_grid          = param_grid,
+                signal_fn           = rule_info["signal_fn"],
+                signal_params_keys  = [],
+                order_amount        = order_amount,
+                net_gain_th         = net_gain_th,
+                dd_th               = dd_th,
+                r2_th               = r2_th,
+                wfr_th              = wfr_th,
+                dtype               = dtype,
+                n_symbols           = n_symbols,
+                pct_profitable_th   = multiverse_pct_th,
+            )
+            raw_by_id[rule_id]["multiverse_pct_profit"] = pct_profitable_mv
+            if approved_mv:
+                survivors.append((rule_id, trades))
+        validated_wfo_test = survivors
+        survivors_mv = [rid for rid, _ in validated_wfo_test]
+        _print_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
+    else:
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MULTIVERSE")
 
     if show_plots:
         for rule_id, trades in validated_wfo_test:
@@ -274,33 +373,43 @@ def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
-def _print_ranking(all_raw_results: list, highlight_ids: list, stage_label: str) -> None:
-    rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
+def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None) -> None:
+    rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
     rows.sort(key=lambda r: r["net_gain"], reverse=True)
 
-    id_width = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
+    show_status  = survivor_ids is not None
+    survivor_set = set(survivor_ids) if show_status else None
 
-    print(f"\n{'=' * 160}")
-    print(f"  RULE MINING RESULTS — {stage_label} ── {len(rows)} / {len(all_raw_results)} tested")
-    print(f"{'=' * 160}")
-    print(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'STAB':<8}{'TRADES':<8}RULE")
-    print(f"{'-' * 160}")
+    id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
+    label_width = max((len(r["label"]) for r in rows), default=8) + 2
+
+    count_str = f"{len(survivor_ids)} / {len(rows)} passed" if show_status else f"{len(rows)} / {len(all_raw_results)} tested"
+
+    logger.info(f"\n{'─' * 160}")
+    logger.info(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
+    logger.info(f"{'─' * 160}")
+
+    status_header = f"  {'STATUS':<8}" if show_status else ""
+    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PCT':<8}{'SR':<8}{'BHY_P':<10}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
+    logger.info(f"{'─' * 160}")
 
     for r in rows:
-        print(
+        status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
+        logger.info(
             f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
-            f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}{r['param_stability']:<8.3f}"
-            f"{r['n_trades']:<8}{r['label']}"
+            f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
+            f"{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}{r.get('multiverse_pct_profit', 0.0):<8.1f}"
+            f"{r.get('sharpe', 0.0):<8.2f}{r.get('bhy_p_value', 1.0):<10.4f}{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 
-    print(f"{'=' * 160}\n")
-    
+    logger.info(f"{'─' * 160}\n")
+
 def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     if not rows:
         return
 
-    threshold_metrics = ["net_gain", "max_dd", "r_squared", "param_stability"]
+    threshold_metrics = ["net_gain", "max_dd", "r_squared"]
     groups = {}
     for r in rows:
         key = (r["timeframe"], r["side"])
@@ -313,43 +422,39 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
             for m in threshold_metrics
         }
 
-    logger.info(f"\n{'=' * 115}")
-    logger.info(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
-    logger.info(f"{'=' * 115}")
-    logger.info(
+    logger.debug(f"\n{'─' * 115}")
+    logger.debug(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
+    logger.debug(f"{'─' * 115}")
+    logger.debug(
         f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
-        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}{'STAB min/max':<16}"
+        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
     )
-    logger.info(f"{'-' * 115}")
+    logger.debug(f"{'─' * 115}")
 
     for (tf, side), group_rows in sorted(groups.items()):
         s = group_stats[(tf, side)]
-        logger.info(
+        logger.debug(
             f"{tf:<12}{side:<8}{len(group_rows):<6}"
             f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
             f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
             f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
-            f"{f'{s['param_stability'][0]:.3f} / {s['param_stability'][1]:.3f}':<16}"
         )
 
-    logger.info(f"{'-' * 115}")
+    logger.debug(f"{'─' * 115}")
 
-    # Joint-safe global thresholds: guaranteed to keep at least 1 row per group,
-    # because they're derived from actual per-group anchor rows (same row, all 4 metrics),
-    # not independent per-column extremes (which can mix metrics from different rows).
+
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
 
-    safe_net_gain  = min(a["net_gain"]        for a in anchors.values())  # higher better → min of anchors
-    safe_max_dd    = max(abs(a["max_dd"])     for a in anchors.values())  # lower |dd| better → max of anchors
-    safe_r2        = min(a["r_squared"]       for a in anchors.values())  # higher better → min of anchors
-    safe_stability = max(a["param_stability"] for a in anchors.values())  # lower better → max of anchors
+    safe_net_gain = min(a["net_gain"]  for a in anchors.values())  # higher better → min of anchors
+    safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())  # lower |dd| better → max of anchors
+    safe_r2       = min(a["r_squared"] for a in anchors.values())  # higher better → min of anchors
 
-    logger.info("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
+    logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):
-        logger.info(f"    {tf:<10}{side:<8}{a['rule_id']}")
+        logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
 
-    logger.info(
-        f"\n  JOINT-SAFE THRESHOLDS (guaranteed \u22651 survivor per group, all 4 conditions at once) ── "
-        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  STAB<={safe_stability:.3f}"
+    logger.debug(
+        f"\n  JOINT-SAFE THRESHOLDS (guaranteed \u22651 survivor per group, all conditions at once) ── "
+        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}"
     )
-    logger.info(f"{'=' * 115}\n")
+    logger.debug(f"{'─' * 115}\n")

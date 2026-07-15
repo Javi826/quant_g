@@ -40,7 +40,7 @@ def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity
     weekly        = eq_series.resample("W").last().pct_change().dropna()
     weekly_pct    = (weekly > 0).mean() * 100
 
-    sharpe = (round(float(profits.mean() / profits.std() * np.sqrt(252)), 3)
+    sharpe = (round(float(profits.mean() / profits.std() * np.sqrt(365)), 3)
               if profits.std() > 0 else np.nan)
     
     running_max_w   = weekly.add(1).cumprod().cummax()

@@ -19,6 +19,20 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 
+# Independent debug control for rule_runner's own pipeline-stage logging
+# (pass/fail lists, min/max-by-group), separate from the global LOG_LEVEL above.
+RULE_RUNNER_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
+
+# Independent debug control for the BHY significance module only
+
+BHY_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.bhy_significance").setLevel(BHY_LOG_LEVEL)
+
+# Independent debug control for the Multiverse module only
+MULTIVERSE_LOG_LEVEL = logging.DEBUG
+logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
+
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
@@ -27,43 +41,17 @@ from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 
 # =============================================================================
-# RUN CONFIGURATION
+# UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
-
 DTYPE        = np.float32
 RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
-
-WFO_NET_GAIN_TH  = 50
-WFO_DD_TH        = 19
-WFO_R2_TH        = 0.724
-WFO_STABILITY_TH = 0.701
-CORRELATION_DD_THRESHOLD = 0.55
-
-# =============================================================================
-# WFO_NET_GAIN_TH  = 50
-# WFO_DD_TH        = 20
-# WFO_R2_TH        = 0.6
-# WFO_STABILITY_TH = 0.7
-# CORRELATION_DD_THRESHOLD = 0.55
-# =============================================================================
-
-SHOW_PLOTS             = True
-RUN_CORRELATION        = True
-RUN_BEST_WFO_PORTFOLIO = True
-RUN_DEPLOY             = False
-SAVE_TRADES            = False
-
-STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
-SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
-BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
-DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -72,18 +60,67 @@ PARAM_GRID = {
 }
 
 # =============================================================================
+# WFO — Walk-Forward Optimization approval thresholds (Stage 1)
+# =============================================================================
+WFO_NET_GAIN_TH = 50
+WFO_DD_TH       = 20
+WFO_R2_TH       = 0.5
+WFO_WFR_TH      = 0.6
+
+# =============================================================================
+# PIPELINES — sequential validation filters (executed in this order)
+# =============================================================================
+
+#Stage 2: BHY (Benjamini-Yekutieli FDR control on per-rule p-values)
+PIPELINE_BHY = True
+BHY_ALPHA    = 0.05   # target False Discovery Rate
+
+#Stage 4: Montecarlo (bootstrap of executed trades — validates RISK)
+PIPELINE_MONTECARLO = True
+MONTECARLO_RUIN_TH  = 50  # max % of simulations allowed to hit ruin (article: healthy < 5%)
+
+#Stage 5: Multiverse (synthetic price paths — validates EDGE)
+PIPELINE_MULTIVERSE = True
+MULTIVERSE_PCT_TH   = 70
+
+# =============================================================================
+# RUNS — portfolio construction and output stages
+# =============================================================================
+
+# ---- Stage 3: Correlation (drop redundant/correlated rules) ----
+RUN_CORRELATION          = True
+CORRELATION_DD_THRESHOLD = 0.55
+
+# ---- Best portfolio combination search (post-filters) ----
+RUN_PORTFOLIO = True
+
+# ---- Deploy (write approved rules to the live rules file) ----
+RUN_DEPLOY = False
+
+STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
+SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
+BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
+DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
+
+# =============================================================================
+# MISC OUTPUT / DEBUG OPTIONS
+# =============================================================================
+SHOW_PLOTS  = True
+SAVE_TRADES = False
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
 if __name__ == "__main__":
     start = time.time()
 
-    logger.info(f"\n{'=' * 115}")
+    logger.info(f"\n{'─' * 115}")
     logger.info(f"  RULE MINING START")
-    logger.info(f"{'=' * 115}")
+    logger.info(f"{'─' * 115}")
     logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
     logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
-    logger.info(f"  VALIDATION  : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  STABILITY_TH={WFO_STABILITY_TH}")
+    logger.info(f"  VALIDATION  : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
     logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM GRID  : {PARAM_GRID}")
     _windows_str = "  |  ".join(
@@ -92,11 +129,16 @@ if __name__ == "__main__":
     )
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(
-        f"  RUNS        : CORRELATION : {'🟢' if RUN_CORRELATION else '⚪'}  "
-        f"BEST PORTFOLIO: {'🟢' if RUN_BEST_WFO_PORTFOLIO else '⚪'}  "
+        f"  PIPELINES   : BHY: {'🟢' if PIPELINE_BHY else '⚪'}  "
+        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
+        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
+    )
+    logger.info(
+        f"  RUNS        : CORRELATION: {'🟢' if RUN_CORRELATION else '⚪'}  "
+        f"BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
         f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"
     )
-    logger.info(f"{'=' * 115}\n")
+    logger.info(f"{'─' * 115}\n")
 
     all_raw_results         = []
     ohlcv_data_by_timeframe = {}
@@ -122,7 +164,7 @@ if __name__ == "__main__":
             net_gain_th          = WFO_NET_GAIN_TH,
             dd_th                = WFO_DD_TH,
             r2_th                = WFO_R2_TH,
-            stability_th         = WFO_STABILITY_TH,
+            wfr_th               = WFO_WFR_TH,
             dtype                = DTYPE,
             rules_n_jobs         = RULES_N_JOBS,
             inner_n_jobs         = INNER_N_JOBS,
@@ -142,17 +184,29 @@ if __name__ == "__main__":
         ohlcv_data_by_timeframe  = ohlcv_data_by_timeframe,
         param_grid               = PARAM_GRID,
         order_amount             = ORDER_AMOUNT,
+        net_gain_th              = WFO_NET_GAIN_TH,
+        dd_th                    = WFO_DD_TH,
+        r2_th                    = WFO_R2_TH,
+        wfr_th                   = WFO_WFR_TH,
         dtype                    = DTYPE,
         data_folder              = DATA_FOLDER_IS,
         inner_n_jobs             = INNER_N_JOBS,
         n_symbols                = N_SYMBOLS,
         show_plots               = SHOW_PLOTS,
-        correlation_threshold    = CORRELATION_DD_THRESHOLD,
+        # ---- RUNS ----
         run_correlation          = RUN_CORRELATION,
-        run_best_portfolio       = RUN_BEST_WFO_PORTFOLIO,
+        correlation_threshold    = CORRELATION_DD_THRESHOLD,
+        run_best_portfolio       = RUN_PORTFOLIO,
         run_deploy               = RUN_DEPLOY,
         symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
         deploy_output_path       = DEPLOY_OUTPUT_PATH,
+        # ---- PIPELINES ----
+        pipeline_bhy             = PIPELINE_BHY,
+        bhy_alpha                = BHY_ALPHA,
+        pipeline_montecarlo      = PIPELINE_MONTECARLO,
+        montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
+        pipeline_multiverse      = PIPELINE_MULTIVERSE,
+        multiverse_pct_th        = MULTIVERSE_PCT_TH,
     )
 
     elapsed = int(time.time() - start)

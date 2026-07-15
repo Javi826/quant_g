@@ -61,24 +61,6 @@ def _aggregate_ema(df_params: pd.DataFrame, param_ranges: dict) -> dict:
         final_params[col] = _round_param(ema_val, decimals)
     return final_params
 
-def _compute_param_stability(df_params: pd.DataFrame, param_ranges: dict) -> float:
-
-    combos    = list(df_params.itertuples(index=False, name=None))
-    n_windows = len(combos)
-    if n_windows == 0:
-        return np.nan
-
-    counts = Counter(combos)
-    probs  = np.array([c / n_windows for c in counts.values()])
-    entropy = -np.sum(probs * np.log2(probs))
-
-    n_possible_combos = 1
-    for col in df_params.columns:
-        n_possible_combos *= len(param_ranges[col])
-
-    max_entropy = np.log2(n_possible_combos) if n_possible_combos > 1 else 1.0
-    return round(float(entropy / max_entropy), 3) if max_entropy > 0 else 0.0
-
 _AGGREGATORS = {
     "MODE": _aggregate_mode,
     "MEAN": _aggregate_mean,
@@ -210,9 +192,11 @@ def walk_forward_optimization(
     test_symbols_list  = []
 
     # Trade accumulators per window
-    train_trades_list  = []
-    test_trades_list   = []
-    test_n_trades_list = []
+    train_trades_list      = []
+    test_trades_list       = []
+    test_n_trades_list     = []
+    window_test_arrays_list = []  # per-window test OHLCV, needed for synthetic-path (Multiverse) validation
+    window_test_start_ts_list = []  # per-window real test_start_ts, needed to drop warmup trades downstream
 
     start = 0
     end   = length_train_set
@@ -312,6 +296,9 @@ def walk_forward_optimization(
                 'high_time': arr_dict['high_time'][warm_start:t1_sym],
             }
 
+        window_test_arrays_list.append(base_arrays_test)
+        window_test_start_ts_list.append(test_start_ts)
+
         # -----------------------------------------------------------
         # Parallel evaluation via shared memory
         # -----------------------------------------------------------
@@ -336,28 +323,37 @@ def walk_forward_optimization(
 
         best_params_list.append(best_params)
 
-        # -----------------------------------------------------------
-        # Collect trades for this window — filter out warmup trades
-        # best_crite is derived from filtered test trades for consistency
-        # -----------------------------------------------------------
         window_test_n_trades = 0
         test_criterion       = np.nan
 
+        df_train = None
         if collect_train_trades_fn is not None and base_arrays:
             df_train = collect_train_trades_fn(best_params, base_arrays)
             if df_train is not None and not df_train.empty:
                 df_train = df_train[df_train["buy_time"] >= pd.Timestamp(train_start_ts)].copy()
-                df_train["wfo_window"] = window_idx
-                train_trades_list.append(df_train)
 
+        df_test = None
         if collect_test_trades_fn is not None and base_arrays_test:
             df_test = collect_test_trades_fn(best_params, base_arrays_test)
             if df_test is not None and not df_test.empty:
                 df_test = df_test[df_test["buy_time"] >= pd.Timestamp(test_start_ts)].copy()
-                df_test["wfo_window"] = window_idx
-                test_trades_list.append(df_test)
-                window_test_n_trades = len(df_test)
-                test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
+
+        train_has_trades = df_train is not None and not df_train.empty
+        test_has_trades  = df_test is not None and not df_test.empty
+
+        if train_has_trades and test_has_trades:
+            df_train["wfo_window"] = window_idx
+            train_trades_list.append(df_train)
+
+            df_test["wfo_window"] = window_idx
+            test_trades_list.append(df_test)
+            window_test_n_trades = len(df_test)
+            test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
+        else:
+            logger.debug(
+                f"WFO window {window_idx} ── dropped from train/test WFR pool "
+                f"(train_has_trades={train_has_trades}, test_has_trades={test_has_trades})"
+            )
 
         best_criteria_list.append(test_criterion)
         test_n_trades_list.append(window_test_n_trades)
@@ -377,12 +373,12 @@ def walk_forward_optimization(
             start += length_test
             end = start + length_train_set
 
-# -----------------------------------------------------------
+    # -----------------------------------------------------------
     # Final parameter summary (aggregated via param_selection_mode)
     # -----------------------------------------------------------
     df_params    = pd.DataFrame(best_params_list)
     final_params = _AGGREGATORS[param_selection_mode](df_params, param_ranges)
-    param_stability  = _compute_param_stability(df_params, param_ranges)
+
     # -----------------------------------------------------------
     # Final DataFrame with train/test dates, params, and criterion
     # -----------------------------------------------------------
@@ -433,4 +429,4 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, param_stability
+    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, best_params_list, window_test_arrays_list, window_test_start_ts_list

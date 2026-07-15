@@ -9,17 +9,18 @@ from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_B
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
+
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
 WFO_WINDOW_CONFIG = {
-    "15m":   {"train_months": 9, "test_months": 2},
-    "30m":   {"train_months": 9, "test_months": 2},
-    "1H":    {"train_months": 9, "test_months": 2},
-    "4H":    {"train_months": 9, "test_months": 2},
-    "6Hutc": {"train_months": 9, "test_months": 2},
+    "15m":    {"train_months": 9, "test_months": 2},
+    "30m":    {"train_months": 9, "test_months": 2},
+    "1H":     {"train_months": 9, "test_months": 2},
+    "4H":     {"train_months": 9, "test_months": 2},
+    "6Hutc":  {"train_months": 9, "test_months": 2},
     "12Hutc": {"train_months": 9, "test_months": 2},
 }
 
@@ -132,29 +133,41 @@ def _collect_trades_fn(
 # =============================================================================
 
 def _evaluate_wfo_approval(
+    wfo_train_trades: pd.DataFrame,
     wfo_test_trades: pd.DataFrame,
     net_gain_th: float,
     dd_th: float,
     r2_th: float,
-    stability_th: float,
-    param_stability: float,
+    wfr_th: float,
+    train_months: float,
+    test_months: float,
 ) -> tuple:
 
     if wfo_test_trades.empty:
-        return False, 0.0, 0.0
+        return False, 0.0, 0.0, 0.0
 
     m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
     net_gain_pct = m["Net_Gain_pct"]
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
+
+    net_gain_pct_is = 0.0
+    if wfo_train_trades is not None and not wfo_train_trades.empty:
+        m_is            = compute_metrics(wfo_train_trades, capital=INITIAL_BALANCE, name="")
+        net_gain_pct_is = m_is["Net_Gain_pct"]
+
+    monthly_test = net_gain_pct / test_months
+    monthly_is   = net_gain_pct_is / train_months if train_months else 0.0
+    wfr          = monthly_test / monthly_is if monthly_is > 0 else 0.0
+
     approved     = (
         net_gain_pct >= net_gain_th
         and abs(max_dd_pct) <= dd_th
         and r_squared >= r2_th
-        and param_stability <= stability_th
+        and wfr >= wfr_th
     )
 
-    return approved, net_gain_pct, max_dd_pct
+    return approved, net_gain_pct, max_dd_pct, wfr
 
 # =============================================================================
 # RUN WFO IS
@@ -170,7 +183,7 @@ def run_wfo_is(
     net_gain_th: float,
     dd_th: float,
     r2_th: float,
-    stability_th: float,
+    wfr_th: float,
     dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
@@ -188,9 +201,6 @@ def run_wfo_is(
     length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
     pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
 
-    # Shared per-window signal cache: when the signal is independent of the exit
-    # grid (signal_params_keys empty), signals are computed once per window and
-    # reused across all param combinations. Bit-exact vs. per-combo recomputation.
     _signal_cache = {}
 
     evaluate_fn = partial(
@@ -212,7 +222,7 @@ def run_wfo_is(
 
     collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn
 
-    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, param_stability = walk_forward_optimization(
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, window_best_params, window_test_arrays, window_test_start_ts = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,
         param_ranges            = param_ranges,
         length_train_set        = length_train_set,
@@ -226,19 +236,24 @@ def run_wfo_is(
         collect_train_trades_fn = collect_train_fn,
         collect_test_trades_fn  = collect_test_fn,
     )
-    
+
     logger.debug(
         f"STAGE 1 ── WFO completed  ── {n_windows} windows | "
         f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 
-    approved_wfo, wfo_net_gain, wfo_max_dd = _evaluate_wfo_approval(
-        wfo_test_trades = wfo_test_trades,
-        net_gain_th     = net_gain_th,
-        dd_th           = dd_th,
-        r2_th           = r2_th,
-        stability_th    = stability_th,
-        param_stability = param_stability,
+    approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = _evaluate_wfo_approval(
+        wfo_train_trades = wfo_train_trades,
+        wfo_test_trades  = wfo_test_trades,
+        net_gain_th      = net_gain_th,
+        dd_th            = dd_th,
+        r2_th            = r2_th,
+        wfr_th           = wfr_th,
+        train_months     = _wfo_cfg["train_months"],
+        test_months      = _wfo_cfg["test_months"],
     )
 
-    return best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, param_stability
+    return (
+        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, wfo_wfr,
+        window_best_params, window_test_arrays, window_test_start_ts,
+    )

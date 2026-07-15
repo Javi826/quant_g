@@ -107,7 +107,7 @@ def _decorrelate(
             lines.append(f"  {ranked.index(sid)+1:<6} {sid:<{id_width}} {ng:>9.2f}%  {'✅ SELECTED':<20}")
 
     lines.append(f"  {'─' * sep_width}")
-    logger.info("\n".join(lines))
+    logger.debug("\n".join(lines))
 
     return [(sid, trades_map[sid]) for sid in sorted(selected, key=_num) if sid in trades_map]
 
