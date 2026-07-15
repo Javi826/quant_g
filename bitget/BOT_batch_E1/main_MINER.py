@@ -48,8 +48,8 @@ RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["6Hutc","12Hutc"]
-TIMEFRAMES   = ["12Hutc"]
+#TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -65,7 +65,7 @@ PARAM_GRID = {
 WFO_NET_GAIN_TH = 50
 WFO_DD_TH       = 20
 WFO_R2_TH       = 0.5
-WFO_WFR_TH      = 0.6
+WFO_WFR_TH      = 0.5
 
 # =============================================================================
 # PIPELINES — sequential validation filters (executed in this order)
@@ -89,7 +89,7 @@ MULTIVERSE_PCT_TH   = 70
 
 # ---- Stage 3: Correlation (drop redundant/correlated rules) ----
 RUN_CORRELATION          = True
-CORRELATION_DD_THRESHOLD = 0.55
+CORRELATION_DD_THRESHOLD = 0.70
 
 # ---- Best portfolio combination search (post-filters) ----
 RUN_PORTFOLIO = True

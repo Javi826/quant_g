@@ -17,7 +17,7 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
 N_PATHS    = 2000 
 N_JOBS     = -1   
-BLOCK_SIZE = 10     
+BLOCK_SIZE = 1     
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -61,15 +61,12 @@ def _evaluate_universe(
     wfr_th: float,
     dtype,
     n_symbols: int,
-) -> bool | None:
+) -> tuple:
 
     synthetic_ohlcv = _synthetic_ohlcv_data(paths, path_idx, ts_index, dtype)
     if len(synthetic_ohlcv) < n_symbols_expected:
-        return None
+        return None, None
 
-    # Single level of joblib parallelism: this call always runs its param-grid
-    # evaluation serially (n_jobs=1), since the outer Parallel already
-    # parallelizes across universes.
     (
         _best_params, _approved_wfo, _net_gain, _max_dd, _train_trades, wfo_test_trades,
         _df_results, _wfr, _window_best_params, _window_test_arrays, _window_test_start_ts,
@@ -92,8 +89,9 @@ def _evaluate_universe(
     )
 
     if wfo_test_trades is None or wfo_test_trades.empty:
-        return False
-    return float(wfo_test_trades["profit"].sum()) > 0
+        return False, 0.0
+    profit_sum = float(wfo_test_trades["profit"].sum())
+    return profit_sum > 0, profit_sum
 
 
 # =============================================================================
@@ -149,12 +147,13 @@ def pipe_multiverse(
         for path_idx in range(n_paths)
     )
 
-    valid_results = [r for r in results if r is not None]
-    n_valid       = len(valid_results)
+    valid_flags   = [r[0] for r in results if r[0] is not None]
+    valid_profits = [r[1] for r in results if r[0] is not None]
+    n_valid       = len(valid_flags)
     if n_valid == 0:
         return False, 0.0
 
-    n_profitable   = sum(valid_results)
+    n_profitable   = sum(valid_flags)
     pct_profitable = float(n_profitable) / n_valid * 100.0
     approved       = _evaluate_multiverse_approval(pct_profitable, pct_profitable_th)
 
