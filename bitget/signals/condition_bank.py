@@ -20,8 +20,10 @@ from scipy import signal as sp_signal
 # 
 # ATR_BASE_PERIODS           = [14]
 # ATR_REGIME_SMA_PERIODS     = [10]
-# 
-# ADX_PERIODS                = [14]
+# =============================================================================
+
+# =============================================================================
+# ADX_PERIODS                 = [14]
 # ADX_THRESHOLDS              = [20]
 # HISTVOL_BASE_PERIODS        = [30]
 # HISTVOL_REGIME_SMA_PERIODS  = [50]
@@ -40,7 +42,7 @@ MOMENTUM_PERIODS           = [5,10,20]      # los 3 aparecen
 HISTVOL_BASE_PERIODS       = [10,30]        # ambos aparecen
 HISTVOL_REGIME_SMA_PERIODS = [20,50]        # ambos aparecen
 
-ATR_BASE_PERIODS           = [14]           # solo aparece 14
+ATR_BASE_PERIODS           = [14]         # solo aparece 14
 ATR_REGIME_SMA_PERIODS     = [10,50]        # ambos aparecen
 
 

@@ -245,16 +245,24 @@ def run_wfo_is(
         f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 
-    approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = _evaluate_wfo_approval(
-        wfo_train_trades = wfo_train_trades,
-        wfo_test_trades  = wfo_test_trades,
-        net_gain_th      = net_gain_th,
-        dd_th            = dd_th,
-        r2_th            = r2_th,
-        wfr_th           = wfr_th,
-        train_months     = _wfo_cfg["train_months"],
-        test_months      = _wfo_cfg["test_months"],
-    )
+    # Reject outright if any window had no trades (best_crite == NaN),
+    # instead of only aggregating over the windows that did trade.
+    has_nan_window = df_results["best_crite"].iloc[:-1].isna().any()
+
+    if has_nan_window:
+        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = False, 0.0, 0.0, 0.0
+        logger.debug("STAGE 1 ── WFO rejected — at least one window had no trades (NaN)")
+    else:
+        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = _evaluate_wfo_approval(
+            wfo_train_trades = wfo_train_trades,
+            wfo_test_trades  = wfo_test_trades,
+            net_gain_th      = net_gain_th,
+            dd_th            = dd_th,
+            r2_th            = r2_th,
+            wfr_th           = wfr_th,
+            train_months     = _wfo_cfg["train_months"],
+            test_months      = _wfo_cfg["test_months"],
+        )
 
     return (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, wfo_wfr,

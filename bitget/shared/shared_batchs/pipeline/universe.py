@@ -8,10 +8,8 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
-N_SYMBOLS_MCIS            = 6
-MY_SYMBOLS                = False
-FIX_SYMBOLS_MCIS_TRAINING = False
-OOS23_MATCH_SYMBOLS       = True
+MY_SYMBOLS = False
+
 
 #symbols_to_exclude        = {"BTCUSDT","ETHUSDT"}
 symbols_to_exclude        = {}
@@ -141,36 +139,25 @@ def select_universe(
     oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
     symbols_oos_final = oos_ranked[:n_symbols]
 
-    if FIX_SYMBOLS_MCIS_TRAINING:
-        vol_is           = {sym: _vol_1d(sym, data_folder_is) for sym in filtered_is}
-        is_ranked        = sorted(filtered_is, key=lambda s: vol_is.get(s, 0), reverse=True)
-        symbols_is_final = is_ranked[:N_SYMBOLS_MCIS]
-        logger.debug(f"FIX_SYMBOLS_MCIS_TRAINING=True — IS top {N_SYMBOLS_MCIS} by volume: {symbols_is_final}")
-    else:
-        syms_is  = set(filtered_is)
-        syms_oos = set(symbols_oos_final)
-        in_both              = sorted(syms_is & syms_oos)
-        only_in_oos          = sorted(syms_oos - syms_is)
-        vol_is               = {sym: _vol_1d(sym, data_folder_is) for sym in syms_is}
-        is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
-        needed               = max(0, n_symbols - len(in_both))
-        symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
+    syms_is  = set(filtered_is)
+    syms_oos = set(symbols_oos_final)
 
-        logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
-        logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
-        logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
-        logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
+    in_both              = sorted(syms_is & syms_oos)
+    only_in_oos          = sorted(syms_oos - syms_is)
+    vol_is               = {sym: _vol_1d(sym, data_folder_is) for sym in syms_is}
+    is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
+    needed               = max(0, n_symbols - len(in_both))
+    symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
+
+    logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
+    logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
+    logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
+    logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
 
     logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
     logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
 
-    fix_str = "FIX=True" if FIX_SYMBOLS_MCIS_TRAINING else "FIX=False"
-    #logger.info(f"STAGE 0 ── Universe Selection     ── IS:{len(symbols_is_final)} symbols | OOS:{len(symbols_oos_final)} symbols | {fix_str}")
+    if len(symbols_is_final) < n_symbols:
+        logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
 
-    if FIX_SYMBOLS_MCIS_TRAINING:
-        if len(symbols_is_final) < N_SYMBOLS_MCIS:
-            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS_MCIS ({N_SYMBOLS_MCIS}). Proceeding with available.")
-    else:
-        if len(symbols_is_final) < n_symbols:
-            logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
-    return symbols_is_final, symbols_oos_final, ohlcv_is, ohlcv_oos
+    return symbols_oos_final, ohlcv_is, ohlcv_oos

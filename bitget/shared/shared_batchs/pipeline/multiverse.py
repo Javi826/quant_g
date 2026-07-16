@@ -18,6 +18,7 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 N_PATHS    = 500 
 N_JOBS     = -1   
 BLOCK_SIZE = 20     
+DEBUG_MAX_PATHS = 3
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -89,9 +90,22 @@ def _evaluate_universe(
     )
 
     if wfo_test_trades is None or wfo_test_trades.empty:
+        if path_idx < DEBUG_MAX_PATHS:
+            logger.debug(f"MULTIVERSE path={path_idx} ── no test trades ── result=False profit_sum=0.0")
         return False, 0.0
+
     profit_sum = float(wfo_test_trades["profit"].sum())
-    return profit_sum > 0, profit_sum
+    approved   = profit_sum > 0
+
+    if path_idx < DEBUG_MAX_PATHS:
+        per_window = wfo_test_trades.groupby("wfo_window")["profit"].sum()
+        window_breakdown = " | ".join(f"w{w}={p:.2f}" for w, p in per_window.items())
+        logger.debug(
+            f"MULTIVERSE path={path_idx} ── {len(per_window)} windows with trades ── "
+            f"{window_breakdown} ── TOTAL={profit_sum:.2f} -> {'PASS' if approved else 'FAIL'}"
+        )
+
+    return approved, profit_sum
 
 
 # =============================================================================
