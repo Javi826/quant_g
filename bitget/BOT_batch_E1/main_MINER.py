@@ -38,6 +38,12 @@ DTYPE        = np.float32
 RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
+# =============================================================================
+# MISC OUTPUT / DEBUG OPTIONS
+# =============================================================================
+SHOW_PLOTS  = True
+SAVE_TRADES = False
+
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
@@ -82,12 +88,6 @@ BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
 # =============================================================================
-# MISC OUTPUT / DEBUG OPTIONS
-# =============================================================================
-SHOW_PLOTS  = True
-SAVE_TRADES = False
-
-# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -107,9 +107,10 @@ if __name__ == "__main__":
         for tf in TIMEFRAMES
     )
     logger.info(f"  WFO WINDOWS : {_windows_str}")
+    logger.info(f"  WFO_MODE    : {WFO_MODE}")
     logger.info(
-        f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
-        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
+        f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
+        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PCT_TH})"
     )
     logger.info(
         f"  RUNS        : CORRELATION: {'🟢' if RUN_CORRELATION else '⚪'}  "

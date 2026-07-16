@@ -28,7 +28,7 @@ METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 # WFO parameter-selection mode:
 #   "wfo"      -> each window's test uses that window's own train optimum (no memory)
 #   "wfo_ema"  -> each window's test uses the running EMA of train optima across windows 1..i
-WFO_MODE = "wfo_ema"
+WFO_MODE = "wfo"
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -245,8 +245,6 @@ def run_wfo_is(
         f"train={_wfo_cfg['train_months']}m  test={_wfo_cfg['test_months']}m"
     )
 
-    # Reject outright if any window had no trades (best_crite == NaN),
-    # instead of only aggregating over the windows that did trade.
     has_nan_window = df_results["best_crite"].iloc[:-1].isna().any()
 
     if has_nan_window:

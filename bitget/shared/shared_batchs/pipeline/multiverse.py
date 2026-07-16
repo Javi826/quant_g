@@ -1,14 +1,11 @@
 #shared_batchs/pipeline/multiverse.py
 import logging
-
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.wfo import run_wfo_is
 from shared_batchs.engines.optimize_MC import generate_paths_for_all_symbols_functional
-
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
 # =============================================================================
@@ -113,7 +110,6 @@ def _evaluate_universe(
 # =============================================================================
 def _evaluate_multiverse_approval(pct_profitable: float, pct_profitable_th: float) -> bool:
     return pct_profitable >= pct_profitable_th
-
 
 # =============================================================================
 # RUN MULTIVERSE

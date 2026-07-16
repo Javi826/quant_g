@@ -9,8 +9,6 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # FILTER SYMBOLS
 # =============================================================================
 MY_SYMBOLS = False
-
-
 #symbols_to_exclude        = {"BTCUSDT","ETHUSDT"}
 symbols_to_exclude        = {}
 
@@ -109,10 +107,10 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     logger.debug(f"🔹Symbols remaining : {len(filtered_symbols)}")
     
     return ohlcv_data, filtered_symbols
+
 # =============================================================================
 # UNIVERSE SELECTION
 # =============================================================================
-
 def select_universe(
     data_folder_is:    str,
     data_folder_oos:   str,

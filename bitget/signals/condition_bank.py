@@ -358,7 +358,6 @@ INDICATOR_REGISTRY = [
     },
 ]
 
-
 class ConditionBank:
 
     _REGISTRY_BY_TYPE = {entry["type"]: entry for entry in INDICATOR_REGISTRY}
