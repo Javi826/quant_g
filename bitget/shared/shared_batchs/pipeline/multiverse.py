@@ -15,9 +15,9 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 # MULTIVERSE EXECUTION CONFIG
 # =============================================================================
 
-N_PATHS    = 2000 
+N_PATHS    = 500 
 N_JOBS     = -1   
-BLOCK_SIZE = 1     
+BLOCK_SIZE = 20     
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -126,8 +126,8 @@ def pipe_multiverse(
     if not ohlcv_data:
         return False, 0.0
 
-    n_obs    = min(len(df) for df in ohlcv_data.values())
-    ref_sym  = next(iter(ohlcv_data))
+    ref_sym  = max(ohlcv_data.keys(), key=lambda sym: len(ohlcv_data[sym]))
+    n_obs    = len(ohlcv_data[ref_sym])
     ts_index = ohlcv_data[ref_sym].index[:n_obs].to_numpy()
 
     paths = generate_paths_for_all_symbols_functional(

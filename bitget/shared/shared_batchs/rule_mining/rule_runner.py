@@ -194,12 +194,11 @@ def finalize_rule_mining(
     montecarlo_ruin_th: float = 5.0,
     pipeline_multiverse: bool = True,
     multiverse_pct_th: float = 90.0,
-    pipeline_bhy: bool = True,
-    bhy_alpha: float = 0.05,
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
+    deploy_wfo_mode: str = "wfo",
 ) -> list:
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
@@ -213,27 +212,6 @@ def finalize_rule_mining(
     _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-WFO")
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
 
-
-    if pipeline_bhy and validated_wfo_test:
-
-        from shared_batchs.pipeline.bhy_significance import run_bhy_significance
-
-        candidates_before_bhy = [rid for rid, _ in validated_wfo_test]
-
-        bhy_result      = run_bhy_significance(all_raw_results, alpha=bhy_alpha)
-        significant_ids = bhy_result["significant_ids"]
-        p_values_by_id  = bhy_result["p_values_by_rule_id"]
-
-        for rule_id in candidates_before_bhy:
-            raw_by_id[rule_id]["bhy_p_value"] = p_values_by_id.get(rule_id, 1.0)
-
-        validated_wfo_test = [
-            (rid, trades) for rid, trades in validated_wfo_test if rid in significant_ids
-        ]
-        survivors_bhy = [rid for rid, _ in validated_wfo_test]
-        _print_ranking(all_raw_results, candidates_before_bhy, "POST-BHY", survivor_ids=survivors_bhy)
-    else:
-        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-BHY")
 
     # -------------------------------------------------------------------
     # STAGE 3 ── Correlation (portfolio construction: drop redundant rules)
@@ -359,6 +337,7 @@ def finalize_rule_mining(
                 symbols_live_folder = symbols_live_folder,
                 deploy_map          = deploy_map,
                 label_width         = label_width,
+                wfo_mode            = deploy_wfo_mode,
             )
 
         _save_rule_deploy_batch(
@@ -390,16 +369,17 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
     logger.info(f"{'─' * 160}")
 
     status_header = f"  {'STATUS':<8}" if show_status else ""
-    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'WIN%':<8}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PCT':<8}{'SR':<8}{'BHY_P':<10}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
+    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PCT':<8}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
     logger.info(f"{'─' * 160}")
 
     for r in rows:
         status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
         logger.info(
             f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
-            f"{r['win_rate']:<8.1f}{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
-            f"{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}{r.get('multiverse_pct_profit', 0.0):<8.1f}"
-            f"{r.get('sharpe', 0.0):<8.2f}{r.get('bhy_p_value', 1.0):<10.4f}{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
+            f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
+            f"{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
+            f"{r.get('multiverse_pct_profit', 0.0):<8.1f}"
+            f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 
     logger.info(f"{'─' * 160}\n")

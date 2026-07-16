@@ -10,6 +10,7 @@ from shared_batchs.runs.run_deploy import (
     _slice_deploy_window,
     _select_deploy_symbols,
     _run_deploy_grid,
+    run_wfo_deploy_ema,
     _save_deploy_symbols,
 )
 
@@ -121,32 +122,47 @@ def run_deploy_rule(
     symbols_live_folder: str,
     deploy_map: dict,
     label_width: int = 0,
+    wfo_mode: str = "wfo",
 ) -> bool:
+
 
     label = f"{rule_id:<{label_width}}"
 
-    logger.info(f"DEPLOY  ── {label} ── running deploy train window")
+    logger.info(f"DEPLOY  ── {label} ── running deploy train window ({wfo_mode})")
 
-    param_names    = list(param_grid.keys())
-    lists_for_grid = [param_grid[k] for k in param_names]
+    if wfo_mode == "wfo_ema":
+        deploy_params, deploy_symbols, train_start_ts, train_end_ts = run_wfo_deploy_ema(
+            ohlcv_is     = ohlcv_is,
+            timeframe    = timeframe,
+            param_grid   = param_grid,
+            signal_fn    = signal_fn,
+            order_amount = order_amount,
+            n_symbols    = n_symbols,
+            dtype        = dtype,
+            n_jobs       = n_jobs,
+        )
+    else:
+        param_names    = list(param_grid.keys())
+        lists_for_grid = [param_grid[k] for k in param_names]
 
-    ohlcv_window, train_start_ts, train_end_ts = _slice_deploy_window(ohlcv_is, timeframe)
-    ohlcv_selected = _select_deploy_symbols(ohlcv_window, n_symbols, train_start_ts)
-    deploy_symbols = list(ohlcv_selected.keys())
+        ohlcv_window, train_start_ts, train_end_ts = _slice_deploy_window(ohlcv_is, timeframe)
+        ohlcv_selected = _select_deploy_symbols(ohlcv_window, n_symbols, train_start_ts)
+        deploy_symbols = list(ohlcv_selected.keys())
+
+        deploy_params = _run_deploy_grid(
+            ohlcv_selected     = ohlcv_selected,
+            param_names        = param_names,
+            lists_for_grid     = lists_for_grid,
+            signal_fn          = signal_fn,
+            signal_params_keys = [],
+            order_amount       = order_amount,
+            dtype              = dtype,
+            n_jobs             = n_jobs,
+        )
+
     logger.info(
         f"DEPLOY  ── {label} ── {len(deploy_symbols):>3} symbols | "
         f"from {pd.Timestamp(train_start_ts)} to {pd.Timestamp(train_end_ts)}"
-    )
-
-    deploy_params = _run_deploy_grid(
-        ohlcv_selected     = ohlcv_selected,
-        param_names        = param_names,
-        lists_for_grid     = lists_for_grid,
-        signal_fn          = signal_fn,
-        signal_params_keys = [],
-        order_amount       = order_amount,
-        dtype              = dtype,
-        n_jobs             = n_jobs,
     )
 
     params_str = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")

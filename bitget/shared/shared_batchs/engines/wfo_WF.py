@@ -17,8 +17,10 @@ logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 EMA_ALPHA   = 0.3
 WARMUP_BARS = 100
 
+WFO_MODES = ("wfo", "wfo_ema")
+
 # =============================================================================
-# PARAM AGGREGATION HELPERS
+# PARAM ROUNDING HELPERS
 # =============================================================================
 
 def _decimals_for_values(values) -> int:
@@ -36,36 +38,23 @@ def _round_param(value, decimals: int):
     return int(round(value)) if decimals == 0 else round(float(value), decimals)
 
 
-def _aggregate_mode(df_params: pd.DataFrame, param_ranges: dict) -> dict:
-    final_params = {}
-    for col in df_params.columns:
-        most_common_val, _ = Counter(df_params[col]).most_common(1)[0]
-        decimals = _decimals_for_values(param_ranges[col])
-        final_params[col] = _round_param(most_common_val, decimals)
-    return final_params
+def _round_params_dict(params: dict, param_ranges: dict) -> dict:
+    return {
+        k: _round_param(v, _decimals_for_values(param_ranges[k]))
+        for k, v in params.items()
+    }
 
 
-def _aggregate_mean(df_params: pd.DataFrame, param_ranges: dict) -> dict:
-    final_params = {}
-    for col in df_params.columns:
-        decimals = _decimals_for_values(param_ranges[col])
-        final_params[col] = _round_param(df_params[col].mean(), decimals)
-    return final_params
+# =============================================================================
+# EMA STATE — running exponential moving average of per-window optimal params
+# =============================================================================
 
+def _update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float = EMA_ALPHA) -> dict:
 
-def _aggregate_ema(df_params: pd.DataFrame, param_ranges: dict) -> dict:
-    final_params = {}
-    for col in df_params.columns:
-        decimals = _decimals_for_values(param_ranges[col])
-        ema_val  = df_params[col].ewm(alpha=EMA_ALPHA).mean().iloc[-1]
-        final_params[col] = _round_param(ema_val, decimals)
-    return final_params
+    if ema_raw is None:
+        return dict(new_best)
+    return {k: alpha * new_best[k] + (1.0 - alpha) * ema_raw[k] for k in new_best}
 
-_AGGREGATORS = {
-    "MODE": _aggregate_mode,
-    "MEAN": _aggregate_mean,
-    "EMA":  _aggregate_ema,
-}
 
 # =============================================================================
 # WINDOW SYMBOL SELECTION
@@ -161,7 +150,7 @@ def walk_forward_optimization(
     pct_train_set,
     anchored,
     evaluate_fn,
-    param_selection_mode="MODE",
+    wfo_mode="wfo",
     n_jobs=-1,
     show_progress=False,
     n_symbols=None,
@@ -171,8 +160,8 @@ def walk_forward_optimization(
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
 
-    if param_selection_mode not in _AGGREGATORS:
-        raise ValueError(f"Unknown param_selection_mode: {param_selection_mode}")
+    if wfo_mode not in WFO_MODES:
+        raise ValueError(f"Unknown wfo_mode: {wfo_mode} (expected one of {WFO_MODES})")
 
     keys               = list(param_ranges.keys())
     all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
@@ -197,6 +186,8 @@ def walk_forward_optimization(
     test_n_trades_list     = []
     window_test_arrays_list = []  # per-window test OHLCV, needed for synthetic-path (Multiverse) validation
     window_test_start_ts_list = []  # per-window real test_start_ts, needed to drop warmup trades downstream
+
+    ema_raw = None  # running unrounded EMA state, only used when wfo_mode == "wfo_ema"
 
     start = 0
     end   = length_train_set
@@ -302,39 +293,62 @@ def walk_forward_optimization(
         # -----------------------------------------------------------
         # Parallel evaluation via shared memory
         # -----------------------------------------------------------
-        shm_list, shm_metadata = _arrays_to_shared_memory(base_arrays)
-        try:
-            with (tqdm_joblib(
-                tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
-            ) if show_progress else contextlib.nullcontext()):
-                results = Parallel(n_jobs=n_jobs)(
-                    delayed(_evaluate_with_shm)(params, shm_metadata, evaluate_fn)
-                    for params in dict_combinations
-                )
-        finally:
-            for shm in shm_list:
-                shm.close()
-                shm.unlink()
+        if n_jobs == 1:
+            # Sequential path: no inter-process parallelism needed, so avoid creating
+            # multiprocessing.SharedMemory blocks entirely. This matters because this
+            # function may itself run inside an already-forked worker process (e.g.
+            # called from Multiverse's outer Parallel with n_jobs=1) — repeatedly
+            # creating/destroying SharedMemory blocks inside nested worker processes,
+            # thousands of times over a run, is a known source of memory corruption
+            # and SIGSEGV crashes.
+            results = [evaluate_fn(params, base_arrays) for params in dict_combinations]
+        else:
+            shm_list, shm_metadata = _arrays_to_shared_memory(base_arrays)
+            try:
+                with (tqdm_joblib(
+                    tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
+                ) if show_progress else contextlib.nullcontext()):
+                    results = Parallel(n_jobs=n_jobs)(
+                        delayed(_evaluate_with_shm)(params, shm_metadata, evaluate_fn)
+                        for params in dict_combinations
+                    )
+            finally:
+                for shm in shm_list:
+                    shm.close()
+                    shm.unlink()
 
         # -----------------------------------------------------------
         # Select best result (on train)
         # -----------------------------------------------------------
-        _, best_params = max(results, key=lambda x: x[0])
+        _, raw_best_params = max(results, key=lambda x: x[0])
 
-        best_params_list.append(best_params)
+        # -----------------------------------------------------------
+        # WFO_MODE:
+        #   "wfo"      -> use this window's raw train optimum as-is (no memory)
+        #   "wfo_ema"  -> use the running EMA of raw optima across windows 1..i
+        #                 (window 1 starts the EMA at its own raw optimum)
+        # In both cases, effective_params is what is actually applied to the test window.
+        # -----------------------------------------------------------
+        if wfo_mode == "wfo_ema":
+            ema_raw          = _update_ema_state(ema_raw, raw_best_params, alpha=EMA_ALPHA)
+            effective_params = _round_params_dict(ema_raw, param_ranges)
+        else:
+            effective_params = raw_best_params
+
+        best_params_list.append(effective_params)
 
         window_test_n_trades = 0
         test_criterion       = np.nan
 
         df_train = None
         if collect_train_trades_fn is not None and base_arrays:
-            df_train = collect_train_trades_fn(best_params, base_arrays)
+            df_train = collect_train_trades_fn(effective_params, base_arrays)
             if df_train is not None and not df_train.empty:
                 df_train = df_train[df_train["buy_time"] >= pd.Timestamp(train_start_ts)].copy()
 
         df_test = None
         if collect_test_trades_fn is not None and base_arrays_test:
-            df_test = collect_test_trades_fn(best_params, base_arrays_test)
+            df_test = collect_test_trades_fn(effective_params, base_arrays_test)
             if df_test is not None and not df_test.empty:
                 df_test = df_test[df_test["buy_time"] >= pd.Timestamp(test_start_ts)].copy()
 
@@ -374,10 +388,12 @@ def walk_forward_optimization(
             end = start + length_train_set
 
     # -----------------------------------------------------------
-    # Final parameter summary (aggregated via param_selection_mode)
+    # Final parameter summary (deploy params)
+    # In both modes this is simply the effective_params actually applied in the LAST
+    # window — for "wfo" that is the last window's raw optimum; for "wfo_ema" that is
+    # the running EMA already used to generate that window's test trades.
     # -----------------------------------------------------------
-    df_params    = pd.DataFrame(best_params_list)
-    final_params = _AGGREGATORS[param_selection_mode](df_params, param_ranges)
+    final_params = best_params_list[-1] if best_params_list else {}
 
     # -----------------------------------------------------------
     # Final DataFrame with train/test dates, params, and criterion
@@ -408,7 +424,7 @@ def walk_forward_optimization(
     df_results['_test_end_ts']    = test_end_ts_raw
 
     summary_row = dict(final_params)
-    summary_row['train_start'] = param_selection_mode
+    summary_row['train_start'] = wfo_mode
     summary_row['train_end']   = ''
     summary_row['test_start']  = ''
     summary_row['test_end']    = ''

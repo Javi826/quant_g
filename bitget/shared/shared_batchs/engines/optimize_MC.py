@@ -52,12 +52,14 @@ def generate_multiple_paths(df_hist, n_paths, n_obs, raw_columns=[], base_seed=4
     n_features     = data_array.shape[1]
     n_raw          = n_features - 6
     n_features_out = 7 + n_raw
+    
+    start_price     = float(df_features["open"].iloc[-1])
+    start_timestamp = df_features.index[-1].value // 10**9
 # =============================================================================
-#     start_price     = float(df_features["open"].iloc[-1])
-#     start_timestamp = df_features.index[-1].value // 10**9
+#     start_price     = float(df_features["open"].iloc[0])
+#     start_timestamp = df_features.index[0].value // 10**9
 # =============================================================================
-    start_price     = float(df_features["open"].iloc[0])
-    start_timestamp = df_features.index[0].value // 10**9
+    
     paths_array   = np.empty((n_paths, n_obs, n_features_out), dtype=np.float64)
     effective_block_size = min(block_size, n_rows) if block_size > 1 else 1
     for i in range(n_paths):

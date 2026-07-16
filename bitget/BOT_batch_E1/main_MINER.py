@@ -1,42 +1,33 @@
 #BOT_batch/main_MINER.py
 import os
 import sys
+import time
+import logging
+import numpy as np
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch_regime")))
 
-import time
-import logging
-import numpy as np
-
 # LOGGING CONFIGURATION
 #------------------------------------------------------------------------------
 LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
-logging.getLogger("joblib").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
-
-# Independent debug control for rule_runner's own pipeline-stage logging
-# (pass/fail lists, min/max-by-group), separate from the global LOG_LEVEL above.
 RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
-
-# Independent debug control for the BHY significance module only
-
-BHY_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.bhy_significance").setLevel(BHY_LOG_LEVEL)
-
-# Independent debug control for the Multiverse module only
-MULTIVERSE_LOG_LEVEL = logging.DEBUG
+MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
+DEPLOY_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 
+logging.getLogger("joblib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
-from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG
+from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, WFO_MODE
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 
@@ -48,8 +39,8 @@ RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -64,38 +55,26 @@ PARAM_GRID = {
 # =============================================================================
 WFO_NET_GAIN_TH = 50
 WFO_DD_TH       = 20
-WFO_R2_TH       = 0.5
+WFO_R2_TH       = 0.4
 WFO_WFR_TH      = 0.5
 
 # =============================================================================
 # PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-#Stage 2: BHY (Benjamini-Yekutieli FDR control on per-rule p-values)
-PIPELINE_BHY = True
-BHY_ALPHA    = 0.05   # target False Discovery Rate
-
-#Stage 4: Montecarlo (bootstrap of executed trades — validates RISK)
 PIPELINE_MONTECARLO = True
-MONTECARLO_RUIN_TH  = 50  # max % of simulations allowed to hit ruin (article: healthy < 5%)
-
-#Stage 5: Multiverse (synthetic price paths — validates EDGE)
+MONTECARLO_RUIN_TH  = 50 
 PIPELINE_MULTIVERSE = True
-MULTIVERSE_PCT_TH   = 70
+MULTIVERSE_PCT_TH   = 10
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
 # =============================================================================
 
-# ---- Stage 3: Correlation (drop redundant/correlated rules) ----
-RUN_CORRELATION          = True
-CORRELATION_DD_THRESHOLD = 0.70
-
-# ---- Best portfolio combination search (post-filters) ----
-RUN_PORTFOLIO = True
-
-# ---- Deploy (write approved rules to the live rules file) ----
-RUN_DEPLOY = False
+RUN_CORRELATION   = True
+CORRELATION_DD_TH = 0.55
+RUN_PORTFOLIO     = True
+RUN_DEPLOY        = False
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -129,8 +108,7 @@ if __name__ == "__main__":
     )
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(
-        f"  PIPELINES   : BHY: {'🟢' if PIPELINE_BHY else '⚪'}  "
-        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
+        f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
         f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
     )
     logger.info(
@@ -195,14 +173,13 @@ if __name__ == "__main__":
         show_plots               = SHOW_PLOTS,
         # ---- RUNS ----
         run_correlation          = RUN_CORRELATION,
-        correlation_threshold    = CORRELATION_DD_THRESHOLD,
+        correlation_threshold    = CORRELATION_DD_TH,
         run_best_portfolio       = RUN_PORTFOLIO,
         run_deploy               = RUN_DEPLOY,
         symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
         deploy_output_path       = DEPLOY_OUTPUT_PATH,
+        deploy_wfo_mode          = WFO_MODE,
         # ---- PIPELINES ----
-        pipeline_bhy             = PIPELINE_BHY,
-        bhy_alpha                = BHY_ALPHA,
         pipeline_montecarlo      = PIPELINE_MONTECARLO,
         montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
         pipeline_multiverse      = PIPELINE_MULTIVERSE,

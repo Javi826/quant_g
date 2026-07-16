@@ -1,10 +1,8 @@
 #shared_batchs/pipeline/wfo.py
 import logging
-from functools import partial
-
 import numpy as np
 import pandas as pd
-
+from functools import partial
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
@@ -24,9 +22,13 @@ WFO_WINDOW_CONFIG = {
     "12Hutc": {"train_months": 9, "test_months": 2},
 }
 
-ANCHORED             = False
-METRIC_MODE          = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
-PARAM_SELECTION_MODE = "MODE"           # "MODE", "MEAN" or "EMA"
+ANCHORED    = False
+METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
+
+# WFO parameter-selection mode:
+#   "wfo"      -> each window's test uses that window's own train optimum (no memory)
+#   "wfo_ema"  -> each window's test uses the running EMA of train optima across windows 1..i
+WFO_MODE = "wfo_ema"
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -189,6 +191,7 @@ def run_wfo_is(
     show_progress: bool = False,
     n_symbols: int = None,
     collect_test_fn_override: callable = None,
+    wfo_mode: str = WFO_MODE,
 ) -> tuple:
 
     ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
@@ -229,7 +232,7 @@ def run_wfo_is(
         pct_train_set           = pct_train_set,
         anchored                = ANCHORED,
         evaluate_fn             = evaluate_fn,
-        param_selection_mode    = PARAM_SELECTION_MODE,
+        wfo_mode                = wfo_mode,
         n_jobs                  = n_jobs,
         show_progress           = show_progress,
         n_symbols               = n_symbols,

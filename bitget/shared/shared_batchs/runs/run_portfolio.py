@@ -24,8 +24,8 @@ MIN_STRATEGIES     = 3
 MAX_STRATEGIES     = 6
 TOP_N              = 2
 
-REQUIRE_LONG_SHORT     = True
-REQUIRE_ALL_TIMEFRAMES = True
+REQUIRE_LONG_SHORT     = False
+REQUIRE_ALL_TIMEFRAMES = False
 
 # Metric extraction: (column_in_compute_metrics_output, higher_is_better)
 _METRIC_MAP = {
