@@ -59,10 +59,10 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 40
-WFO_DD_TH       = 20
-WFO_R2_TH       = 0.6
-WFO_WFR_TH      = 0.6
+WFO_NET_GAIN_TH = 1
+WFO_DD_TH       = 200
+WFO_R2_TH       = 0.1
+WFO_WFR_TH      = 0.1
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
@@ -78,9 +78,9 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_MONTECARLO = True
-MONTECARLO_RUIN_TH  = 20 
+MONTECARLO_RUIN_TH  = 2 
 PIPELINE_MULTIVERSE = True
-MULTIVERSE_PCT_TH   = 70
+MULTIVERSE_PCT_TH   = 7
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")

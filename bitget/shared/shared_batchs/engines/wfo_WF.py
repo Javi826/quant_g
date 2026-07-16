@@ -7,14 +7,13 @@ import itertools
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from collections import Counter
 from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
-EMA_ALPHA   = 0.3
+EMA_ALPHA   = 1.0
 WARMUP_BARS = 100
 
 WFO_MODES = ("wfo", "wfo_ema")
