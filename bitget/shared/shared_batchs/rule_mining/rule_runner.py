@@ -198,7 +198,6 @@ def finalize_rule_mining(
     run_deploy: bool = False,
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
-    deploy_wfo_mode: str = "wfo",
 ) -> list:
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
@@ -337,7 +336,6 @@ def finalize_rule_mining(
                 symbols_live_folder = symbols_live_folder,
                 deploy_map          = deploy_map,
                 label_width         = label_width,
-                wfo_mode            = deploy_wfo_mode,
             )
 
         _save_rule_deploy_batch(

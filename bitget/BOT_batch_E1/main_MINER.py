@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 
 # LOGGING CONFIGURATION
 #------------------------------------------------------------------------------
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 RULE_RUNNER_LOG_LEVEL = logging.INFO
@@ -27,9 +27,9 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
-from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, WFO_MODE
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
+from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
@@ -59,17 +59,17 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 1
+WFO_NET_GAIN_TH = 4
 WFO_DD_TH       = 200
-WFO_R2_TH       = 0.1
-WFO_WFR_TH      = 0.1
+WFO_R2_TH       = 0.7
+WFO_WFR_TH      = 0.6
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
 # =============================================================================
 
 RUN_CORRELATION   = True
-CORRELATION_DD_TH = 0.60
+CORRELATION_DD_TH = 0.55
 RUN_PORTFOLIO     = True
 RUN_DEPLOY        = False
 
@@ -78,9 +78,9 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_MONTECARLO = True
-MONTECARLO_RUIN_TH  = 2 
+MONTECARLO_RUIN_TH  = 100 
 PIPELINE_MULTIVERSE = True
-MULTIVERSE_PCT_TH   = 7
+MULTIVERSE_PCT_TH   = 1
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         for tf in TIMEFRAMES
     )
     logger.info(f"  WFO WINDOWS : {_windows_str}")
-    logger.info(f"  WFO_MODE    : {WFO_MODE}")
+    logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
         f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
         f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PCT_TH})"
@@ -179,7 +179,6 @@ if __name__ == "__main__":
         run_deploy               = RUN_DEPLOY,
         symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
         deploy_output_path       = DEPLOY_OUTPUT_PATH,
-        deploy_wfo_mode          = WFO_MODE,
         # ---- PIPELINES ----
         pipeline_montecarlo      = PIPELINE_MONTECARLO,
         montecarlo_ruin_th       = MONTECARLO_RUIN_TH,

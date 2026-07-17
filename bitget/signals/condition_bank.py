@@ -43,8 +43,8 @@ HISTVOL_REGIME_SMA_PERIODS  = [50]
 # 
 # ATR_BASE_PERIODS           = [14]         # solo aparece 14
 # ATR_REGIME_SMA_PERIODS     = [10,50]        # ambos aparecen
+# 
 # =============================================================================
-
 
 def _sma(close: np.ndarray, window: int) -> np.ndarray:
     n   = len(close)

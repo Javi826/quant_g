@@ -10,13 +10,12 @@ from tqdm_joblib import tqdm_joblib
 from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
-
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
-EMA_ALPHA   = 1.0
+
 WARMUP_BARS = 100
 
-WFO_MODES = ("wfo", "wfo_ema")
+
 
 # =============================================================================
 # PARAM ROUNDING HELPERS
@@ -48,7 +47,7 @@ def _round_params_dict(params: dict, param_ranges: dict) -> dict:
 # EMA STATE — running exponential moving average of per-window optimal params
 # =============================================================================
 
-def _update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float = EMA_ALPHA) -> dict:
+def _update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float) -> dict:
 
     if ema_raw is None:
         return dict(new_best)
@@ -141,7 +140,6 @@ def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
 # =============================================================================
 # WALK FORWARD OPTIMIZATION
 # =============================================================================
-
 def walk_forward_optimization(
     ohlcv_arr,
     param_ranges,
@@ -149,7 +147,7 @@ def walk_forward_optimization(
     pct_train_set,
     anchored,
     evaluate_fn,
-    wfo_mode="wfo",
+    ema_alpha,
     n_jobs=-1,
     show_progress=False,
     n_symbols=None,
@@ -158,9 +156,6 @@ def walk_forward_optimization(
 ):
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
-
-    if wfo_mode not in WFO_MODES:
-        raise ValueError(f"Unknown wfo_mode: {wfo_mode} (expected one of {WFO_MODES})")
 
     keys               = list(param_ranges.keys())
     all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
@@ -186,7 +181,7 @@ def walk_forward_optimization(
     window_test_arrays_list = []  # per-window test OHLCV, needed for synthetic-path (Multiverse) validation
     window_test_start_ts_list = []  # per-window real test_start_ts, needed to drop warmup trades downstream
 
-    ema_raw = None  # running unrounded EMA state, only used when wfo_mode == "wfo_ema"
+    ema_raw = None 
 
     start = 0
     end   = length_train_set
@@ -321,18 +316,8 @@ def walk_forward_optimization(
         # -----------------------------------------------------------
         _, raw_best_params = max(results, key=lambda x: x[0])
 
-        # -----------------------------------------------------------
-        # WFO_MODE:
-        #   "wfo"      -> use this window's raw train optimum as-is (no memory)
-        #   "wfo_ema"  -> use the running EMA of raw optima across windows 1..i
-        #                 (window 1 starts the EMA at its own raw optimum)
-        # In both cases, effective_params is what is actually applied to the test window.
-        # -----------------------------------------------------------
-        if wfo_mode == "wfo_ema":
-            ema_raw          = _update_ema_state(ema_raw, raw_best_params, alpha=EMA_ALPHA)
-            effective_params = _round_params_dict(ema_raw, param_ranges)
-        else:
-            effective_params = raw_best_params
+        ema_raw          = _update_ema_state(ema_raw, raw_best_params, alpha=ema_alpha)
+        effective_params = _round_params_dict(ema_raw, param_ranges)
 
         best_params_list.append(effective_params)
 
@@ -386,12 +371,7 @@ def walk_forward_optimization(
             start += length_test
             end = start + length_train_set
 
-    # -----------------------------------------------------------
-    # Final parameter summary (deploy params)
-    # In both modes this is simply the effective_params actually applied in the LAST
-    # window — for "wfo" that is the last window's raw optimum; for "wfo_ema" that is
-    # the running EMA already used to generate that window's test trades.
-    # -----------------------------------------------------------
+
     final_params = best_params_list[-1] if best_params_list else {}
 
     # -----------------------------------------------------------
@@ -423,7 +403,7 @@ def walk_forward_optimization(
     df_results['_test_end_ts']    = test_end_ts_raw
 
     summary_row = dict(final_params)
-    summary_row['train_start'] = wfo_mode
+    summary_row['train_start'] = 'wfo_ema'
     summary_row['train_end']   = ''
     summary_row['test_start']  = ''
     summary_row['test_end']    = ''

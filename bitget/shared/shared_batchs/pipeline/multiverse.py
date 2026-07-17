@@ -12,11 +12,65 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 # MULTIVERSE EXECUTION CONFIG
 # =============================================================================
 
-N_PATHS    = 500 
-N_JOBS     = -1   
-BLOCK_SIZE = 20     
-DEBUG_MAX_PATHS = 3
+N_PATHS    = 2 
+N_JOBS     = 1   
+BLOCK_SIZE = 1     
+DEBUG_MAX_PATHS = 1
+# === DEBUG BLOCK: DRIFT ANALYSIS (remove entire block to disable) ===
+DEBUG_DRIFT_ANALYSIS = True
 
+def _log_drift_analysis(ohlcv_data: dict, paths: dict, block_size: int) -> None:
+    rows = []
+    for sym, df_hist in ohlcv_data.items():
+        arr_paths = paths.get(sym)
+        if arr_paths is None or arr_paths.shape[0] == 0:
+            continue
+
+        hist_close = df_hist["close"].to_numpy(dtype=np.float64)
+        hist_open  = df_hist["open"].to_numpy(dtype=np.float64)
+        hist_mean_ret       = float(np.mean((hist_close - hist_open) / hist_open))
+        hist_total_ret_pct  = float((hist_close[-1] / hist_close[0] - 1.0) * 100.0)
+
+        synth_open  = arr_paths[:, :, 0].astype(np.float64)
+        synth_close = arr_paths[:, :, 3].astype(np.float64)
+        synth_ret_per_bar   = (synth_close - synth_open) / synth_open
+        synth_mean_ret      = float(np.mean(synth_ret_per_bar))
+        synth_total_ret_pct = (synth_close[:, -1] / synth_close[:, 0] - 1.0) * 100.0
+        synth_mean_total_ret_pct = float(np.mean(synth_total_ret_pct))
+        synth_pct_paths_bullish  = float(np.mean(synth_total_ret_pct > 0) * 100.0)
+
+        rows.append({
+            "symbol":                   sym,
+            "hist_mean_ret":            hist_mean_ret,
+            "hist_total_ret_pct":       hist_total_ret_pct,
+            "synth_mean_ret":           synth_mean_ret,
+            "synth_mean_total_ret_pct": synth_mean_total_ret_pct,
+            "synth_pct_paths_bullish":  synth_pct_paths_bullish,
+            "block_size":               block_size,
+        })
+
+    if not rows:
+        logger.warning("DRIFT ANALYSIS ── no valid symbols to analyze")
+        return
+
+    df_drift = pd.DataFrame(rows)
+    summary  = df_drift.drop(columns=["symbol", "block_size"]).mean()
+    df_drift = pd.concat(
+        [df_drift, pd.DataFrame([{
+            "symbol": "MEAN",
+            **summary.to_dict(),
+            "block_size": block_size,
+        }])],
+        ignore_index=True,
+    )
+
+    pd.set_option("display.float_format", lambda x: f"{x:.4f}")
+    logger.info(f"\n{'─' * 115}")
+    logger.info("  DRIFT ANALYSIS ── historical vs synthetic paths")
+    logger.info(f"{'─' * 115}")
+    logger.info(f"\n{df_drift.to_string(index=False)}")
+    logger.info(f"{'─' * 115}\n")
+# === END DEBUG BLOCK ===
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -143,6 +197,10 @@ def pipe_multiverse(
     paths = generate_paths_for_all_symbols_functional(
         ohlcv_data, n_paths=n_paths, n_obs=n_obs, raw_columns=[VOLUME_COL], block_size=block_size,
     )
+    # === DEBUG BLOCK: DRIFT ANALYSIS (remove entire block to disable) ===
+    if DEBUG_DRIFT_ANALYSIS:
+        _log_drift_analysis(ohlcv_data, paths, block_size)
+    # === END DEBUG BLOCK ===
 
     param_names    = list(param_grid.keys())
     lists_for_grid = [param_grid[k] for k in param_names]

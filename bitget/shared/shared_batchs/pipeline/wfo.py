@@ -25,10 +25,10 @@ WFO_WINDOW_CONFIG = {
 ANCHORED    = False
 METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 
-# WFO parameter-selection mode:
-#   "wfo"      -> each window's test uses that window's own train optimum (no memory)
-#   "wfo_ema"  -> each window's test uses the running EMA of train optima across windows 1..i
-WFO_MODE = "wfo"
+# EMA smoothing factor for running optimum across WFO windows.
+# alpha=1.0 -> no memory (each window uses only its own train optimum)
+# alpha<1.0 -> smoothed running optimum across windows 1..i
+EMA_ALPHA = 0.3
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -191,7 +191,6 @@ def run_wfo_is(
     show_progress: bool = False,
     n_symbols: int = None,
     collect_test_fn_override: callable = None,
-    wfo_mode: str = WFO_MODE,
 ) -> tuple:
 
     ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
@@ -232,7 +231,7 @@ def run_wfo_is(
         pct_train_set           = pct_train_set,
         anchored                = ANCHORED,
         evaluate_fn             = evaluate_fn,
-        wfo_mode                = wfo_mode,
+        ema_alpha               = EMA_ALPHA,
         n_jobs                  = n_jobs,
         show_progress           = show_progress,
         n_symbols               = n_symbols,
