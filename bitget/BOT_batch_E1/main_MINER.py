@@ -12,12 +12,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 
 # LOGGING CONFIGURATION
 #------------------------------------------------------------------------------
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
-MULTIVERSE_LOG_LEVEL = logging.DEBUG
+MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
 DEPLOY_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
@@ -26,7 +26,7 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 from shared_batchs.pipeline.universe import filter_symbols, select_universe
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
-from shared_batch_regime.config_paths import DATA_FOLDER_IS, DATA_FOLDER_OOS1
+from shared_batch_regime.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
@@ -45,7 +45,7 @@ SHOW_PLOTS  = True
 SAVE_TRADES = False
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -59,10 +59,10 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 4
-WFO_DD_TH       = 200
+WFO_NET_GAIN_TH = 45
+WFO_DD_TH       = 20
 WFO_R2_TH       = 0.7
-WFO_WFR_TH      = 0.6
+WFO_WFR_TH      = 0.7
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
@@ -78,9 +78,9 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_MONTECARLO = True
-MONTECARLO_RUIN_TH  = 100 
-PIPELINE_MULTIVERSE = True
-MULTIVERSE_PCT_TH   = 1
+MONTECARLO_RUIN_TH  = 10
+PIPELINE_MULTIVERSE   = True
+MULTIVERSE_PVALUE_TH  = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
         f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
-        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PCT_TH})"
+        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PVALUE_TH})"
     )
     logger.info(
         f"  RUNS        : CORRELATION: {'🟢' if RUN_CORRELATION else '⚪'}  "
@@ -125,11 +125,9 @@ if __name__ == "__main__":
     for timeframe in TIMEFRAMES:
         tf_start = time.time()
 
-        symbols_oos_final, ohlcv_is, ohlcv_oos1 = select_universe(
+        ohlcv_is = select_universe(
             data_folder_is    = DATA_FOLDER_IS,
-            data_folder_oos   = DATA_FOLDER_OOS1,
             timeframe         = timeframe,
-            n_symbols         = N_SYMBOLS,
             min_price         = MIN_PRICE,
             filter_symbols_fn = filter_symbols,
         )
@@ -183,7 +181,7 @@ if __name__ == "__main__":
         pipeline_montecarlo      = PIPELINE_MONTECARLO,
         montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
         pipeline_multiverse      = PIPELINE_MULTIVERSE,
-        multiverse_pct_th        = MULTIVERSE_PCT_TH,
+        multiverse_p_value_th    = MULTIVERSE_PVALUE_TH,
     )
 
     elapsed = int(time.time() - start)

@@ -20,31 +20,29 @@ from scipy import signal as sp_signal
 # 
 # ATR_BASE_PERIODS           = [14]
 # ATR_REGIME_SMA_PERIODS     = [10]
+# 
+# ADX_PERIODS                 = [14]
+# ADX_THRESHOLDS              = [20]
+# HISTVOL_BASE_PERIODS        = [30]
+# HISTVOL_REGIME_SMA_PERIODS  = [50]
 # =============================================================================
 
-ADX_PERIODS                 = [14]
-ADX_THRESHOLDS              = [20]
-HISTVOL_BASE_PERIODS        = [30]
-HISTVOL_REGIME_SMA_PERIODS  = [50]
+RSI_PERIODS                = [7,14,21]      # los 3 aparecen
+RSI_THRESHOLDS             = [30,50,70]     # los 3 aparecen
 
-# =============================================================================
-# RSI_PERIODS                = [7,14,21]      # los 3 aparecen
-# RSI_THRESHOLDS             = [30,50,70]     # los 3 aparecen
-# 
-# ADX_PERIODS                = [7,14]         # solo 7 y 14 aparecen (21 no aparece en ninguna)
-# ADX_THRESHOLDS             = [20,25,30]     # los 3 aparecen
-# 
-# MA_PERIODS                 = [20,50,100]    # los 3 aparecen (20 solo 1 vez, pero aparece)
-# 
-# MOMENTUM_PERIODS           = [5,10,20]      # los 3 aparecen
-# 
-# HISTVOL_BASE_PERIODS       = [10,30]        # ambos aparecen
-# HISTVOL_REGIME_SMA_PERIODS = [20,50]        # ambos aparecen
-# 
-# ATR_BASE_PERIODS           = [14]         # solo aparece 14
-# ATR_REGIME_SMA_PERIODS     = [10,50]        # ambos aparecen
-# 
-# =============================================================================
+ADX_PERIODS                = [7,14]         # solo 7 y 14 aparecen (21 no aparece en ninguna)
+ADX_THRESHOLDS             = [20,25,30]     # los 3 aparecen
+
+MA_PERIODS                 = [20,50,100]    # los 3 aparecen (20 solo 1 vez, pero aparece)
+
+MOMENTUM_PERIODS           = [5,10,20]      # los 3 aparecen
+
+HISTVOL_BASE_PERIODS       = [10,30]        # ambos aparecen
+HISTVOL_REGIME_SMA_PERIODS = [20,50]        # ambos aparecen
+
+ATR_BASE_PERIODS           = [14,21]         # solo aparece 14
+ATR_REGIME_SMA_PERIODS     = [10,50]        # ambos aparecen
+
 
 def _sma(close: np.ndarray, window: int) -> np.ndarray:
     n   = len(close)
@@ -244,23 +242,21 @@ def _build_specs_two_periods(entry):
 
 
 INDICATOR_REGISTRY = [
-# =============================================================================
-#     {
-#         "type": "rsi",
-#         "periods": RSI_PERIODS,
-#         "thresholds": RSI_THRESHOLDS,
-#         "ops": [">", "<"],
-#         "build_specs": _build_specs_threshold,
-#         "evaluate": lambda bank, spec: (
-#             bank._get_cached("rsi", spec["period"], lambda b: _rsi(b.close, spec["period"]))
-#             > spec["value"]
-#             if spec["op"] == ">"
-#             else bank._get_cached("rsi", spec["period"], lambda b: _rsi(b.close, spec["period"]))
-#             < spec["value"]
-#         ),
-#         "describe": lambda spec: f"RSI{spec['period']}{spec['op']}{spec['value']}",
-#     },
-# =============================================================================
+    {
+        "type": "rsi",
+        "periods": RSI_PERIODS,
+        "thresholds": RSI_THRESHOLDS,
+        "ops": [">", "<"],
+        "build_specs": _build_specs_threshold,
+        "evaluate": lambda bank, spec: (
+            bank._get_cached("rsi", spec["period"], lambda b: _rsi(b.close, spec["period"]))
+            > spec["value"]
+            if spec["op"] == ">"
+            else bank._get_cached("rsi", spec["period"], lambda b: _rsi(b.close, spec["period"]))
+            < spec["value"]
+        ),
+        "describe": lambda spec: f"RSI{spec['period']}{spec['op']}{spec['value']}",
+    },
     {
         "type": "adx",
         "periods": ADX_PERIODS,
@@ -273,62 +269,60 @@ INDICATOR_REGISTRY = [
         ),
         "describe": lambda spec: f"ADX{spec['period']}{spec['op']}{spec['value']}",
     },
-# =============================================================================
-#     {
-#         "type": "ma",
-#         "periods": MA_PERIODS,
-#         "ops": [">", "<"],
-#         "build_specs": _build_specs_own_value,
-#         "evaluate": lambda bank, spec: (
-#             bank.close
-#             > bank._get_cached("ma", spec["value"], lambda b: _sma(b.close, spec["value"]))
-#             if spec["op"] == ">"
-#             else bank.close
-#             < bank._get_cached("ma", spec["value"], lambda b: _sma(b.close, spec["value"]))
-#         ),
-#         "describe": lambda spec: f"CLOSE{spec['op']}MA{spec['value']}",
-#     },
-#     {
-#         "type": "momentum",
-#         "periods": MOMENTUM_PERIODS,
-#         "ops": [">", "<"],
-#         "build_cache": None,
-#         "build_specs": _build_specs_own_value,
-#         "evaluate": lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
-#         "describe": lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
-#     },
-#     {
-#         "type": "atr_regime",
-#         "periods": ATR_BASE_PERIODS,
-#         "sma_periods": ATR_REGIME_SMA_PERIODS,
-#         "ops": [">", "<"],
-#         "build_specs": _build_specs_two_periods,
-#         "evaluate": lambda bank, spec: (
-#             bank._get_cached(
-#                 "atr_regime", (spec["period"], spec["sma_period"]),
-#                 lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
-#                            _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
-#             )[0]
-#             > bank._get_cached(
-#                 "atr_regime", (spec["period"], spec["sma_period"]),
-#                 lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
-#                            _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
-#             )[1]
-#             if spec["op"] == ">"
-#             else bank._get_cached(
-#                 "atr_regime", (spec["period"], spec["sma_period"]),
-#                 lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
-#                            _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
-#             )[0]
-#             < bank._get_cached(
-#                 "atr_regime", (spec["period"], spec["sma_period"]),
-#                 lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
-#                            _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
-#             )[1]
-#         ),
-#         "describe": lambda spec: f"ATR{spec['period']}{spec['op']}SMA_ATR{spec['sma_period']}",
-#     },
-# =============================================================================
+    {
+        "type": "ma",
+        "periods": MA_PERIODS,
+        "ops": [">", "<"],
+        "build_specs": _build_specs_own_value,
+        "evaluate": lambda bank, spec: (
+            bank.close
+            > bank._get_cached("ma", spec["value"], lambda b: _sma(b.close, spec["value"]))
+            if spec["op"] == ">"
+            else bank.close
+            < bank._get_cached("ma", spec["value"], lambda b: _sma(b.close, spec["value"]))
+        ),
+        "describe": lambda spec: f"CLOSE{spec['op']}MA{spec['value']}",
+    },
+    {
+        "type": "momentum",
+        "periods": MOMENTUM_PERIODS,
+        "ops": [">", "<"],
+        "build_cache": None,
+        "build_specs": _build_specs_own_value,
+        "evaluate": lambda bank, spec: bank._momentum_mask(spec["op"], spec["value"]),
+        "describe": lambda spec: f"CLOSE{spec['op']}CLOSE[-{spec['value']}]",
+    },
+    {
+        "type": "atr_regime",
+        "periods": ATR_BASE_PERIODS,
+        "sma_periods": ATR_REGIME_SMA_PERIODS,
+        "ops": [">", "<"],
+        "build_specs": _build_specs_two_periods,
+        "evaluate": lambda bank, spec: (
+            bank._get_cached(
+                "atr_regime", (spec["period"], spec["sma_period"]),
+                lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
+                           _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
+            )[0]
+            > bank._get_cached(
+                "atr_regime", (spec["period"], spec["sma_period"]),
+                lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
+                           _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
+            )[1]
+            if spec["op"] == ">"
+            else bank._get_cached(
+                "atr_regime", (spec["period"], spec["sma_period"]),
+                lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
+                           _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
+            )[0]
+            < bank._get_cached(
+                "atr_regime", (spec["period"], spec["sma_period"]),
+                lambda b: (_atr(b.high, b.low, b.close, spec["period"]),
+                           _rolling_mean_skipnan(_atr(b.high, b.low, b.close, spec["period"]), spec["sma_period"]))
+            )[1]
+        ),
+        "describe": lambda spec: f"ATR{spec['period']}{spec['op']}SMA_ATR{spec['sma_period']}",
+    },
     {
         "type": "histvol_regime",
         "periods": HISTVOL_BASE_PERIODS,

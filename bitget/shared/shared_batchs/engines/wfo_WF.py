@@ -12,10 +12,7 @@ from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
-
 WARMUP_BARS = 100
-
-
 
 # =============================================================================
 # PARAM ROUNDING HELPERS

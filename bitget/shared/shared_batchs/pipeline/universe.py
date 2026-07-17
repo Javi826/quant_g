@@ -12,6 +12,9 @@ MY_SYMBOLS = False
 #symbols_to_exclude        = {"BTCUSDT","ETHUSDT"}
 symbols_to_exclude        = {}
 
+# Symbols must have data available from this date onward (covers WFO window 0 train_start).
+MIN_START_DATE = "2022-01-03"
+
 symbols_to_include = [
     "BTCUSDT",
     "ETHUSDT",
@@ -30,7 +33,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     ohlcv_data         = {}
     filtered_symbols   = []
     removed_symbols    = []
-    removed_by_reasons = {"No data": 0, "Not enough bars": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0}
+    removed_by_reasons = {"No data": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0, "Starts too late": 0}
     
     #Inclusion
     if MY_SYMBOLS:
@@ -77,23 +80,10 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 if avg_vol < min_vol_usdt:
                     reasons.append("Avg volume too low")
                     
-            if df is not None:
-                n_rows = len(df)
-                min_bars_map = {
-                    "1Dutc":  365,
-                    "12Hutc": 730,
-                    "6Hutc":  1460,
-                    "4H":     2190,
-                    "1H":     8760,
-                    "30m":    17520,
-                    "15m":    35040,
-                }
-                min_bars = min_bars_map.get(timeframe, 999999)
-                min_bars = 50
-                if n_rows < min_bars:
-                    reasons.append("Not enough bars")
-                min_bars = 50
-                    
+            if df is not None and not df.empty:
+                if df.index[0] > pd.Timestamp(MIN_START_DATE):
+                    reasons.append("Starts too late")
+
         if reasons:
             removed_symbols.append(sym)
             for r in reasons:
@@ -113,49 +103,17 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
 # =============================================================================
 def select_universe(
     data_folder_is:    str,
-    data_folder_oos:   str,
     timeframe:         str,
-    n_symbols:         int,
     min_price:         float,
     filter_symbols_fn: callable,
-) -> tuple:
+) -> dict:
 
-    raw_is  = sorted([f.split("_")[0] for f in os.listdir(data_folder_is)  if f.endswith(f"_{timeframe}.parquet")])
-    raw_oos = sorted([f.split("_")[0] for f in os.listdir(data_folder_oos) if f.endswith(f"_{timeframe}.parquet")])
+    raw_is = sorted([f.split("_")[0] for f in os.listdir(data_folder_is) if f.endswith(f"_{timeframe}.parquet")])
 
-    ohlcv_oos, filtered_oos = filter_symbols_fn(raw_oos, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_oos, min_price=min_price, vol_window=50)
-    ohlcv_is,  filtered_is  = filter_symbols_fn(raw_is,  min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is,  min_price=min_price, vol_window=50)
+    ohlcv_is, filtered_is = filter_symbols_fn(
+        raw_is, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is, min_price=min_price, vol_window=50
+    )
 
-    def _vol_1d(sym, folder):
-        path = os.path.join(folder, f"{sym}_1Dutc.parquet")
-        if not os.path.exists(path):
-            return 0.0
-        df = pd.read_parquet(path, columns=[VOLUME_COL])
-        return float(df[VOLUME_COL].tail(180).mean())
+    logger.debug(f"IS pool ({len(filtered_is):>3}): {filtered_is}")
 
-    vol_oos           = {sym: _vol_1d(sym, data_folder_oos) for sym in filtered_oos}
-    oos_ranked        = sorted(filtered_oos, key=lambda s: vol_oos.get(s, 0), reverse=True)
-    symbols_oos_final = oos_ranked[:n_symbols]
-
-    syms_is  = set(filtered_is)
-    syms_oos = set(symbols_oos_final)
-
-    in_both              = sorted(syms_is & syms_oos)
-    only_in_oos          = sorted(syms_oos - syms_is)
-    vol_is               = {sym: _vol_1d(sym, data_folder_is) for sym in syms_is}
-    is_candidates_by_vol = sorted(syms_is - syms_oos, key=lambda s: vol_is.get(s, 0), reverse=True)
-    needed               = max(0, n_symbols - len(in_both))
-    symbols_is_final     = sorted(in_both + is_candidates_by_vol[:needed])
-
-    logger.debug(f"OOS pool ({len(filtered_oos):>3}): {len(filtered_oos)} candidates")
-    logger.debug(f"IS  pool ({len(filtered_is):>3}): {len(filtered_is)} candidates")
-    logger.debug(f"In both  ({len(in_both):>3}): {in_both}")
-    logger.debug(f"Only in OOS ({len(only_in_oos):>3}): {only_in_oos}")
-
-    logger.debug(f"OOS final universe ({len(symbols_oos_final):>3}): {sorted(symbols_oos_final)}")
-    logger.debug(f"IS  final universe ({len(symbols_is_final):>3}): {symbols_is_final}")
-
-    if len(symbols_is_final) < n_symbols:
-        logger.warning(f"⚠️  IS has only {len(symbols_is_final)} symbols — fewer than N_SYMBOLS ({n_symbols}). Proceeding with available.")
-
-    return symbols_oos_final, ohlcv_is, ohlcv_oos
+    return ohlcv_is

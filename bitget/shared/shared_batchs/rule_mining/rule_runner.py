@@ -193,7 +193,7 @@ def finalize_rule_mining(
     pipeline_montecarlo: bool = True,
     montecarlo_ruin_th: float = 5.0,
     pipeline_multiverse: bool = True,
-    multiverse_pct_th: float = 90.0,
+    multiverse_p_value_th: float = 0.05,
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
     symbols_live_folder: str = None,
@@ -249,7 +249,7 @@ def finalize_rule_mining(
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MONTECARLO")
 
     # -------------------------------------------------------------------
-    # STAGE 5 ── Multiverse (full synthetic WFO re-run — validates EDGE)
+    # STAGE 5 ── Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
     # -------------------------------------------------------------------
     if pipeline_multiverse and validated_wfo_test:
         from shared_batchs.pipeline.multiverse import pipe_multiverse
@@ -258,7 +258,7 @@ def finalize_rule_mining(
         survivors = []
         for rule_id, trades in validated_wfo_test:
             rule_info = raw_by_id[rule_id]
-            approved_mv, pct_profitable_mv = pipe_multiverse(
+            approved_mv, p_value_mv = pipe_multiverse(
                 ohlcv_data          = ohlcv_data_by_timeframe[rule_info["timeframe"]],
                 timeframe           = rule_info["timeframe"],
                 param_grid          = param_grid,
@@ -271,9 +271,10 @@ def finalize_rule_mining(
                 wfr_th              = wfr_th,
                 dtype               = dtype,
                 n_symbols           = n_symbols,
-                pct_profitable_th   = multiverse_pct_th,
+                real_profit         = float(trades["profit"].sum()),
+                p_value_th          = multiverse_p_value_th,
             )
-            raw_by_id[rule_id]["multiverse_pct_profit"] = pct_profitable_mv
+            raw_by_id[rule_id]["multiverse_p_value"] = p_value_mv
             if approved_mv:
                 survivors.append((rule_id, trades))
         validated_wfo_test = survivors
@@ -367,7 +368,7 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
     logger.info(f"{'─' * 160}")
 
     status_header = f"  {'STATUS':<8}" if show_status else ""
-    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PCT':<8}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
+    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
     logger.info(f"{'─' * 160}")
 
     for r in rows:
@@ -376,7 +377,7 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
             f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
             f"{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
-            f"{r.get('multiverse_pct_profit', 0.0):<8.1f}"
+            f"{r.get('multiverse_p_value', 1.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 

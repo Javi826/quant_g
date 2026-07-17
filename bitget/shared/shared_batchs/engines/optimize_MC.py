@@ -4,11 +4,17 @@ import numpy as np
 import pandas as pd
 DTYPE = np.float32
 
+DETREND_RETURNS = False
+
 def compute_candle_features(df, raw_columns=[]):
     df = df.copy()
     df["pct_open_low"]   = (df["low"] - df["open"]) / df["open"]
     df["pct_open_high"]  = (df["high"] - df["open"]) / df["open"]
     df["pct_open_close"] = (df["close"] - df["open"]) / df["open"]
+
+    if DETREND_RETURNS:
+        df["pct_open_close"] = df["pct_open_close"] - df["pct_open_close"].mean()
+
     if len(df.index) >= 2:
         time_index = (df.index[1:] - df.index[:-1]).total_seconds()
         mode = pd.Series(time_index).mode()[0]
