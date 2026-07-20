@@ -17,6 +17,8 @@ logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, fo
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
+DSR_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
 DEPLOY_LOG_LEVEL = logging.INFO
@@ -44,9 +46,9 @@ INNER_N_JOBS = 1
 SHOW_PLOTS  = True
 SAVE_TRADES = False
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -59,17 +61,17 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 45
-WFO_DD_TH       = 20
-WFO_R2_TH       = 0.7
-WFO_WFR_TH      = 0.7
+WFO_NET_GAIN_TH = 4
+WFO_DD_TH       = 200
+WFO_R2_TH       = 0.6
+WFO_WFR_TH      = 0.5
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
 # =============================================================================
 
 RUN_CORRELATION   = True
-CORRELATION_DD_TH = 0.55
+CORRELATION_DD_TH = 0.7
 RUN_PORTFOLIO     = True
 RUN_DEPLOY        = False
 
@@ -77,10 +79,12 @@ RUN_DEPLOY        = False
 # PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-PIPELINE_MONTECARLO = True
-MONTECARLO_RUIN_TH  = 10
-PIPELINE_MULTIVERSE   = True
-MULTIVERSE_PVALUE_TH  = 0.05
+PIPELINE_DSR         = True
+DSR_TH               = 0.4
+PIPELINE_MONTECARLO  = True
+MONTECARLO_RUIN_TH   = 10
+PIPELINE_MULTIVERSE  = True
+MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -109,7 +113,8 @@ if __name__ == "__main__":
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
-        f"  PIPELINES   : MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
+        f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'} (DSR_TH={DSR_TH})  "
+        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
         f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PVALUE_TH})"
     )
     logger.info(
@@ -178,6 +183,8 @@ if __name__ == "__main__":
         symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
         deploy_output_path       = DEPLOY_OUTPUT_PATH,
         # ---- PIPELINES ----
+        run_dsr                  = PIPELINE_DSR,
+        dsr_th                   = DSR_TH,
         pipeline_montecarlo      = PIPELINE_MONTECARLO,
         montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
         pipeline_multiverse      = PIPELINE_MULTIVERSE,

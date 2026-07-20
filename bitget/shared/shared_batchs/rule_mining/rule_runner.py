@@ -8,6 +8,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 
 from shared_batchs.pipeline.wfo import run_wfo_is, WFO_WINDOW_CONFIG
+from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_comparison
@@ -114,7 +115,10 @@ def _run_single_rule(
         "calmar":           metrics["Calmar"]        if metrics else 0.0,
         "r_squared":        metrics["R_Squared"]     if metrics else 0.0,
         "wfr":              wfo_wfr,
-        "sharpe":           metrics["Sharpe"] if metrics else np.nan,
+        "sharpe":           metrics["Sharpe"]   if metrics else np.nan,
+        "skew":             metrics["Skew"]     if metrics else np.nan,
+        "kurtosis":         metrics["Kurtosis"] if metrics else np.nan,
+        "n_days":           metrics["N_days"]   if metrics else 0,
         "best_params":      best_params,
         "wfo_test_trades":  wfo_test_trades,
     }
@@ -185,9 +189,11 @@ def finalize_rule_mining(
     wfr_th: float,
     dtype,
     data_folder: str,
+    dsr_th: float,
     inner_n_jobs: int = -1,
     n_symbols: int = None,
     show_plots: bool = False,
+    run_dsr: bool = True,
     correlation_threshold: float = 0.75,
     run_correlation: bool = True,
     pipeline_montecarlo: bool = True,
@@ -211,6 +217,31 @@ def finalize_rule_mining(
     _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-WFO")
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
 
+    # -------------------------------------------------------------------
+    # STAGE 2 ── DSR (Deflated Sharpe Ratio — corrects for multiple testing)
+    # -------------------------------------------------------------------
+    if run_dsr and validated_wfo_test:
+        candidates_before_dsr = [rid for rid, _ in validated_wfo_test]
+
+        # SR0 / N_eff are estimated over the FULL universe of tested rules (all_raw_results),
+        # not just WFO survivors — using only survivors would reintroduce survivorship bias.
+        dsr_result = pipe_dsr(all_raw_results, dsr_th=dsr_th, debug_ids=set(candidates_before_dsr))
+
+        for rule_id, dsr_value in dsr_result["dsr_by_rule_id"].items():
+            raw_by_id[rule_id]["dsr"] = dsr_value
+
+        # DIAGNOSTIC ONLY — universe-wide rules that pass the DSR threshold,
+        # regardless of WFO status. Does not affect the pipeline / survivors.
+        if logger.isEnabledFor(logging.DEBUG):
+            _print_ranking(all_raw_results, dsr_result["significant_ids"], "DSR-SIGNIFICANT (diagnostic, universe-wide)")
+
+        # DSR filter is applied only to rules that already passed WFO
+        significant_set    = set(dsr_result["significant_ids"])
+        validated_wfo_test = [(rid, trades) for rid, trades in validated_wfo_test if rid in significant_set]
+        survivors_dsr       = [rid for rid, _ in validated_wfo_test]
+        _print_ranking(all_raw_results, candidates_before_dsr, "POST-DSR", survivor_ids=survivors_dsr)
+    else:
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-DSR")
 
     # -------------------------------------------------------------------
     # STAGE 3 ── Correlation (portfolio construction: drop redundant rules)
@@ -351,37 +382,42 @@ def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
-def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None) -> None:
+def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
     rows.sort(key=lambda r: r["net_gain"], reverse=True)
 
     show_status  = survivor_ids is not None
     survivor_set = set(survivor_ids) if show_status else None
+    log_fn       = logger.info
+    id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
 
     id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
     label_width = max((len(r["label"]) for r in rows), default=8) + 2
 
     count_str = f"{len(survivor_ids)} / {len(rows)} passed" if show_status else f"{len(rows)} / {len(all_raw_results)} tested"
 
-    logger.info(f"\n{'─' * 160}")
-    logger.info(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
-    logger.info(f"{'─' * 160}")
+    log_fn(f"\n{'─' * 170}")
+    log_fn(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
+    log_fn(f"{'─' * 170}")
 
     status_header = f"  {'STATUS':<8}" if show_status else ""
-    logger.info(f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}")
-    logger.info(f"{'─' * 160}")
+    log_fn(
+        f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
+        f"{'WFR':<8}{'DSR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
+    )
+    log_fn(f"{'─' * 170}")
 
     for r in rows:
         status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
-        logger.info(
+        log_fn(
             f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
-            f"{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
-            f"{r.get('multiverse_p_value', 1.0):<9.3f}"
+            f"{r['wfr']:<8.2f}{r.get('dsr', 0.0):<8.3f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
+            f"{r.get('multiverse_p_value', 0.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 
-    logger.info(f"{'─' * 160}\n")
+    log_fn(f"{'─' * 170}\n")
 
 def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]

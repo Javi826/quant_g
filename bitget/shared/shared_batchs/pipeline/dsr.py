@@ -3,7 +3,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, skew, kurtosis
+from scipy.stats import norm
 
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
 
@@ -12,10 +12,9 @@ logger = logging.getLogger("BOT_batch.pipeline.dsr")
 # =============================================================================
 EULER_GAMMA         = 0.5772156649015328606  # Euler-Mascheroni constant
 SHARPE_PERIODS_YEAR = 365.0                  # must match the annualization factor in compute_metrics (sqrt(365))
-DSR_TH              = 0.95                   # min DSR probability required to accept a rule
 
 # =============================================================================
-# PRIVATE HELPERS — trial correlation / N estimation (paper Eq. 8-9)
+# PRIVATE HELPERS — trial correlation / N estimation
 # =============================================================================
 def _daily_profit_series(wfo_test_trades: pd.DataFrame) -> pd.Series:
     if wfo_test_trades is None or wfo_test_trades.empty:
@@ -25,9 +24,14 @@ def _daily_profit_series(wfo_test_trades: pd.DataFrame) -> pd.Series:
     return tl.groupby("_date")["profit"].sum()
 
 
-def _build_correlation_matrix(all_raw_results: list) -> tuple:
+def _build_daily_profit_matrix(all_raw_results: list) -> tuple:
     """Aligns all candidates' daily profit series on a common date index and
-    returns (corr_matrix, trial_rule_ids). Only candidates with >1 profit day qualify."""
+    returns (matrix, trial_rule_ids), where matrix is T x M (T = trading days,
+    M = candidate rules) — NOT the M x M correlation matrix. Only candidates
+    with >1 profit day qualify. Building the M x M correlation matrix directly
+    is the actual bottleneck when M is large (rule mining can produce M in the
+    hundreds of thousands), so we defer that to the dual/Gram trick in
+    _estimate_n_eff_eigen, which never materializes an M x M array."""
     daily_series = {}
     for r in all_raw_results:
         s = _daily_profit_series(r.get("wfo_test_trades"))
@@ -42,22 +46,67 @@ def _build_correlation_matrix(all_raw_results: list) -> tuple:
     for rule_id, s in daily_series.items():
         matrix[rule_id] = s.reindex(all_dates, fill_value=0.0)
 
-    return matrix.corr(), list(daily_series.keys())
+    return matrix, list(daily_series.keys())
 
 
-def _average_off_diagonal_correlation(corr_matrix: pd.DataFrame) -> float:
-    """Equal-weighted average correlation across all off-diagonal pairs (Eq. 8)."""
-    values      = corr_matrix.to_numpy(dtype=np.float64)
-    n           = values.shape[0]
-    off_diag    = values.sum() - np.trace(values)
-    n_pairs     = n * (n - 1)
-    return float(off_diag / n_pairs) if n_pairs > 0 else 0.0
+def _standardize_and_split(matrix: pd.DataFrame) -> tuple:
+    """Standardizes each column (rule) to zero mean / unit variance, and splits
+    off zero-variance (constant profit) columns, which can't be standardized.
+    Returns (x_std, n_const), where x_std is a T x M_valid ndarray of standardized
+    columns and n_const is the count of zero-variance columns excluded from it."""
+    arr        = matrix.to_numpy(dtype=np.float64)
+    means      = arr.mean(axis=0)
+    stds       = arr.std(axis=0, ddof=1)
+    valid_mask = stds > 0
+    n_const    = int(np.sum(~valid_mask))
+
+    if not np.any(valid_mask):
+        return None, n_const
+
+    x_std = (arr[:, valid_mask] - means[valid_mask]) / stds[valid_mask]
+    return x_std, n_const
 
 
-def _estimate_n_independent_trials(avg_corr: float, m_trials: int) -> float:
-    """Interpolates between N=1 (rho=1) and N=M (rho=0) — Eq. 9."""
-    avg_corr = float(np.clip(avg_corr, 0.0, 1.0))
-    return avg_corr + (1.0 - avg_corr) * m_trials
+def _eigenvalues_desc(square_array: np.ndarray) -> np.ndarray:
+    eigenvalues = np.linalg.eigvalsh(square_array)
+    eigenvalues = eigenvalues[np.isfinite(eigenvalues)]
+    eigenvalues = np.clip(eigenvalues, 0.0, None)  # guard against numerical noise (tiny negative values)
+    return np.sort(eigenvalues)[::-1]
+
+
+def _estimate_n_eff_eigen(matrix: pd.DataFrame) -> float:
+    """Effective number of independent trials via spectral decomposition (participation
+    ratio): N_eff = (sum(lambda))^2 / sum(lambda^2). Equals M when all eigenvalues are
+    equal (fully independent trials), and approaches 1 when a single eigenvalue dominates
+    (fully redundant trials).
+
+    DUAL / GRAM TRICK (Option B): the eigenvalues of the M x M correlation matrix C are
+    identical (up to zero-padding) to the eigenvalues of the T x T Gram matrix
+    G = (1 / (T-1)) * Xstd @ Xstd.T, where Xstd is the T x M matrix of standardized daily
+    profit columns. Since T (trading days) is typically orders of magnitude smaller than
+    M (candidate rules), this avoids ever building or decomposing the M x M matrix —
+    turning an O(M^2) memory / O(M^3) compute problem into O(T^2) / O(T^3).
+
+    Constant-profit columns (zero variance) can't be standardized; each is treated as an
+    independent trial with self-correlation 1 and zero correlation to everything else
+    (matching the diagonal-fix applied to NaN correlations in the dense-matrix version),
+    which contributes exactly one eigenvalue of 1.0 to the full M x M spectrum."""
+    x_std, n_const = _standardize_and_split(matrix)
+
+    if x_std is None:
+        # every column had zero variance -> each is independent by the same convention.
+        return float(n_const) if n_const > 0 else 1.0
+
+    t_days = x_std.shape[0]
+    gram   = (x_std @ x_std.T) / (t_days - 1)
+
+    eigenvalues = _eigenvalues_desc(gram)
+
+    sum_eig    = eigenvalues.sum() + n_const
+    sum_eig_sq = np.sum(eigenvalues ** 2) + n_const
+    if sum_eig_sq <= 0:
+        return 1.0
+    return float((sum_eig ** 2) / sum_eig_sq)
 
 
 # =============================================================================
@@ -79,14 +128,16 @@ def _expected_max_sharpe(var_sr: float, n_trials: float) -> float:
     return float(np.sqrt(var_sr) * term)
 
 
-def _deflated_sharpe_ratio(sr: float, sr0: float, t_trades: int, skew_r: float, kurt_r: float) -> float:
-    """Eq. 2. sr and sr0 must both be UNANNUALIZED. kurt_r is raw kurtosis (fisher=False)."""
-    if t_trades <= 1 or not np.isfinite(sr):
+def _deflated_sharpe_ratio(sr: float, sr0: float, t_obs: int, skew_r: float, kurt_r: float) -> float:
+    """Eq. 2. sr and sr0 must both be UNANNUALIZED. kurt_r is raw kurtosis (fisher=False).
+    t_obs is the number of observations in the SAME series used for sr/skew_r/kurt_r
+    (here: daily profit observations, matching the sqrt(365) annualization in batch_metrics)."""
+    if t_obs <= 1 or not np.isfinite(sr):
         return 0.0
     moment_term = 1.0 - skew_r * sr + ((kurt_r - 1.0) / 4.0) * (sr ** 2)
     if moment_term <= 0:
         return 0.0
-    numerator = (sr - sr0) * np.sqrt(t_trades - 1)
+    numerator = (sr - sr0) * np.sqrt(t_obs - 1)
     return float(norm.cdf(numerator / np.sqrt(moment_term)))
 
 
@@ -98,27 +149,42 @@ def _evaluate_dsr_approval(dsr_value: float, dsr_th: float) -> bool:
 
 
 # =============================================================================
-# RUN DSR SIGNIFICANCE (across the full set of candidate trials)
+# PIPE DSR (across the full set of candidate trials)
 # =============================================================================
-def run_dsr_significance(all_raw_results: list, dsr_th: float = DSR_TH) -> dict:
+def pipe_dsr(all_raw_results: list, dsr_th: float, debug_ids: set = None) -> dict:
     """
     Computes the Deflated Sharpe Ratio for every candidate rule that produced trades,
     correcting Sharpe ratio inflation caused by (1) multiple testing / selection bias
     and (2) non-Normal returns (Bailey & Lopez de Prado, 2014).
 
-    N (independent trials) is estimated via the average off-diagonal correlation between
-    the daily profit series of ALL candidates (Eq. 8-9 in the paper) — NOT via the raw
-    count of trials (M), and NOT via PCA.
+    SR, skew, kurtosis and T are ALL sourced from the DAILY profit series (via
+    batch_metrics.compute_metrics), not from per-trade profits — this keeps them
+    mutually consistent, since the DSR formula requires all four to come from the
+    same underlying series.
+
+    N (independent trials) is estimated via the spectral decomposition (eigenvalues)
+    of the correlation matrix between the daily profit series of ALL candidates —
+    NOT via the raw count of trials (M), and NOT via the average off-diagonal correlation.
+    That decomposition is computed via the dual/Gram trick (see _estimate_n_eff_eigen),
+    which never materializes the M x M correlation matrix.
     """
-    corr_matrix, trial_ids = _build_correlation_matrix(all_raw_results)
+    total_candidates = len(all_raw_results)
+    daily_matrix, trial_ids = _build_daily_profit_matrix(all_raw_results)
     m_trials = len(trial_ids)
 
-    if corr_matrix is None or m_trials < 2:
-        logger.debug(f"DSR ── skipped: not enough trials with trades (M={m_trials})")
-        return {"significant_ids": [], "dsr_by_rule_id": {}, "n_eff": 0.0, "avg_corr": 0.0, "sr0": 0.0}
+    logger.debug(
+        f"DSR ── candidate universe ── total_candidates={total_candidates} "
+        f"(all timeframes, incl. zero-trade rules) vs matrix_dim(M)={m_trials} "
+        f"-> excluded={total_candidates - m_trials}"
+    )
 
-    avg_corr = _average_off_diagonal_correlation(corr_matrix)
-    n_eff    = _estimate_n_independent_trials(avg_corr, m_trials)
+    if daily_matrix is None or m_trials < 2:
+        logger.debug(f"DSR ── skipped: not enough trials with trades (M={m_trials})")
+        return {"significant_ids": [], "dsr_by_rule_id": {}, "n_eff": 0.0, "sr0": 0.0}
+
+    n_eff = _estimate_n_eff_eigen(daily_matrix)
+
+    logger.debug(f"DSR ── N_eff terms ── method=ratio(dual/Gram) M={m_trials} -> N_eff={n_eff:.4f}")
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
@@ -132,18 +198,58 @@ def run_dsr_significance(all_raw_results: list, dsr_th: float = DSR_TH) -> dict:
 
     sr0 = _expected_max_sharpe(var_sr, n_eff)
 
+    logger.debug(
+        f"DSR ── SR0 terms ── n_sr={sr_array.size} var_sr={var_sr:.6f} n_eff={n_eff:.4f} -> SR0={sr0:.4f}"
+    )
+
     dsr_by_id = {}
+    _sr_vals, _skew_vals, _kurt_vals, _dsr_vals = [], [], [], []
     for rule_id in trial_ids:
-        profits  = raw_by_id[rule_id]["wfo_test_trades"]["profit"].to_numpy(dtype=np.float64)
-        t_trades = len(profits)
-        skew_r   = float(skew(profits))
-        kurt_r   = float(kurtosis(profits, fisher=False))
-        dsr_by_id[rule_id] = _deflated_sharpe_ratio(sr_by_id[rule_id], sr0, t_trades, skew_r, kurt_r)
+        t_days = int(raw_by_id[rule_id].get("n_days", 0))
+        skew_r = float(raw_by_id[rule_id].get("skew", np.nan))
+        kurt_r = float(raw_by_id[rule_id].get("kurtosis", np.nan))
+
+        if not (np.isfinite(skew_r) and np.isfinite(kurt_r)):
+            dsr_by_id[rule_id] = 0.0
+            if debug_ids is None or rule_id in debug_ids:
+                logger.debug(f"DSR[{rule_id}] ── skipped: non-finite skew/kurtosis (skew={skew_r} kurt={kurt_r})")
+            continue
+
+        dsr_value = _deflated_sharpe_ratio(sr_by_id[rule_id], sr0, t_days, skew_r, kurt_r)
+        dsr_by_id[rule_id] = dsr_value
+
+        if np.isfinite(sr_by_id[rule_id]):
+            _sr_vals.append(sr_by_id[rule_id])
+        _skew_vals.append(skew_r)
+        _kurt_vals.append(kurt_r)
+        _dsr_vals.append(dsr_value)
+
+        if debug_ids is None or rule_id in debug_ids:
+            logger.debug(
+                f"DSR[{rule_id}] ── SR={sr_by_id[rule_id]:.4f} SR0={sr0:.4f} T_days={t_days} "
+                f"skew={skew_r:.4f} kurt={kurt_r:.4f} -> DSR={dsr_value:.4f}"
+            )
 
     significant_ids = [rid for rid, dsr_val in dsr_by_id.items() if _evaluate_dsr_approval(dsr_val, dsr_th)]
 
+    def _stats(name: str, values: list) -> str:
+        if not values:
+            return f"{name}: n/a"
+        arr = np.array(values, dtype=np.float64)
+        return f"{name}[min={arr.min():.4f} mean={arr.mean():.4f} max={arr.max():.4f}]"
+
     logger.debug(
-        f"DSR ── M={m_trials} N_eff={n_eff:.1f} avg_corr={avg_corr:.3f} SR0={sr0:.3f} "
+        "DSR ── metric ranges ── " +
+        " ".join([
+            _stats("SR", _sr_vals),
+            _stats("skew", _skew_vals),
+            _stats("kurt", _kurt_vals),
+            _stats("DSR", _dsr_vals),
+        ])
+    )
+
+    logger.debug(
+        f"DSR ── M={m_trials} N_eff={n_eff:.1f} SR0={sr0:.3f} "
         f"-> {len(significant_ids)}/{m_trials} significant at th={dsr_th}"
     )
 
@@ -151,6 +257,5 @@ def run_dsr_significance(all_raw_results: list, dsr_th: float = DSR_TH) -> dict:
         "significant_ids": significant_ids,
         "dsr_by_rule_id":  dsr_by_id,
         "n_eff":           n_eff,
-        "avg_corr":        avg_corr,
         "sr0":             sr0,
     }

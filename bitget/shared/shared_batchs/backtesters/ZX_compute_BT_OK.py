@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute.py
+#shared/shared_batchs/backtesters/ZX_compute_BT.py
 import heapq
 import logging
 import warnings

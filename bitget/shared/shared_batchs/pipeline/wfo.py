@@ -28,7 +28,7 @@ METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 # EMA smoothing factor for running optimum across WFO windows.
 # alpha=1.0 -> no memory (each window uses only its own train optimum)
 # alpha<1.0 -> smoothed running optimum across windows 1..i
-EMA_ALPHA = 0.3
+EMA_ALPHA = 0.1
 
 # =============================================================================
 # PRIVATE HELPERS

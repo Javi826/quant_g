@@ -339,13 +339,13 @@ def pipe_multiverse(
     n_no_trades   = sum(1 for r in results if r[0] is not None and not r[2])
     n_with_trades = sum(1 for r in results if r[0] is not None and r[2])
     pct_no_trades = n_no_trades / n_valid * 100.0
-    logger.info(
+    logger.debug(
         f"MCPT DEBUG ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
         f"with_trades_paths={n_with_trades}/{n_valid}"
     )
     if n_with_trades > 0:
         with_trades_profits = [r[1] for r in results if r[0] is not None and r[2]]
-        logger.info(
+        logger.debug(
             f"MCPT DEBUG ── with_trades profit_sum stats: "
             f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
             f"mean={float(np.mean(with_trades_profits)):.2f}"
