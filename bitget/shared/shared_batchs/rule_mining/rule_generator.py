@@ -1,25 +1,68 @@
-#shared/shared_batchs/rule_mining/rule_generator.py
 from itertools import combinations
-
 from signals.condition_bank import ConditionBank
 from signals.signal_builder import build_signal_fn, describe_rule
 
-MAX_DEPTH = 3
-SIDES     = ("long", "short")
+MAX_DEPTH        = 3
+SIDES            = ("long", "short")
+VERBOSE_DISCARDED = False  # set to False to silence discarded-combo prints
 
 
-def generate_rule_combinations(condition_specs: list, max_depth: int = MAX_DEPTH) -> list:
+def _indicator_key(bank: ConditionBank, spec: dict):
+    entry         = bank._REGISTRY_BY_TYPE[spec["type"]]
+    identity_keys = entry["identity_keys"]
+    return (spec["type"],) + tuple(spec[k] for k in identity_keys)
+
+
+def _pair_conflicts(bank: ConditionBank, spec_a: dict, spec_b: dict) -> bool:
+    entry = bank._REGISTRY_BY_TYPE[spec_a["type"]]
+
+    if not entry["has_threshold"]:
+        # No real threshold: op ">" and "<" compare the same quantity against
+        # itself (or its SMA) with no valid range between them, so any match
+        # on identity_keys is a conflict regardless of op.
+        return True
+
+    if spec_a["op"] == spec_b["op"]:
+        # Same direction, different threshold: the weaker one is redundant.
+        return True
+
+    # Opposite directions: only a conflict if the ">" threshold is not
+    # strictly below the "<" threshold (i.e. the range is empty).
+    greater_spec = spec_a if spec_a["op"] == ">" else spec_b
+    less_spec    = spec_b if spec_a["op"] == ">" else spec_a
+    return greater_spec["value"] >= less_spec["value"]
+
+
+def _has_conflict(bank: ConditionBank, rule_specs: list) -> bool:
+    for i in range(len(rule_specs)):
+        for j in range(i + 1, len(rule_specs)):
+            spec_a, spec_b = rule_specs[i], rule_specs[j]
+            if _indicator_key(bank, spec_a) != _indicator_key(bank, spec_b):
+                continue
+            if _pair_conflicts(bank, spec_a, spec_b):
+                return True
+    return False
+
+
+def generate_rule_combinations(bank: ConditionBank, condition_specs: list, max_depth: int = MAX_DEPTH) -> list:
     rules = []
     for depth in range(1, max_depth + 1):
         for combo in combinations(range(len(condition_specs)), depth):
-            rules.append([condition_specs[i] for i in combo])
+            rule_specs = [condition_specs[i] for i in combo]
+            if depth > 1 and _has_conflict(bank, rule_specs):
+                if VERBOSE_DISCARDED:
+                    label = " AND ".join(bank.describe(spec) for spec in rule_specs)
+                    print(f"[rule_generator] discarded: {label}")
+                continue
+            rules.append(rule_specs)
     return rules
 
 
 def generate_all_rules(arr_sample: dict, max_depth: int = MAX_DEPTH) -> list:
     bank            = ConditionBank(arr_sample)
     condition_specs = bank.build_condition_specs()
-    rule_combos     = generate_rule_combinations(condition_specs, max_depth)
+    rule_combos     = generate_rule_combinations(bank, condition_specs, max_depth)
+
     all_rules = []
     for side in SIDES:
         for rule_specs in rule_combos:

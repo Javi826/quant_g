@@ -3,7 +3,11 @@ import logging
 import numpy as np
 import pandas as pd
 from functools import partial
-from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest, INITIAL_BALANCE
+from shared_batchs.backtesters.ZX_compute_BT import (
+    INITIAL_BALANCE,
+    prepare_backtest_data,
+    run_backtest_from_prepared,
+)
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
@@ -70,6 +74,28 @@ def _build_ohlcv_with_signal(
 
     return ohlcv_arrays
 
+def _get_prepared_data(
+    base_arrays: dict,
+    ohlcv_arrays: dict,
+    _prepared_cache: dict = None,
+):
+    """Return prepare_backtest_data(ohlcv_arrays), reusing a cached result for
+    the current window when signal_params_keys is empty (so ohlcv_arrays is
+    identical across every grid combination within the window)."""
+
+    if _prepared_cache is None:
+        return prepare_backtest_data(ohlcv_arrays)
+
+    cache_key = _window_cache_key(base_arrays)
+    cached    = _prepared_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    prepared = prepare_backtest_data(ohlcv_arrays)
+    _prepared_cache.clear()  # only one window's prepared data needs to live at a time
+    _prepared_cache[cache_key] = prepared
+    return prepared
+
 def _compute_metric(results: dict) -> float:
 
     trade_log = results.get("__PORTFOLIO__", {}).get("trade_log")
@@ -96,13 +122,15 @@ def _evaluate_fn(
     order_amount: int,
     dtype,
     _signal_cache: dict = None,
+    _prepared_cache: dict = None,
 ) -> tuple:
     """Single param combination evaluation for one WFO train window."""
     ohlcv_arrays = _build_ohlcv_with_signal(
         base_arrays, signal_fn, signal_params_keys, params, dtype, _signal_cache=_signal_cache
     )
-    results = run_grid_backtest(
-        ohlcv_arrays,
+    prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
+    results = run_backtest_from_prepared(
+        prepared_data,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],
         sl_pct       = params["SL_PCT"],
@@ -117,11 +145,13 @@ def _collect_trades_fn(
     signal_params_keys: list,
     order_amount: int,
     dtype,
+    _prepared_cache: dict = None,
 ) -> pd.DataFrame:
     """Run backtest with best_params on a window and return the trade log."""
-    ohlcv_arrays = _build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
-    results      = run_grid_backtest(
-        ohlcv_arrays,
+    ohlcv_arrays  = _build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
+    prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
+    results       = run_backtest_from_prepared(
+        prepared_data,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],
         sl_pct       = params["SL_PCT"],
@@ -205,7 +235,8 @@ def run_wfo_is(
     length_train_set = int(_wfo_cfg["train_months"] * bars_per_month)
     pct_train_set    = _wfo_cfg["train_months"] / (_wfo_cfg["train_months"] + _wfo_cfg["test_months"])
 
-    _signal_cache = {}
+    _signal_cache   = {}
+    _prepared_cache = {}
 
     evaluate_fn = partial(
         _evaluate_fn,
@@ -214,6 +245,7 @@ def run_wfo_is(
         order_amount       = order_amount,
         dtype              = dtype,
         _signal_cache      = _signal_cache,
+        _prepared_cache    = _prepared_cache,
     )
 
     collect_train_fn = partial(
@@ -222,6 +254,7 @@ def run_wfo_is(
         signal_params_keys = signal_params_keys,
         order_amount       = order_amount,
         dtype              = dtype,
+        _prepared_cache    = _prepared_cache,
     )
 
     collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn

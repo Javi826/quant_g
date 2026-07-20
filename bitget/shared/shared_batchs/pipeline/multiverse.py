@@ -236,6 +236,7 @@ def _evaluate_universe(
     (
         _best_params, _approved_wfo, _net_gain, _max_dd, _train_trades, wfo_test_trades,
         _df_results, _wfr, _window_best_params, _window_test_arrays, _window_test_start_ts, _metrics,
+        _grid_train_matrix,
     ) = run_wfo_is(
         ohlcv_data           = synthetic_ohlcv,
         param_names          = param_names,

@@ -408,6 +408,68 @@ def build_results_dict(trades, trade_log_cols):
 
 
 # ============================
+# PREPARE STEP — independent of sell_after/tp_pct/sl_pct
+# ============================
+def prepare_backtest_data(ohlcv_arrays):
+    """Reorganize ohlcv_arrays into the internal structures needed by the
+    backtest loop (sym_data, signals_by_time, timestamps, etc.).
+
+    This step is independent of sell_after/tp_pct/sl_pct, so callers that
+    evaluate a grid of param combinations over the same ohlcv_arrays (e.g.
+    the WFO grid search) can call this once and reuse the result across
+    combinations via run_backtest_from_prepared, instead of repeating this
+    reorganization work for every combination."""
+    return prepare_data(ohlcv_arrays)
+
+
+# ============================
+# SIMULATION STEP — depends on sell_after/tp_pct/sl_pct
+# ============================
+def run_backtest_from_prepared(
+    prepared_data,
+    sell_after,
+    tp_pct,
+    sl_pct,
+    order_amount
+):
+    """Run the backtest simulation using data already prepared by
+    prepare_backtest_data. Use this directly (with a cached prepared_data)
+    when evaluating multiple param combinations over the same ohlcv_arrays."""
+
+    (
+        sym_data,
+        signals_by_time,
+        all_timestamps_int,
+        all_timestamps_dt,
+        symbol_order,
+        ts_int_arrays,
+        close_arrays
+    ) = prepared_data
+
+    comi_factor     = float(COMISION) / 100.0
+    cash_bank       = float(INITIAL_BALANCE)
+    blocked_cash    = 0.0
+
+    symbols = list(sym_data.keys())
+
+    trades = {sym: [] for sym in symbols}
+    trade_times = {sym: [] for sym in symbols}
+    trade_log_cols = {k: [] for k in [
+        'symbol','buy_time','buy_price','sell_time','sell_price',
+        'qty','profit','exit_reason','commission_buy','commission_sell','position_type']}
+
+    cash_bank, blocked_cash = run_backtest_loop(
+        all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
+        cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
+        trades, trade_times, trade_log_cols
+    )
+
+    results = build_results_dict(trades, trade_log_cols)
+
+    return results
+
+
+# ============================
 # FUNCIÓN PRINCIPAL - MODIFICADO PARA SOPORTAR LONG/SHORT
 # ============================
 def run_grid_backtest(
@@ -417,40 +479,17 @@ def run_grid_backtest(
     sl_pct,
     order_amount  # NUEVO PARÁMETRO: monto por orden
 ):
+    """Public API — unchanged behavior. Internally delegates to
+    prepare_backtest_data + run_backtest_from_prepared. Callers that don't
+    need to cache the prepare step (e.g. run_deploy.py) keep using this
+    function exactly as before."""
 
-    # Constantes
-    comi_factor     = float(COMISION) / 100.0
-    cash_bank       = float(INITIAL_BALANCE)   # efectivo total de la cuenta
-    blocked_cash    = 0.0                      # efectivo bloqueado (ingresos de shorts)
-    initial_balance = INITIAL_BALANCE
-    
-    (
-        sym_data,
-        signals_by_time,
-        all_timestamps_int,
-        all_timestamps_dt,
-        symbol_order,
-        ts_int_arrays,
-        close_arrays
-    ) = prepare_data(ohlcv_arrays)
-    
-    symbols = list(ohlcv_arrays.keys())
-    
-    # Inicializar estructuras
-    trades = {sym: [] for sym in symbols}
-    trade_times = {sym: [] for sym in symbols}
-    trade_log_cols = {k: [] for k in [
-        'symbol','buy_time','buy_price','sell_time','sell_price',
-        'qty','profit','exit_reason','commission_buy','commission_sell','position_type']}
-    
-    # Ejecutar backtest con el tipo de posición especificado
-    cash_bank, blocked_cash = run_backtest_loop(
-        all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
-        cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
-        trades, trade_times, trade_log_cols
+    prepared_data = prepare_backtest_data(ohlcv_arrays)
+
+    return run_backtest_from_prepared(
+        prepared_data,
+        sell_after   = sell_after,
+        tp_pct       = tp_pct,
+        sl_pct       = sl_pct,
+        order_amount = order_amount
     )
-    
-    # Construir resultados — solo datos crudos; las métricas se calculan en batch_metrics
-    results = build_results_dict(trades, trade_log_cols)
-    
-    return results

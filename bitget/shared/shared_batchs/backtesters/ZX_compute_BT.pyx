@@ -151,6 +151,17 @@ def prepare_data(ohlcv_arrays):
 
 
 # ============================================================
+# prepare_backtest_data  (public alias — cache-friendly prepare step)
+# ============================================================
+def prepare_backtest_data(ohlcv_arrays):
+    """Reorganize ohlcv_arrays into internal structures needed by the backtest
+    loop. Independent of sell_after/tp_pct/sl_pct — callers evaluating a grid
+    of param combinations over the same ohlcv_arrays can call this once and
+    reuse the result across combinations via run_backtest_from_prepared."""
+    return prepare_data(ohlcv_arrays)
+
+
+# ============================================================
 # _detect_intrabar_exit  (typed Cython)
 # ============================================================
 cdef tuple _detect_intrabar_exit_cy(
@@ -164,7 +175,6 @@ cdef tuple _detect_intrabar_exit_cy(
 ):
     cdef int bi, tp_first, sl_first, chosen_idx
     cdef long tp_t, sl_t
-    cdef double exec_price
     cdef int reason  # 0=none 1=TP 2=SL
 
     tp_first = -1
@@ -499,20 +509,15 @@ def _backtest_core(
 
 
 # ============================================================
-# run_grid_backtest  --  public API (same signature & output)
+# _run_core_from_arrays  (shared simulation step)
 # ============================================================
-def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
-
+def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
     cdef_factor     = float(COMISION) / 100.0
     initial_balance = float(INITIAL_BALANCE)
 
-    result = prepare_data(ohlcv_arrays)
-    (sym_data, _, all_timestamps_int, all_timestamps_dt,
-     sym_ids, ts_int_arrays, close_arrays, arrays) = result
-
     (open_2d, close_2d, high_2d, low_2d,
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
-     signal_events, _) = arrays
+     signal_events, all_timestamps_int) = arrays
 
     open_2d      = np.ascontiguousarray(open_2d,      dtype=np.float64)
     close_2d     = np.ascontiguousarray(close_2d,     dtype=np.float64)
@@ -559,12 +564,10 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
         'position_type':   ['SHORT' if s else 'LONG' for s in tl_is_short],
     })
 
-    trades      = {sym: [] for sym in symbols}
-    trade_times = {sym: [] for sym in symbols}
+    trades = {sym: [] for sym in symbols}
     for i in range(n_trades):
         sym = id_to_sym[int(tl_sym_id[i])]
         trades[sym].append(float(tl_profit[i]))
-        trade_times[sym].append(np.datetime64(int(tl_sell_time[i]), 'ns'))
 
     return {
         "__PORTFOLIO__": {
@@ -572,3 +575,38 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
             'trade_log': trade_log,
         }
     }
+
+
+# ============================================================
+# run_backtest_from_prepared  (simulate step — reuse prepared data)
+# ============================================================
+def run_backtest_from_prepared(prepared_data, sell_after, tp_pct, sl_pct, order_amount):
+    """Run simulation using data already prepared by prepare_backtest_data.
+    Use this when evaluating multiple param combinations over the same
+    ohlcv_arrays to avoid repeating the prepare step."""
+
+    (sym_data, _, all_timestamps_int, all_timestamps_dt,
+     sym_ids, ts_int_arrays, close_arrays, arrays) = prepared_data
+
+    return _run_core_from_arrays(
+        arrays, sym_ids, sym_data,
+        sell_after, tp_pct, sl_pct, order_amount
+    )
+
+
+# ============================================================
+# run_grid_backtest  --  public API (same signature & output)
+# ============================================================
+def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
+    """Public API — unchanged behavior. Internally delegates to
+    prepare_backtest_data + run_backtest_from_prepared."""
+
+    prepared_data = prepare_backtest_data(ohlcv_arrays)
+
+    return run_backtest_from_prepared(
+        prepared_data,
+        sell_after   = sell_after,
+        tp_pct       = tp_pct,
+        sl_pct       = sl_pct,
+        order_amount = order_amount
+    )

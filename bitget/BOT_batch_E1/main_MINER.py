@@ -46,8 +46,8 @@ INNER_N_JOBS = 1
 SHOW_PLOTS  = True
 SAVE_TRADES = False
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -73,18 +73,18 @@ WFO_WFR_TH      = 0.5
 RUN_CORRELATION   = True
 CORRELATION_DD_TH = 0.7
 RUN_PORTFOLIO     = True
-RUN_DEPLOY        = False
+RUN_DEPLOY        = True
 
 # =============================================================================
 # PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.8
+DSR_TH               = 0.3
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
-PIPELINE_MULTIVERSE  = False
-MULTIVERSE_PVALUE_TH = 0.05
+PIPELINE_MULTIVERSE  = True
+MULTIVERSE_PVALUE_TH = 0.15
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
