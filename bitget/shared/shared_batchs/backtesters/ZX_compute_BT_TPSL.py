@@ -426,8 +426,6 @@ def run_backtest_from_prepared(
     sl_pct,
     order_amount
 ):
-
-
     (
         sym_data,
         signals_by_time,
