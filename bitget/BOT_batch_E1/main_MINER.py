@@ -80,7 +80,7 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.4
+DSR_TH               = 0.8
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = False

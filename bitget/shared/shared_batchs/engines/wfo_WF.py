@@ -177,6 +177,7 @@ def walk_forward_optimization(
     test_n_trades_list     = []
     window_test_arrays_list = []  # per-window test OHLCV, needed for synthetic-path (Multiverse) validation
     window_test_start_ts_list = []  # per-window real test_start_ts, needed to drop warmup trades downstream
+    grid_train_metrics_list = []  # per-window train metric for all grid combinations (for DSR N_eff estimation) # per-window real test_start_ts, needed to drop warmup trades downstream
 
     ema_raw = None 
 
@@ -309,6 +310,11 @@ def walk_forward_optimization(
                     shm.unlink()
 
         # -----------------------------------------------------------
+        # Capture train metric for all grid combinations (for DSR N_eff estimation)
+        # -----------------------------------------------------------
+        grid_train_metrics_list.append([metric for metric, _ in results])
+
+        # -----------------------------------------------------------
         # Select best result (on train)
         # -----------------------------------------------------------
         _, raw_best_params = max(results, key=lambda x: x[0])
@@ -421,4 +427,8 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, best_params_list, window_test_arrays_list, window_test_start_ts_list
+    # Shape: (n_windows, n_grid_combinations). Used downstream to estimate the
+    # number of effective independent trials within the grid search (DSR correction).
+    grid_train_matrix = np.array(grid_train_metrics_list) if grid_train_metrics_list else np.empty((0, 0))
+
+    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, best_params_list, window_test_arrays_list, window_test_start_ts_list, grid_train_matrix

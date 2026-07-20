@@ -13,8 +13,8 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 #NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
 WFO_METRIC            = "R_SQUARED" 
-WFO_N_SPLITS          = 4
-WFO_SUBPERIOD_WEIGHTS = [0.10, 0.20, 0.20, 0.50]
+WFO_N_SPLITS          = 8
+WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.10,0.10,0.10,0.10,0.10,0.20]
 
 # WFO_N_SPLITS          = 8
 # WFO_SUBPERIOD_WEIGHTS = [0.10, 0.10, 0.10, 0.10, 0.10, 0.10, 0.20, 0.20]

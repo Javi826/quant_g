@@ -62,7 +62,7 @@ def _run_single_rule(
 
     (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, wfo_wfr,
-        _window_best_params, _window_test_arrays, _window_test_start_ts, metrics,
+        _window_best_params, _window_test_arrays, _window_test_start_ts, metrics, grid_train_matrix,
     ) = run_wfo_is(
         ohlcv_data          = ohlcv_data,
         param_names         = param_names,
@@ -120,6 +120,7 @@ def _run_single_rule(
         "n_days":           metrics["N_days"]   if metrics else 0,
         "best_params":      best_params,
         "wfo_test_trades":  wfo_test_trades,
+        "grid_train_matrix": grid_train_matrix,
     }
 
 def run_rule_mining(

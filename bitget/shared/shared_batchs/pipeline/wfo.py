@@ -226,7 +226,7 @@ def run_wfo_is(
 
     collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn
 
-    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, window_best_params, window_test_arrays, window_test_start_ts = walk_forward_optimization(
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, window_best_params, window_test_arrays, window_test_start_ts, grid_train_matrix = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,
         param_ranges            = param_ranges,
         length_train_set        = length_train_set,
@@ -265,5 +265,5 @@ def run_wfo_is(
 
     return (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, wfo_wfr,
-        window_best_params, window_test_arrays, window_test_start_ts, wfo_metrics,
+        window_best_params, window_test_arrays, window_test_start_ts, wfo_metrics, grid_train_matrix,
     )

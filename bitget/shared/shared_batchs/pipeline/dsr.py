@@ -84,6 +84,27 @@ def _estimate_n_eff_eigen(matrix: pd.DataFrame) -> float:
         return 1.0
     return float((sum_eig ** 2) / sum_eig_sq)
 
+def _estimate_grid_n_eff(grid_train_matrix: np.ndarray) -> float | None:
+    """Effective number of independent trials within a rule's own grid search
+    (rows=WFO windows, columns=grid combinations), estimated from the
+    correlation of train-metric values across grid combinations.
+
+    Combinations with zero trades across all windows (metric == 0.0 everywhere)
+    are dropped before estimation — a flat zero-column is not a real independent
+    trial, and letting it through inflates n_grid_eff artificially (see
+    _standardize_and_split, where zero-variance columns count as independent)."""
+    if grid_train_matrix is None or grid_train_matrix.size == 0:
+        return None
+
+    non_zero_cols = ~np.all(grid_train_matrix == 0.0, axis=0)
+    clean_matrix  = grid_train_matrix[:, non_zero_cols]
+
+    n_windows, n_combos = clean_matrix.shape
+    if n_combos < 2 or n_windows < 2:
+        return None
+
+    return _estimate_n_eff_eigen(pd.DataFrame(clean_matrix))
+
 
 # =============================================================================
 # PRIVATE HELPERS — DSR formula (paper Eq. 1-2)
@@ -143,11 +164,44 @@ def pipe_dsr(all_raw_results: list, dsr_th: float, debug_ids: set = None) -> dic
         logger.debug(f"DSR ── skipped: not enough trials with trades (M={m_trials})")
         return {"significant_ids": [], "dsr_by_rule_id": {}, "n_eff": 0.0, "sr0": 0.0}
 
-    n_eff = _estimate_n_eff_eigen(daily_matrix)
-    
-    logger.debug(f"DSR ── N_eff terms ── method=ratio(dual/Gram) M={m_trials} -> N_eff={n_eff:.4f}")
+    n_eff_rules = _estimate_n_eff_eigen(daily_matrix)
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
+
+    # -------------------------------------------------------------------
+    # GRID SEARCH CORRECTION — effective independent trials within each
+    # rule's own grid search (e.g. TP_PCT x SL_PCT), estimated from the
+    # correlation of train-metric values across grid combinations.
+    # -------------------------------------------------------------------
+    grid_n_eff_by_id = {}
+    grid_size        = None
+    for rule_id in trial_ids:
+        matrix     = raw_by_id[rule_id].get("grid_train_matrix")
+        grid_n_eff = _estimate_grid_n_eff(matrix)
+        if grid_n_eff is not None:
+            grid_n_eff_by_id[rule_id] = grid_n_eff
+            if grid_size is None:
+                grid_size = matrix.shape[1]
+
+    if grid_n_eff_by_id:
+        grid_n_eff_values = np.array(list(grid_n_eff_by_id.values()), dtype=np.float64)
+        grid_n_eff_mean   = float(grid_n_eff_values.mean())
+        grid_avg_corr     = (grid_size - grid_n_eff_mean) / (grid_size - 1) if grid_size > 1 else 0.0
+        logger.debug(
+            f"DSR ── GRID terms ── n_grid_eff[min={grid_n_eff_values.min():.2f} "
+            f"mean={grid_n_eff_mean:.2f} max={grid_n_eff_values.max():.2f}] "
+            f"(grid_size={grid_size}, implied avg_corr={grid_avg_corr:.3f})"
+        )
+    else:
+        grid_n_eff_mean = 1.0
+        logger.debug("DSR ── GRID terms ── skipped: no valid grid_train_matrix found")
+
+    n_eff = n_eff_rules * grid_n_eff_mean
+
+    logger.debug(
+        f"DSR ── N_eff terms ── method=ratio(dual/Gram) M={m_trials} n_eff_rules={n_eff_rules:.4f} "
+        f"-> n_eff_total={n_eff:.4f}"
+    )
 
     sr_by_id = {
         rule_id: _unannualize_sharpe(raw_by_id[rule_id].get("sharpe", np.nan))
@@ -186,9 +240,10 @@ def pipe_dsr(all_raw_results: list, dsr_th: float, debug_ids: set = None) -> dic
         _dsr_vals.append(dsr_value)
 
         if debug_ids is None or rule_id in debug_ids:
+            grid_n_eff_str = f"{grid_n_eff_by_id[rule_id]:.2f}" if rule_id in grid_n_eff_by_id else "n/a"
             logger.debug(
                 f"DSR[{rule_id}] ── SR={sr_by_id[rule_id]:.4f} SR0={sr0:.4f} T_days={t_days} "
-                f"skew={skew_r:.4f} kurt={kurt_r:.4f} -> DSR={dsr_value:.4f}"
+                f"skew={skew_r:.4f} kurt={kurt_r:.4f} n_grid_eff={grid_n_eff_str} -> DSR={dsr_value:.4f}"
             )
 
     significant_ids = [rid for rid, dsr_val in dsr_by_id.items() if _evaluate_dsr_approval(dsr_val, dsr_th)]
