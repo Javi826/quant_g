@@ -178,6 +178,7 @@ def close_position(pos, exec_time, exec_price, exit_reason, comi_factor,
     trade_log_cols['commission_buy'].append(commission_buy)
     trade_log_cols['commission_sell'].append(commission_sell)
     trade_log_cols['position_type'].append('SHORT' if is_short else 'LONG')
+    trade_log_cols['is_end_clamped'].append(pos.get('is_end_clamped', False))
 
     # evitar pequeños negativos por floating point
     if blocked_cash < 0 and abs(blocked_cash) < 1e-12:
@@ -215,12 +216,15 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
             exec_price = float(close_arr[idx] if idx >= 0 else close_arr[0])
             
             exec_time_dt = np.datetime64(int(sell_ts_int), 'ns')
-            
-            cash_bank, blocked_cash = close_position(pos, exec_time_dt, exec_price, 'SELL_AFTER',
+
+            # Distinguir cierre por sell_after cumplido vs cierre forzado por fin de array
+            exit_reason = 'END_OF_DATA' if pos.get('is_end_clamped', False) else 'SELL_AFTER'
+
+            cash_bank, blocked_cash = close_position(pos, exec_time_dt, exec_price, exit_reason,
                                                      comi_factor, trades, trade_times, trade_log_cols,
                                                      cash_bank, blocked_cash)
             pos['closed'] = True
-            closed_reasons.append('SELL_AFTER')
+            closed_reasons.append(exit_reason)
             
     return cash_bank, blocked_cash, closed_reasons
 
@@ -257,6 +261,7 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
         cash_bank -= (order_amount + commission_buy)
 
     sell_idx = min(buy_idx + sell_after, d['len'] - 1)
+    is_end_clamped = (buy_idx + sell_after) > (d['len'] - 1)
 
     sell_time_dt = d['ts'][sell_idx]
     sell_time_int = int(d['ts_int'][sell_idx])
@@ -279,7 +284,8 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
         'sell_time_int': sell_time_int,
         'commission_buy': commission_buy,
         'is_short': is_short,
-        'blocked_amount': blocked_amount
+        'blocked_amount': blocked_amount,
+        'is_end_clamped': is_end_clamped
     }
 
     # Si es short y hemos bloqueado algo, añadirlo al total bloqueado
@@ -442,7 +448,8 @@ def run_backtest_from_prepared(
     trade_times = {sym: [] for sym in symbols}
     trade_log_cols = {k: [] for k in [
         'symbol','buy_time','buy_price','sell_time','sell_price',
-        'qty','profit','exit_reason','commission_buy','commission_sell','position_type']}
+        'qty','profit','exit_reason','commission_buy','commission_sell',
+        'position_type','is_end_clamped']}
 
     cash_bank, blocked_cash = run_backtest_loop(
         all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,

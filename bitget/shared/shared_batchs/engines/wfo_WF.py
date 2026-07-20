@@ -158,6 +158,12 @@ def walk_forward_optimization(
     all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
     dict_combinations  = [dict(zip(keys, comb)) for comb in all_combinations]
 
+    # Cooldown buffer: real price data appended after the test window so that
+    # trades opened near the end can resolve naturally (TP/SL/timeout) instead
+    # of being force-closed at the window boundary. Mirrors WARMUP_BARS on the
+    # other end. Sized to the largest SELL_AFTER in the grid (worst case).
+    COOLDOWN_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
+
     length_test        = int(length_train_set / pct_train_set - length_train_set)
     best_params_list   = []
     best_criteria_list = []
@@ -264,19 +270,29 @@ def walk_forward_optimization(
                 'high_time': arr_dict['high_time'][warm_start:t1_sym],
             }
 
+        # -----------------------------------------------------------
+        # Prepare base arrays (test) with warmup prefix AND cooldown suffix.
+        # The cooldown suffix is real data past test_end_ts, used only so that
+        # trades opened near the window boundary can resolve naturally
+        # (TP/SL/timeout) instead of being force-closed at test_end_ts. Any
+        # signal generated inside the cooldown region is later dropped from
+        # df_test via the test_end_ts upper-bound filter below, so it never
+        # contributes new entries — only lets already-open trades finish.
+        # -----------------------------------------------------------
         base_arrays_test = {}
         for sym, (t0_sym, t1_sym) in test_indices.items():
             arr_dict   = ohlcv_arr[sym]
             warm_start = max(0, t0_sym - WARMUP_BARS)
+            cool_end   = min(len(arr_dict['ts']), t1_sym + COOLDOWN_BARS)
             base_arrays_test[sym] = {
-                'ts':        arr_dict['ts'][warm_start:t1_sym],
-                'open':      arr_dict['open'][warm_start:t1_sym],
-                'high':      arr_dict['high'][warm_start:t1_sym],
-                'low':       arr_dict['low'][warm_start:t1_sym],
-                'close':     arr_dict['close'][warm_start:t1_sym],
-                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[warm_start:t1_sym],
-                'low_time':  arr_dict['low_time'][warm_start:t1_sym],
-                'high_time': arr_dict['high_time'][warm_start:t1_sym],
+                'ts':        arr_dict['ts'][warm_start:cool_end],
+                'open':      arr_dict['open'][warm_start:cool_end],
+                'high':      arr_dict['high'][warm_start:cool_end],
+                'low':       arr_dict['low'][warm_start:cool_end],
+                'close':     arr_dict['close'][warm_start:cool_end],
+                VOLUME_COL:  arr_dict.get(VOLUME_COL, arr_dict['close'] * 0)[warm_start:cool_end],
+                'low_time':  arr_dict['low_time'][warm_start:cool_end],
+                'high_time': arr_dict['high_time'][warm_start:cool_end],
             }
 
         window_test_arrays_list.append(base_arrays_test)
@@ -337,7 +353,12 @@ def walk_forward_optimization(
         if collect_test_trades_fn is not None and base_arrays_test:
             df_test = collect_test_trades_fn(effective_params, base_arrays_test)
             if df_test is not None and not df_test.empty:
-                df_test = df_test[df_test["buy_time"] >= pd.Timestamp(test_start_ts)].copy()
+                # Lower bound drops warmup trades; upper bound drops trades opened
+                # inside the cooldown suffix (those belong to the next window, not this one).
+                df_test = df_test[
+                    (df_test["buy_time"] >= pd.Timestamp(test_start_ts)) &
+                    (df_test["buy_time"] <= pd.Timestamp(test_end_ts))
+                ].copy()
 
         train_has_trades = df_train is not None and not df_train.empty
         test_has_trades  = df_test is not None and not df_test.empty
