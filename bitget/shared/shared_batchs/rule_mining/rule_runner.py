@@ -62,7 +62,7 @@ def _run_single_rule(
 
     (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, wfo_wfr,
-        _window_best_params, _window_test_arrays, _window_test_start_ts,
+        _window_best_params, _window_test_arrays, _window_test_start_ts, metrics,
     ) = run_wfo_is(
         ohlcv_data          = ohlcv_data,
         param_names         = param_names,
@@ -80,7 +80,6 @@ def _run_single_rule(
         show_progress       = show_progress,
         n_symbols           = n_symbols,
     )
-
     n_windows = len(df_results) - 1 if df_results is not None else 0
     n_trades  = 0 if wfo_test_trades is None else len(wfo_test_trades)
 

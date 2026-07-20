@@ -28,7 +28,7 @@ METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 # EMA smoothing factor for running optimum across WFO windows.
 # alpha=1.0 -> no memory (each window uses only its own train optimum)
 # alpha<1.0 -> smoothed running optimum across windows 1..i
-EMA_ALPHA = 0.1
+EMA_ALPHA = 0.3
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -71,17 +71,19 @@ def _build_ohlcv_with_signal(
     return ohlcv_arrays
 
 def _compute_metric(results: dict) -> float:
-    """Selection metric for WFO window optimization: Net Gain % or Calmar ratio."""
-    port         = results.get("__PORTFOLIO__", {})
-    trades       = port.get("trades", [])
-    net_gain     = float(np.sum(trades)) if trades else 0.0
-    net_gain_pct = (net_gain / INITIAL_BALANCE) * 100.0
+
+    trade_log = results.get("__PORTFOLIO__", {}).get("trade_log")
+    if trade_log is None or trade_log.empty:
+        return 0.0
+
+    m            = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
+    net_gain_pct = m["Net_Gain_pct"]
 
     if METRIC_MODE == "NET_GAIN_PCT":
         return net_gain_pct
 
     if METRIC_MODE == "CALMAR":
-        max_dd_pct = float(port.get("max_dd", 0.0)) * 100.0
+        max_dd_pct = abs(m["Max_DD_pct"])
         return net_gain_pct / max_dd_pct if max_dd_pct > 0 else net_gain_pct
 
     raise ValueError(f"Unknown METRIC_MODE: {METRIC_MODE}")
@@ -146,7 +148,7 @@ def _evaluate_wfo_approval(
 ) -> tuple:
 
     if wfo_test_trades.empty:
-        return False, 0.0, 0.0, 0.0
+        return False, 0.0, 0.0, 0.0, None
 
     m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
     net_gain_pct = m["Net_Gain_pct"]
@@ -169,7 +171,7 @@ def _evaluate_wfo_approval(
         and wfr >= wfr_th
     )
 
-    return approved, net_gain_pct, max_dd_pct, wfr
+    return approved, net_gain_pct, max_dd_pct, wfr, m
 
 # =============================================================================
 # RUN WFO IS
@@ -247,10 +249,10 @@ def run_wfo_is(
     has_nan_window = df_results["best_crite"].iloc[:-1].isna().any()
 
     if has_nan_window:
-        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = False, 0.0, 0.0, 0.0
+        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr, wfo_metrics = False, 0.0, 0.0, 0.0, None
         logger.debug("STAGE 1 ── WFO rejected — at least one window had no trades (NaN)")
     else:
-        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr = _evaluate_wfo_approval(
+        approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr, wfo_metrics = _evaluate_wfo_approval(
             wfo_train_trades = wfo_train_trades,
             wfo_test_trades  = wfo_test_trades,
             net_gain_th      = net_gain_th,
@@ -263,5 +265,5 @@ def run_wfo_is(
 
     return (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, wfo_wfr,
-        window_best_params, window_test_arrays, window_test_start_ts,
+        window_best_params, window_test_arrays, window_test_start_ts, wfo_metrics,
     )

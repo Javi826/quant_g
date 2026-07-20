@@ -47,6 +47,7 @@ cdef int _searchsorted_right(long[::1] arr, long val, int n) nogil:
             hi = mid
     return lo
 
+
 # ============================================================
 # prepare_data  (pure Python, no Cython types needed)
 # ============================================================
@@ -295,8 +296,8 @@ def _backtest_core(
     double sl_pct,
     int default_candles
 ):
-    cdef int n_ticks   = len(all_timestamps_int)
-    cdef int n_events  = len(signal_events)
+    cdef int n_ticks    = len(all_timestamps_int)
+    cdef int n_events   = len(signal_events)
     cdef int max_trades = n_events + 1
 
     # ── Pre-allocated trade log (typed memoryviews) ──
@@ -324,12 +325,6 @@ def _backtest_core(
     cdef double[::1] tl_comm_sell   = tl_comm_sell_arr
     cdef int[::1]    tl_is_short    = tl_is_short_arr
 
-    # ── sim_balance ──
-    cdef np.ndarray[long,   ndim=1] sb_timestamp_arr = np.empty(n_ticks, dtype=np.int64)
-    cdef np.ndarray[double, ndim=1] sb_balance_arr   = np.empty(n_ticks, dtype=np.float64)
-    cdef long[::1]   sb_timestamp = sb_timestamp_arr
-    cdef double[::1] sb_balance   = sb_balance_arr
-
     # ── Account state ──
     cdef double cash_bank    = initial_balance
     cdef double blocked_cash = 0.0
@@ -348,7 +343,6 @@ def _backtest_core(
     cdef int    chosen_idx, reason_code
     cdef double exec_price_intra
     cdef int    idx
-    cdef double total_val, price
     cdef long   n_sym
 
     # ── Typed memoryviews for 2D arrays ──
@@ -363,6 +357,7 @@ def _backtest_core(
     cdef long[::1]      sym_len_mv   = sym_len
     cdef long[:, ::1]   ev_mv        = signal_events
     cdef long[::1]      ts_all_mv    = all_timestamps_int
+
     cdef np.ndarray[long, ndim=1] ev_col0_arr = np.ascontiguousarray(signal_events[:, 0], dtype=np.int64)
     cdef long[::1]      ev_col0      = ev_col0_arr
 
@@ -386,9 +381,9 @@ def _backtest_core(
                 exec_time_int    = pos['exec_time_int']
                 reason_code      = pos['exit_reason_code']
             else:
-                sid    = pos['sym_id']
-                n_sym  = sym_len_mv[sid]
-                idx    = _searchsorted_right(ts_int_mv[sid], <long>pos['sell_time_int'], <int>n_sym) - 1
+                sid   = pos['sym_id']
+                n_sym = sym_len_mv[sid]
+                idx   = _searchsorted_right(ts_int_mv[sid], <long>pos['sell_time_int'], <int>n_sym) - 1
                 if idx < 0:
                     idx = 0
                 exec_price_intra = close_mv[sid, idx]
@@ -423,18 +418,9 @@ def _backtest_core(
                     buy_idx = <int>ev_mv[ev_scan, 2]
                     ev_scan += 1
 
-                    n_bars = <int>sym_len_mv[sid]
-
-# =============================================================================
-#                     if sell_after > 0:
-#                         if buy_idx + sell_after > n_bars:
-#                             continue
-#                     else:
-#                         if buy_idx + default_candles >= n_bars:
-#                             continue
-# =============================================================================
-
+                    n_bars    = <int>sym_len_mv[sid]
                     free_cash = cash_bank - blocked_cash
+
                     if free_cash < order_amount:
                         break
 
@@ -479,15 +465,15 @@ def _backtest_core(
                         cash_bank     -= (order_amount + comm_buy)
 
                     pos = {
-                        'sym_id':            sid,
-                        'qty':               qty,
-                        'buy_price':         price_t,
-                        'buy_time_int':      ts_int_mv[sid, buy_idx],
-                        'sell_time_int':     sell_time_int,
-                        'commission_buy':    comm_buy,
-                        'is_short':          is_short,
-                        'blocked_amount':    blocked_amount,
-                        'closed':            False,
+                        'sym_id':         sid,
+                        'qty':            qty,
+                        'buy_price':      price_t,
+                        'buy_time_int':   ts_int_mv[sid, buy_idx],
+                        'sell_time_int':  sell_time_int,
+                        'commission_buy': comm_buy,
+                        'is_short':       is_short,
+                        'blocked_amount': blocked_amount,
+                        'closed':         False,
                     }
 
                     intra, chosen_idx, reason_code, exec_price_intra = _detect_intrabar_exit_cy(
@@ -507,71 +493,14 @@ def _backtest_core(
 
                     counter += 1
 
-        # ── 3. Snapshot sim_balance ──
-        sb_timestamp[tick_i] = t_int
-        if open_heap:
-            total_val  = cash_bank
-            # Single pass: accumulate qty and track is_short per symbol
-            seen_qty   = {}   # sid -> net qty
-            seen_short = {}   # sid -> is_short (all positions per sid share direction)
-            for _, _, p in open_heap:
-                if p.get('closed', False):
-                    continue
-                s = p['sym_id']
-                seen_qty[s]   = seen_qty.get(s, 0.0) + p['qty']
-                seen_short[s] = p['is_short']
-
-            for s, qty_sum in seen_qty.items():
-                idx = _searchsorted_right(ts_int_mv[s], t_int, <int>sym_len_mv[s]) - 1
-                if idx < 0:
-                    idx = 0
-                price = close_mv[s, idx]
-                if seen_short[s]:
-                    total_val -= qty_sum * price
-                else:
-                    total_val += qty_sum * price
-            sb_balance[tick_i] = total_val
-        else:
-            sb_balance[tick_i] = cash_bank
-
     return (
         n_trades,
         tl_sym_id_arr[:n_trades],    tl_buy_time_arr[:n_trades],   tl_buy_price_arr[:n_trades],
         tl_sell_time_arr[:n_trades], tl_sell_price_arr[:n_trades], tl_qty_arr[:n_trades],
         tl_profit_arr[:n_trades],    tl_exit_reason_arr[:n_trades],
         tl_comm_buy_arr[:n_trades],  tl_comm_sell_arr[:n_trades],  tl_is_short_arr[:n_trades],
-        sb_timestamp_arr, sb_balance_arr,
         cash_bank, blocked_cash
     )
-
-
-# ============================================================
-# compute_annualized_sharpe
-# ============================================================
-def compute_annualized_sharpe(equity_arr, time_index_int64):
-    if equity_arr is None or equity_arr.size < 2:
-        return np.nan
-
-    with np.errstate(divide='ignore', invalid='ignore'):
-        returns = (equity_arr[1:] / equity_arr[:-1]) - 1.0
-    returns = returns[np.isfinite(returns)]
-    if returns.size == 0:
-        return np.nan
-
-    if len(time_index_int64) >= 2:
-        deltas_s = np.diff(time_index_int64).astype(np.float64) / 1e9
-        positive = deltas_s[deltas_s > 0]
-        median_delta_s = float(np.median(positive)) if positive.size > 0 else 24 * 3600
-    else:
-        median_delta_s = 24 * 3600
-
-    periods_per_year = (365.0 * 24.0 * 3600.0) / median_delta_s if median_delta_s > 0 else 252.0
-    mean_p = np.mean(returns)
-    std_p  = np.std(returns, ddof=0)
-    if not np.isfinite(std_p) or std_p == 0.0:
-        return np.nan
-
-    return float((mean_p * periods_per_year) / (std_p * np.sqrt(periods_per_year)))
 
 
 # ============================================================
@@ -590,7 +519,6 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
      signal_events, _) = arrays
 
-    # Force C-contiguous arrays before passing to Cython memoryviews
     open_2d      = np.ascontiguousarray(open_2d,      dtype=np.float64)
     close_2d     = np.ascontiguousarray(close_2d,     dtype=np.float64)
     high_2d      = np.ascontiguousarray(high_2d,      dtype=np.float64)
@@ -612,7 +540,6 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
         tl_sell_time, tl_sell_price, tl_qty,
         tl_profit, tl_exit_reason,
         tl_comm_buy, tl_comm_sell, tl_is_short,
-        sb_timestamp, sb_balance,
         final_cash_bank, _
     ) = _backtest_core(
         open_2d, close_2d, high_2d, low_2d,
@@ -644,35 +571,9 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
         trades[sym].append(float(tl_profit[i]))
         trade_times[sym].append(np.datetime64(int(tl_sell_time[i]), 'ns'))
 
-    sim_balance_cols = {
-        'timestamp': list(sb_timestamp.astype('datetime64[ns]')),
-        'balance':   list(sb_balance),
-    }
-
-    sim_values = sb_balance
-    sim_ts_int = sb_timestamp
-
-    final_balance    = float(sim_values[-1]) if sim_values.size > 0 else initial_balance
-    cummax           = np.maximum.accumulate(sim_values) if sim_values.size > 0 else np.array([initial_balance])
-    drawdowns        = (cummax - sim_values) / np.where(cummax == 0, 1, cummax)
-    max_dd_portfolio = float(np.max(drawdowns)) if drawdowns.size > 0 else 0.0
-    sharpe_portfolio = compute_annualized_sharpe(sim_values, sim_ts_int)
-
-    all_trades = [p for lst in trades.values() for p in lst]
-    num_trades = len(all_trades)
-    proportion_winners = (
-        float(np.sum(np.array(all_trades) > 0.0)) / num_trades if num_trades > 0 else np.nan
-    )
-
     return {
         "__PORTFOLIO__": {
-            'trades':              all_trades,
-            'final_balance':       final_balance,
-            'num_signals':         n_trades,
-            'proportion_winners':  proportion_winners,
-            'max_dd':              max_dd_portfolio,
-            'sim_balance_history': sim_balance_cols,
-            'trade_log':           trade_log,
-            'sharpe':              sharpe_portfolio,
+            'trades':    [p for lst in trades.values() for p in lst],
+            'trade_log': trade_log,
         }
     }

@@ -25,13 +25,7 @@ def _daily_profit_series(wfo_test_trades: pd.DataFrame) -> pd.Series:
 
 
 def _build_daily_profit_matrix(all_raw_results: list) -> tuple:
-    """Aligns all candidates' daily profit series on a common date index and
-    returns (matrix, trial_rule_ids), where matrix is T x M (T = trading days,
-    M = candidate rules) — NOT the M x M correlation matrix. Only candidates
-    with >1 profit day qualify. Building the M x M correlation matrix directly
-    is the actual bottleneck when M is large (rule mining can produce M in the
-    hundreds of thousands), so we defer that to the dual/Gram trick in
-    _estimate_n_eff_eigen, which never materializes an M x M array."""
+
     daily_series = {}
     for r in all_raw_results:
         s = _daily_profit_series(r.get("wfo_test_trades"))
@@ -50,10 +44,7 @@ def _build_daily_profit_matrix(all_raw_results: list) -> tuple:
 
 
 def _standardize_and_split(matrix: pd.DataFrame) -> tuple:
-    """Standardizes each column (rule) to zero mean / unit variance, and splits
-    off zero-variance (constant profit) columns, which can't be standardized.
-    Returns (x_std, n_const), where x_std is a T x M_valid ndarray of standardized
-    columns and n_const is the count of zero-variance columns excluded from it."""
+
     arr        = matrix.to_numpy(dtype=np.float64)
     means      = arr.mean(axis=0)
     stds       = arr.std(axis=0, ddof=1)
@@ -75,22 +66,7 @@ def _eigenvalues_desc(square_array: np.ndarray) -> np.ndarray:
 
 
 def _estimate_n_eff_eigen(matrix: pd.DataFrame) -> float:
-    """Effective number of independent trials via spectral decomposition (participation
-    ratio): N_eff = (sum(lambda))^2 / sum(lambda^2). Equals M when all eigenvalues are
-    equal (fully independent trials), and approaches 1 when a single eigenvalue dominates
-    (fully redundant trials).
 
-    DUAL / GRAM TRICK (Option B): the eigenvalues of the M x M correlation matrix C are
-    identical (up to zero-padding) to the eigenvalues of the T x T Gram matrix
-    G = (1 / (T-1)) * Xstd @ Xstd.T, where Xstd is the T x M matrix of standardized daily
-    profit columns. Since T (trading days) is typically orders of magnitude smaller than
-    M (candidate rules), this avoids ever building or decomposing the M x M matrix —
-    turning an O(M^2) memory / O(M^3) compute problem into O(T^2) / O(T^3).
-
-    Constant-profit columns (zero variance) can't be standardized; each is treated as an
-    independent trial with self-correlation 1 and zero correlation to everything else
-    (matching the diagonal-fix applied to NaN correlations in the dense-matrix version),
-    which contributes exactly one eigenvalue of 1.0 to the full M x M spectrum."""
     x_std, n_const = _standardize_and_split(matrix)
 
     if x_std is None:
@@ -152,22 +128,7 @@ def _evaluate_dsr_approval(dsr_value: float, dsr_th: float) -> bool:
 # PIPE DSR (across the full set of candidate trials)
 # =============================================================================
 def pipe_dsr(all_raw_results: list, dsr_th: float, debug_ids: set = None) -> dict:
-    """
-    Computes the Deflated Sharpe Ratio for every candidate rule that produced trades,
-    correcting Sharpe ratio inflation caused by (1) multiple testing / selection bias
-    and (2) non-Normal returns (Bailey & Lopez de Prado, 2014).
 
-    SR, skew, kurtosis and T are ALL sourced from the DAILY profit series (via
-    batch_metrics.compute_metrics), not from per-trade profits — this keeps them
-    mutually consistent, since the DSR formula requires all four to come from the
-    same underlying series.
-
-    N (independent trials) is estimated via the spectral decomposition (eigenvalues)
-    of the correlation matrix between the daily profit series of ALL candidates —
-    NOT via the raw count of trials (M), and NOT via the average off-diagonal correlation.
-    That decomposition is computed via the dual/Gram trick (see _estimate_n_eff_eigen),
-    which never materializes the M x M correlation matrix.
-    """
     total_candidates = len(all_raw_results)
     daily_matrix, trial_ids = _build_daily_profit_matrix(all_raw_results)
     m_trials = len(trial_ids)
@@ -183,7 +144,7 @@ def pipe_dsr(all_raw_results: list, dsr_th: float, debug_ids: set = None) -> dic
         return {"significant_ids": [], "dsr_by_rule_id": {}, "n_eff": 0.0, "sr0": 0.0}
 
     n_eff = _estimate_n_eff_eigen(daily_matrix)
-
+    
     logger.debug(f"DSR ── N_eff terms ── method=ratio(dual/Gram) M={m_trials} -> N_eff={n_eff:.4f}")
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}

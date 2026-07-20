@@ -6,35 +6,35 @@ from scipy import signal as sp_signal
 # CONFIG
 # =============================================================================
 
+RSI_PERIODS                = [14]
+RSI_THRESHOLDS             = [30]
+
+ADX_PERIODS                = [14]
+ADX_THRESHOLDS             = [20]
+
+MA_PERIODS                 = [100]
+MOMENTUM_PERIODS           = [50]
+HISTVOL_BASE_PERIODS       = [30]
+HISTVOL_REGIME_SMA_PERIODS = [50]
+
+ATR_BASE_PERIODS           = [14]
+ATR_REGIME_SMA_PERIODS     = [10]
+
 # =============================================================================
 # RSI_PERIODS                = [14]
 # RSI_THRESHOLDS             = [30]
 # 
-# ADX_PERIODS                = [14]
-# ADX_THRESHOLDS             = [20]
+# ADX_PERIODS                = []
+# ADX_THRESHOLDS             = []
 # 
 # MA_PERIODS                 = [100]
-# MOMENTUM_PERIODS           = [50]
-# HISTVOL_BASE_PERIODS       = [30]
-# HISTVOL_REGIME_SMA_PERIODS = [50]
+# MOMENTUM_PERIODS           = []
+# HISTVOL_BASE_PERIODS       = []
+# HISTVOL_REGIME_SMA_PERIODS = []
 # 
 # ATR_BASE_PERIODS           = [14]
 # ATR_REGIME_SMA_PERIODS     = [10]
 # =============================================================================
-
-RSI_PERIODS                = [14]
-RSI_THRESHOLDS             = [30]
-
-ADX_PERIODS                = []
-ADX_THRESHOLDS             = []
-
-MA_PERIODS                 = [100]
-MOMENTUM_PERIODS           = []
-HISTVOL_BASE_PERIODS       = []
-HISTVOL_REGIME_SMA_PERIODS = []
-
-ATR_BASE_PERIODS           = [14]
-ATR_REGIME_SMA_PERIODS     = [10]
 
 # =============================================================================
 # RSI_PERIODS                = [7,14,21]      # los 3 aparecen

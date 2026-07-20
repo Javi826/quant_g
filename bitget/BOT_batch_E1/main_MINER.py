@@ -61,8 +61,8 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 4
-WFO_DD_TH       = 200
+WFO_NET_GAIN_TH = 45
+WFO_DD_TH       = 20
 WFO_R2_TH       = 0.6
 WFO_WFR_TH      = 0.5
 
@@ -83,7 +83,7 @@ PIPELINE_DSR         = True
 DSR_TH               = 0.4
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
-PIPELINE_MULTIVERSE  = True
+PIPELINE_MULTIVERSE  = False
 MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
