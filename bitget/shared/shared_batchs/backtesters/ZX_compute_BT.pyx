@@ -19,7 +19,6 @@ warnings.filterwarnings("ignore")
 MIN_PRICE       = 0.00001
 INITIAL_BALANCE = 1000
 COMISION        = 0.1
-DEFAULT_CANDLES = 50
 
 # ============================================================
 # C-level binary search helpers  (replaces np.searchsorted)
@@ -293,8 +292,7 @@ def _backtest_core(
     double order_amount,
     int sell_after,
     double tp_pct,
-    double sl_pct,
-    int default_candles
+    double sl_pct
 ):
     cdef int n_ticks    = len(all_timestamps_int)
     cdef int n_events   = len(signal_events)
@@ -438,10 +436,7 @@ def _backtest_core(
                     qty      = order_amount / price_t
                     comm_buy = order_amount * comi_factor
 
-                    if sell_after == 0:
-                        exit_idx = buy_idx + default_candles
-                    else:
-                        exit_idx = buy_idx + sell_after
+                    exit_idx = buy_idx + sell_after
                     if exit_idx >= n_bars:
                         exit_idx = n_bars - 1
 
@@ -546,7 +541,7 @@ def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
         high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
         signal_events, all_timestamps_int,
         initial_balance, cdef_factor, float(order_amount),
-        int(sell_after), float(tp_pct), float(sl_pct), int(DEFAULT_CANDLES)
+        int(sell_after), float(tp_pct), float(sl_pct)
     )
 
     exit_reason_map = {0: 'SELL_AFTER', 1: 'TP', 2: 'SL'}

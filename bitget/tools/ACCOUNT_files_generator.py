@@ -76,7 +76,7 @@ def generate_batch():
         lines.append(f'        "direction": "{s["direction"]}",')
         for bin_key in REGIME_BIN_KEYS:
             lines.append(f'        "{bin_key}": {float(s.get(bin_key, 1.0))},')
-        lines.append(f'        "sell_after_ncandles": {s.get("sell_after_ncandles", 0)},')
+        lines.append(f'        "sell_after_ncandles": {s.get("sell_after_ncandles", 50)},')
         lines.append(f'        "order_amount_prod": {s.get("order_amount", 200)},')
         for k in SIGNAL_PARAM_KEYS:
             if k in s:
@@ -126,7 +126,7 @@ def generate_loop():
         n_symbols_val    = "N_SYMBOLS"    if USE_GLOBAL_VARS_IN_LOOP else n_symbols
         order_amount_val = "ORDER_AMOUNT" if USE_GLOBAL_VARS_IN_LOOP else DEFAULT_ORDER_AMOUNT
 
-        param_grid = {"SELL_AFTER": [s.get("sell_after_ncandles", 0)]}
+        param_grid = {"SELL_AFTER": [s.get("sell_after_ncandles", 50)]}
         for k in SIGNAL_PARAM_KEYS:
             if k in s:
                 param_grid[k.upper()] = [s[k]]

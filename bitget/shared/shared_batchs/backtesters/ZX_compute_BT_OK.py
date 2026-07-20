@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute_bb.py
+#shared/shared_batchs/backtesters/ZX_compute_BT.py
 import heapq
 import logging
 import warnings
@@ -11,7 +11,6 @@ warnings.filterwarnings("ignore")
 MIN_PRICE       = 0.00001
 INITIAL_BALANCE = 1000
 COMISION        = 0.1
-DEFAULT_CANDLES = 50
 
 # ============================
 # prepare_data - 
@@ -93,113 +92,48 @@ def prepare_data(ohlcv_arrays):
 # Helper: detect_intrabar_exit - MODIFICADO PARA SHORT
 # ============================
 def detect_intrabar_exit(d, buy_idx, sell_idx, tp_price, sl_price, is_short=False):
-    intravela_detected = False
-    chosen_idx  = None
-    exit_reason = None
-    exec_price  = None
-
     if tp_price is None and sl_price is None:
-        return intravela_detected, chosen_idx, exit_reason, exec_price
+        return False, None, None, None
 
-    start = buy_idx #VELA
-    end = sell_idx
+    start = buy_idx
+    end   = sell_idx
     if end < start:
-        return intravela_detected, chosen_idx, exit_reason, exec_price
+        return False, None, None, None
 
     high_slice = d['high'][start:end+1]
-    low_slice = d['low'][start:end+1]
+    low_slice  = d['low'][start:end+1]
 
     if is_short:
-        # Para SHORT: TP se alcanza cuando el precio BAJA (low <= tp_price)
-        # SL se alcanza cuando el precio SUBE (high >= sl_price)
-        tp_hits = np.where(low_slice <= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
+        tp_hits = np.where(low_slice  <= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
         sl_hits = np.where(high_slice >= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
-        
-        tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-        sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
-
-        if tp_first is not None and sl_first is not None:
-            tp_time_val = d['low_time'][tp_first]  # Para SHORT usamos low_time para TP
-            sl_time_val = d['high_time'][sl_first]  # Para SHORT usamos high_time para SL
-
-            if tp_first == sl_first:
-                if tp_time_val <= sl_time_val:
-                    chosen_idx = tp_first
-                    exit_reason = 'TP'
-                    exec_price = tp_price
-                else:
-                    chosen_idx = sl_first
-                    exit_reason = 'SL'
-                    exec_price = sl_price
-            else:
-                if sl_first < tp_first:
-                    chosen_idx = sl_first
-                    exit_reason = 'SL'
-                    exec_price = sl_price
-                else:
-                    chosen_idx = tp_first
-                    exit_reason = 'TP'
-                    exec_price = tp_price
-
-            intravela_detected = True
-
-        elif sl_first is not None:
-            chosen_idx = sl_first
-            exit_reason = 'SL'
-            exec_price = sl_price
-            intravela_detected = True
-
-        elif tp_first is not None:
-            chosen_idx = tp_first
-            exit_reason = 'TP'
-            exec_price = tp_price
-            intravela_detected = True
+        tp_time_arr = d['low_time']
+        sl_time_arr = d['high_time']
     else:
-        # LONG (lógica original)
         tp_hits = np.where(high_slice >= tp_price)[0] if tp_price is not None else np.array([], dtype=int)
-        sl_hits = np.where(low_slice <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+        sl_hits = np.where(low_slice  <= sl_price)[0] if sl_price is not None else np.array([], dtype=int)
+        tp_time_arr = d['high_time']
+        sl_time_arr = d['low_time']
 
-        tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
-        sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
+    tp_first = tp_hits[0] + start if tp_hits.size > 0 else None
+    sl_first = sl_hits[0] + start if sl_hits.size > 0 else None
 
-        if tp_first is not None and sl_first is not None:
-            tp_time_val = d['high_time'][tp_first]
-            sl_time_val = d['low_time'][sl_first]
+    if tp_first is None and sl_first is None:
+        return False, None, None, None
 
-            if tp_first == sl_first:
-                if tp_time_val <= sl_time_val:
-                    chosen_idx = tp_first
-                    exit_reason = 'TP'
-                    exec_price = tp_price
-                else:
-                    chosen_idx = sl_first
-                    exit_reason = 'SL'
-                    exec_price = sl_price
+    if tp_first is not None and sl_first is not None:
+        if tp_first == sl_first:
+            if tp_time_arr[tp_first] <= sl_time_arr[sl_first]:
+                return True, tp_first, 'TP', tp_price
             else:
-                if sl_first < tp_first:
-                    chosen_idx = sl_first
-                    exit_reason = 'SL'
-                    exec_price = sl_price
-                else:
-                    chosen_idx = tp_first
-                    exit_reason = 'TP'
-                    exec_price = tp_price
-
-            intravela_detected = True
-
-        elif sl_first is not None:
-            chosen_idx = sl_first
-            exit_reason = 'SL'
-            exec_price = sl_price
-            intravela_detected = True
-
-        elif tp_first is not None:
-            chosen_idx = tp_first
-            exit_reason = 'TP'
-            exec_price = tp_price
-            intravela_detected = True
-
-    return intravela_detected, chosen_idx, exit_reason, exec_price
+                return True, sl_first, 'SL', sl_price
+        elif sl_first < tp_first:
+            return True, sl_first, 'SL', sl_price
+        else:
+            return True, tp_first, 'TP', tp_price
+    elif sl_first is not None:
+        return True, sl_first, 'SL', sl_price
+    else:
+        return True, tp_first, 'TP', tp_price
 
 
 # ============================
@@ -290,62 +224,8 @@ def close_expired_positions(t_int, open_heap, sym_data, ts_int_arrays, close_arr
             
     return cash_bank, blocked_cash, closed_reasons
 
-
-# ============================
-# MODIFICADO PARA SHORT
-# Usa cash_bank (efectivo total) para calcular equity = cash_bank + valor_long - valor_short
-# ============================
-def update_sim_balance(t_int, open_heap, cash_bank, ts_int_arrays, close_arrays, sim_balance_cols):
-
-    if not open_heap:
-        sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-        sim_balance_cols['balance'].append(cash_bank)
-        return sim_balance_cols
-    
-    # Agrupar posiciones por símbolo
-    symbol_qty_long = {}
-    symbol_qty_short = {}
-    
-    for _, _, pos in open_heap:
-        if pos.get('closed', False):
-            continue
-        sym = pos['symbol']
-        is_short = pos.get('is_short', False)
-        
-        if is_short:
-            symbol_qty_short[sym] = symbol_qty_short.get(sym, 0.0) + pos['qty']
-        else:
-            symbol_qty_long[sym] = symbol_qty_long.get(sym, 0.0) + pos['qty']
-    
-    # Calcular valor total
-    total_value = 0.0
-    
-    # Valor de posiciones LONG
-    for sym, qty_sum in symbol_qty_long.items():
-        ts_arr       = ts_int_arrays[sym]
-        close_arr    = close_arrays[sym]
-        idx          = np.searchsorted(ts_arr, t_int, side='right') - 1
-        price        = float(close_arr[idx] if idx >= 0 else close_arr[0])
-        total_value += qty_sum * price
-    
-    # Valor de posiciones SHORT (el valor es negativo del precio actual)
-    for sym, qty_sum in symbol_qty_short.items():
-        ts_arr    = ts_int_arrays[sym]
-        close_arr = close_arrays[sym]
-        idx       = np.searchsorted(ts_arr, t_int, side='right') - 1
-        price     = float(close_arr[idx] if idx >= 0 else close_arr[0])
-        # Para SHORT: valor = -(qty * precio_actual)
-        total_value -= qty_sum * price
-    
-    sim_balance_cols['timestamp'].append(np.datetime64(int(t_int), 'ns'))
-    sim_balance_cols['balance'].append(cash_bank + total_value)
-    return sim_balance_cols
-
-
 # ============================
 # execute_signal - MODIFICADO PARA SHORT
-# Ahora actualiza cash_bank y blocked_cash. La lógica de LONGS queda intacta.
-# Cambiado: blocked_amount = proceeds + margin_required (antes solo proceeds)
 # ============================
 def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amount, sell_after,
                         sym_data, counter, open_heap, tp_pct, sl_pct, is_short=False):
@@ -353,6 +233,9 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
     d = sym_data[sym]
     price_t = float(d['open'][buy_idx]) #OPEN
     qty = order_amount / price_t
+
+   # print(f"[DEBUG] sym={sym} | signal_candle_ts={d['ts'][buy_idx-1]} signal_candle_close={d['close'][buy_idx-1]} "
+      #    f"| exec_candle_ts={d['ts'][buy_idx]} exec_open={price_t}")
 
     commission_buy = float(order_amount * comi_factor)
     
@@ -373,11 +256,7 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
         blocked_amount = 0.0
         cash_bank -= (order_amount + commission_buy)
 
-    if sell_after == 0:
-        n_velas = DEFAULT_CANDLES  
-        sell_idx = min(buy_idx + n_velas, d['len'] - 1)
-    else:
-        sell_idx = min(buy_idx + sell_after, d['len'] - 1)
+    sell_idx = min(buy_idx + sell_after, d['len'] - 1)
 
     sell_time_dt = d['ts'][sell_idx]
     sell_time_int = int(d['ts_int'][sell_idx])
@@ -435,13 +314,12 @@ def execute_signal(sym, buy_idx, cash_bank, blocked_cash, comi_factor, order_amo
 def run_backtest_loop(
     all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
     cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
-    trades, trade_times, trade_log_cols, sim_balance_cols
+    trades, trade_times, trade_log_cols
 ):
- 
-    num_signals_executed = 0
+
     open_heap = []
     counter = 0
- 
+
     # Alias locales para velocidad
     sd = sym_data
     tia = ts_int_arrays
@@ -452,17 +330,17 @@ def run_backtest_loop(
     sa = sell_after
     tp = tp_pct
     sp = sl_pct
- 
+
     for t_int in all_timestamps_int:
- 
+
         # Guardar si el heap ya estaba vacío ANTES de cerrar posiciones en esta vela
         was_empty_before = not open_heap
- 
+
         # Cerrar posiciones expiradas -> devuelve cash_bank, blocked_cash y los motivos de cierre
         cash_bank, blocked_cash, closed_reasons = close_expired_positions(
             t_int, open_heap, sd, tia, ca, cf, trades, trade_times, trade_log_cols, cash_bank, blocked_cash
         )
- 
+
         if not open_heap:
             if was_empty_before:
                 # El heap ya estaba vacío antes de esta vela -> buscar señales normalmente
@@ -473,38 +351,30 @@ def run_backtest_loop(
                 # cierres fueron por timeout, se busca en la misma vela (igual que producción).
                 had_intrabar_exit = any(r in ('TP', 'SL') for r in closed_reasons)
                 search_signals = not had_intrabar_exit
- 
+
             if search_signals:
                 events = sbt.get(int(t_int))
                 if events:
                     events_sorted = sorted(events, key=lambda x: x[0])
- 
+
                     for sym, buy_idx in events_sorted:
-                        # --- Validación inline mejorada ---
-                        if sa > 0:
-                            if buy_idx + sa > len(ca[sym]):
-                                continue
-                        else:
-                            if buy_idx + DEFAULT_CANDLES >= len(ca[sym]):
-                                continue
- 
                         # Calcular cash libre (no incluir ingresos bloqueados por shorts)
                         free_cash = cash_bank - blocked_cash
                         # Verificar saldo suficiente usando free_cash
                         if free_cash < oa:
                             break
- 
+
                         # Determinar dirección según la señal: 1 -> long, -1 -> short
                         signal_value = sd[sym]['signal'][buy_idx]
                         if signal_value == 0:
                             continue  # ignorar si no hay señal
                         is_short = signal_value < 0
- 
+
                         # VALIDACIÓN ADICIONAL PARA SHORTS: si no hay SL (sp == 0) rechazamos porque riesgo ilimitado
                         if is_short:
                             if sp == 0.0:
                                 continue
- 
+
                             # pérdida máxima esperada = order_amount * (sl_pct/100)
                             potential_max_loss = oa * (sp / 100.0)
                             commission_buy = oa * cf
@@ -512,92 +382,26 @@ def run_backtest_loop(
                             if free_cash < (potential_max_loss + commission_buy):
                                 # no hay suficiente capital libre para cubrir la pérdida máxima estimada
                                 continue
- 
+
                         # Ejecutar señal (ahora devuelve cash_bank y blocked_cash)
                         cash_bank, blocked_cash, counter = execute_signal(
                             sym, buy_idx, cash_bank, blocked_cash, cf, oa, sa, sd, counter, open_heap, tp, sp, is_short
                         )
-                        num_signals_executed += 1
- 
-        # Actualizar balance simulado (usa cash_bank para calcular equity)
-        sim_balance_cols = update_sim_balance(
-            t_int, open_heap, cash_bank, tia, ca, sim_balance_cols
-        )
- 
-    return cash_bank, blocked_cash, num_signals_executed
+
+    return cash_bank, blocked_cash
 
 # ============================
 # Métricas (sin cambios)
 # ============================
-def compute_annualized_sharpe(equity_arr, time_index_int64):
-    if equity_arr is None or equity_arr.size < 2:
-        return np.nan
-
-    with np.errstate(divide='ignore', invalid='ignore'):
-        returns = (equity_arr[1:] / equity_arr[:-1]) - 1.0
-    returns = returns[np.isfinite(returns)]
-    if returns.size == 0:
-        return np.nan
-
-    if len(time_index_int64) >= 2:
-        deltas_s = np.diff(time_index_int64).astype(np.float64) / 1e9
-        positive = deltas_s[deltas_s > 0]
-        median_delta_s = float(np.median(positive)) if positive.size > 0 else 24*3600
-    else:
-        median_delta_s = 24*3600
-
-    periods_per_year = (365.0 * 24.0 * 3600.0) / median_delta_s if median_delta_s > 0 else 252.0
-
-    mean_periodic = np.mean(returns)
-    std_periodic = np.std(returns, ddof=0)
-    if not np.isfinite(std_periodic) or std_periodic == 0.0:
-        return np.nan
-
-    annualized_mean = mean_periodic * periods_per_year
-    annualized_std = std_periodic * np.sqrt(periods_per_year)
-    return float(annualized_mean / annualized_std)
-
-
-def compute_post_backtest_metrics(symbols, trades, trade_times, all_timestamps_dt, initial_balance, sim_balance_cols):
-    sim_values = np.array(sim_balance_cols['balance'], dtype=np.float64)
-    sim_ts_arr = np.array(sim_balance_cols['timestamp'], dtype='datetime64[ns]') if len(sim_balance_cols['timestamp']) > 0 else np.array([], dtype='datetime64[ns]')
-    sim_ts_int = sim_ts_arr.astype('int64') if sim_ts_arr.size > 0 else np.array([], dtype=np.int64)
-
-    final_balance = float(sim_values[-1]) if sim_values.size > 0 else float(initial_balance)
-
-    cummax_portfolio    = np.maximum.accumulate(sim_values) if sim_values.size > 0 else np.array([initial_balance])
-    drawdowns_portfolio = (cummax_portfolio - sim_values) / np.where(cummax_portfolio == 0, 1, cummax_portfolio)
-    max_dd_portfolio    = float(np.max(drawdowns_portfolio)) if drawdowns_portfolio.size > 0 else 0.0
-
-    sharpe_portfolio = compute_annualized_sharpe(sim_values, sim_ts_int)
-
-    all_trades = [p for lst in trades.values() for p in lst]
-    num_trades = len(all_trades)
-    proportion_winners = np.sum(np.array(all_trades) > 0.0) / num_trades if num_trades > 0 else np.nan
-
-    return {
-        "final_balance": final_balance,
-        "max_dd_portfolio": max_dd_portfolio,
-        "sharpe_portfolio": sharpe_portfolio,
-        "proportion_winners": proportion_winners       
-    }
-
-
-def build_results_dict(symbols, trades, trade_times, 
-                       final_balance, num_signals_executed, 
-                       proportion_winners, max_dd_portfolio,
-                       sim_balance_cols, trade_log_cols, sharpe_portfolio):
-
+def build_results_dict(trades, trade_log_cols):
+    """The backtester returns only raw simulation output — trades and the trade
+    log. All evaluation metrics (Sharpe, drawdown, win rate, Calmar...) are
+    computed exclusively by batch_metrics.compute_metrics, the single source
+    of truth for metrics in the pipeline."""
     results = {
         "__PORTFOLIO__": {
-            'trades': [p for lst in trades.values() for p in lst],
-            'final_balance': final_balance,
-            'num_signals': num_signals_executed,
-            'proportion_winners': proportion_winners,
-            'max_dd': max_dd_portfolio,
-            'sim_balance_history': sim_balance_cols,
+            'trades':    [p for lst in trades.values() for p in lst],
             'trade_log': pd.DataFrame(trade_log_cols),
-            'sharpe': sharpe_portfolio
         }
     }
     return results
@@ -605,7 +409,6 @@ def build_results_dict(symbols, trades, trade_times,
 
 # ============================
 # FUNCIÓN PRINCIPAL - MODIFICADO PARA SOPORTAR LONG/SHORT
-# Ahora inicializa cash_bank y blocked_cash y los pasa al loop
 # ============================
 def run_grid_backtest(
     ohlcv_arrays,
@@ -639,30 +442,15 @@ def run_grid_backtest(
     trade_log_cols = {k: [] for k in [
         'symbol','buy_time','buy_price','sell_time','sell_price',
         'qty','profit','exit_reason','commission_buy','commission_sell','position_type']}
-    sim_balance_cols = {'timestamp': [], 'balance': []}
     
     # Ejecutar backtest con el tipo de posición especificado
-    cash_bank, blocked_cash, num_signals_executed = run_backtest_loop(
+    cash_bank, blocked_cash = run_backtest_loop(
         all_timestamps_int, sym_data, ts_int_arrays, close_arrays, signals_by_time,
         cash_bank, blocked_cash, order_amount, comi_factor, sell_after, tp_pct, sl_pct,
-        trades, trade_times, trade_log_cols, sim_balance_cols
+        trades, trade_times, trade_log_cols
     )
     
-    # Calcular métricas
-    metrics = compute_post_backtest_metrics(
-        symbols, trades, trade_times, all_timestamps_dt, initial_balance, sim_balance_cols
-    )
-    
-    # Construir resultados
-    results = build_results_dict(
-        symbols, trades, trade_times,
-        metrics['final_balance'],
-        num_signals_executed,
-        metrics['proportion_winners'],
-        metrics['max_dd_portfolio'],
-        sim_balance_cols,
-        trade_log_cols,
-        metrics['sharpe_portfolio']
-    )
+    # Construir resultados — solo datos crudos; las métricas se calculan en batch_metrics
+    results = build_results_dict(trades, trade_log_cols)
     
     return results
