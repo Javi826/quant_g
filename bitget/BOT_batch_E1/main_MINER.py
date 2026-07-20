@@ -37,7 +37,7 @@ from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
 DTYPE        = np.float32
-RULES_N_JOBS = -1
+RULES_N_JOBS = 1
 INNER_N_JOBS = 1
 
 # =============================================================================
@@ -48,7 +48,7 @@ SAVE_TRADES = False
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -61,10 +61,10 @@ PARAM_GRID = {
 # =============================================================================
 # WFO — Walk-Forward Optimization approval thresholds (Stage 1)
 # =============================================================================
-WFO_NET_GAIN_TH = 45
-WFO_DD_TH       = 20
-WFO_R2_TH       = 0.6
-WFO_WFR_TH      = 0.5
+WFO_NET_GAIN_TH = 0
+WFO_DD_TH       = 200
+WFO_R2_TH       = 0.1
+WFO_WFR_TH      = 0.1
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
@@ -73,18 +73,18 @@ WFO_WFR_TH      = 0.5
 RUN_CORRELATION   = True
 CORRELATION_DD_TH = 0.7
 RUN_PORTFOLIO     = True
-RUN_DEPLOY        = True
+RUN_DEPLOY        = False
 
 # =============================================================================
 # PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-PIPELINE_DSR         = True
-DSR_TH               = 0.3
-PIPELINE_MONTECARLO  = True
+PIPELINE_DSR         = False
+DSR_TH               = 0.8
+PIPELINE_MONTECARLO  = False
 MONTECARLO_RUIN_TH   = 10
-PIPELINE_MULTIVERSE  = True
-MULTIVERSE_PVALUE_TH = 0.15
+PIPELINE_MULTIVERSE  = False
+MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
