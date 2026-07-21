@@ -36,7 +36,7 @@ def _run_single_rule(
     i: int,
     total: int,
     rule: dict,
-    ohlcv_data: dict,
+    ohlcv_arr: dict,
     param_names: list,
     lists_for_grid: list,
     order_amount: int,
@@ -64,7 +64,7 @@ def _run_single_rule(
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, wfo_wfr,
         _window_best_params, _window_test_arrays, _window_test_start_ts, metrics, grid_train_matrix,
     ) = run_wfo_is(
-        ohlcv_data          = ohlcv_data,
+        ohlcv_arr           = ohlcv_arr,
         param_names         = param_names,
         lists_for_grid      = lists_for_grid,
         signal_fn           = rule["signal_fn"],
@@ -125,6 +125,7 @@ def _run_single_rule(
 
 def run_rule_mining(
     ohlcv_data: dict,
+    ohlcv_arr: dict,
     timeframe: str,
     param_grid: dict,
     order_amount: int,
@@ -161,7 +162,7 @@ def run_rule_mining(
     with tqdm_joblib(tqdm(desc=f"RULE MINING {timeframe}", total=total_rules, dynamic_ncols=True)):
         raw_results = Parallel(n_jobs=rules_n_jobs)(
             delayed(_run_single_rule)(
-                i, total_rules, rule, ohlcv_data, param_names, lists_for_grid, order_amount,
+                i, total_rules, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
                 timeframe, net_gain_th, dd_th, r2_th, wfr_th, dtype, inner_n_jobs, show_progress, n_symbols,
                 log_level, save_trades, brief_trades_folder,
             )

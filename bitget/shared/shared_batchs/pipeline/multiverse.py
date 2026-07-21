@@ -5,6 +5,8 @@ import pandas as pd
 from joblib import Parallel, delayed
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.wfo import run_wfo_is
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+from shared_batchs.pipeline.wfo import run_wfo_is
 
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
@@ -233,12 +235,14 @@ def _evaluate_universe(
     if len(synthetic_ohlcv) < n_symbols_expected:
         return None, None
 
+    synthetic_arr = prepare_ohlcv_arrays(synthetic_ohlcv)
+
     (
         _best_params, _approved_wfo, _net_gain, _max_dd, _train_trades, wfo_test_trades,
         _df_results, _wfr, _window_best_params, _window_test_arrays, _window_test_start_ts, _metrics,
         _grid_train_matrix,
     ) = run_wfo_is(
-        ohlcv_data           = synthetic_ohlcv,
+        ohlcv_arr            = synthetic_arr,
         param_names          = param_names,
         lists_for_grid       = lists_for_grid,
         signal_fn            = signal_fn,

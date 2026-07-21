@@ -2,7 +2,7 @@ from itertools import combinations
 from signals.condition_bank import ConditionBank
 from signals.signal_builder import build_signal_fn, describe_rule
 
-MAX_DEPTH        = 3
+MAX_DEPTH        = 2
 SIDES            = ("long", "short")
 VERBOSE_DISCARDED = False  # set to False to silence discarded-combo prints
 

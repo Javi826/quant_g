@@ -9,7 +9,7 @@ from shared_batchs.backtesters.ZX_compute_BT import (
     run_backtest_from_prepared,
 )
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
+from shared_batchs.utils.ohlcv_utils import get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
 
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
@@ -207,7 +207,7 @@ def _evaluate_wfo_approval(
 # RUN WFO IS
 # =============================================================================
 def run_wfo_is(
-    ohlcv_data: dict,
+    ohlcv_arr: dict,
     param_names: list,
     lists_for_grid: list,
     signal_fn: callable,
@@ -225,7 +225,6 @@ def run_wfo_is(
     collect_test_fn_override: callable = None,
 ) -> tuple:
 
-    ohlcv_arr    = prepare_ohlcv_arrays(ohlcv_data)
     param_ranges = dict(zip(param_names, lists_for_grid))
 
     _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe)

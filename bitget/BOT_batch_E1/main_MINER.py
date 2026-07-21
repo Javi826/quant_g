@@ -32,7 +32,7 @@ from shared_batch_regime.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
-
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -46,7 +46,7 @@ INNER_N_JOBS = 1
 SHOW_PLOTS  = True
 SAVE_TRADES = False
 
-TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
@@ -80,7 +80,7 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.8
+DSR_TH               = 0.7
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True
@@ -137,9 +137,11 @@ if __name__ == "__main__":
             filter_symbols_fn = filter_symbols,
         )
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
-
+        ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
+ 
         raw_results = run_rule_mining(
             ohlcv_data           = ohlcv_is,
+            ohlcv_arr            = ohlcv_arr,
             timeframe            = timeframe,
             param_grid           = PARAM_GRID,
             order_amount         = ORDER_AMOUNT,
