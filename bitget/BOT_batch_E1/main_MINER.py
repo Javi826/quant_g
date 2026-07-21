@@ -15,10 +15,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
-RULE_RUNNER_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
+RULE_RUNNER_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
 DEPLOY_LOG_LEVEL = logging.INFO
@@ -63,15 +63,13 @@ PARAM_GRID = {
 # =============================================================================
 WFO_NET_GAIN_TH = 45
 WFO_DD_TH       = 20
-WFO_R2_TH       = 0.6
-WFO_WFR_TH      = 0.5
+WFO_R2_TH       = 0.2
+WFO_WFR_TH      = 0.2
 
 # =============================================================================
 # RUNS — portfolio construction and output stages
 # =============================================================================
 
-RUN_CORRELATION   = True
-CORRELATION_DD_TH = 0.6
 RUN_PORTFOLIO     = True
 RUN_DEPLOY        = False
 
@@ -80,7 +78,9 @@ RUN_DEPLOY        = False
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.7
+DSR_TH               = 0.8
+PIPELINE_CORRELATION = True
+CORRELATION_DD_TH    = 0.6
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True
@@ -103,7 +103,6 @@ if __name__ == "__main__":
     logger.info(f"{'─' * 115}")
     logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
     logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
-    logger.info(f"  VALIDATION  : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
     logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM GRID  : {PARAM_GRID}")
     _windows_str = "  |  ".join(
@@ -113,23 +112,31 @@ if __name__ == "__main__":
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
-        f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'} (DSR_TH={DSR_TH})  "
-        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'} (RUIN_TH={MONTECARLO_RUIN_TH})  "
-        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'} (PCT_TH={MULTIVERSE_PVALUE_TH})"
+        f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'}  "
+        f"WFO: 🟢  "
+        f"CORRELATION: {'🟢' if PIPELINE_CORRELATION else '⚪'}  "
+        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
+        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
     )
+    logger.info(f"  DSR         : DSR_TH={DSR_TH}")
+    logger.info(f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
+    logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
+    logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
+    logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
     logger.info(
-        f"  RUNS        : CORRELATION: {'🟢' if RUN_CORRELATION else '⚪'}  "
-        f"BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
+        f"  RUNS        : BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
         f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"
     )
     logger.info(f"{'─' * 115}\n")
 
-    all_raw_results         = []
+    # -------------------------------------------------------------------
+    # DATA LOADING — cheap, sequential across timeframes. Rule mining
+    # (DSR + WFO) is orchestrated separately, across ALL timeframes.
+    # -------------------------------------------------------------------
     ohlcv_data_by_timeframe = {}
+    ohlcv_arr_by_timeframe  = {}
 
     for timeframe in TIMEFRAMES:
-        tf_start = time.time()
-
         ohlcv_is = select_universe(
             data_folder_is    = DATA_FOLDER_IS,
             timeframe         = timeframe,
@@ -137,31 +144,34 @@ if __name__ == "__main__":
             filter_symbols_fn = filter_symbols,
         )
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
-        ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
- 
-        raw_results = run_rule_mining(
-            ohlcv_data           = ohlcv_is,
-            ohlcv_arr            = ohlcv_arr,
-            timeframe            = timeframe,
-            param_grid           = PARAM_GRID,
-            order_amount         = ORDER_AMOUNT,
-            net_gain_th          = WFO_NET_GAIN_TH,
-            dd_th                = WFO_DD_TH,
-            r2_th                = WFO_R2_TH,
-            wfr_th               = WFO_WFR_TH,
-            dtype                = DTYPE,
-            rules_n_jobs         = RULES_N_JOBS,
-            inner_n_jobs         = INNER_N_JOBS,
-            n_symbols            = N_SYMBOLS,
-            max_depth            = RULE_MAX_DEPTH,
-            log_level            = LOG_LEVEL,
-            save_trades          = SAVE_TRADES,
-            brief_trades_folder  = BRIEF_TRADES_FOLDER,
-        )
-        all_raw_results.extend(raw_results)
+        ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
 
-        tf_elapsed = int(time.time() - tf_start)
-        logger.info(f"\n🏁 {timeframe} DONE — {tf_elapsed // 3600} h {(tf_elapsed % 3600) // 60} min {tf_elapsed % 60} s")
+    # -------------------------------------------------------------------
+    # RULE MINING — Phase A: DSR for every timeframe, then a combined
+    # ranking table, THEN Phase B: WFO for every timeframe (only rules
+    # that passed DSR).
+    # -------------------------------------------------------------------
+    all_raw_results = run_rule_mining(
+        ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
+        ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
+        timeframes              = TIMEFRAMES,
+        param_grid              = PARAM_GRID,
+        order_amount            = ORDER_AMOUNT,
+        net_gain_th             = WFO_NET_GAIN_TH,
+        dd_th                   = WFO_DD_TH,
+        r2_th                   = WFO_R2_TH,
+        wfr_th                  = WFO_WFR_TH,
+        dtype                   = DTYPE,
+        dsr_th                  = DSR_TH,
+        run_dsr                 = PIPELINE_DSR,
+        rules_n_jobs            = RULES_N_JOBS,
+        inner_n_jobs            = INNER_N_JOBS,
+        n_symbols               = N_SYMBOLS,
+        max_depth               = RULE_MAX_DEPTH,
+        log_level               = LOG_LEVEL,
+        save_trades             = SAVE_TRADES,
+        brief_trades_folder     = BRIEF_TRADES_FOLDER,
+    )
 
     finalize_rule_mining(
         all_raw_results          = all_raw_results,
@@ -177,21 +187,22 @@ if __name__ == "__main__":
         inner_n_jobs             = INNER_N_JOBS,
         n_symbols                = N_SYMBOLS,
         show_plots               = SHOW_PLOTS,
-        # ---- RUNS ----
-        run_correlation          = RUN_CORRELATION,
-        correlation_threshold    = CORRELATION_DD_TH,
-        run_best_portfolio       = RUN_PORTFOLIO,
-        run_deploy               = RUN_DEPLOY,
-        symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
-        deploy_output_path       = DEPLOY_OUTPUT_PATH,
         # ---- PIPELINES ----
-        run_dsr                  = PIPELINE_DSR,
-        dsr_th                   = DSR_TH,
+        pipeline_correlation     = PIPELINE_CORRELATION,
+        correlation_threshold    = CORRELATION_DD_TH,
         pipeline_montecarlo      = PIPELINE_MONTECARLO,
         montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
         pipeline_multiverse      = PIPELINE_MULTIVERSE,
         multiverse_p_value_th    = MULTIVERSE_PVALUE_TH,
+        # ---- RUNS ----
+        run_best_portfolio       = RUN_PORTFOLIO,
+        run_deploy               = RUN_DEPLOY,
+        symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
+        deploy_output_path       = DEPLOY_OUTPUT_PATH,
     )
+
+    elapsed = int(time.time() - start)
+    logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

@@ -17,7 +17,6 @@ def _make_overlapping_blocks(profits: np.ndarray, block_size: int) -> np.ndarray
     n_trades = len(profits)
     n_blocks = n_trades - block_size + 1
     return np.lib.stride_tricks.sliding_window_view(profits, block_size)[:n_blocks]
-
 def _bootstrap_max_drawdowns(
     profits: np.ndarray,
     initial_balance: float,
@@ -40,21 +39,18 @@ def _bootstrap_max_drawdowns(
         dd = (cummax - equity) / safe_cummax
         max_dds[i] = float(np.nanmax(dd)) * 100.0 if np.any(np.isfinite(dd)) else 100.0
     return max_dds
-
 def _probability_of_ruin(max_dds: np.ndarray, ruin_threshold_pct: float) -> float:
     """% of simulations whose max drawdown exceeds the ruin threshold."""
     return float(np.mean(max_dds >= ruin_threshold_pct)) * 100.0
-
 # =============================================================================
 # APPROVAL CRITERION
 # =============================================================================
 def _evaluate_montecarlo_approval(prob_ruin: float, prob_ruin_th: float) -> bool:
     return prob_ruin <= prob_ruin_th
-
 # =============================================================================
-# RUN MONTECARLO
+# CORE MONTECARLO EVALUATION (single rule)
 # =============================================================================
-def pipe_montecarlo(
+def _evaluate_montecarlo(
     wfo_test_trades: pd.DataFrame,
     initial_balance: float,
     prob_ruin_th: float,
@@ -63,7 +59,8 @@ def pipe_montecarlo(
     ruin_threshold_pct: float = RUIN_THRESHOLD_PCT,
     seed: int = SEED,
 ) -> tuple:
-    
+    """Runs the bootstrap for a single rule's trades. Returns (approved, prob_ruin)."""
+
     if wfo_test_trades is None or wfo_test_trades.empty:
         return False, 100.0
     trades_sorted = wfo_test_trades.sort_values("buy_time")
@@ -79,3 +76,53 @@ def pipe_montecarlo(
         f"prob_ruin={prob_ruin:.1f}% -> {'PASS' if approved else 'FAIL'}"
     )
     return approved, prob_ruin
+
+
+# =============================================================================
+# PIPE MONTECARLO — evaluates every rule's WFO test trades independently
+# =============================================================================
+def _empty_montecarlo_fields() -> dict:
+    """Placeholder Montecarlo fields for rules that were never evaluated (pipe disabled)."""
+    return {
+        "passed_montecarlo":    True,
+        "montecarlo_prob_ruin": 0.0,
+    }
+
+
+def pipe_montecarlo(
+    rules: list,
+    initial_balance: float,
+    prob_ruin_th: float,
+    enabled: bool = True,
+    n_simulations: int = N_SIMULATIONS,
+    block_size: int = BLOCK_SIZE,
+    ruin_threshold_pct: float = RUIN_THRESHOLD_PCT,
+    seed: int = SEED,
+) -> list:
+
+
+    if not enabled:
+        logger.info(f"MONTECARLO ── disabled — passing all {len(rules)} rules through untouched")
+        return [{**r, **_empty_montecarlo_fields()} for r in rules]
+
+    results = []
+    for r in rules:
+        approved, prob_ruin = _evaluate_montecarlo(
+            wfo_test_trades    = r["wfo_test_trades"],
+            initial_balance    = initial_balance,
+            prob_ruin_th       = prob_ruin_th,
+            n_simulations      = n_simulations,
+            block_size         = block_size,
+            ruin_threshold_pct = ruin_threshold_pct,
+            seed               = seed,
+        )
+        results.append({
+            **r,
+            "passed_montecarlo":    approved,
+            "montecarlo_prob_ruin": prob_ruin,
+        })
+
+    n_passed = sum(1 for r in results if r["passed_montecarlo"])
+    logger.info(f"MONTECARLO ── {n_passed}/{len(rules)} rules pass")
+
+    return results

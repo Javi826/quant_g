@@ -6,7 +6,6 @@ from joblib import Parallel, delayed
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.wfo import run_wfo_is
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.pipeline.wfo import run_wfo_is
 
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
@@ -238,9 +237,7 @@ def _evaluate_universe(
     synthetic_arr = prepare_ohlcv_arrays(synthetic_ohlcv)
 
     (
-        _best_params, _approved_wfo, _net_gain, _max_dd, _train_trades, wfo_test_trades,
-        _df_results, _wfr, _window_best_params, _window_test_arrays, _window_test_start_ts, _metrics,
-        _grid_train_matrix,
+        _best_params, _approved_wfo, _net_gain, _max_dd, wfo_test_trades, _df_results, _wfr, _metrics,
     ) = run_wfo_is(
         ohlcv_arr            = synthetic_arr,
         param_names          = param_names,
@@ -286,9 +283,9 @@ def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
 
 
 # =============================================================================
-# RUN MCPT
+# CORE MULTIVERSE EVALUATION (single rule)
 # =============================================================================
-def pipe_multiverse(
+def _evaluate_multiverse(
     ohlcv_data: dict,
     timeframe: str,
     param_grid: dict,
@@ -306,6 +303,7 @@ def pipe_multiverse(
     n_paths: int = N_PERMUTATIONS,
     n_jobs: int = N_JOBS,
 ) -> tuple:
+    """Runs MCPT for a single rule. Returns (approved, p_value)."""
 
     if not ohlcv_data:
         return False, 1.0
@@ -365,3 +363,68 @@ def pipe_multiverse(
         f"p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
     )
     return approved, p_value
+
+
+# =============================================================================
+# PIPE MULTIVERSE — evaluates every rule's WFO test trades independently
+# =============================================================================
+def _empty_multiverse_fields() -> dict:
+    """Placeholder Multiverse fields for rules that were never evaluated (pipe disabled)."""
+    return {
+        "passed_multiverse":  True,
+        "multiverse_p_value": 0.0,
+    }
+
+
+def pipe_multiverse(
+    rules: list,
+    ohlcv_data_by_timeframe: dict,
+    param_grid: dict,
+    order_amount: int,
+    net_gain_th: float,
+    dd_th: float,
+    r2_th: float,
+    wfr_th: float,
+    dtype,
+    n_symbols: int,
+    p_value_th: float,
+    enabled: bool = True,
+    n_paths: int = N_PERMUTATIONS,
+    n_jobs: int = N_JOBS,
+) -> list:
+
+
+    if not enabled:
+        logger.info(f"MULTIVERSE ── disabled — passing all {len(rules)} rules through untouched")
+        return [{**r, **_empty_multiverse_fields()} for r in rules]
+
+    results = []
+    for r in rules:
+        approved, p_value = _evaluate_multiverse(
+            ohlcv_data          = ohlcv_data_by_timeframe[r["timeframe"]],
+            timeframe           = r["timeframe"],
+            param_grid          = param_grid,
+            signal_fn           = r["signal_fn"],
+            signal_params_keys  = [],
+            order_amount        = order_amount,
+            net_gain_th         = net_gain_th,
+            dd_th               = dd_th,
+            r2_th               = r2_th,
+            wfr_th              = wfr_th,
+            dtype               = dtype,
+            n_symbols           = n_symbols,
+            real_profit         = float(r["wfo_test_trades"]["profit"].sum()),
+            p_value_th          = p_value_th,
+            n_paths             = n_paths,
+            n_jobs              = n_jobs,
+        )
+        results.append({
+            **r,
+            "passed_multiverse":  approved,
+            "multiverse_p_value": p_value,
+        })
+
+    n_passed = sum(1 for r in results if r["passed_multiverse"])
+    logger.info(f"MULTIVERSE ── {n_passed}/{len(rules)} rules pass")
+
+    return results

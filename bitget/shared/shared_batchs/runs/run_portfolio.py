@@ -1,4 +1,4 @@
-#shared/shared_batchs/runs/run_best_wfo_portfolio.py
+#shared/shared_batchs/runs/run_portfolio.py
 import logging
 import numpy as np
 import pandas as pd

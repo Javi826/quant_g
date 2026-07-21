@@ -1,8 +1,12 @@
 #shared_batchs/pipeline/wfo.py
 import logging
+import os
 import numpy as np
 import pandas as pd
 from functools import partial
+from joblib import Parallel, delayed
+from tqdm import tqdm
+from tqdm_joblib import tqdm_joblib
 from shared_batchs.backtesters.ZX_compute_BT import (
     INITIAL_BALANCE,
     prepare_backtest_data,
@@ -167,7 +171,8 @@ def _collect_trades_fn(
 # =============================================================================
 
 def _evaluate_wfo_approval(
-    wfo_train_trades: pd.DataFrame,
+    train_net_gain_is_avg: float,
+    test_net_gain_oos_avg: float,
     wfo_test_trades: pd.DataFrame,
     net_gain_th: float,
     dd_th: float,
@@ -185,13 +190,14 @@ def _evaluate_wfo_approval(
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
 
-    net_gain_pct_is = 0.0
-    if wfo_train_trades is not None and not wfo_train_trades.empty:
-        m_is            = compute_metrics(wfo_train_trades, capital=INITIAL_BALANCE, name="")
-        net_gain_pct_is = m_is["Net_Gain_pct"]
-
-    monthly_test = net_gain_pct / test_months
-    monthly_is   = net_gain_pct_is / train_months if train_months else 0.0
+    # Both sides of WFR use the SAME convention — average of each window's
+    # OWN Net_Gain_pct (never the multi-window aggregate), so numerator and
+    # denominator are on comparable footing. Train windows overlap in
+    # calendar time (rolling); test windows don't — averaging per-window
+    # avoids both the overlap bias on train and the window-count inflation
+    # on test that a naive aggregate/single-window-months division would add.
+    monthly_test = test_net_gain_oos_avg / test_months
+    monthly_is   = train_net_gain_is_avg / train_months if train_months else 0.0
     wfr          = monthly_test / monthly_is if monthly_is > 0 else 0.0
 
     approved     = (
@@ -258,7 +264,7 @@ def run_wfo_is(
 
     collect_test_fn = collect_test_fn_override if collect_test_fn_override is not None else collect_train_fn
 
-    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, window_best_params, window_test_arrays, window_test_start_ts, grid_train_matrix = walk_forward_optimization(
+    best_params, df_results, wfo_train_trades, wfo_test_trades, n_windows, train_net_gain_is_avg, test_net_gain_oos_avg = walk_forward_optimization(
         ohlcv_arr               = ohlcv_arr,
         param_ranges            = param_ranges,
         length_train_set        = length_train_set,
@@ -285,17 +291,179 @@ def run_wfo_is(
         logger.debug("STAGE 1 ── WFO rejected — at least one window had no trades (NaN)")
     else:
         approved_wfo, wfo_net_gain, wfo_max_dd, wfo_wfr, wfo_metrics = _evaluate_wfo_approval(
-            wfo_train_trades = wfo_train_trades,
-            wfo_test_trades  = wfo_test_trades,
-            net_gain_th      = net_gain_th,
-            dd_th            = dd_th,
-            r2_th            = r2_th,
-            wfr_th           = wfr_th,
-            train_months     = _wfo_cfg["train_months"],
-            test_months      = _wfo_cfg["test_months"],
+            train_net_gain_is_avg = train_net_gain_is_avg,
+            test_net_gain_oos_avg = test_net_gain_oos_avg,
+            wfo_test_trades       = wfo_test_trades,
+            net_gain_th           = net_gain_th,
+            dd_th                 = dd_th,
+            r2_th                 = r2_th,
+            wfr_th                = wfr_th,
+            train_months          = _wfo_cfg["train_months"],
+            test_months           = _wfo_cfg["test_months"],
         )
 
     return (
-        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_train_trades, wfo_test_trades, df_results, wfo_wfr,
-        window_best_params, window_test_arrays, window_test_start_ts, wfo_metrics, grid_train_matrix,
+        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_test_trades, df_results, wfo_wfr, wfo_metrics,
     )
+
+
+# =============================================================================
+# PIPE WFO — one timeframe at a time, parallelized by rule
+# =============================================================================
+def _empty_wfo_fields() -> dict:
+    """Placeholder WFO fields for rules that were never evaluated (pipe disabled)."""
+    return {
+        "approved":        False,
+        "net_gain":        0.0,
+        "max_dd":          0.0,
+        "n_trades":        0,
+        "n_windows":       0,
+        "win_rate":        0.0,
+        "profit_factor":   0.0,
+        "calmar":          0.0,
+        "r_squared":       0.0,
+        "wfr":             0.0,
+        "best_params":     None,
+        "wfo_test_trades": None,
+    }
+
+
+def _run_wfo_for_rule(
+    idx: int,
+    total: int,
+    rule: dict,
+    ohlcv_arr: dict,
+    param_names: list,
+    lists_for_grid: list,
+    order_amount: int,
+    timeframe: str,
+    net_gain_th: float,
+    dd_th: float,
+    r2_th: float,
+    wfr_th: float,
+    dtype,
+    inner_n_jobs: int,
+    show_progress: bool,
+    n_symbols: int,
+    log_level: int,
+    save_trades: bool,
+    brief_trades_folder: str,
+) -> dict:
+    """Runs WFO for a single rule; returns the rule dict merged with WFO result fields."""
+    logging.basicConfig(level=log_level, format="%(message)s", force=True)
+    logging.getLogger("joblib").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
+    rule_id = rule["rule_id"]
+
+    (
+        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_test_trades, df_results, wfo_wfr, metrics,
+    ) = run_wfo_is(
+        ohlcv_arr           = ohlcv_arr,
+        param_names         = param_names,
+        lists_for_grid      = lists_for_grid,
+        signal_fn           = rule["signal_fn"],
+        signal_params_keys  = [],
+        order_amount        = order_amount,
+        timeframe           = timeframe,
+        net_gain_th         = net_gain_th,
+        dd_th               = dd_th,
+        r2_th               = r2_th,
+        wfr_th              = wfr_th,
+        dtype               = dtype,
+        n_jobs              = inner_n_jobs,
+        show_progress       = show_progress,
+        n_symbols           = n_symbols,
+    )
+    n_windows = len(df_results) - 1 if df_results is not None else 0
+    n_trades  = 0 if wfo_test_trades is None else len(wfo_test_trades)
+
+    if save_trades and wfo_test_trades is not None and not wfo_test_trades.empty:
+        os.makedirs(brief_trades_folder, exist_ok=True)
+        wfo_test_trades.to_csv(
+            os.path.join(brief_trades_folder, f"trades_wfo_test_{rule_id}.csv"),
+            index=False,
+        )
+
+    metrics = None
+    if wfo_test_trades is not None and not wfo_test_trades.empty:
+        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
+
+    logger.debug(f"[{idx + 1}/{total}] {rule['side']:<5} {rule['label']} -> "
+                 f"{'PASS' if approved_wfo else 'FAIL'} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")
+
+    return {
+        **rule,
+        "approved":        approved_wfo,
+        "net_gain":        wfo_net_gain,
+        "max_dd":          wfo_max_dd,
+        "n_trades":        n_trades,
+        "n_windows":       n_windows,
+        "win_rate":        metrics["Win_Rate"]      if metrics else 0.0,
+        "profit_factor":   metrics["Profit_Factor"] if metrics else 0.0,
+        "calmar":          metrics["Calmar"]        if metrics else 0.0,
+        "r_squared":       metrics["R_Squared"]     if metrics else 0.0,
+        "wfr":             wfo_wfr,
+        "best_params":     best_params,
+        "wfo_test_trades": wfo_test_trades,
+    }
+
+
+def pipe_wfo(
+    rules: list,
+    ohlcv_arr: dict,
+    param_grid: dict,
+    order_amount: int,
+    timeframe: str,
+    net_gain_th: float,
+    dd_th: float,
+    r2_th: float,
+    wfr_th: float,
+    dtype,
+    enabled: bool = True,
+    rules_n_jobs: int = 1,
+    inner_n_jobs: int = -1,
+    show_progress: bool = False,
+    n_symbols: int = None,
+    log_level: int = logging.INFO,
+    save_trades: bool = False,
+    brief_trades_folder: str = None,
+) -> list:
+    """PIPE WFO — walk-forward optimization, one timeframe at a time.
+
+    Parallelizes by RULE (rules_n_jobs). Every rule in `rules` must already
+    carry a unique 'rule_id' (assigned upstream by the DSR stage).
+
+    Returns EVERY input rule merged with its WFO result fields (approved or
+    not) — the caller (rule_runner) filters by 'approved' to build the next
+    stage's input, same pattern used for montecarlo/multiverse.
+
+    If disabled, returns every input rule untouched, merged with placeholder
+    WFO fields (no rule is evaluated)."""
+
+    if not enabled:
+        logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
+        return [{**r, **_empty_wfo_fields()} for r in rules]
+
+    param_names    = list(param_grid.keys())
+    lists_for_grid = [param_grid[k] for k in param_names]
+    total          = len(rules)
+
+    with tqdm_joblib(tqdm(desc=f"WFO {timeframe}", total=total, dynamic_ncols=True)):
+        results = Parallel(n_jobs=rules_n_jobs)(
+            delayed(_run_wfo_for_rule)(
+                i, total, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
+                timeframe, net_gain_th, dd_th, r2_th, wfr_th, dtype, inner_n_jobs, show_progress, n_symbols,
+                log_level, save_trades, brief_trades_folder,
+            )
+            for i, rule in enumerate(rules)
+        )
+
+    if results:
+        _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe, {})
+        logger.info(
+            f"WFO ── {timeframe} completed ── {results[0]['n_windows']} windows | "
+            f"train={_wfo_cfg.get('train_months')}m  test={_wfo_cfg.get('test_months')}m"
+        )
+
+    return results

@@ -1,12 +1,11 @@
-# shared_batchs/runs/run_correlation.py
+# shared_batchs/pipeline/correlation.py
 import logging
 import numpy as np
 import pandas as pd
 
 from shared_batchs.utils.batch_metrics import compute_metrics
 
-logger = logging.getLogger("BOT_batch.runs.run_correlation")
-
+logger = logging.getLogger("BOT_batch.pipeline.correlation")
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -124,3 +123,43 @@ def decorrelate_by_profit(
         threshold, precomputed_metrics,
         series_fn=_profit_series, label="Profit",
     )
+
+
+# =============================================================================
+# PIPE CORRELATION — greedy profit-correlation filter across all rules
+# =============================================================================
+def pipe_correlation(
+    rules: list,
+    initial_balance: float,
+    threshold: float = 0.7,
+    enabled: bool = True,
+) -> list:
+    """PIPE CORRELATION — drops rules whose profit series is too correlated
+    with an already-selected (higher NetGain) rule.
+
+    Every rule in `rules` must already carry 'rule_id', 'wfo_test_trades'
+    (non-empty) and 'net_gain' (from WFO). Correlation is an all-or-nothing
+    filter (there is no per-rule threshold like DSR/WFO/Montecarlo), so this
+    pipe returns only the SURVIVING rules — not the full input list with a
+    boolean flag.
+
+    If disabled, returns every input rule untouched (no filtering)."""
+
+    if not enabled:
+        logger.info(f"CORRELATION ── disabled — passing all {len(rules)} rules through untouched")
+        return rules
+
+    by_id = {r["rule_id"]: r for r in rules}
+    strategy_trades_wfo_test = [(r["rule_id"], r["wfo_test_trades"]) for r in rules]
+    precomputed_metrics      = {r["rule_id"]: {"Net_Gain_pct": r["net_gain"]} for r in rules}
+
+    survivors = decorrelate_by_profit(
+        strategy_trades_wfo_test = strategy_trades_wfo_test,
+        initial_balance          = initial_balance,
+        threshold                = threshold,
+        precomputed_metrics      = precomputed_metrics,
+    )
+
+    logger.info(f"CORRELATION ── {len(survivors)}/{len(rules)} rules pass")
+
+    return [by_id[rule_id] for rule_id, _ in survivors]

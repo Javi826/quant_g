@@ -1,19 +1,12 @@
 #shared/shared_batchs/rule_mining/rule_runner.py
-import os
 import logging
 
-import numpy as np
-from joblib import Parallel, delayed
-from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
-
-from shared_batchs.pipeline.wfo import run_wfo_is, WFO_WINDOW_CONFIG
+from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
-from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_comparison
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
-from shared_batchs.runs.run_correlation import decorrelate_by_profit
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
@@ -32,121 +25,14 @@ def _slugify_label(label: str) -> str:
     slug = slug.replace("[", "").replace("]", "").replace("-", "m")
     return slug
 
-def _run_single_rule(
-    i: int,
-    total: int,
-    rule: dict,
-    ohlcv_arr: dict,
-    param_names: list,
-    lists_for_grid: list,
-    order_amount: int,
-    timeframe: str,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
-    dtype,
-    inner_n_jobs: int,
-    show_progress: bool,
-    n_symbols: int,
-    log_level: int,
-    save_trades: bool,
-    brief_trades_folder: str,
-) -> dict:
 
-    logging.basicConfig(level=log_level, format="%(message)s", force=True)
-    logging.getLogger("joblib").setLevel(logging.WARNING)
-    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+def _build_rule_id(i: int, timeframe: str, rule: dict) -> str:
+    return f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
-    rule_id = f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
-    (
-        best_params, approved_wfo, wfo_net_gain, wfo_max_dd, _, wfo_test_trades, df_results, wfo_wfr,
-        _window_best_params, _window_test_arrays, _window_test_start_ts, metrics, grid_train_matrix,
-    ) = run_wfo_is(
-        ohlcv_arr           = ohlcv_arr,
-        param_names         = param_names,
-        lists_for_grid      = lists_for_grid,
-        signal_fn           = rule["signal_fn"],
-        signal_params_keys  = [],
-        order_amount        = order_amount,
-        timeframe           = timeframe,
-        net_gain_th         = net_gain_th,
-        dd_th               = dd_th,
-        r2_th               = r2_th,
-        wfr_th              = wfr_th,
-        dtype               = dtype,
-        n_jobs              = inner_n_jobs,
-        show_progress       = show_progress,
-        n_symbols           = n_symbols,
-    )
-    n_windows = len(df_results) - 1 if df_results is not None else 0
-    n_trades  = 0 if wfo_test_trades is None else len(wfo_test_trades)
-
-    if save_trades and wfo_test_trades is not None and not wfo_test_trades.empty:
-        os.makedirs(brief_trades_folder, exist_ok=True)
-        wfo_test_trades.to_csv(
-            os.path.join(brief_trades_folder, f"trades_wfo_test_{rule_id}.csv"),
-            index=False,
-        )
-
-    metrics = None
-    if wfo_test_trades is not None and not wfo_test_trades.empty:
-        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
-
-    logger.debug(f"[{i + 1}/{total}] {rule['side']:<5} {rule['label']} -> "
-                 f"{'PASS' if approved_wfo else 'FAIL'} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")
-
-    return {
-        "rule_id":         rule_id,
-        "timeframe":        timeframe,
-        "side":             rule["side"],
-        "specs":            rule["specs"],
-        "signal_fn":        rule["signal_fn"],
-        "label":            rule["label"],
-        "approved":         approved_wfo,
-        "net_gain":         wfo_net_gain,
-        "max_dd":           wfo_max_dd,
-        "n_trades":         n_trades,
-        "n_windows":        n_windows,
-        "win_rate":         metrics["Win_Rate"]      if metrics else 0.0,
-        "profit_factor":    metrics["Profit_Factor"] if metrics else 0.0,
-        "calmar":           metrics["Calmar"]        if metrics else 0.0,
-        "r_squared":        metrics["R_Squared"]     if metrics else 0.0,
-        "wfr":              wfo_wfr,
-        "sharpe":           metrics["Sharpe"]   if metrics else np.nan,
-        "skew":             metrics["Skew"]     if metrics else np.nan,
-        "kurtosis":         metrics["Kurtosis"] if metrics else np.nan,
-        "n_days":           metrics["N_days"]   if metrics else 0,
-        "best_params":      best_params,
-        "wfo_test_trades":  wfo_test_trades,
-        "grid_train_matrix": grid_train_matrix,
-    }
-
-def run_rule_mining(
-    ohlcv_data: dict,
-    ohlcv_arr: dict,
-    timeframe: str,
-    param_grid: dict,
-    order_amount: int,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
-    dtype,
-    rules_n_jobs: int = 1,
-    inner_n_jobs: int = -1,
-    show_progress: bool = False,
-    n_symbols: int = None,
-    max_depth: int = MAX_DEPTH,
-    log_level: int = logging.INFO,
-    save_trades: bool = False,
-    brief_trades_folder: str = None,
-) -> list:
-
-    param_names    = list(param_grid.keys())
-    lists_for_grid = [param_grid[k] for k in param_names]
-
+def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
+    """Generate all candidate rules for one timeframe, each tagged with a
+    unique rule_id — the schema every pipe (DSR, WFO, ...) expects."""
     arr_sample = next(iter(ohlcv_data.values()))
     all_rules  = generate_all_rules({
         "open":  arr_sample["open"],
@@ -156,27 +42,130 @@ def run_rule_mining(
         "volume_quote": arr_sample["volume_quote"],
     }, max_depth=max_depth)
 
-    total_rules = len(all_rules)
-    logger.info(f"RULE MINING ── {timeframe} ── total candidate rules: {total_rules}")
+    return [
+        {
+            "rule_id":   _build_rule_id(i, timeframe, rule),
+            "timeframe": timeframe,
+            "side":      rule["side"],
+            "specs":     rule["specs"],
+            "signal_fn": rule["signal_fn"],
+            "label":     rule["label"],
+        }
+        for i, rule in enumerate(all_rules)
+    ]
 
-    with tqdm_joblib(tqdm(desc=f"RULE MINING {timeframe}", total=total_rules, dynamic_ncols=True)):
-        raw_results = Parallel(n_jobs=rules_n_jobs)(
-            delayed(_run_single_rule)(
-                i, total_rules, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
-                timeframe, net_gain_th, dd_th, r2_th, wfr_th, dtype, inner_n_jobs, show_progress, n_symbols,
-                log_level, save_trades, brief_trades_folder,
-            )
-            for i, rule in enumerate(all_rules)
+
+# =============================================================================
+# ORCHESTRATOR — chains pipe_dsr (all timeframes) then pipe_wfo (all
+# timeframes), each stage toggleable and reported via _print_ranking.
+# =============================================================================
+def run_rule_mining(
+    ohlcv_data_by_timeframe: dict,
+    ohlcv_arr_by_timeframe: dict,
+    timeframes: list,
+    param_grid: dict,
+    order_amount: int,
+    net_gain_th: float,
+    dd_th: float,
+    r2_th: float,
+    wfr_th: float,
+    dtype,
+    dsr_th: float,
+    run_dsr: bool = True,
+    rules_n_jobs: int = 1,
+    inner_n_jobs: int = -1,
+    show_progress: bool = False,
+    n_symbols: int = None,
+    max_depth: int = MAX_DEPTH,
+    log_level: int = logging.INFO,
+    save_trades: bool = False,
+    brief_trades_folder: str = None,
+) -> list:
+    """Runs the DSR stage for EVERY timeframe first (own N_eff/SR0 per
+    timeframe), reports one combined ranking table, THEN runs WFO for
+    EVERY timeframe on the rules that passed DSR. Returns the combined
+    list of rules (all timeframes), ready for finalize_rule_mining."""
+
+    # -------------------------------------------------------------------
+    # PHASE A ── DSR, one timeframe at a time, ALL timeframes before moving on.
+    # -------------------------------------------------------------------
+    all_dsr_results = []
+    for timeframe in timeframes:
+        rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
+        logger.info(f"RULE MINING ── {timeframe} ── total candidate rules: {len(rules)}")
+
+        dsr_results = pipe_dsr(
+            rules        = rules,
+            ohlcv_arr    = ohlcv_arr_by_timeframe[timeframe],
+            param_grid   = param_grid,
+            order_amount = order_amount,
+            dtype        = dtype,
+            dsr_th       = dsr_th,
+            enabled      = run_dsr,
+            timeframe    = timeframe,
         )
+        all_dsr_results.extend([{**r, **_empty_wfo_fields()} for r in dsr_results])
 
-    if raw_results:
-        _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe, {})
-        logger.info(
-            f"STAGE 1 ── WFO completed  ── {raw_results[0]['n_windows']} windows | "
-            f"train={_wfo_cfg.get('train_months')}m  test={_wfo_cfg.get('test_months')}m"
+    passed_dsr_ids = {r["rule_id"] for r in all_dsr_results if r["passed_dsr"]}
+    _print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids))
+
+    # -------------------------------------------------------------------
+    # PHASE B ── WFO, one timeframe at a time, only for rules that passed DSR.
+    # -------------------------------------------------------------------
+    wfo_by_id = {}
+    for timeframe in timeframes:
+        rules_this_tf = [r for r in all_dsr_results if r["timeframe"] == timeframe and r["passed_dsr"]]
+
+        wfo_results = pipe_wfo(
+            rules               = rules_this_tf,
+            ohlcv_arr           = ohlcv_arr_by_timeframe[timeframe],
+            param_grid          = param_grid,
+            order_amount        = order_amount,
+            timeframe           = timeframe,
+            net_gain_th         = net_gain_th,
+            dd_th               = dd_th,
+            r2_th               = r2_th,
+            wfr_th              = wfr_th,
+            dtype               = dtype,
+            enabled             = True,
+            rules_n_jobs        = rules_n_jobs,
+            inner_n_jobs        = inner_n_jobs,
+            show_progress       = show_progress,
+            n_symbols           = n_symbols,
+            log_level           = log_level,
+            save_trades         = save_trades,
+            brief_trades_folder = brief_trades_folder,
         )
+        wfo_by_id.update({r["rule_id"]: r for r in wfo_results})
 
-    return raw_results
+    all_raw_results = [
+        wfo_by_id[r["rule_id"]] if r["rule_id"] in wfo_by_id else r
+        for r in all_dsr_results
+    ]
+
+    wfo_candidate_ids = list(wfo_by_id.keys())
+    _print_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
+
+    return all_raw_results
+
+
+def _empty_wfo_fields() -> dict:
+    """Placeholder WFO fields for rules not yet sent to WFO (e.g. filtered
+    out by DSR, or before Phase B has run)."""
+    return {
+        "approved":        False,
+        "net_gain":        0.0,
+        "max_dd":          0.0,
+        "n_trades":        0,
+        "n_windows":       0,
+        "win_rate":        0.0,
+        "profit_factor":   0.0,
+        "calmar":          0.0,
+        "r_squared":       0.0,
+        "wfr":             0.0,
+        "best_params":     None,
+        "wfo_test_trades": None,
+    }
 
 
 def finalize_rule_mining(
@@ -190,13 +179,11 @@ def finalize_rule_mining(
     wfr_th: float,
     dtype,
     data_folder: str,
-    dsr_th: float,
     inner_n_jobs: int = -1,
     n_symbols: int = None,
     show_plots: bool = False,
-    run_dsr: bool = True,
     correlation_threshold: float = 0.75,
-    run_correlation: bool = True,
+    pipeline_correlation: bool = True,
     pipeline_montecarlo: bool = True,
     montecarlo_ruin_th: float = 5.0,
     pipeline_multiverse: bool = True,
@@ -215,101 +202,77 @@ def finalize_rule_mining(
         if r["approved"] and r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
     ]
 
-    _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-WFO")
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
 
     # -------------------------------------------------------------------
-    # STAGE 2 ── DSR (Deflated Sharpe Ratio — corrects for multiple testing)
+    # STAGE ── Correlation (portfolio construction: drop redundant rules)
     # -------------------------------------------------------------------
-    if run_dsr and validated_wfo_test:
-        candidates_before_dsr = [rid for rid, _ in validated_wfo_test]
-
-        # SR0 / N_eff are estimated over the FULL universe of tested rules (all_raw_results),
-        # not just WFO survivors — using only survivors would reintroduce survivorship bias.
-        dsr_result = pipe_dsr(all_raw_results, dsr_th=dsr_th, debug_ids=set(candidates_before_dsr))
-
-        for rule_id, dsr_value in dsr_result["dsr_by_rule_id"].items():
-            raw_by_id[rule_id]["dsr"] = dsr_value
-
-        # DIAGNOSTIC ONLY — universe-wide rules that pass the DSR threshold,
-        # regardless of WFO status. Does not affect the pipeline / survivors.
-        if logger.isEnabledFor(logging.DEBUG):
-            _print_ranking(all_raw_results, dsr_result["significant_ids"], "DSR-SIGNIFICANT (diagnostic, universe-wide)")
-
-        # DSR filter is applied only to rules that already passed WFO
-        significant_set    = set(dsr_result["significant_ids"])
-        validated_wfo_test = [(rid, trades) for rid, trades in validated_wfo_test if rid in significant_set]
-        survivors_dsr       = [rid for rid, _ in validated_wfo_test]
-        _print_ranking(all_raw_results, candidates_before_dsr, "POST-DSR", survivor_ids=survivors_dsr)
-    else:
-        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-DSR")
-
-    # -------------------------------------------------------------------
-    # STAGE 3 ── Correlation (portfolio construction: drop redundant rules)
-    # -------------------------------------------------------------------
-    if run_correlation and validated_wfo_test:
+    if validated_wfo_test:
         candidates_before_corr = [rid for rid, _ in validated_wfo_test]
-        validated_wfo_test = decorrelate_by_profit(
-            strategy_trades_wfo_test = validated_wfo_test,
-            initial_balance          = INITIAL_BALANCE,
-            threshold                = correlation_threshold,
+        rules_for_corr = [raw_by_id[rid] for rid in candidates_before_corr]
+        survivors_rules = pipe_correlation(
+            rules           = rules_for_corr,
+            initial_balance = INITIAL_BALANCE,
+            threshold       = correlation_threshold,
+            enabled         = pipeline_correlation,
         )
-        survivors_corr = [rid for rid, _ in validated_wfo_test]
+        survivors_corr      = [r["rule_id"] for r in survivors_rules]
+        validated_wfo_test  = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
         _print_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
     else:
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
 
     # -------------------------------------------------------------------
-    # STAGE 4 ── Montecarlo (bootstrap of executed trades — validates RISK)
+    # STAGE ── Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
-    if pipeline_montecarlo and validated_wfo_test:
+    if validated_wfo_test:
         candidates_before_mc = [rid for rid, _ in validated_wfo_test]
-        survivors = []
-        for rule_id, trades in validated_wfo_test:
-            approved_mc, prob_ruin = pipe_montecarlo(
-                wfo_test_trades = trades,
-                initial_balance = INITIAL_BALANCE,
-                prob_ruin_th    = montecarlo_ruin_th,
-            )
-            raw_by_id[rule_id]["montecarlo_prob_ruin"] = prob_ruin
-            if approved_mc:
-                survivors.append((rule_id, trades))
-        validated_wfo_test = survivors
+        rules_for_mc = [raw_by_id[rid] for rid in candidates_before_mc]
+        mc_results = pipe_montecarlo(
+            rules           = rules_for_mc,
+            initial_balance = INITIAL_BALANCE,
+            prob_ruin_th    = montecarlo_ruin_th,
+            enabled         = pipeline_montecarlo,
+        )
+        for r in mc_results:
+            raw_by_id[r["rule_id"]]["montecarlo_prob_ruin"] = r["montecarlo_prob_ruin"]
+
+        validated_wfo_test = [
+            (r["rule_id"], r["wfo_test_trades"]) for r in mc_results if r["passed_montecarlo"]
+        ]
         survivors_mc = [rid for rid, _ in validated_wfo_test]
         _print_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
     else:
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MONTECARLO")
 
     # -------------------------------------------------------------------
-    # STAGE 5 ── Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
+    # STAGE ── Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
     # -------------------------------------------------------------------
-    if pipeline_multiverse and validated_wfo_test:
+    if validated_wfo_test:
         from shared_batchs.pipeline.multiverse import pipe_multiverse
 
         candidates_before_mv = [rid for rid, _ in validated_wfo_test]
-        survivors = []
-        for rule_id, trades in validated_wfo_test:
-            rule_info = raw_by_id[rule_id]
-            approved_mv, p_value_mv = pipe_multiverse(
-                ohlcv_data          = ohlcv_data_by_timeframe[rule_info["timeframe"]],
-                timeframe           = rule_info["timeframe"],
-                param_grid          = param_grid,
-                signal_fn           = rule_info["signal_fn"],
-                signal_params_keys  = [],
-                order_amount        = order_amount,
-                net_gain_th         = net_gain_th,
-                dd_th               = dd_th,
-                r2_th               = r2_th,
-                wfr_th              = wfr_th,
-                dtype               = dtype,
-                n_symbols           = n_symbols,
-                real_profit         = float(trades["profit"].sum()),
-                p_value_th          = multiverse_p_value_th,
-            )
-            raw_by_id[rule_id]["multiverse_p_value"] = p_value_mv
-            if approved_mv:
-                survivors.append((rule_id, trades))
-        validated_wfo_test = survivors
+        rules_for_mv = [raw_by_id[rid] for rid in candidates_before_mv]
+        mv_results = pipe_multiverse(
+            rules                   = rules_for_mv,
+            ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
+            param_grid              = param_grid,
+            order_amount            = order_amount,
+            net_gain_th             = net_gain_th,
+            dd_th                   = dd_th,
+            r2_th                   = r2_th,
+            wfr_th                  = wfr_th,
+            dtype                   = dtype,
+            n_symbols               = n_symbols,
+            p_value_th              = multiverse_p_value_th,
+            enabled                 = pipeline_multiverse,
+        )
+        for r in mv_results:
+            raw_by_id[r["rule_id"]]["multiverse_p_value"] = r["multiverse_p_value"]
+
+        validated_wfo_test = [
+            (r["rule_id"], r["wfo_test_trades"]) for r in mv_results if r["passed_multiverse"]
+        ]
         survivors_mv = [rid for rid, _ in validated_wfo_test]
         _print_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
     else:
@@ -340,7 +303,7 @@ def finalize_rule_mining(
         top_portfolios = find_best_portfolio_combination_wfo(
             validated_wfo_trades = validated_wfo_test,
             initial_balance      = INITIAL_BALANCE,
-            show_plots           = show_plots,
+            show_plots            = show_plots,
         )
         if top_portfolios:
             best_combo_ids = list(top_portfolios[0]["combo"])
@@ -383,6 +346,7 @@ def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
+
 def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
     rows.sort(key=lambda r: r["net_gain"], reverse=True)
@@ -390,12 +354,11 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
     show_status  = survivor_ids is not None
     survivor_set = set(survivor_ids) if show_status else None
     log_fn       = logger.info
-    id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
 
     id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
     label_width = max((len(r["label"]) for r in rows), default=8) + 2
 
-    count_str = f"{len(survivor_ids)} / {len(rows)} passed" if show_status else f"{len(rows)} / {len(all_raw_results)} tested"
+    count_str = f"{len(survivor_ids)} / {len(all_raw_results)} passed" if show_status else f"{len(rows)} / {len(all_raw_results)} tested"
 
     log_fn(f"\n{'─' * 170}")
     log_fn(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
@@ -404,7 +367,7 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
     status_header = f"  {'STATUS':<8}" if show_status else ""
     log_fn(
         f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
-        f"{'WFR':<8}{'DSR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
+        f"{'DSR':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
     )
     log_fn(f"{'─' * 170}")
 
@@ -413,12 +376,13 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
         log_fn(
             f"{_short_id(r['rule_id']):<{id_width}}{r['side']:<6}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
-            f"{r['wfr']:<8.2f}{r.get('dsr', 0.0):<8.3f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
+            f"{r.get('dsr', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
             f"{r.get('multiverse_p_value', 0.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 
     log_fn(f"{'─' * 170}\n")
+
 
 def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
@@ -458,12 +422,11 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
 
     logger.debug(f"{'─' * 115}")
 
-
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
 
-    safe_net_gain = min(a["net_gain"]  for a in anchors.values())  # higher better → min of anchors
-    safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())  # lower |dd| better → max of anchors
-    safe_r2       = min(a["r_squared"] for a in anchors.values())  # higher better → min of anchors
+    safe_net_gain = min(a["net_gain"]  for a in anchors.values())
+    safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
+    safe_r2       = min(a["r_squared"] for a in anchors.values())
 
     logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):

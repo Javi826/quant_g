@@ -10,6 +10,7 @@ from tqdm_joblib import tqdm_joblib
 from multiprocessing.shared_memory import SharedMemory
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
+from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
 WARMUP_BARS = 100
@@ -179,11 +180,9 @@ def walk_forward_optimization(
 
     # Trade accumulators per window
     train_trades_list      = []
-    test_trades_list       = []
-    test_n_trades_list     = []
-    window_test_arrays_list = []  # per-window test OHLCV, needed for synthetic-path (Multiverse) validation
-    window_test_start_ts_list = []  # per-window real test_start_ts, needed to drop warmup trades downstream
-    grid_train_metrics_list = []  # per-window train metric for all grid combinations (for DSR N_eff estimation) # per-window real test_start_ts, needed to drop warmup trades downstream
+    test_trades_list        = []
+    test_n_trades_list      = []
+    train_criteria_list     = []  # per-window train Net_Gain_pct — used for WFR, avoids double-counting overlapping trades
 
     ema_raw = None 
 
@@ -295,9 +294,6 @@ def walk_forward_optimization(
                 'high_time': arr_dict['high_time'][warm_start:cool_end],
             }
 
-        window_test_arrays_list.append(base_arrays_test)
-        window_test_start_ts_list.append(test_start_ts)
-
         # -----------------------------------------------------------
         # Parallel evaluation via shared memory
         # -----------------------------------------------------------
@@ -326,11 +322,6 @@ def walk_forward_optimization(
                     shm.unlink()
 
         # -----------------------------------------------------------
-        # Capture train metric for all grid combinations (for DSR N_eff estimation)
-        # -----------------------------------------------------------
-        grid_train_metrics_list.append([metric for metric, _ in results])
-
-        # -----------------------------------------------------------
         # Select best result (on train)
         # -----------------------------------------------------------
         _, raw_best_params = max(results, key=lambda x: x[0])
@@ -342,6 +333,7 @@ def walk_forward_optimization(
 
         window_test_n_trades = 0
         test_criterion       = np.nan
+        train_criterion      = np.nan
 
         df_train = None
         if collect_train_trades_fn is not None and base_arrays:
@@ -371,6 +363,13 @@ def walk_forward_optimization(
             test_trades_list.append(df_test)
             window_test_n_trades = len(df_test)
             test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
+
+            # Per-window train Net_Gain_pct — computed once per window, on that
+            # window's OWN train slice only (never concatenated across windows),
+            # since consecutive rolling windows share up to (train_months -
+            # test_months) months of the same underlying trades.
+            m_train         = compute_metrics(df_train, capital=INITIAL_BALANCE, name="")
+            train_criterion = m_train["Net_Gain_pct"]
         else:
             logger.debug(
                 f"WFO window {window_idx} ── dropped from train/test WFR pool "
@@ -379,6 +378,7 @@ def walk_forward_optimization(
 
         best_criteria_list.append(test_criterion)
         test_n_trades_list.append(window_test_n_trades)
+        train_criteria_list.append(train_criterion)
 
         train_start_dates.append(ref_ts[t0]       if t0       < len(ref_ts) else None)
         train_end_dates.append(ref_ts[t1 - 1]     if t1 - 1   < len(ref_ts) else None)
@@ -448,8 +448,14 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    # Shape: (n_windows, n_grid_combinations). Used downstream to estimate the
-    # number of effective independent trials within the grid search (DSR correction).
-    grid_train_matrix = np.array(grid_train_metrics_list) if grid_train_metrics_list else np.empty((0, 0))
+    # Average of each window's OWN train Net_Gain_pct — NOT derived from
+    # wfo_train_trades (which concatenates overlapping rolling windows and
+    # would double-count trades shared between consecutive windows). This is
+    # the value WFR's in-sample denominator should use.
+    valid_train_criteria = [c for c in train_criteria_list if np.isfinite(c)]
+    train_net_gain_is_avg = float(np.mean(valid_train_criteria)) if valid_train_criteria else 0.0
 
-    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, best_params_list, window_test_arrays_list, window_test_start_ts_list, grid_train_matrix
+    valid_test_criteria = [c for c in best_criteria_list if np.isfinite(c)]
+    test_net_gain_oos_avg = float(np.mean(valid_test_criteria)) if valid_test_criteria else 0.0
+
+    return final_params, df_results, wfo_train_trades, wfo_test_trades, window_idx, train_net_gain_is_avg, test_net_gain_oos_avg
