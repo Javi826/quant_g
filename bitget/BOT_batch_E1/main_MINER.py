@@ -46,7 +46,7 @@ INNER_N_JOBS = 1
 SHOW_PLOTS  = True
 SAVE_TRADES = False
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
