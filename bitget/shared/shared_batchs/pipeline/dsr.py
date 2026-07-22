@@ -347,7 +347,7 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
     if n_eff is None:
-        logger.warning("DSR ── N_eff unavailable — setting DSR=0.0 for all rules (no rules pass).")
+        logger.debug("DSR ── N_eff unavailable — setting DSR=0.0 for all rules (no rules pass).")
         dsr_by_id = {rule_id: 0.0 for rule_id in raw_by_id}
         return {
             "passed_dsr_ids": [],
@@ -499,13 +499,12 @@ def _check_m_vs_t_ratio(ohlcv_arr: dict, n_rules: int, n_combos: int, timeframe:
     m_bruto  = n_rules * max(n_combos, 1)
 
     if m_bruto > M_TO_T_WARN_RATIO * t_days:
-        logger.warning(
+        logger.debug(
             f"DSR ── {timeframe} ── M/T check ⚠️ ── M_bruto={m_bruto} (rules={n_rules} x combos={n_combos}) "
             f"vs T={t_days} days (ratio={m_bruto / t_days:.2f}x, warn_th={M_TO_T_WARN_RATIO}x) "
-            f"── correlation matrix likely ill-conditioned"
         )
     else:
-        logger.info(
+        logger.debug(
             f"DSR ── {timeframe} ── M/T check ✅ ── M_bruto={m_bruto} (rules={n_rules} x combos={n_combos}) "
             f"vs T={t_days} days (ratio={m_bruto / t_days:.2f}x, warn_th={M_TO_T_WARN_RATIO}x)"
         )

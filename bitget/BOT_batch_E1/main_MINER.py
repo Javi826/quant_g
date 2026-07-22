@@ -32,6 +32,7 @@ from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
+
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -46,9 +47,10 @@ RUN_PORTFOLIO = True
 RUN_DEPLOY    = False
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
+#------------------------------------------------------------------------------
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+#TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -63,13 +65,13 @@ PARAM_GRID = {
 # WFO + PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-WFO_NET_GAIN_TH      = 45
-WFO_DD_TH            = 20
+WFO_NET_GAIN_TH      = 30
+WFO_DD_TH            = 15
 WFO_R2_TH            = 0.6
 WFO_WFR_TH           = 0.5
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.8
+DSR_TH               = 0.9
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.6
 PIPELINE_MONTECARLO  = True
@@ -122,7 +124,6 @@ if __name__ == "__main__":
 
     # -------------------------------------------------------------------
     # DATA LOADING — cheap, sequential across timeframes. Rule mining
-    # (DSR + WFO) is orchestrated separately, across ALL timeframes.
     # -------------------------------------------------------------------
     ohlcv_data_by_timeframe = {}
     ohlcv_arr_by_timeframe  = {}
@@ -139,8 +140,6 @@ if __name__ == "__main__":
 
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
-    # ranking table, THEN Phase B: WFO for every timeframe (only rules
-    # that passed DSR).
     # -------------------------------------------------------------------
     all_raw_results = run_rule_mining(
         ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
@@ -167,7 +166,6 @@ if __name__ == "__main__":
 #     from shared_batchs.pipeline.reality_check import print_comparison_table
 #     print_comparison_table(all_raw_results, dsr_th=DSR_TH)
 # =============================================================================
-
     finalize_rule_mining(
         all_raw_results          = all_raw_results,
         ohlcv_data_by_timeframe  = ohlcv_data_by_timeframe,

@@ -470,7 +470,4 @@ def pipe_multiverse(
             "multiverse_p_value": p_value,
         })
 
-    n_passed = sum(1 for r in results if r["passed_multiverse"])
-    logger.info(f"MULTIVERSE ── {n_passed}/{len(rules)} rules pass")
-
     return results

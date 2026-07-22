@@ -122,7 +122,4 @@ def pipe_montecarlo(
             "montecarlo_prob_ruin": prob_ruin,
         })
 
-    n_passed = sum(1 for r in results if r["passed_montecarlo"])
-    logger.info(f"MONTECARLO ── {n_passed}/{len(rules)} rules pass")
-
     return results
