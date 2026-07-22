@@ -14,6 +14,7 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 # =============================================================================
 
 N_PERMUTATIONS  = 1000
+BLOCK_SIZE      = 20   # 1 = simple bootstrap with replacement (no block structure).
 N_JOBS          = -1
 DEBUG_MAX_PATHS = 1
 
@@ -90,7 +91,7 @@ def _log_drift_analysis(ohlcv_data: dict, paths: dict) -> None:
 
 
 # =============================================================================
-# MCPT PATH GENERATION — log-return permutation (Timothy Masters method)
+# MCPT PATH GENERATION — moving block bootstrap (overlapping blocks + replacement)
 # =============================================================================
 def _compute_log_features(df: pd.DataFrame, raw_columns: list) -> tuple:
     df = df.copy()
@@ -120,7 +121,38 @@ def _compute_log_features(df: pd.DataFrame, raw_columns: list) -> tuple:
     return df, df_raw
 
 
-def _generate_mcpt_paths(df_hist: pd.DataFrame, n_paths: int, raw_columns: list, base_seed: int, dtype) -> np.ndarray:
+def _make_overlapping_row_blocks(data_array: np.ndarray, block_size: int) -> np.ndarray:
+    """Returns array of shape (n_blocks, block_size, n_features) — sliding windows over rows."""
+    windows = np.lib.stride_tricks.sliding_window_view(data_array, block_size, axis=0)
+    return np.moveaxis(windows, -1, 1)
+
+
+def _block_bootstrap_sample(
+    data_array: np.ndarray,
+    n_rows: int,
+    block_size: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Moving block bootstrap: overlapping blocks sampled with replacement, concatenated and truncated to n_rows."""
+    if block_size <= 1:
+        chosen_idx = rng.integers(0, n_rows, size=n_rows)
+        return data_array[chosen_idx]
+
+    blocks   = _make_overlapping_row_blocks(data_array, block_size)
+    n_blocks = blocks.shape[0]
+    n_blocks_needed = int(np.ceil(n_rows / block_size))
+    chosen = rng.integers(0, n_blocks, size=n_blocks_needed)
+    return np.concatenate(blocks[chosen], axis=0)[:n_rows]
+
+
+def _generate_mcpt_paths(
+    df_hist: pd.DataFrame,
+    n_paths: int,
+    raw_columns: list,
+    base_seed: int,
+    dtype,
+    block_size: int = BLOCK_SIZE,
+) -> np.ndarray:
     df_features, df_raw = _compute_log_features(df_hist, raw_columns)
     n_rows = len(df_features)
     if n_rows == 0:
@@ -144,12 +176,13 @@ def _generate_mcpt_paths(df_hist: pd.DataFrame, n_paths: int, raw_columns: list,
     start_price     = float(df_features["open"].iloc[0])
     start_timestamp = df_features.index[0].value // 10**9
 
+    effective_block_size = min(block_size, n_rows)
+
     paths_array = np.empty((n_paths, n_rows, n_features_out), dtype=np.float64)
 
     for i in range(n_paths):
-        rng      = np.random.default_rng(base_seed + i)
-        perm_idx = rng.permutation(n_rows)
-        sampled  = data_array[perm_idx]
+        rng     = np.random.default_rng(base_seed + i)
+        sampled = _block_bootstrap_sample(data_array, n_rows, effective_block_size, rng)
 
         log_ret_close  = sampled[:, 0]
         log_open_low   = sampled[:, 1]
@@ -175,11 +208,19 @@ def _generate_mcpt_paths(df_hist: pd.DataFrame, n_paths: int, raw_columns: list,
     return paths_array.astype(dtype, copy=False)
 
 
-def _generate_mcpt_paths_all_symbols(ohlcv_data: dict, n_paths: int, raw_columns: list, dtype, base_seed: int = 42) -> dict:
+def _generate_mcpt_paths_all_symbols(
+    ohlcv_data: dict,
+    n_paths: int,
+    raw_columns: list,
+    dtype,
+    base_seed: int = 42,
+    block_size: int = BLOCK_SIZE,
+) -> dict:
     paths_per_symbol = {}
     for symbol, df_hist in ohlcv_data.items():
         arr_paths = _generate_mcpt_paths(
             df_hist, n_paths=n_paths, raw_columns=raw_columns, base_seed=base_seed, dtype=dtype,
+            block_size=block_size,
         )
         if arr_paths is not None and arr_paths.shape[0] > 0:
             paths_per_symbol[symbol] = arr_paths
@@ -301,6 +342,7 @@ def _evaluate_multiverse(
     real_profit: float,
     p_value_th: float,
     n_paths: int = N_PERMUTATIONS,
+    block_size: int = BLOCK_SIZE,
     n_jobs: int = N_JOBS,
 ) -> tuple:
     """Runs MCPT for a single rule. Returns (approved, p_value)."""
@@ -312,7 +354,9 @@ def _evaluate_multiverse(
     n_obs    = len(ohlcv_data[ref_sym])
     ts_index = ohlcv_data[ref_sym].index[:n_obs].to_numpy()
 
-    paths = _generate_mcpt_paths_all_symbols(ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], dtype=dtype)
+    paths = _generate_mcpt_paths_all_symbols(
+        ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], dtype=dtype, block_size=block_size,
+    )
 
     # === DEBUG BLOCK: DRIFT ANALYSIS (remove entire block to disable) ===
     if DEBUG_DRIFT_ANALYSIS:
@@ -359,8 +403,8 @@ def _evaluate_multiverse(
     approved = p_value <= p_value_th
 
     logger.debug(
-        f"MCPT ── n_paths={n_paths} valid_universes={n_valid} real_profit={real_profit:.2f} "
-        f"p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
+        f"MCPT ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
+        f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
     )
     return approved, p_value
 
@@ -390,6 +434,7 @@ def pipe_multiverse(
     p_value_th: float,
     enabled: bool = True,
     n_paths: int = N_PERMUTATIONS,
+    block_size: int = BLOCK_SIZE,
     n_jobs: int = N_JOBS,
 ) -> list:
 
@@ -416,6 +461,7 @@ def pipe_multiverse(
             real_profit         = float(r["wfo_test_trades"]["profit"].sum()),
             p_value_th          = p_value_th,
             n_paths             = n_paths,
+            block_size          = block_size,
             n_jobs              = n_jobs,
         )
         results.append({

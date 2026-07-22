@@ -8,7 +8,6 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch_regime")))
 
 # LOGGING CONFIGURATION
 #------------------------------------------------------------------------------
@@ -26,13 +25,13 @@ logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-from shared_batchs.pipeline.universe import filter_symbols, select_universe
-from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
-from shared_batch_regime.config_paths import DATA_FOLDER_IS
+from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -41,13 +40,15 @@ RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
 # =============================================================================
-# MISC OUTPUT / DEBUG OPTIONS
+# RUNS + OUTPUTS — portfolio construction and output stages
 # =============================================================================
-SHOW_PLOTS  = True
-SAVE_TRADES = False
+RUN_PORTFOLIO = True
+RUN_DEPLOY    = False
+SHOW_PLOTS    = True
+SAVE_TRADES   = False
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -59,23 +60,13 @@ PARAM_GRID = {
 }
 
 # =============================================================================
-# WFO — Walk-Forward Optimization approval thresholds (Stage 1)
-# =============================================================================
-WFO_NET_GAIN_TH = 45
-WFO_DD_TH       = 20
-WFO_R2_TH       = 0.2
-WFO_WFR_TH      = 0.2
-
-# =============================================================================
-# RUNS — portfolio construction and output stages
+# WFO + PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-RUN_PORTFOLIO     = True
-RUN_DEPLOY        = False
-
-# =============================================================================
-# PIPELINES — sequential validation filters (executed in this order)
-# =============================================================================
+WFO_NET_GAIN_TH      = 45
+WFO_DD_TH            = 20
+WFO_R2_TH            = 0.6
+WFO_WFR_TH           = 0.5
 
 PIPELINE_DSR         = True
 DSR_TH               = 0.8
@@ -172,6 +163,10 @@ if __name__ == "__main__":
         save_trades             = SAVE_TRADES,
         brief_trades_folder     = BRIEF_TRADES_FOLDER,
     )
+# =============================================================================
+#     from shared_batchs.pipeline.reality_check import print_comparison_table
+#     print_comparison_table(all_raw_results, dsr_th=DSR_TH)
+# =============================================================================
 
     finalize_rule_mining(
         all_raw_results          = all_raw_results,
@@ -200,9 +195,6 @@ if __name__ == "__main__":
         symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
         deploy_output_path       = DEPLOY_OUTPUT_PATH,
     )
-
-    elapsed = int(time.time() - start)
-    logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

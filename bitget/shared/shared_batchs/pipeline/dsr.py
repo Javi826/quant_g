@@ -2,7 +2,7 @@
 import itertools
 import logging
 import os
-
+import time
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -26,7 +26,8 @@ EULER_GAMMA         = 0.5772156649015328606  # Euler-Mascheroni constant
 SHARPE_PERIODS_YEAR = 365.0                  # must match the annualization factor in compute_metrics (sqrt(365))
 DSR_N_JOBS          = -1                     # safe to parallelize fully: this Parallel runs as its own phase, sequential relative to WFO — no nesting
 DSR_MIN_TRADES      = 100   
-DSR_MAX_SHARPE_ANN  = 10.0                   # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)                 # combos with fewer trades are rejected (near-zero variance inflates Sharpe artificially)
+DSR_MAX_SHARPE_ANN  = 10.0                   # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)
+M_TO_T_WARN_RATIO   = 2.0                    # warn if M (columns) exceeds this multiple of T (days) — ill-conditioned correlation matrix (paper Appendix 3)                 # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)                 # combos with fewer trades are rejected (near-zero variance inflates Sharpe artificially)
 # =============================================================================
 # FULL-PERIOD GRID SEARCH — selection-bias metrics (single pass, no WFO windows)
 # =============================================================================
@@ -142,6 +143,22 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
 # =============================================================================
 # PRIVATE HELPERS — N_eff estimation (flat rule x combo matrix, eigenvalue method)
 # =============================================================================
+def _build_flat_daily_matrixDDD(all_raw_results: list) -> pd.DataFrame | None:
+
+    series_by_col = {}
+    for r in all_raw_results:
+        combo_profit = r.get("combo_daily_profit") or {}
+        for combo_id, s in combo_profit.items():
+            series_by_col[f"{r['rule_id']}__{combo_id}"] = s
+
+    if len(series_by_col) < 2:
+        return None
+
+    matrix = pd.concat(series_by_col, axis=1)
+    matrix = matrix.sort_index().fillna(0.0)
+
+    return matrix
+
 def _build_flat_daily_matrix(all_raw_results: list) -> pd.DataFrame | None:
 
     series_by_col = {}
@@ -153,13 +170,19 @@ def _build_flat_daily_matrix(all_raw_results: list) -> pd.DataFrame | None:
     if len(series_by_col) < 2:
         return None
 
-    all_dates = sorted(set().union(*[s.index for s in series_by_col.values()]))
-    matrix    = pd.DataFrame(index=all_dates)
-    for col_id, s in series_by_col.items():
-        matrix[col_id] = s.reindex(all_dates, fill_value=0.0)
+    col_names = list(series_by_col.keys())
 
-    return matrix
+    all_dates = np.unique(
+        np.concatenate([s.index.to_numpy() for s in series_by_col.values()])
+    )
 
+    matrix_arr = np.zeros((all_dates.shape[0], len(col_names)), dtype=np.float64)
+    for col_idx, col_name in enumerate(col_names):
+        s = series_by_col[col_name]
+        row_idx = np.searchsorted(all_dates, s.index.to_numpy())
+        matrix_arr[row_idx, col_idx] = s.to_numpy(dtype=np.float64)
+
+    return pd.DataFrame(matrix_arr, index=pd.DatetimeIndex(all_dates), columns=col_names)
 
 def _standardize_and_split(matrix: pd.DataFrame) -> tuple:
     arr        = matrix.to_numpy(dtype=np.float64)
@@ -252,6 +275,21 @@ def _short_id(rule_id: str) -> str:
     return "_".join(rule_id.split("_")[:3])
 
 
+def _train_period_str(r: dict) -> str:
+    combo_daily_profit = r.get("combo_daily_profit") or {}
+    best_combo_id       = r.get("best_combo_id")
+    if best_combo_id is None or best_combo_id not in combo_daily_profit:
+        return "n/a"
+
+    daily_profit = combo_daily_profit[best_combo_id]
+    if daily_profit is None or daily_profit.empty:
+        return "n/a"
+
+    start = daily_profit.index.min()
+    end   = daily_profit.index.max()
+    return f"{start:%Y-%m-%d}..{end:%Y-%m-%d}"
+
+
 def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, candidate_ids: set, passed_ids: set, sr0: float) -> None:
 
     rows = [raw_by_id[rid] for rid in candidate_ids if rid in raw_by_id]
@@ -260,17 +298,20 @@ def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict,
     if not rows:
         return
 
-    id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
-    label_width = max((len(r.get("label", "")) for r in rows), default=8) + 2
+    id_width     = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
+    label_width  = max((len(r.get("label", "")) for r in rows), default=8) + 2
+    combo_width  = max((len(r.get("best_combo_id", "") or "") for r in rows), default=8) + 2
+    period_width = max((len(_train_period_str(r)) for r in rows), default=8) + 2
 
-    logger.debug(f"\n{'─' * 170}")
+    logger.debug(f"\n{'─' * 200}")
     logger.debug(f"  DSR TRAIN METRICS (full-period grid search) ── SR0={sr0:.4f} ── {len(rows)} candidates")
-    logger.debug(f"{'─' * 170}")
+    logger.debug(f"{'─' * 200}")
     logger.debug(
         f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN_TR':<13}{'MAX_DD_TR':<11}{'SR_ANN':<10}{'SR_UNANN':<11}"
-        f"{'SKEW_TR':<10}{'KURT_TR':<10}{'N_DAYS_TR':<11}{'DSR':<9}{'RULE':<{label_width}}{'STATUS':<8}"
+        f"{'SKEW_TR':<10}{'KURT_TR':<10}{'N_DAYS_TR':<11}{'DSR':<9}{'BEST_COMBO':<{combo_width}}"
+        f"{'TRAIN_PERIOD':<{period_width}}{'RULE':<{label_width}}{'STATUS':<8}"
     )
-    logger.debug(f"{'─' * 170}")
+    logger.debug(f"{'─' * 200}")
 
     for r in rows:
         rule_id = r["rule_id"]
@@ -281,11 +322,12 @@ def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict,
             f"{r.get('sharpe_train', float('nan')):<10.4f}{sr_by_id.get(rule_id, float('nan')):<11.4f}"
             f"{r.get('skew_train', float('nan')):<10.4f}{r.get('kurtosis_train', float('nan')):<10.4f}"
             f"{r.get('n_days_train', 0):<11}{dsr_by_id.get(rule_id, 0.0):<9.4f}"
+            f"{(r.get('best_combo_id', '') or 'n/a'):<{combo_width}}"
+            f"{_train_period_str(r):<{period_width}}"
             f"{r.get('label', ''):<{label_width}}{status:<8}"
         )
 
-    logger.debug(f"{'─' * 170}\n")
-
+    logger.debug(f"{'─' * 200}\n")
 
 # =============================================================================
 # CORE DSR CALCULATION (across a set of candidate trials — typically one timeframe)
@@ -391,10 +433,17 @@ def pipe_dsr(
     timeframe: str = "",
 ) -> list:
 
+    start = time.time()
 
     if not enabled:
         logger.info(f"DSR ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_dsr_fields()} for r in rules]
+
+    n_combos = 1
+    for _values in param_grid.values():
+        n_combos *= len(_values)
+
+    _check_m_vs_t_ratio(ohlcv_arr, n_rules=len(rules), n_combos=n_combos, timeframe=timeframe)
 
     rules_for_search = [
         {"rule_id": r["rule_id"], "ohlcv_arr": ohlcv_arr, "signal_fn": r["signal_fn"]}
@@ -408,10 +457,6 @@ def pipe_dsr(
         progress_label = timeframe,
     )
 
-    n_combos = 1
-    for _values in param_grid.values():
-        n_combos *= len(_values)
-
     raw_for_dsr = [
         {**r, **full_period_by_rule[r["rule_id"]]}
         for r in rules
@@ -421,7 +466,7 @@ def pipe_dsr(
     dsr_by_id      = dsr_result["dsr_by_rule_id"]
 
     logger.info(f"DSR ── {timeframe} ── {len(passed_dsr_ids)}/{len(rules)} rules pass")
-    debug_plot_approved_dsr_daily_profit(raw_for_dsr, passed_dsr_ids)  # DEBUG — remove after use
+    #debug_plot_approved_dsr_daily_profit(raw_for_dsr, passed_dsr_ids)  # DEBUG — remove after use
 
     results = []
     for r in rules:
@@ -441,14 +486,34 @@ def pipe_dsr(
             "best_combo_id":      fp["best_combo_id"],
         })
 
+    elapsed = int(time.time() - start)
+    logger.info(f"DSR ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+
     return results
+
+def _check_m_vs_t_ratio(ohlcv_arr: dict, n_rules: int, n_combos: int, timeframe: str) -> None:
+
+    any_sym  = next(iter(ohlcv_arr.values()))
+    ts_range = pd.to_datetime(any_sym["ts"])
+    t_days   = max((ts_range.max() - ts_range.min()).days, 1)
+    m_bruto  = n_rules * max(n_combos, 1)
+
+    if m_bruto > M_TO_T_WARN_RATIO * t_days:
+        logger.warning(
+            f"DSR ── {timeframe} ── M/T check ⚠️ ── M_bruto={m_bruto} (rules={n_rules} x combos={n_combos}) "
+            f"vs T={t_days} days (ratio={m_bruto / t_days:.2f}x, warn_th={M_TO_T_WARN_RATIO}x) "
+            f"── correlation matrix likely ill-conditioned"
+        )
+    else:
+        logger.info(
+            f"DSR ── {timeframe} ── M/T check ✅ ── M_bruto={m_bruto} (rules={n_rules} x combos={n_combos}) "
+            f"vs T={t_days} days (ratio={m_bruto / t_days:.2f}x, warn_th={M_TO_T_WARN_RATIO}x)"
+        )
 
 # =============================================================================
 # DEBUG ONLY — remove after use
 # =============================================================================
 def debug_plot_approved_dsr_daily_profit(results: list, passed_dsr_ids: set) -> None:
-    import matplotlib.pyplot as plt
-
     for r in results:
         rule_id = r["rule_id"]
         if rule_id not in passed_dsr_ids:
@@ -466,23 +531,21 @@ def debug_plot_approved_dsr_daily_profit(results: list, passed_dsr_ids: set) -> 
         values = daily_profit.values[np.isfinite(daily_profit.values)]
         if values.size == 0 or np.ptp(values) < 1e-6:
             logger.warning(
-                f"DSR DEBUG PLOT ── {rule_id} ── skipped, degenerate combo={best_combo_id} "
+                f"DSR DEBUG STATS ── {rule_id} ── skipped, degenerate combo={best_combo_id} "
                 f"n_days={values.size} n_nonzero={(values != 0).sum()} "
                 f"min={values.min() if values.size else 'n/a'} max={values.max() if values.size else 'n/a'}"
             )
             continue
 
         nonzero_values = values[values != 0.0]
+        n_days         = values.size
+        n_nonzero      = nonzero_values.size
+        top5           = np.sort(np.abs(nonzero_values))[-5:][::-1] if nonzero_values.size else np.array([])
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-        fig.suptitle(f"{rule_id} — {best_combo_id}")
-
-        axes[0].hist(values, bins=50)
-        axes[0].set_title("Daily profit (with zeros)")
-
-        if nonzero_values.size > 0 and np.ptp(nonzero_values) >= 1e-6:
-            axes[1].hist(nonzero_values, bins=50)
-        axes[1].set_title("Daily profit (without zeros)")
-
-        plt.tight_layout()
-        plt.show()
+        logger.warning(
+            f"DSR DEBUG STATS ── {rule_id} — {best_combo_id} ── "
+            f"n_days={n_days} n_nonzero={n_nonzero} ({n_nonzero / n_days:.1%}) "
+            f"min={values.min():.2f} max={values.max():.2f} "
+            f"mean_nonzero={nonzero_values.mean():.2f} std_nonzero={nonzero_values.std():.2f} "
+            f"top5_abs={np.round(top5, 2).tolist()}"
+        )
