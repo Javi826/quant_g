@@ -43,13 +43,13 @@ INNER_N_JOBS = 1
 # =============================================================================
 # RUNS + OUTPUTS — portfolio construction and output stages
 # =============================================================================
-RUN_PORTFOLIO = True
-RUN_DEPLOY    = False
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
+RUN_PORTFOLIO = True
+RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
-TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc","1Dutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
@@ -67,13 +67,13 @@ PARAM_GRID = {
 
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
-WFO_R2_TH            = 0.6
+WFO_R2_TH            = 0.7
 WFO_WFR_TH           = 0.5
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.9
+DSR_TH               = 0.8
 PIPELINE_CORRELATION = True
-CORRELATION_DD_TH    = 0.6
+CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True

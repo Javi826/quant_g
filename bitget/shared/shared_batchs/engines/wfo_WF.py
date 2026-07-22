@@ -40,7 +40,6 @@ def _round_params_dict(params: dict, param_ranges: dict) -> dict:
         for k, v in params.items()
     }
 
-
 # =============================================================================
 # EMA STATE — running exponential moving average of per-window optimal params
 # =============================================================================
@@ -364,10 +363,6 @@ def walk_forward_optimization(
             window_test_n_trades = len(df_test)
             test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
 
-            # Per-window train Net_Gain_pct — computed once per window, on that
-            # window's OWN train slice only (never concatenated across windows),
-            # since consecutive rolling windows share up to (train_months -
-            # test_months) months of the same underlying trades.
             m_train         = compute_metrics(df_train, capital=INITIAL_BALANCE, name="")
             train_criterion = m_train["Net_Gain_pct"]
         else:
@@ -448,10 +443,6 @@ def walk_forward_optimization(
     wfo_train_trades = pd.concat(train_trades_list, ignore_index=True) if train_trades_list else pd.DataFrame()
     wfo_test_trades  = pd.concat(test_trades_list,  ignore_index=True) if test_trades_list  else pd.DataFrame()
 
-    # Average of each window's OWN train Net_Gain_pct — NOT derived from
-    # wfo_train_trades (which concatenates overlapping rolling windows and
-    # would double-count trades shared between consecutive windows). This is
-    # the value WFR's in-sample denominator should use.
     valid_train_criteria = [c for c in train_criteria_list if np.isfinite(c)]
     train_net_gain_is_avg = float(np.mean(valid_train_criteria)) if valid_train_criteria else 0.0
 

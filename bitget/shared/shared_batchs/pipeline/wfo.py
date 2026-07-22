@@ -32,11 +32,7 @@ WFO_WINDOW_CONFIG = {
 
 ANCHORED    = False
 METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
-
-# EMA smoothing factor for running optimum across WFO windows.
-# alpha=1.0 -> no memory (each window uses only its own train optimum)
-# alpha<1.0 -> smoothed running optimum across windows 1..i
-EMA_ALPHA = 0.3
+EMA_ALPHA   = 0.3
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -83,9 +79,6 @@ def _get_prepared_data(
     ohlcv_arrays: dict,
     _prepared_cache: dict = None,
 ):
-    """Return prepare_backtest_data(ohlcv_arrays), reusing a cached result for
-    the current window when signal_params_keys is empty (so ohlcv_arrays is
-    identical across every grid combination within the window)."""
 
     if _prepared_cache is None:
         return prepare_backtest_data(ohlcv_arrays)
@@ -429,17 +422,7 @@ def pipe_wfo(
     save_trades: bool = False,
     brief_trades_folder: str = None,
 ) -> list:
-    """PIPE WFO — walk-forward optimization, one timeframe at a time.
 
-    Parallelizes by RULE (rules_n_jobs). Every rule in `rules` must already
-    carry a unique 'rule_id' (assigned upstream by the DSR stage).
-
-    Returns EVERY input rule merged with its WFO result fields (approved or
-    not) — the caller (rule_runner) filters by 'approved' to build the next
-    stage's input, same pattern used for montecarlo/multiverse.
-
-    If disabled, returns every input rule untouched, merged with placeholder
-    WFO fields (no rule is evaluated)."""
 
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
