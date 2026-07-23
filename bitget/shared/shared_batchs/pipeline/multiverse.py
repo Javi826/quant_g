@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+from tqdm import tqdm
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.wfo import run_wfo_is
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
@@ -444,7 +445,7 @@ def pipe_multiverse(
         return [{**r, **_empty_multiverse_fields()} for r in rules]
 
     results = []
-    for r in rules:
+    for r in tqdm(rules, desc="MULTIVERSE", dynamic_ncols=True):
         approved, p_value = _evaluate_multiverse(
             ohlcv_data          = ohlcv_data_by_timeframe[r["timeframe"]],
             timeframe           = r["timeframe"],

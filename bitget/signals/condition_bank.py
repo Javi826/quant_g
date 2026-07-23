@@ -6,8 +6,8 @@ from scipy import signal as sp_signal
 # CONFIG
 # =============================================================================
 
+#------------------------------------------------------------------------------
 # =============================================================================
-# #------------------------------------------------------------------------------
 # RSI_PERIODS                = [14]
 # RSI_THRESHOLDS             = [30,70]
 #  
@@ -21,30 +21,32 @@ from scipy import signal as sp_signal
 #  
 # ATR_BASE_PERIODS           = [14]
 # ATR_REGIME_SMA_PERIODS     = [10,50]
-#  
-# #------------------------------------------------------------------------------
+# =============================================================================
+ 
+#------------------------------------------------------------------------------
+# =============================================================================
 # RSI_PERIODS                = [14]
 # RSI_THRESHOLDS             = [30]
 # 
 # ADX_PERIODS                = []
 # ADX_THRESHOLDS             = []
 # 
-# MA_PERIODS                 = [100]
+# MA_PERIODS                 = []
 # 
 # MOMENTUM_PERIODS           = []
 # 
-# HISTVOL_BASE_PERIODS       = [10, 30]
-# HISTVOL_REGIME_SMA_PERIODS = [20, 50]
+# HISTVOL_BASE_PERIODS       = [10]
+# HISTVOL_REGIME_SMA_PERIODS = [20]
 # 
-# ATR_BASE_PERIODS           = [14, 21]
-# ATR_REGIME_SMA_PERIODS     = [50, 10]
-# #------------------------------------------------------------------------------
+# ATR_BASE_PERIODS           = [14]
+# ATR_REGIME_SMA_PERIODS     = [50]
 # =============================================================================
+#------------------------------------------------------------------------------
 
 RSI_PERIODS                = [7,14,21]      # los 3 aparecen
 RSI_THRESHOLDS             = [30,50,70]     # los 3 aparecen
 
-ADX_PERIODS                = [7,14]         # solo 7 y 14 aparecen (21 no aparece en ninguna)
+ADX_PERIODS                = [7,14,21]         # solo 7 y 14 aparecen (21 no aparece en ninguna)
 ADX_THRESHOLDS             = [20,25,30]     # los 3 aparecen
 
 MA_PERIODS                 = [20,50,100]    # los 3 aparecen (20 solo 1 vez, pero aparece)
@@ -54,7 +56,7 @@ MOMENTUM_PERIODS           = [5,10,20]      # los 3 aparecen
 HISTVOL_BASE_PERIODS       = [10,30]        # ambos aparecen
 HISTVOL_REGIME_SMA_PERIODS = [20,50]        # ambos aparecen
 
-ATR_BASE_PERIODS           = [14,21]         # solo aparece 14
+ATR_BASE_PERIODS           = [7,14,21]         # solo aparece 14
 ATR_REGIME_SMA_PERIODS     = [10,50]        # ambos aparecen
 
 

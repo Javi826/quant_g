@@ -129,8 +129,18 @@ def _run_full_period_for_rule(
 def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, progress_label: str = "") -> dict:
 
     desc = f"DSR FULL-PERIOD SEARCH {progress_label}".strip()
+# =============================================================================
+#     with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
+#         results = Parallel(n_jobs=DSR_N_JOBS, max_nbytes=None)(
+#             delayed(_run_full_period_for_rule)(
+#                 r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype,
+#             )
+#             for r in rules
+#         )
+# =============================================================================
+        
     with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
-        results = Parallel(n_jobs=DSR_N_JOBS, max_nbytes=None)(
+        results = Parallel(n_jobs=DSR_N_JOBS)(
             delayed(_run_full_period_for_rule)(
                 r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype,
             )
@@ -470,11 +480,12 @@ def pipe_dsr(
 
     results = []
     for r in rules:
-        rid = r["rule_id"]
-        fp  = full_period_by_rule[rid]
+        rid    = r["rule_id"]
+        fp     = full_period_by_rule[rid]
+        passed = rid in passed_dsr_ids
         results.append({
             **r,
-            "passed_dsr":         rid in passed_dsr_ids,
+            "passed_dsr":         passed,
             "dsr":                dsr_by_id.get(rid, 0.0),
             "sharpe_train":       fp["sharpe_train"],
             "skew_train":         fp["skew_train"],
@@ -482,8 +493,11 @@ def pipe_dsr(
             "n_days_train":       fp["n_days_train"],
             "net_gain_train":     fp["net_gain_train"],
             "max_dd_train":       fp["max_dd_train"],
-            "combo_daily_profit": fp["combo_daily_profit"],
-            "best_combo_id":      fp["best_combo_id"],
+            # freed for non-survivors: combo_daily_profit is no longer needed
+            # once _compute_dsr (N_eff/DSR) has already used it above — keeping
+            # it for ~9000/9280 rejected rules per timeframe was the main RAM driver.
+            "combo_daily_profit": fp["combo_daily_profit"] if passed else None,
+            "best_combo_id":      fp["best_combo_id"] if passed else None,
         })
 
     elapsed = int(time.time() - start)

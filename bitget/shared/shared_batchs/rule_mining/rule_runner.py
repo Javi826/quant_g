@@ -219,9 +219,9 @@ def finalize_rule_mining(
         survivors_corr      = [r["rule_id"] for r in survivors_rules]
         validated_wfo_test  = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
         _print_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
+        _print_min_by_group(all_raw_results, survivors_corr)
     else:
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
-
     # -------------------------------------------------------------------
     # STAGE ── Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
@@ -242,6 +242,7 @@ def finalize_rule_mining(
         ]
         survivors_mc = [rid for rid, _ in validated_wfo_test]
         _print_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
+        _print_min_by_group(all_raw_results, survivors_mc)
     else:
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MONTECARLO")
 
@@ -275,6 +276,7 @@ def finalize_rule_mining(
         ]
         survivors_mv = [rid for rid, _ in validated_wfo_test]
         _print_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
+        _print_min_by_group(all_raw_results, survivors_mv)
     else:
         _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MULTIVERSE")
 
@@ -382,34 +384,30 @@ def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str,
 
     log_fn(f"{'─' * 170}\n")
 
-
 def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     if not rows:
         return
-
-    threshold_metrics = ["net_gain", "max_dd", "r_squared"]
+    threshold_metrics = ["net_gain", "max_dd", "r_squared", "dsr", "wfr"]
     groups = {}
     for r in rows:
         key = (r["timeframe"], r["side"])
         groups.setdefault(key, []).append(r)
-
     group_stats = {}
     for key, group_rows in groups.items():
         group_stats[key] = {
             m: (min(r[m] for r in group_rows), max(r[m] for r in group_rows))
             for m in threshold_metrics
         }
-
-    logger.debug(f"\n{'─' * 115}")
+    logger.debug(f"\n{'─' * 140}")
     logger.debug(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
-    logger.debug(f"{'─' * 115}")
+    logger.debug(f"{'─' * 140}")
     logger.debug(
         f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
         f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
+        f"{'DSR min/max':<16}{'WFR min/max':<16}"
     )
-    logger.debug(f"{'─' * 115}")
-
+    logger.debug(f"{'─' * 140}")
     for (tf, side), group_rows in sorted(groups.items()):
         s = group_stats[(tf, side)]
         logger.debug(
@@ -417,22 +415,22 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
             f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
             f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
             f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
+            f"{f'{s['dsr'][0]:.3f} / {s['dsr'][1]:.3f}':<16}"
+            f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
         )
-
-    logger.debug(f"{'─' * 115}")
-
+    logger.debug(f"{'─' * 140}")
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
-
     safe_net_gain = min(a["net_gain"]  for a in anchors.values())
     safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
     safe_r2       = min(a["r_squared"] for a in anchors.values())
-
+    safe_dsr      = min(a["dsr"] for a in anchors.values())
+    safe_wfr      = min(a["wfr"] for a in anchors.values())
     logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):
         logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
-
     logger.debug(
-        f"\n  JOINT-SAFE THRESHOLDS (guaranteed \u22651 survivor per group, all conditions at once) ── "
-        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}"
+        f"\n  JOINT-SAFE THRESHOLDS (guaranteed ≥1 survivor per group, all conditions at once) ── "
+        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
+        f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
     )
-    logger.debug(f"{'─' * 115}\n")
+    logger.debug(f"{'─' * 140}\n")

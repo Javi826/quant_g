@@ -16,7 +16,7 @@ logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, fo
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
-RULE_RUNNER_LOG_LEVEL = logging.INFO
+RULE_RUNNER_LOG_LEVEL = logging.DEBUG
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
@@ -49,9 +49,10 @@ RUN_PORTFOLIO = True
 RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc","1Dutc"]
+TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
+#TIMEFRAMES   = ["1Dutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -68,10 +69,11 @@ PARAM_GRID = {
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
 WFO_R2_TH            = 0.7
-WFO_WFR_TH           = 0.5
+WFO_WFR_TH           = 0.7
+
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.8
+DSR_TH               = 0.85
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
