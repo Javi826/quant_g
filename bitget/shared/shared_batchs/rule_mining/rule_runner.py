@@ -16,7 +16,6 @@ logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
 _OP_SLUG = {">": "gt", "<": "lt"}
 
-
 def _slugify_label(label: str) -> str:
     slug = label
     for op, tag in _OP_SLUG.items():

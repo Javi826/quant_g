@@ -17,6 +17,8 @@ def _make_overlapping_blocks(profits: np.ndarray, block_size: int) -> np.ndarray
     n_trades = len(profits)
     n_blocks = n_trades - block_size + 1
     return np.lib.stride_tricks.sliding_window_view(profits, block_size)[:n_blocks]
+
+
 def _bootstrap_max_drawdowns(
     profits: np.ndarray,
     initial_balance: float,
@@ -39,9 +41,12 @@ def _bootstrap_max_drawdowns(
         dd = (cummax - equity) / safe_cummax
         max_dds[i] = float(np.nanmax(dd)) * 100.0 if np.any(np.isfinite(dd)) else 100.0
     return max_dds
+
+
 def _probability_of_ruin(max_dds: np.ndarray, ruin_threshold_pct: float) -> float:
     """% of simulations whose max drawdown exceeds the ruin threshold."""
     return float(np.mean(max_dds >= ruin_threshold_pct)) * 100.0
+
 # =============================================================================
 # APPROVAL CRITERION
 # =============================================================================

@@ -16,7 +16,7 @@ logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, fo
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
-RULE_RUNNER_LOG_LEVEL = logging.DEBUG
+RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
@@ -71,13 +71,12 @@ WFO_DD_TH            = 15
 WFO_R2_TH            = 0.7
 WFO_WFR_TH           = 0.7
 
-
 PIPELINE_DSR         = True
 DSR_TH               = 0.85
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
-MONTECARLO_RUIN_TH   = 10
+MONTECARLO_RUIN_TH   = 5
 PIPELINE_MULTIVERSE  = True
 MULTIVERSE_PVALUE_TH = 0.05
 

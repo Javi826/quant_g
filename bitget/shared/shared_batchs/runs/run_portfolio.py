@@ -7,6 +7,8 @@ from joblib import Parallel, delayed
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_best_wfo_portfolio
 from shared_batchs.utils.plotting import plot_wfo_portfolio
+from tqdm import tqdm
+from tqdm_joblib import tqdm_joblib
 logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 # CONFIGURATION
@@ -16,7 +18,7 @@ WFO_METRIC            = "R_SQUARED"
 WFO_N_SPLITS          = 8
 WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.10,0.10,0.10,0.10,0.10,0.20]
 
-MIN_STRATEGIES     = 2
+MIN_STRATEGIES     = 3
 MAX_STRATEGIES     = 5
 TOP_N              = 2
 
@@ -257,10 +259,11 @@ def find_best_portfolio_combination_wfo(
 
     logger.info(f"\n  Evaluating {len(combos)} combo(s)...\n")
 
-    raw_scores = Parallel(n_jobs=-1)(
-        delayed(_score_combo)(combo, subperiods, initial_balance, metric)
-        for combo in combos
-    )
+    with tqdm_joblib(tqdm(desc="Portfolio combos", total=len(combos), dynamic_ncols=True)):
+        raw_scores = Parallel(n_jobs=-1)(
+            delayed(_score_combo)(combo, subperiods, initial_balance, metric)
+            for combo in combos
+        )
 
     raw_scores = _rank_combos_by_subperiod(raw_scores, subperiods)
 
