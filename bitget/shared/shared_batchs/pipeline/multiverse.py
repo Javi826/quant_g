@@ -14,7 +14,7 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 # MCPT EXECUTION CONFIG
 # =============================================================================
 
-N_PERMUTATIONS  = 1000
+N_PERMUTATIONS  = 500
 BLOCK_SIZE      = 20   # 1 = simple bootstrap with replacement (no block structure).
 N_JOBS          = -1
 DEBUG_MAX_PATHS = 1

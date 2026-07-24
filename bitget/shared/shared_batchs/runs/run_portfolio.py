@@ -18,11 +18,11 @@ WFO_METRIC            = "R_SQUARED"
 WFO_N_SPLITS          = 8
 WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.10,0.10,0.10,0.10,0.10,0.20]
 
-MIN_STRATEGIES     = 3
-MAX_STRATEGIES     = 5
+MIN_STRATEGIES     = 4
+MAX_STRATEGIES     = 6
 TOP_N              = 2
 
-REQUIRE_LONG_SHORT     = True
+REQUIRE_LONG_SHORT     = False
 REQUIRE_ALL_TIMEFRAMES = False
 
 # Metric extraction: (column_in_compute_metrics_output, higher_is_better)
@@ -258,12 +258,34 @@ def find_best_portfolio_combination_wfo(
         return []
 
     logger.info(f"\n  Evaluating {len(combos)} combo(s)...\n")
-
+    
+# =============================================================================
+#     with tqdm_joblib(tqdm(desc="Portfolio combos", total=len(combos), dynamic_ncols=True)):
+#         raw_scores = Parallel(n_jobs=-1)(
+#             delayed(_score_combo)(combo, subperiods, initial_balance, metric)
+#             for combo in combos
+#         )
+# =============================================================================
+    
     with tqdm_joblib(tqdm(desc="Portfolio combos", total=len(combos), dynamic_ncols=True)):
-        raw_scores = Parallel(n_jobs=-1)(
+        raw_scores = Parallel(n_jobs=-1, backend="threading")(
             delayed(_score_combo)(combo, subperiods, initial_balance, metric)
             for combo in combos
         )
+
+    split_labels = [label for label, _, _, _ in subperiods]
+    n_before_filter = len(raw_scores)
+    raw_scores = [
+        r for r in raw_scores
+        if all(not np.isnan(r[label]) for label in split_labels)
+    ]
+    n_disqualified = n_before_filter - len(raw_scores)
+    if n_disqualified > 0:
+        logger.info(f"  Disqualified {n_disqualified}/{n_before_filter} combo(s) with a losing/empty subperiod.")
+
+    if not raw_scores:
+        logger.warning("All combos were disqualified (losing or empty subperiod in every combo). No portfolio found.")
+        return []
 
     raw_scores = _rank_combos_by_subperiod(raw_scores, subperiods)
 

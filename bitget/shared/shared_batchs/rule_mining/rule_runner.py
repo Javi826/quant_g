@@ -350,7 +350,8 @@ def _short_id(rule_id: str) -> str:
 
 def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
-    rows.sort(key=lambda r: r["net_gain"], reverse=True)
+    #rows.sort(key=lambda r: r["net_gain"], reverse=True)
+    rows.sort(key=lambda r: r["rule_id"])
 
     show_status  = survivor_ids is not None
     survivor_set = set(survivor_ids) if show_status else None
