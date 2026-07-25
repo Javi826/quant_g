@@ -51,7 +51,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 #TIMEFRAMES   = ["1Dutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -66,18 +66,18 @@ PARAM_GRID = {
 # WFO + PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-WFO_NET_GAIN_TH      = 30
-WFO_DD_TH            = 15
+WFO_NET_GAIN_TH      = -30
+WFO_DD_TH            = 150
 WFO_R2_TH            = 0.6
 WFO_WFR_TH           = 0.5
 
 PIPELINE_DSR         = True
 DSR_TH               = 0.85
-PIPELINE_CORRELATION = True
+PIPELINE_CORRELATION = False
 CORRELATION_DD_TH    = 0.55
-PIPELINE_MONTECARLO  = True
+PIPELINE_MONTECARLO  = False
 MONTECARLO_RUIN_TH   = 5
-PIPELINE_MULTIVERSE  = True
+PIPELINE_MULTIVERSE  = False
 MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")

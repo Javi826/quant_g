@@ -1,39 +1,26 @@
 #shared/shared_batchs/runs/run_portfolio.py
 import logging
+import time
 import numpy as np
 import pandas as pd
 from itertools import combinations
-from joblib import Parallel, delayed
-from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.reporting import print_best_wfo_portfolio
 from shared_batchs.utils.plotting import plot_wfo_portfolio
-from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-#NET_GAIN_PCT | WEEKLY_PCT | WIN_RATE | CALMAR | R_SQUARED | MAX_DD_PCT
+#NET_GAIN_PCT | CALMAR | R_SQUARED | MAX_DD_PCT — see _FAST_METRIC_MAP below
 WFO_METRIC            = "R_SQUARED" 
 WFO_N_SPLITS          = 8
 WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.10,0.10,0.10,0.10,0.10,0.20]
 
-MIN_STRATEGIES     = 4
-MAX_STRATEGIES     = 6
+MIN_STRATEGIES     = 1
+MAX_STRATEGIES     = 5
 TOP_N              = 2
 
 REQUIRE_LONG_SHORT     = False
 REQUIRE_ALL_TIMEFRAMES = False
-
-# Metric extraction: (column_in_compute_metrics_output, higher_is_better)
-_METRIC_MAP = {
-    "NET_GAIN_PCT": ("Net_Gain_pct", True),
-    "WEEKLY_PCT":   ("Weekly_pct",   True),
-    "WIN_RATE":     ("Win_Rate",     True),
-    "R_SQUARED":    ("R_Squared",    True),
-    "MAX_DD_PCT":   ("Max_DD_pct",   False),  # lower is better → negated internally
-    "CALMAR":       ("Calmar",       True),
-}
 # =============================================================================
 # PRIVATE HELPERS — Validation
 # =============================================================================
@@ -44,10 +31,10 @@ def _validate_config(n_splits: int, weights: list, metric: str) -> None:
             f"WFO_SUBPERIOD_WEIGHTS has {len(weights)} entries but WFO_N_SPLITS={n_splits}. "
             "They must match."
         )
-    if metric not in _METRIC_MAP:
+    if metric not in _FAST_METRIC_MAP:
         raise ValueError(
             f"Unknown WFO_METRIC='{metric}'. "
-            f"Valid options: {list(_METRIC_MAP.keys())}"
+            f"Valid options: {list(_FAST_METRIC_MAP.keys())}"
         )
 # =============================================================================
 # PRIVATE HELPERS — Identity
@@ -68,26 +55,28 @@ def _split_trades_by_time(
     trades_list: list,
     n_splits: int,
 ) -> list:
-
     if not trades_list:
         return []
-
-    all_times  = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
-    t_min      = pd.Timestamp(all_times.min())
-    t_max      = pd.Timestamp(all_times.max())
-    total_days = (t_max - t_min).days
-    split_len  = total_days / n_splits
+    all_times      = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
+    t_min          = pd.Timestamp(all_times.min())
+    t_max          = pd.Timestamp(all_times.max())
+    total_duration = t_max - t_min  # exact Timedelta, no truncation to whole days
+    split_len      = total_duration / n_splits
 
     result = []
     for i in range(n_splits):
-        t_start = t_min + pd.Timedelta(days=i * split_len)
-        t_end   = t_min + pd.Timedelta(days=(i + 1) * split_len)
+        is_last = (i == n_splits - 1)
+        t_start = t_min + i * split_len
+        t_end   = t_max if is_last else t_min + (i + 1) * split_len
         label   = f"S{i + 1}"
 
-        subset = [
-            (sid, df[(df["sell_time"] >= t_start) & (df["sell_time"] < t_end)])
-            for sid, df in trades_list
-        ]
+        subset = []
+        for sid, df in trades_list:
+            if is_last:
+                df_split = df[(df["sell_time"] >= t_start) & (df["sell_time"] <= t_end)]
+            else:
+                df_split = df[(df["sell_time"] >= t_start) & (df["sell_time"] < t_end)]
+            subset.append((sid, df_split))
         subset = [(sid, df) for sid, df in subset if len(df) > 0]
 
         if subset:
@@ -95,41 +84,154 @@ def _split_trades_by_time(
 
     return result
 # =============================================================================
-# PRIVATE HELPERS — Metric extraction
+# PRIVATE HELPERS — Vectorized combo scoring (matrix ops, no per-combo loop)
 # =============================================================================
-def _extract_metric(m: dict, metric: str) -> float:
-    if m.get("Net_Gain_pct", np.nan) <= 0:
-        return np.nan  
 
-    col, higher_is_better = _METRIC_MAP[metric]
-    val = m.get(col, np.nan)
-    return val if higher_is_better else -abs(val)  
-# =============================================================================
-# PRIVATE HELPERS — Combo scoring (raw metric per subperiod)
-# =============================================================================
-def _score_combo(
-    combo: tuple,
-    subperiods: list,
-    initial_balance: float,
-    metric: str,
-) -> dict:
+_FAST_METRIC_MAP = {
+    "NET_GAIN_PCT": (0, True),
+    "MAX_DD_PCT":   (1, False),
+    "R_SQUARED":    (2, True),
+    "CALMAR":       (3, True),
+}
 
-    scores = {}
+
+def _precompute_subperiod_matrices(subperiods: list, all_ids: list) -> list:
+
+    id_to_idx = {sid: i for i, sid in enumerate(all_ids)}
+    subperiod_matrices = []
 
     for label, _t_start, _t_end, split_trades in subperiods:
-        combo_trades = [(sid, df) for sid, df in split_trades if sid in combo]
-        if not combo_trades:
-            scores[label] = np.nan
+        series_by_id = {}
+        for sid, df in split_trades:
+            tl          = df.copy()
+            tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+            series_by_id[sid] = tl.groupby("_date")["profit"].sum()
+
+        if not series_by_id:
+            subperiod_matrices.append((label, None))
             continue
 
-        tl            = pd.concat([df for _, df in combo_trades], ignore_index=True).sort_values("sell_time").reset_index(drop=True)
-        total_capital = initial_balance * len(combo_trades)
-        m             = compute_metrics(tl, capital=total_capital, name="")
-        val           = _extract_metric(m, metric)
+        all_dates  = pd.concat(series_by_id.values()).index
+        date_range = pd.date_range(start=all_dates.min(), end=all_dates.max(), freq="1D")
+        n_days     = len(date_range)
 
-        scores[label] = round(val, 3)
+        daily_matrix = np.zeros((len(all_ids), n_days), dtype=np.float64)
+        for sid, series in series_by_id.items():
+            row_idx = id_to_idx[sid]
+            daily_matrix[row_idx, :] = series.reindex(date_range, fill_value=0.0).to_numpy()
 
-    return {"combo": combo, **scores}
+        subperiod_matrices.append((label, daily_matrix))
+
+    return subperiod_matrices
+
+
+def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.ndarray:
+
+    n_combos, n_days = equity.shape
+    x = np.arange(n_days, dtype=np.float64)
+
+    nonzero_mask = profit_matrix != 0
+    has_any      = nonzero_mask.any(axis=1)
+
+    first_idx = np.argmax(nonzero_mask, axis=1)
+    last_idx  = n_days - 1 - np.argmax(nonzero_mask[:, ::-1], axis=1)
+
+    # Combos with no nonzero profit day at all in this subperiod: fall back
+    # to the full range (denom check below will still yield NaN if flat).
+    first_idx = np.where(has_any, first_idx, 0)
+    last_idx  = np.where(has_any, last_idx, n_days - 1)
+
+    zeros_col = np.zeros((n_combos, 1), dtype=np.float64)
+    prefix_y  = np.concatenate([zeros_col, np.cumsum(equity, axis=1)], axis=1)
+    prefix_y2 = np.concatenate([zeros_col, np.cumsum(equity ** 2, axis=1)], axis=1)
+    prefix_xy = np.concatenate([zeros_col, np.cumsum(equity * x[None, :], axis=1)], axis=1)
+
+    rows   = np.arange(n_combos)
+    sum_y  = prefix_y[rows, last_idx + 1]  - prefix_y[rows, first_idx]
+    sum_y2 = prefix_y2[rows, last_idx + 1] - prefix_y2[rows, first_idx]
+    sum_xy = prefix_xy[rows, last_idx + 1] - prefix_xy[rows, first_idx]
+
+    a = first_idx.astype(np.float64)
+    b = last_idx.astype(np.float64)
+    n = b - a + 1.0
+
+    # Closed-form sum of i and i² over the integer window [a, b] (0-indexed),
+    # avoids materializing the window to sum it directly.
+    sum_x  = (a + b) * n / 2.0
+    sum_x2 = (b * (b + 1.0) * (2.0 * b + 1.0) - (a - 1.0) * a * (2.0 * a - 1.0)) / 6.0
+
+    cov_xy  = n * sum_xy - sum_x * sum_y
+    var_x_n = n * sum_x2 - sum_x ** 2
+    var_y_n = n * sum_y2 - sum_y ** 2
+
+    denom = var_x_n * var_y_n
+    r2    = np.full(n_combos, np.nan)
+    valid = denom > 0
+    r2[valid] = (cov_xy[valid] ** 2) / denom[valid]
+    return r2
+
+
+def _score_all_combos_vectorized(
+    combos: list,
+    subperiods: list,
+    all_ids: list,
+    initial_balance: float,
+    metric: str,
+) -> list:
+
+    id_to_idx = {sid: i for i, sid in enumerate(all_ids)}
+    n_combos  = len(combos)
+    n_ids     = len(all_ids)
+
+    combo_matrix = np.zeros((n_combos, n_ids), dtype=np.float64)
+    for i, combo in enumerate(combos):
+        idxs = [id_to_idx[sid] for sid in combo if sid in id_to_idx]
+        combo_matrix[i, idxs] = 1.0
+
+    subperiod_matrices = _precompute_subperiod_matrices(subperiods, all_ids)
+    col_idx, higher_is_better = _FAST_METRIC_MAP[metric]
+
+    scores_by_label = {}
+    for label, daily_matrix in subperiod_matrices:
+        if daily_matrix is None:
+            scores_by_label[label] = np.full(n_combos, np.nan)
+            continue
+
+        presence_mask         = (daily_matrix.any(axis=1)).astype(np.float64)  # (n_ids,)
+        effective_membership  = combo_matrix * presence_mask                   # (n_combos, n_ids)
+        counts_per_combo      = effective_membership.sum(axis=1)               # (n_combos,)
+
+        profit_matrix = effective_membership @ daily_matrix                    # (n_combos, n_days)
+
+        valid_combo = counts_per_combo > 0
+        capital     = np.where(valid_combo, initial_balance * counts_per_combo, np.nan)
+
+        equity      = capital[:, None] + np.cumsum(profit_matrix, axis=1)
+        running_max = np.maximum.accumulate(equity, axis=1)
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            max_dd   = ((equity - running_max) / running_max * 100).min(axis=1)
+            net_gain = (equity[:, -1] - capital) / capital * 100
+            calmar   = np.where(max_dd < 0, net_gain / np.abs(max_dd), np.nan)
+
+        r2 = _r_squared_windowed(equity, profit_matrix)
+
+        stacked = np.column_stack([net_gain, max_dd, r2, calmar])
+        val     = stacked[:, col_idx]
+        val     = val if higher_is_better else -np.abs(val)
+        val     = np.where((net_gain <= 0) | ~valid_combo, np.nan, val)
+
+        scores_by_label[label] = np.round(val, 3)
+
+    raw_scores = []
+    for i, combo in enumerate(combos):
+        entry = {"combo": combo}
+        for label, arr in scores_by_label.items():
+            v            = arr[i]
+            entry[label] = float(v) if np.isfinite(v) else np.nan
+        raw_scores.append(entry)
+
+    return raw_scores
 
 # =============================================================================
 # PRIVATE HELPERS — Rank-based scoring across subperiods
@@ -258,22 +360,19 @@ def find_best_portfolio_combination_wfo(
         return []
 
     logger.info(f"\n  Evaluating {len(combos)} combo(s)...\n")
-    
-# =============================================================================
-#     with tqdm_joblib(tqdm(desc="Portfolio combos", total=len(combos), dynamic_ncols=True)):
-#         raw_scores = Parallel(n_jobs=-1)(
-#             delayed(_score_combo)(combo, subperiods, initial_balance, metric)
-#             for combo in combos
-#         )
-# =============================================================================
-    
-    with tqdm_joblib(tqdm(desc="Portfolio combos", total=len(combos), dynamic_ncols=True)):
-        raw_scores = Parallel(n_jobs=-1, backend="threading")(
-            delayed(_score_combo)(combo, subperiods, initial_balance, metric)
-            for combo in combos
+
+    if metric not in _FAST_METRIC_MAP:
+        raise ValueError(
+            f"Vectorized combo scoring doesn't support metric='{metric}' "
+            f"(needs trade-level data). Supported: {list(_FAST_METRIC_MAP.keys())}"
         )
 
-    split_labels = [label for label, _, _, _ in subperiods]
+    _combo_eval_start = time.perf_counter()
+    raw_scores = _score_all_combos_vectorized(combos, subperiods, all_ids, initial_balance, metric)
+    _combo_eval_elapsed = time.perf_counter() - _combo_eval_start
+    logger.info(f"  Combo evaluation elapsed: {_combo_eval_elapsed:.2f}s (n_combos={len(combos)})")
+
+    split_labels    = [label for label, _, _, _ in subperiods]
     n_before_filter = len(raw_scores)
     raw_scores = [
         r for r in raw_scores
