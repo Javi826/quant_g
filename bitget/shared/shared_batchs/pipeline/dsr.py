@@ -1,20 +1,14 @@
 #shared_batchs/pipeline/dsr.py
+import time
 import itertools
 import logging
-import os
-import time
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from scipy.stats import norm
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-
-from shared_batchs.backtesters.ZX_compute_BT import (
-    INITIAL_BALANCE,
-    prepare_backtest_data,
-    run_backtest_from_prepared,
-)
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared
 from shared_batchs.utils.batch_metrics import compute_metrics
 
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
@@ -129,16 +123,7 @@ def _run_full_period_for_rule(
 def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, progress_label: str = "") -> dict:
 
     desc = f"DSR FULL-PERIOD SEARCH {progress_label}".strip()
-# =============================================================================
-#     with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
-#         results = Parallel(n_jobs=DSR_N_JOBS, max_nbytes=None)(
-#             delayed(_run_full_period_for_rule)(
-#                 r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype,
-#             )
-#             for r in rules
-#         )
-# =============================================================================
-        
+   
     with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
         results = Parallel(n_jobs=DSR_N_JOBS)(
             delayed(_run_full_period_for_rule)(
@@ -148,7 +133,6 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
         )
 
     return dict(results)
-
 
 # =============================================================================
 # PRIVATE HELPERS — N_eff estimation (flat rule x combo matrix, eigenvalue method)

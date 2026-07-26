@@ -1,6 +1,5 @@
 #shared/shared_batchs/rule_mining/rule_runner.py
 import logging
-
 from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
@@ -8,7 +7,6 @@ from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_comparison
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
-
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, _save_rule_deploy_batch
 
@@ -27,7 +25,6 @@ def _slugify_label(label: str) -> str:
 
 def _build_rule_id(i: int, timeframe: str, rule: dict) -> str:
     return f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
-
 
 def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
     """Generate all candidate rules for one timeframe, each tagged with a
@@ -52,11 +49,8 @@ def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
         }
         for i, rule in enumerate(all_rules)
     ]
-
-
 # =============================================================================
-# ORCHESTRATOR — chains pipe_dsr (all timeframes) then pipe_wfo (all
-# timeframes), each stage toggleable and reported via _print_ranking.
+# ORCHESTRATOR 
 # =============================================================================
 def run_rule_mining(
     ohlcv_data_by_timeframe: dict,
@@ -80,11 +74,6 @@ def run_rule_mining(
     save_trades: bool = False,
     brief_trades_folder: str = None,
 ) -> list:
-    """Runs the DSR stage for EVERY timeframe first (own N_eff/SR0 per
-    timeframe), reports one combined ranking table, THEN runs WFO for
-    EVERY timeframe on the rules that passed DSR. Returns the combined
-    list of rules (all timeframes), ready for finalize_rule_mining."""
-
     # -------------------------------------------------------------------
     # PHASE A ── DSR, one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
@@ -106,7 +95,7 @@ def run_rule_mining(
         all_dsr_results.extend([{**r, **_empty_wfo_fields()} for r in dsr_results])
 
     passed_dsr_ids = {r["rule_id"] for r in all_dsr_results if r["passed_dsr"]}
-    _print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids))
+    _print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
 
     # -------------------------------------------------------------------
     # PHASE B ── WFO, one timeframe at a time, only for rules that passed DSR.
@@ -350,12 +339,11 @@ def _short_id(rule_id: str) -> str:
 
 def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
-    #rows.sort(key=lambda r: r["net_gain"], reverse=True)
     rows.sort(key=lambda r: r["rule_id"])
 
     show_status  = survivor_ids is not None
     survivor_set = set(survivor_ids) if show_status else None
-    log_fn       = logger.info
+    log_fn       = logger.debug if debug else logger.info
 
     id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
     label_width = max((len(r["label"]) for r in rows), default=8) + 2
@@ -399,18 +387,18 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
             m: (min(r[m] for r in group_rows), max(r[m] for r in group_rows))
             for m in threshold_metrics
         }
-    logger.debug(f"\n{'─' * 140}")
-    logger.debug(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
-    logger.debug(f"{'─' * 140}")
-    logger.debug(
+    logger.info(f"\n{'─' * 140}")
+    logger.info(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
+    logger.info(f"{'─' * 140}")
+    logger.info(
         f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
         f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
         f"{'DSR min/max':<16}{'WFR min/max':<16}"
     )
-    logger.debug(f"{'─' * 140}")
+    logger.info(f"{'─' * 140}")
     for (tf, side), group_rows in sorted(groups.items()):
         s = group_stats[(tf, side)]
-        logger.debug(
+        logger.info(
             f"{tf:<12}{side:<8}{len(group_rows):<6}"
             f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
             f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
@@ -418,19 +406,19 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
             f"{f'{s['dsr'][0]:.3f} / {s['dsr'][1]:.3f}':<16}"
             f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
         )
-    logger.debug(f"{'─' * 140}")
+    logger.info(f"{'─' * 140}")
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
     safe_net_gain = min(a["net_gain"]  for a in anchors.values())
     safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
     safe_r2       = min(a["r_squared"] for a in anchors.values())
     safe_dsr      = min(a["dsr"] for a in anchors.values())
     safe_wfr      = min(a["wfr"] for a in anchors.values())
-    logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
+    logger.info("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):
-        logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
-    logger.debug(
+        logger.info(f"    {tf:<10}{side:<8}{a['rule_id']}")
+    logger.info(
         f"\n  JOINT-SAFE THRESHOLDS (guaranteed ≥1 survivor per group, all conditions at once) ── "
         f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
         f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
     )
-    logger.debug(f"{'─' * 140}\n")
+    logger.info(f"{'─' * 140}\n")

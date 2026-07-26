@@ -420,7 +420,6 @@ def _empty_multiverse_fields() -> dict:
         "multiverse_p_value": 0.0,
     }
 
-
 def pipe_multiverse(
     rules: list,
     ohlcv_data_by_timeframe: dict,

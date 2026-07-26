@@ -11,15 +11,29 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # CONFIGURATION
 # =============================================================================
 #NET_GAIN_PCT | CALMAR | R_SQUARED | MAX_DD_PCT — see _FAST_METRIC_MAP below
-WFO_METRIC            = "R_SQUARED" 
-WFO_N_SPLITS          = 8
-WFO_SUBPERIOD_WEIGHTS = [0.05,0.05,0.10,0.10,0.10,0.10,0.10,0.20]
+WFO_METRIC   = "R_SQUARED" 
+WFO_N_SPLITS = 16
 
-MIN_STRATEGIES     = 1
-MAX_STRATEGIES     = 5
-TOP_N              = 2
+def _generate_subperiod_weights(n_splits: int) -> list:
 
-REQUIRE_LONG_SHORT     = False
+    base        = 1.0 / n_splits
+    last_weight = 2.0 * base
+    extra       = last_weight - base
+
+    n_rest      = n_splits - 1
+    rest_weight = base - extra / n_rest
+
+    weights = [rest_weight] * n_rest + [last_weight]
+    return [round(w, 6) for w in weights]
+
+
+WFO_SUBPERIOD_WEIGHTS = _generate_subperiod_weights(WFO_N_SPLITS)
+
+MIN_STRATEGIES   = 3
+MAX_STRATEGIES   = 7
+TOP_N            = 2
+
+REQUIRE_LONG_SHORT     = True
 REQUIRE_ALL_TIMEFRAMES = False
 # =============================================================================
 # PRIVATE HELPERS — Validation
@@ -137,7 +151,6 @@ def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.nda
     last_idx  = n_days - 1 - np.argmax(nonzero_mask[:, ::-1], axis=1)
 
     # Combos with no nonzero profit day at all in this subperiod: fall back
-    # to the full range (denom check below will still yield NaN if flat).
     first_idx = np.where(has_any, first_idx, 0)
     last_idx  = np.where(has_any, last_idx, n_days - 1)
 
@@ -156,7 +169,6 @@ def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.nda
     n = b - a + 1.0
 
     # Closed-form sum of i and i² over the integer window [a, b] (0-indexed),
-    # avoids materializing the window to sum it directly.
     sum_x  = (a + b) * n / 2.0
     sum_x2 = (b * (b + 1.0) * (2.0 * b + 1.0) - (a - 1.0) * a * (2.0 * a - 1.0)) / 6.0
 

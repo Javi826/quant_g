@@ -2,14 +2,9 @@
 import os
 import logging
 from datetime import datetime
-
 import pandas as pd
-
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG
-from shared_batchs.runs.run_deploy import (
-    run_wfo_deploy_ema,
-    _save_deploy_symbols,
-)
+from shared_batchs.runs.run_deploy import run_wfo_deploy_ema,_save_deploy_symbols
 
 logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 

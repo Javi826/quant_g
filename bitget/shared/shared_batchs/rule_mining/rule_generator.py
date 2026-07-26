@@ -1,11 +1,12 @@
+import logging
 from itertools import combinations
 from signals.condition_bank import ConditionBank
 from signals.signal_builder import build_signal_fn, describe_rule
 
+logger = logging.getLogger("BOT_batch.rule_mining.generator")
+
 MAX_DEPTH        = 3
 SIDES            = ("long", "short")
-VERBOSE_DISCARDED = False  # set to False to silence discarded-combo prints
-
 
 def _indicator_key(bank: ConditionBank, spec: dict):
     entry         = bank._REGISTRY_BY_TYPE[spec["type"]]
@@ -17,17 +18,13 @@ def _pair_conflicts(bank: ConditionBank, spec_a: dict, spec_b: dict) -> bool:
     entry = bank._REGISTRY_BY_TYPE[spec_a["type"]]
 
     if not entry["has_threshold"]:
-        # No real threshold: op ">" and "<" compare the same quantity against
-        # itself (or its SMA) with no valid range between them, so any match
-        # on identity_keys is a conflict regardless of op.
+
         return True
 
     if spec_a["op"] == spec_b["op"]:
-        # Same direction, different threshold: the weaker one is redundant.
+
         return True
 
-    # Opposite directions: only a conflict if the ">" threshold is not
-    # strictly below the "<" threshold (i.e. the range is empty).
     greater_spec = spec_a if spec_a["op"] == ">" else spec_b
     less_spec    = spec_b if spec_a["op"] == ">" else spec_a
     return greater_spec["value"] >= less_spec["value"]
@@ -50,9 +47,8 @@ def generate_rule_combinations(bank: ConditionBank, condition_specs: list, max_d
         for combo in combinations(range(len(condition_specs)), depth):
             rule_specs = [condition_specs[i] for i in combo]
             if depth > 1 and _has_conflict(bank, rule_specs):
-                if VERBOSE_DISCARDED:
-                    label = " AND ".join(bank.describe(spec) for spec in rule_specs)
-                    print(f"[rule_generator] discarded: {label}")
+                label = " AND ".join(bank.describe(spec) for spec in rule_specs)
+                logger.debug(f"discarded: {label}")
                 continue
             rules.append(rule_specs)
     return rules

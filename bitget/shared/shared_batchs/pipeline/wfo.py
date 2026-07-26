@@ -180,12 +180,6 @@ def _evaluate_wfo_approval(
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
 
-    # Both sides of WFR use the SAME convention — average of each window's
-    # OWN Net_Gain_pct (never the multi-window aggregate), so numerator and
-    # denominator are on comparable footing. Train windows overlap in
-    # calendar time (rolling); test windows don't — averaging per-window
-    # avoids both the overlap bias on train and the window-count inflation
-    # on test that a naive aggregate/single-window-months division would add.
     monthly_test = test_net_gain_oos_avg / test_months
     monthly_is   = train_net_gain_is_avg / train_months if train_months else 0.0
     wfr          = monthly_test / monthly_is if monthly_is > 0 else 0.0
@@ -295,8 +289,6 @@ def run_wfo_is(
     return (
         best_params, approved_wfo, wfo_net_gain, wfo_max_dd, wfo_test_trades, df_results, wfo_wfr, wfo_metrics,
     )
-
-
 # =============================================================================
 # PIPE WFO — one timeframe at a time, parallelized by rule
 # =============================================================================
@@ -316,7 +308,6 @@ def _empty_wfo_fields() -> dict:
         "best_params":     None,
         "wfo_test_trades": None,
     }
-
 
 def _run_wfo_for_rule(
     idx: int,
@@ -398,7 +389,6 @@ def _run_wfo_for_rule(
         "wfo_test_trades": wfo_test_trades,
     }
 
-
 def pipe_wfo(
     rules: list,
     ohlcv_arr: dict,
@@ -419,7 +409,6 @@ def pipe_wfo(
     save_trades: bool = False,
     brief_trades_folder: str = None,
 ) -> list:
-
 
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")

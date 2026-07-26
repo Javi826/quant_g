@@ -9,18 +9,43 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
+# =============================================================================
 # LOGGING CONFIGURATION
-#------------------------------------------------------------------------------
+# =============================================================================
 LOG_LEVEL = logging.INFO
-logging.basicConfig(level=LOG_LEVEL, format="%(message)s", stream=sys.stdout, force=True)
+logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
+logger.setLevel(LOG_LEVEL)
+#UNIVERSE
+UNIVERSE_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.universe").setLevel(UNIVERSE_LOG_LEVEL)
+#RULE_MINNING
+RULE_RUNNER_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
+RULE_GENERATOR_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG_LEVEL)
+#DSR
 DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
-RULE_RUNNER_LOG_LEVEL = logging.DEBUG
-logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
+#WFO
+WFO_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.wfo").setLevel(WFO_LOG_LEVEL)
+logging.getLogger("BOT_batch.engines.wfo_WF").setLevel(WFO_LOG_LEVEL)
+#CORRELATION
+CORRELATION_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.correlation").setLevel(CORRELATION_LOG_LEVEL)
+#MONTECARLO
+MONTECARLO_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.montecarlo").setLevel(MONTECARLO_LOG_LEVEL)
+#MULTIVERSE
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
-DEPLOY_LOG_LEVEL = logging.DEBUG
+#BESTPORFTOLIO
+RUN_PORTFOLIO_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio").setLevel(RUN_PORTFOLIO_LOG_LEVEL)
+#DEPLOY
+DEPLOY_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -51,8 +76,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-TIMEFRAMES   = ["12Hutc"]
-#TIMEFRAMES   = ["1Dutc"]
+#TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -66,18 +90,18 @@ PARAM_GRID = {
 # WFO + PIPELINES — sequential validation filters (executed in this order)
 # =============================================================================
 
-WFO_NET_GAIN_TH      = -30
-WFO_DD_TH            = 150
-WFO_R2_TH            = 0.6
-WFO_WFR_TH           = 0.5
+WFO_NET_GAIN_TH      = 40
+WFO_DD_TH            = 15
+WFO_R2_TH            = 0.8
+WFO_WFR_TH           = 0.6
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.85
-PIPELINE_CORRELATION = False
+DSR_TH               = 0.80
+PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
-PIPELINE_MONTECARLO  = False
-MONTECARLO_RUIN_TH   = 5
-PIPELINE_MULTIVERSE  = False
+PIPELINE_MONTECARLO  = True
+MONTECARLO_RUIN_TH   = 10
+PIPELINE_MULTIVERSE  = True
 MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")

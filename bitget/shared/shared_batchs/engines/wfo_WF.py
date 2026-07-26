@@ -28,7 +28,6 @@ def _decimals_for_values(values) -> int:
             max_decimals = max(max_decimals, len(s.split(".")[1]))
     return max_decimals
 
-
 def _round_param(value, decimals: int):
     """Round a value to match the precision of its original param grid."""
     return int(round(value)) if decimals == 0 else round(float(value), decimals)
@@ -39,6 +38,19 @@ def _round_params_dict(params: dict, param_ranges: dict) -> dict:
         k: _round_param(v, _decimals_for_values(param_ranges[k]))
         for k, v in params.items()
     }
+
+# =============================================================================
+# def _snap_to_grid(value: float, grid_values: list):
+#     """Snap a continuous EMA value to the closest valid value in its param grid."""
+#     return min(grid_values, key=lambda g: abs(g - value))
+# 
+# 
+# def _round_params_dict(params: dict, param_ranges: dict) -> dict:
+#     return {
+#         k: _snap_to_grid(v, param_ranges[k])
+#         for k, v in params.items()
+#     }
+# =============================================================================
 
 # =============================================================================
 # EMA STATE — running exponential moving average of per-window optimal params

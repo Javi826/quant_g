@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 logger = logging.getLogger("BOT_batch.pipeline.montecarlo")
+
 # =============================================================================
 # MONTECARLO EXECUTION CONFIG
 # =============================================================================
@@ -92,7 +93,6 @@ def _empty_montecarlo_fields() -> dict:
         "passed_montecarlo":    True,
         "montecarlo_prob_ruin": 0.0,
     }
-
 
 def pipe_montecarlo(
     rules: list,
