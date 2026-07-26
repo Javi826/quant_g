@@ -8,9 +8,7 @@ from joblib import Parallel, delayed
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, _build_ohlcv_with_signal, _compute_metric
 from shared_batchs.pipeline.wfo import EMA_ALPHA
-from shared_batchs.engines.wfo_WF import (
-    WARMUP_BARS, _select_window_symbols, _update_ema_state, _round_params_dict,
-)
+from shared_batchs.engines.wfo_WF import WARMUP_BARS, _select_window_symbols, _update_ema_state, _round_params_dict
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_config import VOLUME_COL
 
@@ -20,7 +18,7 @@ logger = logging.getLogger("BOT_batch.runs.run_deploy")
 # PRIVATE HELPERS — 
 # =============================================================================
 
-def _backward_anchored_window_bounds(max_length: int, length_train_set: int, length_test: int) -> list:
+def _backward_frompresent_window_bounds(max_length: int, length_train_set: int, length_test: int) -> list:
 
     windows       = []
     train_end_idx = max_length - 1
@@ -74,7 +72,7 @@ def run_wfo_deploy_ema(
         )
         return _compute_metric(results), params
 
-    windows = _backward_anchored_window_bounds(max_length, length_train_set, length_test)
+    windows = _backward_frompresent_window_bounds(max_length, length_train_set, length_test)
     if not windows:
         raise ValueError("Not enough history to build even one deploy train window")
 

@@ -14,7 +14,7 @@ ADX_PERIODS                = [14]
 ADX_THRESHOLDS             = [20]
  
 MA_PERIODS                 = []
-MOMENTUM_PERIODS           = [5]
+MOMENTUM_PERIODS           = []
 HISTVOL_BASE_PERIODS       = [10]
 HISTVOL_REGIME_SMA_PERIODS = [20]
  

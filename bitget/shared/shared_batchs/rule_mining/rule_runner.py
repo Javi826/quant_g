@@ -49,10 +49,29 @@ def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
         }
         for i, rule in enumerate(all_rules)
     ]
+
+def _empty_wfo_fields() -> dict:
+    """Placeholder WFO fields for rules not yet sent to WFO (e.g. filtered
+    out by DSR, or before Phase B has run)."""
+    return {
+        "approved":        False,
+        "net_gain":        0.0,
+        "max_dd":          0.0,
+        "n_trades":        0,
+        "n_windows":       0,
+        "win_rate":        0.0,
+        "profit_factor":   0.0,
+        "calmar":          0.0,
+        "r_squared":       0.0,
+        "wfr":             0.0,
+        "best_params":     None,
+        "wfo_test_trades": None,
+    }
 # =============================================================================
 # ORCHESTRATOR 
 # =============================================================================
-def run_rule_mining(
+
+def run_rule_mining_pipeline(
     ohlcv_data_by_timeframe: dict,
     ohlcv_arr_by_timeframe: dict,
     timeframes: list,
@@ -64,6 +83,7 @@ def run_rule_mining(
     wfr_th: float,
     dtype,
     dsr_th: float,
+    data_folder: str,
     run_dsr: bool = True,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -73,6 +93,17 @@ def run_rule_mining(
     log_level: int = logging.INFO,
     save_trades: bool = False,
     brief_trades_folder: str = None,
+    show_plots: bool = False,
+    correlation_threshold: float = 0.75,
+    pipeline_correlation: bool = True,
+    pipeline_montecarlo: bool = True,
+    montecarlo_ruin_th: float = 5.0,
+    pipeline_multiverse: bool = True,
+    multiverse_p_value_th: float = 0.05,
+    run_best_portfolio: bool = True,
+    run_deploy: bool = False,
+    symbols_live_folder: str = None,
+    deploy_output_path: str = None,
 ) -> list:
     # -------------------------------------------------------------------
     # PHASE A ── DSR, one timeframe at a time, ALL timeframes before moving on.
@@ -134,69 +165,24 @@ def run_rule_mining(
     wfo_candidate_ids = list(wfo_by_id.keys())
     _print_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
 
-    return all_raw_results
-
-
-def _empty_wfo_fields() -> dict:
-    """Placeholder WFO fields for rules not yet sent to WFO (e.g. filtered
-    out by DSR, or before Phase B has run)."""
-    return {
-        "approved":        False,
-        "net_gain":        0.0,
-        "max_dd":          0.0,
-        "n_trades":        0,
-        "n_windows":       0,
-        "win_rate":        0.0,
-        "profit_factor":   0.0,
-        "calmar":          0.0,
-        "r_squared":       0.0,
-        "wfr":             0.0,
-        "best_params":     None,
-        "wfo_test_trades": None,
-    }
-
-
-def finalize_rule_mining(
-    all_raw_results: list,
-    ohlcv_data_by_timeframe: dict,
-    param_grid: dict,
-    order_amount: int,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
-    dtype,
-    data_folder: str,
-    inner_n_jobs: int = -1,
-    n_symbols: int = None,
-    show_plots: bool = False,
-    correlation_threshold: float = 0.75,
-    pipeline_correlation: bool = True,
-    pipeline_montecarlo: bool = True,
-    montecarlo_ruin_th: float = 5.0,
-    pipeline_multiverse: bool = True,
-    multiverse_p_value_th: float = 0.05,
-    run_best_portfolio: bool = True,
-    run_deploy: bool = False,
-    symbols_live_folder: str = None,
-    deploy_output_path: str = None,
-) -> list:
-
+    # -------------------------------------------------------------------
+    # PHASE C ── Portfolio construction on the flattened, cross-timeframe pool.
+    # -------------------------------------------------------------------
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
-    validated_wfo_test = [
+    validated_after_wfo = [
         (r["rule_id"], r["wfo_test_trades"])
         for r in all_raw_results
         if r["approved"] and r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
     ]
 
-    _print_min_by_group(all_raw_results, [rid for rid, _ in validated_wfo_test])
+    _print_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
 
     # -------------------------------------------------------------------
     # STAGE ── Correlation (portfolio construction: drop redundant rules)
     # -------------------------------------------------------------------
-    if validated_wfo_test:
-        candidates_before_corr = [rid for rid, _ in validated_wfo_test]
+    if validated_after_wfo:
+        candidates_before_corr = [rid for rid, _ in validated_after_wfo]
         rules_for_corr = [raw_by_id[rid] for rid in candidates_before_corr]
         survivors_rules = pipe_correlation(
             rules           = rules_for_corr,
@@ -204,17 +190,18 @@ def finalize_rule_mining(
             threshold       = correlation_threshold,
             enabled         = pipeline_correlation,
         )
-        survivors_corr      = [r["rule_id"] for r in survivors_rules]
-        validated_wfo_test  = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
+        survivors_corr              = [r["rule_id"] for r in survivors_rules]
+        validated_after_correlation = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
         _print_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
         _print_min_by_group(all_raw_results, survivors_corr)
     else:
-        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-CORRELATION")
+        validated_after_correlation = validated_after_wfo
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
     # -------------------------------------------------------------------
     # STAGE ── Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
-    if validated_wfo_test:
-        candidates_before_mc = [rid for rid, _ in validated_wfo_test]
+    if validated_after_correlation:
+        candidates_before_mc = [rid for rid, _ in validated_after_correlation]
         rules_for_mc = [raw_by_id[rid] for rid in candidates_before_mc]
         mc_results = pipe_montecarlo(
             rules           = rules_for_mc,
@@ -225,22 +212,23 @@ def finalize_rule_mining(
         for r in mc_results:
             raw_by_id[r["rule_id"]]["montecarlo_prob_ruin"] = r["montecarlo_prob_ruin"]
 
-        validated_wfo_test = [
+        validated_after_montecarlo = [
             (r["rule_id"], r["wfo_test_trades"]) for r in mc_results if r["passed_montecarlo"]
         ]
-        survivors_mc = [rid for rid, _ in validated_wfo_test]
+        survivors_mc = [rid for rid, _ in validated_after_montecarlo]
         _print_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
         _print_min_by_group(all_raw_results, survivors_mc)
     else:
-        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MONTECARLO")
+        validated_after_montecarlo = validated_after_correlation
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_after_montecarlo], "POST-MONTECARLO")
 
     # -------------------------------------------------------------------
     # STAGE ── Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
     # -------------------------------------------------------------------
-    if validated_wfo_test:
+    if validated_after_montecarlo:
         from shared_batchs.pipeline.multiverse import pipe_multiverse
 
-        candidates_before_mv = [rid for rid, _ in validated_wfo_test]
+        candidates_before_mv = [rid for rid, _ in validated_after_montecarlo]
         rules_for_mv = [raw_by_id[rid] for rid in candidates_before_mv]
         mv_results = pipe_multiverse(
             rules                   = rules_for_mv,
@@ -259,17 +247,18 @@ def finalize_rule_mining(
         for r in mv_results:
             raw_by_id[r["rule_id"]]["multiverse_p_value"] = r["multiverse_p_value"]
 
-        validated_wfo_test = [
+        validated_after_multiverse = [
             (r["rule_id"], r["wfo_test_trades"]) for r in mv_results if r["passed_multiverse"]
         ]
-        survivors_mv = [rid for rid, _ in validated_wfo_test]
+        survivors_mv = [rid for rid, _ in validated_after_multiverse]
         _print_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
         _print_min_by_group(all_raw_results, survivors_mv)
     else:
-        _print_ranking(all_raw_results, [rid for rid, _ in validated_wfo_test], "POST-MULTIVERSE")
+        validated_after_multiverse = validated_after_montecarlo
+        _print_ranking(all_raw_results, [rid for rid, _ in validated_after_multiverse], "POST-MULTIVERSE")
 
     if show_plots:
-        for rule_id, trades in validated_wfo_test:
+        for rule_id, trades in validated_after_multiverse:
             plot_filter_comparison(
                 strategy_id        = f"{rule_id}_wfo_test",
                 trades_df_baseline = trades,
@@ -279,9 +268,9 @@ def finalize_rule_mining(
                 regime_enabled     = False,
             )
 
-        if validated_wfo_test:
+        if validated_after_multiverse:
             plot_portfolio_comparison(
-                strategy_trades_baseline = validated_wfo_test,
+                strategy_trades_baseline = validated_after_multiverse,
                 strategy_trades_regime01 = None,
                 data_folder              = data_folder,
                 initial_balance          = INITIAL_BALANCE,
@@ -289,9 +278,9 @@ def finalize_rule_mining(
             )
 
     best_combo_ids = []
-    if run_best_portfolio and validated_wfo_test:
+    if run_best_portfolio and validated_after_multiverse:
         top_portfolios = find_best_portfolio_combination_wfo(
-            validated_wfo_trades = validated_wfo_test,
+            validated_wfo_trades = validated_after_multiverse,
             initial_balance      = INITIAL_BALANCE,
             show_plots            = show_plots,
         )
@@ -329,7 +318,7 @@ def finalize_rule_mining(
             deploy_map  = deploy_map,
         )
 
-    return validated_wfo_test
+    return validated_after_multiverse
 
 
 def _short_id(rule_id: str) -> str:

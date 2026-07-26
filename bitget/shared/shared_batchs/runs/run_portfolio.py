@@ -362,7 +362,7 @@ def find_best_portfolio_combination_wfo(
     for i, (lbl, t_start, t_end, subset) in enumerate(subperiods):
         n_strats = len({sid for sid, _ in subset})
         logger.info(
-            f"    {lbl}  {t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')}  "
+            f"    {lbl:<4} {t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')}  "
             f"weight={subperiod_weights[i]:.2f}  strategies={n_strats}"
         )
 
@@ -382,7 +382,7 @@ def find_best_portfolio_combination_wfo(
     _combo_eval_start = time.perf_counter()
     raw_scores = _score_all_combos_vectorized(combos, subperiods, all_ids, initial_balance, metric)
     _combo_eval_elapsed = time.perf_counter() - _combo_eval_start
-    logger.info(f"  Combo evaluation elapsed: {_combo_eval_elapsed:.2f}s (n_combos={len(combos)})")
+    logger.info(f"  Combo evaluation elapsed: {_combo_eval_elapsed:.2f}s (n_combos={len(combos):,}".replace(",", ".") + ")")
 
     split_labels    = [label for label, _, _, _ in subperiods]
     n_before_filter = len(raw_scores)
@@ -392,7 +392,14 @@ def find_best_portfolio_combination_wfo(
     ]
     n_disqualified = n_before_filter - len(raw_scores)
     if n_disqualified > 0:
-        logger.info(f"  Disqualified {n_disqualified}/{n_before_filter} combo(s) with a losing/empty subperiod.")
+        pct_disqualified = n_disqualified / n_before_filter * 100
+        pct_ok           = 100 - pct_disqualified
+        n_disqualified_str  = f"{n_disqualified:,}".replace(",", ".")
+        n_before_filter_str = f"{n_before_filter:,}".replace(",", ".")
+        logger.info(
+            f"  Disqualified {n_disqualified_str}/{n_before_filter_str} combo(s) with a losing/empty subperiod "
+            f"({pct_disqualified:.1f}% discarded, {pct_ok:.1f}% OK)."
+        )
 
     if not raw_scores:
         logger.warning("All combos were disqualified (losing or empty subperiod in every combo). No portfolio found.")

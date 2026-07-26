@@ -52,7 +52,6 @@ logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 from shared_batchs.symbols.universe import filter_symbols, select_universe
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
-from shared_batchs.rule_mining.rule_runner import run_rule_mining, finalize_rule_mining
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
@@ -71,7 +70,7 @@ INNER_N_JOBS = 1
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = False
+RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
@@ -87,16 +86,17 @@ PARAM_GRID = {
 }
 
 # =============================================================================
-# WFO + PIPELINES — sequential validation filters (executed in this order)
+# PIPELINES — sequential validation filters
 # =============================================================================
+
+PIPELINE_DSR         = True
+DSR_TH               = 0.80
 
 WFO_NET_GAIN_TH      = 40
 WFO_DD_TH            = 15
 WFO_R2_TH            = 0.8
 WFO_WFR_TH           = 0.6
 
-PIPELINE_DSR         = True
-DSR_TH               = 0.80
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
@@ -162,11 +162,11 @@ if __name__ == "__main__":
         )
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
-
+    from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
     # -------------------------------------------------------------------
-    all_raw_results = run_rule_mining(
+    validated_wfo_test = run_rule_mining_pipeline(
         ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
         ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
         timeframes              = TIMEFRAMES,
@@ -178,45 +178,28 @@ if __name__ == "__main__":
         wfr_th                  = WFO_WFR_TH,
         dtype                   = DTYPE,
         dsr_th                  = DSR_TH,
+        data_folder             = DATA_FOLDER_IS,
         run_dsr                 = PIPELINE_DSR,
         rules_n_jobs            = RULES_N_JOBS,
         inner_n_jobs            = INNER_N_JOBS,
         n_symbols               = N_SYMBOLS,
         max_depth               = RULE_MAX_DEPTH,
-        log_level               = LOG_LEVEL,
+        log_level               = WFO_LOG_LEVEL,
         save_trades             = SAVE_TRADES,
         brief_trades_folder     = BRIEF_TRADES_FOLDER,
-    )
-# =============================================================================
-#     from shared_batchs.pipeline.reality_check import print_comparison_table
-#     print_comparison_table(all_raw_results, dsr_th=DSR_TH)
-# =============================================================================
-    finalize_rule_mining(
-        all_raw_results          = all_raw_results,
-        ohlcv_data_by_timeframe  = ohlcv_data_by_timeframe,
-        param_grid               = PARAM_GRID,
-        order_amount             = ORDER_AMOUNT,
-        net_gain_th              = WFO_NET_GAIN_TH,
-        dd_th                    = WFO_DD_TH,
-        r2_th                    = WFO_R2_TH,
-        wfr_th                   = WFO_WFR_TH,
-        dtype                    = DTYPE,
-        data_folder              = DATA_FOLDER_IS,
-        inner_n_jobs             = INNER_N_JOBS,
-        n_symbols                = N_SYMBOLS,
-        show_plots               = SHOW_PLOTS,
+        show_plots              = SHOW_PLOTS,
         # ---- PIPELINES ----
-        pipeline_correlation     = PIPELINE_CORRELATION,
-        correlation_threshold    = CORRELATION_DD_TH,
-        pipeline_montecarlo      = PIPELINE_MONTECARLO,
-        montecarlo_ruin_th       = MONTECARLO_RUIN_TH,
-        pipeline_multiverse      = PIPELINE_MULTIVERSE,
-        multiverse_p_value_th    = MULTIVERSE_PVALUE_TH,
+        pipeline_correlation    = PIPELINE_CORRELATION,
+        correlation_threshold   = CORRELATION_DD_TH,
+        pipeline_montecarlo     = PIPELINE_MONTECARLO,
+        montecarlo_ruin_th      = MONTECARLO_RUIN_TH,
+        pipeline_multiverse     = PIPELINE_MULTIVERSE,
+        multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
         # ---- RUNS ----
-        run_best_portfolio       = RUN_PORTFOLIO,
-        run_deploy               = RUN_DEPLOY,
-        symbols_live_folder      = SYMBOLS_LIVE_FOLDER,
-        deploy_output_path       = DEPLOY_OUTPUT_PATH,
+        run_best_portfolio      = RUN_PORTFOLIO,
+        run_deploy              = RUN_DEPLOY,
+        symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
+        deploy_output_path      = DEPLOY_OUTPUT_PATH,
     )
 
     elapsed = int(time.time() - start)
