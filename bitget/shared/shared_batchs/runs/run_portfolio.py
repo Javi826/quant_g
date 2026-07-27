@@ -27,8 +27,8 @@ def _generate_subperiod_weights(n_splits: int) -> list:
 
 
 MIN_STRATEGIES   = 3
-MAX_STRATEGIES   = 7
-TOP_N            = 2
+MAX_STRATEGIES   = 8
+TOP_N            = 3
 
 REQUIRE_LONG_SHORT     = True
 REQUIRE_ALL_TIMEFRAMES = False

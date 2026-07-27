@@ -320,9 +320,7 @@ def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict,
             f"{_train_period_str(r):<{period_width}}"
             f"{r.get('label', ''):<{label_width}}{status:<8}"
         )
-
     logger.debug(f"{'─' * 200}\n")
-
 # =============================================================================
 # CORE DSR CALCULATION (across a set of candidate trials — typically one timeframe)
 # =============================================================================
@@ -333,9 +331,13 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
 
     n_eff = estimate_n_eff_flat(all_raw_results)
 
+    n_bruto_str    = f"{n_bruto:,}".replace(",", ".")
+    m_str          = f"{total_candidates:,}".replace(",", ".")
+    n_eff_str      = f"{n_eff:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if n_eff is not None else "n/a (insufficient data)"
+
     logger.info(
-        f"DSR ── N comparison ── N_bruto={n_bruto} (M={total_candidates} x n_combos={n_combos})  "
-        f"N_eff(eigen, flat rule x combo pool)={n_eff if n_eff is not None else 'n/a (insufficient data)'}"
+        f"DSR ── N_bruto={n_bruto_str} (M={m_str} x n_combos={n_combos})  "
+        f"N_eff={n_eff_str}"
     )
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
