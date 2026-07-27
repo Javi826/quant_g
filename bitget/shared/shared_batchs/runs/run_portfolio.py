@@ -11,7 +11,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 #NET_GAIN_PCT | CALMAR | R_SQUARED | MAX_DD_PCT — see _FAST_METRIC_MAP below
 WFO_METRIC       = "R_SQUARED"
-WFO_SPLIT_MONTHS = 2   # length of each subperiod, in months. Number of splits
+WFO_SPLIT_MONTHS = 2 
 
 def _generate_subperiod_weights(n_splits: int) -> list:
 
@@ -399,13 +399,15 @@ def find_best_portfolio_combination_wfo(
     ]
     n_disqualified = n_before_filter - len(raw_scores)
     if n_disqualified > 0:
-        pct_disqualified = n_disqualified / n_before_filter * 100
-        pct_ok           = 100 - pct_disqualified
+        n_ok              = n_before_filter - n_disqualified
+        pct_disqualified  = n_disqualified / n_before_filter * 100
+        pct_ok            = n_ok / n_before_filter * 100
         n_disqualified_str  = f"{n_disqualified:,}".replace(",", ".")
         n_before_filter_str = f"{n_before_filter:,}".replace(",", ".")
+        n_ok_str            = f"{n_ok:,}".replace(",", ".")
         logger.info(
             f"  Disqualified {n_disqualified_str}/{n_before_filter_str} combo(s) with a losing/empty subperiod "
-            f"({pct_disqualified:.1f}% discarded, {pct_ok:.1f}% OK)."
+            f"({pct_disqualified:.2f}% discarded, {n_ok_str} OK = {pct_ok:.2f}% OK)."
         )
 
     if not raw_scores:

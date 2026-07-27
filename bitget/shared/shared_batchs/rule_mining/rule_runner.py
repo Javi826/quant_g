@@ -105,6 +105,7 @@ def run_rule_mining_pipeline(
     run_deploy: bool = False,
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
+    run_config: dict = None,
 ) -> list:
     # -------------------------------------------------------------------
     #DSR, one timeframe at a time, ALL timeframes before moving on.
@@ -320,6 +321,7 @@ def run_rule_mining_pipeline(
             _save_rule_deploy_batch(
                 output_path = _build_top_output_path(deploy_output_path, top_idx),
                 deploy_map  = deploy_map,
+                run_config  = run_config,
             )
 
     return validated_after_multiverse

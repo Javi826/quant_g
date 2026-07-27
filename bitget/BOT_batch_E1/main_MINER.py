@@ -59,7 +59,7 @@ from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
-
+from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -73,7 +73,7 @@ INNER_N_JOBS = 1
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = False
+RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
@@ -112,6 +112,20 @@ SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
+run_config = {
+        "PIPELINE_DSR":         PIPELINE_DSR,
+        "DSR_TH":               DSR_TH,
+        "WFO_NET_GAIN_TH":      WFO_NET_GAIN_TH,
+        "WFO_DD_TH":            WFO_DD_TH,
+        "WFO_R2_TH":            WFO_R2_TH,
+        "WFO_WFR_TH":           WFO_WFR_TH,
+        "PIPELINE_CORRELATION": PIPELINE_CORRELATION,
+        "CORRELATION_DD_TH":    CORRELATION_DD_TH,
+        "PIPELINE_MONTECARLO":  PIPELINE_MONTECARLO,
+        "MONTECARLO_RUIN_TH":   MONTECARLO_RUIN_TH,
+        "PIPELINE_MULTIVERSE":  PIPELINE_MULTIVERSE,
+        "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH,
+    }
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -165,7 +179,6 @@ if __name__ == "__main__":
         )
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
-    from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
     # -------------------------------------------------------------------
@@ -203,6 +216,7 @@ if __name__ == "__main__":
         run_deploy              = RUN_DEPLOY,
         symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
         deploy_output_path      = DEPLOY_OUTPUT_PATH,
+        run_config = run_config,
     )
 
     elapsed = int(time.time() - start)
