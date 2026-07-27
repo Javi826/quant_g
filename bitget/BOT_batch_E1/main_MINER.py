@@ -48,7 +48,7 @@ DEPLOY_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 #REPORTING
-REPORTING_LOG_LEVEL = logging.DEBUG
+REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -77,7 +77,7 @@ RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["6Hutc","12Hutc"]
+TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100

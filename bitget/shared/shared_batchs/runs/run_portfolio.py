@@ -6,6 +6,7 @@ from itertools import combinations
 from shared_batchs.utils.reporting import print_best_wfo_portfolio
 from shared_batchs.utils.plotting import plot_wfo_portfolio
 logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -26,12 +27,13 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     return [round(w, 6) for w in weights]
 
 
-MIN_STRATEGIES   = 3
+MIN_STRATEGIES   = 1
 MAX_STRATEGIES   = 8
 TOP_N            = 3
 
-REQUIRE_LONG_SHORT     = True
-REQUIRE_ALL_TIMEFRAMES = False
+REQUIRE_LONG_SHORT          = True
+REQUIRE_ALL_TIMEFRAMES      = False
+REQUIRE_SUBPERIODS_POSITIVE = False
 # =============================================================================
 # PRIVATE HELPERS — Validation
 # =============================================================================
@@ -58,8 +60,6 @@ def _get_timeframe(strategy_id: str) -> str:
 # PRIVATE HELPERS — Splitting
 # =============================================================================
 AVG_DAYS_PER_MONTH = 30.4368  # 365.2425 / 12 — used only to decide where the
-                               # remainder gets absorbed; actual cut points
-                               # below use calendar months (pd.DateOffset).
 
 def _split_trades_by_time(
     trades_list: list,
@@ -119,7 +119,6 @@ _FAST_METRIC_MAP = {
     "CALMAR":       (3, True),
 }
 
-
 def _precompute_subperiod_matrices(subperiods: list, all_ids: list) -> list:
 
     id_to_idx = {sid: i for i, sid in enumerate(all_ids)}
@@ -170,10 +169,10 @@ def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.nda
     prefix_y2 = np.concatenate([zeros_col, np.cumsum(equity ** 2, axis=1)], axis=1)
     prefix_xy = np.concatenate([zeros_col, np.cumsum(equity * x[None, :], axis=1)], axis=1)
 
-    rows   = np.arange(n_combos)
-    sum_y  = prefix_y[rows, last_idx + 1]  - prefix_y[rows, first_idx]
-    sum_y2 = prefix_y2[rows, last_idx + 1] - prefix_y2[rows, first_idx]
-    sum_xy = prefix_xy[rows, last_idx + 1] - prefix_xy[rows, first_idx]
+    rows      = np.arange(n_combos)
+    sum_y     = prefix_y[rows, last_idx + 1]  - prefix_y[rows, first_idx]
+    sum_y2    = prefix_y2[rows, last_idx + 1] - prefix_y2[rows, first_idx]
+    sum_xy    = prefix_xy[rows, last_idx + 1] - prefix_xy[rows, first_idx]
 
     a = first_idx.astype(np.float64)
     b = last_idx.astype(np.float64)
@@ -187,12 +186,12 @@ def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.nda
     var_x_n = n * sum_x2 - sum_x ** 2
     var_y_n = n * sum_y2 - sum_y ** 2
 
-    denom = var_x_n * var_y_n
-    r2    = np.full(n_combos, np.nan)
-    valid = denom > 0
+    denom     = var_x_n * var_y_n
+    r2        = np.full(n_combos, np.nan)
+    valid     = denom > 0
     r2[valid] = (cov_xy[valid] ** 2) / denom[valid]
+    
     return r2
-
 
 def _score_all_combos_vectorized(
     combos: list,
@@ -393,22 +392,26 @@ def find_best_portfolio_combination_wfo(
 
     split_labels    = [label for label, _, _, _ in subperiods]
     n_before_filter = len(raw_scores)
-    raw_scores = [
-        r for r in raw_scores
-        if all(not np.isnan(r[label]) for label in split_labels)
-    ]
-    n_disqualified = n_before_filter - len(raw_scores)
-    if n_disqualified > 0:
-        n_ok              = n_before_filter - n_disqualified
-        pct_disqualified  = n_disqualified / n_before_filter * 100
-        pct_ok            = n_ok / n_before_filter * 100
-        n_disqualified_str  = f"{n_disqualified:,}".replace(",", ".")
-        n_before_filter_str = f"{n_before_filter:,}".replace(",", ".")
-        n_ok_str            = f"{n_ok:,}".replace(",", ".")
-        logger.info(
-            f"  Disqualified {n_disqualified_str}/{n_before_filter_str} combo(s) with a losing/empty subperiod "
-            f"({pct_disqualified:.2f}% discarded, {n_ok_str} OK = {pct_ok:.2f}% OK)."
-        )
+
+    if REQUIRE_SUBPERIODS_POSITIVE:
+        raw_scores = [
+            r for r in raw_scores
+            if all(not np.isnan(r[label]) for label in split_labels)
+        ]
+        n_disqualified = n_before_filter - len(raw_scores)
+        if n_disqualified > 0:
+            n_ok              = n_before_filter - n_disqualified
+            pct_disqualified  = n_disqualified / n_before_filter * 100
+            pct_ok            = n_ok / n_before_filter * 100
+            n_disqualified_str  = f"{n_disqualified:,}".replace(",", ".")
+            n_before_filter_str = f"{n_before_filter:,}".replace(",", ".")
+            n_ok_str            = f"{n_ok:,}".replace(",", ".")
+            logger.info(
+                f"  Disqualified {n_disqualified_str}/{n_before_filter_str} combo(s) with a losing/empty subperiod "
+                f"({pct_disqualified:.2f}% discarded, {n_ok_str} OK = {pct_ok:.2f}% OK)."
+            )
+    else:
+        logger.info(f"  REQUIRE_ALL_SUBPERIODS_POSITIVE=False — skipping positive-subperiod filter ({n_before_filter} combos kept).")
 
     if not raw_scores:
         logger.warning("All combos were disqualified (losing or empty subperiod in every combo). No portfolio found.")

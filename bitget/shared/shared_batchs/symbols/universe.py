@@ -16,16 +16,16 @@ symbols_to_exclude  = {"BTCUSDT","ETHUSDT"}
 MIN_START_DATE = "2022-01-02"
 
 symbols_to_include = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT",
-    "XRPUSDT",
-    "DOGEUSDT",
-    "SUIUSDT",
-    "HYPEUSDT",
     "ADAUSDT",
-    "TAOUSDT",
-    "PIPPINUSDT",
+    "AVAXUSDT",
+    "BCHUSDT",
+    "BNBUSDT",
+    "DOGEUSDT",
+    "LINKUSDT",
+    "NEARUSDT",
+    "SOLUSDT",
+    "XLMUSDT",
+    "XRPUSDT",
 ]
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,

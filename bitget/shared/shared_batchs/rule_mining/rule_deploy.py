@@ -8,7 +8,6 @@ from shared_batchs.runs.run_deploy import run_wfo_deploy_ema,_save_deploy_symbol
 
 logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 
-
 def _fmt_spec(spec: dict) -> str:
     if "sma_period" in spec:
         return (
@@ -23,7 +22,6 @@ def _fmt_spec(spec: dict) -> str:
     return (
         f'{{"type": "{spec["type"]}", "op": "{spec["op"]}", "value": {spec["value"]}}}'
     )
-
 
 def _build_window_summary_lines(deploy_map: dict) -> list:
     seen_tfs = {}
@@ -52,7 +50,6 @@ def _build_window_summary_lines(deploy_map: dict) -> list:
         lines.append(f'  {tf:<6}: {ts_str} → {te_str}  ({train_m_str})  |  next train: {next_str}  ({test_m_str})')
 
     return lines
-
 
 def _save_rule_deploy_batch(
     output_path: str,
@@ -101,7 +98,6 @@ def _save_rule_deploy_batch(
     with open(output_path, "w") as f:
         f.write("\n".join(lines) + "\n")
     logger.info(f"DEPLOY ── rule mining batch saved → {output_path}")
-
 
 def run_deploy_rule(
     rule_id: str,
