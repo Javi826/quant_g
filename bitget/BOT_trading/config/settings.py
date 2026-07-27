@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 ACCOUNTS = {
     "E1": {
-        "initial_capital": 12000,
+        "initial_capital": 20000,
         "dashboard_port": 5001,
         "description": "Elite Account",
         "type": "production",
@@ -85,7 +85,7 @@ MIN_CANDLES = 49
 MAX_CANDLES = 51
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['15m','30m','1H','4H','6Hutc']
+VALID_TIMEFRAMES = ['4H','6Hutc','12Hutc']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION

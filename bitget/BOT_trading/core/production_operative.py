@@ -138,7 +138,7 @@ class ProductionOperative:
                 usdt_amount=usdt_amount
             )
             logger.info(
-                f"ENTRY {direction.upper()} {symbol}  ${float(entry_price):.4f} | "
+                f"{direction.upper()} {symbol}  ${float(entry_price):.4f} | "
                 f"${usdt_amount:.2f}"
             )
         else:
