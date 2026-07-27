@@ -168,15 +168,15 @@ def print_best_wfo_portfolio(
         for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
             icon = "🟢" if "_long_" in s else "🔴"
             logger.info(f"    {icon} {s}")
-        logger.info(f"\n  {'Subperiod':<10} {'Weight':>8} {'Value':>10} {'Rank':>6}  {'Period'}")
-        logger.info(f"  {'─'*65}")
+        logger.debug(f"\n  {'Subperiod':<10} {'Weight':>8} {'Value':>10} {'Rank':>6}  {'Period'}")
+        logger.debug(f"  {'─'*65}")
         for i, (lbl, t_start, t_end, _) in enumerate(subperiods):
             val      = entry.get(lbl, np.nan)
             val_str  = f"{val:.3f}" if not np.isnan(val) else "N/A"
             rank_val = entry.get(f"{lbl}_rank", "-")
-            logger.info(f"  {lbl:<10} {weights[i]:>8.2f} {val_str:>10} {rank_val:>6}  ({t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')})")
-        logger.info(f"  {'─'*65}")
-        logger.info(f"  {'WEIGHTED RANK':<10} {'':>8} {'':>10} {score:>6.2f}")
+            logger.debug(f"  {lbl:<10} {weights[i]:>8.2f} {val_str:>10} {rank_val:>6}  ({t_start.strftime('%Y-%m-%d')} → {t_end.strftime('%Y-%m-%d')})")
+        logger.debug(f"  {'─'*65}")
+        logger.debug(f"  {'WEIGHTED RANK':<10} {'':>8} {'':>10} {score:>6.2f}")
 
         combo_trades = [(sid, df) for sid, df in trades_list if sid in combo]
         if combo_trades:

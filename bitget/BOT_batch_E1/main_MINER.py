@@ -47,6 +47,9 @@ logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio").setLevel(RUN_PORTFOLI
 DEPLOY_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
+#REPORTING
+REPORTING_LOG_LEVEL = logging.DEBUG
+logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)

@@ -1,3 +1,4 @@
+#shared/shared_batchs/runs/run_portfolio.py
 import logging
 import time
 import numpy as np
@@ -10,8 +11,8 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # CONFIGURATION
 # =============================================================================
 #NET_GAIN_PCT | CALMAR | R_SQUARED | MAX_DD_PCT — see _FAST_METRIC_MAP below
-WFO_METRIC       = "R_SQUARED"
-WFO_SPLIT_MONTHS = 2   # length of each subperiod, in months. Number of splits
+WFO_METRIC   = "R_SQUARED" 
+WFO_N_SPLITS = 16
 
 def _generate_subperiod_weights(n_splits: int) -> list:
 
@@ -26,6 +27,8 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     return [round(w, 6) for w in weights]
 
 
+WFO_SUBPERIOD_WEIGHTS = _generate_subperiod_weights(WFO_N_SPLITS)
+
 MIN_STRATEGIES   = 3
 MAX_STRATEGIES   = 7
 TOP_N            = 2
@@ -36,7 +39,12 @@ REQUIRE_ALL_TIMEFRAMES = False
 # PRIVATE HELPERS — Validation
 # =============================================================================
 
-def _validate_config(metric: str) -> None:
+def _validate_config(n_splits: int, weights: list, metric: str) -> None:
+    if len(weights) != n_splits:
+        raise ValueError(
+            f"WFO_SUBPERIOD_WEIGHTS has {len(weights)} entries but WFO_N_SPLITS={n_splits}. "
+            "They must match."
+        )
     if metric not in _FAST_METRIC_MAP:
         raise ValueError(
             f"Unknown WFO_METRIC='{metric}'. "
@@ -57,42 +65,23 @@ def _get_timeframe(strategy_id: str) -> str:
 # =============================================================================
 # PRIVATE HELPERS — Splitting
 # =============================================================================
-AVG_DAYS_PER_MONTH = 30.4368  # 365.2425 / 12 — used only to decide where the
-                               # remainder gets absorbed; actual cut points
-                               # below use calendar months (pd.DateOffset).
-
 def _split_trades_by_time(
     trades_list: list,
-    split_months: int,
+    n_splits: int,
 ) -> list:
     if not trades_list:
         return []
-    all_times = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
-    t_min     = pd.Timestamp(all_times.min())
-    t_max     = pd.Timestamp(all_times.max())
+    all_times      = pd.concat([df["sell_time"] for _, df in trades_list], ignore_index=True)
+    t_min          = pd.Timestamp(all_times.min())
+    t_max          = pd.Timestamp(all_times.max())
+    total_duration = t_max - t_min  # exact Timedelta, no truncation to whole days
+    split_len      = total_duration / n_splits
 
-    min_split_len = pd.Timedelta(days=split_months * AVG_DAYS_PER_MONTH)
-
-    # Walk backward from t_max in fixed calendar-month steps. Any leftover
-    # shorter than one full split is absorbed into the oldest (first)
-    # subperiod instead of becoming its own short split.
-    boundaries = [t_max]
-    cursor     = t_max
-    while True:
-        next_cursor = cursor - pd.DateOffset(months=split_months)
-        if (next_cursor - t_min) < min_split_len:
-            break
-        boundaries.append(next_cursor)
-        cursor = next_cursor
-    boundaries.append(t_min)
-    boundaries = boundaries[::-1]  # oldest -> newest
-
-    n_splits = len(boundaries) - 1
-    result   = []
+    result = []
     for i in range(n_splits):
         is_last = (i == n_splits - 1)
-        t_start = boundaries[i]
-        t_end   = boundaries[i + 1]
+        t_start = t_min + i * split_len
+        t_end   = t_max if is_last else t_min + (i + 1) * split_len
         label   = f"S{i + 1}"
 
         subset = []
@@ -337,7 +326,8 @@ def find_best_portfolio_combination_wfo(
     validated_wfo_trades: list,
     initial_balance: float,
     metric: str                    = WFO_METRIC,
-    split_months: int              = WFO_SPLIT_MONTHS,
+    n_splits: int                  = WFO_N_SPLITS,
+    subperiod_weights: list        = WFO_SUBPERIOD_WEIGHTS,
     min_strategies: int            = MIN_STRATEGIES,
     max_strategies: int            = MAX_STRATEGIES,
     top_n: int                     = TOP_N,
@@ -346,7 +336,7 @@ def find_best_portfolio_combination_wfo(
     show_plots: bool               = False,
 ) -> list:
 
-    _validate_config(metric)
+    _validate_config(n_splits, subperiod_weights, metric)
 
     if not validated_wfo_trades:
         logger.warning("No validated WFO trades — skipping best WFO portfolio search.")
@@ -354,16 +344,19 @@ def find_best_portfolio_combination_wfo(
 
     all_ids = list({sid for sid, _ in validated_wfo_trades})
     logger.info(f"\n{'='*115}")
-    logger.info(f"  BEST WFO PORTFOLIO — {len(all_ids)} validated strategies | metric: {metric} | split_months: {split_months}")
+    logger.info(f"  BEST WFO PORTFOLIO — {len(all_ids)} validated strategies | metric: {metric} | splits: {n_splits}")
     logger.info(f"{'='*115}")
 
-    subperiods = _split_trades_by_time(validated_wfo_trades, split_months)
+    subperiods = _split_trades_by_time(validated_wfo_trades, n_splits)
     if not subperiods:
         logger.warning("No subperiods could be built — check WFO trades data.")
         return []
 
-    n_splits          = len(subperiods)
-    subperiod_weights = _generate_subperiod_weights(n_splits)
+    if len(subperiods) != n_splits:
+        logger.warning(
+            f"Expected {n_splits} subperiods but got {len(subperiods)} "
+            "(some buckets were empty). Weights may not align — check trade coverage."
+        )
 
     logger.info(f"\n  Subperiods:")
     for i, (lbl, t_start, t_end, subset) in enumerate(subperiods):

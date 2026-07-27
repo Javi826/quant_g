@@ -1,4 +1,5 @@
 #shared/shared_batchs/rule_mining/rule_runner.py
+import os
 import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_batchs.pipeline.dsr import pipe_dsr
@@ -106,7 +107,7 @@ def run_rule_mining_pipeline(
     deploy_output_path: str = None,
 ) -> list:
     # -------------------------------------------------------------------
-    # PHASE A ── DSR, one timeframe at a time, ALL timeframes before moving on.
+    #DSR, one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_dsr_results = []
     for timeframe in timeframes:
@@ -129,7 +130,7 @@ def run_rule_mining_pipeline(
     _print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
 
     # -------------------------------------------------------------------
-    # PHASE B ── WFO, one timeframe at a time, only for rules that passed DSR.
+    #WFO, one timeframe at a time, only for rules that passed DSR.
     # -------------------------------------------------------------------
     wfo_by_id = {}
     for timeframe in timeframes:
@@ -166,7 +167,7 @@ def run_rule_mining_pipeline(
     _print_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
 
     # -------------------------------------------------------------------
-    # PHASE C ── Portfolio construction on the flattened, cross-timeframe pool.
+    #Portfolio construction on the flattened, cross-timeframe pool.
     # -------------------------------------------------------------------
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
@@ -179,7 +180,7 @@ def run_rule_mining_pipeline(
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
 
     # -------------------------------------------------------------------
-    # STAGE ── Correlation (portfolio construction: drop redundant rules)
+    #Correlation (portfolio construction: drop redundant rules)
     # -------------------------------------------------------------------
     if validated_after_wfo:
         candidates_before_corr = [rid for rid, _ in validated_after_wfo]
@@ -198,7 +199,7 @@ def run_rule_mining_pipeline(
         validated_after_correlation = validated_after_wfo
         _print_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
     # -------------------------------------------------------------------
-    # STAGE ── Montecarlo (bootstrap of executed trades — validates RISK)
+    #Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
     if validated_after_correlation:
         candidates_before_mc = [rid for rid, _ in validated_after_correlation]
@@ -277,46 +278,49 @@ def run_rule_mining_pipeline(
                 title                    = "Portfolio WFO Test — Validated only",
             )
 
-    best_combo_ids = []
+    top_portfolios = []
     if run_best_portfolio and validated_after_multiverse:
         top_portfolios = find_best_portfolio_combination_wfo(
             validated_wfo_trades = validated_after_multiverse,
             initial_balance      = INITIAL_BALANCE,
             show_plots            = show_plots,
         )
-        if top_portfolios:
-            best_combo_ids = list(top_portfolios[0]["combo"])
 
-    if run_deploy and best_combo_ids:
-        deploy_map  = {}
-        label_width = max(len(rid) for rid in best_combo_ids) + 2
+    if run_deploy and top_portfolios:
+        for top_idx, portfolio in enumerate(top_portfolios, start=1):
+            combo_ids = list(portfolio["combo"])
+            if not combo_ids:
+                continue
 
-        for rule_id in best_combo_ids:
-            rule_info = raw_by_id[rule_id]
-            rule_tf   = rule_info["timeframe"]
+            deploy_map  = {}
+            label_width = max(len(rid) for rid in combo_ids) + 2
 
-            run_deploy_rule(
-                rule_id             = rule_id,
-                specs               = rule_info["specs"],
-                side                = rule_info["side"],
-                timeframe           = rule_tf,
-                ohlcv_is            = ohlcv_data_by_timeframe[rule_tf],
-                signal_fn           = rule_info["signal_fn"],
-                param_grid          = param_grid,
-                order_amount        = order_amount,
-                n_symbols           = n_symbols,
-                approved            = rule_info["approved"],
-                dtype               = dtype,
-                n_jobs              = inner_n_jobs,
-                symbols_live_folder = symbols_live_folder,
-                deploy_map          = deploy_map,
-                label_width         = label_width,
+            for rule_id in combo_ids:
+                rule_info = raw_by_id[rule_id]
+                rule_tf   = rule_info["timeframe"]
+
+                run_deploy_rule(
+                    rule_id             = rule_id,
+                    specs               = rule_info["specs"],
+                    side                = rule_info["side"],
+                    timeframe           = rule_tf,
+                    ohlcv_is            = ohlcv_data_by_timeframe[rule_tf],
+                    signal_fn           = rule_info["signal_fn"],
+                    param_grid          = param_grid,
+                    order_amount        = order_amount,
+                    n_symbols           = n_symbols,
+                    approved            = rule_info["approved"],
+                    dtype               = dtype,
+                    n_jobs              = inner_n_jobs,
+                    symbols_live_folder = symbols_live_folder,
+                    deploy_map          = deploy_map,
+                    label_width         = label_width,
+                )
+
+            _save_rule_deploy_batch(
+                output_path = _build_top_output_path(deploy_output_path, top_idx),
+                deploy_map  = deploy_map,
             )
-
-        _save_rule_deploy_batch(
-            output_path = deploy_output_path,
-            deploy_map  = deploy_map,
-        )
 
     return validated_after_multiverse
 
@@ -325,6 +329,10 @@ def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
+def _build_top_output_path(base_path: str, top_idx: int) -> str:
+    """Insert a _topN suffix before the file extension, e.g. rules_batch.py -> rules_batch_top1.py."""
+    root, ext = os.path.splitext(base_path)
+    return f"{root}_top{top_idx}{ext}"
 
 def _print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
