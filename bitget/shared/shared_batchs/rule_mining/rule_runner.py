@@ -412,9 +412,9 @@ def _print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     safe_r2       = min(a["r_squared"] for a in anchors.values())
     safe_dsr      = min(a["dsr"] for a in anchors.values())
     safe_wfr      = min(a["wfr"] for a in anchors.values())
-    logger.info("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
+    logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):
-        logger.info(f"    {tf:<10}{side:<8}{a['rule_id']}")
+        logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
     logger.info(
         f"\n  JOINT-SAFE THRESHOLDS (guaranteed ≥1 survivor per group, all conditions at once) ── "
         f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "

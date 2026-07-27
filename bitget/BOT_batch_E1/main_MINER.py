@@ -76,7 +76,7 @@ RUN_PORTFOLIO = True
 RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
-TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
+TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
 
@@ -98,8 +98,8 @@ DSR_TH               = 0.80
 
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
-WFO_R2_TH            = 0.7
-WFO_WFR_TH           = 0.5
+WFO_R2_TH            = 0.8
+WFO_WFR_TH           = 0.6
 
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
