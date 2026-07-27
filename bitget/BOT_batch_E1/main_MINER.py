@@ -77,8 +77,9 @@ RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
 TIMEFRAMES   = ["4H","6Hutc","12Hutc"]
-TIMEFRAMES   = ["6Hutc","12Hutc"]
+#TIMEFRAMES   = ["6Hutc","12Hutc"]
 #TIMEFRAMES   = ["12Hutc"]
+
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
 
@@ -93,12 +94,12 @@ PARAM_GRID = {
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.95
+DSR_TH               = 0.80
 
-WFO_NET_GAIN_TH      = 40
+WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
-WFO_R2_TH            = 0.8
-WFO_WFR_TH           = 0.6
+WFO_R2_TH            = 0.7
+WFO_WFR_TH           = 0.5
 
 PIPELINE_CORRELATION = True
 CORRELATION_DD_TH    = 0.55
@@ -113,17 +114,13 @@ BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
 run_config = {
-        #"PIPELINE_DSR":         PIPELINE_DSR,
         "DSR_TH":               DSR_TH,
         "WFO_NET_GAIN_TH":      WFO_NET_GAIN_TH,
         "WFO_DD_TH":            WFO_DD_TH,
         "WFO_R2_TH":            WFO_R2_TH,
         "WFO_WFR_TH":           WFO_WFR_TH,
-        #"PIPELINE_CORRELATION": PIPELINE_CORRELATION,
         "CORRELATION_DD_TH":    CORRELATION_DD_TH,
-        #"PIPELINE_MONTECARLO":  PIPELINE_MONTECARLO,
         "MONTECARLO_RUIN_TH":   MONTECARLO_RUIN_TH,
-        #"PIPELINE_MULTIVERSE":  PIPELINE_MULTIVERSE,
         "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH,
     }
 # =============================================================================

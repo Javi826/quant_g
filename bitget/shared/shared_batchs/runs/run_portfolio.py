@@ -27,13 +27,13 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     return [round(w, 6) for w in weights]
 
 
-MIN_STRATEGIES   = 1
+MIN_STRATEGIES   = 3
 MAX_STRATEGIES   = 8
 TOP_N            = 3
 
 REQUIRE_LONG_SHORT          = True
+REQUIRE_SUBPERIODS_POSITIVE = True
 REQUIRE_ALL_TIMEFRAMES      = False
-REQUIRE_SUBPERIODS_POSITIVE = False
 # =============================================================================
 # PRIVATE HELPERS — Validation
 # =============================================================================
