@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 REGIME_REFERENCE = "BTCUSDT"
+PLOT_SCALING     = 10
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.utils.plotting")
 
@@ -37,6 +38,10 @@ def _render_comparison_plot(
     regime_enabled: bool = False,
 ) -> None:
     """Core rendering function for equity curve comparison plots."""
+    eq_base = eq_base * PLOT_SCALING
+    if eq_r01 is not None:
+        eq_r01 = eq_r01 * PLOT_SCALING
+
     fig, ax = plt.subplots(figsize=(14, 5))
     fig.patch.set_facecolor("#F8F9FA")
     ax.set_facecolor("#F8F9FA")

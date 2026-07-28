@@ -73,7 +73,7 @@ INNER_N_JOBS = 1
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = True
+RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
