@@ -1,3 +1,4 @@
+#signals/condition_bank.py
 import numpy as np
 import pandas as pd
 from scipy import signal as sp_signal
@@ -198,14 +199,6 @@ def _historical_volatility(close: np.ndarray, window: int) -> np.ndarray:
 def _ema(values: np.ndarray, period: int) -> np.ndarray:
     return pd.Series(values, dtype=np.float64).ewm(span=period, adjust=False).mean().to_numpy()
 
-
-def _rolling_max(values: np.ndarray, window: int) -> np.ndarray:
-    return pd.Series(values, dtype=np.float64).rolling(window=window).max().to_numpy()
-
-
-def _rolling_min(values: np.ndarray, window: int) -> np.ndarray:
-    return pd.Series(values, dtype=np.float64).rolling(window=window).min().to_numpy()
-
 # =============================================================================
 # INDICATOR REGISTRY
 # =============================================================================
@@ -368,10 +361,10 @@ class ConditionBank:
     _REGISTRY_BY_TYPE = {entry["type"]: entry for entry in INDICATOR_REGISTRY}
 
     def __init__(self, arr: dict):
-        self.open   = np.ascontiguousarray(arr["open"],         dtype=np.float64)
-        self.high   = np.ascontiguousarray(arr["high"],         dtype=np.float64)
-        self.low    = np.ascontiguousarray(arr["low"],          dtype=np.float64)
-        self.close  = np.ascontiguousarray(arr["close"],        dtype=np.float64)
+        self.open   = np.ascontiguousarray(arr["open"],dtype=np.float64)
+        self.high   = np.ascontiguousarray(arr["high"],dtype=np.float64)
+        self.low    = np.ascontiguousarray(arr["low"],dtype=np.float64)
+        self.close  = np.ascontiguousarray(arr["close"],dtype=np.float64)
         self.n      = len(self.close)
         self._cache = {}
 

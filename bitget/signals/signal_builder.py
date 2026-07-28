@@ -1,4 +1,4 @@
-#signals/rule_engine/signal_builder.py
+#signals/signal_builder.py
 import numpy as np
 
 from signals.condition_bank import ConditionBank

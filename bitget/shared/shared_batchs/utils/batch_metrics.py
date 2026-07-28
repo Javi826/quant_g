@@ -15,25 +15,24 @@ SHARPE_ABS_CAP = 50.0  # annualized Sharpe values beyond this are treated as inv
 # COMPUTE METRICS
 # =============================================================================
 def compute_metrics(trade_log: pd.DataFrame, capital: float, name: str = "Equity") -> dict:
-    tl      = trade_log.sort_values("sell_time").reset_index(drop=True)
-    profits = tl["profit"].values
-    win_rate = round((profits > 0).mean() * 100, 1)
-    gains  = profits[profits > 0].sum()
-    losses = -profits[profits < 0].sum()
-    pf     = round(float(gains / losses), 3) if losses > 0 else np.inf
-    tl["_date"]  = pd.to_datetime(tl["sell_time"]).dt.normalize()
-    daily_profit = tl.groupby("_date")["profit"].sum()
-    date_range   = pd.date_range(
-        start=daily_profit.index.min(), end=daily_profit.index.max(), freq="1D"
-    )
-    daily_profit = daily_profit.reindex(date_range, fill_value=0.0)
-    eq           = capital + daily_profit.cumsum().values
-    eq_series    = pd.Series(eq, index=date_range)
-    cm       = np.maximum.accumulate(eq)
-    max_dd   = ((eq - cm) / cm * 100).min()
-    net_gain = (eq[-1] - capital) / capital * 100
-    profit_abs = round(float(eq[-1] - capital), 2)
-    calmar = round(float(net_gain / abs(max_dd)), 3) if max_dd < 0 else np.nan
+    
+    tl            = trade_log.sort_values("sell_time").reset_index(drop=True)
+    profits       = tl["profit"].values
+    win_rate      = round((profits > 0).mean() * 100, 1)
+    gains         = profits[profits > 0].sum()
+    losses        = -profits[profits < 0].sum()
+    pf            = round(float(gains / losses), 3) if losses > 0 else np.inf
+    tl["_date"]   = pd.to_datetime(tl["sell_time"]).dt.normalize()
+    daily_profit  = tl.groupby("_date")["profit"].sum()
+    date_range    = pd.date_range(start=daily_profit.index.min(), end=daily_profit.index.max(), freq="1D")
+    daily_profit  = daily_profit.reindex(date_range, fill_value=0.0)
+    eq            = capital + daily_profit.cumsum().values
+    eq_series     = pd.Series(eq, index=date_range)
+    cm            = np.maximum.accumulate(eq)
+    max_dd        = ((eq - cm) / cm * 100).min()
+    net_gain      = (eq[-1] - capital) / capital * 100
+    profit_abs    = round(float(eq[-1] - capital), 2)
+    calmar        = round(float(net_gain / abs(max_dd)), 3) if max_dd < 0 else np.nan
     daily_returns = eq_series.pct_change().dropna()
     weekly        = eq_series.resample("W").last().pct_change().dropna()
     weekly_pct    = (weekly > 0).mean() * 100
