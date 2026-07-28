@@ -1,3 +1,4 @@
+#shared_batchs/runs/run_portfolio.py
 import logging
 import time
 import numpy as np
@@ -425,7 +426,7 @@ def find_best_portfolio_combination_wfo(
     raw_scores.sort(key=lambda x: x["weighted_rank_score"])  # lower rank = better
 
     top = raw_scores[:top_n]
-    print_best_wfo_portfolio(top, subperiods, validated_wfo_trades, initial_balance, metric, subperiod_weights)
+    print_best_wfo_portfolio(top, subperiods, validated_wfo_trades, initial_balance, metric, subperiod_weights, len(raw_scores))
 
     df_scored = pd.DataFrame([
         {"combo": r["combo"], "weighted_rank_score": r["weighted_rank_score"]}

@@ -153,6 +153,7 @@ def print_best_wfo_portfolio(
     initial_balance: float,
     metric: str,
     weights: list,
+    n_qualified: int,
 ) -> None:
     W          = 115
     split_keys = [label for label, _, _, _ in subperiods]
@@ -163,7 +164,8 @@ def print_best_wfo_portfolio(
         combo      = entry["combo"]
         score      = entry["weighted_rank_score"]
         avg_trades = np.mean([len(df) for sid, df in trades_list if sid in combo])
-        logger.info(f"\nBEST #{rank} — Strategies: {len(combo)}  |  AvgTrades/strat={avg_trades:.0f}  |  WeightedRankScore={score:.2f}")
+        percentile = score / n_qualified * 100
+        logger.info(f"\nBEST #{rank} — Strategies: {len(combo)}  |  AvgTrades/strat={avg_trades:.0f}  |  WeightedRankScore={score:.2f}  |  Top {percentile:.1f}%")
         logger.info(f"{'─'*W}")
         for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
             icon = "🟢" if "_long_" in s else "🔴"
