@@ -9,7 +9,7 @@ logger = logging.getLogger("BOT_batch.pipeline.montecarlo")
 # =============================================================================
 N_SIMULATIONS      = 1000
 BLOCK_SIZE         = 20   # 1 = simple bootstrap with replacement (no block structure).
-RUIN_THRESHOLD_PCT = 25   # % capital drawdown considered "ruin" within a single simulation
+RUIN_THRESHOLD_PCT = 20   # % capital drawdown considered "ruin" within a single simulation
 SEED               = 42   # fixed seed for reproducible bootstrap runs
 # =============================================================================
 # PRIVATE HELPERS
@@ -17,8 +17,8 @@ SEED               = 42   # fixed seed for reproducible bootstrap runs
 def _make_overlapping_blocks(profits: np.ndarray, block_size: int) -> np.ndarray:
     n_trades = len(profits)
     n_blocks = n_trades - block_size + 1
+    
     return np.lib.stride_tricks.sliding_window_view(profits, block_size)[:n_blocks]
-
 
 def _bootstrap_max_drawdowns(
     profits: np.ndarray,
@@ -27,20 +27,20 @@ def _bootstrap_max_drawdowns(
     block_size: int,
     seed: int,
 ) -> np.ndarray:
-    n_trades = len(profits)
-    blocks   = _make_overlapping_blocks(profits, block_size)
-    n_blocks = len(blocks)
-    max_dds = np.empty(n_simulations, dtype=np.float64)
-    rng = np.random.default_rng(seed)
+    n_trades        = len(profits)
+    blocks          = _make_overlapping_blocks(profits, block_size)
+    n_blocks        = len(blocks)
+    max_dds         = np.empty(n_simulations, dtype=np.float64)
+    rng             = np.random.default_rng(seed)
     n_blocks_needed = int(np.ceil(n_trades / block_size))
     for i in range(n_simulations):
-        chosen  = rng.integers(0, n_blocks, size=n_blocks_needed)
-        sampled = np.concatenate(blocks[chosen])[:n_trades]
-        equity  = initial_balance + np.cumsum(sampled)
-        cummax = np.maximum.accumulate(equity)
+        chosen      = rng.integers(0, n_blocks, size=n_blocks_needed)
+        sampled     = np.concatenate(blocks[chosen])[:n_trades]
+        equity      = initial_balance + np.cumsum(sampled)
+        cummax      = np.maximum.accumulate(equity)
         safe_cummax = np.where(cummax <= 0, np.nan, cummax)
-        dd = (cummax - equity) / safe_cummax
-        max_dds[i] = float(np.nanmax(dd)) * 100.0 if np.any(np.isfinite(dd)) else 100.0
+        dd          = (cummax - equity) / safe_cummax
+        max_dds[i]  = float(np.nanmax(dd)) * 100.0 if np.any(np.isfinite(dd)) else 100.0
     return max_dds
 
 
@@ -82,8 +82,6 @@ def _evaluate_montecarlo(
         f"prob_ruin={prob_ruin:.1f}% -> {'PASS' if approved else 'FAIL'}"
     )
     return approved, prob_ruin
-
-
 # =============================================================================
 # PIPE MONTECARLO — evaluates every rule's WFO test trades independently
 # =============================================================================

@@ -7,6 +7,14 @@ Train windows:
   12Hutc: 2025-10-23 → 2026-07-23  (9m train)  |  next train: 2026-09-23  (+2m)
   6Hutc : 2025-10-23 → 2026-07-23  (9m train)  |  next train: 2026-09-23  (+2m)
   4H    : 2025-10-23 → 2026-07-23  (9m train)  |  next train: 2026-09-23  (+2m)
+  DSR_TH               = 0.80
+  WFO_NET_GAIN_TH      = 40
+  WFO_DD_TH            = 20
+  WFO_R2_TH            = 0.8
+  WFO_WFR_TH           = 0.6
+  CORRELATION_DD_TH    = 0.55
+  MONTECARLO_RUIN_TH   = 10
+  MULTIVERSE_PVALUE_TH = 0.05
 """
 
 STRATEGIES = [
