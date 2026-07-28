@@ -27,7 +27,7 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     return [round(w, 6) for w in weights]
 
 
-MIN_STRATEGIES   = 3
+MIN_STRATEGIES   = 5
 MAX_STRATEGIES   = 7
 TOP_N            = 3
 
