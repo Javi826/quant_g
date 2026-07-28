@@ -17,37 +17,47 @@ logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 logger.setLevel(LOG_LEVEL)
 #UNIVERSE
+#------------------------------------------------------------------------------
 UNIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.universe").setLevel(UNIVERSE_LOG_LEVEL)
 #RULE_MINNING
+#------------------------------------------------------------------------------
 RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 RULE_GENERATOR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG_LEVEL)
 #DSR
+#------------------------------------------------------------------------------
 DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 #WFO
+#------------------------------------------------------------------------------
 WFO_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.wfo").setLevel(WFO_LOG_LEVEL)
 logging.getLogger("BOT_batch.engines.wfo_WF").setLevel(WFO_LOG_LEVEL)
 #CORRELATION
+#------------------------------------------------------------------------------
 CORRELATION_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.correlation").setLevel(CORRELATION_LOG_LEVEL)
 #MONTECARLO
+#------------------------------------------------------------------------------
 MONTECARLO_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.montecarlo").setLevel(MONTECARLO_LOG_LEVEL)
 #MULTIVERSE
+#------------------------------------------------------------------------------
 MULTIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
 #BESTPORFTOLIO
+#------------------------------------------------------------------------------
 RUN_PORTFOLIO_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio").setLevel(RUN_PORTFOLIO_LOG_LEVEL)
 #DEPLOY
+#------------------------------------------------------------------------------
 DEPLOY_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 #REPORTING
+#------------------------------------------------------------------------------
 REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
@@ -60,6 +70,7 @@ from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
+
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
