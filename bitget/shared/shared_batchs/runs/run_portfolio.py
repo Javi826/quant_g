@@ -434,19 +434,19 @@ def find_best_portfolio_combination_wfo(
     ])
 
     if top and show_plots:
-        top_entry         = top[0]
-        top_subp_scores   = {lbl: top_entry.get(lbl, np.nan) for lbl, _, _, _ in subperiods}
-        plot_wfo_portfolio(
-            combo             = top_entry["combo"],
-            trades_list       = validated_wfo_trades,
-            subperiods        = subperiods,
-            subperiod_scores  = top_subp_scores,
-            df_scored         = df_scored,
-            initial_balance   = initial_balance,
-            metric            = metric,
-            weights           = subperiod_weights,
-            title             = f"Best WFO Portfolio — {metric}",
-            validated_trades  = validated_wfo_trades,
-        )
+        for rank, top_entry in enumerate(top, start=1):
+            top_subp_scores   = {lbl: top_entry.get(lbl, np.nan) for lbl, _, _, _ in subperiods}
+            plot_wfo_portfolio(
+                combo             = top_entry["combo"],
+                trades_list       = validated_wfo_trades,
+                subperiods        = subperiods,
+                subperiod_scores  = top_subp_scores,
+                df_scored         = df_scored,
+                initial_balance   = initial_balance,
+                metric            = metric,
+                weights           = subperiod_weights,
+                title             = f"Best WFO Portfolio #{rank} — {metric}",
+                validated_trades  = validated_wfo_trades,
+            )
 
     return top
