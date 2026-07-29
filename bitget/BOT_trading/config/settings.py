@@ -85,7 +85,7 @@ MIN_CANDLES = 49
 MAX_CANDLES = 51
 
 # Valid timeframes
-VALID_TIMEFRAMES = ['4H','6Hutc','12Hutc']
+VALID_TIMEFRAMES = ['1H','4H','6Hutc','12Hutc']
 
 # ==========================================================================
 # POSTGRESQL CONFIGURATION

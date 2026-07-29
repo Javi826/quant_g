@@ -180,8 +180,7 @@ def _run_full_period_for_rule_shm(
     order_amount: int,
     dtype,
 ) -> tuple:
-    """Worker entry point: reconstruct ohlcv_arr from shared memory, run the
-    real logic, then close (not unlink) this worker's local handles."""
+
     ohlcv_arr, shm_handles = _arrays_from_shared_memory(shm_metadata)
     try:
         return _run_full_period_for_rule(rule_id, ohlcv_arr, signal_fn, param_grid, order_amount, dtype)
