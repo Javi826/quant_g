@@ -28,25 +28,12 @@ def _decimals_for_values(values) -> int:
             max_decimals = max(max_decimals, len(s.split(".")[1]))
     return max_decimals
 
-# =============================================================================
-# def _round_param(value, decimals: int):
-#     """Round a value to match the precision of its original param grid."""
-#     return int(round(value)) if decimals == 0 else round(float(value), decimals)
-# 
-# 
-# def _round_params_dict(params: dict, param_ranges: dict) -> dict:
-#     return {
-#         k: _round_param(v, _decimals_for_values(param_ranges[k]))
-#         for k, v in params.items()
-#     }
-# =============================================================================
-
 def _snap_to_grid(value: float, grid_values: list):
     """Snap a continuous EMA value to the closest valid value in its param grid."""
     return min(grid_values, key=lambda g: abs(g - value))
 
 
-def _round_params_dict(params: dict, param_ranges: dict) -> dict:
+def round_params_dict(params: dict, param_ranges: dict) -> dict:
     return {
         k: _snap_to_grid(v, param_ranges[k])
         for k, v in params.items()
@@ -56,7 +43,7 @@ def _round_params_dict(params: dict, param_ranges: dict) -> dict:
 # EMA STATE — running exponential moving average of per-window optimal params
 # =============================================================================
 
-def _update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float) -> dict:
+def update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float) -> dict:
 
     if ema_raw is None:
         return dict(new_best)
@@ -85,7 +72,7 @@ def _find_window_indices(
         return None
     return t0, t1, test0, test1
 
-def _select_window_symbols(
+def select_window_symbols(
     candidate_indices: dict,
     ohlcv_arr: dict,
     n_symbols: int | None,
@@ -146,6 +133,7 @@ def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
     finally:
         for shm in shm_handles:
             shm.close()
+            
 # =============================================================================
 # WALK FORWARD OPTIMIZATION
 # =============================================================================
@@ -244,7 +232,7 @@ def walk_forward_optimization(
         # -----------------------------------------------------------------
         # Select exactly n_symbols (OOS1 priority + fill by volume)
         # -----------------------------------------------------------------
-        selected_indices = _select_window_symbols(
+        selected_indices = select_window_symbols(
             candidate_indices, ohlcv_arr, n_symbols
         )
 
@@ -337,8 +325,8 @@ def walk_forward_optimization(
         # -----------------------------------------------------------
         _, raw_best_params = max(results, key=lambda x: x[0])
 
-        ema_raw          = _update_ema_state(ema_raw, raw_best_params, alpha=ema_alpha)
-        effective_params = _round_params_dict(ema_raw, param_ranges)
+        ema_raw          = update_ema_state(ema_raw, raw_best_params, alpha=ema_alpha)
+        effective_params = round_params_dict(ema_raw, param_ranges)
 
         best_params_list.append(effective_params)
 

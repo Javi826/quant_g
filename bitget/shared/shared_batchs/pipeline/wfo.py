@@ -42,7 +42,7 @@ def _window_cache_key(base_arrays: dict) -> tuple:
         for sym, arr in sorted(base_arrays.items())
     )
 
-def _build_ohlcv_with_signal(
+def build_ohlcv_with_signal(
     base_arrays: dict,
     signal_fn: callable,
     signal_params_keys: list,
@@ -90,7 +90,7 @@ def _get_prepared_data(
     _prepared_cache[cache_key] = prepared
     return prepared
 
-def _compute_metric(results: dict) -> float:
+def compute_metric(results: dict) -> float:
 
     trade_log = results.get("__PORTFOLIO__", {}).get("trade_log")
     if trade_log is None or trade_log.empty:
@@ -119,7 +119,7 @@ def _evaluate_fn(
     _prepared_cache: dict = None,
 ) -> tuple:
     """Single param combination evaluation for one WFO train window."""
-    ohlcv_arrays = _build_ohlcv_with_signal(
+    ohlcv_arrays = build_ohlcv_with_signal(
         base_arrays, signal_fn, signal_params_keys, params, dtype, _signal_cache=_signal_cache
     )
     prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
@@ -130,7 +130,7 @@ def _evaluate_fn(
         sl_pct       = params["SL_PCT"],
         order_amount = order_amount,
     )
-    return _compute_metric(results), params
+    return compute_metric(results), params
 
 def _collect_trades_fn(
     params: dict,
@@ -142,7 +142,7 @@ def _collect_trades_fn(
     _prepared_cache: dict = None,
 ) -> pd.DataFrame:
     """Run backtest with best_params on a window and return the trade log."""
-    ohlcv_arrays  = _build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
+    ohlcv_arrays  = build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
     prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
     results       = run_backtest_from_prepared(
         prepared_data,

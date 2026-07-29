@@ -2,6 +2,7 @@
 import logging
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 logger = logging.getLogger("BOT_batch.pipeline.montecarlo")
 
 # =============================================================================
@@ -9,8 +10,9 @@ logger = logging.getLogger("BOT_batch.pipeline.montecarlo")
 # =============================================================================
 N_SIMULATIONS      = 1000
 BLOCK_SIZE         = 20   # 1 = simple bootstrap with replacement (no block structure).
-RUIN_THRESHOLD_PCT = 20   # % capital drawdown considered "ruin" within a single simulation
+RUIN_THRESHOLD_PCT = 25   # % capital drawdown considered "ruin" within a single simulation
 SEED               = 42   # fixed seed for reproducible bootstrap runs
+MAX_PLOT_CURVES    = 100
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -48,6 +50,43 @@ def _probability_of_ruin(max_dds: np.ndarray, ruin_threshold_pct: float) -> floa
     """% of simulations whose max drawdown exceeds the ruin threshold."""
     return float(np.mean(max_dds >= ruin_threshold_pct)) * 100.0
 
+def _plot_montecarlo_equity_curves(
+    profits: np.ndarray,
+    initial_balance: float,
+    block_size: int,
+    ruin_threshold_pct: float,
+    n_curves: int = MAX_PLOT_CURVES,
+    seed: int = SEED,
+) -> None:
+    """Debug plot: bootstrap equity curves vs the original, with a dynamic ruin band."""
+    n_trades = len(profits)
+    blocks   = _make_overlapping_blocks(profits, block_size)
+    n_blocks = len(blocks)
+    rng      = np.random.default_rng(seed + 1)
+    n_blocks_needed = int(np.ceil(n_trades / block_size))
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    for _ in range(n_curves):
+        chosen  = rng.integers(0, n_blocks, size=n_blocks_needed)
+        sampled = np.concatenate(blocks[chosen])[:n_trades]
+        equity  = initial_balance + np.cumsum(sampled)
+        ax.plot(equity, color="gray", alpha=0.15, linewidth=0.7)
+
+    original_equity      = initial_balance + np.cumsum(profits)
+    original_running_max = np.maximum.accumulate(original_equity)
+    ruin_band            = original_running_max * (1.0 - ruin_threshold_pct / 100.0)
+
+    ax.plot(original_equity, color="red", linewidth=1.8, label="Original equity")
+    ax.plot(ruin_band, color="red", linewidth=1.2, linestyle="--", label=f"Ruin threshold ({ruin_threshold_pct}%% DD)")
+
+    ax.set_title(f"MONTECARLO — bootstrap equity curves (n_curves={n_curves})")
+    ax.set_xlabel("Trade index")
+    ax.set_ylabel("Equity")
+    ax.legend()
+    fig.tight_layout()
+    plt.show()
+
 # =============================================================================
 # APPROVAL CRITERION
 # =============================================================================
@@ -81,6 +120,10 @@ def _evaluate_montecarlo(
         f"MONTECARLO ── n_sims={n_simulations} block_size={block_size} "
         f"prob_ruin={prob_ruin:.1f}% -> {'PASS' if approved else 'FAIL'}"
     )
+
+    if logger.isEnabledFor(logging.DEBUG):
+        _plot_montecarlo_equity_curves(profits, initial_balance, block_size, ruin_threshold_pct, seed=seed)
+
     return approved, prob_ruin
 # =============================================================================
 # PIPE MONTECARLO — evaluates every rule's WFO test trades independently

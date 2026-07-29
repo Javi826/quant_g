@@ -186,10 +186,7 @@ class BotOrchestrator:
     def _setup_directories(self) -> None:
         """Setup necessary directories and paths."""
         os.makedirs(self.base_dir, exist_ok=True)
-        configure_paths(
-            self.trades_log_path,
-            initial_capital=self.initial_capital
-        )
+        configure_paths(self.trades_log_path)
     
     def _load_bot_state(self) -> None:
         self.open_positions, self.strategy_candles = self.operative.load_state()

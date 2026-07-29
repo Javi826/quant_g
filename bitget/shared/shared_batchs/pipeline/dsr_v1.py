@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/dsr.py
+#shared_batchs/pipeline/dsr_v1.py
 import time
 import itertools
 import logging
@@ -84,30 +84,10 @@ def _run_full_period_for_rule(
     dtype,
 ) -> tuple:
 
+    prepared_data = prepare_full_period_data(ohlcv_arr, signal_fn, dtype)
+
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
-
-    # Cheap upper bound: no combo can ever produce more trades than raw signal
-    # firings (each firing yields at most one trade attempt, which may still
-    # be skipped for lack of free cash). If that upper bound is already below
-    # DSR_MIN_TRADES, every combo in the grid is guaranteed to fail the same
-    # check _evaluate_combo_sharpe applies after the fact — skip preparing
-    # the backtest data and running the grid of backtests entirely.
-    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
-    max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
-
-    if max_possible_trades < DSR_MIN_TRADES:
-        winner_metrics = {
-            "sharpe_train":   np.nan,
-            "skew_train":     np.nan,
-            "kurtosis_train": np.nan,
-            "n_days_train":   0,
-            "net_gain_train": np.nan,
-            "max_dd_train":   np.nan,
-        }
-        return rule_id, {**winner_metrics, "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
-
-    prepared_data = prepare_backtest_data(ohlcv_arrays)
 
     rows = [_evaluate_combo_sharpe(params, prepared_data, order_amount) for params in combos]
 
@@ -155,7 +135,7 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
     return dict(results)
 
 # =============================================================================
-# PRIVATE HELPERS — N_eff estimation (streaming Gram accumulation, eigenvalue method)
+# PRIVATE HELPERS — N_eff estimation (flat rule x combo matrix, eigenvalue method)
 # =============================================================================
 def _build_flat_daily_matrixDDD(all_raw_results: list) -> pd.DataFrame | None:
 
@@ -173,25 +153,43 @@ def _build_flat_daily_matrixDDD(all_raw_results: list) -> pd.DataFrame | None:
 
     return matrix
 
-def _iter_daily_profit_columns(all_raw_results: list):
-    """Yields (col_name, daily_profit_series) for every rule x combo pair —
-    the same set of columns a dense flat matrix would have had, but consumed
-    one at a time instead of all held in memory simultaneously."""
+def _build_flat_daily_matrix(all_raw_results: list) -> pd.DataFrame | None:
+
+    series_by_col = {}
     for r in all_raw_results:
         combo_profit = r.get("combo_daily_profit") or {}
         for combo_id, s in combo_profit.items():
-            yield f"{r['rule_id']}__{combo_id}", s
+            series_by_col[f"{r['rule_id']}__{combo_id}"] = s
 
-
-def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
-    """Union of all dates across every column — same axis a dense flat matrix
-    would have used to align/reindex each column. Requires touching each
-    column's index once (cheap: dates only, not the profit values)."""
-
-    date_arrays = [s.index.to_numpy() for _col_name, s in _iter_daily_profit_columns(all_raw_results)]
-    if len(date_arrays) < 2:
+    if len(series_by_col) < 2:
         return None
-    return np.unique(np.concatenate(date_arrays))
+
+    col_names = list(series_by_col.keys())
+
+    all_dates = np.unique(
+        np.concatenate([s.index.to_numpy() for s in series_by_col.values()])
+    )
+
+    matrix_arr = np.zeros((all_dates.shape[0], len(col_names)), dtype=np.float64)
+    for col_idx, col_name in enumerate(col_names):
+        s = series_by_col[col_name]
+        row_idx = np.searchsorted(all_dates, s.index.to_numpy())
+        matrix_arr[row_idx, col_idx] = s.to_numpy(dtype=np.float64)
+
+    return pd.DataFrame(matrix_arr, index=pd.DatetimeIndex(all_dates), columns=col_names)
+
+def _standardize_and_split(matrix: pd.DataFrame) -> tuple:
+    arr        = matrix.to_numpy(dtype=np.float64)
+    means      = arr.mean(axis=0)
+    stds       = arr.std(axis=0, ddof=1)
+    valid_mask = stds > 0
+    n_const    = int(np.sum(~valid_mask))
+
+    if not np.any(valid_mask):
+        return None, n_const
+
+    x_std = (arr[:, valid_mask] - means[valid_mask]) / stds[valid_mask]
+    return x_std, n_const
 
 
 def _eigenvalues_desc(square_array: np.ndarray) -> np.ndarray:
@@ -209,62 +207,25 @@ def _participation_ratio(eigenvalues: np.ndarray, n_const: int) -> float:
     return float((sum_eig ** 2) / sum_eig_sq)
 
 
-BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
-                         # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
-                         # large enough for BLAS to run efficiently (vs. one matmul per column)
+def _estimate_n_eff_eigen(matrix: pd.DataFrame) -> float:
+    x_std, n_const = _standardize_and_split(matrix)
 
-def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
-    """Computes the same participation-ratio N_eff as a dense-matrix eigenvalue
-    approach, but by accumulating the T x T Gram matrix in batches of columns
-    instead of ever materializing the full T x M dense matrix (M = rules x
-    combos). M can reach the hundreds of thousands at scale — the dense matrix
-    is the actual RAM driver; the Gram matrix (T x T) stays fixed-size and
-    small (T = number of days) regardless of how many rules/combos exist.
-    Batching (instead of one column at a time) lets each partial matmul run
-    through BLAS, which is what makes this fast in practice."""
-
-    t_days  = all_dates.shape[0]
-    gram    = np.zeros((t_days, t_days), dtype=np.float64)
-    n_const = 0
-    n_valid = 0
-    batch_cols = []
-
-    for _col_name, s in _iter_daily_profit_columns(all_raw_results):
-        col = np.zeros(t_days, dtype=np.float64)
-        row_idx = np.searchsorted(all_dates, s.index.to_numpy())
-        col[row_idx] = s.to_numpy(dtype=np.float64)
-
-        std = col.std(ddof=1)
-        if std <= 0:
-            n_const += 1
-            continue
-
-        batch_cols.append((col - col.mean()) / std)
-        n_valid += 1
-
-        if len(batch_cols) >= batch_size:
-            x_batch = np.column_stack(batch_cols)
-            gram   += x_batch @ x_batch.T
-            batch_cols = []
-
-    if batch_cols:
-        x_batch = np.column_stack(batch_cols)
-        gram   += x_batch @ x_batch.T
-
-    if n_valid == 0:
+    if x_std is None:
         return float(n_const) if n_const > 0 else 1.0
 
-    gram /= (t_days - 1)
+    t_days = x_std.shape[0]
+    gram   = (x_std @ x_std.T) / (t_days - 1)
+
     eigenvalues = _eigenvalues_desc(gram)
     return _participation_ratio(eigenvalues, n_const)
 
 
 def estimate_n_eff_flat(all_raw_results: list) -> float | None:
 
-    all_dates = _common_date_axis(all_raw_results)
-    if all_dates is None:
+    matrix = _build_flat_daily_matrix(all_raw_results)
+    if matrix is None:
         return None
-    return _estimate_n_eff_eigen_streaming(all_raw_results, all_dates)
+    return _estimate_n_eff_eigen(matrix)
 
 
 # =============================================================================

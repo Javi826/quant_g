@@ -1,16 +1,4 @@
 #BOT_trading/execution/order_manager.py
-"""
-This module is responsible for:
-- Placing market orders via REST API
-- Fetching current prices via WebSocket
-- Managing contract parameters
-- Tracking order fills
-- Closing positions
-
-This module imports from trade_logger for logger but trade_logger
-does not import back, avoiding circular dependencies.
-"""
-
 import os
 import time
 from datetime import datetime
@@ -29,25 +17,14 @@ from config.settings import HOUR_ZONE
 # ==========================================================================
 from config.settings import  PRODUCT_TYPE, MARGIN_MODE
 
-# Global configuration
-TRADES_LOG_PATH = None
-INITIAL_CAPITAL = None
-
-
 # ==========================================================================
 # CONFIGURATION
 # ==========================================================================
-def configure_paths(trades_log_path: str, 
-                   initial_capital: float = 1000) -> None:
-
-    global TRADES_LOG_PATH,INITIAL_CAPITAL
-    
-    TRADES_LOG_PATH = trades_log_path
-    INITIAL_CAPITAL = initial_capital
-    
+# DESPUÉS
+def configure_paths(trades_log_path: str) -> None:
     # Configure trade logger
     configure_log_path(trades_log_path)
-    
+
     # Create directory if doesn't exist
     log_dir = os.path.dirname(trades_log_path)
     if log_dir:

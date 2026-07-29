@@ -6,9 +6,8 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from shared_batchs.backtesters.ZX_compute_BT import run_grid_backtest
-from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, _build_ohlcv_with_signal, _compute_metric
-from shared_batchs.pipeline.wfo import EMA_ALPHA
-from shared_batchs.engines.wfo_WF import WARMUP_BARS, _select_window_symbols, _update_ema_state, _round_params_dict
+from shared_batchs.pipeline.wfo import EMA_ALPHA,WFO_WINDOW_CONFIG, build_ohlcv_with_signal, compute_metric
+from shared_batchs.engines.wfo_WF import WARMUP_BARS, select_window_symbols, update_ema_state, round_params_dict
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_config import VOLUME_COL
 
@@ -62,7 +61,7 @@ def run_wfo_deploy_ema(
     dict_combinations = [dict(zip(param_names, comb)) for comb in itertools.product(*lists_for_grid)]
 
     def _evaluate(params, base_arrays):
-        arrays  = _build_ohlcv_with_signal(base_arrays, signal_fn, [], params, dtype)
+        arrays  = build_ohlcv_with_signal(base_arrays, signal_fn, [], params, dtype)
         results = run_grid_backtest(
             arrays,
             sell_after   = params["SELL_AFTER"],
@@ -70,7 +69,7 @@ def run_wfo_deploy_ema(
             sl_pct       = params["SL_PCT"],
             order_amount = order_amount,
         )
-        return _compute_metric(results), params
+        return compute_metric(results), params
 
     windows = _backward_frompresent_window_bounds(max_length, length_train_set, length_test)
     if not windows:
@@ -96,7 +95,7 @@ def run_wfo_deploy_ema(
             if t1 > t0:
                 candidate_indices[sym] = (t0, t1, t0, t1)
 
-        selected = _select_window_symbols(candidate_indices, ohlcv_arr, n_symbols)
+        selected = select_window_symbols(candidate_indices, ohlcv_arr, n_symbols)
         if not selected:
             logger.debug(f"DEPLOY EMA ── window [{train_start_ts}..{train_end_ts}] skipped: no symbols available")
             continue
@@ -119,7 +118,7 @@ def run_wfo_deploy_ema(
         results = Parallel(n_jobs=n_jobs)(delayed(_evaluate)(p, base_arrays) for p in dict_combinations)
         _, raw_best_params = max(results, key=lambda x: x[0])
 
-        ema_raw = _update_ema_state(ema_raw, raw_best_params, alpha=EMA_ALPHA)
+        ema_raw = update_ema_state(ema_raw, raw_best_params, alpha=EMA_ALPHA)
 
         present_train_start, present_train_end = train_start_ts, train_end_ts
         deploy_symbols = sorted(selected.keys())
@@ -128,17 +127,17 @@ def run_wfo_deploy_ema(
             f"DEPLOY EMA ── window [{pd.Timestamp(train_start_ts).date()} .. {pd.Timestamp(train_end_ts).date()}] "
             f"| symbols={len(deploy_symbols)} "
             f"| raw_best={raw_best_params} "
-            f"| ema_state={_round_params_dict(ema_raw, param_ranges)}"
+            f"| ema_state={round_params_dict(ema_raw, param_ranges)}"
         )
 
     if ema_raw is None:
         raise ValueError("No deploy window produced a valid train optimum (no symbols available in any window)")
 
-    deploy_params = _round_params_dict(ema_raw, param_ranges)
+    deploy_params = round_params_dict(ema_raw, param_ranges)
     return deploy_params, deploy_symbols, present_train_start, present_train_end
 
 
-def _save_deploy_symbols(
+def save_deploy_symbols(
     strategy_id: str,
     deploy_symbols: list,
     timeframe: str,

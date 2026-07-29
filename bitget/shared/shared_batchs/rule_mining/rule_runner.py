@@ -9,7 +9,7 @@ from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
-from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, _save_rule_deploy_batch
+from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
 
 logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
@@ -318,7 +318,7 @@ def run_rule_mining_pipeline(
                     label_width         = label_width,
                 )
 
-            _save_rule_deploy_batch(
+            save_rule_deploy_batch(
                 output_path = _build_top_output_path(deploy_output_path, top_idx),
                 deploy_map  = deploy_map,
                 run_config  = run_config,

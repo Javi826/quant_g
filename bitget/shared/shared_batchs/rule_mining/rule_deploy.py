@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 import pandas as pd
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG
-from shared_batchs.runs.run_deploy import run_wfo_deploy_ema,_save_deploy_symbols
+from shared_batchs.runs.run_deploy import run_wfo_deploy_ema,save_deploy_symbols
 
 logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 
@@ -51,7 +51,7 @@ def _build_window_summary_lines(deploy_map: dict) -> list:
 
     return lines
 
-def _save_rule_deploy_batch(
+def save_rule_deploy_batch(
     output_path: str,
     deploy_map: dict,
     run_config: dict = None,
@@ -120,8 +120,6 @@ def run_deploy_rule(
 
     label = f"{rule_id:<{label_width}}"
 
-    logger.info(f"DEPLOY  ── {label} ── running deploy train window (wfo_ema)")
-
     deploy_params, deploy_symbols, train_start_ts, train_end_ts = run_wfo_deploy_ema(
         ohlcv_is     = ohlcv_is,
         timeframe    = timeframe,
@@ -132,15 +130,14 @@ def run_deploy_rule(
         dtype        = dtype,
         n_jobs       = n_jobs,
     )
-
+    params_str   = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")
+    status       = "🟢 active" if approved else "🔴 inactive"
+    ts_start_str = pd.Timestamp(train_start_ts).strftime("%Y-%m-%d")
+    ts_end_str   = pd.Timestamp(train_end_ts).strftime("%Y-%m-%d")
     logger.info(
-        f"DEPLOY  ── {label} ── {len(deploy_symbols):>3} symbols | "
-        f"from {pd.Timestamp(train_start_ts)} to {pd.Timestamp(train_end_ts)}"
+        f"DEPLOY  ── {label} ── {status} | {params_str} | "
+        f"{len(deploy_symbols):>3} symbols | {ts_start_str} → {ts_end_str}"
     )
-
-    params_str = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")
-    status     = "🟢 active" if approved else "🔴 inactive"
-    logger.info(f"DEPLOY  ── {label} ── {status} | {params_str}")
 
     deploy_map[rule_id] = {
         "specs":          specs,
@@ -153,6 +150,6 @@ def run_deploy_rule(
         "train_end_ts":   train_end_ts,
     }
 
-    symbols_changed = _save_deploy_symbols(rule_id, deploy_symbols, timeframe, symbols_live_folder)
+    symbols_changed = save_deploy_symbols(rule_id, deploy_symbols, timeframe, symbols_live_folder)
 
     return symbols_changed

@@ -27,13 +27,12 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     weights = [rest_weight] * n_rest + [last_weight]
     return [round(w, 6) for w in weights]
 
-
 MIN_STRATEGIES   = 5
 MAX_STRATEGIES   = 7
 TOP_N            = 3
 
-REQUIRE_LONG_SHORT          = True
 REQUIRE_SUBPERIODS_POSITIVE = True
+REQUIRE_LONG_SHORT          = True
 REQUIRE_ALL_TIMEFRAMES      = False
 # =============================================================================
 # PRIVATE HELPERS — Validation
@@ -75,8 +74,6 @@ def _split_trades_by_time(
     min_split_len = pd.Timedelta(days=split_months * AVG_DAYS_PER_MONTH)
 
     # Walk backward from t_max in fixed calendar-month steps. Any leftover
-    # shorter than one full split is absorbed into the oldest (first)
-    # subperiod instead of becoming its own short split.
     boundaries = [t_max]
     cursor     = t_max
     while True:
@@ -148,7 +145,6 @@ def _precompute_subperiod_matrices(subperiods: list, all_ids: list) -> list:
         subperiod_matrices.append((label, daily_matrix))
 
     return subperiod_matrices
-
 
 def _r_squared_windowed(equity: np.ndarray, profit_matrix: np.ndarray) -> np.ndarray:
 
