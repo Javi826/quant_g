@@ -10,7 +10,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared
 from shared_batchs.utils.batch_metrics import compute_metrics
-
+from multiprocessing.shared_memory import SharedMemory
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
 
 # =============================================================================
@@ -73,6 +73,39 @@ def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tu
     daily_profit = _daily_profit_from_trades(trade_log)
     return sharpe, params, m, daily_profit
 
+def _arrays_to_shared_memory(ohlcv_arr: dict) -> tuple:
+    """Write ohlcv_arr's numpy arrays to shared memory once, so ~9000+ tasks
+    can attach to them by name instead of each being pickled a full copy."""
+    shm_list = []
+    metadata = {}
+    for sym, arr_dict in ohlcv_arr.items():
+        metadata[sym] = {}
+        for key, arr in arr_dict.items():
+            if isinstance(arr, np.ndarray):
+                shm    = SharedMemory(create=True, size=max(arr.nbytes, 1))
+                buf    = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf)
+                buf[:] = arr
+                shm_list.append(shm)
+                metadata[sym][key] = {"name": shm.name, "shape": arr.shape, "dtype": str(arr.dtype)}
+            else:
+                metadata[sym][key] = {"value": arr}
+    return shm_list, metadata
+
+
+def _arrays_from_shared_memory(metadata: dict) -> tuple:
+    """Reconstruct ohlcv_arr from shared memory metadata inside a worker."""
+    ohlcv_arr   = {}
+    shm_handles = []
+    for sym, fields in metadata.items():
+        ohlcv_arr[sym] = {}
+        for key, info in fields.items():
+            if "name" in info:
+                shm = SharedMemory(name=info["name"], create=False)
+                shm_handles.append(shm)
+                ohlcv_arr[sym][key] = np.ndarray(info["shape"], dtype=np.dtype(info["dtype"]), buffer=shm.buf)
+            else:
+                ohlcv_arr[sym][key] = info["value"]
+    return ohlcv_arr, shm_handles
 
 def _run_full_period_for_rule(
     rule_id: str,
@@ -139,17 +172,43 @@ def _run_full_period_for_rule(
 
     return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
 
+def _run_full_period_for_rule_shm(
+    rule_id: str,
+    shm_metadata: dict,
+    signal_fn: callable,
+    param_grid: dict,
+    order_amount: int,
+    dtype,
+) -> tuple:
+    """Worker entry point: reconstruct ohlcv_arr from shared memory, run the
+    real logic, then close (not unlink) this worker's local handles."""
+    ohlcv_arr, shm_handles = _arrays_from_shared_memory(shm_metadata)
+    try:
+        return _run_full_period_for_rule(rule_id, ohlcv_arr, signal_fn, param_grid, order_amount, dtype)
+    finally:
+        for shm in shm_handles:
+            shm.close()
+            
 def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, progress_label: str = "") -> dict:
 
     desc = f"DSR FULL-PERIOD SEARCH {progress_label}".strip()
-   
-    with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
-        results = Parallel(n_jobs=DSR_N_JOBS)(
-            delayed(_run_full_period_for_rule)(
-                r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype,
+
+    if not rules:
+        return {}
+
+    shm_list, shm_metadata = _arrays_to_shared_memory(rules[0]["ohlcv_arr"])
+    try:
+        with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
+            results = Parallel(n_jobs=DSR_N_JOBS, batch_size=1, pre_dispatch='all')(
+                delayed(_run_full_period_for_rule_shm)(
+                    r["rule_id"], shm_metadata, r["signal_fn"], param_grid, order_amount, dtype,
+                )
+                for r in rules
             )
-            for r in rules
-        )
+    finally:
+        for shm in shm_list:
+            shm.close()
+            shm.unlink()
 
     return dict(results)
 
