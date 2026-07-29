@@ -363,7 +363,7 @@ def walk_forward_optimization(
             window_test_n_trades = len(df_test)
             test_criterion       = float(df_test["profit"].sum()) / INITIAL_BALANCE * 100
 
-            m_train         = compute_metrics(df_train, capital=INITIAL_BALANCE, name="")
+            m_train         = compute_metrics(df_train, capital=INITIAL_BALANCE, name="", include_weekly=False)
             train_criterion = m_train["Net_Gain_pct"]
         else:
             logger.debug(

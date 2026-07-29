@@ -96,7 +96,7 @@ def compute_metric(results: dict) -> float:
     if trade_log is None or trade_log.empty:
         return 0.0
 
-    m            = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
+    m            = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False)
     net_gain_pct = m["Net_Gain_pct"]
 
     if METRIC_MODE == "NET_GAIN_PCT":
@@ -175,7 +175,7 @@ def _evaluate_wfo_approval(
     if wfo_test_trades.empty:
         return False, 0.0, 0.0, 0.0, None
 
-    m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
+    m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False)
     net_gain_pct = m["Net_Gain_pct"]
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
@@ -368,7 +368,7 @@ def _run_wfo_for_rule(
 
     metrics = None
     if wfo_test_trades is not None and not wfo_test_trades.empty:
-        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="")
+        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False)
 
     logger.debug(f"[{idx + 1}/{total}] {rule['side']:<5} {rule['label']} -> "
                  f"{'PASS' if approved_wfo else 'FAIL'} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")

@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/dsr.py
+#shared_batchs/pipeline/dsr_v4.py
 import time
 import itertools
 import logging
@@ -8,7 +8,7 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, run_backtest_from_prepared
 from shared_batchs.utils.batch_metrics import compute_metrics
 
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
@@ -31,26 +31,210 @@ def _combo_id(params: dict) -> str:
 
 
 def _daily_profit_from_trades(trade_log: pd.DataFrame) -> pd.Series:
-    sell_days = trade_log["sell_time"].values.astype("datetime64[D]")
-    return (
-        pd.Series(trade_log["profit"].values, index=pd.DatetimeIndex(sell_days))
-        .groupby(level=0)
-        .sum()
+    tl = trade_log.copy()
+    tl["_date"] = pd.to_datetime(tl["sell_time"]).dt.normalize()
+    return tl.groupby("_date")["profit"].sum()
+
+
+def _prepare_static_bundle(ohlcv_arr: dict) -> dict:
+    """Local replica of the signal-independent part of ZX_compute_BT.pyx's
+    prepare_data (Cython, compiled to .so — cannot be edited without a rebuild
+    step outside our control): per-symbol static fields, the padded 2D
+    price/time arrays (n_symbols x max_len) the compiled backtest core reads
+    via typed memoryviews, and symbol/timestamp bookkeeping. Computed once per
+    OHLCV universe and reused across every rule of the same timeframe.
+
+    IMPORTANT: must be kept in sync with the static portion of
+    ZX_compute_BT.pyx's own prepare_data if that implementation ever changes."""
+
+    if not ohlcv_arr:
+        return {
+            "symbols":            [],
+            "sym_ids":            {},
+            "sym_data_static":    {},
+            "ts_int_arrays":      {},
+            "close_arrays":       {},
+            "all_timestamps_int": np.array([], dtype=np.int64),
+            "all_timestamps_dt":  np.array([], dtype='datetime64[ns]'),
+            "max_len":            0,
+            "open_2d":            None,
+            "close_2d":           None,
+            "high_2d":            None,
+            "low_2d":             None,
+            "high_time_2d":       None,
+            "low_time_2d":        None,
+            "ts_int_2d":          None,
+            "sym_len":            np.array([], dtype=np.int64),
+        }
+
+    symbols = list(ohlcv_arr.keys())
+
+    sym_data_static  = {}
+    ts_int_arrays    = {}
+    close_arrays     = {}
+    all_ts_int_lists = []
+
+    for sym in symbols:
+        data = ohlcv_arr[sym]
+
+        ts = data['ts']
+        if ts.dtype.kind != 'M':
+            ts = ts.astype('datetime64[ns]')
+
+        ts_int     = ts.view('int64')
+        close_view = data['close']
+        n          = len(ts)
+
+        sym_data_static[sym] = {
+            'ts':        ts,
+            'ts_int':    ts_int,
+            'open':      data['open'],
+            'close':     close_view,
+            'high':      data['high'],
+            'low':       data['low'],
+            'len':       n,
+            'high_time': data['high_time'],
+            'low_time':  data['low_time'],
+        }
+
+        ts_int_arrays[sym] = ts_int
+        close_arrays[sym]  = close_view
+        all_ts_int_lists.append(ts_int)
+
+    n_syms  = len(symbols)
+    # NOTE: sym_ids uses sorted(symbols), independent of ohlcv_arr's insertion
+    # order — matches ZX_compute_BT.pyx's own prepare_data exactly, since the
+    # 2D arrays are indexed by this mapping (sid) and must line up.
+    sym_ids = {s: i for i, s in enumerate(sorted(symbols))}
+
+    max_len = max(sym_data_static[s]['len'] for s in symbols)
+
+    open_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    close_2d     = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    high_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    low_2d       = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    high_time_2d = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    low_time_2d  = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    ts_int_2d    = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    sym_len      = np.zeros(n_syms, dtype=np.int64)
+
+    for sym in symbols:
+        sid = sym_ids[sym]
+        d   = sym_data_static[sym]
+        n   = d['len']
+
+        sym_len[sid]          = n
+        open_2d[sid, :n]      = d['open'].astype(np.float64)
+        close_2d[sid, :n]     = d['close'].astype(np.float64)
+        high_2d[sid, :n]      = d['high'].astype(np.float64)
+        low_2d[sid, :n]       = d['low'].astype(np.float64)
+        high_time_2d[sid, :n] = d['high_time'].astype(np.int64)
+        low_time_2d[sid, :n]  = d['low_time'].astype(np.int64)
+        ts_int_2d[sid, :n]    = d['ts_int'].astype(np.int64)
+
+    all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists))
+    all_timestamps_dt  = all_timestamps_int.view('datetime64[ns]')
+
+    return {
+        "symbols":            symbols,
+        "sym_ids":            sym_ids,
+        "sym_data_static":    sym_data_static,
+        "ts_int_arrays":      ts_int_arrays,
+        "close_arrays":       close_arrays,
+        "all_timestamps_int": all_timestamps_int,
+        "all_timestamps_dt":  all_timestamps_dt,
+        "max_len":            max_len,
+        "open_2d":            open_2d,
+        "close_2d":           close_2d,
+        "high_2d":            high_2d,
+        "low_2d":             low_2d,
+        "high_time_2d":       high_time_2d,
+        "low_time_2d":        low_time_2d,
+        "ts_int_2d":          ts_int_2d,
+        "sym_len":            sym_len,
+    }
+
+
+def _build_dynamic_bundle_local(static_bundle: dict, signal_arrays: dict) -> tuple:
+    """Local replica of the signal-dependent part of ZX_compute_BT.pyx's
+    prepare_data — builds sym_data (static fields + 'signal'), signal_2d, and
+    signal_events (the (ts, sym_id, idx) array the compiled core scans via
+    binary search). See _prepare_static_bundle docstring for why this lives
+    here instead of in ZX_compute_BT.pyx."""
+
+    symbols = static_bundle["symbols"]
+    sym_ids = static_bundle["sym_ids"]
+    n_syms  = len(symbols)
+    max_len = static_bundle["max_len"]
+
+    sym_data     = {}
+    signal_2d    = np.zeros((n_syms, max_len), dtype=np.int64)
+    event_chunks = []
+
+    for sym in symbols:
+        static = static_bundle["sym_data_static"][sym]
+        n      = static['len']
+        sig    = np.asarray(signal_arrays[sym][:n])
+
+        sym_data[sym] = {**static, 'signal': sig}
+
+        sid = sym_ids[sym]
+        signal_2d[sid, :n] = sig.astype(np.int64)
+
+        sig_idxs = np.flatnonzero(sig)
+        sig_idxs = sig_idxs[sig_idxs < n]
+        if sig_idxs.size:
+            ts_ints = static['ts_int'][sig_idxs]
+            chunk   = np.empty((sig_idxs.size, 3), dtype=np.int64)
+            chunk[:, 0] = ts_ints
+            chunk[:, 1] = sid
+            chunk[:, 2] = sig_idxs
+            event_chunks.append(chunk)
+
+    if event_chunks:
+        signal_events = np.concatenate(event_chunks, axis=0)
+        # Same key order as ZX_compute_BT.pyx: primary key = timestamp (col 0),
+        # secondary key = symbol id (col 1) — np.lexsort takes keys last-first.
+        order         = np.lexsort((signal_events[:, 1], signal_events[:, 0]))
+        signal_events = signal_events[order]
+    else:
+        signal_events = np.empty((0, 3), dtype=np.int64)
+
+    return sym_data, signal_2d, signal_events
+
+
+def prepare_full_period_data(signal_arrays: dict, static_bundle: dict) -> tuple:
+    """Combines already-computed signal arrays with the timeframe's precomputed
+    static bundle into the same 8-tuple structure ZX_compute_BT.pyx's compiled
+    run_backtest_from_prepared expects (sym_data, {}, all_timestamps_int,
+    all_timestamps_dt, sym_ids, ts_int_arrays, close_arrays, arrays)."""
+
+    sym_data, signal_2d, signal_events = _build_dynamic_bundle_local(static_bundle, signal_arrays)
+
+    arrays = (
+        static_bundle["open_2d"],
+        static_bundle["close_2d"],
+        static_bundle["high_2d"],
+        static_bundle["low_2d"],
+        static_bundle["high_time_2d"],
+        static_bundle["low_time_2d"],
+        static_bundle["ts_int_2d"],
+        signal_2d,
+        static_bundle["sym_len"],
+        signal_events,
+        static_bundle["all_timestamps_int"],
     )
 
-
-def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, dtype) -> dict:
-    ohlcv_arrays = {}
-    for sym, arr in ohlcv_arr.items():
-        signals = signal_fn(arr, live_trading=False)
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
-    return ohlcv_arrays
-
-
-def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
-
-    ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
-    return prepare_backtest_data(ohlcv_arrays)
+    return (
+        sym_data,
+        {},
+        static_bundle["all_timestamps_int"],
+        static_bundle["all_timestamps_dt"],
+        static_bundle["sym_ids"],
+        static_bundle["ts_int_arrays"],
+        static_bundle["close_arrays"],
+        arrays,
+    )
 
 
 def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tuple:
@@ -65,7 +249,11 @@ def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tu
     if trade_log is None or trade_log.empty or len(trade_log) < DSR_MIN_TRADES:
         return -np.inf, params, None, None
 
-    m      = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False)
+    trade_log             = trade_log.copy()
+    trade_log.columns     = trade_log.columns.str.lower().str.strip()
+    trade_log["buy_time"] = pd.to_datetime(trade_log["buy_time"])
+
+    m      = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="")
     sharpe = m["Sharpe"] if np.isfinite(m["Sharpe"]) else -np.inf
     if sharpe > DSR_MAX_SHARPE_ANN:
         return -np.inf, params, None, None
@@ -81,19 +269,24 @@ def _run_full_period_for_rule(
     param_grid: dict,
     order_amount: int,
     dtype,
+    static_bundle: dict,
 ) -> tuple:
 
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
 
+    signal_arrays = {
+        sym: np.asarray(signal_fn(arr, live_trading=False), dtype=dtype)
+        for sym, arr in ohlcv_arr.items()
+    }
+
     # Cheap upper bound: no combo can ever produce more trades than raw signal
     # firings (each firing yields at most one trade attempt, which may still
     # be skipped for lack of free cash). If that upper bound is already below
     # DSR_MIN_TRADES, every combo in the grid is guaranteed to fail the same
-    # check _evaluate_combo_sharpe applies after the fact — skip preparing
-    # the backtest data and running the grid of backtests entirely.
-    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
-    max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
+    # check _evaluate_combo_sharpe applies after the fact — skip building the
+    # prepared backtest data and running the grid of backtests entirely.
+    max_possible_trades = sum(int(np.count_nonzero(sig)) for sig in signal_arrays.values())
 
     if max_possible_trades < DSR_MIN_TRADES:
         winner_metrics = {
@@ -106,7 +299,7 @@ def _run_full_period_for_rule(
         }
         return rule_id, {**winner_metrics, "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
 
-    prepared_data = prepare_backtest_data(ohlcv_arrays)
+    prepared_data = prepare_full_period_data(signal_arrays, static_bundle)
 
     rows = [_evaluate_combo_sharpe(params, prepared_data, order_amount) for params in combos]
 
@@ -139,14 +332,14 @@ def _run_full_period_for_rule(
 
     return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
 
-def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, progress_label: str = "") -> dict:
+def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, static_bundle: dict, progress_label: str = "") -> dict:
 
     desc = f"DSR FULL-PERIOD SEARCH {progress_label}".strip()
    
     with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
         results = Parallel(n_jobs=DSR_N_JOBS)(
             delayed(_run_full_period_for_rule)(
-                r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype,
+                r["rule_id"], r["ohlcv_arr"], r["signal_fn"], param_grid, order_amount, dtype, static_bundle,
             )
             for r in rules
         )
@@ -479,6 +672,12 @@ def pipe_dsr(
 
     _check_m_vs_t_ratio(ohlcv_arr, n_rules=len(rules), n_combos=n_combos, timeframe=timeframe)
 
+    # Static part (prices/timestamps) is identical for every rule of this
+    # timeframe — computed once here instead of once per rule. Built locally
+    # (see _prepare_static_bundle) since the compiled backtester module cannot
+    # be edited to expose this split without a rebuild step.
+    static_bundle = _prepare_static_bundle(ohlcv_arr)
+
     rules_for_search = [
         {"rule_id": r["rule_id"], "ohlcv_arr": ohlcv_arr, "signal_fn": r["signal_fn"]}
         for r in rules
@@ -488,6 +687,7 @@ def pipe_dsr(
         param_grid     = param_grid,
         order_amount   = order_amount,
         dtype          = dtype,
+        static_bundle  = static_bundle,
         progress_label = timeframe,
     )
 
