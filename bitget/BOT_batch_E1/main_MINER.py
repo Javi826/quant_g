@@ -89,7 +89,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+TIMEFRAMES   = ["12Hutc"]
 
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -108,15 +108,15 @@ PIPELINE_DSR         = True
 DSR_TH               = 0.80
 
 WFO_NET_GAIN_TH      = 35
-WFO_DD_TH            = 15
+WFO_DD_TH            = 20
 WFO_R2_TH            = 0.8
 WFO_WFR_TH           = 0.6
 
-PIPELINE_CORRELATION = True
+PIPELINE_CORRELATION = False
 CORRELATION_DD_TH    = 0.55
-PIPELINE_MONTECARLO  = True
+PIPELINE_MONTECARLO  = False
 MONTECARLO_RUIN_TH   = 10
-PIPELINE_MULTIVERSE  = True
+PIPELINE_MULTIVERSE  = False
 MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")

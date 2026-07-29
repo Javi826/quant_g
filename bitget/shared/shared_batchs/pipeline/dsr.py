@@ -18,7 +18,7 @@ logger = logging.getLogger("BOT_batch.pipeline.dsr")
 # =============================================================================
 EULER_GAMMA         = 0.5772156649015328606  # Euler-Mascheroni constant
 SHARPE_PERIODS_YEAR = 365.0                  # must match the annualization factor in compute_metrics (sqrt(365))
-DSR_N_JOBS          = -1                     # safe to parallelize fully: this Parallel runs as its own phase, sequential relative to WFO — no nesting
+DSR_N_JOBS          = 1                     # safe to parallelize fully: this Parallel runs as its own phase, sequential relative to WFO — no nesting
 DSR_MIN_TRADES      = 100   
 DSR_MAX_SHARPE_ANN  = 10.0                   # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)
 M_TO_T_WARN_RATIO   = 2.0                    # warn if M (columns) exceeds this multiple of T (days) — ill-conditioned correlation matrix (paper Appendix 3)                 # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)                 # combos with fewer trades are rejected (near-zero variance inflates Sharpe artificially)

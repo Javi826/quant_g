@@ -28,8 +28,7 @@ def _build_rule_id(i: int, timeframe: str, rule: dict) -> str:
     return f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
 def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
-    """Generate all candidate rules for one timeframe, each tagged with a
-    unique rule_id — the schema every pipe (DSR, WFO, ...) expects."""
+
     arr_sample = next(iter(ohlcv_data.values()))
     all_rules  = generate_all_rules({
         "open":  arr_sample["open"],
@@ -52,8 +51,7 @@ def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
     ]
 
 def _empty_wfo_fields() -> dict:
-    """Placeholder WFO fields for rules not yet sent to WFO (e.g. filtered
-    out by DSR, or before Phase B has run)."""
+
     return {
         "approved":        False,
         "net_gain":        0.0,
@@ -108,7 +106,7 @@ def run_rule_mining_pipeline(
     run_config: dict = None,
 ) -> list:
     # -------------------------------------------------------------------
-    #DSR, one timeframe at a time, ALL timeframes before moving on.
+    # DSR, one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_dsr_results = []
     for timeframe in timeframes:
@@ -131,7 +129,7 @@ def run_rule_mining_pipeline(
     _print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
 
     # -------------------------------------------------------------------
-    #WFO, one timeframe at a time, only for rules that passed DSR.
+    # WFO, one timeframe at a time, only for rules that passed DSR.
     # -------------------------------------------------------------------
     wfo_by_id = {}
     for timeframe in timeframes:
@@ -168,7 +166,7 @@ def run_rule_mining_pipeline(
     _print_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
 
     # -------------------------------------------------------------------
-    #Portfolio construction on the flattened, cross-timeframe pool.
+    # Portfolio construction on the flattened, cross-timeframe pool.
     # -------------------------------------------------------------------
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
@@ -181,7 +179,7 @@ def run_rule_mining_pipeline(
     _print_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
 
     # -------------------------------------------------------------------
-    #Correlation (portfolio construction: drop redundant rules)
+    # Correlation (portfolio construction: drop redundant rules)
     # -------------------------------------------------------------------
     if validated_after_wfo:
         candidates_before_corr = [rid for rid, _ in validated_after_wfo]
@@ -200,7 +198,7 @@ def run_rule_mining_pipeline(
         validated_after_correlation = validated_after_wfo
         _print_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
     # -------------------------------------------------------------------
-    #Montecarlo (bootstrap of executed trades — validates RISK)
+    # Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
     if validated_after_correlation:
         candidates_before_mc = [rid for rid, _ in validated_after_correlation]
@@ -225,7 +223,7 @@ def run_rule_mining_pipeline(
         _print_ranking(all_raw_results, [rid for rid, _ in validated_after_montecarlo], "POST-MONTECARLO")
 
     # -------------------------------------------------------------------
-    # STAGE ── Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
+    # Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
     # -------------------------------------------------------------------
     if validated_after_montecarlo:
         from shared_batchs.pipeline.multiverse import pipe_multiverse
