@@ -32,7 +32,7 @@ ADX_THRESHOLDS             = [20,25,30]
 
 MA_PERIODS                 = [20,50,100]
 
-MOMENTUM_PERIODS           = [5,10,20]      
+MOMENTUM_PERIODS           = []     
 
 HISTVOL_BASE_PERIODS       = [10,30]     
 HISTVOL_REGIME_SMA_PERIODS = [20,50]     
@@ -198,6 +198,30 @@ def _historical_volatility(close: np.ndarray, window: int) -> np.ndarray:
 
 def _ema(values: np.ndarray, period: int) -> np.ndarray:
     return pd.Series(values, dtype=np.float64).ewm(span=period, adjust=False).mean().to_numpy()
+
+from numpy.lib.stride_tricks import sliding_window_view
+ 
+# ---- Ubicación 2: reemplaza las dos funciones _rolling_max_shifted / _rolling_min_shifted ----
+ 
+def _rolling_max_shifted(values: np.ndarray, window: int) -> np.ndarray:
+    n   = len(values)
+    out = np.full(n, np.nan)
+    if window >= n:
+        return out
+    windows      = sliding_window_view(values[:-1], window)
+    out[window:] = windows.max(axis=1)
+    return out
+ 
+ 
+def _rolling_min_shifted(values: np.ndarray, window: int) -> np.ndarray:
+    n   = len(values)
+    out = np.full(n, np.nan)
+    if window >= n:
+        return out
+    windows      = sliding_window_view(values[:-1], window)
+    out[window:] = windows.min(axis=1)
+    return out
+ 
 
 # =============================================================================
 # INDICATOR REGISTRY

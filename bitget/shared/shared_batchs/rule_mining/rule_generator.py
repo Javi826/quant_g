@@ -1,3 +1,4 @@
+#shared/shared_batchs/rule_mining/rule_generator.py
 import logging
 from itertools import combinations
 from signals.condition_bank import ConditionBank
