@@ -222,26 +222,25 @@ def _generate_mcpt_paths_all_symbols(
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
-def _synthetic_ohlcv_data(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray, dtype) -> dict:
+def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray, dtype) -> dict:
+    ts64 = ts_index.astype("datetime64[ns]")
 
-    ohlcv_data = {}
+    ohlcv_arr = {}
     for sym, arr_paths in paths_per_symbol.items():
         if path_idx >= arr_paths.shape[0]:
             continue
         arr = arr_paths[path_idx]  # (n_obs, n_features)
-        ohlcv_data[sym] = pd.DataFrame(
-            {
-                "open":       arr[:, 0].astype(dtype),
-                "low":        arr[:, 1].astype(dtype),
-                "high":       arr[:, 2].astype(dtype),
-                "close":      arr[:, 3].astype(dtype),
-                "low_time":   np.array(arr[:, 4], dtype="datetime64[ns]"),
-                "high_time":  np.array(arr[:, 5], dtype="datetime64[ns]"),
-                VOLUME_COL:   arr[:, 7].astype(dtype),
-            },
-            index=pd.DatetimeIndex(ts_index),
-        )
-    return ohlcv_data
+        ohlcv_arr[sym] = {
+            "ts":        ts64,
+            "open":      arr[:, 0].astype(np.float64),
+            "high":      arr[:, 2].astype(np.float64),
+            "low":       arr[:, 1].astype(np.float64),
+            "close":     arr[:, 3].astype(np.float64),
+            VOLUME_COL:  arr[:, 7].astype(np.float64),
+            "low_time":  np.array(arr[:, 4], dtype="datetime64[ns]"),
+            "high_time": np.array(arr[:, 5], dtype="datetime64[ns]"),
+        }
+    return ohlcv_arr
 
 
 def _evaluate_universe(
@@ -255,11 +254,9 @@ def _evaluate_universe(
     dtype,
 ) -> tuple:
 
-    synthetic_ohlcv = _synthetic_ohlcv_data(paths, path_idx, ts_index, dtype)
-    if len(synthetic_ohlcv) < n_symbols_expected:
+    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index, dtype)
+    if len(synthetic_arr) < n_symbols_expected:
         return None, None
-
-    synthetic_arr = prepare_ohlcv_arrays(synthetic_ohlcv)
 
     ohlcv_arrays = {}
     for sym, arr in synthetic_arr.items():

@@ -8,7 +8,13 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared_light
+from shared_batchs.backtesters.ZX_compute_BT import (
+    INITIAL_BALANCE,
+    prepare_backtest_data,
+    prepare_static_arrays,
+    prepare_signal_arrays,
+    run_backtest_from_prepared_light,
+)
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 
@@ -80,6 +86,7 @@ def _run_full_period_for_rule(
     param_grid: dict,
     order_amount: int,
     dtype,
+    static_bundle: dict | None = None,
 ) -> tuple:
 
     keys   = list(param_grid.keys())
@@ -105,7 +112,10 @@ def _run_full_period_for_rule(
         }
         return rule_id, {**winner_metrics, "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
 
-    prepared_data = prepare_backtest_data(ohlcv_arrays)
+    if static_bundle is not None:
+        prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
+    else:
+        prepared_data = prepare_backtest_data(ohlcv_arrays)
 
     rows = [_evaluate_combo_sharpe(params, prepared_data, order_amount) for params in combos]
 
@@ -137,6 +147,32 @@ def _run_full_period_for_rule(
         }
 
     return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
+_STATIC_BUNDLE_CACHE: dict = {}
+
+
+def _static_bundle_cache_key(shm_metadata: dict):
+    try:
+        return tuple(
+            (sym, key, info.get("name", info.get("value")))
+            for sym in sorted(shm_metadata)
+            for key, info in sorted(shm_metadata[sym].items())
+        )
+    except TypeError:
+        return None
+
+
+def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
+    cache_key = _static_bundle_cache_key(shm_metadata)
+    if cache_key is None:
+        return prepare_static_arrays(ohlcv_arr)
+
+    bundle = _STATIC_BUNDLE_CACHE.get(cache_key)
+    if bundle is None:
+        _STATIC_BUNDLE_CACHE.clear()
+        bundle = prepare_static_arrays(ohlcv_arr)
+        _STATIC_BUNDLE_CACHE[cache_key] = bundle
+    return bundle
+
 
 def _run_full_period_for_rule_shm(
     rule_id: str,
@@ -149,7 +185,8 @@ def _run_full_period_for_rule_shm(
 
     ohlcv_arr, shm_handles = arrays_from_shared_memory(shm_metadata)
     try:
-        return _run_full_period_for_rule(rule_id, ohlcv_arr, signal_fn, param_grid, order_amount, dtype)
+        static_bundle = _get_static_bundle(shm_metadata, ohlcv_arr)
+        return _run_full_period_for_rule(rule_id, ohlcv_arr, signal_fn, param_grid, order_amount, dtype, static_bundle)
     finally:
         for shm in shm_handles:
             shm.close()

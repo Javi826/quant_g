@@ -125,15 +125,26 @@ cdef inline int _heap_pop(
 # ============================================================
 # prepare_data  (pure Python, no Cython types needed)
 # ============================================================
-def prepare_data(ohlcv_arrays):
+def prepare_static_arrays(ohlcv_arrays):
     if not ohlcv_arrays:
-        return ({}, {}, np.array([], dtype=np.int64),
-                np.array([], dtype='datetime64[ns]'), {}, {}, {})
+        return {
+            "symbols": [], "sym_ids": {}, "ts_int_arrays": {}, "close_arrays": {},
+            "all_timestamps_int": np.array([], dtype=np.int64),
+            "all_timestamps_dt":  np.array([], dtype='datetime64[ns]'),
+            "open_2d": np.empty((0, 0)), "close_2d": np.empty((0, 0)),
+            "high_2d": np.empty((0, 0)), "low_2d": np.empty((0, 0)),
+            "high_time_2d": np.empty((0, 0), dtype=np.int64),
+            "low_time_2d":  np.empty((0, 0), dtype=np.int64),
+            "ts_int_2d":    np.empty((0, 0), dtype=np.int64),
+            "sym_len":      np.array([], dtype=np.int64),
+        }
 
-    symbols          = list(ohlcv_arrays.keys())
-    sym_data         = {}
-    ts_int_arrays    = {}
-    close_arrays     = {}
+    symbols       = list(ohlcv_arrays.keys())
+    n_syms        = len(symbols)
+    sym_ids       = {s: i for i, s in enumerate(sorted(symbols))}
+    ts_int_arrays = {}
+    close_arrays  = {}
+    per_sym_ts    = {}
     all_ts_int_lists = []
 
     for sym in symbols:
@@ -141,16 +152,74 @@ def prepare_data(ohlcv_arrays):
         ts   = data['ts']
         if ts.dtype.kind != 'M':
             ts = ts.astype('datetime64[ns]')
+        ts_int = ts.view('int64')
+        per_sym_ts[sym] = (ts_int, len(ts))
+        ts_int_arrays[sym] = ts_int
+        close_arrays[sym]  = data['close']
+        all_ts_int_lists.append(ts_int)
 
-        ts_int     = ts.view('int64')
-        close_view = data['close']
-        n          = len(ts)
+    max_len      = max(per_sym_ts[s][1] for s in symbols)
+    open_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    close_2d     = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    high_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    low_2d       = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    high_time_2d = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    low_time_2d  = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    ts_int_2d    = np.full((n_syms, max_len), 0,      dtype=np.int64)
+    sym_len      = np.zeros(n_syms, dtype=np.int64)
 
+    for sym in symbols:
+        sid  = sym_ids[sym]
+        data = ohlcv_arrays[sym]
+        ts_int, n = per_sym_ts[sym]
+        sym_len[sid]          = n
+        open_2d[sid, :n]      = data['open'].astype(np.float64)
+        close_2d[sid, :n]     = data['close'].astype(np.float64)
+        high_2d[sid, :n]      = data['high'].astype(np.float64)
+        low_2d[sid, :n]       = data['low'].astype(np.float64)
+        high_time_2d[sid, :n] = data['high_time'].astype(np.int64)
+        low_time_2d[sid, :n]  = data['low_time'].astype(np.int64)
+        ts_int_2d[sid, :n]    = ts_int.astype(np.int64)
+
+    all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists))
+    all_timestamps_dt  = all_timestamps_int.view('datetime64[ns]')
+
+    return {
+        "symbols":            symbols,
+        "sym_ids":            sym_ids,
+        "ts_int_arrays":      ts_int_arrays,
+        "close_arrays":       close_arrays,
+        "all_timestamps_int": all_timestamps_int,
+        "all_timestamps_dt":  all_timestamps_dt,
+        "open_2d":            open_2d,
+        "close_2d":           close_2d,
+        "high_2d":            high_2d,
+        "low_2d":             low_2d,
+        "high_time_2d":       high_time_2d,
+        "low_time_2d":        low_time_2d,
+        "ts_int_2d":          ts_int_2d,
+        "sym_len":            sym_len,
+    }
+
+
+def prepare_signal_arrays(static_bundle, ohlcv_arrays):
+    symbols = static_bundle["symbols"]
+    sym_ids = static_bundle["sym_ids"]
+    sym_len = static_bundle["sym_len"]
+    max_len = static_bundle["open_2d"].shape[1]
+    n_syms  = len(symbols)
+
+    sym_data = {}
+    for sym in symbols:
+        data   = ohlcv_arrays[sym]
+        sid    = sym_ids[sym]
+        n      = int(sym_len[sid])
+        ts_int = static_bundle["ts_int_arrays"][sym]
         sym_data[sym] = {
-            'ts':        ts,
+            'ts':        ts_int.view('datetime64[ns]'),
             'ts_int':    ts_int,
             'open':      data['open'],
-            'close':     close_view,
+            'close':     data['close'],
             'high':      data['high'],
             'low':       data['low'],
             'signal':    data['signal'][:n],
@@ -158,20 +227,18 @@ def prepare_data(ohlcv_arrays):
             'high_time': data['high_time'],
             'low_time':  data['low_time'],
         }
-        ts_int_arrays[sym] = ts_int
-        close_arrays[sym]  = close_view
-        all_ts_int_lists.append(ts_int)
 
-    n_syms  = len(symbols)
-    sym_ids = {s: i for i, s in enumerate(sorted(symbols))}
-
+    signal_2d    = np.full((n_syms, max_len), 0, dtype=np.int64)
     event_chunks = []
     for sym in symbols:
         sid        = sym_ids[sym]
         d          = sym_data[sym]
         signal_arr = d['signal']
-        sig_idxs   = np.flatnonzero(signal_arr)
-        sig_idxs   = sig_idxs[sig_idxs < d['len']]
+        n          = d['len']
+        signal_2d[sid, :n] = signal_arr.astype(np.int64)
+
+        sig_idxs = np.flatnonzero(signal_arr)
+        sig_idxs = sig_idxs[sig_idxs < n]
         if sig_idxs.size:
             ts_ints = d['ts_int'][sig_idxs]
             chunk   = np.empty((sig_idxs.size, 3), dtype=np.int64)
@@ -187,50 +254,29 @@ def prepare_data(ohlcv_arrays):
     else:
         signal_events = np.empty((0, 3), dtype=np.int64)
 
-    # Precompute the sorted event-time column once here so every call to
-    # _backtest_core (e.g. across a param grid reusing this prepared data)
-    # doesn't have to re-copy it from signal_events[:, 0].
     if signal_events.shape[0] > 0:
         ev_col0 = np.ascontiguousarray(signal_events[:, 0], dtype=np.int64)
     else:
         ev_col0 = np.empty((0,), dtype=np.int64)
 
-    max_len      = max(sym_data[s]['len'] for s in symbols)
-    open_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    close_2d     = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    high_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    low_2d       = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    high_time_2d = np.full((n_syms, max_len), 0,      dtype=np.int64)
-    low_time_2d  = np.full((n_syms, max_len), 0,      dtype=np.int64)
-    ts_int_2d    = np.full((n_syms, max_len), 0,      dtype=np.int64)
-    signal_2d    = np.full((n_syms, max_len), 0,      dtype=np.int64)
-    sym_len      = np.zeros(n_syms, dtype=np.int64)
-
-    for sym in symbols:
-        sid  = sym_ids[sym]
-        d    = sym_data[sym]
-        n    = d['len']
-        sym_len[sid]          = n
-        open_2d[sid, :n]      = d['open'].astype(np.float64)
-        close_2d[sid, :n]     = d['close'].astype(np.float64)
-        high_2d[sid, :n]      = d['high'].astype(np.float64)
-        low_2d[sid, :n]       = d['low'].astype(np.float64)
-        high_time_2d[sid, :n] = d['high_time'].astype(np.int64)
-        low_time_2d[sid, :n]  = d['low_time'].astype(np.int64)
-        ts_int_2d[sid, :n]    = d['ts_int'].astype(np.int64)
-        signal_2d[sid, :n]    = d['signal'].astype(np.int64)
-
-    all_timestamps_int = np.unique(np.concatenate(all_ts_int_lists))
-    all_timestamps_dt  = all_timestamps_int.view('datetime64[ns]')
-
     arrays = (
-        open_2d, close_2d, high_2d, low_2d,
-        high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
-        signal_events, all_timestamps_int, ev_col0
+        static_bundle["open_2d"], static_bundle["close_2d"],
+        static_bundle["high_2d"], static_bundle["low_2d"],
+        static_bundle["high_time_2d"], static_bundle["low_time_2d"],
+        static_bundle["ts_int_2d"], signal_2d, sym_len,
+        signal_events, static_bundle["all_timestamps_int"], ev_col0
     )
 
-    return (sym_data, {}, all_timestamps_int, all_timestamps_dt,
-            sym_ids, ts_int_arrays, close_arrays, arrays)
+    return (sym_data, {}, static_bundle["all_timestamps_int"], static_bundle["all_timestamps_dt"],
+            sym_ids, static_bundle["ts_int_arrays"], static_bundle["close_arrays"], arrays)
+
+
+def prepare_data(ohlcv_arrays):
+    if not ohlcv_arrays:
+        return ({}, {}, np.array([], dtype=np.int64),
+                np.array([], dtype='datetime64[ns]'), {}, {}, {})
+    static_bundle = prepare_static_arrays(ohlcv_arrays)
+    return prepare_signal_arrays(static_bundle, ohlcv_arrays)
 
 
 # ============================================================
