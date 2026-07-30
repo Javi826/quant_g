@@ -7,7 +7,7 @@ from functools import partial
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared,run_backtest_from_prepared_light
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
@@ -123,7 +123,7 @@ def _evaluate_fn(
         base_arrays, signal_fn, signal_params_keys, params, dtype, _signal_cache=_signal_cache
     )
     prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
-    results = run_backtest_from_prepared(
+    results = run_backtest_from_prepared_light(
         prepared_data,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],

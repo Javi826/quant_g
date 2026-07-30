@@ -8,7 +8,7 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared_light
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 
@@ -53,9 +53,8 @@ def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
     ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
     return prepare_backtest_data(ohlcv_arrays)
 
-
 def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tuple:
-    results = run_backtest_from_prepared(
+    results = run_backtest_from_prepared_light(
         prepared_data,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],

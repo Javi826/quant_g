@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/multiverse_v2.py
+#shared_batchs/pipeline/multiverse.py
 import logging
 import numpy as np
 import pandas as pd
@@ -6,7 +6,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from shared_config import VOLUME_COL
 import matplotlib.pyplot as plt
-from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared
+from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared_light
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
@@ -267,7 +267,7 @@ def _evaluate_universe(
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
 
     prepared_data = prepare_backtest_data(ohlcv_arrays)
-    results = run_backtest_from_prepared(
+    results = run_backtest_from_prepared_light(
         prepared_data,
         sell_after   = best_params["SELL_AFTER"],
         tp_pct       = best_params["TP_PCT"],

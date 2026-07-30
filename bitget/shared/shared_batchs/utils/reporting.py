@@ -5,7 +5,6 @@ import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.utils.reporting")
 
-
 # =============================================================================
 # PRINT HELPERS
 # =============================================================================
@@ -158,7 +157,7 @@ def print_best_wfo_portfolio(
     W          = 115
     split_keys = [label for label, _, _, _ in subperiods]
     logger.info(f"\n{'='*W}")
-    logger.info(f"  BEST WFO PORTFOLIO — metric: {metric} | splits: {len(subperiods)} | weights: {[round(w, 2) for w in weights]}")
+    logger.info(f"  BEST WFO PORTFOLIO — metric: {metric} | splits: {len(subperiods)}")
     logger.info(f"{'='*W}")
     for rank, entry in enumerate(top, start=1):
         combo      = entry["combo"]
@@ -217,3 +216,93 @@ def print_best_wfo_portfolio(
             avg_monthly_pct = round(m["Net_Gain_pct"] / n_months, 2)
             logger.info(f"\n  Monthly NetGain  ── {avg_monthly_pct:+.2f}% / month  ({n_months:.1f} months)")
     logger.info(f"\n{'─'*W}")
+    
+def _short_id(rule_id: str) -> str:
+    parts = rule_id.split("_")
+    return "_".join(parts[:3])
+
+def print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
+    rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
+    rows.sort(key=lambda r: r["rule_id"])
+
+    show_status  = survivor_ids is not None
+    survivor_set = set(survivor_ids) if show_status else None
+    log_fn       = logger.debug if debug else logger.info
+
+    id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
+    label_width = max((len(r["label"]) for r in rows), default=8) + 2
+
+    count_str = f"{len(survivor_ids)} / {len(candidate_ids)} passed" if show_status else f"{len(rows)} / {len(candidate_ids)} tested"
+
+    log_fn(f"\n{'─' * 170}")
+    log_fn(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
+    log_fn(f"{'─' * 170}")
+
+    status_header = f"  {'STATUS':<8}" if show_status else ""
+    log_fn(
+        f"{'ID':<{id_width}}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
+        f"{'DSR':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
+    )
+    log_fn(f"{'─' * 170}")
+    for r in rows:
+        status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
+        log_fn(
+            f"{_short_id(r['rule_id']):<{id_width}}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
+            f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
+            f"{r.get('dsr', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
+            f"{r.get('multiverse_p_value', 0.0):<9.3f}"
+            f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
+        )
+
+    log_fn(f"{'─' * 170}\n")
+
+def print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
+    rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
+    if not rows:
+        return
+    threshold_metrics = ["net_gain", "max_dd", "r_squared", "dsr", "wfr"]
+    groups = {}
+    for r in rows:
+        key = (r["timeframe"], r["side"])
+        groups.setdefault(key, []).append(r)
+    group_stats = {}
+    for key, group_rows in groups.items():
+        group_stats[key] = {
+            m: (min(r[m] for r in group_rows), max(r[m] for r in group_rows))
+            for m in threshold_metrics
+        }
+    logger.info(f"\n{'─' * 140}")
+    logger.info(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
+    logger.info(f"{'─' * 140}")
+    logger.info(
+        f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
+        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
+        f"{'DSR min/max':<16}{'WFR min/max':<16}"
+    )
+    logger.info(f"{'─' * 140}")
+    for (tf, side), group_rows in sorted(groups.items()):
+        s = group_stats[(tf, side)]
+        logger.info(
+            f"{tf:<12}{side:<8}{len(group_rows):<6}"
+            f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
+            f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
+            f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
+            f"{f'{s['dsr'][0]:.3f} / {s['dsr'][1]:.3f}':<16}"
+            f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
+        )
+    logger.info(f"{'─' * 140}")
+    anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
+    safe_net_gain = min(a["net_gain"]  for a in anchors.values())
+    safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
+    safe_r2       = min(a["r_squared"] for a in anchors.values())
+    safe_dsr      = min(a["dsr"] for a in anchors.values())
+    safe_wfr      = min(a["wfr"] for a in anchors.values())
+    logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
+    for (tf, side), a in sorted(anchors.items()):
+        logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
+    logger.info(
+        f"\n  JOINT-SAFE THRESHOLDS (guaranteed ≥1 survivor per group, all conditions at once) ── "
+        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
+        f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
+    )
+    logger.info(f"{'─' * 140}\n")

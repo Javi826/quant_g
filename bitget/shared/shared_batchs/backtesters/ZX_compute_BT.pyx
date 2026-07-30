@@ -315,18 +315,6 @@ cdef inline void _detect_intrabar_exit_cy(
 
 # ============================================================
 # _backtest_core  (typed Cython hot loop)
-#
-# Position state is held in flat, preallocated arrays indexed by "slot"
-# instead of per-position Python dicts. New positions are only opened when
-# no position is currently open (heap fully empty), and at most one signal
-# event exists per symbol per tick, so a batch can never exceed n_syms
-# concurrently open positions — this bounds every position/heap array to
-# a fixed size of n_syms, allocated once per call.
-#
-# The tick loop runs entirely inside `with nogil:`: every helper it calls
-# (_searchsorted_left/right, _heap_push/pop, _detect_intrabar_exit_cy) takes
-# raw pointers rather than memoryviews, so no GIL-bound slicing happens
-# anywhere in the hot path.
 # ============================================================
 def _backtest_core(
     np.ndarray[double, ndim=2] open_2d,
@@ -714,6 +702,89 @@ def run_backtest_from_prepared(prepared_data, sell_after, tp_pct, sl_pct, order_
     return _run_core_from_arrays(
         arrays, sym_ids, sym_data,
         sell_after, tp_pct, sl_pct, order_amount
+    )
+
+
+# ============================================================
+# _run_core_from_arrays_light  (shared simulation step — metrics-only)
+#
+# Same simulation as _run_core_from_arrays, but skips building the 8
+# columns (symbol, buy_price, sell_price, qty, exit_reason, commission_buy,
+# commission_sell, position_type) and the 'trades' list that compute_metrics()
+# never reads — only 'buy_time', 'sell_time' and 'profit' survive. Building
+# the full 11-column DataFrame is 60-90% of the per-call cost for a typical
+# grid-search dataset size, so this matters wherever a param grid calls this
+# once per combo (dozens to hundreds of times per rule) and only needs the
+# resulting Sharpe/net-gain/etc — e.g. DSR's and WFO's inner param search.
+# Do NOT use this where the full trade_log is needed downstream (CSV export,
+# per-trade inspection, symbol/exit-reason breakdowns) — use
+# run_backtest_from_prepared for that.
+# ============================================================
+def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount):
+    cdef_factor     = float(COMISION) / 100.0
+    initial_balance = float(INITIAL_BALANCE)
+
+    (open_2d, close_2d, high_2d, low_2d,
+     high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+     signal_events, all_timestamps_int, ev_col0) = arrays
+
+    open_2d      = np.ascontiguousarray(open_2d,      dtype=np.float64)
+    close_2d     = np.ascontiguousarray(close_2d,     dtype=np.float64)
+    high_2d      = np.ascontiguousarray(high_2d,      dtype=np.float64)
+    low_2d       = np.ascontiguousarray(low_2d,       dtype=np.float64)
+    high_time_2d = np.ascontiguousarray(high_time_2d, dtype=np.int64)
+    low_time_2d  = np.ascontiguousarray(low_time_2d,  dtype=np.int64)
+    ts_int_2d    = np.ascontiguousarray(ts_int_2d,    dtype=np.int64)
+    signal_2d    = np.ascontiguousarray(signal_2d,    dtype=np.int64)
+    sym_len      = np.ascontiguousarray(sym_len,      dtype=np.int64)
+    signal_events      = np.ascontiguousarray(signal_events,      dtype=np.int64)
+    all_timestamps_int = np.ascontiguousarray(all_timestamps_int, dtype=np.int64)
+    ev_col0            = np.ascontiguousarray(ev_col0,            dtype=np.int64)
+
+    (
+        n_trades,
+        tl_sym_id, tl_buy_time, tl_buy_price,
+        tl_sell_time, tl_sell_price, tl_qty,
+        tl_profit, tl_exit_reason,
+        tl_comm_buy, tl_comm_sell, tl_is_short,
+        final_cash_bank, _
+    ) = _backtest_core(
+        open_2d, close_2d, high_2d, low_2d,
+        high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+        signal_events, all_timestamps_int, ev_col0,
+        initial_balance, cdef_factor, float(order_amount),
+        int(sell_after), float(tp_pct), float(sl_pct)
+    )
+
+    trade_log = pd.DataFrame({
+        'buy_time':  tl_buy_time.astype('datetime64[ns]'),
+        'sell_time': tl_sell_time.astype('datetime64[ns]'),
+        'profit':    tl_profit,
+    })
+
+    return {
+        "__PORTFOLIO__": {
+            'trade_log': trade_log,
+        }
+    }
+
+
+# ============================================================
+# run_backtest_from_prepared_light  (simulate step — metrics-only output)
+# ============================================================
+def run_backtest_from_prepared_light(prepared_data, sell_after, tp_pct, sl_pct, order_amount):
+    """Like run_backtest_from_prepared, but the returned trade_log only has
+    'buy_time', 'sell_time' and 'profit' — everything compute_metrics() needs
+    and nothing else. There is no 'trades' key. Use this for inner param-grid
+    search loops (many calls per rule/window, result only feeds a scoring
+    function); use run_backtest_from_prepared when the full trade detail is
+    needed downstream (CSV export, symbol/exit-reason breakdowns, etc)."""
+
+    (sym_data, _, all_timestamps_int, all_timestamps_dt,
+     sym_ids, ts_int_arrays, close_arrays, arrays) = prepared_data
+
+    return _run_core_from_arrays_light(
+        arrays, sell_after, tp_pct, sl_pct, order_amount
     )
 
 
