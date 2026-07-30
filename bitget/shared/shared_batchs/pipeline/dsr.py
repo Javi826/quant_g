@@ -541,9 +541,6 @@ def pipe_dsr(
             "n_days_train":       fp["n_days_train"],
             "net_gain_train":     fp["net_gain_train"],
             "max_dd_train":       fp["max_dd_train"],
-            # freed for non-survivors: combo_daily_profit is no longer needed
-            # once _compute_dsr (N_eff/DSR) has already used it above — keeping
-            # it for ~9000/9280 rejected rules per timeframe was the main RAM driver.
             "combo_daily_profit": fp["combo_daily_profit"] if passed else None,
             "best_combo_id":      fp["best_combo_id"] if passed else None,
         })
