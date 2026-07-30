@@ -27,7 +27,7 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     weights = [rest_weight] * n_rest + [last_weight]
     return [round(w, 6) for w in weights]
 
-MIN_STRATEGIES   = 5
+MIN_STRATEGIES   = 3
 MAX_STRATEGIES   = 8
 TOP_N            = 3
 
@@ -350,7 +350,7 @@ def find_best_portfolio_combination_wfo(
 
     all_ids = list({sid for sid, _ in validated_wfo_trades})
     logger.info(f"\n{'='*115}")
-    logger.info(f"  BEST WFO PORTFOLIO — {len(all_ids)} validated strategies | metric: {metric} | split_months: {split_months}")
+    logger.info(f"  BEST WFO PORTFOLIO — {len(all_ids)} validated strategies | metric: {metric}")
     logger.info(f"{'='*115}")
 
     subperiods = _split_trades_by_time(validated_wfo_trades, split_months)

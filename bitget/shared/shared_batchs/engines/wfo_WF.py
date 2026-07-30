@@ -7,7 +7,7 @@ import itertools
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from multiprocessing.shared_memory import SharedMemory
+from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from shared_batchs.utils.batch_metrics import compute_metrics
@@ -38,7 +38,6 @@ def round_params_dict(params: dict, param_ranges: dict) -> dict:
         k: _snap_to_grid(v, param_ranges[k])
         for k, v in params.items()
     }
-
 # =============================================================================
 # EMA STATE — running exponential moving average of per-window optimal params
 # =============================================================================
@@ -48,7 +47,6 @@ def update_ema_state(ema_raw: dict | None, new_best: dict, alpha: float) -> dict
     if ema_raw is None:
         return dict(new_best)
     return {k: alpha * new_best[k] + (1.0 - alpha) * ema_raw[k] for k in new_best}
-
 
 # =============================================================================
 # WINDOW SYMBOL SELECTION
@@ -90,50 +88,15 @@ def select_window_symbols(
     selected_syms = sorted(candidate_indices, key=_avg_train_vol, reverse=True)[:n_symbols]
     return {sym: candidate_indices[sym] for sym in selected_syms}
 
-# =============================================================================
-# SHARED MEMORY HELPERS
-# =============================================================================
-def _arrays_to_shared_memory(base_arrays: dict) -> tuple:
-    """Copy base_arrays numpy arrays to shared memory. Returns (shm_list, metadata)."""
-    shm_list = []
-    metadata = {}
-    for sym, arr_dict in base_arrays.items():
-        metadata[sym] = {}
-        for key, arr in arr_dict.items():
-            if isinstance(arr, np.ndarray):
-                shm      = SharedMemory(create=True, size=max(arr.nbytes, 1))
-                buf      = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shm.buf)
-                buf[:]   = arr
-                shm_list.append(shm)
-                metadata[sym][key] = {"name": shm.name, "shape": arr.shape, "dtype": str(arr.dtype)}
-            else:
-                metadata[sym][key] = {"value": arr}
-    return shm_list, metadata
-
-def _arrays_from_shared_memory(metadata: dict) -> tuple:
-    """Reconstruct base_arrays from shared memory metadata. Returns (base_arrays, shm_handles)."""
-    base_arrays = {}
-    shm_handles = []
-    for sym, fields in metadata.items():
-        base_arrays[sym] = {}
-        for key, info in fields.items():
-            if "name" in info:
-                shm = SharedMemory(name=info["name"], create=False)
-                shm_handles.append(shm)
-                base_arrays[sym][key] = np.ndarray(info["shape"], dtype=np.dtype(info["dtype"]), buffer=shm.buf)
-            else:
-                base_arrays[sym][key] = info["value"]
-    return base_arrays, shm_handles
-
 def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
     """Worker: reconstruct base_arrays from shared memory and evaluate."""
-    base_arrays, shm_handles = _arrays_from_shared_memory(shm_metadata)
+    base_arrays, shm_handles = arrays_from_shared_memory(shm_metadata)
     try:
         return evaluate_fn(params, base_arrays)
     finally:
         for shm in shm_handles:
             shm.close()
-            
+          
 # =============================================================================
 # WALK FORWARD OPTIMIZATION
 # =============================================================================
@@ -306,7 +269,7 @@ def walk_forward_optimization(
             # and SIGSEGV crashes.
             results = [evaluate_fn(params, base_arrays) for params in dict_combinations]
         else:
-            shm_list, shm_metadata = _arrays_to_shared_memory(base_arrays)
+            shm_list, shm_metadata = arrays_to_shared_memory(base_arrays)
             try:
                 with (tqdm_joblib(
                     tqdm(desc=f"🔁 WFO Window {window_idx}", total=len(dict_combinations), dynamic_ncols=True)
