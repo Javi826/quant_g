@@ -1,14 +1,14 @@
 #shared_batchs/pipeline/multiverse.py
+import time
 import logging
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from tqdm import tqdm
+from tqdm_joblib import tqdm_joblib
 from shared_config import VOLUME_COL
 import matplotlib.pyplot as plt
-from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared_light
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-
+from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays,prepare_signal_arrays,run_backtest_from_prepared_light
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
 # =============================================================================
@@ -243,41 +243,49 @@ def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.nda
     return ohlcv_arr
 
 
-def _evaluate_universe(
+def _evaluate_universe_batch(
     path_idx: int,
     paths: dict,
     ts_index: np.ndarray,
     n_symbols_expected: int,
-    signal_fn: callable,
-    best_params: dict,
+    rules: list,
     order_amount: int,
     dtype,
-) -> tuple:
+) -> dict:
 
     synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index, dtype)
+
     if len(synthetic_arr) < n_symbols_expected:
-        return None, None
+        return {r["rule_id"]: (None, None, None) for r in rules}
 
-    ohlcv_arrays = {}
-    for sym, arr in synthetic_arr.items():
-        signals = signal_fn(arr, live_trading=False)
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
+    static_bundle = prepare_static_arrays(synthetic_arr)
 
-    prepared_data = prepare_backtest_data(ohlcv_arrays)
-    results = run_backtest_from_prepared_light(
-        prepared_data,
-        sell_after   = best_params["SELL_AFTER"],
-        tp_pct       = best_params["TP_PCT"],
-        sl_pct       = best_params["SL_PCT"],
-        order_amount = order_amount,
-    )
+    results = {}
+    for r in rules:
+        best_params = r["best_params"]
 
-    trade_log = results["__PORTFOLIO__"]["trade_log"]
-    if trade_log is None or trade_log.empty:
-        return True, 0.0, False
+        ohlcv_arrays = {}
+        for sym, arr in synthetic_arr.items():
+            signals = r["signal_fn"](arr, live_trading=False)
+            ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
 
-    profit_sum = float(trade_log["profit"].sum())
-    return True, profit_sum, True
+        prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
+        bt_results = run_backtest_from_prepared_light(
+            prepared_data,
+            sell_after   = best_params["SELL_AFTER"],
+            tp_pct       = best_params["TP_PCT"],
+            sl_pct       = best_params["SL_PCT"],
+            order_amount = order_amount,
+        )
+
+        trade_log = bt_results["__PORTFOLIO__"]["trade_log"]
+        if trade_log is None or trade_log.empty:
+            results[r["rule_id"]] = (True, 0.0, False)
+        else:
+            profit_sum = float(trade_log["profit"].sum())
+            results[r["rule_id"]] = (True, profit_sum, True)
+
+    return results
 
 
 # =============================================================================
@@ -289,25 +297,25 @@ def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
 
 
 # =============================================================================
-# CORE MULTIVERSE EVALUATION (single rule)
+# CORE MULTIVERSE EVALUATION (one timeframe, every rule of that timeframe)
 # =============================================================================
-def _evaluate_multiverse(
+def _evaluate_multiverse_batch(
     ohlcv_data: dict,
-    signal_fn: callable,
-    best_params: dict,
+    rules: list,
     order_amount: int,
     dtype,
-    real_profit: float,
     p_value_th: float,
     n_paths: int = N_PERMUTATIONS,
     block_size: int = BLOCK_SIZE,
     n_jobs: int = N_JOBS,
+    timeframe: str = "",
 ) -> tuple:
-    """Runs MCPT for a single rule, using its fixed best_params (no re-optimization
-    per synthetic universe). Returns (approved, p_value)."""
 
-    if not ohlcv_data:
-        return False, 1.0
+    if not ohlcv_data or not rules:
+        return (
+            {r["rule_id"]: 1.0   for r in rules},
+            {r["rule_id"]: False for r in rules},
+        )
 
     ref_sym  = max(ohlcv_data.keys(), key=lambda sym: len(ohlcv_data[sym]))
     n_obs    = len(ohlcv_data[ref_sym])
@@ -319,26 +327,42 @@ def _evaluate_multiverse(
 
     n_symbols_expected = len(ohlcv_data)
 
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(_evaluate_universe)(
-            path_idx, paths, ts_index, n_symbols_expected,
-            signal_fn, best_params, order_amount, dtype,
+    desc = f"MULTIVERSE {timeframe}".strip()
+    with tqdm_joblib(tqdm(desc=desc, total=n_paths, dynamic_ncols=True)):
+        per_path_results = Parallel(n_jobs=n_jobs)(
+            delayed(_evaluate_universe_batch)(
+                path_idx, paths, ts_index, n_symbols_expected,
+                rules, order_amount, dtype,
+            )
+            for path_idx in range(n_paths)
         )
-        for path_idx in range(n_paths)
-    )
 
-    permuted_profits = [r[1] for r in results if r[0] is not None]
-    n_valid           = len(permuted_profits)
-    if n_valid == 0:
-        return False, 1.0
+    p_value_by_id  = {}
+    approved_by_id = {}
+    for r in rules:
+        rid = r["rule_id"]
+        permuted_profits = [res[rid][1] for res in per_path_results if res[rid][0] is not None]
+        n_valid = len(permuted_profits)
 
-    p_value  = _compute_p_value(real_profit, permuted_profits)
-    approved = p_value <= p_value_th
+        if n_valid == 0:
+            p_value_by_id[rid]  = 1.0
+            approved_by_id[rid] = False
+            continue
+
+        real_profit = float(r["wfo_test_trades"]["profit"].sum())
+        p_value     = _compute_p_value(real_profit, permuted_profits)
+        approved    = p_value <= p_value_th
+
+        p_value_by_id[rid]  = p_value
+        approved_by_id[rid] = approved
 
     if logger.isEnabledFor(logging.DEBUG):
-        _log_multiverse_debug(ohlcv_data, paths, results, n_valid, n_paths, block_size, real_profit, p_value, approved)
+        _log_multiverse_debug_batch(
+            ohlcv_data, paths, per_path_results, rules,
+            p_value_by_id, approved_by_id, n_paths, block_size,
+        )
 
-    return approved, p_value
+    return p_value_by_id, approved_by_id
 
 
 # =============================================================================
@@ -369,64 +393,89 @@ def pipe_multiverse(
     n_jobs: int = N_JOBS,
 ) -> list:
 
+    start = time.time()
 
     if not enabled:
         logger.info(f"MULTIVERSE ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_multiverse_fields()} for r in rules]
 
-    results = []
-    for r in tqdm(rules, desc="MULTIVERSE", dynamic_ncols=True):
-        approved, p_value = _evaluate_multiverse(
-            ohlcv_data   = ohlcv_data_by_timeframe[r["timeframe"]],
-            signal_fn    = r["signal_fn"],
-            best_params  = r["best_params"],
+    rules_by_timeframe: dict = {}
+    for r in rules:
+        rules_by_timeframe.setdefault(r["timeframe"], []).append(r)
+
+    p_value_by_id:  dict = {}
+    approved_by_id: dict = {}
+
+    for timeframe, tf_rules in rules_by_timeframe.items():
+        tf_p_values, tf_approved = _evaluate_multiverse_batch(
+            ohlcv_data   = ohlcv_data_by_timeframe[timeframe],
+            rules        = tf_rules,
             order_amount = order_amount,
             dtype        = dtype,
-            real_profit  = float(r["wfo_test_trades"]["profit"].sum()),
             p_value_th   = p_value_th,
             n_paths      = n_paths,
             block_size   = block_size,
             n_jobs       = n_jobs,
+            timeframe    = timeframe,
         )
-        results.append({
+        p_value_by_id.update(tf_p_values)
+        approved_by_id.update(tf_approved)
+
+    results = [
+        {
             **r,
-            "passed_multiverse":  approved,
-            "multiverse_p_value": p_value,
-        })
+            "passed_multiverse":  approved_by_id[r["rule_id"]],
+            "multiverse_p_value": p_value_by_id[r["rule_id"]],
+        }
+        for r in rules
+    ]
+
+    elapsed = int(time.time() - start)
+    logger.info(f"MULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return results
 
-def _log_multiverse_debug(
+def _log_multiverse_debug_batch(
     ohlcv_data: dict,
     paths: dict,
-    results: list,
-    n_valid: int,
+    per_path_results: list,
+    rules: list,
+    p_value_by_id: dict,
+    approved_by_id: dict,
     n_paths: int,
     block_size: int,
-    real_profit: float,
-    p_value: float,
-    approved: bool,
 ) -> None:
-    """Single entry point for all multiverse debug logging, gated by logger level."""
+
     _log_drift_analysis(ohlcv_data, paths)
     _plot_synthetic_vs_historical(ohlcv_data, paths)
 
-    n_no_trades   = sum(1 for r in results if r[0] is not None and not r[2])
-    n_with_trades = sum(1 for r in results if r[0] is not None and r[2])
-    pct_no_trades = n_no_trades / n_valid * 100.0
-    logger.debug(
-        f"MCPT DEBUG ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
-        f"with_trades_paths={n_with_trades}/{n_valid}"
-    )
-    if n_with_trades > 0:
-        with_trades_profits = [r[1] for r in results if r[0] is not None and r[2]]
-        logger.debug(
-            f"MCPT DEBUG ── with_trades profit_sum stats: "
-            f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
-            f"mean={float(np.mean(with_trades_profits)):.2f}"
-        )
+    for r in rules:
+        rid = r["rule_id"]
+        rule_results = [res[rid] for res in per_path_results]
 
-    logger.debug(
-        f"MCPT ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
-        f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
-    )
+        n_valid = sum(1 for res in rule_results if res[0] is not None)
+        if n_valid == 0:
+            continue
+
+        n_no_trades   = sum(1 for res in rule_results if res[0] is not None and not res[2])
+        n_with_trades = sum(1 for res in rule_results if res[0] is not None and res[2])
+        pct_no_trades = n_no_trades / n_valid * 100.0
+        logger.debug(
+            f"MCPT DEBUG ── {rid} ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
+            f"with_trades_paths={n_with_trades}/{n_valid}"
+        )
+        if n_with_trades > 0:
+            with_trades_profits = [res[1] for res in rule_results if res[0] is not None and res[2]]
+            logger.debug(
+                f"MCPT DEBUG ── {rid} ── with_trades profit_sum stats: "
+                f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
+                f"mean={float(np.mean(with_trades_profits)):.2f}"
+            )
+
+        real_profit = float(r["wfo_test_trades"]["profit"].sum())
+        p_value     = p_value_by_id[rid]
+        approved    = approved_by_id[rid]
+        logger.debug(
+            f"MCPT ── {rid} ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
+            f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
+        )

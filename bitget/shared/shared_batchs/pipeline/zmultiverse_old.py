@@ -1,4 +1,5 @@
-#shared_batchs/pipeline/multiverse_v1.py
+#shared_batchs/pipeline/multiverse_old.py
+import time
 import logging
 import numpy as np
 import pandas as pd
@@ -6,16 +7,14 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from shared_config import VOLUME_COL
 import matplotlib.pyplot as plt
-from shared_batchs.pipeline.wfo import run_wfo_is
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-
+from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared_light
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
 # =============================================================================
 # MCPT EXECUTION CONFIG
 # =============================================================================
 
-N_PERMUTATIONS  = 500
+N_PERMUTATIONS  = 1000
 BLOCK_SIZE      = 20   # 1 = simple bootstrap with replacement (no block structure).
 N_JOBS          = -1
 
@@ -39,7 +38,7 @@ def _plot_synthetic_vs_historical(ohlcv_data: dict, paths: dict) -> None:
         ax.legend()
         fig.tight_layout()
         plt.show()
-        
+
 def _log_drift_analysis(ohlcv_data: dict, paths: dict) -> None:
     rows = []
     for sym, df_hist in ohlcv_data.items():
@@ -222,26 +221,25 @@ def _generate_mcpt_paths_all_symbols(
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
-def _synthetic_ohlcv_data(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray, dtype) -> dict:
+def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray, dtype) -> dict:
+    ts64 = ts_index.astype("datetime64[ns]")
 
-    ohlcv_data = {}
+    ohlcv_arr = {}
     for sym, arr_paths in paths_per_symbol.items():
         if path_idx >= arr_paths.shape[0]:
             continue
         arr = arr_paths[path_idx]  # (n_obs, n_features)
-        ohlcv_data[sym] = pd.DataFrame(
-            {
-                "open":       arr[:, 0].astype(dtype),
-                "low":        arr[:, 1].astype(dtype),
-                "high":       arr[:, 2].astype(dtype),
-                "close":      arr[:, 3].astype(dtype),
-                "low_time":   np.array(arr[:, 4], dtype="datetime64[ns]"),
-                "high_time":  np.array(arr[:, 5], dtype="datetime64[ns]"),
-                VOLUME_COL:   arr[:, 7].astype(dtype),
-            },
-            index=pd.DatetimeIndex(ts_index),
-        )
-    return ohlcv_data
+        ohlcv_arr[sym] = {
+            "ts":        ts64,
+            "open":      arr[:, 0].astype(np.float64),
+            "high":      arr[:, 2].astype(np.float64),
+            "low":       arr[:, 1].astype(np.float64),
+            "close":     arr[:, 3].astype(np.float64),
+            VOLUME_COL:  arr[:, 7].astype(np.float64),
+            "low_time":  np.array(arr[:, 4], dtype="datetime64[ns]"),
+            "high_time": np.array(arr[:, 5], dtype="datetime64[ns]"),
+        }
+    return ohlcv_arr
 
 
 def _evaluate_universe(
@@ -249,50 +247,35 @@ def _evaluate_universe(
     paths: dict,
     ts_index: np.ndarray,
     n_symbols_expected: int,
-    param_names: list,
-    lists_for_grid: list,
     signal_fn: callable,
-    signal_params_keys: list,
+    best_params: dict,
     order_amount: int,
-    timeframe: str,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
     dtype,
-    n_symbols: int,
 ) -> tuple:
 
-    synthetic_ohlcv = _synthetic_ohlcv_data(paths, path_idx, ts_index, dtype)
-    if len(synthetic_ohlcv) < n_symbols_expected:
+    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index, dtype)
+    if len(synthetic_arr) < n_symbols_expected:
         return None, None
 
-    synthetic_arr = prepare_ohlcv_arrays(synthetic_ohlcv)
+    ohlcv_arrays = {}
+    for sym, arr in synthetic_arr.items():
+        signals = signal_fn(arr, live_trading=False)
+        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
 
-    (
-        _best_params, _approved_wfo, _net_gain, _max_dd, wfo_test_trades, _df_results, _wfr, _metrics,
-    ) = run_wfo_is(
-        ohlcv_arr            = synthetic_arr,
-        param_names          = param_names,
-        lists_for_grid       = lists_for_grid,
-        signal_fn            = signal_fn,
-        signal_params_keys   = signal_params_keys,
-        order_amount         = order_amount,
-        timeframe            = timeframe,
-        net_gain_th          = net_gain_th,
-        dd_th                = dd_th,
-        r2_th                = r2_th,
-        wfr_th               = wfr_th,
-        dtype                = dtype,
-        n_jobs               = 1,
-        show_progress        = False,
-        n_symbols            = n_symbols,
+    prepared_data = prepare_backtest_data(ohlcv_arrays)
+    results = run_backtest_from_prepared_light(
+        prepared_data,
+        sell_after   = best_params["SELL_AFTER"],
+        tp_pct       = best_params["TP_PCT"],
+        sl_pct       = best_params["SL_PCT"],
+        order_amount = order_amount,
     )
 
-    if wfo_test_trades is None or wfo_test_trades.empty:
+    trade_log = results["__PORTFOLIO__"]["trade_log"]
+    if trade_log is None or trade_log.empty:
         return True, 0.0, False
 
-    profit_sum = float(wfo_test_trades["profit"].sum())
+    profit_sum = float(trade_log["profit"].sum())
     return True, profit_sum, True
 
 
@@ -309,24 +292,18 @@ def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
 # =============================================================================
 def _evaluate_multiverse(
     ohlcv_data: dict,
-    timeframe: str,
-    param_grid: dict,
     signal_fn: callable,
-    signal_params_keys: list,
+    best_params: dict,
     order_amount: int,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
     dtype,
-    n_symbols: int,
     real_profit: float,
     p_value_th: float,
     n_paths: int = N_PERMUTATIONS,
     block_size: int = BLOCK_SIZE,
     n_jobs: int = N_JOBS,
 ) -> tuple:
-    """Runs MCPT for a single rule. Returns (approved, p_value)."""
+    """Runs MCPT for a single rule, using its fixed best_params (no re-optimization
+    per synthetic universe). Returns (approved, p_value)."""
 
     if not ohlcv_data:
         return False, 1.0
@@ -339,15 +316,12 @@ def _evaluate_multiverse(
         ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], dtype=dtype, block_size=block_size,
     )
 
-    param_names    = list(param_grid.keys())
-    lists_for_grid = [param_grid[k] for k in param_names]
     n_symbols_expected = len(ohlcv_data)
 
     results = Parallel(n_jobs=n_jobs)(
         delayed(_evaluate_universe)(
-            path_idx, paths, ts_index, n_symbols_expected, param_names, lists_for_grid,
-            signal_fn, signal_params_keys, order_amount, timeframe,
-            net_gain_th, dd_th, r2_th, wfr_th, dtype, n_symbols,
+            path_idx, paths, ts_index, n_symbols_expected,
+            signal_fn, best_params, order_amount, dtype,
         )
         for path_idx in range(n_paths)
     )
@@ -394,6 +368,7 @@ def pipe_multiverse(
     n_jobs: int = N_JOBS,
 ) -> list:
 
+    start = time.time()
 
     if not enabled:
         logger.info(f"MULTIVERSE ── disabled — passing all {len(rules)} rules through untouched")
@@ -402,29 +377,25 @@ def pipe_multiverse(
     results = []
     for r in tqdm(rules, desc="MULTIVERSE", dynamic_ncols=True):
         approved, p_value = _evaluate_multiverse(
-            ohlcv_data          = ohlcv_data_by_timeframe[r["timeframe"]],
-            timeframe           = r["timeframe"],
-            param_grid          = param_grid,
-            signal_fn           = r["signal_fn"],
-            signal_params_keys  = [],
-            order_amount        = order_amount,
-            net_gain_th         = net_gain_th,
-            dd_th               = dd_th,
-            r2_th               = r2_th,
-            wfr_th              = wfr_th,
-            dtype               = dtype,
-            n_symbols           = n_symbols,
-            real_profit         = float(r["wfo_test_trades"]["profit"].sum()),
-            p_value_th          = p_value_th,
-            n_paths             = n_paths,
-            block_size          = block_size,
-            n_jobs              = n_jobs,
+            ohlcv_data   = ohlcv_data_by_timeframe[r["timeframe"]],
+            signal_fn    = r["signal_fn"],
+            best_params  = r["best_params"],
+            order_amount = order_amount,
+            dtype        = dtype,
+            real_profit  = float(r["wfo_test_trades"]["profit"].sum()),
+            p_value_th   = p_value_th,
+            n_paths      = n_paths,
+            block_size   = block_size,
+            n_jobs       = n_jobs,
         )
         results.append({
             **r,
             "passed_multiverse":  approved,
             "multiverse_p_value": p_value,
         })
+
+    elapsed = int(time.time() - start)
+    logger.info(f"MULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return results
 

@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
-
+import profile_pipeline  # DIAGNOSTIC ONLY — remove after profiling
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
@@ -220,3 +220,4 @@ if __name__ == "__main__":
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+    profile_pipeline.print_summary()  # DIAGNOSTIC ONLY — remove after profiling

@@ -1,3 +1,4 @@
+#shared/shared_batchs/backtesters/ZX_compute_BT.pyx
 # cython: language_level=3
 # cython: boundscheck=False
 # cython: wraparound=False
@@ -8,10 +9,8 @@ import logging
 import warnings
 import numpy as np
 import pandas as pd
-
 cimport numpy as np
 from libc.math cimport HUGE_VAL
-
 logging.basicConfig(level=logging.INFO)
 warnings.filterwarnings("ignore")
 
@@ -21,8 +20,6 @@ COMISION        = 0.1
 
 # ============================================================
 # C-level binary search helpers  (replaces np.searchsorted)
-# Raw-pointer signatures so these can be called from a nogil context
-# without triggering memoryview slicing (which requires the GIL).
 # ============================================================
 cdef int _searchsorted_left(long* arr, long val, int n) noexcept nogil:
     """Return first index i where arr[i] >= val (left side)."""
@@ -46,8 +43,6 @@ cdef int _searchsorted_right(long* arr, long val, int n) noexcept nogil:
         else:
             hi = mid
     return lo
-
-
 # ============================================================
 # Manual min-heap over (time, counter) -> slot  (replaces heapq of dicts)
 # ============================================================
@@ -120,8 +115,6 @@ cdef inline int _heap_pop(
         i = smallest
 
     return slot
-
-
 # ============================================================
 # prepare_data  (pure Python, no Cython types needed)
 # ============================================================
@@ -201,7 +194,6 @@ def prepare_static_arrays(ohlcv_arrays):
         "sym_len":            sym_len,
     }
 
-
 def prepare_signal_arrays(static_bundle, ohlcv_arrays):
     symbols = static_bundle["symbols"]
     sym_ids = static_bundle["sym_ids"]
@@ -270,33 +262,19 @@ def prepare_signal_arrays(static_bundle, ohlcv_arrays):
     return (sym_data, {}, static_bundle["all_timestamps_int"], static_bundle["all_timestamps_dt"],
             sym_ids, static_bundle["ts_int_arrays"], static_bundle["close_arrays"], arrays)
 
-
 def prepare_data(ohlcv_arrays):
     if not ohlcv_arrays:
         return ({}, {}, np.array([], dtype=np.int64),
                 np.array([], dtype='datetime64[ns]'), {}, {}, {})
     static_bundle = prepare_static_arrays(ohlcv_arrays)
     return prepare_signal_arrays(static_bundle, ohlcv_arrays)
-
-
 # ============================================================
 # prepare_backtest_data  (public alias — cache-friendly prepare step)
 # ============================================================
 def prepare_backtest_data(ohlcv_arrays):
-    """Reorganize ohlcv_arrays into internal structures needed by the backtest
-    loop. Independent of sell_after/tp_pct/sl_pct — callers evaluating a grid
-    of param combinations over the same ohlcv_arrays can call this once and
-    reuse the result across combinations via run_backtest_from_prepared."""
+
     return prepare_data(ohlcv_arrays)
 
-
-# ============================================================
-# _detect_intrabar_exit  (typed Cython, pointer I/O, nogil-safe)
-#
-# Results are written through output pointers instead of returned as a
-# Python tuple, so this can run fully inside a `with nogil:` block without
-# any boxing/allocation overhead per call.
-# ============================================================
 cdef inline void _detect_intrabar_exit_cy(
     double* high_row,
     double* low_row,
@@ -646,8 +624,6 @@ def _backtest_core(
         tl_comm_buy_arr[:n_trades],  tl_comm_sell_arr[:n_trades],  tl_is_short_arr[:n_trades],
         cash_bank, blocked_cash
     )
-
-
 # ============================================================
 # _run_core_from_arrays  (shared simulation step)
 # ============================================================
@@ -659,26 +635,9 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
      signal_events, all_timestamps_int, ev_col0) = arrays
 
-    open_2d      = np.ascontiguousarray(open_2d,      dtype=np.float64)
-    close_2d     = np.ascontiguousarray(close_2d,     dtype=np.float64)
-    high_2d      = np.ascontiguousarray(high_2d,      dtype=np.float64)
-    low_2d       = np.ascontiguousarray(low_2d,       dtype=np.float64)
-    high_time_2d = np.ascontiguousarray(high_time_2d, dtype=np.int64)
-    low_time_2d  = np.ascontiguousarray(low_time_2d,  dtype=np.int64)
-    ts_int_2d    = np.ascontiguousarray(ts_int_2d,    dtype=np.int64)
-    signal_2d    = np.ascontiguousarray(signal_2d,    dtype=np.int64)
-    sym_len      = np.ascontiguousarray(sym_len,      dtype=np.int64)
-    signal_events      = np.ascontiguousarray(signal_events,      dtype=np.int64)
-    all_timestamps_int = np.ascontiguousarray(all_timestamps_int, dtype=np.int64)
-    ev_col0            = np.ascontiguousarray(ev_col0,            dtype=np.int64)
-
     symbols = list(ohlcv_arrays.keys())
     n_syms  = len(sym_ids)
 
-    # sym_names[sid]         -> symbol string for that id
-    # symbol_order_rank[sid] -> position of that symbol within `symbols`
-    # (the original insertion order of ohlcv_arrays), used below to group
-    # trades exactly as the original per-symbol dict grouping did.
     sym_names         = np.empty(n_syms, dtype=object)
     symbol_order_rank = np.empty(n_syms, dtype=np.int64)
     for i, sym in enumerate(symbols):
@@ -718,10 +677,6 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
         'position_type':   position_type_names[tl_is_short],
     })
 
-    # Reproduce the original grouping (all profits of symbol 1, then symbol
-    # 2, etc., in `symbols` order, preserving chronological order within
-    # each symbol) via a single stable argsort instead of a per-trade
-    # Python loop over a dict of lists.
     rank_per_trade = symbol_order_rank[tl_sym_id]
     order          = np.argsort(rank_per_trade, kind='stable')
     trades_list    = tl_profit[order].tolist()
@@ -732,15 +687,10 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
             'trade_log': trade_log,
         }
     }
-
-
 # ============================================================
 # run_backtest_from_prepared  (simulate step — reuse prepared data)
 # ============================================================
 def run_backtest_from_prepared(prepared_data, sell_after, tp_pct, sl_pct, order_amount):
-    """Run simulation using data already prepared by prepare_backtest_data.
-    Use this when evaluating multiple param combinations over the same
-    ohlcv_arrays to avoid repeating the prepare step."""
 
     (sym_data, _, all_timestamps_int, all_timestamps_dt,
      sym_ids, ts_int_arrays, close_arrays, arrays) = prepared_data
@@ -750,22 +700,6 @@ def run_backtest_from_prepared(prepared_data, sell_after, tp_pct, sl_pct, order_
         sell_after, tp_pct, sl_pct, order_amount
     )
 
-
-# ============================================================
-# _run_core_from_arrays_light  (shared simulation step — metrics-only)
-#
-# Same simulation as _run_core_from_arrays, but skips building the 8
-# columns (symbol, buy_price, sell_price, qty, exit_reason, commission_buy,
-# commission_sell, position_type) and the 'trades' list that compute_metrics()
-# never reads — only 'buy_time', 'sell_time' and 'profit' survive. Building
-# the full 11-column DataFrame is 60-90% of the per-call cost for a typical
-# grid-search dataset size, so this matters wherever a param grid calls this
-# once per combo (dozens to hundreds of times per rule) and only needs the
-# resulting Sharpe/net-gain/etc — e.g. DSR's and WFO's inner param search.
-# Do NOT use this where the full trade_log is needed downstream (CSV export,
-# per-trade inspection, symbol/exit-reason breakdowns) — use
-# run_backtest_from_prepared for that.
-# ============================================================
 def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount):
     cdef_factor     = float(COMISION) / 100.0
     initial_balance = float(INITIAL_BALANCE)
@@ -773,19 +707,6 @@ def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount
     (open_2d, close_2d, high_2d, low_2d,
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
      signal_events, all_timestamps_int, ev_col0) = arrays
-
-    open_2d      = np.ascontiguousarray(open_2d,      dtype=np.float64)
-    close_2d     = np.ascontiguousarray(close_2d,     dtype=np.float64)
-    high_2d      = np.ascontiguousarray(high_2d,      dtype=np.float64)
-    low_2d       = np.ascontiguousarray(low_2d,       dtype=np.float64)
-    high_time_2d = np.ascontiguousarray(high_time_2d, dtype=np.int64)
-    low_time_2d  = np.ascontiguousarray(low_time_2d,  dtype=np.int64)
-    ts_int_2d    = np.ascontiguousarray(ts_int_2d,    dtype=np.int64)
-    signal_2d    = np.ascontiguousarray(signal_2d,    dtype=np.int64)
-    sym_len      = np.ascontiguousarray(sym_len,      dtype=np.int64)
-    signal_events      = np.ascontiguousarray(signal_events,      dtype=np.int64)
-    all_timestamps_int = np.ascontiguousarray(all_timestamps_int, dtype=np.int64)
-    ev_col0            = np.ascontiguousarray(ev_col0,            dtype=np.int64)
 
     (
         n_trades,
@@ -813,18 +734,10 @@ def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount
             'trade_log': trade_log,
         }
     }
-
-
 # ============================================================
 # run_backtest_from_prepared_light  (simulate step — metrics-only output)
 # ============================================================
 def run_backtest_from_prepared_light(prepared_data, sell_after, tp_pct, sl_pct, order_amount):
-    """Like run_backtest_from_prepared, but the returned trade_log only has
-    'buy_time', 'sell_time' and 'profit' — everything compute_metrics() needs
-    and nothing else. There is no 'trades' key. Use this for inner param-grid
-    search loops (many calls per rule/window, result only feeds a scoring
-    function); use run_backtest_from_prepared when the full trade detail is
-    needed downstream (CSV export, symbol/exit-reason breakdowns, etc)."""
 
     (sym_data, _, all_timestamps_int, all_timestamps_dt,
      sym_ids, ts_int_arrays, close_arrays, arrays) = prepared_data
@@ -832,14 +745,10 @@ def run_backtest_from_prepared_light(prepared_data, sell_after, tp_pct, sl_pct, 
     return _run_core_from_arrays_light(
         arrays, sell_after, tp_pct, sl_pct, order_amount
     )
-
-
 # ============================================================
 # run_grid_backtest  --  public API (same signature & output)
 # ============================================================
 def run_grid_backtest(ohlcv_arrays, sell_after, tp_pct, sl_pct, order_amount):
-    """Public API — unchanged behavior. Internally delegates to
-    prepare_backtest_data + run_backtest_from_prepared."""
 
     prepared_data = prepare_backtest_data(ohlcv_arrays)
 

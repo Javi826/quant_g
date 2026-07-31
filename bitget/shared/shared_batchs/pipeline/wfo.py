@@ -1,6 +1,7 @@
 #shared_batchs/pipeline/wfo.py
-import logging
 import os
+import time
+import logging
 import numpy as np
 import pandas as pd
 from functools import partial
@@ -96,7 +97,7 @@ def compute_metric(results: dict) -> float:
     if trade_log is None or trade_log.empty:
         return 0.0
 
-    m            = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False)
+    m            = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False, include_skew_kurtosis=False, include_r2=False)
     net_gain_pct = m["Net_Gain_pct"]
 
     if METRIC_MODE == "NET_GAIN_PCT":
@@ -175,7 +176,7 @@ def _evaluate_wfo_approval(
     if wfo_test_trades.empty:
         return False, 0.0, 0.0, 0.0, None
 
-    m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False)
+    m            = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False, include_skew_kurtosis=False)
     net_gain_pct = m["Net_Gain_pct"]
     max_dd_pct   = m["Max_DD_pct"]
     r_squared    = m["R_Squared"]
@@ -368,7 +369,7 @@ def _run_wfo_for_rule(
 
     metrics = None
     if wfo_test_trades is not None and not wfo_test_trades.empty:
-        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False)
+        metrics = compute_metrics(wfo_test_trades, capital=INITIAL_BALANCE, name="", include_weekly=False, include_skew_kurtosis=False)
 
     logger.debug(f"[{idx + 1}/{total}] {rule['side']:<5} {rule['label']} -> "
                  f"{'PASS' if approved_wfo else 'FAIL'} NetGain={wfo_net_gain:.1f}% DD={wfo_max_dd:.1f}%")
@@ -410,6 +411,8 @@ def pipe_wfo(
     brief_trades_folder: str = None,
 ) -> list:
 
+    start = time.time()
+
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_wfo_fields()} for r in rules]
@@ -434,5 +437,8 @@ def pipe_wfo(
             f"WFO ── {timeframe} completed ── {results[0]['n_windows']} windows | "
             f"train={_wfo_cfg.get('train_months')}m  test={_wfo_cfg.get('test_months')}m"
         )
+
+    elapsed = int(time.time() - start)
+    logger.info(f"WFO ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return results

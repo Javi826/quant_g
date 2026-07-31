@@ -8,13 +8,10 @@ from joblib import Parallel, delayed
 from scipy.stats import norm
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import (
-    INITIAL_BALANCE,
-    prepare_backtest_data,
-    prepare_static_arrays,
-    prepare_signal_arrays,
-    run_backtest_from_prepared_light,
-)
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,run_backtest_from_prepared_light
+from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
+from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
+from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
 from shared_batchs.utils.batch_metrics import compute_metrics
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 
@@ -71,7 +68,7 @@ def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tu
     if trade_log is None or trade_log.empty or len(trade_log) < DSR_MIN_TRADES:
         return -np.inf, params, None, None
 
-    m      = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False)
+    m      = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False, include_r2=False)
     sharpe = m["Sharpe"] if np.isfinite(m["Sharpe"]) else -np.inf
     if sharpe > DSR_MAX_SHARPE_ANN:
         return -np.inf, params, None, None
