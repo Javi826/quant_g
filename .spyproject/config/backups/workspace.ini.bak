@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_batch_E1/main_MINER.py', 'bitget/signals/condition_bank.py']
+recent_files = ['bitget/BOT_batch_E1/main_MINER.py', 'bitget/shared/shared_batchs/pipeline/dsr_o.py', 'bitget/shared/shared_batchs/utils/paralelization.py', 'bitget/shared/shared_batchs/backtesters/ZX_compute_BT.pyx', 'bitget/shared/shared_batchs/pipeline/dsr.py']
 
 [main]
 version = 0.2.0

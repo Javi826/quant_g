@@ -13,7 +13,7 @@ logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 # =============================================================================
 #NET_GAIN_PCT | CALMAR | R_SQUARED | MAX_DD_PCT — see _FAST_METRIC_MAP below
 WFO_METRIC       = "R_SQUARED"
-WFO_SPLIT_MONTHS = 2 
+WFO_SPLIT_MONTHS = 2
 
 def _generate_subperiod_weights(n_splits: int) -> list:
 

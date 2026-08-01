@@ -1,4 +1,4 @@
-#shared/shared_batch/ohlcv_utils.py
+#shared/shared_batchs/utils/ohlcv_utils.py
 import pandas as pd
 import numpy as np
 from shared_config import VOLUME_COL

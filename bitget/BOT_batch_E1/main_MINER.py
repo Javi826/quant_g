@@ -89,7 +89,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["12Hutc"]
+#TIMEFRAMES   = ["1H"]
 
 N_SYMBOLS    = 10
 ORDER_AMOUNT = 100
@@ -105,7 +105,7 @@ PARAM_GRID = {
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.80
+DSR_TH               = 0.8
 
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
@@ -124,7 +124,7 @@ SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
-run_config = {"DSR_TH":DSR_TH,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH,}
+run_config = {"DSR_TH":DSR_TH,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
 # =============================================================================
 # MAIN
 # =============================================================================

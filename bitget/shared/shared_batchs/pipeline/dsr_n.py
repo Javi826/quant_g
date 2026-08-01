@@ -1,20 +1,21 @@
-#shared_batchs/pipeline/dsr.py
+#shared_batchs/pipeline/dsr_new.py
 import time
 import itertools
 import logging
+import hashlib
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from scipy.stats import norm
+from scipy.stats import norm, skew, kurtosis
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,run_backtest_from_prepared_light
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, COMISION, _backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
-from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batchs.utils.batch_metrics import SHARPE_ABS_CAP
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
-from threadpoolctl import threadpool_limits, threadpool_info
+
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
 
 # =============================================================================
@@ -34,10 +35,9 @@ def _combo_id(params: dict) -> str:
     return "_".join(f"{k}{v}" for k, v in sorted(params.items()))
 
 
-def _daily_profit_from_trades(trade_log: pd.DataFrame) -> pd.Series:
-    sell_days = trade_log["sell_time"].values.astype("datetime64[D]")
+def _daily_profit_from_days(sell_days: np.ndarray, profits: np.ndarray) -> pd.Series:
     return (
-        pd.Series(trade_log["profit"].values, index=pd.DatetimeIndex(sell_days))
+        pd.Series(profits, index=pd.DatetimeIndex(sell_days))
         .groupby(level=0)
         .sum()
     )
@@ -56,25 +56,107 @@ def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
     ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
     return prepare_backtest_data(ohlcv_arrays)
 
-def _evaluate_combo_sharpe(params: dict, prepared_data, order_amount: int) -> tuple:
-    results = run_backtest_from_prepared_light(
-        prepared_data,
+
+# =============================================================================
+# PRIVATE HELPERS — metrics derived in-place from the backtest core output
+#
+# The grid search evaluates n_combos backtests per rule but keeps the metrics of
+# exactly one (the highest-Sharpe combo). These helpers reproduce, bit for bit,
+# the subset of compute_metrics that DSR consumes — Sharpe for combo ranking,
+# and Net_Gain / Max_DD / Skew / Kurtosis / N_days for the winner only — so the
+# losing combos never pay for a full pandas metrics pass, and no intermediate
+# trade-log DataFrame is built at all.
+# =============================================================================
+def _run_backtest_core_light(prepared_arrays, sell_after, tp_pct, sl_pct, order_amount) -> tuple:
+    """Direct call into the Cython backtest core, bypassing the trade-log
+    DataFrame that run_backtest_from_prepared_light assembles. Only sell
+    timestamps (int64 ns) and profits are needed downstream."""
+    (open_2d, close_2d, high_2d, low_2d,
+     high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+     signal_events, all_timestamps_int, ev_col0) = prepared_arrays
+
+    core_output = _backtest_core(
+        open_2d, close_2d, high_2d, low_2d,
+        high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+        signal_events, all_timestamps_int, ev_col0,
+        float(INITIAL_BALANCE), float(COMISION) / 100.0, float(order_amount),
+        int(sell_after), float(tp_pct), float(sl_pct),
+    )
+    n_trades      = core_output[0]
+    sell_time_int = core_output[4]
+    profits       = core_output[7]
+    return n_trades, sell_time_int, profits
+
+
+def _daily_values_from_trades(sell_time_int: np.ndarray, profits: np.ndarray) -> tuple:
+    """Calendar-day aggregation over the full date span, identical to the
+    bincount compute_metrics performs internally."""
+    sell_days    = sell_time_int.view("datetime64[ns]").astype("datetime64[D]")
+    start_day    = sell_days.min()
+    end_day      = sell_days.max()
+    n_days       = int((end_day - start_day).astype("int64")) + 1
+    day_offset   = (sell_days - start_day).astype("int64")
+    daily_values = np.bincount(day_offset, weights=profits, minlength=n_days)
+    return daily_values, n_days, sell_days
+
+
+def _sharpe_from_daily_values(daily_values: np.ndarray) -> float:
+    daily_std = daily_values.std()
+    sharpe = (round(float(daily_values.mean() / daily_std * np.sqrt(365)), 3)
+              if daily_std > 0 else np.nan)
+    if np.isfinite(sharpe) and abs(sharpe) > SHARPE_ABS_CAP:
+        sharpe = np.nan
+    return sharpe
+
+
+def _winner_metrics_from_daily_values(daily_values: np.ndarray, n_days: int, sharpe: float) -> dict:
+    eq       = INITIAL_BALANCE + np.cumsum(daily_values)
+    cm       = np.maximum.accumulate(eq)
+    max_dd   = ((eq - cm) / cm * 100).min()
+    net_gain = (eq[-1] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
+
+    return {
+        "sharpe_train":   sharpe,
+        "skew_train":     float(skew(daily_values)) if n_days > 2 else np.nan,
+        "kurtosis_train": float(kurtosis(daily_values, fisher=False)) if n_days > 2 else np.nan,
+        "n_days_train":   n_days,
+        "net_gain_train": round(float(net_gain), 2),
+        "max_dd_train":   round(float(max_dd), 2),
+    }
+
+
+def _empty_winner_metrics() -> dict:
+    return {
+        "sharpe_train":   np.nan,
+        "skew_train":     np.nan,
+        "kurtosis_train": np.nan,
+        "n_days_train":   0,
+        "net_gain_train": np.nan,
+        "max_dd_train":   np.nan,
+    }
+
+
+def _evaluate_combo_sharpe(params: dict, prepared_arrays, order_amount: int) -> tuple:
+    n_trades, sell_time_int, profits = _run_backtest_core_light(
+        prepared_arrays,
         sell_after   = params["SELL_AFTER"],
         tp_pct       = params["TP_PCT"],
         sl_pct       = params["SL_PCT"],
         order_amount = order_amount,
     )
-    trade_log = results["__PORTFOLIO__"]["trade_log"]
-    if trade_log is None or trade_log.empty or len(trade_log) < DSR_MIN_TRADES:
+    if n_trades == 0 or n_trades < DSR_MIN_TRADES:
         return -np.inf, params, None, None
 
-    m      = compute_metrics(trade_log, capital=INITIAL_BALANCE, name="", include_weekly=False, include_r2=False)
-    sharpe = m["Sharpe"] if np.isfinite(m["Sharpe"]) else -np.inf
-    if sharpe > DSR_MAX_SHARPE_ANN:
+    daily_values, n_days, sell_days = _daily_values_from_trades(sell_time_int, profits)
+
+    sharpe_metric = _sharpe_from_daily_values(daily_values)
+    sharpe_rank   = sharpe_metric if np.isfinite(sharpe_metric) else -np.inf
+    if sharpe_rank > DSR_MAX_SHARPE_ANN:
         return -np.inf, params, None, None
 
-    daily_profit = _daily_profit_from_trades(trade_log)
-    return sharpe, params, m, daily_profit
+    daily_profit = _daily_profit_from_days(sell_days, profits)
+    return sharpe_rank, params, (daily_values, n_days, sharpe_metric), daily_profit
+
 
 def _run_full_period_for_rule(
     rule_id: str,
@@ -99,49 +181,30 @@ def _run_full_period_for_rule(
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
     if max_possible_trades < DSR_MIN_TRADES:
-        winner_metrics = {
-            "sharpe_train":   np.nan,
-            "skew_train":     np.nan,
-            "kurtosis_train": np.nan,
-            "n_days_train":   0,
-            "net_gain_train": np.nan,
-            "max_dd_train":   np.nan,
-        }
-        return rule_id, {**winner_metrics, "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
+        return rule_id, {**_empty_winner_metrics(), "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
 
     if static_bundle is not None:
         prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
     else:
         prepared_data = prepare_backtest_data(ohlcv_arrays)
 
-    rows = [_evaluate_combo_sharpe(params, prepared_data, order_amount) for params in combos]
+    prepared_arrays = prepared_data[7]
+
+    rows = [_evaluate_combo_sharpe(params, prepared_arrays, order_amount) for params in combos]
 
     combo_daily_profit = {
         _combo_id(params): daily_profit
-        for _sharpe, params, _m, daily_profit in rows
+        for _sharpe, params, _bundle, daily_profit in rows
         if daily_profit is not None and len(daily_profit) > 1
     }
-    best_sharpe, best_params, best_metrics, _best_daily = max(rows, key=lambda x: x[0])
+    best_sharpe, best_params, best_bundle, _best_daily = max(rows, key=lambda x: x[0])
     best_combo_id = _combo_id(best_params)
 
-    if best_metrics is None:
-        winner_metrics = {
-            "sharpe_train":   np.nan,
-            "skew_train":     np.nan,
-            "kurtosis_train": np.nan,
-            "n_days_train":   0,
-            "net_gain_train": np.nan,
-            "max_dd_train":   np.nan,
-        }
+    if best_bundle is None:
+        winner_metrics = _empty_winner_metrics()
     else:
-        winner_metrics = {
-            "sharpe_train":   best_metrics["Sharpe"],
-            "skew_train":     best_metrics["Skew"],
-            "kurtosis_train": best_metrics["Kurtosis"],
-            "n_days_train":   best_metrics["N_days"],
-            "net_gain_train": best_metrics["Net_Gain_pct"],
-            "max_dd_train":   best_metrics["Max_DD_pct"],
-        }
+        best_daily_values, best_n_days, best_sharpe_metric = best_bundle
+        winner_metrics = _winner_metrics_from_daily_values(best_daily_values, best_n_days, best_sharpe_metric)
 
     return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
 _STATIC_BUNDLE_CACHE: dict = {}
@@ -169,7 +232,6 @@ def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
         bundle = prepare_static_arrays(ohlcv_arr)
         _STATIC_BUNDLE_CACHE[cache_key] = bundle
     return bundle
-
 
 def _run_full_period_for_rule_shm(
     rule_id: str,
@@ -214,14 +276,20 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
 # =============================================================================
 # PRIVATE HELPERS — N_eff estimation (streaming Gram accumulation, eigenvalue method)
 # =============================================================================
+
 def _iter_daily_profit_columns(all_raw_results: list):
-    """Yields (col_name, daily_profit_series) for every rule x combo pair —
-    the same set of columns a dense flat matrix would have had, but consumed
-    one at a time instead of all held in memory simultaneously."""
-    for r in all_raw_results:
-        combo_profit = r.get("combo_daily_profit") or {}
-        for combo_id, s in combo_profit.items():
-            yield f"{r['rule_id']}__{combo_id}", s
+    """Yields (col_name, daily_profit_series) for every rule x combo pair,
+    in a fixed deterministic order (sorted by col_name). This makes the
+    Gram-matrix accumulation order independent of upstream scheduling
+    (joblib worker completion order, dict iteration order), which is a
+    prerequisite for reproducible N_eff estimation."""
+    columns = [
+        (f"{r['rule_id']}__{combo_id}", s)
+        for r in all_raw_results
+        for combo_id, s in (r.get("combo_daily_profit") or {}).items()
+    ]
+    columns.sort(key=lambda item: item[0])
+    yield from columns
 
 
 def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
@@ -253,6 +321,15 @@ def _participation_ratio(eigenvalues: np.ndarray, n_const: int) -> float:
 BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
                          # large enough for BLAS to run efficiently (vs. one matmul per column)
+def _series_hash(s: pd.Series) -> bytes:
+    """Deterministic content hash of a sparse daily-profit series, used to
+    detect exact-duplicate columns (identical active days and values) before
+    they are standardized and folded into the Gram matrix. Hashing the sparse
+    representation avoids materializing the dense T-length column just to
+    detect a duplicate."""
+    index_bytes  = s.index.to_numpy().tobytes()
+    values_bytes = s.to_numpy(dtype=np.float64).tobytes()
+    return hashlib.sha256(index_bytes + b"|" + values_bytes).digest()
 
 def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
     """Computes the same participation-ratio N_eff as a dense-matrix eigenvalue
@@ -262,26 +339,56 @@ def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray
     is the actual RAM driver; the Gram matrix (T x T) stays fixed-size and
     small (T = number of days) regardless of how many rules/combos exist.
     Batching (instead of one column at a time) lets each partial matmul run
-    through BLAS, which is what makes this fast in practice."""
+    through BLAS, which is what makes this fast in practice.
 
-    t_days  = all_dates.shape[0]
-    gram    = np.zeros((t_days, t_days), dtype=np.float64)
-    n_const = 0
-    n_valid = 0
+    Exact-duplicate columns (identical active days and profit values — common
+    at scale when many mined rules produce the same trade sequence) are
+    collapsed before entering the Gram matrix: each unique column is added
+    once, weighted by its multiplicity k (k * outer(x, x) instead of k
+    separate outer(x, x) additions). This is mathematically exact in exact
+    arithmetic — the participation ratio is unchanged — and reduces the
+    floating-point operation count, which lowers the accumulated rounding
+    error that made the Gram matrix sensitive to BLAS thread scheduling at
+    high duplication ratios (e.g. 1H timeframe).
+
+    Columns are consumed via _iter_daily_profit_columns in a fixed sorted
+    order, so batch composition and accumulation order no longer depend on
+    upstream scheduling."""
+
+    t_days = all_dates.shape[0]
+
+    # ---- Pass 1: multiplicity count per unique column, via cheap sparse hash ----
+    group_counts: dict = {}
+    for _col_name, s in _iter_daily_profit_columns(all_raw_results):
+        key = _series_hash(s)
+        group_counts[key] = group_counts.get(key, 0) + 1
+
+    # ---- Pass 2: build Gram matrix from unique columns only, weighted by k ----
+    gram      = np.zeros((t_days, t_days), dtype=np.float64)
+    n_const   = 0
+    n_valid   = 0
+    seen_keys = set()
     batch_cols = []
 
     for _col_name, s in _iter_daily_profit_columns(all_raw_results):
+        key = _series_hash(s)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        k = group_counts[key]
+
         col = np.zeros(t_days, dtype=np.float64)
         row_idx = np.searchsorted(all_dates, s.index.to_numpy())
         col[row_idx] = s.to_numpy(dtype=np.float64)
 
         std = col.std(ddof=1)
         if std <= 0:
-            n_const += 1
+            n_const += k
             continue
 
-        batch_cols.append((col - col.mean()) / std)
-        n_valid += 1
+        # scale by sqrt(k) so that outer(sqrt(k)*x, sqrt(k)*x) == k * outer(x, x)
+        batch_cols.append(((col - col.mean()) / std) * np.sqrt(k))
+        n_valid += k
 
         if len(batch_cols) >= batch_size:
             x_batch = np.column_stack(batch_cols)
@@ -299,23 +406,6 @@ def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray
     eigenvalues = _eigenvalues_desc(gram)
     return _participation_ratio(eigenvalues, n_const)
 
-def _diagnose_n_eff_stability(all_raw_results: list, n_repeats: int = 5) -> None:
-    """DIAGNOSTIC ONLY — remove after use. Repeats the N_eff computation
-    n_repeats times on the exact same in-memory data, both with default
-    BLAS threading and with BLAS pinned to 1 thread, to check whether
-    the value is non-deterministic within a single process run."""
-    logger.info(f"DSR DIAG ── BLAS config: {threadpool_info()}")
-
-    logger.info("DSR DIAG ── default threading, repeated calls:")
-    for i in range(n_repeats):
-        n_eff = estimate_n_eff_flat(all_raw_results)
-        logger.warning(f"DSR DIAG ── run {i+1}/{n_repeats} ── N_eff={n_eff!r}")
-
-    logger.info("DSR DIAG ── BLAS pinned to 1 thread, repeated calls:")
-    with threadpool_limits(limits=1, user_api="blas"):
-        for i in range(n_repeats):
-            n_eff = estimate_n_eff_flat(all_raw_results)
-            logger.info(f"DSR DIAG ── run {i+1}/{n_repeats} (1 thread) ── N_eff={n_eff!r}")
 
 def estimate_n_eff_flat(all_raw_results: list) -> float | None:
 
@@ -425,7 +515,7 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
 
     total_candidates = len(all_raw_results)
     n_bruto           = total_candidates * max(n_combos, 1)
-    #_diagnose_n_eff_stability(all_raw_results)
+
     n_eff = estimate_n_eff_flat(all_raw_results)
 
     n_bruto_str    = f"{n_bruto:,}".replace(",", ".")

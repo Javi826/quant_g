@@ -9,18 +9,18 @@ from scipy import signal as sp_signal
 
 #------------------------------------------------------------------------------
 RSI_PERIODS                = [14]
-RSI_THRESHOLDS             = [30,70]
+RSI_THRESHOLDS             = [30]
  
 ADX_PERIODS                = [14]
-ADX_THRESHOLDS             = [20,30]
+ADX_THRESHOLDS             = [20]
  
-MA_PERIODS                 = [20,100]
-MOMENTUM_PERIODS           = [5,20]
-HISTVOL_BASE_PERIODS       = [10,30]
-HISTVOL_REGIME_SMA_PERIODS = [20,50]
+MA_PERIODS                 = []
+MOMENTUM_PERIODS           = [20]
+HISTVOL_BASE_PERIODS       = [10]
+HISTVOL_REGIME_SMA_PERIODS = [20]
  
 ATR_BASE_PERIODS           = [14]
-ATR_REGIME_SMA_PERIODS     = [10,50]
+ATR_REGIME_SMA_PERIODS     = [10]
  
 #------------------------------------------------------------------------------
 

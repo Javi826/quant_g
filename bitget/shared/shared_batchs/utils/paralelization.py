@@ -1,3 +1,4 @@
+#shared/shared_batchs/utils/paralelization.py
 import numpy as np
 from multiprocessing.shared_memory import SharedMemory
 

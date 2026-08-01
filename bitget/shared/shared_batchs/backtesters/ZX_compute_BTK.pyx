@@ -145,10 +145,10 @@ def prepare_static_arrays(ohlcv_arrays):
         ts   = data['ts']
         if ts.dtype.kind != 'M':
             ts = ts.astype('datetime64[ns]')
-        ts_int = ts.view('int64').copy()  # own memory: bundle outlives the shm-backed input
+        ts_int = ts.view('int64')
         per_sym_ts[sym] = (ts_int, len(ts))
         ts_int_arrays[sym] = ts_int
-        close_arrays[sym]  = np.array(data['close'], dtype=np.float64, copy=True)
+        close_arrays[sym]  = data['close']
         all_ts_int_lists.append(ts_int)
 
     max_len      = max(per_sym_ts[s][1] for s in symbols)
