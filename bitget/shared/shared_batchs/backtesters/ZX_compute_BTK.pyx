@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute_BT.pyx
+#shared/shared_batchs/backtesters/ZX_compute_BTK.pyx
 # cython: language_level=3
 # cython: boundscheck=False
 # cython: wraparound=False

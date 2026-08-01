@@ -89,12 +89,6 @@ def _run_full_period_for_rule(
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
 
-    # Cheap upper bound: no combo can ever produce more trades than raw signal
-    # firings (each firing yields at most one trade attempt, which may still
-    # be skipped for lack of free cash). If that upper bound is already below
-    # DSR_MIN_TRADES, every combo in the grid is guaranteed to fail the same
-    # check _evaluate_combo_sharpe applies after the fact — skip preparing
-    # the backtest data and running the grid of backtests entirely.
     ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
@@ -299,24 +293,6 @@ def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray
     eigenvalues = _eigenvalues_desc(gram)
     return _participation_ratio(eigenvalues, n_const)
 
-def _diagnose_n_eff_stability(all_raw_results: list, n_repeats: int = 5) -> None:
-    """DIAGNOSTIC ONLY — remove after use. Repeats the N_eff computation
-    n_repeats times on the exact same in-memory data, both with default
-    BLAS threading and with BLAS pinned to 1 thread, to check whether
-    the value is non-deterministic within a single process run."""
-    logger.info(f"DSR DIAG ── BLAS config: {threadpool_info()}")
-
-    logger.info("DSR DIAG ── default threading, repeated calls:")
-    for i in range(n_repeats):
-        n_eff = estimate_n_eff_flat(all_raw_results)
-        logger.warning(f"DSR DIAG ── run {i+1}/{n_repeats} ── N_eff={n_eff!r}")
-
-    logger.info("DSR DIAG ── BLAS pinned to 1 thread, repeated calls:")
-    with threadpool_limits(limits=1, user_api="blas"):
-        for i in range(n_repeats):
-            n_eff = estimate_n_eff_flat(all_raw_results)
-            logger.info(f"DSR DIAG ── run {i+1}/{n_repeats} (1 thread) ── N_eff={n_eff!r}")
-
 def estimate_n_eff_flat(all_raw_results: list) -> float | None:
 
     all_dates = _common_date_axis(all_raw_results)
@@ -425,7 +401,6 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
 
     total_candidates = len(all_raw_results)
     n_bruto           = total_candidates * max(n_combos, 1)
-    #_diagnose_n_eff_stability(all_raw_results)
     n_eff = estimate_n_eff_flat(all_raw_results)
 
     n_bruto_str    = f"{n_bruto:,}".replace(",", ".")

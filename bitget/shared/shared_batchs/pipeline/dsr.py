@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/dsr.py
+#shared_batchs/pipeline/dsr_new.py
 import time
 import itertools
 import logging
@@ -20,12 +20,12 @@ logger = logging.getLogger("BOT_batch.pipeline.dsr")
 # =============================================================================
 # DSR EXECUTION CONFIG
 # =============================================================================
-EULER_GAMMA         = 0.5772156649015328606  # Euler-Mascheroni constant
-SHARPE_PERIODS_YEAR = 365.0                  # must match the annualization factor in compute_metrics (sqrt(365))
-DSR_N_JOBS          = -1                     # safe to parallelize fully: this Parallel runs as its own phase, sequential relative to WFO — no nesting
+EULER_GAMMA         = 0.5772156649015328606
+SHARPE_PERIODS_YEAR = 365.0               
+DSR_N_JOBS          = -1                
 DSR_MIN_TRADES      = 100   
-DSR_MAX_SHARPE_ANN  = 10.0                   # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)
-M_TO_T_WARN_RATIO   = 2.0                    # warn if M (columns) exceeds this multiple of T (days) — ill-conditioned correlation matrix (paper Appendix 3)                 # combos with unrealistically high annualized Sharpe are rejected (near-zero variance artifact)                 # combos with fewer trades are rejected (near-zero variance inflates Sharpe artificially)
+DSR_MAX_SHARPE_ANN  = 10.0              
+M_TO_T_WARN_RATIO   = 2.0           
 # =============================================================================
 # FULL-PERIOD GRID SEARCH — selection-bias metrics (single pass, no WFO windows)
 # =============================================================================
@@ -35,9 +35,7 @@ def _combo_id(params: dict) -> str:
 
 
 def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> pd.Series:
-    """Sparse daily-profit series derived directly from the already-computed
-    dense daily_values array — avoids a second, redundant day-aggregation
-    pass (previously done via pandas groupby on the raw per-trade profits)."""
+
     nonzero_idx = np.flatnonzero(daily_values)
     if nonzero_idx.size == 0:
         return pd.Series(dtype=np.float64)
@@ -58,21 +56,11 @@ def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
     ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
     return prepare_backtest_data(ohlcv_arrays)
 
-
 # =============================================================================
 # PRIVATE HELPERS — metrics derived in-place from the backtest core output
-#
-# The grid search evaluates n_combos backtests per rule but keeps the metrics of
-# exactly one (the highest-Sharpe combo). These helpers reproduce, bit for bit,
-# the subset of compute_metrics that DSR consumes — Sharpe for combo ranking,
-# and Net_Gain / Max_DD / Skew / Kurtosis / N_days for the winner only — so the
-# losing combos never pay for a full pandas metrics pass, and no intermediate
-# trade-log DataFrame is built at all.
 # =============================================================================
 def _run_backtest_core_light(prepared_arrays, sell_after, tp_pct, sl_pct, order_amount) -> tuple:
-    """Direct call into the Cython backtest core, bypassing the trade-log
-    DataFrame that run_backtest_from_prepared_light assembles. Only sell
-    timestamps (int64 ns) and profits are needed downstream."""
+
     (open_2d, close_2d, high_2d, low_2d,
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
      signal_events, all_timestamps_int, ev_col0) = prepared_arrays
@@ -91,8 +79,7 @@ def _run_backtest_core_light(prepared_arrays, sell_after, tp_pct, sl_pct, order_
 
 
 def _daily_values_from_trades(sell_time_int: np.ndarray, profits: np.ndarray) -> tuple:
-    """Calendar-day aggregation over the full date span, identical to the
-    bincount compute_metrics performs internally."""
+
     sell_days    = sell_time_int.view("datetime64[ns]").astype("datetime64[D]")
     start_day    = sell_days.min()
     end_day      = sell_days.max()
@@ -137,7 +124,6 @@ def _empty_winner_metrics() -> dict:
         "max_dd_train":   np.nan,
     }
 
-
 def _evaluate_combo_sharpe(params: dict, prepared_arrays, order_amount: int) -> tuple:
     n_trades, sell_time_int, profits = _run_backtest_core_light(
         prepared_arrays,
@@ -172,12 +158,6 @@ def _run_full_period_for_rule(
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
 
-    # Cheap upper bound: no combo can ever produce more trades than raw signal
-    # firings (each firing yields at most one trade attempt, which may still
-    # be skipped for lack of free cash). If that upper bound is already below
-    # DSR_MIN_TRADES, every combo in the grid is guaranteed to fail the same
-    # check _evaluate_combo_sharpe applies after the fact — skip preparing
-    # the backtest data and running the grid of backtests entirely.
     ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
@@ -279,10 +259,7 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
 # =============================================================================
 
 def _iter_daily_profit_columns(all_raw_results: list):
-    """Yields (col_name, daily_profit_series) for every rule x combo pair.
-    Order matches joblib's Parallel(...) return order (submission order,
-    not completion order), which is already deterministic — no extra sort
-    needed."""
+
     for r in all_raw_results:
         combo_profit = r.get("combo_daily_profit") or {}
         for combo_id, s in combo_profit.items():
@@ -290,9 +267,6 @@ def _iter_daily_profit_columns(all_raw_results: list):
 
 
 def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
-    """Union of all dates across every column — same axis a dense flat matrix
-    would have used to align/reindex each column. Requires touching each
-    column's index once (cheap: dates only, not the profit values)."""
 
     date_arrays = [s.index.to_numpy() for _col_name, s in _iter_daily_profit_columns(all_raw_results)]
     if len(date_arrays) < 2:
@@ -319,19 +293,6 @@ BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS mat
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
 
 def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
-    """Computes the participation-ratio N_eff by accumulating the T x T Gram
-    matrix in batches of columns instead of ever materializing the full T x M
-    dense matrix (M = rules x combos). M can reach the hundreds of thousands
-    at scale — the dense matrix is the actual RAM driver; the Gram matrix
-    (T x T) stays fixed-size and small (T = number of days) regardless of how
-    many rules/combos exist. Batching (instead of one column at a time) lets
-    each partial matmul run through BLAS, which is what makes this fast in
-    practice.
-
-    Columns are consumed via _iter_daily_profit_columns in a single pass —
-    no duplicate-column detection. Duplicate columns are rare enough post-fix
-    that hashing every column costs more than it saves.
-    """
 
     t_days     = all_dates.shape[0]
     gram       = np.zeros((t_days, t_days), dtype=np.float64)
@@ -374,7 +335,6 @@ def estimate_n_eff_flat(all_raw_results: list) -> float | None:
         return None
     return _estimate_n_eff_eigen_streaming(all_raw_results, all_dates)
 
-
 # =============================================================================
 # PRIVATE HELPERS — DSR formula (paper Eq. 1-2)
 # =============================================================================
@@ -382,7 +342,6 @@ def _unannualize_sharpe(sharpe_annualized: float, periods_per_year: float = SHAR
     if sharpe_annualized is None or not np.isfinite(sharpe_annualized):
         return np.nan
     return float(sharpe_annualized / np.sqrt(periods_per_year))
-
 
 def _expected_max_sharpe(var_sr: float, n_trials: float) -> float:
     """Eq. 1 — expected maximum Sharpe ratio under N independent trials, assuming null skill."""
@@ -403,7 +362,6 @@ def _deflated_sharpe_ratio(sr: float, sr0: float, t_obs: int, skew_r: float, kur
         return 0.0
     numerator = (sr - sr0) * np.sqrt(t_obs - 1)
     return float(norm.cdf(numerator / np.sqrt(moment_term)))
-
 
 # =============================================================================
 # APPROVAL CRITERION
@@ -429,7 +387,6 @@ def _train_period_str(r: dict) -> str:
     start = daily_profit.index.min()
     end   = daily_profit.index.max()
     return f"{start:%Y-%m-%d}..{end:%Y-%m-%d}"
-
 
 def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, candidate_ids: set, passed_ids: set, sr0: float) -> None:
 
@@ -545,7 +502,6 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
         "sr0":            sr0,
     }
 
-
 # =============================================================================
 # PIPE DSR — one timeframe at a time
 # =============================================================================
@@ -563,7 +519,6 @@ def _empty_dsr_fields() -> dict:
         "combo_daily_profit": None,
         "best_combo_id":      None,
     }
-
 
 def pipe_dsr(
     rules: list,
@@ -609,8 +564,7 @@ def pipe_dsr(
     dsr_by_id      = dsr_result["dsr_by_rule_id"]
 
     logger.info(f"DSR ── {timeframe} ── {len(passed_dsr_ids)}/{len(rules)} rules pass")
-    #debug_plot_approved_dsr_daily_profit(raw_for_dsr, passed_dsr_ids)  # DEBUG — remove after use
-
+ 
     results = []
     for r in rules:
         rid    = r["rule_id"]
@@ -651,44 +605,4 @@ def _check_m_vs_t_ratio(ohlcv_arr: dict, n_rules: int, n_combos: int, timeframe:
         logger.debug(
             f"DSR ── {timeframe} ── M/T check ✅ ── M_bruto={m_bruto} (rules={n_rules} x combos={n_combos}) "
             f"vs T={t_days} days (ratio={m_bruto / t_days:.2f}x, warn_th={M_TO_T_WARN_RATIO}x)"
-        )
-
-# =============================================================================
-# DEBUG ONLY — remove after use
-# =============================================================================
-def debug_plot_approved_dsr_daily_profit(results: list, passed_dsr_ids: set) -> None:
-    for r in results:
-        rule_id = r["rule_id"]
-        if rule_id not in passed_dsr_ids:
-            continue
-
-        combo_daily_profit = r.get("combo_daily_profit") or {}
-        if not combo_daily_profit:
-            continue
-
-        best_combo_id = r.get("best_combo_id")
-        if best_combo_id is None or best_combo_id not in combo_daily_profit:
-            continue
-        daily_profit = combo_daily_profit[best_combo_id]
-
-        values = daily_profit.values[np.isfinite(daily_profit.values)]
-        if values.size == 0 or np.ptp(values) < 1e-6:
-            logger.warning(
-                f"DSR DEBUG STATS ── {rule_id} ── skipped, degenerate combo={best_combo_id} "
-                f"n_days={values.size} n_nonzero={(values != 0).sum()} "
-                f"min={values.min() if values.size else 'n/a'} max={values.max() if values.size else 'n/a'}"
-            )
-            continue
-
-        nonzero_values = values[values != 0.0]
-        n_days         = values.size
-        n_nonzero      = nonzero_values.size
-        top5           = np.sort(np.abs(nonzero_values))[-5:][::-1] if nonzero_values.size else np.array([])
-
-        logger.warning(
-            f"DSR DEBUG STATS ── {rule_id} — {best_combo_id} ── "
-            f"n_days={n_days} n_nonzero={n_nonzero} ({n_nonzero / n_days:.1%}) "
-            f"min={values.min():.2f} max={values.max():.2f} "
-            f"mean_nonzero={nonzero_values.mean():.2f} std_nonzero={nonzero_values.std():.2f} "
-            f"top5_abs={np.round(top5, 2).tolist()}"
         )

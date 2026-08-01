@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute_BT.pyx
+#shared/shared_batchs/backtesters/ZX_compute_BTF.pyx
 # cython: language_level=3
 # cython: boundscheck=False
 # cython: wraparound=False
@@ -31,7 +31,6 @@ cdef int _searchsorted_left(long* arr, long val, int n) noexcept nogil:
         else:
             hi = mid
     return lo
-
 
 cdef int _searchsorted_right(long* arr, long val, int n) noexcept nogil:
     """Return first index i where arr[i] > val (right side)."""
