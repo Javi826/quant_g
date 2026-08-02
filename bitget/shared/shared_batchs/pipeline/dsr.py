@@ -8,7 +8,8 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from scipy.stats import norm, skew, kurtosis
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, COMISION, backtest_core
+from shared_batchs.setup.config_backtest import INITIAL_BALANCE, COMISION
+from shared_batchs.backtesters.ZX_compute_BT import backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays

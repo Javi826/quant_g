@@ -9,7 +9,7 @@ from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 from shared_config import VOLUME_COL
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
+from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 

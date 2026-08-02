@@ -8,7 +8,8 @@ from functools import partial
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE,prepare_backtest_data,run_backtest_from_prepared,run_backtest_from_prepared_light
+from shared_batchs.setup.config_backtest import INITIAL_BALANCE
+from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared, run_backtest_from_prepared_light
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics

@@ -2,11 +2,12 @@
 import os
 import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
+from shared_config import VOLUME_COL
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
+from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
@@ -36,7 +37,7 @@ def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
         "high":  arr_sample["high"],
         "low":   arr_sample["low"],
         "close": arr_sample["close"],
-        "volume_quote": arr_sample["volume_quote"],
+        VOLUME_COL: arr_sample[VOLUME_COL],
     }, max_depth=max_depth)
 
     return [

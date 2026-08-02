@@ -88,7 +88,6 @@ def prepare_static_arrays(ohlcv_arrays):
         "sym_len":            sym_len,
     }
 
-
 # ============================================================
 # prepare_signal_arrays  (depends on the signal, reuses static_bundle)
 # ============================================================
@@ -160,7 +159,6 @@ def prepare_signal_arrays(static_bundle, ohlcv_arrays):
     return (sym_data, {}, static_bundle["all_timestamps_int"], static_bundle["all_timestamps_dt"],
             sym_ids, static_bundle["ts_int_arrays"], static_bundle["close_arrays"], arrays)
 
-
 # ============================================================
 # prepare_data / prepare_backtest_data
 # ============================================================
@@ -172,11 +170,9 @@ def prepare_data(ohlcv_arrays):
     static_bundle = prepare_static_arrays(ohlcv_arrays)
     return prepare_signal_arrays(static_bundle, ohlcv_arrays)
 
-
 def prepare_backtest_data(ohlcv_arrays):
 
     return prepare_data(ohlcv_arrays)
-
 
 # ============================================================
 # _detect_intrabar_exit  (tie-break logic identical to the Cython version)
@@ -217,7 +213,6 @@ def _detect_intrabar_exit(high_row, low_row, high_time_row, low_time_row,
     if sl_first is not None:
         return True, sl_first, 2, sl_price
     return True, tp_first, 1, tp_price
-
 
 # ============================================================
 # backtest_core  (pure Python port of the Cython hot loop)
@@ -409,8 +404,6 @@ def backtest_core(open_2d, close_2d, high_2d, low_2d,
         np.array(tl_is_short,    dtype=np.int32),
         cash_bank, blocked_cash
     )
-
-
 # ============================================================
 # _run_core_from_arrays  (full trade_log — matches Cython column set)
 # ============================================================
@@ -474,8 +467,6 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
             'trade_log': trade_log,
         }
     }
-
-
 # ============================================================
 # run_backtest_from_prepared  (simulate step — reuse prepared data)
 # ============================================================
@@ -488,8 +479,6 @@ def run_backtest_from_prepared(prepared_data, sell_after, tp_pct, sl_pct, order_
         arrays, sym_ids, sym_data,
         sell_after, tp_pct, sl_pct, order_amount
     )
-
-
 # ============================================================
 # _run_core_from_arrays_light  (metrics-only trade_log — no reordering)
 # ============================================================
@@ -527,12 +516,6 @@ def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount
             'trade_log': trade_log,
         }
     }
-
-
-# ============================================================
-# run_backtest_from_prepared_light  (simulate step — metrics-only output)
-
-
 # ============================================================
 # run_backtest_from_prepared_light  (simulate step — metrics-only output)
 # ============================================================
@@ -544,8 +527,6 @@ def run_backtest_from_prepared_light(prepared_data, sell_after, tp_pct, sl_pct, 
     return _run_core_from_arrays_light(
         arrays, sell_after, tp_pct, sl_pct, order_amount
     )
-
-
 # ============================================================
 # run_grid_backtest  --  public API (same signature & output)
 # ============================================================
