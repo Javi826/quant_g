@@ -16,7 +16,7 @@ LOG_LEVEL = logging.INFO
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 logger.setLevel(LOG_LEVEL)
-#UNIVERSE
+#UNIVERSE0
 #------------------------------------------------------------------------------
 UNIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.universe").setLevel(UNIVERSE_LOG_LEVEL)
@@ -88,7 +88,7 @@ RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-N_SYMBOLS  = 10
+N_SYMBOLS  = 15
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
