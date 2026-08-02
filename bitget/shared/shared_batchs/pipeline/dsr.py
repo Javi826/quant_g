@@ -1,20 +1,19 @@
-#shared_batchs/pipeline/dsr_new.py
+#shared_batchs/pipeline/dsr.py
 import time
 import itertools
 import logging
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
-from scipy.stats import norm, skew, kurtosis
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, COMISION, _backtest_core
+from joblib import Parallel, delayed
+from scipy.stats import norm, skew, kurtosis
+from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE, COMISION, backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
-from shared_batchs.utils.batch_metrics import SHARPE_ABS_CAP
+from shared_batchs.utils.batch_metrics import sharpe_from_daily_values
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
-
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
 
 # =============================================================================
@@ -33,7 +32,6 @@ M_TO_T_WARN_RATIO   = 2.0
 def _combo_id(params: dict) -> str:
     return "_".join(f"{k}{v}" for k, v in sorted(params.items()))
 
-
 def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> pd.Series:
 
     nonzero_idx = np.flatnonzero(daily_values)
@@ -42,14 +40,12 @@ def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> 
     dates = start_day + nonzero_idx.astype("timedelta64[D]")
     return pd.Series(daily_values[nonzero_idx], index=pd.DatetimeIndex(dates))
 
-
 def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, dtype) -> dict:
     ohlcv_arrays = {}
     for sym, arr in ohlcv_arr.items():
         signals = signal_fn(arr, live_trading=False)
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
     return ohlcv_arrays
-
 
 def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
 
@@ -65,7 +61,7 @@ def _run_backtest_core_light(prepared_arrays, sell_after, tp_pct, sl_pct, order_
      high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
      signal_events, all_timestamps_int, ev_col0) = prepared_arrays
 
-    core_output = _backtest_core(
+    core_output = backtest_core(
         open_2d, close_2d, high_2d, low_2d,
         high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
         signal_events, all_timestamps_int, ev_col0,
@@ -77,7 +73,6 @@ def _run_backtest_core_light(prepared_arrays, sell_after, tp_pct, sl_pct, order_
     profits       = core_output[7]
     return n_trades, sell_time_int, profits
 
-
 def _daily_values_from_trades(sell_time_int: np.ndarray, profits: np.ndarray) -> tuple:
 
     sell_days    = sell_time_int.view("datetime64[ns]").astype("datetime64[D]")
@@ -87,16 +82,6 @@ def _daily_values_from_trades(sell_time_int: np.ndarray, profits: np.ndarray) ->
     day_offset   = (sell_days - start_day).astype("int64")
     daily_values = np.bincount(day_offset, weights=profits, minlength=n_days)
     return daily_values, n_days, start_day
-
-
-def _sharpe_from_daily_values(daily_values: np.ndarray) -> float:
-    daily_std = daily_values.std()
-    sharpe = (round(float(daily_values.mean() / daily_std * np.sqrt(365)), 3)
-              if daily_std > 0 else np.nan)
-    if np.isfinite(sharpe) and abs(sharpe) > SHARPE_ABS_CAP:
-        sharpe = np.nan
-    return sharpe
-
 
 def _winner_metrics_from_daily_values(daily_values: np.ndarray, n_days: int, sharpe: float) -> dict:
     eq       = INITIAL_BALANCE + np.cumsum(daily_values)
@@ -112,7 +97,6 @@ def _winner_metrics_from_daily_values(daily_values: np.ndarray, n_days: int, sha
         "net_gain_train": round(float(net_gain), 2),
         "max_dd_train":   round(float(max_dd), 2),
     }
-
 
 def _empty_winner_metrics() -> dict:
     return {
@@ -137,7 +121,7 @@ def _evaluate_combo_sharpe(params: dict, prepared_arrays, order_amount: int) -> 
  
     daily_values, n_days, start_day = _daily_values_from_trades(sell_time_int, profits)
  
-    sharpe_metric = _sharpe_from_daily_values(daily_values)
+    sharpe_metric = sharpe_from_daily_values(daily_values)
     sharpe_rank   = sharpe_metric if np.isfinite(sharpe_metric) else -np.inf
     if sharpe_rank > DSR_MAX_SHARPE_ANN:
         return -np.inf, params, None, None
@@ -188,8 +172,8 @@ def _run_full_period_for_rule(
         winner_metrics = _winner_metrics_from_daily_values(best_daily_values, best_n_days, best_sharpe_metric)
 
     return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
-_STATIC_BUNDLE_CACHE: dict = {}
 
+_STATIC_BUNDLE_CACHE: dict = {}
 
 def _static_bundle_cache_key(shm_metadata: dict):
     try:
@@ -265,14 +249,12 @@ def _iter_daily_profit_columns(all_raw_results: list):
         for combo_id, s in combo_profit.items():
             yield f"{r['rule_id']}__{combo_id}", s
 
-
 def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
 
     date_arrays = [s.index.to_numpy() for _col_name, s in _iter_daily_profit_columns(all_raw_results)]
     if len(date_arrays) < 2:
         return None
     return np.unique(np.concatenate(date_arrays))
-
 
 def _eigenvalues_desc(square_array: np.ndarray) -> np.ndarray:
     eigenvalues = np.linalg.eigvalsh(square_array)
@@ -291,7 +273,6 @@ def _participation_ratio(eigenvalues: np.ndarray, n_const: int) -> float:
 
 BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
-
 def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
 
     t_days     = all_dates.shape[0]

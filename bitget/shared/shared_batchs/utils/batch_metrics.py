@@ -10,7 +10,7 @@ logger = logging.getLogger("BOT_batch.utils.batch_metrics")
 SHARPE_ABS_CAP = 50.0  # annualized Sharpe values beyond this are treated as invalid/degenerate
 
 # =============================================================================
-# PRIVATE HELPERS
+# R_SQUARED
 # =============================================================================
 def _r_squared_linear_trend(y: np.ndarray) -> float:
 
@@ -39,8 +39,20 @@ def _r_squared_linear_trend(y: np.ndarray) -> float:
     return float(1.0 - ss_res / ss_tot)
 
 # =============================================================================
+# SHARPE
+# =============================================================================
+def sharpe_from_daily_values(daily_values: np.ndarray) -> float:
+    daily_std = daily_values.std()
+    sharpe = (round(float(daily_values.mean() / daily_std * np.sqrt(365)), 3)
+              if daily_std > 0 else np.nan)
+    if sharpe is not None and np.isfinite(sharpe) and abs(sharpe) > SHARPE_ABS_CAP:
+        sharpe = np.nan
+    return sharpe
+
+# =============================================================================
 # COMPUTE METRICS
 # =============================================================================
+
 def compute_metrics(
     trade_log: pd.DataFrame,
     capital: float,
@@ -86,11 +98,9 @@ def compute_metrics(
     else:
         weekly_pct            = np.nan
         max_weeks_to_recovery = 0
-    daily_std = daily_values.std()
-    sharpe = (round(float(daily_values.mean() / daily_std * np.sqrt(365)), 3)
-              if daily_std > 0 else np.nan)
-    if sharpe is not None and np.isfinite(sharpe) and abs(sharpe) > SHARPE_ABS_CAP:
-        sharpe = np.nan
+
+    sharpe = sharpe_from_daily_values(daily_values)
+
     if include_skew_kurtosis:
         skew_daily = float(skew(daily_values)) if n_days > 2 else np.nan
         kurt_daily = float(kurtosis(daily_values, fisher=False)) if n_days > 2 else np.nan

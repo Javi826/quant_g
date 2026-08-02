@@ -8,19 +8,21 @@ from scipy import signal as sp_signal
 # =============================================================================
 
 #------------------------------------------------------------------------------
-RSI_PERIODS                = [14]
-RSI_THRESHOLDS             = [30]
- 
-ADX_PERIODS                = [14]
-ADX_THRESHOLDS             = [20]
- 
-MA_PERIODS                 = []
-MOMENTUM_PERIODS           = [20]
-HISTVOL_BASE_PERIODS       = [10]
-HISTVOL_REGIME_SMA_PERIODS = [20]
- 
-ATR_BASE_PERIODS           = [14]
-ATR_REGIME_SMA_PERIODS     = [10]
+# =============================================================================
+# RSI_PERIODS                = [14]
+# RSI_THRESHOLDS             = [30,70]
+#  
+# ADX_PERIODS                = [14]
+# ADX_THRESHOLDS             = [20]
+#  
+# MA_PERIODS                 = [100]
+# MOMENTUM_PERIODS           = [20]
+# HISTVOL_BASE_PERIODS       = [10]
+# HISTVOL_REGIME_SMA_PERIODS = [20]
+#  
+# ATR_BASE_PERIODS           = [14]
+# ATR_REGIME_SMA_PERIODS     = [10]
+# =============================================================================
  
 #------------------------------------------------------------------------------
 
@@ -50,12 +52,10 @@ def _sma(close: np.ndarray, window: int) -> np.ndarray:
     out[window:]    = (csum[window:] - csum[:n - window]) / window
     return out
 
-
 def _rolling_mean_skipnan(values: np.ndarray, window: int) -> np.ndarray:
     out = pd.Series(values, dtype=np.float64).rolling(window=window, min_periods=1).mean().to_numpy(copy=True)
     out[:window - 1] = np.nan
     return out
-
 
 def _rsi(close: np.ndarray, window: int) -> np.ndarray:
     n     = len(close)
@@ -79,7 +79,6 @@ def _rsi(close: np.ndarray, window: int) -> np.ndarray:
     out[idx[mask]] = rsi_vals[mask]
     return out
 
-
 def _wilder_sum_smooth(seed: float, x: np.ndarray, window: int) -> np.ndarray:
 
     if len(x) == 0:
@@ -90,7 +89,6 @@ def _wilder_sum_smooth(seed: float, x: np.ndarray, window: int) -> np.ndarray:
     zi = sp_signal.lfiltic(b, a, [seed], [0.0])
     y, _ = sp_signal.lfilter(b, a, x, zi=zi)
     return y
-
 
 def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n        = len(close)
@@ -152,7 +150,6 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> n
     adx_full[prefix:prefix + k] = adx_smooth
     return adx_full
 
-
 def _true_range(high: np.ndarray, low: np.ndarray, close: np.ndarray) -> np.ndarray:
     n   = len(close)
     out = np.empty(n)
@@ -163,7 +160,6 @@ def _true_range(high: np.ndarray, low: np.ndarray, close: np.ndarray) -> np.ndar
     tr3 = np.abs(low[1:] - prev_close)
     out[1:] = np.maximum(np.maximum(tr1, tr2), tr3)
     return out
-
 
 def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     tr  = _true_range(high, low, close)
@@ -185,7 +181,6 @@ def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> n
 
     return out
 
-
 def _historical_volatility(close: np.ndarray, window: int) -> np.ndarray:
     n           = len(close)
     log_returns = np.full(n, np.nan)
@@ -194,7 +189,6 @@ def _historical_volatility(close: np.ndarray, window: int) -> np.ndarray:
     out = pd.Series(log_returns).rolling(window=window).std(ddof=0).to_numpy(copy=True)
     out[:window] = np.nan
     return out
-
 
 def _ema(values: np.ndarray, period: int) -> np.ndarray:
     return pd.Series(values, dtype=np.float64).ewm(span=period, adjust=False).mean().to_numpy()
@@ -211,8 +205,7 @@ def _rolling_max_shifted(values: np.ndarray, window: int) -> np.ndarray:
     windows      = sliding_window_view(values[:-1], window)
     out[window:] = windows.max(axis=1)
     return out
- 
- 
+  
 def _rolling_min_shifted(values: np.ndarray, window: int) -> np.ndarray:
     n   = len(values)
     out = np.full(n, np.nan)
@@ -221,7 +214,6 @@ def _rolling_min_shifted(values: np.ndarray, window: int) -> np.ndarray:
     windows      = sliding_window_view(values[:-1], window)
     out[window:] = windows.min(axis=1)
     return out
- 
 
 # =============================================================================
 # INDICATOR REGISTRY
@@ -251,7 +243,6 @@ def _build_specs_two_periods(entry):
             for op in entry["ops"]:
                 specs.append({"type": entry["type"], "period": period, "sma_period": sma_period, "op": op})
     return specs
-
 
 INDICATOR_REGISTRY = [
     {

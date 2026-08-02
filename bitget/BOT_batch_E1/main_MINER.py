@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
-import profile_pipeline  # DIAGNOSTIC ONLY — remove after profiling
+
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
@@ -68,7 +68,7 @@ from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE
+from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
 
 # =============================================================================
@@ -87,12 +87,8 @@ RUN_PORTFOLIO = True
 RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
-TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES   = ["6Hutc","12Hutc"]
-#TIMEFRAMES   = ["1H"]
-
-N_SYMBOLS    = 10
-ORDER_AMOUNT = 100
+TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -220,4 +216,4 @@ if __name__ == "__main__":
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
-    profile_pipeline.print_summary()  # DIAGNOSTIC ONLY — remove after profiling
+    #profile_pipeline.print_summary()  # DIAGNOSTIC ONLY — remove after profiling

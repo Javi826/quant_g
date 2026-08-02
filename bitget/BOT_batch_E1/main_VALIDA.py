@@ -26,7 +26,7 @@ logger = logging.getLogger("BOT_batch.main_rule_validation")
 from shared_batchs.symbols.universe import filter_symbols, select_universe
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.backtesters.ZX_compute_BT import MIN_PRICE, INITIAL_BALANCE
+from shared_batchs.setup.config_backtest import MIN_PRICE, INITIAL_BALANCE
 from shared_batchs.pipeline.wfo import _run_wfo_for_rule
 from shared_batchs.rule_mining.rule_runner import _build_rule_id, _print_ranking
 from signals.signal_builder import build_signal_fn

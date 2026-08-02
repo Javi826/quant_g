@@ -1,4 +1,4 @@
-#shared/shared_batchs/backtesters/ZX_compute_BTF.pyx
+#shared/shared_batchs/backtesters/ZX_compute_BT.pyx
 # cython: language_level=3
 # cython: boundscheck=False
 # cython: wraparound=False
@@ -12,25 +12,12 @@ import pandas as pd
 cimport numpy as np
 from libc.math cimport HUGE_VAL
 logging.basicConfig(level=logging.INFO)
+from shared_batchs.setup.config_backtest import INITIAL_BALANCE, COMISION
 warnings.filterwarnings("ignore")
-
-MIN_PRICE       = 0.00001
-INITIAL_BALANCE = 1000
-COMISION        = 0.1
 
 # ============================================================
 # C-level binary search helpers  (replaces np.searchsorted)
 # ============================================================
-cdef int _searchsorted_left(long* arr, long val, int n) noexcept nogil:
-    """Return first index i where arr[i] >= val (left side)."""
-    cdef int lo = 0, hi = n, mid
-    while lo < hi:
-        mid = (lo + hi) >> 1
-        if arr[mid] < val:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo
 
 cdef int _searchsorted_right(long* arr, long val, int n) noexcept nogil:
     """Return first index i where arr[i] > val (right side)."""
@@ -114,6 +101,7 @@ cdef inline int _heap_pop(
         i = smallest
 
     return slot
+
 # ============================================================
 # prepare_data  (pure Python, no Cython types needed)
 # ============================================================
@@ -267,6 +255,7 @@ def prepare_data(ohlcv_arrays):
                 np.array([], dtype='datetime64[ns]'), {}, {}, {})
     static_bundle = prepare_static_arrays(ohlcv_arrays)
     return prepare_signal_arrays(static_bundle, ohlcv_arrays)
+
 # ============================================================
 # prepare_backtest_data  (public alias — cache-friendly prepare step)
 # ============================================================
@@ -296,7 +285,7 @@ cdef inline void _detect_intrabar_exit_cy(
                 tp_first = bi
             if sl_first < 0 and high_row[bi] >= sl_price:
                 sl_first = bi
-            if tp_first >= 0 and sl_first >= 0:
+            if tp_first >= 0 or sl_first >= 0:
                 break
     else:
         for bi in range(buy_idx, sell_idx + 1):
@@ -304,7 +293,7 @@ cdef inline void _detect_intrabar_exit_cy(
                 tp_first = bi
             if sl_first < 0 and low_row[bi] <= sl_price:
                 sl_first = bi
-            if tp_first >= 0 and sl_first >= 0:
+            if tp_first >= 0 or sl_first >= 0:
                 break
 
     if tp_first < 0 and sl_first < 0:
@@ -337,9 +326,9 @@ cdef inline void _detect_intrabar_exit_cy(
 
 
 # ============================================================
-# _backtest_core  (typed Cython hot loop)
+# backtest_core  (typed Cython hot loop)
 # ============================================================
-def _backtest_core(
+def backtest_core(
     np.ndarray[double, ndim=2] open_2d,
     np.ndarray[double, ndim=2] close_2d,
     np.ndarray[double, ndim=2] high_2d,
@@ -432,7 +421,7 @@ def _backtest_core(
     cdef int    n_trades     = 0
 
     # ── Loop vars ──
-    cdef int    tick_i, ev_start, ev_scan
+    cdef int    tick_i, ev_scan, ev_cursor
     cdef long   t_int, exp_time
     cdef int    sid, buy_idx, n_bars, exit_idx, slot, batch_slot
     cdef long   sell_time_int, exec_time_int
@@ -463,6 +452,7 @@ def _backtest_core(
     cdef long[::1]      ev_col0_mv   = ev_col0
 
     with nogil:
+        ev_cursor = 0
         for tick_i in range(n_ticks):
             t_int = ts_all_mv[tick_i]
 
@@ -529,8 +519,9 @@ def _backtest_core(
                     search_signals = not closed_any_tp_sl
 
                 if search_signals:
-                    ev_start   = _searchsorted_left(&ev_col0_mv[0], t_int, n_events)
-                    ev_scan    = ev_start
+                    while ev_cursor < n_events and ev_mv[ev_cursor, 0] < t_int:
+                        ev_cursor += 1
+                    ev_scan    = ev_cursor
                     batch_slot = 0
 
                     while ev_scan < n_events and ev_mv[ev_scan, 0] == t_int:
@@ -651,7 +642,7 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
         tl_profit, tl_exit_reason,
         tl_comm_buy, tl_comm_sell, tl_is_short,
         final_cash_bank, _
-    ) = _backtest_core(
+    ) = backtest_core(
         open_2d, close_2d, high_2d, low_2d,
         high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
         signal_events, all_timestamps_int, ev_col0,
@@ -714,7 +705,7 @@ def _run_core_from_arrays_light(arrays, sell_after, tp_pct, sl_pct, order_amount
         tl_profit, tl_exit_reason,
         tl_comm_buy, tl_comm_sell, tl_is_short,
         final_cash_bank, _
-    ) = _backtest_core(
+    ) = backtest_core(
         open_2d, close_2d, high_2d, low_2d,
         high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
         signal_events, all_timestamps_int, ev_col0,
