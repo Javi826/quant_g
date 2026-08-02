@@ -1,4 +1,4 @@
-#shared_batch/utils/plotting.py
+# shared_batch/utils/plotting.py
 import logging
 import os
 import numpy as np
@@ -30,7 +30,7 @@ def _load_reference(data_folder: str, t_start, t_end) -> tuple:
     return None, None
 
 
-def _render_comparison_plot(
+def _render_rule_mining_comparison_plot(
     ts_base, eq_base, m_base,
     ts_r01, eq_r01, m_r01,
     ref_ts, ref_pct,
@@ -94,7 +94,7 @@ def _render_comparison_plot(
     plt.show()
 
 
-def plot_filter_comparison(
+def plot_rule_mining_filter_comparison(
     strategy_id: str,
     trades_df_baseline: pd.DataFrame,
     trades_df_r01,
@@ -124,9 +124,9 @@ def plot_filter_comparison(
     )
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
-    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, strategy_id, regime_enabled=regime_enabled) 
+    _render_rule_mining_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, strategy_id, regime_enabled=regime_enabled)
 
-def plot_portfolio_comparison(
+def plot_rule_mining_portfolio_comparison(
     strategy_trades_baseline: list,
     strategy_trades_regime01: list,
     data_folder: str,
@@ -161,9 +161,9 @@ def plot_portfolio_comparison(
     t_end   = pd.Timestamp(pd.to_datetime(ts_base).max())
     ref_ts, ref_pct = _load_reference(data_folder, t_start, t_end)
 
-    _render_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, title)
+    _render_rule_mining_comparison_plot(ts_base, eq_base, m_base, ts_r01, eq_r01, m_r01, ref_ts, ref_pct, title)
 
-def plot_wfo_portfolio(
+def plot_best_wfo_portfolio(
     combo: tuple,
     trades_list: list,
     subperiods: list,
@@ -247,3 +247,74 @@ def plot_wfo_portfolio(
     fig.autofmt_xdate()
     plt.tight_layout()
     plt.show()
+
+# =============================================================================
+# MONTECARLO — debug-only plot (moved from pipeline/montecarlo.py)
+# =============================================================================
+
+def _mc_overlapping_blocks(profits: np.ndarray, block_size: int) -> np.ndarray:
+    n_trades = len(profits)
+    n_blocks = n_trades - block_size + 1
+    return np.lib.stride_tricks.sliding_window_view(profits, block_size)[:n_blocks]
+
+def plot_montecarlo_equity_curves(
+    profits: np.ndarray,
+    initial_balance: float,
+    block_size: int,
+    ruin_threshold_pct: float,
+    n_curves: int = 100,
+    seed: int = 42,
+) -> None:
+    """Debug plot: bootstrap equity curves vs the original, with a dynamic ruin band."""
+    n_trades = len(profits)
+    blocks   = _mc_overlapping_blocks(profits, block_size)
+    n_blocks = len(blocks)
+    rng      = np.random.default_rng(seed + 1)
+    n_blocks_needed = int(np.ceil(n_trades / block_size))
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    for _ in range(n_curves):
+        chosen  = rng.integers(0, n_blocks, size=n_blocks_needed)
+        sampled = np.concatenate(blocks[chosen])[:n_trades]
+        equity  = initial_balance + np.cumsum(sampled)
+        ax.plot(equity, color="gray", alpha=0.15, linewidth=0.7)
+
+    original_equity      = initial_balance + np.cumsum(profits)
+    original_running_max = np.maximum.accumulate(original_equity)
+    ruin_band            = original_running_max * (1.0 - ruin_threshold_pct / 100.0)
+
+    ax.plot(original_equity, color="red", linewidth=1.8, label="Original equity")
+    ax.plot(ruin_band, color="red", linewidth=1.2, linestyle="--", label=f"Ruin threshold ({ruin_threshold_pct}%% DD)")
+
+    ax.set_title(f"MONTECARLO — bootstrap equity curves (n_curves={n_curves})")
+    ax.set_xlabel("Trade index")
+    ax.set_ylabel("Equity")
+    ax.legend()
+    fig.tight_layout()
+    plt.show()
+
+# =============================================================================
+# MULTIVERSE — debug-only plot (moved from pipeline/multiverse.py)
+# =============================================================================
+
+def plot_multiverse_synthetic_vs_historical(ohlcv_data: dict, paths: dict) -> None:
+    for sym, df_hist in ohlcv_data.items():
+        arr_paths = paths.get(sym)
+        if arr_paths is None or arr_paths.shape[0] == 0:
+            continue
+
+        hist_close  = df_hist["close"].to_numpy(dtype=np.float64)
+        synth_close = arr_paths[:, :, 3].astype(np.float64)
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+        for path_idx in range(synth_close.shape[0]):
+            ax.plot(synth_close[path_idx], color="gray", alpha=0.15, linewidth=0.7)
+        ax.plot(hist_close, color="red", linewidth=1.8, label="Historical close")
+
+        ax.set_title(f"{sym} — historical vs MCPT permuted paths (n_paths={synth_close.shape[0]})")
+        ax.set_xlabel("Bar index")
+        ax.set_ylabel("Close price")
+        ax.legend()
+        fig.tight_layout()
+        plt.show()

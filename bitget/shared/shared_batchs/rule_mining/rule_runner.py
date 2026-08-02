@@ -5,12 +5,12 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
-from shared_batchs.utils.plotting import plot_filter_comparison, plot_portfolio_comparison
+from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
 from shared_batchs.backtesters.ZX_compute_BT import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
-from shared_batchs.utils.reporting import print_ranking, print_min_by_group
+from shared_batchs.utils.reporting import print_rule_mining_ranking, print_rule_mining_min_by_group
 
 logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
@@ -127,7 +127,7 @@ def run_rule_mining_pipeline(
         all_dsr_results.extend([{**r, **_empty_wfo_fields()} for r in dsr_results])
 
     passed_dsr_ids = {r["rule_id"] for r in all_dsr_results if r["passed_dsr"]}
-    print_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
+    print_rule_mining_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
 
     # -------------------------------------------------------------------
     # WFO, one timeframe at a time, only for rules that passed DSR.
@@ -164,7 +164,7 @@ def run_rule_mining_pipeline(
     ]
 
     wfo_candidate_ids = list(wfo_by_id.keys())
-    print_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
+    print_rule_mining_ranking(all_raw_results, wfo_candidate_ids, "POST-WFO", survivor_ids=[r["rule_id"] for r in all_raw_results if r["approved"]])
 
     # -------------------------------------------------------------------
     # Portfolio construction on the flattened, cross-timeframe pool.
@@ -177,7 +177,7 @@ def run_rule_mining_pipeline(
         if r["approved"] and r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
     ]
 
-    print_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
+    print_rule_mining_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
 
     # -------------------------------------------------------------------
     # Correlation (portfolio construction: drop redundant rules)
@@ -193,11 +193,11 @@ def run_rule_mining_pipeline(
         )
         survivors_corr              = [r["rule_id"] for r in survivors_rules]
         validated_after_correlation = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
-        print_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
-        print_min_by_group(all_raw_results, survivors_corr)
+        print_rule_mining_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
+        print_rule_mining_min_by_group(all_raw_results, survivors_corr)
     else:
         validated_after_correlation = validated_after_wfo
-        print_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
+        print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
     # -------------------------------------------------------------------
     # Montecarlo (bootstrap of executed trades — validates RISK)
     # -------------------------------------------------------------------
@@ -217,11 +217,11 @@ def run_rule_mining_pipeline(
             (r["rule_id"], r["wfo_test_trades"]) for r in mc_results if r["passed_montecarlo"]
         ]
         survivors_mc = [rid for rid, _ in validated_after_montecarlo]
-        print_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
-        print_min_by_group(all_raw_results, survivors_mc)
+        print_rule_mining_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
+        print_rule_mining_min_by_group(all_raw_results, survivors_mc)
     else:
         validated_after_montecarlo = validated_after_correlation
-        print_ranking(all_raw_results, [rid for rid, _ in validated_after_montecarlo], "POST-MONTECARLO")
+        print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_montecarlo], "POST-MONTECARLO")
 
     # -------------------------------------------------------------------
     # Multiverse / MCPT (log-return permutation — validates EDGE via p-value)
@@ -252,15 +252,15 @@ def run_rule_mining_pipeline(
             (r["rule_id"], r["wfo_test_trades"]) for r in mv_results if r["passed_multiverse"]
         ]
         survivors_mv = [rid for rid, _ in validated_after_multiverse]
-        print_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
-        print_min_by_group(all_raw_results, survivors_mv)
+        print_rule_mining_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
+        print_rule_mining_min_by_group(all_raw_results, survivors_mv)
     else:
         validated_after_multiverse = validated_after_montecarlo
-        print_ranking(all_raw_results, [rid for rid, _ in validated_after_multiverse], "POST-MULTIVERSE")
+        print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_multiverse], "POST-MULTIVERSE")
 
     if show_plots:
         for rule_id, trades in validated_after_multiverse:
-            plot_filter_comparison(
+            plot_rule_mining_filter_comparison(
                 strategy_id        = f"{rule_id}_wfo_test",
                 trades_df_baseline = trades,
                 trades_df_r01      = None,
@@ -270,7 +270,7 @@ def run_rule_mining_pipeline(
             )
 
         if validated_after_multiverse:
-            plot_portfolio_comparison(
+            plot_rule_mining_portfolio_comparison(
                 strategy_trades_baseline = validated_after_multiverse,
                 strategy_trades_regime01 = None,
                 data_folder              = data_folder,

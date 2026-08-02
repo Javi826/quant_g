@@ -7,8 +7,8 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from shared_config import VOLUME_COL
-import matplotlib.pyplot as plt
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays,prepare_signal_arrays,run_backtest_from_prepared_light
+from shared_batchs.utils.reporting import report_multiverse_debug
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 
 # =============================================================================
@@ -18,69 +18,6 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 N_PERMUTATIONS  = 1000
 BLOCK_SIZE      = 20   # 1 = simple bootstrap with replacement (no block structure).
 N_JOBS          = -1
-
-def _plot_synthetic_vs_historical(ohlcv_data: dict, paths: dict) -> None:
-    for sym, df_hist in ohlcv_data.items():
-        arr_paths = paths.get(sym)
-        if arr_paths is None or arr_paths.shape[0] == 0:
-            continue
-
-        hist_close  = df_hist["close"].to_numpy(dtype=np.float64)
-        synth_close = arr_paths[:, :, 3].astype(np.float64)
-
-        fig, ax = plt.subplots(figsize=(12, 5))
-        for path_idx in range(synth_close.shape[0]):
-            ax.plot(synth_close[path_idx], color="gray", alpha=0.15, linewidth=0.7)
-        ax.plot(hist_close, color="red", linewidth=1.8, label="Historical close")
-
-        ax.set_title(f"{sym} — historical vs MCPT permuted paths (n_paths={synth_close.shape[0]})")
-        ax.set_xlabel("Bar index")
-        ax.set_ylabel("Close price")
-        ax.legend()
-        fig.tight_layout()
-        plt.show()
-
-def _log_drift_analysis(ohlcv_data: dict, paths: dict) -> None:
-    rows = []
-    for sym, df_hist in ohlcv_data.items():
-        arr_paths = paths.get(sym)
-        if arr_paths is None or arr_paths.shape[0] == 0:
-            continue
-
-        hist_close = df_hist["close"].to_numpy(dtype=np.float64)
-        hist_n_bars        = len(hist_close)
-        hist_total_ret_pct = float((hist_close[-1] / hist_close[0] - 1.0) * 100.0)
-
-        synth_close = arr_paths[:, :, 3].astype(np.float64)
-        synth_n_bars           = arr_paths.shape[1]
-        synth_total_ret_pct    = (synth_close[:, -1] / synth_close[:, 0] - 1.0) * 100.0
-        synth_pct_paths_positive = float(np.mean(synth_total_ret_pct > 0) * 100.0)
-
-        rows.append({
-            "symbol":                   sym,
-            "hist_n_bars":              hist_n_bars,
-            "synth_n_bars":             synth_n_bars,
-            "hist_total_ret_pct":       hist_total_ret_pct,
-            "synth_pct_paths_positive": synth_pct_paths_positive,
-        })
-
-    if not rows:
-        logger.warning("DRIFT ANALYSIS ── no valid symbols to analyze")
-        return
-
-    df_drift = pd.DataFrame(rows)
-    summary  = df_drift.drop(columns=["symbol"]).mean()
-    df_drift = pd.concat(
-        [df_drift, pd.DataFrame([{"symbol": "MEAN", **summary.to_dict()}])],
-        ignore_index=True,
-    )
-
-    pd.set_option("display.float_format", lambda x: f"{x:.4f}")
-    logger.info(f"\n{'─' * 115}")
-    logger.info("  DRIFT ANALYSIS ── historical vs MCPT permuted paths")
-    logger.info(f"{'─' * 115}")
-    logger.info(f"\n{df_drift.to_string(index=False)}")
-    logger.info(f"{'─' * 115}\n")
 
 # =============================================================================
 # MCPT PATH GENERATION — moving block bootstrap (overlapping blocks + replacement)
@@ -357,7 +294,7 @@ def _evaluate_multiverse_batch(
         approved_by_id[rid] = approved
 
     if logger.isEnabledFor(logging.DEBUG):
-        _log_multiverse_debug_batch(
+        report_multiverse_debug(
             ohlcv_data, paths, per_path_results, rules,
             p_value_by_id, approved_by_id, n_paths, block_size,
         )
@@ -435,47 +372,3 @@ def pipe_multiverse(
 
     return results
 
-def _log_multiverse_debug_batch(
-    ohlcv_data: dict,
-    paths: dict,
-    per_path_results: list,
-    rules: list,
-    p_value_by_id: dict,
-    approved_by_id: dict,
-    n_paths: int,
-    block_size: int,
-) -> None:
-
-    _log_drift_analysis(ohlcv_data, paths)
-    _plot_synthetic_vs_historical(ohlcv_data, paths)
-
-    for r in rules:
-        rid = r["rule_id"]
-        rule_results = [res[rid] for res in per_path_results]
-
-        n_valid = sum(1 for res in rule_results if res[0] is not None)
-        if n_valid == 0:
-            continue
-
-        n_no_trades   = sum(1 for res in rule_results if res[0] is not None and not res[2])
-        n_with_trades = sum(1 for res in rule_results if res[0] is not None and res[2])
-        pct_no_trades = n_no_trades / n_valid * 100.0
-        logger.debug(
-            f"MCPT DEBUG ── {rid} ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
-            f"with_trades_paths={n_with_trades}/{n_valid}"
-        )
-        if n_with_trades > 0:
-            with_trades_profits = [res[1] for res in rule_results if res[0] is not None and res[2]]
-            logger.debug(
-                f"MCPT DEBUG ── {rid} ── with_trades profit_sum stats: "
-                f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
-                f"mean={float(np.mean(with_trades_profits)):.2f}"
-            )
-
-        real_profit = float(r["wfo_test_trades"]["profit"].sum())
-        p_value     = p_value_by_id[rid]
-        approved    = approved_by_id[rid]
-        logger.debug(
-            f"MCPT ── {rid} ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
-            f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
-        )

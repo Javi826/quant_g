@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from itertools import combinations
 from shared_batchs.utils.reporting import print_best_wfo_portfolio
-from shared_batchs.utils.plotting import plot_wfo_portfolio
+from shared_batchs.utils.plotting import plot_best_wfo_portfolio
 logger = logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio")
 
 # =============================================================================
@@ -432,7 +432,7 @@ def find_best_portfolio_combination_wfo(
     if top and show_plots:
         for rank, top_entry in enumerate(top, start=1):
             top_subp_scores   = {lbl: top_entry.get(lbl, np.nan) for lbl, _, _, _ in subperiods}
-            plot_wfo_portfolio(
+            plot_best_wfo_portfolio(
                 combo             = top_entry["combo"],
                 trades_list       = validated_wfo_trades,
                 subperiods        = subperiods,

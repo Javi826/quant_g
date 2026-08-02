@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
+from shared_batchs.utils.plotting import plot_multiverse_synthetic_vs_historical
 logger = logging.getLogger("BOT_batch.utils.reporting")
 
 # =============================================================================
@@ -144,7 +145,7 @@ def print_wfo_summary(wfo_results: list, validation_results: list = None) -> Non
         lines.append(line)
     lines.append(f" {'─'*115}")
     logger.info("\n".join(lines))
-    
+
 def print_best_wfo_portfolio(
     top: list,
     subperiods: list,
@@ -216,12 +217,12 @@ def print_best_wfo_portfolio(
             avg_monthly_pct = round(m["Net_Gain_pct"] / n_months, 2)
             logger.info(f"\n  Monthly NetGain  ── {avg_monthly_pct:+.2f}% / month  ({n_months:.1f} months)")
     logger.info(f"\n{'─'*W}")
-    
+
 def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
-def print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
+def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
     rows.sort(key=lambda r: r["rule_id"])
 
@@ -256,7 +257,7 @@ def print_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, 
 
     log_fn(f"{'─' * 170}\n")
 
-def print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
+def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     if not rows:
         return
@@ -306,3 +307,159 @@ def print_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
         f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
     )
     logger.info(f"{'─' * 140}\n")
+
+# =============================================================================
+# DSR — debug-only reporting (moved from pipeline/dsr.py)
+# =============================================================================
+
+def _dsr_train_period_str(r: dict) -> str:
+    combo_daily_profit = r.get("combo_daily_profit") or {}
+    best_combo_id       = r.get("best_combo_id")
+    if best_combo_id is None or best_combo_id not in combo_daily_profit:
+        return "n/a"
+
+    daily_profit = combo_daily_profit[best_combo_id]
+    if daily_profit is None or daily_profit.empty:
+        return "n/a"
+
+    start = daily_profit.index.min()
+    end   = daily_profit.index.max()
+    return f"{start:%Y-%m-%d}..{end:%Y-%m-%d}"
+
+def print_dsr_train_metrics(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, candidate_ids: set, passed_ids: set, sr0: float) -> None:
+
+    rows = [raw_by_id[rid] for rid in candidate_ids if rid in raw_by_id]
+    rows.sort(key=lambda r: dsr_by_id.get(r["rule_id"], 0.0), reverse=True)
+
+    if not rows:
+        return
+
+    id_width     = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
+    label_width  = max((len(r.get("label", "")) for r in rows), default=8) + 2
+    combo_width  = max((len(r.get("best_combo_id", "") or "") for r in rows), default=8) + 2
+    period_width = max((len(_dsr_train_period_str(r)) for r in rows), default=8) + 2
+
+    logger.debug(f"\n{'─' * 200}")
+    logger.debug(f"  DSR TRAIN METRICS (full-period grid search) ── SR0={sr0:.4f} ── {len(rows)} candidates")
+    logger.debug(f"{'─' * 200}")
+    logger.debug(
+        f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN_TR':<13}{'MAX_DD_TR':<11}{'SR_ANN':<10}{'SR_UNANN':<11}"
+        f"{'SKEW_TR':<10}{'KURT_TR':<10}{'N_DAYS_TR':<11}{'DSR':<9}{'BEST_COMBO':<{combo_width}}"
+        f"{'TRAIN_PERIOD':<{period_width}}{'RULE':<{label_width}}{'STATUS':<8}"
+    )
+    logger.debug(f"{'─' * 200}")
+
+    for r in rows:
+        rule_id = r["rule_id"]
+        status  = "✅" if rule_id in passed_ids else "❌"
+        logger.debug(
+            f"{_short_id(rule_id):<{id_width}}{r.get('side', ''):<6}"
+            f"{r.get('net_gain_train', float('nan')):<13.1f}{r.get('max_dd_train', float('nan')):<11.1f}"
+            f"{r.get('sharpe_train', float('nan')):<10.4f}{sr_by_id.get(rule_id, float('nan')):<11.4f}"
+            f"{r.get('skew_train', float('nan')):<10.4f}{r.get('kurtosis_train', float('nan')):<10.4f}"
+            f"{r.get('n_days_train', 0):<11}{dsr_by_id.get(rule_id, 0.0):<9.4f}"
+            f"{(r.get('best_combo_id', '') or 'n/a'):<{combo_width}}"
+            f"{_dsr_train_period_str(r):<{period_width}}"
+            f"{r.get('label', ''):<{label_width}}{status:<8}"
+        )
+    logger.debug(f"{'─' * 200}\n")
+
+# =============================================================================
+# MULTIVERSE — debug-only reporting (moved from pipeline/multiverse.py)
+# =============================================================================
+
+def print_multiverse_drift_analysis(ohlcv_data: dict, paths: dict) -> None:
+    rows = []
+    for sym, df_hist in ohlcv_data.items():
+        arr_paths = paths.get(sym)
+        if arr_paths is None or arr_paths.shape[0] == 0:
+            continue
+
+        hist_close = df_hist["close"].to_numpy(dtype=np.float64)
+        hist_n_bars        = len(hist_close)
+        hist_total_ret_pct = float((hist_close[-1] / hist_close[0] - 1.0) * 100.0)
+
+        synth_close = arr_paths[:, :, 3].astype(np.float64)
+        synth_n_bars           = arr_paths.shape[1]
+        synth_total_ret_pct    = (synth_close[:, -1] / synth_close[:, 0] - 1.0) * 100.0
+        synth_pct_paths_positive = float(np.mean(synth_total_ret_pct > 0) * 100.0)
+
+        rows.append({
+            "symbol":                   sym,
+            "hist_n_bars":              hist_n_bars,
+            "synth_n_bars":             synth_n_bars,
+            "hist_total_ret_pct":       hist_total_ret_pct,
+            "synth_pct_paths_positive": synth_pct_paths_positive,
+        })
+
+    if not rows:
+        logger.warning("MULTIVERSE DRIFT ANALYSIS ── no valid symbols to analyze")
+        return
+
+    df_drift = pd.DataFrame(rows)
+    summary  = df_drift.drop(columns=["symbol"]).mean()
+    df_drift = pd.concat(
+        [df_drift, pd.DataFrame([{"symbol": "MEAN", **summary.to_dict()}])],
+        ignore_index=True,
+    )
+
+    pd.set_option("display.float_format", lambda x: f"{x:.4f}")
+    logger.info(f"\n{'─' * 115}")
+    logger.info("  MULTIVERSE DRIFT ANALYSIS ── historical vs MCPT permuted paths")
+    logger.info(f"{'─' * 115}")
+    logger.info(f"\n{df_drift.to_string(index=False)}")
+    logger.info(f"{'─' * 115}\n")
+
+def print_multiverse_debug_summary(
+    per_path_results: list,
+    rules: list,
+    p_value_by_id: dict,
+    approved_by_id: dict,
+    n_paths: int,
+    block_size: int,
+) -> None:
+    for r in rules:
+        rid = r["rule_id"]
+        rule_results = [res[rid] for res in per_path_results]
+
+        n_valid = sum(1 for res in rule_results if res[0] is not None)
+        if n_valid == 0:
+            continue
+
+        n_no_trades   = sum(1 for res in rule_results if res[0] is not None and not res[2])
+        n_with_trades = sum(1 for res in rule_results if res[0] is not None and res[2])
+        pct_no_trades = n_no_trades / n_valid * 100.0
+        logger.debug(
+            f"MULTIVERSE DEBUG ── {rid} ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
+            f"with_trades_paths={n_with_trades}/{n_valid}"
+        )
+        if n_with_trades > 0:
+            with_trades_profits = [res[1] for res in rule_results if res[0] is not None and res[2]]
+            logger.debug(
+                f"MULTIVERSE DEBUG ── {rid} ── with_trades profit_sum stats: "
+                f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
+                f"mean={float(np.mean(with_trades_profits)):.2f}"
+            )
+
+        real_profit = float(r["wfo_test_trades"]["profit"].sum())
+        p_value     = p_value_by_id[rid]
+        approved    = approved_by_id[rid]
+        logger.debug(
+            f"MULTIVERSE ── {rid} ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
+            f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
+        )
+
+def report_multiverse_debug(
+    ohlcv_data: dict,
+    paths: dict,
+    per_path_results: list,
+    rules: list,
+    p_value_by_id: dict,
+    approved_by_id: dict,
+    n_paths: int,
+    block_size: int,
+) -> None:
+    """Debug-only orchestrator: drift analysis table + synthetic-vs-historical plots + per-rule summary."""
+    print_multiverse_drift_analysis(ohlcv_data, paths)
+    plot_multiverse_synthetic_vs_historical(ohlcv_data, paths)
+    print_multiverse_debug_summary(per_path_results, rules, p_value_by_id, approved_by_id, n_paths, block_size)

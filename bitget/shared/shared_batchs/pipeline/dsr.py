@@ -14,6 +14,7 @@ from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
 from shared_batchs.utils.batch_metrics import sharpe_from_daily_values
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
+from shared_batchs.utils.reporting import print_dsr_train_metrics
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
 
 # =============================================================================
@@ -350,62 +351,6 @@ def _deflated_sharpe_ratio(sr: float, sr0: float, t_obs: int, skew_r: float, kur
 def _evaluate_dsr_approval(dsr_value: float, dsr_th: float) -> bool:
     return dsr_value >= dsr_th
 
-
-def _short_id(rule_id: str) -> str:
-    return "_".join(rule_id.split("_")[:3])
-
-
-def _train_period_str(r: dict) -> str:
-    combo_daily_profit = r.get("combo_daily_profit") or {}
-    best_combo_id       = r.get("best_combo_id")
-    if best_combo_id is None or best_combo_id not in combo_daily_profit:
-        return "n/a"
-
-    daily_profit = combo_daily_profit[best_combo_id]
-    if daily_profit is None or daily_profit.empty:
-        return "n/a"
-
-    start = daily_profit.index.min()
-    end   = daily_profit.index.max()
-    return f"{start:%Y-%m-%d}..{end:%Y-%m-%d}"
-
-def _print_train_metrics_table(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, candidate_ids: set, passed_ids: set, sr0: float) -> None:
-
-    rows = [raw_by_id[rid] for rid in candidate_ids if rid in raw_by_id]
-    rows.sort(key=lambda r: dsr_by_id.get(r["rule_id"], 0.0), reverse=True)
-
-    if not rows:
-        return
-
-    id_width     = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
-    label_width  = max((len(r.get("label", "")) for r in rows), default=8) + 2
-    combo_width  = max((len(r.get("best_combo_id", "") or "") for r in rows), default=8) + 2
-    period_width = max((len(_train_period_str(r)) for r in rows), default=8) + 2
-
-    logger.debug(f"\n{'─' * 200}")
-    logger.debug(f"  DSR TRAIN METRICS (full-period grid search) ── SR0={sr0:.4f} ── {len(rows)} candidates")
-    logger.debug(f"{'─' * 200}")
-    logger.debug(
-        f"{'ID':<{id_width}}{'SIDE':<6}{'NET_GAIN_TR':<13}{'MAX_DD_TR':<11}{'SR_ANN':<10}{'SR_UNANN':<11}"
-        f"{'SKEW_TR':<10}{'KURT_TR':<10}{'N_DAYS_TR':<11}{'DSR':<9}{'BEST_COMBO':<{combo_width}}"
-        f"{'TRAIN_PERIOD':<{period_width}}{'RULE':<{label_width}}{'STATUS':<8}"
-    )
-    logger.debug(f"{'─' * 200}")
-
-    for r in rows:
-        rule_id = r["rule_id"]
-        status  = "✅" if rule_id in passed_ids else "❌"
-        logger.debug(
-            f"{_short_id(rule_id):<{id_width}}{r.get('side', ''):<6}"
-            f"{r.get('net_gain_train', float('nan')):<13.1f}{r.get('max_dd_train', float('nan')):<11.1f}"
-            f"{r.get('sharpe_train', float('nan')):<10.4f}{sr_by_id.get(rule_id, float('nan')):<11.4f}"
-            f"{r.get('skew_train', float('nan')):<10.4f}{r.get('kurtosis_train', float('nan')):<10.4f}"
-            f"{r.get('n_days_train', 0):<11}{dsr_by_id.get(rule_id, 0.0):<9.4f}"
-            f"{(r.get('best_combo_id', '') or 'n/a'):<{combo_width}}"
-            f"{_train_period_str(r):<{period_width}}"
-            f"{r.get('label', ''):<{label_width}}{status:<8}"
-        )
-    logger.debug(f"{'─' * 200}\n")
 # =============================================================================
 # CORE DSR CALCULATION (across a set of candidate trials — typically one timeframe)
 # =============================================================================
@@ -468,7 +413,7 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
     passed_dsr_ids = [rid for rid, dsr_val in dsr_by_id.items() if _evaluate_dsr_approval(dsr_val, dsr_th)]
 
     if logger.isEnabledFor(logging.DEBUG):
-        _print_train_metrics_table(raw_by_id, dsr_by_id, sr_by_id, set(passed_dsr_ids), set(passed_dsr_ids), sr0)
+        print_dsr_train_metrics(raw_by_id, dsr_by_id, sr_by_id, set(passed_dsr_ids), set(passed_dsr_ids), sr0)
 
     logger.debug(
         f"DSR ── M={total_candidates} n_combos={n_combos} N_bruto={n_bruto} N_eff={n_eff:.4f} SR0={sr0:.3f} "

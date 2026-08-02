@@ -26,9 +26,10 @@ logger = logging.getLogger("BOT_batch.main_rule_validation")
 from shared_batchs.symbols.universe import filter_symbols, select_universe
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.setup.config_backtest import MIN_PRICE, INITIAL_BALANCE
+from shared_batchs.setup.config_backtest import MIN_PRICE
 from shared_batchs.pipeline.wfo import _run_wfo_for_rule
-from shared_batchs.rule_mining.rule_runner import _build_rule_id, _print_ranking
+from shared_batchs.rule_mining.rule_runner import _build_rule_id
+from shared_batchs.utils.reporting import print_rule_mining_ranking
 from signals.signal_builder import build_signal_fn
 
 # =============================================================================
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         logger.info(f"\n🏁 {timeframe} DONE — {tf_elapsed // 3600} h {(tf_elapsed % 3600) // 60} min {tf_elapsed % 60} s")
 
     all_ids = [r["rule_id"] for r in all_raw_results]
-    _print_ranking(all_raw_results, all_ids, "PRODUCTION VALIDATION")
+    print_rule_mining_ranking(all_raw_results, all_ids, "PRODUCTION VALIDATION")
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
