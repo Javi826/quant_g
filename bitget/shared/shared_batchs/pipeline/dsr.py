@@ -1,4 +1,5 @@
 #shared_batchs/pipeline/dsr.py
+import os
 import time
 import itertools
 import logging
@@ -7,13 +8,13 @@ import pandas as pd
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
-from scipy.stats import norm, skew, kurtosis
+from scipy.stats import norm
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE, COMISION
 from shared_batchs.backtesters.ZX_compute_BT import backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
-from shared_batchs.utils.batch_metrics import sharpe_from_daily_values
+from shared_batchs.utils.batch_metrics import sharpe_from_daily_values, skew_kurtosis_from_daily_values
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 from shared_batchs.utils.reporting import print_dsr_train_metrics
 logger = logging.getLogger("BOT_batch.pipeline.dsr")
@@ -95,10 +96,15 @@ def _winner_metrics_from_daily_values(daily_values: np.ndarray, n_days: int, sha
     max_dd   = ((eq - cm) / cm * 100).min()
     net_gain = (eq[-1] - INITIAL_BALANCE) / INITIAL_BALANCE * 100
 
+    if n_days > 2:
+        skew_val, kurt_val = skew_kurtosis_from_daily_values(daily_values)
+    else:
+        skew_val, kurt_val = np.nan, np.nan
+
     return {
         "sharpe_train":   sharpe,
-        "skew_train":     float(skew(daily_values)) if n_days > 2 else np.nan,
-        "kurtosis_train": float(kurtosis(daily_values, fisher=False)) if n_days > 2 else np.nan,
+        "skew_train":     skew_val,
+        "kurtosis_train": kurt_val,
         "n_days_train":   n_days,
         "net_gain_train": round(float(net_gain), 2),
         "max_dd_train":   round(float(max_dd), 2),

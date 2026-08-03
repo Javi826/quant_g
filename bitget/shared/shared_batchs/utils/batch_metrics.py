@@ -2,7 +2,6 @@
 import logging
 import numpy as np
 import pandas as pd
-from scipy.stats import skew, kurtosis
 logger = logging.getLogger("BOT_batch.utils.batch_metrics")
 # =============================================================================
 # METRICS CONFIG
@@ -38,9 +37,6 @@ def _r_squared_linear_trend(y: np.ndarray) -> float:
 
     return float(1.0 - ss_res / ss_tot)
 
-# =============================================================================
-# SHARPE
-# =============================================================================
 def sharpe_from_daily_values(daily_values: np.ndarray) -> float:
     daily_std = daily_values.std()
     sharpe = (round(float(daily_values.mean() / daily_std * np.sqrt(365)), 3)
@@ -48,6 +44,20 @@ def sharpe_from_daily_values(daily_values: np.ndarray) -> float:
     if sharpe is not None and np.isfinite(sharpe) and abs(sharpe) > SHARPE_ABS_CAP:
         sharpe = np.nan
     return sharpe
+
+# =============================================================================
+# SKEW / KURTOSIS
+# =============================================================================
+def skew_kurtosis_from_daily_values(daily_values: np.ndarray) -> tuple:
+    """Population skewness (Fisher-Pearson, bias=True) and non-excess kurtosis
+    (Pearson's definition, fisher=False) computed directly — equivalent to
+    scipy.stats.skew()/kurtosis(fisher=False) but without scipy's per-call
+    argument-validation overhead. Caller must guarantee variance > 0."""
+    deviations = daily_values - daily_values.mean()
+    m2 = np.mean(deviations ** 2)
+    m3 = np.mean(deviations ** 3)
+    m4 = np.mean(deviations ** 4)
+    return float(m3 / (m2 ** 1.5)), float(m4 / (m2 ** 2))
 
 # =============================================================================
 # COMPUTE METRICS
@@ -101,9 +111,8 @@ def compute_metrics(
 
     sharpe = sharpe_from_daily_values(daily_values)
 
-    if include_skew_kurtosis:
-        skew_daily = float(skew(daily_values)) if n_days > 2 else np.nan
-        kurt_daily = float(kurtosis(daily_values, fisher=False)) if n_days > 2 else np.nan
+    if include_skew_kurtosis and n_days > 2:
+        skew_daily, kurt_daily = skew_kurtosis_from_daily_values(daily_values)
     else:
         skew_daily = np.nan
         kurt_daily = np.nan

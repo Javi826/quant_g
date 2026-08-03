@@ -1,68 +1,138 @@
-#BOT_batch/profile_pipeline.py
-import time
-import atexit
-import functools
+import os
+import sys
+import hashlib
 import logging
+from collections import defaultdict
 
-import shared_batchs.pipeline.dsr as dsr
-import shared_batchs.pipeline.wfo as wfo
-import shared_batchs.pipeline.correlation as correlation
-import shared_batchs.pipeline.montecarlo as montecarlo
-import shared_batchs.pipeline.multiverse as multiverse
+import numpy as np
+from tqdm import tqdm
+from tqdm_joblib import tqdm_joblib
+from joblib import Parallel, delayed
 
-logger = logging.getLogger("BOT_batch.profiling")
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
-_STATS = {}
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger("analyze_rule_duplicates")
 
+from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.setup.config_paths import DATA_FOLDER_IS
+from shared_batchs.setup.config_backtest import MIN_PRICE
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
+from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
+from shared_config import VOLUME_COL
 
-def _instrument(module, func_name):
-    original = getattr(module, func_name)
+# =============================================================================
+# CONFIG
+# =============================================================================
+TIMEFRAME   = "1H"
+N_SYMBOLS   = 10
+HASH_N_JOBS = -1
+CHUNK_SIZE  = 200  # rules per joblib task — amortizes cloudpickle/process overhead
 
-    @functools.wraps(original)
-    def wrapped(*args, **kwargs):
-        start = time.perf_counter()
-        result = original(*args, **kwargs)
-        elapsed = time.perf_counter() - start
-        entry = _STATS.setdefault(func_name, {"n_calls": 0, "total_s": 0.0})
-        entry["n_calls"] += 1
-        entry["total_s"] += elapsed
-        return result
-
-    setattr(module, func_name, wrapped)
-
-def print_summary():
-    if not _STATS:
-        logger.info("PROFILING ── no calls recorded yet")
-        return
-
-    logger.info(f"\n{'─' * 100}")
-    logger.info("  PIPELINE PROFILING SUMMARY — cumulative time per stage")
-    logger.info(f"{'─' * 100}")
-    logger.info(f"{'STAGE':<25}{'N_CALLS':<12}{'TOTAL_S':<14}{'AVG_S':<10}")
-    logger.info(f"{'─' * 100}")
-    for name, stats in sorted(_STATS.items(), key=lambda kv: kv[1]["total_s"], reverse=True):
-        n_calls = stats["n_calls"]
-        total_s = stats["total_s"]
-        avg_s   = (total_s / n_calls) if n_calls else 0.0
-        logger.info(f"{name:<25}{n_calls:<12}{total_s:<14.2f}{avg_s:<10.2f}")
-    logger.info(f"{'─' * 100}\n")
+# =============================================================================
+# SIGNAL HASHING
+# =============================================================================
+def _signal_hash(signal_fn, ohlcv_arr: dict) -> bytes:
+    hasher = hashlib.blake2b(digest_size=16)
+    for sym in sorted(ohlcv_arr.keys()):
+        arr = ohlcv_arr[sym]
+        signal = np.asarray(signal_fn(arr, live_trading=False))
+        hasher.update(sym.encode("utf-8"))
+        hasher.update(signal.astype(np.int8).tobytes())
+    return hasher.digest()
 
 
-# atexit only fires when the Python PROCESS exits — unreliable in Spyder/Jupyter,
-# where the kernel process stays alive across runs. Kept as a fallback for plain
-# `python main_MINER.py` runs; main_MINER.py also calls print_summary() explicitly.
-atexit.register(print_summary)
+def _hash_rule_chunk(rule_chunk: list, shm_metadata: dict) -> list:
+    """Runs in a worker: reattach to shared ohlcv_arr, hash each rule's signal
+    in the chunk, return (label, hash) pairs. Avoids pickling ohlcv_arr per task."""
+    ohlcv_arr, shm_handles = arrays_from_shared_memory(shm_metadata)
+    try:
+        return [(label, _signal_hash(signal_fn, ohlcv_arr)) for label, signal_fn in rule_chunk]
+    finally:
+        for shm in shm_handles:
+            shm.close()
 
-# Each pipe_* is instrumented at its ORIGIN module. rule_runner.py imports
-# pipe_dsr / pipe_wfo / pipe_correlation / pipe_montecarlo via
-# `from ... import name` at rule_runner's own module-load time, so this
-# module must be imported BEFORE rule_runner.py for the patch to take effect.
-# pipe_multiverse is imported locally at call-time inside rule_runner, so it
-# is unaffected by import ordering.
-_instrument(dsr,         "pipe_dsr")
-_instrument(wfo,         "pipe_wfo")
-_instrument(correlation, "pipe_correlation")
-_instrument(montecarlo,  "pipe_montecarlo")
-_instrument(multiverse,  "pipe_multiverse")
 
-print("PROFILING ── instrumentation active", flush=True)
+def _chunked(items: list, size: int):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+def main() -> None:
+    ohlcv_is = select_universe(
+        data_folder_is    = DATA_FOLDER_IS,
+        timeframe         = TIMEFRAME,
+        min_price         = MIN_PRICE,
+        filter_symbols_fn = filter_symbols,
+    )
+    ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
+
+    arr_sample = next(iter(ohlcv_arr.values()))
+    all_rules  = generate_all_rules({
+        "open":  arr_sample["open"],
+        "high":  arr_sample["high"],
+        "low":   arr_sample["low"],
+        "close": arr_sample["close"],
+        VOLUME_COL: arr_sample[VOLUME_COL],
+    }, max_depth=MAX_DEPTH)
+
+    logger.info(f"Total candidate rules: {len(all_rules)}")
+
+    rule_pairs = [(rule["label"], rule["signal_fn"]) for rule in all_rules]
+    chunks     = list(_chunked(rule_pairs, CHUNK_SIZE))
+
+    shm_list, shm_metadata = arrays_to_shared_memory(ohlcv_arr)
+    try:
+        with tqdm_joblib(tqdm(desc="Hashing rule signals", total=len(chunks), dynamic_ncols=True)):
+            chunk_results = Parallel(n_jobs=HASH_N_JOBS, batch_size=1, pre_dispatch="all")(
+                delayed(_hash_rule_chunk)(chunk, shm_metadata) for chunk in chunks
+            )
+    finally:
+        for shm in shm_list:
+            shm.close()
+            shm.unlink()
+
+    groups = defaultdict(list)
+    for chunk_result in chunk_results:
+        for label, h in chunk_result:
+            groups[h].append(label)
+
+    n_rules  = len(all_rules)
+    n_groups = len(groups)
+    group_sizes = sorted((len(v) for v in groups.values()), reverse=True)
+
+    size_hist = defaultdict(int)
+    for size in group_sizes:
+        if size == 1:
+            size_hist["1 (unique)"] += 1
+        elif size <= 5:
+            size_hist["2-5"] += 1
+        elif size <= 10:
+            size_hist["6-10"] += 1
+        else:
+            size_hist["11+"] += 1
+
+    logger.info("─" * 70)
+    logger.info(f"TIMEFRAME            : {TIMEFRAME}")
+    logger.info(f"Total rules          : {n_rules}")
+    logger.info(f"Unique signal groups : {n_groups}")
+    logger.info(f"Duplication ratio    : {n_rules / n_groups:.2f}x")
+    logger.info(f"Redundant rules      : {n_rules - n_groups} ({(n_rules - n_groups) / n_rules * 100:.1f}%)")
+    logger.info("Group size distribution:")
+    for label, count in size_hist.items():
+        logger.info(f"  groups with size {label:12s}: {count}")
+    logger.info("─" * 70)
+
+    logger.info("Top 10 largest duplicate groups (sample labels):")
+    largest = sorted(groups.values(), key=len, reverse=True)[:10]
+    for grp in largest:
+        if len(grp) > 1:
+            logger.info(f"  size={len(grp):4d} — e.g. {grp[0]}")
+
+
+if __name__ == "__main__":
+    main()
