@@ -374,7 +374,8 @@ def find_best_portfolio_combination_wfo(
         logger.warning("No valid combinations found — check require_long_short or strategy count.")
         return []
 
-    logger.info(f"\n  Evaluating {len(combos)} combo(s)...\n")
+    n_combos_str = f"{len(combos):,}".replace(",", ".")
+    logger.info(f"\n  Evaluating {n_combos_str} combo(s)...\n")
 
     if metric not in _FAST_METRIC_MAP:
         raise ValueError(

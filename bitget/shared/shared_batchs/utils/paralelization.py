@@ -4,11 +4,6 @@ from multiprocessing.shared_memory import SharedMemory
 
 
 def arrays_to_shared_memory(base_arrays: dict) -> tuple:
-    """Write a dict[symbol][field] -> numpy array structure to shared memory
-    once, so many tasks can attach to it by name instead of each being
-    pickled a full copy. Returns (shm_list, metadata). Non-array values are
-    passed through as-is in metadata. Caller owns shm_list and must close()
-    + unlink() each block once every worker has finished using it."""
     shm_list = []
     metadata = {}
     for sym, arr_dict in base_arrays.items():
@@ -26,9 +21,6 @@ def arrays_to_shared_memory(base_arrays: dict) -> tuple:
 
 
 def arrays_from_shared_memory(metadata: dict) -> tuple:
-    """Reconstruct the dict[symbol][field] -> numpy array structure from shared
-    memory metadata inside a worker. Returns (base_arrays, shm_handles). Caller
-    must close() each handle (not unlink — only the creator unlinks) once done."""
     base_arrays = {}
     shm_handles = []
     for sym, fields in metadata.items():

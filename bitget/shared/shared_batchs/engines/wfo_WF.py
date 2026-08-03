@@ -117,15 +117,21 @@ def walk_forward_optimization(
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
 
-    keys               = list(param_ranges.keys())
-    all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
-    dict_combinations  = [dict(zip(keys, comb)) for comb in all_combinations]
-
     # Cooldown buffer: real price data appended after the test window so that
     # trades opened near the end can resolve naturally (TP/SL/timeout) instead
     # of being force-closed at the window boundary. Mirrors WARMUP_BARS on the
     # other end. Sized to the largest SELL_AFTER in the grid (worst case).
     COOLDOWN_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
+
+    # Edge buffer: symmetric to COOLDOWN_BARS but for the train window. Signals
+    # opened in the last EDGE_BUFFER_BARS bars of train would not have room to
+    # close naturally before train_end, so their trades get force-closed at the
+    # boundary (truncation bias). Trades opened past this cutoff are dropped.
+    EDGE_BUFFER_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
+
+    keys               = list(param_ranges.keys())
+    all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
+    dict_combinations  = [dict(zip(keys, comb)) for comb in all_combinations]
 
     length_test        = int(length_train_set / pct_train_set - length_train_set)
     best_params_list   = []
@@ -178,6 +184,7 @@ def walk_forward_optimization(
             last_test_end_ref = test1_ref
 
         train_start_ts = ref_ts[t0_ref]
+        train_edge_ts  = ref_ts[max(t0_ref, t1_ref - EDGE_BUFFER_BARS)]
         test_start_ts  = ref_ts[t1_ref] if t1_ref < max_length else ref_ts[-1]
         test_end_ts    = ref_ts[test1_ref - 1]
 
@@ -301,7 +308,12 @@ def walk_forward_optimization(
         if collect_train_trades_fn is not None and base_arrays:
             df_train = collect_train_trades_fn(effective_params, base_arrays)
             if df_train is not None and not df_train.empty:
-                df_train = df_train[df_train["buy_time"] >= pd.Timestamp(train_start_ts)].copy()
+                # Lower bound drops warmup trades; upper bound drops trades opened
+                # too close to train_end to resolve naturally (truncation bias).
+                df_train = df_train[
+                    (df_train["buy_time"] >= pd.Timestamp(train_start_ts)) &
+                    (df_train["buy_time"] <= pd.Timestamp(train_edge_ts))
+                ].copy()
 
         df_test = None
         if collect_test_trades_fn is not None and base_arrays_test:

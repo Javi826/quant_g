@@ -26,7 +26,7 @@ WFO_WINDOW_CONFIG = {
     "4H":     {"train_months": 9, "test_months": 2},
     "6Hutc":  {"train_months": 9, "test_months": 2},
     "12Hutc": {"train_months": 9, "test_months": 2},
-    "1Dutc":  {"train_months": 12, "test_months": 4},
+    "1Dutc":  {"train_months": 9, "test_months": 2},
 }
 
 ANCHORED    = False

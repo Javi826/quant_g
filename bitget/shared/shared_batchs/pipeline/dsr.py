@@ -26,7 +26,8 @@ SHARPE_PERIODS_YEAR = 365.0
 DSR_N_JOBS          = -1                
 DSR_MIN_TRADES      = 100   
 DSR_MAX_SHARPE_ANN  = 10.0              
-M_TO_T_WARN_RATIO   = 2.0           
+M_TO_T_WARN_RATIO   = 2.0   
+        
 # =============================================================================
 # FULL-PERIOD GRID SEARCH — selection-bias metrics (single pass, no WFO windows)
 # =============================================================================
@@ -34,13 +35,16 @@ M_TO_T_WARN_RATIO   = 2.0
 def _combo_id(params: dict) -> str:
     return "_".join(f"{k}{v}" for k, v in sorted(params.items()))
 
-def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> pd.Series:
+def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> tuple | None:
 
     nonzero_idx = np.flatnonzero(daily_values)
     if nonzero_idx.size == 0:
-        return pd.Series(dtype=np.float64)
-    dates = start_day + nonzero_idx.astype("timedelta64[D]")
-    return pd.Series(daily_values[nonzero_idx], index=pd.DatetimeIndex(dates))
+        return None
+    return (
+        nonzero_idx.astype(np.int32),
+        daily_values[nonzero_idx].astype(np.float32),
+        start_day,
+    )
 
 def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, dtype) -> dict:
     ohlcv_arrays = {}
@@ -162,7 +166,7 @@ def _run_full_period_for_rule(
     combo_daily_profit = {
         _combo_id(params): daily_profit
         for _sharpe, params, _bundle, daily_profit in rows
-        if daily_profit is not None and len(daily_profit) > 1
+        if daily_profit is not None and daily_profit[0].size > 1
     }
     best_sharpe, best_params, best_bundle, _best_daily = max(rows, key=lambda x: x[0])
     best_combo_id = _combo_id(best_params)
@@ -251,31 +255,31 @@ def _iter_daily_profit_columns(all_raw_results: list):
         for combo_id, s in combo_profit.items():
             yield f"{r['rule_id']}__{combo_id}", s
 
+def _column_dates(column: tuple) -> np.ndarray:
+    """Rebuild the datetime64[D] index of a sparse column from its raw payload."""
+    day_offsets, _values, start_day = column
+    return start_day + day_offsets.astype("timedelta64[D]")
+
+
 def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
 
-    date_arrays = [s.index.to_numpy() for _col_name, s in _iter_daily_profit_columns(all_raw_results)]
+    date_arrays = [_column_dates(col) for _col_name, col in _iter_daily_profit_columns(all_raw_results)]
     if len(date_arrays) < 2:
         return None
     return np.unique(np.concatenate(date_arrays))
-
-def _eigenvalues_desc(square_array: np.ndarray) -> np.ndarray:
-    eigenvalues = np.linalg.eigvalsh(square_array)
-    eigenvalues = eigenvalues[np.isfinite(eigenvalues)]
-    eigenvalues = np.clip(eigenvalues, 0.0, None)
-    return np.sort(eigenvalues)[::-1]
-
-
-def _participation_ratio(eigenvalues: np.ndarray, n_const: int) -> float:
-    sum_eig    = eigenvalues.sum() + n_const
-    sum_eig_sq = np.sum(eigenvalues ** 2) + n_const
+def _participation_ratio_from_gram(gram: np.ndarray, n_const: int) -> float:
+    """Participation ratio without eigendecomposition: for a symmetric PSD matrix
+    sum(eigenvalues) == trace(G) and sum(eigenvalues**2) == squared Frobenius norm,
+    so the O(T^3) eigvalsh call is unnecessary."""
+    sum_eig    = float(np.einsum("ii->", gram)) + n_const
+    sum_eig_sq = float(np.einsum("ij,ij->", gram, gram)) + n_const
     if sum_eig_sq <= 0:
         return 1.0
     return float((sum_eig ** 2) / sum_eig_sq)
 
-
 BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
-def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
+def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
 
     t_days     = all_dates.shape[0]
     gram       = np.zeros((t_days, t_days), dtype=np.float64)
@@ -283,10 +287,10 @@ def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray
     n_valid    = 0
     batch_cols = []
 
-    for _col_name, s in _iter_daily_profit_columns(all_raw_results):
+    for _col_name, column in _iter_daily_profit_columns(all_raw_results):
         col = np.zeros(t_days, dtype=np.float64)
-        row_idx = np.searchsorted(all_dates, s.index.to_numpy())
-        col[row_idx] = s.to_numpy(dtype=np.float64)
+        row_idx = np.searchsorted(all_dates, _column_dates(column))
+        col[row_idx] = column[1].astype(np.float64)
 
         std = col.std(ddof=1)
         if std <= 0:
@@ -309,14 +313,13 @@ def _estimate_n_eff_eigen_streaming(all_raw_results: list, all_dates: np.ndarray
         return float(n_const) if n_const > 0 else 1.0
 
     gram /= (t_days - 1)
-    eigenvalues = _eigenvalues_desc(gram)
-    return _participation_ratio(eigenvalues, n_const)
+    return _participation_ratio_from_gram(gram, n_const)
 def estimate_n_eff_flat(all_raw_results: list) -> float | None:
 
     all_dates = _common_date_axis(all_raw_results)
     if all_dates is None:
         return None
-    return _estimate_n_eff_eigen_streaming(all_raw_results, all_dates)
+    return _estimate_n_eff_streaming(all_raw_results, all_dates)
 
 # =============================================================================
 # PRIVATE HELPERS — DSR formula (paper Eq. 1-2)

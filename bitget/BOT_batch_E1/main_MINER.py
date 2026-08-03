@@ -88,7 +88,8 @@ RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-N_SYMBOLS  = 15
+#TIMEFRAMES = ["15m","30m"]
+N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],

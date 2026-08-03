@@ -1,4 +1,5 @@
 #shared_batchs/pipeline/multiverse.py
+import os
 import time
 import logging
 import numpy as np
@@ -50,12 +51,6 @@ def _compute_log_features(df: pd.DataFrame, raw_columns: list) -> tuple:
     return df, df_raw
 
 
-def _make_overlapping_row_blocks(data_array: np.ndarray, block_size: int) -> np.ndarray:
-    """Returns array of shape (n_blocks, block_size, n_features) — sliding windows over rows."""
-    windows = np.lib.stride_tricks.sliding_window_view(data_array, block_size, axis=0)
-    return np.moveaxis(windows, -1, 1)
-
-
 def _block_bootstrap_sample(
     data_array: np.ndarray,
     n_rows: int,
@@ -67,13 +62,32 @@ def _block_bootstrap_sample(
         chosen_idx = rng.integers(0, n_rows, size=n_rows)
         return data_array[chosen_idx]
 
-    blocks   = _make_overlapping_row_blocks(data_array, block_size)
-    n_blocks = blocks.shape[0]
+    n_blocks = n_rows - block_size + 1
     n_blocks_needed = int(np.ceil(n_rows / block_size))
     chosen = rng.integers(0, n_blocks, size=n_blocks_needed)
-    return np.concatenate(blocks[chosen], axis=0)[:n_rows]
 
+    n_features = data_array.shape[1]
+    out = np.empty((n_blocks_needed * block_size, n_features), dtype=data_array.dtype)
+    for k, start in enumerate(chosen):
+        out[k * block_size:(k + 1) * block_size] = data_array[start:start + block_size]
+    return out[:n_rows]
 
+def _evaluate_universe_batch_chunk(
+    path_indices: list,
+    paths: dict,
+    ts_index: np.ndarray,
+    n_symbols_expected: int,
+    rules: list,
+    order_amount: int,
+    dtype,
+) -> list:
+    return [
+        _evaluate_universe_batch(
+            path_idx, paths, ts_index, n_symbols_expected,
+            rules, order_amount, dtype,
+        )
+        for path_idx in path_indices
+    ]
 def _generate_mcpt_paths(
     df_hist: pd.DataFrame,
     n_paths: int,
@@ -224,14 +238,12 @@ def _evaluate_universe_batch(
 
     return results
 
-
 # =============================================================================
 # APPROVAL CRITERION — Monte Carlo Permutation Test p-value
 # =============================================================================
 def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
     n_matching_or_beating = sum(1 for p in permuted_profits if p >= real_profit)
     return n_matching_or_beating / len(permuted_profits)
-
 
 # =============================================================================
 # CORE MULTIVERSE EVALUATION (one timeframe, every rule of that timeframe)
@@ -265,14 +277,19 @@ def _evaluate_multiverse_batch(
     n_symbols_expected = len(ohlcv_data)
 
     desc = f"MULTIVERSE {timeframe}".strip()
-    with tqdm_joblib(tqdm(desc=desc, total=n_paths, dynamic_ncols=True)):
-        per_path_results = Parallel(n_jobs=n_jobs)(
-            delayed(_evaluate_universe_batch)(
-                path_idx, paths, ts_index, n_symbols_expected,
+    n_workers  = n_jobs if n_jobs > 0 else (os.cpu_count() or 1)
+    n_chunks   = min(n_paths, n_workers)
+    path_chunks = [chunk for chunk in np.array_split(np.arange(n_paths), n_chunks) if len(chunk) > 0]
+
+    with tqdm_joblib(tqdm(desc=desc, total=len(path_chunks), dynamic_ncols=True)):
+        chunked_results = Parallel(n_jobs=n_jobs)(
+            delayed(_evaluate_universe_batch_chunk)(
+                chunk.tolist(), paths, ts_index, n_symbols_expected,
                 rules, order_amount, dtype,
             )
-            for path_idx in range(n_paths)
+            for chunk in path_chunks
         )
+    per_path_results = [res for chunk_res in chunked_results for res in chunk_res]
 
     p_value_by_id  = {}
     approved_by_id = {}
@@ -371,4 +388,3 @@ def pipe_multiverse(
     logger.info(f"MULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return results
-
