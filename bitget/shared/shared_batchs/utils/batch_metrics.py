@@ -49,10 +49,7 @@ def sharpe_from_daily_values(daily_values: np.ndarray) -> float:
 # SKEW / KURTOSIS
 # =============================================================================
 def skew_kurtosis_from_daily_values(daily_values: np.ndarray) -> tuple:
-    """Population skewness (Fisher-Pearson, bias=True) and non-excess kurtosis
-    (Pearson's definition, fisher=False) computed directly — equivalent to
-    scipy.stats.skew()/kurtosis(fisher=False) but without scipy's per-call
-    argument-validation overhead. Caller must guarantee variance > 0."""
+
     deviations = daily_values - daily_values.mean()
     m2 = np.mean(deviations ** 2)
     m3 = np.mean(deviations ** 3)

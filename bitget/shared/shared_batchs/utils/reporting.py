@@ -292,17 +292,36 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
             f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
         )
     logger.info(f"{'─' * 140}")
+    # ALL-SAFE: worst-case across the whole table -> every rule shown passes all conditions at once.
+    all_safe_net_gain = min(s["net_gain"][0]   for s in group_stats.values())
+    all_safe_max_dd   = max(abs(s["max_dd"][0]) for s in group_stats.values())
+    all_safe_r2       = min(s["r_squared"][0]  for s in group_stats.values())
+    all_safe_dsr      = min(s["dsr"][0]        for s in group_stats.values())
+    all_safe_wfr      = min(s["wfr"][0]        for s in group_stats.values())
+
+    # JOINT-SAFE: worst-case across each group's best (anchor) row -> guarantees >=1 survivor per group.
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
     safe_net_gain = min(a["net_gain"]  for a in anchors.values())
     safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
     safe_r2       = min(a["r_squared"] for a in anchors.values())
     safe_dsr      = min(a["dsr"] for a in anchors.values())
     safe_wfr      = min(a["wfr"] for a in anchors.values())
+
     logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
     for (tf, side), a in sorted(anchors.items()):
         logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
+
+    label_all_safe   = "ALL - SAFE THRESHOLDS (guaranteed ALL rows in the table)"
+    label_joint_safe = "ONE - SAFE THRESHOLDS (guaranteed ≥1 survivor per group)"
+    label_width      = max(len(label_all_safe), len(label_joint_safe))
+
     logger.info(
-        f"\n  JOINT-SAFE THRESHOLDS (guaranteed ≥1 survivor per group, all conditions at once) ── "
+        f"\n  {label_all_safe.ljust(label_width)} ── "
+        f"NET_GAIN>={all_safe_net_gain:.1f}  MAX_DD<={all_safe_max_dd:.1f}  R2>={all_safe_r2:.3f}  "
+        f"DSR>={all_safe_dsr:.3f}  WFR>={all_safe_wfr:.2f}"
+    )
+    logger.info(
+        f"  {label_joint_safe.ljust(label_width)} ── "
         f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
         f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
     )

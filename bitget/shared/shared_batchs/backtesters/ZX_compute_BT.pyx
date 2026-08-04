@@ -135,14 +135,14 @@ def prepare_static_arrays(ohlcv_arrays):
         ts_int = ts.view('int64').copy()  # own memory: bundle outlives the shm-backed input
         per_sym_ts[sym] = (ts_int, len(ts))
         ts_int_arrays[sym] = ts_int
-        close_arrays[sym]  = np.array(data['close'], dtype=np.float64, copy=True)
+        close_arrays[sym]  = np.array(data['close'], dtype=np.float32, copy=True)
         all_ts_int_lists.append(ts_int)
 
     max_len      = max(per_sym_ts[s][1] for s in symbols)
-    open_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    close_2d     = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    high_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float64)
-    low_2d       = np.full((n_syms, max_len), np.nan, dtype=np.float64)
+    open_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float32)
+    close_2d     = np.full((n_syms, max_len), np.nan, dtype=np.float32)
+    high_2d      = np.full((n_syms, max_len), np.nan, dtype=np.float32)
+    low_2d       = np.full((n_syms, max_len), np.nan, dtype=np.float32)
     high_time_2d = np.full((n_syms, max_len), 0,      dtype=np.int64)
     low_time_2d  = np.full((n_syms, max_len), 0,      dtype=np.int64)
     ts_int_2d    = np.full((n_syms, max_len), 0,      dtype=np.int64)
@@ -153,10 +153,10 @@ def prepare_static_arrays(ohlcv_arrays):
         data = ohlcv_arrays[sym]
         ts_int, n = per_sym_ts[sym]
         sym_len[sid]          = n
-        open_2d[sid, :n]      = data['open'].astype(np.float64)
-        close_2d[sid, :n]     = data['close'].astype(np.float64)
-        high_2d[sid, :n]      = data['high'].astype(np.float64)
-        low_2d[sid, :n]       = data['low'].astype(np.float64)
+        open_2d[sid, :n]      = data['open'].astype(np.float32)
+        close_2d[sid, :n]     = data['close'].astype(np.float32)
+        high_2d[sid, :n]      = data['high'].astype(np.float32)
+        low_2d[sid, :n]       = data['low'].astype(np.float32)
         high_time_2d[sid, :n] = data['high_time'].astype(np.int64)
         low_time_2d[sid, :n]  = data['low_time'].astype(np.int64)
         ts_int_2d[sid, :n]    = ts_int.astype(np.int64)
@@ -264,8 +264,8 @@ def prepare_backtest_data(ohlcv_arrays):
     return prepare_data(ohlcv_arrays)
 
 cdef inline void _detect_intrabar_exit_cy(
-    double* high_row,
-    double* low_row,
+    float* high_row,
+    float* low_row,
     long*   high_time_row,
     long*   low_time_row,
     int buy_idx, int sell_idx,
@@ -329,10 +329,10 @@ cdef inline void _detect_intrabar_exit_cy(
 # backtest_core  (typed Cython hot loop)
 # ============================================================
 def backtest_core(
-    np.ndarray[double, ndim=2] open_2d,
-    np.ndarray[double, ndim=2] close_2d,
-    np.ndarray[double, ndim=2] high_2d,
-    np.ndarray[double, ndim=2] low_2d,
+    np.ndarray[float, ndim=2] open_2d,
+    np.ndarray[float, ndim=2] close_2d,
+    np.ndarray[float, ndim=2] high_2d,
+    np.ndarray[float, ndim=2] low_2d,
     np.ndarray[long,   ndim=2] high_time_2d,
     np.ndarray[long,   ndim=2] low_time_2d,
     np.ndarray[long,   ndim=2] ts_int_2d,
@@ -438,10 +438,10 @@ def backtest_core(
     cdef long   counter = 0
 
     # ── Typed memoryviews for 2D arrays ──
-    cdef double[:, ::1] open_mv      = open_2d
-    cdef double[:, ::1] close_mv     = close_2d
-    cdef double[:, ::1] high_mv      = high_2d
-    cdef double[:, ::1] low_mv       = low_2d
+    cdef float[:, ::1] open_mv      = open_2d
+    cdef float[:, ::1] close_mv     = close_2d
+    cdef float[:, ::1] high_mv      = high_2d
+    cdef float[:, ::1] low_mv       = low_2d
     cdef long[:, ::1]   high_time_mv = high_time_2d
     cdef long[:, ::1]   low_time_mv  = low_time_2d
     cdef long[:, ::1]   ts_int_mv    = ts_int_2d

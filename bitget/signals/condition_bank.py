@@ -6,26 +6,24 @@ from scipy import signal as sp_signal
 # =============================================================================
 # CONFIG
 # =============================================================================
-
-#------------------------------------------------------------------------------
 # =============================================================================
-# RSI_PERIODS                = [14]
-# RSI_THRESHOLDS             = [30,70]
-#  
-# ADX_PERIODS                = [14]
-# ADX_THRESHOLDS             = [20]
-#  
-# MA_PERIODS                 = [100]
-# MOMENTUM_PERIODS           = [20]
-# HISTVOL_BASE_PERIODS       = [10]
-# HISTVOL_REGIME_SMA_PERIODS = [20]
-#  
-# ATR_BASE_PERIODS           = [14]
+# RSI_PERIODS                = [14]  
+# RSI_THRESHOLDS             = [30]  
+# 
+# ADX_PERIODS                = [7] 
+# ADX_THRESHOLDS             = [20]   
+# 
+# MA_PERIODS                 = [20,50,100]
+# 
+# MOMENTUM_PERIODS           = [5]     
+# 
+# HISTVOL_BASE_PERIODS       = [10,20,30]     
+# HISTVOL_REGIME_SMA_PERIODS = [20]     
+# 
+# ATR_BASE_PERIODS           = [7,14,21]        
 # ATR_REGIME_SMA_PERIODS     = [10]
 # =============================================================================
- 
 #------------------------------------------------------------------------------
-
 RSI_PERIODS                = [7,14,21]  
 RSI_THRESHOLDS             = [30,50,70]  
 
@@ -36,11 +34,30 @@ MA_PERIODS                 = [20,50,100]
 
 MOMENTUM_PERIODS           = [5,10,20]     
 
-HISTVOL_BASE_PERIODS       = [10,30]     
-HISTVOL_REGIME_SMA_PERIODS = [20,50]     
+HISTVOL_BASE_PERIODS       = [10,20,30]     
+HISTVOL_REGIME_SMA_PERIODS = [20,30,50]     
 
 ATR_BASE_PERIODS           = [7,14,21]        
-ATR_REGIME_SMA_PERIODS     = [10,50]     
+ATR_REGIME_SMA_PERIODS     = [10,30,50]
+#------------------------------------------------------------------------------
+
+# =============================================================================
+# RSI_PERIODS                = [7,14,21]  
+# RSI_THRESHOLDS             = [30,50,70]  
+# 
+# ADX_PERIODS                = [7,14,21] 
+# ADX_THRESHOLDS             = [20,25,30]   
+# 
+# MA_PERIODS                 = [20,50,100]
+# 
+# MOMENTUM_PERIODS           = [5,10,20]     
+# 
+# HISTVOL_BASE_PERIODS       = [10,30]     
+# HISTVOL_REGIME_SMA_PERIODS = [20,50]     
+# 
+# ATR_BASE_PERIODS           = [7,14,21]        
+# ATR_REGIME_SMA_PERIODS     = [10,50]     
+# =============================================================================
 
 def _sma(close: np.ndarray, window: int) -> np.ndarray:
     n   = len(close)

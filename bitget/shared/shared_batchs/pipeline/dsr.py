@@ -1,5 +1,4 @@
 #shared_batchs/pipeline/dsr.py
-import os
 import time
 import itertools
 import logging
@@ -274,9 +273,7 @@ def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
         return None
     return np.unique(np.concatenate(date_arrays))
 def _participation_ratio_from_gram(gram: np.ndarray, n_const: int) -> float:
-    """Participation ratio without eigendecomposition: for a symmetric PSD matrix
-    sum(eigenvalues) == trace(G) and sum(eigenvalues**2) == squared Frobenius norm,
-    so the O(T^3) eigvalsh call is unnecessary."""
+
     sum_eig    = float(np.einsum("ii->", gram)) + n_const
     sum_eig_sq = float(np.einsum("ij,ij->", gram, gram)) + n_const
     if sum_eig_sq <= 0:
@@ -294,9 +291,9 @@ def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batc
     batch_cols = []
 
     for _col_name, column in _iter_daily_profit_columns(all_raw_results):
-        col = np.zeros(t_days, dtype=np.float64)
+        col = np.zeros(t_days, dtype=np.float32)
         row_idx = np.searchsorted(all_dates, _column_dates(column))
-        col[row_idx] = column[1].astype(np.float64)
+        col[row_idx] = column[1].astype(np.float32)
 
         std = col.std(ddof=1)
         if std <= 0:
