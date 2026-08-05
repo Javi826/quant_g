@@ -60,16 +60,35 @@ def run_wfo_deploy_ema(
     param_ranges      = dict(zip(param_names, lists_for_grid))
     dict_combinations = [dict(zip(param_names, comb)) for comb in itertools.product(*lists_for_grid)]
 
-    def _evaluate(params, base_arrays):
-        arrays  = build_ohlcv_with_signal(base_arrays, signal_fn, [], params, dtype)
-        results = run_grid_backtest(
+    # Symmetric to EDGE_BUFFER_BARS in wfo_WF.py: drops trades opened too close
+    # to the window end to resolve naturally via SELL_AFTER (truncation bias),
+    # since these train windows carry no real cooldown data past train_end.
+    EDGE_BUFFER_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
+
+    def _evaluate(params, base_arrays, train_start_ts, train_edge_ts):
+        arrays      = build_ohlcv_with_signal(base_arrays, signal_fn, [], params, dtype)
+        results     = run_grid_backtest(
             arrays,
             sell_after   = params["SELL_AFTER"],
             tp_pct       = params["TP_PCT"],
             sl_pct       = params["SL_PCT"],
             order_amount = order_amount,
         )
-        return compute_metric(results), params
+        trade_log   = results["__PORTFOLIO__"]["trade_log"]
+        n_before    = len(trade_log)
+        if not trade_log.empty:
+            # Only SELL_AFTER exits opened inside the buffer risk truncation
+            # (dataset ran out before their natural exit); TP/SL exits are
+            # always resolved against real price and never truncated.
+            truncated_mask = (
+                (trade_log["exit_reason"] == "SELL_AFTER") &
+                (trade_log["buy_time"] >= pd.Timestamp(train_start_ts)) &
+                (trade_log["buy_time"] > pd.Timestamp(train_edge_ts))
+            )
+            trade_log = trade_log[~truncated_mask]
+            results   = {"__PORTFOLIO__": {"trade_log": trade_log}}
+        n_after = len(trade_log)
+        return compute_metric(results), params, n_before, n_after
 
     windows = _backward_frompresent_window_bounds(max_length, length_train_set, length_test)
     if not windows:
@@ -84,6 +103,7 @@ def run_wfo_deploy_ema(
     for train_start_idx, train_end_idx in reversed(windows):
         train_start_ts = ref_ts[train_start_idx]
         train_end_ts   = ref_ts[train_end_idx]
+        train_edge_ts  = ref_ts[max(train_start_idx, train_end_idx - EDGE_BUFFER_BARS)]
 
         candidate_indices = {}
         for sym, arr_dict in ohlcv_arr.items():
@@ -115,8 +135,10 @@ def run_wfo_deploy_ema(
                 "high_time": arr_dict["high_time"][warm_start:t1],
             }
 
-        results = Parallel(n_jobs=n_jobs)(delayed(_evaluate)(p, base_arrays) for p in dict_combinations)
-        _, raw_best_params = max(results, key=lambda x: x[0])
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(_evaluate)(p, base_arrays, train_start_ts, train_edge_ts) for p in dict_combinations
+        )
+        _, raw_best_params, best_n_before, best_n_after = max(results, key=lambda x: x[0])
 
         ema_raw = update_ema_state(ema_raw, raw_best_params, alpha=EMA_ALPHA)
 
@@ -126,6 +148,7 @@ def run_wfo_deploy_ema(
         logger.debug(
             f"DEPLOY EMA ── window [{pd.Timestamp(train_start_ts).date()} .. {pd.Timestamp(train_end_ts).date()}] "
             f"| symbols={len(deploy_symbols)} "
+            f"| trades={best_n_before}->{best_n_after} "
             f"| raw_best={raw_best_params} "
             f"| ema_state={round_params_dict(ema_raw, param_ranges)}"
         )

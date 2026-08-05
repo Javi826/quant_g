@@ -70,7 +70,8 @@ from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
-
+from shared_batchs.pipeline.reality_check import print_comparison_table
+from shared_batchs.pipeline.n_eff_calibration import calibrate_n_eff
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -83,12 +84,12 @@ INNER_N_JOBS = 1
 # =============================================================================
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
-RUN_PORTFOLIO = True
+RUN_PORTFOLIO = False
 RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES = ["15m","30m"]
+#TIMEFRAMES = ["1H","12Hutc"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
@@ -104,17 +105,21 @@ PARAM_GRID = {
 PIPELINE_DSR         = True
 DSR_TH               = 0.80
 
+PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
 WFO_R2_TH            = 0.8
 WFO_WFR_TH           = 0.6
 
 PIPELINE_CORRELATION = True
-CORRELATION_DD_TH    = 0.40
+CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True
 MULTIVERSE_PVALUE_TH = 0.05
+
+PIPELINE_N_EFF_CALIBRATION = False   # off by default — expensive (n_null_paths x full DSR search)
+N_EFF_N_NULL_PATHS         = 100
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -178,7 +183,7 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
     # -------------------------------------------------------------------
-    validated_wfo_test = run_rule_mining_pipeline(
+    validated_wfo_test, all_dsr_results = run_rule_mining_pipeline(
         ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
         ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
         timeframes              = TIMEFRAMES,
@@ -192,6 +197,7 @@ if __name__ == "__main__":
         dsr_th                  = DSR_TH,
         data_folder             = DATA_FOLDER_IS,
         run_dsr                 = PIPELINE_DSR,
+        pipeline_wfo            = PIPELINE_WFO,
         rules_n_jobs            = RULES_N_JOBS,
         inner_n_jobs            = INNER_N_JOBS,
         n_symbols               = N_SYMBOLS,
@@ -214,6 +220,24 @@ if __name__ == "__main__":
         deploy_output_path      = DEPLOY_OUTPUT_PATH,
         run_config = run_config,
     )
+# =============================================================================
+#     print_comparison_table(
+#         all_raw_results = all_dsr_results,
+#         dsr_th          = DSR_TH,
+#     )
+# =============================================================================
+    
+# =============================================================================
+#     calibrate_n_eff(
+#     ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
+#     timeframes              = TIMEFRAMES,
+#     param_grid              = PARAM_GRID,
+#     order_amount            = ORDER_AMOUNT,
+#     dtype                   = DTYPE,
+#     n_null_paths            = N_EFF_N_NULL_PATHS,
+#     enabled                 = PIPELINE_N_EFF_CALIBRATION,
+#     )
+# =============================================================================
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

@@ -336,14 +336,17 @@ def _dsr_train_period_str(r: dict) -> str:
     best_combo_id       = r.get("best_combo_id")
     if best_combo_id is None or best_combo_id not in combo_daily_profit:
         return "n/a"
-
     daily_profit = combo_daily_profit[best_combo_id]
-    if daily_profit is None or daily_profit.empty:
+    if daily_profit is None:
         return "n/a"
-
-    start = daily_profit.index.min()
-    end   = daily_profit.index.max()
-    return f"{start:%Y-%m-%d}..{end:%Y-%m-%d}"
+    day_offsets, _values, start_day = daily_profit
+    if day_offsets.size == 0:
+        return "n/a"
+    start = start_day + day_offsets.min().astype("timedelta64[D]")
+    end   = start_day + day_offsets.max().astype("timedelta64[D]")
+    start_dt = start.astype("datetime64[D]").astype(object)
+    end_dt   = end.astype("datetime64[D]").astype(object)
+    return f"{start_dt:%Y-%m-%d}..{end_dt:%Y-%m-%d}"
 
 def print_dsr_train_metrics(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, candidate_ids: set, passed_ids: set, sr0: float) -> None:
 

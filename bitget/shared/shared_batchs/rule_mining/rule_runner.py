@@ -86,6 +86,7 @@ def run_rule_mining_pipeline(
     dsr_th: float,
     data_folder: str,
     run_dsr: bool = True,
+    pipeline_wfo: bool = True,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
     show_progress: bool = False,
@@ -148,7 +149,7 @@ def run_rule_mining_pipeline(
             r2_th               = r2_th,
             wfr_th              = wfr_th,
             dtype               = dtype,
-            enabled             = True,
+            enabled             = pipeline_wfo,
             rules_n_jobs        = rules_n_jobs,
             inner_n_jobs        = inner_n_jobs,
             show_progress       = show_progress,
@@ -324,7 +325,7 @@ def run_rule_mining_pipeline(
                 run_config  = run_config,
             )
 
-    return validated_after_multiverse
+    return validated_after_multiverse, all_dsr_results
 
 def _build_top_output_path(base_path: str, top_idx: int) -> str:
     """Insert a _topN suffix before the file extension, e.g. rules_batch.py -> rules_batch_top1.py."""

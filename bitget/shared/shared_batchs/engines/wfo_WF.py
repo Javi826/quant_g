@@ -308,12 +308,20 @@ def walk_forward_optimization(
         if collect_train_trades_fn is not None and base_arrays:
             df_train = collect_train_trades_fn(effective_params, base_arrays)
             if df_train is not None and not df_train.empty:
-                # Lower bound drops warmup trades; upper bound drops trades opened
-                # too close to train_end to resolve naturally (truncation bias).
-                df_train = df_train[
+                n_before = len(df_train)
+                # Lower bound drops warmup trades. Upper bound only drops SELL_AFTER
+                # exits opened too close to train_end to resolve naturally (truncation
+                # bias) — TP/SL exits are always resolved against real price and safe
+                # to keep regardless of when they opened.
+                truncated_mask = (
+                    (df_train["exit_reason"] == "SELL_AFTER") &
                     (df_train["buy_time"] >= pd.Timestamp(train_start_ts)) &
-                    (df_train["buy_time"] <= pd.Timestamp(train_edge_ts))
-                ].copy()
+                    (df_train["buy_time"] > pd.Timestamp(train_edge_ts))
+                )
+                below_warmup_mask = df_train["buy_time"] < pd.Timestamp(train_start_ts)
+                df_train = df_train[~truncated_mask & ~below_warmup_mask].copy()
+                n_after = len(df_train)
+                #logger.debug(f"WFO window {window_idx} ── train trades={n_before}->{n_after}")
 
         df_test = None
         if collect_test_trades_fn is not None and base_arrays_test:

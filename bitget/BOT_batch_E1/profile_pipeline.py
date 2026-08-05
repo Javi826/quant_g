@@ -1,138 +1,220 @@
-import os
+#validate_stepm.py
+"""
+Ground-truth validation of the StepM (Romano & Wolf, 2005) implementation in
+reality_check.py. This does NOT touch real trading data — it plants a known
+ground truth and checks whether the real production code recovers it.
+
+TEST A — Realized FWER on all-null cohorts.
+    Simulate cohorts of pure noise (no real edge in ANY column). Run the real
+    StepM implementation on each cohort and record whether it approves at
+    least one column. Over many independent cohorts, that approval rate
+    should sit close to STEPM_ALPHA if StepM is correctly controlling the
+    family-wise error rate. This is the same logic as Cohort A / the FWER
+    reading in Inglese (2026), Sec. 3.3, Eq. 6.
+
+TEST B — Power on a cohort with one planted real edge.
+    Same setup, but one column gets a real, known drift added on top of the
+    noise. Measures how often StepM approves THAT specific column.
+
+TEST C — First-round consistency check.
+    Step 1 of the stepdown (before any column is removed from the active
+    set) is mathematically defined to reduce to the standalone global
+    p-value (White, 2000). This checks that the two functions agree on the
+    same data, as a sanity check that the stepdown loop was implemented
+    correctly on top of the global test.
+
+All three tests call the REAL functions from reality_check.py directly, so
+this validates the production code, not a reimplementation of it.
+
+Adjust REALITY_CHECK_MODULE_PATH below to point at the folder containing
+reality_check.py in your repo before running.
+"""
 import sys
-import hashlib
-import logging
-from collections import defaultdict
-
+import contextlib
+import io
 import numpy as np
-from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
-from joblib import Parallel, delayed
+import pandas as pd
 
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
+REALITY_CHECK_MODULE_PATH = "/home/javi/projects/quant/quant_b/bitget/shared/shared_batchs/pipeline"
+sys.path.append(REALITY_CHECK_MODULE_PATH)
 
-logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
-logger = logging.getLogger("analyze_rule_duplicates")
-
-from shared_batchs.symbols.universe import filter_symbols, select_universe
-from shared_batchs.setup.config_paths import DATA_FOLDER_IS
-from shared_batchs.setup.config_backtest import MIN_PRICE
-from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
-from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
-from shared_config import VOLUME_COL
+from reality_check import (
+    _compute_deviation_matrix,
+    _compute_global_pvalue,
+    _stepwise_reality_check_pvalues,
+    SHARPE_PERIODS_YEAR,
+    STEPM_ALPHA,
+    WHITE_N_BOOTSTRAP,
+    WHITE_BLOCK_SIZE,
+)
 
 # =============================================================================
-# CONFIG
+# SIMULATION CONFIG
 # =============================================================================
-TIMEFRAME   = "1H"
-N_SYMBOLS   = 10
-HASH_N_JOBS = -1
-CHUNK_SIZE  = 200  # rules per joblib task — amortizes cloudpickle/process overhead
+N_COHORTS       = 100    # independent cohorts per test — raise for a tighter CI
+N_COLUMNS       = 50     # M, number of candidate columns per cohort
+N_OBS           = 1000   # T, days per cohort
+PLANTED_SHARPE  = 2.0    # annualized Sharpe of the single true edge in Test B
+BASE_SEED       = 12345
+
+
+def _make_null_cohort(n_obs: int, n_cols: int, rng: np.random.Generator) -> pd.DataFrame:
+    """All-null cohort: every column is pure unit-variance noise, no edge anywhere."""
+    returns = rng.standard_normal(size=(n_obs, n_cols))
+    dates   = pd.bdate_range("2015-01-01", periods=n_obs)
+    columns = [f"null_col_{i}" for i in range(n_cols)]
+    return pd.DataFrame(returns, index=dates, columns=columns)
+
+
+def _make_edge_cohort(
+    n_obs: int, n_cols: int, planted_sharpe: float, rng: np.random.Generator
+) -> tuple:
+    """One column carries a real, known drift; the rest are pure noise.
+
+    The per-period drift is derived directly from the target ANNUALIZED
+    Sharpe so this can be read in the same units as dsr.py / reality_check.py.
+    """
+    returns = rng.standard_normal(size=(n_obs, n_cols))
+    daily_mu = planted_sharpe / np.sqrt(SHARPE_PERIODS_YEAR)
+    edge_col_idx = rng.integers(0, n_cols)
+    returns[:, edge_col_idx] += daily_mu
+
+    dates   = pd.bdate_range("2015-01-01", periods=n_obs)
+    columns = [f"null_col_{i}" for i in range(n_cols)]
+    columns[edge_col_idx] = "TRUE_EDGE_col"
+    matrix = pd.DataFrame(returns, index=dates, columns=columns)
+    return matrix, "TRUE_EDGE_col"
+
+
+def _run_stepm_on_matrix(matrix: pd.DataFrame, seed: int) -> dict:
+    """One full pass through the real production code: bootstrap deviations,
+    studentization, global p-value, and StepM p-values.
+
+    Progress bars are silenced here: reality_check.py prints one tqdm bar per
+    call, which is fine for a single production run but floods the output
+    across hundreds of small validation cohorts.
+    """
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        bootstrap_result = _compute_deviation_matrix(
+            matrix,
+            n_bootstrap=WHITE_N_BOOTSTRAP,
+            block_size=WHITE_BLOCK_SIZE,
+            seed=seed,
+            progress_label="[validation]",
+        )
+    kept_columns            = bootstrap_result["kept_columns"]
+    studentized_deviations  = bootstrap_result["studentized_deviations"]
+    z_stat                  = bootstrap_result["z_stat"]
+
+    global_result = _compute_global_pvalue(studentized_deviations, z_stat)
+    stepm_pvals   = _stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=STEPM_ALPHA)
+
+    return {
+        "kept_columns":   kept_columns,
+        "global_p":       global_result["global_p"],
+        "best_col_idx":   global_result["best_col_idx"],
+        "stepm_p_by_col": dict(zip(kept_columns, stepm_pvals)),
+    }
+
 
 # =============================================================================
-# SIGNAL HASHING
+# TEST A — realized FWER under the null
 # =============================================================================
-def _signal_hash(signal_fn, ohlcv_arr: dict) -> bytes:
-    hasher = hashlib.blake2b(digest_size=16)
-    for sym in sorted(ohlcv_arr.keys()):
-        arr = ohlcv_arr[sym]
-        signal = np.asarray(signal_fn(arr, live_trading=False))
-        hasher.update(sym.encode("utf-8"))
-        hasher.update(signal.astype(np.int8).tobytes())
-    return hasher.digest()
+def run_test_a() -> None:
+    print("=" * 70)
+    print("TEST A — Realized FWER on all-null cohorts")
+    print(f"  M={N_COLUMNS} columns, T={N_OBS} days, {N_COHORTS} cohorts, "
+          f"nominal alpha={STEPM_ALPHA}")
+    print("=" * 70)
+
+    n_false_positive_cohorts = 0
+
+    for cohort_idx in range(N_COHORTS):
+        rng    = np.random.default_rng(BASE_SEED + cohort_idx)
+        matrix = _make_null_cohort(N_OBS, N_COLUMNS, rng)
+        result = _run_stepm_on_matrix(matrix, seed=BASE_SEED + cohort_idx)
+
+        any_approved = any(p <= STEPM_ALPHA for p in result["stepm_p_by_col"].values())
+        n_false_positive_cohorts += int(any_approved)
+
+    fwer_hat = n_false_positive_cohorts / N_COHORTS
+    se       = np.sqrt(fwer_hat * (1 - fwer_hat) / N_COHORTS)
+
+    print(f"  Realized FWER      : {fwer_hat:.4f}  (SE ≈ {se:.4f})")
+    print(f"  Nominal alpha       : {STEPM_ALPHA:.4f}")
+    print(f"  Within 2 SE of nominal? {'YES — consistent with correct FWER control' if abs(fwer_hat - STEPM_ALPHA) <= 2 * se else 'NO — investigate'}")
+    print()
 
 
-def _hash_rule_chunk(rule_chunk: list, shm_metadata: dict) -> list:
-    """Runs in a worker: reattach to shared ohlcv_arr, hash each rule's signal
-    in the chunk, return (label, hash) pairs. Avoids pickling ohlcv_arr per task."""
-    ohlcv_arr, shm_handles = arrays_from_shared_memory(shm_metadata)
-    try:
-        return [(label, _signal_hash(signal_fn, ohlcv_arr)) for label, signal_fn in rule_chunk]
-    finally:
-        for shm in shm_handles:
-            shm.close()
+# =============================================================================
+# TEST B — power on a cohort with one planted real edge
+# =============================================================================
+def run_test_b() -> None:
+    print("=" * 70)
+    print("TEST B — Power on a cohort with one planted real edge")
+    print(f"  M={N_COLUMNS} columns, T={N_OBS} days, {N_COHORTS} cohorts, "
+          f"planted annualized Sharpe={PLANTED_SHARPE}")
+    print("=" * 70)
+
+    n_detected = 0
+
+    for cohort_idx in range(N_COHORTS):
+        rng = np.random.default_rng(BASE_SEED + 100_000 + cohort_idx)
+        matrix, edge_col_name = _make_edge_cohort(N_OBS, N_COLUMNS, PLANTED_SHARPE, rng)
+        result = _run_stepm_on_matrix(matrix, seed=BASE_SEED + 100_000 + cohort_idx)
+
+        edge_p = result["stepm_p_by_col"].get(edge_col_name, float("nan"))
+        detected = np.isfinite(edge_p) and edge_p <= STEPM_ALPHA
+        n_detected += int(detected)
+
+    power_hat = n_detected / N_COHORTS
+    se        = np.sqrt(power_hat * (1 - power_hat) / N_COHORTS)
+
+    print(f"  Realized power      : {power_hat:.4f}  (SE ≈ {se:.4f})")
+    print(f"  (Power near 0 would mean StepM never detects even a real edge — "
+          f"investigate. Power near 1 is expected for a strong planted edge.)")
+    print()
 
 
-def _chunked(items: list, size: int):
-    for i in range(0, len(items), size):
-        yield items[i:i + size]
+# =============================================================================
+# TEST C — first-round consistency: StepM round 1 must reduce to the global test
+# =============================================================================
+def run_test_c() -> None:
+    print("=" * 70)
+    print("TEST C — First-round consistency (StepM round 1 == global p-value)")
+    print("=" * 70)
 
+    n_checked  = 0
+    n_consistent = 0
 
-def main() -> None:
-    ohlcv_is = select_universe(
-        data_folder_is    = DATA_FOLDER_IS,
-        timeframe         = TIMEFRAME,
-        min_price         = MIN_PRICE,
-        filter_symbols_fn = filter_symbols,
-    )
-    ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
+    for cohort_idx in range(N_COHORTS):
+        rng = np.random.default_rng(BASE_SEED + 200_000 + cohort_idx)
+        matrix, edge_col_name = _make_edge_cohort(N_OBS, N_COLUMNS, PLANTED_SHARPE, rng)
+        result = _run_stepm_on_matrix(matrix, seed=BASE_SEED + 200_000 + cohort_idx)
 
-    arr_sample = next(iter(ohlcv_arr.values()))
-    all_rules  = generate_all_rules({
-        "open":  arr_sample["open"],
-        "high":  arr_sample["high"],
-        "low":   arr_sample["low"],
-        "close": arr_sample["close"],
-        VOLUME_COL: arr_sample[VOLUME_COL],
-    }, max_depth=MAX_DEPTH)
+        # Only meaningful when the best column is significant enough to be
+        # rejected in round 1 (global_p <= alpha) — otherwise it may only get
+        # rejected in a later round with a smaller active set, and the two
+        # numbers are not expected to match. See docstring for the reasoning.
+        if result["global_p"] > STEPM_ALPHA:
+            continue
 
-    logger.info(f"Total candidate rules: {len(all_rules)}")
+        n_checked += 1
+        best_col_name  = str(result["kept_columns"][result["best_col_idx"]])
+        stepm_p_best   = result["stepm_p_by_col"].get(best_col_name, float("nan"))
+        matches        = np.isclose(stepm_p_best, result["global_p"], atol=1e-12)
+        n_consistent  += int(matches)
 
-    rule_pairs = [(rule["label"], rule["signal_fn"]) for rule in all_rules]
-    chunks     = list(_chunked(rule_pairs, CHUNK_SIZE))
-
-    shm_list, shm_metadata = arrays_to_shared_memory(ohlcv_arr)
-    try:
-        with tqdm_joblib(tqdm(desc="Hashing rule signals", total=len(chunks), dynamic_ncols=True)):
-            chunk_results = Parallel(n_jobs=HASH_N_JOBS, batch_size=1, pre_dispatch="all")(
-                delayed(_hash_rule_chunk)(chunk, shm_metadata) for chunk in chunks
-            )
-    finally:
-        for shm in shm_list:
-            shm.close()
-            shm.unlink()
-
-    groups = defaultdict(list)
-    for chunk_result in chunk_results:
-        for label, h in chunk_result:
-            groups[h].append(label)
-
-    n_rules  = len(all_rules)
-    n_groups = len(groups)
-    group_sizes = sorted((len(v) for v in groups.values()), reverse=True)
-
-    size_hist = defaultdict(int)
-    for size in group_sizes:
-        if size == 1:
-            size_hist["1 (unique)"] += 1
-        elif size <= 5:
-            size_hist["2-5"] += 1
-        elif size <= 10:
-            size_hist["6-10"] += 1
-        else:
-            size_hist["11+"] += 1
-
-    logger.info("─" * 70)
-    logger.info(f"TIMEFRAME            : {TIMEFRAME}")
-    logger.info(f"Total rules          : {n_rules}")
-    logger.info(f"Unique signal groups : {n_groups}")
-    logger.info(f"Duplication ratio    : {n_rules / n_groups:.2f}x")
-    logger.info(f"Redundant rules      : {n_rules - n_groups} ({(n_rules - n_groups) / n_rules * 100:.1f}%)")
-    logger.info("Group size distribution:")
-    for label, count in size_hist.items():
-        logger.info(f"  groups with size {label:12s}: {count}")
-    logger.info("─" * 70)
-
-    logger.info("Top 10 largest duplicate groups (sample labels):")
-    largest = sorted(groups.values(), key=len, reverse=True)[:10]
-    for grp in largest:
-        if len(grp) > 1:
-            logger.info(f"  size={len(grp):4d} — e.g. {grp[0]}")
+    print(f"  Cohorts where the best column was significant enough to check : {n_checked}/{N_COHORTS}")
+    if n_checked > 0:
+        print(f"  Consistent with global p-value                               : {n_consistent}/{n_checked}")
+        print(f"  {'PASS' if n_consistent == n_checked else 'FAIL — investigate the stepdown loop'}")
+    else:
+        print("  No cohort had a strong enough edge to check — raise PLANTED_SHARPE and rerun.")
+    print()
 
 
 if __name__ == "__main__":
-    main()
+    run_test_a()
+    run_test_b()
+    run_test_c()
