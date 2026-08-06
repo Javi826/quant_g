@@ -16,7 +16,7 @@ LOG_LEVEL = logging.INFO
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 logger.setLevel(LOG_LEVEL)
-#UNIVERSE0
+#UNIVERSE
 #------------------------------------------------------------------------------
 UNIVERSE_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.universe").setLevel(UNIVERSE_LOG_LEVEL)
@@ -26,6 +26,10 @@ RULE_RUNNER_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
 RULE_GENERATOR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG_LEVEL)
+#BACKTEST
+#------------------------------------------------------------------------------
+BACKTEST_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(BACKTEST_LOG_LEVEL)
 #DSR
 #------------------------------------------------------------------------------
 DSR_LOG_LEVEL = logging.INFO
@@ -70,8 +74,6 @@ from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
-from shared_batchs.pipeline.reality_check import print_comparison_table
-from shared_batchs.pipeline.n_eff_calibration import calibrate_n_eff
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -84,12 +86,12 @@ INNER_N_JOBS = 1
 # =============================================================================
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
-RUN_PORTFOLIO = False
+RUN_PORTFOLIO = True
 RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES = ["1H","12Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
@@ -103,7 +105,7 @@ PARAM_GRID = {
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.80
+DSR_TH               = 0.8
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
@@ -117,9 +119,6 @@ PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True
 MULTIVERSE_PVALUE_TH = 0.05
-
-PIPELINE_N_EFF_CALIBRATION = False   # off by default — expensive (n_null_paths x full DSR search)
-N_EFF_N_NULL_PATHS         = 100
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
@@ -182,7 +181,7 @@ if __name__ == "__main__":
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
-    # -------------------------------------------------------------------
+    # -------------------------------------------------------------------    
     validated_wfo_test, all_dsr_results = run_rule_mining_pipeline(
         ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
         ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
@@ -220,24 +219,6 @@ if __name__ == "__main__":
         deploy_output_path      = DEPLOY_OUTPUT_PATH,
         run_config = run_config,
     )
-# =============================================================================
-#     print_comparison_table(
-#         all_raw_results = all_dsr_results,
-#         dsr_th          = DSR_TH,
-#     )
-# =============================================================================
-    
-# =============================================================================
-#     calibrate_n_eff(
-#     ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
-#     timeframes              = TIMEFRAMES,
-#     param_grid              = PARAM_GRID,
-#     order_amount            = ORDER_AMOUNT,
-#     dtype                   = DTYPE,
-#     n_null_paths            = N_EFF_N_NULL_PATHS,
-#     enabled                 = PIPELINE_N_EFF_CALIBRATION,
-#     )
-# =============================================================================
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

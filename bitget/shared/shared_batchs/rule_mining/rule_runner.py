@@ -3,6 +3,7 @@ import os
 import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
+from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
@@ -12,7 +13,7 @@ from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
 from shared_batchs.utils.reporting import print_rule_mining_ranking, print_rule_mining_min_by_group
-
+from shared_batchs.pipeline.dsr import pipe_dsr, empty_dsr_fields
 logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
 _OP_SLUG = {">": "gt", "<": "lt"}
@@ -109,28 +110,39 @@ def run_rule_mining_pipeline(
     run_config: dict = None,
 ) -> list:
     # -------------------------------------------------------------------
-    # DSR, one timeframe at a time, ALL timeframes before moving on.
+    # BACKTESTING — one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_dsr_results = []
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
         logger.info(f"RULE MINING ── {timeframe} ── total candidate rules: {len(rules)}")
 
-        dsr_results = pipe_dsr(
+        raw_results, n_combos = pipe_backtesting(
             rules        = rules,
             ohlcv_arr    = ohlcv_arr_by_timeframe[timeframe],
             param_grid   = param_grid,
             order_amount = order_amount,
             dtype        = dtype,
-            dsr_th       = dsr_th,
-            enabled      = run_dsr,
             timeframe    = timeframe,
         )
+
+        if run_dsr:
+            dsr_results = pipe_dsr(
+                raw_results = raw_results,
+                dsr_th      = dsr_th,
+                n_combos    = n_combos,
+                timeframe   = timeframe,
+            )
+        else:
+            logger.info(f"DSR ── {timeframe} ── disabled — passing all rules through untouched")
+            dsr_results = [{**r, **empty_dsr_fields()} for r in raw_results]
+
+        del raw_results  # libera el universo bruto de este timeframe antes de pasar al siguiente
+
         all_dsr_results.extend([{**r, **_empty_wfo_fields()} for r in dsr_results])
 
     passed_dsr_ids = {r["rule_id"] for r in all_dsr_results if r["passed_dsr"]}
     print_rule_mining_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
-
     # -------------------------------------------------------------------
     # WFO, one timeframe at a time, only for rules that passed DSR.
     # -------------------------------------------------------------------

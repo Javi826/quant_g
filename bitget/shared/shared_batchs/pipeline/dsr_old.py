@@ -16,8 +16,7 @@ DSR_MAX_SHARPE_ANN  = 10.0  # DSR's own trust threshold — a combo above this i
                             # the backtest again, it's simply excluded from DSR's own calculations
                             # (n_eff, var_sr, per-rule scoring). Other consumers of the same raw
                             # backtest output (e.g. StepM) are free to trust it or not, on their own.
-        
-#shared_batchs/pipeline/dsr.py (continued)
+
 # =============================================================================
 # PRIVATE HELPERS — N_eff estimation (streaming Gram accumulation, eigenvalue method)
 # =============================================================================
@@ -51,15 +50,14 @@ def _participation_ratio_from_gram(gram: np.ndarray, n_const: int) -> float:
 
 BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
-def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> tuple:
+def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> float:
 
-    t_days       = all_dates.shape[0]
-    gram         = np.zeros((t_days, t_days), dtype=np.float64)
-    n_const      = 0
-    n_untrusted  = 0
-    n_valid      = 0
-    batch_cols   = []
-    sharpe_list  = []
+    t_days      = all_dates.shape[0]
+    gram        = np.zeros((t_days, t_days), dtype=np.float64)
+    n_const     = 0
+    n_untrusted = 0
+    n_valid     = 0
+    batch_cols  = []
 
     for _col_name, column in _iter_daily_profit_columns(all_raw_results):
         col = np.zeros(t_days, dtype=np.float32)
@@ -74,15 +72,14 @@ def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batc
 
         sharpe_ann = float(mean / std) * np.sqrt(SHARPE_PERIODS_YEAR)
         if abs(sharpe_ann) > DSR_MAX_SHARPE_ANN:
-            # DSR doesn't trust this combo enough to let it influence n_eff or
-            # var_sr — backtest_runner.py reported it faithfully; this is
-            # purely DSR's own call, independent of what any other consumer
-            # (e.g. StepM) would decide about the same combo.
+            # DSR doesn't trust this combo enough to let it influence n_eff —
+            # backtest_runner.py reported it faithfully; this is purely DSR's
+            # own call, independent of what any other consumer (e.g. StepM)
+            # would decide about the same combo.
             n_untrusted += 1
             continue
 
         batch_cols.append((col - mean) / std)
-        sharpe_list.append(float(mean / std))  # unannualized Sharpe of this combo — same population as N_eff
         n_valid += 1
 
         if len(batch_cols) >= batch_size:
@@ -95,20 +92,14 @@ def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batc
         gram   += x_batch @ x_batch.T
 
     if n_valid == 0:
-        n_eff = float(n_const) if n_const > 0 else 1.0
-        return n_eff, 0.0
+        return float(n_const) if n_const > 0 else 1.0
 
     if n_untrusted > 0:
-        logger.debug(f"DSR ── excluded {n_untrusted} combo(s) above DSR_MAX_SHARPE_ANN={DSR_MAX_SHARPE_ANN} from n_eff/var_sr")
+        logger.debug(f"DSR ── excluded {n_untrusted} combo(s) above DSR_MAX_SHARPE_ANN={DSR_MAX_SHARPE_ANN} from n_eff")
 
-    gram  /= (t_days - 1)
-    n_eff  = _participation_ratio_from_gram(gram, n_const)
-
-    sharpe_arr = np.asarray(sharpe_list, dtype=np.float64)
-    var_sr     = float(np.var(sharpe_arr, ddof=1)) if sharpe_arr.size > 1 else 0.0
-
-    return n_eff, var_sr
-def estimate_n_eff_and_var_sr(all_raw_results: list) -> tuple | None:
+    gram /= (t_days - 1)
+    return _participation_ratio_from_gram(gram, n_const)
+def estimate_n_eff_flat(all_raw_results: list) -> float | None:
 
     all_dates = _common_date_axis(all_raw_results)
     if all_dates is None:
@@ -157,11 +148,11 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
     total_candidates = len(all_raw_results)
     n_bruto           = total_candidates * max(n_combos, 1)
 
-    n_eff_var_sr = estimate_n_eff_and_var_sr(all_raw_results)
+    n_eff = estimate_n_eff_flat(all_raw_results)
 
     n_bruto_str    = f"{n_bruto:,}".replace(",", ".")
     m_str          = f"{total_candidates:,}".replace(",", ".")
-    n_eff_str      = f"{n_eff_var_sr[0]:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if n_eff_var_sr is not None else "n/a (insufficient data)"
+    n_eff_str      = f"{n_eff:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if n_eff is not None else "n/a (insufficient data)"
 
     logger.info(
         f"DSR ── N_bruto={n_bruto_str} (M={m_str} x n_combos={n_combos})  "
@@ -170,7 +161,7 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
 
     raw_by_id = {r["rule_id"]: r for r in all_raw_results}
 
-    if n_eff_var_sr is None:
+    if n_eff is None:
         logger.debug("DSR ── N_eff unavailable — setting DSR=0.0 for all rules (no rules pass).")
         dsr_by_id = {rule_id: 0.0 for rule_id in raw_by_id}
         return {
@@ -181,18 +172,19 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
             "sr0":            np.nan,
         }
 
-    n_eff, var_sr = n_eff_var_sr
-
     sr_by_id = {
         rule_id: _unannualize_sharpe(r.get("sharpe_train", np.nan))
         for rule_id, r in raw_by_id.items()
     }
+    sr_array = np.array(list(sr_by_id.values()), dtype=np.float64)
+    sr_array = sr_array[np.isfinite(sr_array)]
+    var_sr   = float(np.var(sr_array, ddof=1)) if sr_array.size > 1 else 0.0
 
     sr0 = _expected_max_sharpe(var_sr, n_eff)
 
     logger.debug(
         f"DSR ── SR0 terms ── total_candidates={total_candidates} n_combos={n_combos} "
-        f"n_eff={n_eff:.4f} var_sr={var_sr:.6f} -> SR0={sr0:.4f}"
+        f"n_eff={n_eff:.4f} n_sr={sr_array.size} var_sr={var_sr:.6f} -> SR0={sr0:.4f}"
     )
 
     dsr_by_id = {}

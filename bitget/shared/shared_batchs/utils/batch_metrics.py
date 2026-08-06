@@ -56,6 +56,23 @@ def skew_kurtosis_from_daily_values(daily_values: np.ndarray) -> tuple:
     m4 = np.mean(deviations ** 4)
     return float(m3 / (m2 ** 1.5)), float(m4 / (m2 ** 2))
 
+def daily_values_from_sell_days(sell_days_ns: np.ndarray, profits: np.ndarray) -> tuple:
+    """Bucket per-trade profits into daily P&L totals.
+ 
+    sell_days_ns : datetime64[ns] array of trade close timestamps
+    profits      : matching array of per-trade profit
+ 
+    Returns (daily_values, n_days, start_day), where daily_values[i] is the
+    total profit on calendar day (start_day + i days).
+    """
+    sell_days  = sell_days_ns.astype("datetime64[D]")
+    start_day  = sell_days.min()
+    end_day    = sell_days.max()
+    n_days     = int((end_day - start_day).astype("int64")) + 1
+    day_offset = (sell_days - start_day).astype("int64")
+    daily_values = np.bincount(day_offset, weights=profits, minlength=n_days)
+    return daily_values, n_days, start_day
+ 
 # =============================================================================
 # COMPUTE METRICS
 # =============================================================================
