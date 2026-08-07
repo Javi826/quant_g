@@ -1,9 +1,7 @@
 #shared_batchs/pipeline/backtest_runner.py
-
 import itertools
 import logging
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
@@ -12,9 +10,7 @@ from shared_batchs.backtesters.ZX_compute_BT import backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
-from shared_batchs.utils.batch_metrics import (
-    sharpe_from_daily_values, skew_kurtosis_from_daily_values, daily_values_from_sell_days,
-)
+from shared_batchs.utils.batch_metrics import sharpe_from_daily_values, skew_kurtosis_from_daily_values, daily_values_from_sell_days
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
 
 logger = logging.getLogger("BOT_batch.pipeline.backtest_runner")

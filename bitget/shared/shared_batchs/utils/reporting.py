@@ -485,3 +485,163 @@ def report_multiverse_debug(
     print_multiverse_drift_analysis(ohlcv_data, paths)
     plot_multiverse_synthetic_vs_historical(ohlcv_data, paths)
     print_multiverse_debug_summary(per_path_results, rules, p_value_by_id, approved_by_id, n_paths, block_size)
+    
+# =============================================================================
+# STEPM — debug-only reporting (moved from pipeline/stepm.py)
+# =============================================================================
+
+def print_stepm_matrix_debug(col_names: list, matrix_arr: np.ndarray, n_rows: int, all_dates: np.ndarray) -> None:
+    logger.debug(
+        f"MATRIX ── built {len(col_names)} columns (rule__combo) over "
+        f"{n_rows} distinct days ── range [{all_dates.min()} .. {all_dates.max()}]"
+    )
+    zero_frac = (matrix_arr == 0).mean(axis=0)
+    pct = np.percentile(zero_frac, [0, 50, 90, 99, 100])
+    logger.debug(
+        f"DESCRIBE[zero_fill] ── fraction of zero-filled days per column, "
+        f"percentiles [min,p50,p90,p99,max] = "
+        f"[{pct[0]:.3f}, {pct[1]:.3f}, {pct[2]:.3f}, {pct[3]:.3f}, {pct[4]:.3f}]"
+    )
+
+
+def print_stepm_real_variance_filter_debug(progress_label: str, n_cols_built: int, n_cols_after: int) -> None:
+    n_dropped_real_variance = n_cols_built - n_cols_after
+    logger.debug(
+        f"MATRIX FILTER (real variance) {progress_label} ── "
+        f"{n_dropped_real_variance}/{n_cols_built} columns dropped "
+        f"(zero-variance original series) ── {n_cols_after} remain"
+    )
+
+
+def print_stepm_block_starts_debug(
+    progress_label: str, n_blocks_needed: int, block_size: int, len_last: int, n_obs: int, n_cols: int,
+) -> None:
+    logger.debug(
+        f"BLOCK STARTS {progress_label} ── n_blocks={n_blocks_needed} "
+        f"block_size={block_size} last_block_len={len_last} "
+        f"(reduced gather: {n_blocks_needed}x{n_cols} vs original {n_obs}x{n_cols} per replica)"
+    )
+
+
+def print_stepm_bootstrap_replicas_debug(progress_label: str, deviations: np.ndarray, n_cols: int, n_bootstrap: int) -> None:
+    inf_mask = ~np.isfinite(deviations)
+    n_inf_per_col = inf_mask.sum(axis=0)
+    cols_with_inf_replica = int((n_inf_per_col > 0).sum())
+    logger.debug(
+        f"BOOTSTRAP REPLICAS {progress_label} ── "
+        f"{cols_with_inf_replica}/{n_cols} columns hit a non-finite Sharpe "
+        f"in at least one bootstrap replica (zero-variance block)"
+    )
+    affected = n_inf_per_col[n_inf_per_col > 0]
+    if affected.size:
+        pct = np.percentile(affected, [0, 50, 90, 100])
+        logger.debug(
+            f"DESCRIBE[inf_replicas] {progress_label} ── among affected columns, "
+            f"non-finite replica count per column percentiles "
+            f"[min,p50,p90,max] out of {n_bootstrap} = "
+            f"[{pct[0]:.0f}, {pct[1]:.0f}, {pct[2]:.0f}, {pct[3]:.0f}]"
+        )
+
+
+def print_stepm_se_filter_debug(progress_label: str, n_cols_before: int, n_cols_after: int, sigma_hat: np.ndarray) -> None:
+    n_dropped_bootstrap_se = n_cols_before - n_cols_after
+    logger.debug(
+        f"MATRIX FILTER (bootstrap SE) {progress_label} ── "
+        f"{n_dropped_bootstrap_se}/{n_cols_before} columns dropped "
+        f"(sigma_hat == 0 or non-finite after bootstrap) ── "
+        f"{n_cols_after} remain"
+    )
+    pct_sigma = np.percentile(sigma_hat, [0, 50, 90, 99, 100])
+    ratio_max_min = float(pct_sigma[-1] / max(pct_sigma[0], 1e-12))
+    logger.debug(
+        f"DESCRIBE[sigma_hat] {progress_label} ── bootstrap SE percentiles "
+        f"[min,p50,p90,p99,max] = "
+        f"[{pct_sigma[0]:.4f}, {pct_sigma[1]:.4f}, {pct_sigma[2]:.4f}, "
+        f"{pct_sigma[3]:.4f}, {pct_sigma[4]:.4f}] ── ratio max/min = {ratio_max_min:.2f} "
+        f"(White 2000 Sec.9 flagged a ratio of 22.2 as enough to break the basic method)"
+    )
+
+
+def print_stepm_studentization_debug(
+    progress_label: str,
+    studentized_deviations: np.ndarray,
+    z_stat: np.ndarray,
+    n_cols_built: int,
+    n_cols_after_real_variance: int,
+    n_cols_final: int,
+) -> None:
+    post_std = studentized_deviations.std(axis=0, ddof=1)
+    studentization_ok = bool(np.allclose(post_std, 1.0, atol=1e-3))
+    logger.debug(
+        f"VERIFY[studentization] {progress_label} ── post-division std per column: "
+        f"min={post_std.min():.6f} max={post_std.max():.6f} (expected ≡ 1.0 exactly "
+        f"under Hansen-style constant sigma_hat*, NOT under the paper's per-replica "
+        f"sigma_hat*,m) ── {'✅' if studentization_ok else '❌'}"
+    )
+    pct_z = np.percentile(z_stat, [0, 50, 90, 99, 100])
+    logger.debug(
+        f"DESCRIBE[z_stat] {progress_label} ── studentized statistic percentiles "
+        f"[min,p50,p90,p99,max] = "
+        f"[{pct_z[0]:.4f}, {pct_z[1]:.4f}, {pct_z[2]:.4f}, {pct_z[3]:.4f}, {pct_z[4]:.4f}]"
+    )
+    logger.debug(
+        f"FUNNEL {progress_label} ── built={n_cols_built} → "
+        f"after_real_variance_filter={n_cols_after_real_variance} → "
+        f"after_bootstrap_se_filter={n_cols_final} "
+        f"(survival rate={n_cols_final / n_cols_built:.2%})"
+    )
+
+
+def print_stepm_pvalue_quantile_equivalence_debug(
+    k: int,
+    kth_dev_active: np.ndarray,
+    alpha: float,
+    active_stat: np.ndarray,
+    reject_local: np.ndarray,
+    n_active: int,
+) -> None:
+    pct_dev = np.percentile(kth_dev_active, [0, 50, 90, 99, 100])
+    logger.debug(
+        f"DESCRIBE[kth_dev_active] iter0 (k={k}) ── percentiles "
+        f"[min,p50,p90,p99,max] = "
+        f"[{pct_dev[0]:.4f}, {pct_dev[1]:.4f}, {pct_dev[2]:.4f}, "
+        f"{pct_dev[3]:.4f}, {pct_dev[4]:.4f}]"
+    )
+    quantile_val      = np.quantile(kth_dev_active, 1.0 - alpha)
+    predicted_reject  = active_stat > quantile_val
+    mismatches        = int(np.sum(predicted_reject != reject_local))
+    mismatch_rate     = mismatches / max(n_active, 1)
+    logger.debug(
+        f"VERIFY[pvalue_quantile_equivalence] iter0 (k={k}) ── mismatches between "
+        f"p-value rule and quantile-inversion rule = {mismatches}/{n_active} "
+        f"({mismatch_rate:.4%}) ── {'✅' if mismatch_rate < 0.01 else '❌'}"
+    )
+
+
+def print_stepm_monotonicity_debug(k: int, adjusted_pval_sorted: np.ndarray) -> None:
+    diffs = np.diff(adjusted_pval_sorted)
+    monotonic_ok = bool(np.all(diffs >= -1e-9))
+    min_diff = float(diffs.min()) if diffs.size else float("nan")
+    logger.debug(
+        f"VERIFY[monotonicity] (k={k}) ── adjusted p-values non-decreasing along "
+        f"descending-statistic order ── {'✅' if monotonic_ok else '❌'} "
+        f"(min diff={min_diff:.2e})"
+    )
+
+
+def print_stepm_brc_equivalence_debug(
+    timeframe: str, k_fwe: int, global_p: float, stepm_p_by_col: dict, best_col_name: str,
+) -> None:
+    if k_fwe == 1:
+        p_from_stepm = float(stepm_p_by_col.get(best_col_name, float("nan")))
+        brc_match = bool(np.isclose(p_from_stepm, global_p, atol=1e-9))
+        logger.debug(
+            f"VERIFY[BRC_equivalence] {timeframe} (k={k_fwe}) ── global White p-value = "
+            f"{global_p:.6f} vs StepM p-value of the same best column = "
+            f"{p_from_stepm:.6f} ── {'✅' if brc_match else '❌'}"
+        )
+    else:
+        logger.debug(
+            f"VERIFY[BRC_equivalence] {timeframe} ── skipped: not applicable under "
+            f"k-FWE (k={k_fwe} > 1) by construction"
+        )

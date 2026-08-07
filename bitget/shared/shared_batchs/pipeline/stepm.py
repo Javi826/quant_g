@@ -1,79 +1,51 @@
 #shared_batchs/pipeline/stepm.py
-"""
-StepM (Romano & Wolf, 2005) — bootstrap machinery and orchestration, in one
-module.
 
-k-FWE EXTENSION — IMPORTANT CAVEAT:
-Romano & Wolf (2005) only mention k-FWE control in passing (Section 6),
-crediting Lehmann & Romano (2005) for a method based on individual p-values
-under worst-case dependence (a generalization of Holm's method) — NOT a
-bootstrap-based method that exploits the joint dependence structure the way
-Algorithm 4.1 does. STEPM_K_FWE below is a reasoned extension of Algorithm 4.1
-(replacing the max of the active bootstrap deviations with the k-th largest),
-consistent with how the rest of the algorithm is built, but it is NOT a
-transcription of either paper's proof. With STEPM_K_FWE=1 every code path
-collapses exactly onto the strict-FWE Algorithm 4.1 already validated
-(bit-identical to the pre-k-FWE version of this file).
-"""
 import time
 import logging
 import numpy as np
-import pandas as pd
+from multiprocessing.shared_memory import SharedMemory
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-
+from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
+from shared_batchs.utils.reporting import print_stepm_matrix_debug, print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
+from shared_batchs.utils.reporting import print_stepm_bootstrap_replicas_debug, print_stepm_se_filter_debug, print_stepm_studentization_debug
+from shared_batchs.utils.reporting import print_stepm_pvalue_quantile_equivalence_debug, print_stepm_monotonicity_debug, print_stepm_brc_equivalence_debug
 logger = logging.getLogger("BOT_batch.pipeline.stepm")
 
 # =============================================================================
-# STEPM CONFIG (moving block bootstrap, same style as montecarlo.py)
+# STATISTICAL TEST CONFIG — bootstrap sizing, annualization, reproducibility
 # =============================================================================
-STEPM_ALPHA           = 0.1    # significance level used inside the Romano-Wolf stepdown search
-# The pass/fail threshold MUST equal STEPM_ALPHA. The FWE guarantee of
-# Algorithm 4.1 (Romano & Wolf, 2005) only holds when the active set at each
-# stepdown iteration is built with the same alpha used to decide pass/fail.
-# Decoupling them silently invalidates the FWE control, so this is derived
-# from STEPM_ALPHA rather than set independently.
-WHITE_PVALUE_TH       = STEPM_ALPHA
-WHITE_N_BOOTSTRAP     = 500
-WHITE_BLOCK_SIZE      = 20     # fixed block length — mirrors montecarlo.py BLOCK_SIZE
-SHARPE_PERIODS_YEAR   = 365.0  # must match batch_metrics.py's annualization factor
-RANDOM_SEED           = 42
-STEPM_MAX_ITERATIONS  = 500    # safety cap on stepdown iterations
-BOOTSTRAP_BATCH_SIZE  = 100
+STEPM_ALPHA         = 0.1     # significance level used inside the Romano-Wolf stepdown search
+WHITE_PVALUE_TH     = STEPM_ALPHA
+WHITE_N_BOOTSTRAP   = 1000
+WHITE_BLOCK_SIZE    = 20     # fixed block length — mirrors montecarlo.py BLOCK_SIZE
 
-# k-FWE control level. k=1 is strict FWE control (Algorithm 4.1 as published):
-# reject a column only if its statistic beats the MAX of the active bootstrap
-# deviations. k>1 relaxes this to k-FWE: reject if the statistic beats the
-# K-TH LARGEST active bootstrap deviation, i.e. tolerate up to (k-1) false
-# rejections with non-negligible probability in exchange for power. See the
-# module docstring above for the caveat on how far this is from the papers.
-# Override from main.py the same way BACKTEST_N_JOBS is overridden, e.g.:
-#     import shared_batchs.pipeline.stepm as stepm_module
-#     stepm_module.STEPM_K_FWE = 5
-STEPM_K_FWE = 200
+# =============================================================================
+# STEPDOWN / K-FWE CONFIG — Romano-Wolf rejection rule and convergence cap
+# =============================================================================
+STEPM_K_MODE         = "percentile"  # "absolute" or "percentile"
+STEPM_K_FWE          = 1             # used when STEPM_K_MODE == "absolute"
+STEPM_MAX_ITERATIONS = 500           # safety cap on stepdown iterations
 
-# Toggle for the correctness-verification and distribution-descriptive debug
-# logging below. All of it is logger.debug, so it is inert unless the module
-# logger is raised to DEBUG — this flag additionally gates the extra O(B*S)
-# computations those checks need, so it can be turned off even at DEBUG level
-# once the calculation has been validated. Override from main.py the same way
-# BACKTEST_N_JOBS is overridden on backtest_runner.py, e.g.:
-#     import shared_batchs.pipeline.stepm as stepm_module
-#     stepm_module.STEPM_VERIFY = True
-STEPM_VERIFY = True
+# =============================================================================
+# MEMORY-CHUNKING CONFIG — bounds peak RAM without changing any result
+# =============================================================================
+REPLICA_CHUNK       = 100      # replicas processed per gather chunk inside the bootstrap prefix-sum step
+COLUMN_CHUNK_SIZE   = 5000     # columns processed per chunk for chunked reductions/compaction over dense matrices
+PARTITION_ROW_CHUNK = 50       # bootstrap replicas processed per np.partition call in the stepdown
 
-
+# =============================================================================
+# PARALLELISM + FIX
+# =============================================================================
+STEPM_N_JOBS         = -1
+BOOTSTRAP_BATCH_SIZE = 100    
+RANDOM_SEED          = 42
+SHARPE_PERIODS_YEAR  = 365.0  
 # =============================================================================
 # DAILY MATRIX CONSTRUCTION — T days x M trials (rule x combo)
 # =============================================================================
-def _column_dates(column: tuple) -> np.ndarray:
-
-    day_offsets, _values, start_day = column
-    return start_day + day_offsets.astype("timedelta64[D]")
-
-
-def build_flat_daily_matrix(rules: list) -> pd.DataFrame | None:
+def build_flat_daily_matrix(rules: list):
 
     series_by_col = {}
     for r in rules:
@@ -83,157 +55,242 @@ def build_flat_daily_matrix(rules: list) -> pd.DataFrame | None:
 
     if len(series_by_col) < 2:
         logger.debug(f"MATRIX ── built {len(series_by_col)} columns — below minimum of 2")
-        return None
+        return None, None, None
 
     col_names = list(series_by_col.keys())
 
-    all_dates = np.unique(
-        np.concatenate([_column_dates(col) for col in series_by_col.values()])
-    )
+    min_day, max_day = None, None
+    for day_offsets, _values, start_day in series_by_col.values():
+        col_min = start_day + day_offsets.min().astype("timedelta64[D]")
+        col_max = start_day + day_offsets.max().astype("timedelta64[D]")
+        if min_day is None or col_min < min_day:
+            min_day = col_min
+        if max_day is None or col_max > max_day:
+            max_day = col_max
 
-    matrix_arr = np.zeros((all_dates.shape[0], len(col_names)), dtype=np.float64)
+    n_days_range = int((max_day - min_day) / np.timedelta64(1, "D")) + 1
+    seen_mask = np.zeros(n_days_range, dtype=bool)
+
+    abs_idx_by_col = {}
+    for col_name, (day_offsets, _values, start_day) in series_by_col.items():
+        offset_from_min = int((start_day - min_day) / np.timedelta64(1, "D"))
+        abs_idx = offset_from_min + day_offsets.astype(np.int64)
+        seen_mask[abs_idx] = True
+        abs_idx_by_col[col_name] = abs_idx
+
+    compact_row = np.cumsum(seen_mask) - 1  # abs day idx -> compact row idx
+    n_rows = int(seen_mask.sum())
+
+    matrix_arr = np.zeros((n_rows, len(col_names)), dtype=np.float32)
     for col_idx, col_name in enumerate(col_names):
-        day_offsets, values, _start_day = series_by_col[col_name]
-        row_idx = np.searchsorted(all_dates, _column_dates(series_by_col[col_name]))
-        matrix_arr[row_idx, col_idx] = values.astype(np.float64)
+        _day_offsets, values, _start_day = series_by_col[col_name]
+        abs_idx = abs_idx_by_col[col_name]
+        matrix_arr[compact_row[abs_idx], col_idx] = values.astype(np.float32)
 
-    logger.debug(
-        f"MATRIX ── built {len(col_names)} columns (rule__combo) over "
-        f"{all_dates.shape[0]} distinct days ── "
-        f"range [{all_dates.min()} .. {all_dates.max()}]"
-    )
+    all_dates = None
+    if logger.isEnabledFor(logging.DEBUG):
+        all_dates = min_day + np.flatnonzero(seen_mask).astype("timedelta64[D]")
+        print_stepm_matrix_debug(col_names, matrix_arr, n_rows, all_dates)
 
-    if STEPM_VERIFY:
-        # DESCRIBE[zero_fill] — how much of each column is the zero-fill from
-        # days where that rule__combo had no trade. High zero fractions on
-        # infrequent rules mechanically shrink both mean and std toward zero
-        # at different rates (mean ~k, std ~sqrt(k)), which biases the Sharpe
-        # of sparse rules downward relative to frequently-trading ones.
-        zero_frac = (matrix_arr == 0).mean(axis=0)
-        pct = np.percentile(zero_frac, [0, 50, 90, 99, 100])
-        logger.debug(
-            f"DESCRIBE[zero_fill] ── fraction of zero-filled days per column, "
-            f"percentiles [min,p50,p90,p99,max] = "
-            f"[{pct[0]:.3f}, {pct[1]:.3f}, {pct[2]:.3f}, {pct[3]:.3f}, {pct[4]:.3f}]"
-        )
+    return matrix_arr, col_names, all_dates
 
-    return pd.DataFrame(matrix_arr, index=pd.DatetimeIndex(all_dates), columns=col_names)
+# =============================================================================
+# CHUNKED REDUCTIONS — column-wise mean/std without materializing a full-size
+# =============================================================================
+def _mean_std_by_column_chunks(arr: np.ndarray, ddof: int = 0, chunk_size: int = COLUMN_CHUNK_SIZE):
+    n_cols = arr.shape[1]
+    means = np.empty(n_cols, dtype=np.float64)
+    stds  = np.empty(n_cols, dtype=np.float64)
+    for start in range(0, n_cols, chunk_size):
+        end = min(start + chunk_size, n_cols)
+        chunk = arr[:, start:end]
+        means[start:end] = chunk.mean(axis=0, dtype=np.float64)
+        stds[start:end]  = chunk.std(axis=0, ddof=ddof, dtype=np.float64)
+    return means, stds
 
+
+def _std_by_column_chunks(arr: np.ndarray, ddof: int = 0, chunk_size: int = COLUMN_CHUNK_SIZE) -> np.ndarray:
+    n_cols = arr.shape[1]
+    stds = np.empty(n_cols, dtype=np.float64)
+    for start in range(0, n_cols, chunk_size):
+        end = min(start + chunk_size, n_cols)
+        stds[start:end] = arr[:, start:end].std(axis=0, ddof=ddof, dtype=np.float64)
+    return stds
 
 # =============================================================================
 # STATISTIC — annualized Sharpe per trial column, vectorized over bootstrap replicas
 # =============================================================================
 def _sharpe_per_column(matrix_arr: np.ndarray) -> np.ndarray:
 
-    means = matrix_arr.mean(axis=0)
-    stds  = matrix_arr.std(axis=0, ddof=1)
+    means, stds = _mean_std_by_column_chunks(matrix_arr, ddof=1)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         sharpe = (means / stds) * np.sqrt(SHARPE_PERIODS_YEAR)
 
     return np.where(stds > 0, sharpe, -np.inf)
 
-
 # =============================================================================
-# MOVING BLOCK BOOTSTRAP INDEX GENERATION — fixed block length, with replacement
-# (same technique as montecarlo.py's _make_overlapping_blocks, vectorized here
-# across all bootstrap replicas and applied to the shared day axis)
+# MOVING BLOCK BOOTSTRAP — PREFIX-SUM FORMULATION
 # =============================================================================
-def _moving_block_bootstrap_indices_batch(
-    n_obs: int, block_size: int, n_replicas: int, rng: np.random.Generator
-) -> np.ndarray:
+def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np.random.Generator):
 
     n_blocks_needed = int(np.ceil(n_obs / block_size))
-    n_block_starts   = n_obs - block_size + 1
+    n_block_starts  = n_obs - block_size + 1
 
-    chosen_starts = rng.integers(0, n_block_starts, size=(n_replicas, n_blocks_needed))
+    starts = rng.integers(0, n_block_starts, size=(n_replicas, n_blocks_needed), dtype=np.int32)
 
-    block_offsets = np.arange(block_size)[None, None, :]
-    indices = chosen_starts[:, :, None] + block_offsets           # (n_replicas, n_blocks_needed, block_size)
-    indices = indices.reshape(n_replicas, n_blocks_needed * block_size)[:, :n_obs]
+    len_last = n_obs - (n_blocks_needed - 1) * block_size
+    starts_full = starts[:, :-1] if n_blocks_needed > 1 else starts[:, :0]
+    starts_last = starts[:, -1]
 
-    return indices
+    return starts_full, starts_last, len_last, n_blocks_needed
 
-
-def _bootstrap_deviations_batch(
-    batch_values: np.ndarray, boot_idx: np.ndarray, real_sharpe_batch: np.ndarray
+def _bootstrap_deviations_batch_prefix(
+    batch_values: np.ndarray,
+    starts_full: np.ndarray,
+    starts_last: np.ndarray,
+    block_size: int,
+    len_last: int,
+    n_obs: int,
+    real_sharpe_batch: np.ndarray,
+    replica_chunk: int = REPLICA_CHUNK,
 ) -> np.ndarray:
 
-    boot_samples = batch_values[boot_idx]  # (n_bootstrap, n_obs, batch_size), float32
+    x64 = batch_values.astype(np.float64, copy=False)
 
-    means = boot_samples.mean(axis=1)
-    stds  = boot_samples.std(axis=1, ddof=1)
+    ps = np.empty((n_obs + 1, x64.shape[1]), dtype=np.float64)
+    ps[0] = 0.0
+    np.cumsum(x64, axis=0, out=ps[1:])
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        boot_sharpe = (means / stds) * np.sqrt(SHARPE_PERIODS_YEAR)
-    boot_sharpe = np.where(stds > 0, boot_sharpe, -np.inf).astype(np.float64)
+    ps2 = np.empty_like(ps)
+    ps2[0] = 0.0
+    np.cumsum(x64 * x64, axis=0, out=ps2[1:])
 
-    return boot_sharpe - real_sharpe_batch[None, :]
+    n_replicas = starts_last.shape[0]
+    batch_size = x64.shape[1]
 
+    boot_deviations = np.empty((n_replicas, batch_size), dtype=np.float64)
+
+    for chunk_start in range(0, n_replicas, replica_chunk):
+        chunk_end = min(chunk_start + replica_chunk, n_replicas)
+        chunk_size = chunk_end - chunk_start
+
+        starts_full_chunk = starts_full[chunk_start:chunk_end]
+        starts_last_chunk = starts_last[chunk_start:chunk_end]
+
+        if starts_full_chunk.shape[1] > 0:
+            end_full_chunk   = starts_full_chunk + block_size
+            sum_full_chunk   = (ps[end_full_chunk]  - ps[starts_full_chunk]).sum(axis=1)
+            sumsq_full_chunk = (ps2[end_full_chunk] - ps2[starts_full_chunk]).sum(axis=1)
+        else:
+            sum_full_chunk   = np.zeros((chunk_size, batch_size), dtype=np.float64)
+            sumsq_full_chunk = np.zeros((chunk_size, batch_size), dtype=np.float64)
+
+        end_last_chunk   = starts_last_chunk + len_last
+        sum_last_chunk   = ps[end_last_chunk]  - ps[starts_last_chunk]
+        sumsq_last_chunk = ps2[end_last_chunk] - ps2[starts_last_chunk]
+
+        total_sum_chunk   = sum_full_chunk + sum_last_chunk
+        total_sumsq_chunk = sumsq_full_chunk + sumsq_last_chunk
+
+        means_chunk = total_sum_chunk / n_obs
+        var_chunk = (total_sumsq_chunk - n_obs * means_chunk * means_chunk) / (n_obs - 1)
+        np.maximum(var_chunk, 0.0, out=var_chunk)  # guard tiny negative fp error before sqrt
+        stds_chunk = np.sqrt(var_chunk)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            boot_sharpe_chunk = (means_chunk / stds_chunk) * np.sqrt(SHARPE_PERIODS_YEAR)
+        boot_sharpe_chunk = np.where(stds_chunk > 0, boot_sharpe_chunk, -np.inf)
+
+        # NOTE: computation stays in float64 for numerical stability; only
+        boot_deviations[chunk_start:chunk_end] = boot_sharpe_chunk - real_sharpe_batch[None, :]
+
+    return boot_deviations
+
+
+def _bootstrap_deviations_batch_prefix_shm(
+    shm_metadata: dict,
+    start: int,
+    end: int,
+    block_size: int,
+    len_last: int,
+    n_obs: int,
+    real_sharpe_batch: np.ndarray,
+) -> None:
+
+    base_arrays, shm_handles = arrays_from_shared_memory(shm_metadata)
+    try:
+        matrix       = base_arrays["stepm"]["matrix"]
+        starts_full  = base_arrays["stepm"]["starts_full"]
+        starts_last  = base_arrays["stepm"]["starts_last"]
+        deviations   = base_arrays["stepm"]["deviations"]
+        batch_values = matrix[:, start:end]
+        deviations[:, start:end] = _bootstrap_deviations_batch_prefix(
+            batch_values, starts_full, starts_last, block_size, len_last, n_obs, real_sharpe_batch,
+        )
+    finally:
+        for shm in shm_handles:
+            shm.close()
+
+# =============================================================================
+# IN-PLACE COLUMN COMPACTION — equivalent to `arr[:, mask]` for every array
+# =============================================================================
+def _compact_columns_inplace(mask: np.ndarray, *arrays: np.ndarray, chunk_size: int = COLUMN_CHUNK_SIZE) -> int:
+    keep_idx = np.flatnonzero(mask)
+    n_keep = keep_idx.size
+
+    for arr in arrays:
+        for chunk_start in range(0, n_keep, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_keep)
+            src_idx = keep_idx[chunk_start:chunk_end]
+            if arr.ndim == 1:
+                arr[chunk_start:chunk_end] = arr[src_idx]
+            else:
+                arr[:, chunk_start:chunk_end] = arr[:, src_idx]
+
+    return n_keep
 
 def compute_deviation_matrix(
-    matrix: pd.DataFrame,
+    matrix_arr: np.ndarray,
+    col_names: list,
     n_bootstrap: int = WHITE_N_BOOTSTRAP,
     block_size: int = WHITE_BLOCK_SIZE,
     seed: int = RANDOM_SEED,
-    n_jobs: int = -1,
+    n_jobs: int = None,
     progress_label: str = "",
 ) -> dict:
 
-    n_cols_built = matrix.shape[1]
+    n_jobs = n_jobs if n_jobs is not None else STEPM_N_JOBS
 
-    matrix_arr  = matrix.to_numpy(dtype=np.float64)
+    n_cols_built  = matrix_arr.shape[1]
+    col_names_arr = np.asarray(col_names)
+
     real_sharpe = _sharpe_per_column(matrix_arr)
 
-    # Degenerate-column filtering only (non-finite Sharpe from a zero-variance
-    # series). This is NOT outlier filtering — no column is dropped for having
-    # a large or small statistic, only for being mathematically undefined.
-    finite_mask  = np.isfinite(real_sharpe)
-    matrix_arr   = matrix_arr[:, finite_mask]
-    real_sharpe  = real_sharpe[finite_mask]
-    kept_columns = matrix.columns[finite_mask]
+    finite_mask = np.isfinite(real_sharpe)
+    if finite_mask.all():
+        kept_columns = col_names_arr
+    else:
+        n_keep       = _compact_columns_inplace(finite_mask, matrix_arr, real_sharpe, col_names_arr)
+        matrix_arr   = matrix_arr[:, :n_keep]
+        real_sharpe  = real_sharpe[:n_keep]
+        kept_columns = col_names_arr[:n_keep]
 
-    n_dropped_real_variance = n_cols_built - int(finite_mask.sum())
-    logger.debug(
-        f"MATRIX FILTER (real variance) {progress_label} ── "
-        f"{n_dropped_real_variance}/{n_cols_built} columns dropped "
-        f"(zero-variance original series) ── {matrix_arr.shape[1]} remain"
-    )
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_real_variance_filter_debug(progress_label, n_cols_built, matrix_arr.shape[1])
 
     n_obs  = matrix_arr.shape[0]
     n_cols = matrix_arr.shape[1]
 
-    rng      = np.random.default_rng(seed)
-    boot_idx = _moving_block_bootstrap_indices_batch(n_obs, block_size, n_bootstrap, rng)
+    rng = np.random.default_rng(seed)
+    starts_full, starts_last, len_last, n_blocks_needed = _generate_block_starts(
+        n_obs, block_size, n_bootstrap, rng,
+    )
 
-    if STEPM_VERIFY:
-        # VERIFY[shared_index] — boot_idx is built once and passed unchanged
-        # into every _bootstrap_deviations_batch call below. This is what
-        # preserves the joint dependence structure across columns; if each
-        # batch instead drew its own indices, StepM would collapse to
-        # Bonferroni-with-extra-steps and lose its whole advantage.
-        idx_hash = hash(boot_idx.tobytes())
-        logger.debug(
-            f"VERIFY[shared_index] {progress_label} ── boot_idx shape={boot_idx.shape} "
-            f"hash={idx_hash} ── one array reused across every column batch by construction"
-        )
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_block_starts_debug(progress_label, n_blocks_needed, block_size, len_last, n_obs, n_cols)
 
-        # VERIFY[blocks] — confirm boot_idx actually contains contiguous runs
-        # of length block_size, not i.i.d. single-day draws. Expected fraction
-        # of consecutive (i, i+1) column pairs that are +1 apart is
-        # (block_size - 1) / block_size.
-        consecutive_diffs = np.diff(boot_idx, axis=1)
-        frac_consecutive  = float(np.mean(consecutive_diffs == 1))
-        expected_frac     = (block_size - 1) / block_size
-        blocks_ok = abs(frac_consecutive - expected_frac) < 0.02
-        logger.debug(
-            f"VERIFY[blocks] {progress_label} ── fraction of consecutive-index pairs = "
-            f"{frac_consecutive:.4f} (expected ≈ {expected_frac:.4f} for block_size={block_size}) "
-            f"── {'✅' if blocks_ok else '❌'}"
-        )
-
-    matrix_arr32 = matrix_arr.astype(np.float32)
-    del matrix_arr
+    matrix_arr32 = matrix_arr  # already float32 — no extra copy needed
 
     n_batches = int(np.ceil(n_cols / BOOTSTRAP_BATCH_SIZE))
     batch_bounds = [
@@ -241,109 +298,62 @@ def compute_deviation_matrix(
         for i in range(n_batches)
     ]
 
-    desc = f"STEPM BOOTSTRAP {progress_label} ({BOOTSTRAP_BATCH_SIZE} cols/batch)".strip()
-    with tqdm_joblib(tqdm(desc=desc, total=n_batches, dynamic_ncols=True)):
-        deviations_per_batch = Parallel(n_jobs=n_jobs)(
-            delayed(_bootstrap_deviations_batch)(
-                matrix_arr32[:, start:end], boot_idx, real_sharpe[start:end]
+    # MEMORY OPTIMIZATION: deviations is the dominant buffer in this pipeline
+    deviations_dtype  = np.float32
+    deviations_nbytes = n_bootstrap * n_cols * np.dtype(deviations_dtype).itemsize
+
+    shm_list, shm_metadata = arrays_to_shared_memory({
+        "stepm": {"matrix": matrix_arr32, "starts_full": starts_full, "starts_last": starts_last},
+    })
+    deviations_shm = SharedMemory(create=True, size=max(deviations_nbytes, 1))
+    shm_list.append(deviations_shm)
+    shm_metadata["stepm"]["deviations"] = {
+        "name":  deviations_shm.name,
+        "shape": (n_bootstrap, n_cols),
+        "dtype": str(np.dtype(deviations_dtype)),
+    }
+    deviations_shared = np.ndarray((n_bootstrap, n_cols), dtype=deviations_dtype, buffer=deviations_shm.buf)
+
+    try:
+        desc = f"STEPM BOOTSTRAP {progress_label} ({BOOTSTRAP_BATCH_SIZE} cols/batch)".strip()
+        with tqdm_joblib(tqdm(desc=desc, total=n_batches, dynamic_ncols=True)):
+            Parallel(n_jobs=n_jobs)(
+                delayed(_bootstrap_deviations_batch_prefix_shm)(
+                    shm_metadata, start, end, block_size, len_last, n_obs, real_sharpe[start:end],
+                )
+                for start, end in batch_bounds
             )
-            for start, end in batch_bounds
-        )
+        # Own copy, decoupled from the shared-memory segment released below.
+        deviations = deviations_shared.copy()
+    finally:
+        for shm in shm_list:
+            shm.close()
+            shm.unlink()
 
-    deviations = np.concatenate(deviations_per_batch, axis=1)  # shape (n_bootstrap, n_cols)
-    del deviations_per_batch, matrix_arr32
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_bootstrap_replicas_debug(progress_label, deviations, n_cols, n_bootstrap)
 
-    # Diagnostic only: count columns whose bootstrap deviations contain at
-    # least one -inf value (a bootstrap replica hit a zero-variance block for
-    # that column). These columns are NOT necessarily dropped here — they
-    # only get dropped below if sigma_hat ends up exactly zero or non-finite.
-    # This distinguishes "genuinely degenerate column" from "column that
-    # merely got unlucky in some bootstrap replicas."
-    inf_mask               = ~np.isfinite(deviations)
-    n_inf_per_col          = inf_mask.sum(axis=0)
-    cols_with_inf_replica  = int((n_inf_per_col > 0).sum())
-    logger.debug(
-        f"BOOTSTRAP REPLICAS {progress_label} ── "
-        f"{cols_with_inf_replica}/{n_cols} columns hit a non-finite Sharpe "
-        f"in at least one bootstrap replica (zero-variance block)"
-    )
+    sigma_hat = _std_by_column_chunks(deviations, ddof=1)
 
-    if STEPM_VERIFY:
-        affected = n_inf_per_col[n_inf_per_col > 0]
-        if affected.size:
-            pct = np.percentile(affected, [0, 50, 90, 100])
-            logger.debug(
-                f"DESCRIBE[inf_replicas] {progress_label} ── among affected columns, "
-                f"non-finite replica count per column percentiles "
-                f"[min,p50,p90,max] out of {n_bootstrap} = "
-                f"[{pct[0]:.0f}, {pct[1]:.0f}, {pct[2]:.0f}, {pct[3]:.0f}]"
-            )
+    valid_se = sigma_hat > 0
+    if not valid_se.all():
+        n_keep       = _compact_columns_inplace(valid_se, deviations, real_sharpe, sigma_hat, kept_columns)
+        deviations   = deviations[:, :n_keep]
+        real_sharpe  = real_sharpe[:n_keep]
+        sigma_hat    = sigma_hat[:n_keep]
+        kept_columns = kept_columns[:n_keep]
 
-    sigma_hat = deviations.std(axis=0, ddof=1)
-
-    # Same degenerate-column rule as above, applied post-bootstrap: drop
-    # columns whose bootstrap standard error is exactly zero (undefined
-    # studentization), not columns whose statistic is large.
-    valid_se     = sigma_hat > 0
-    deviations   = deviations[:, valid_se]      # copy — boolean mask indexing cannot be a view
-    real_sharpe  = real_sharpe[valid_se]
-    sigma_hat    = sigma_hat[valid_se]
-    kept_columns = kept_columns[valid_se]
-
-    n_dropped_bootstrap_se = n_cols - int(valid_se.sum())
-    logger.debug(
-        f"MATRIX FILTER (bootstrap SE) {progress_label} ── "
-        f"{n_dropped_bootstrap_se}/{n_cols} columns dropped "
-        f"(sigma_hat == 0 or non-finite after bootstrap) ── "
-        f"{kept_columns.shape[0]} remain"
-    )
-
-    if STEPM_VERIFY:
-        pct_sigma = np.percentile(sigma_hat, [0, 50, 90, 99, 100])
-        ratio_max_min = float(pct_sigma[-1] / max(pct_sigma[0], 1e-12))
-        logger.debug(
-            f"DESCRIBE[sigma_hat] {progress_label} ── bootstrap SE percentiles "
-            f"[min,p50,p90,p99,max] = "
-            f"[{pct_sigma[0]:.4f}, {pct_sigma[1]:.4f}, {pct_sigma[2]:.4f}, "
-            f"{pct_sigma[3]:.4f}, {pct_sigma[4]:.4f}] ── ratio max/min = {ratio_max_min:.2f} "
-            f"(White 2000 Sec.9 flagged a ratio of 22.2 as enough to break the basic method)"
-        )
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_se_filter_debug(progress_label, n_cols, kept_columns.shape[0], sigma_hat)
 
     deviations /= sigma_hat[None, :]
     studentized_deviations = deviations
-    z_stat                 = real_sharpe / sigma_hat
+    z_stat = real_sharpe / sigma_hat
 
-    if STEPM_VERIFY:
-        # VERIFY[studentization] — confirm this is Hansen-style studentization
-        # (sigma_hat* == sigma_hat, a single constant per column applied to
-        # every replica) rather than the paper's preferred per-replica
-        # sigma_hat*,m (Algorithm 4.2 step 4a, Remark in Sec.4.1 footnote 21).
-        # With a single constant divisor, post-division std MUST be exactly
-        # 1.0 by construction — that exactness is itself the signature of
-        # which variant is running, not evidence that studentization is doing
-        # its full per-replica job.
-        post_std = studentized_deviations.std(axis=0, ddof=1)
-        studentization_ok = bool(np.allclose(post_std, 1.0, atol=1e-3))
-        logger.debug(
-            f"VERIFY[studentization] {progress_label} ── post-division std per column: "
-            f"min={post_std.min():.6f} max={post_std.max():.6f} (expected ≡ 1.0 exactly "
-            f"under Hansen-style constant sigma_hat*, NOT under the paper's per-replica "
-            f"sigma_hat*,m) ── {'✅' if studentization_ok else '❌'}"
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_studentization_debug(
+            progress_label, studentized_deviations, z_stat, n_cols_built, n_cols, kept_columns.shape[0],
         )
-
-        pct_z = np.percentile(z_stat, [0, 50, 90, 99, 100])
-        logger.debug(
-            f"DESCRIBE[z_stat] {progress_label} ── studentized statistic percentiles "
-            f"[min,p50,p90,p99,max] = "
-            f"[{pct_z[0]:.4f}, {pct_z[1]:.4f}, {pct_z[2]:.4f}, {pct_z[3]:.4f}, {pct_z[4]:.4f}]"
-        )
-
-    logger.debug(
-        f"FUNNEL {progress_label} ── built={n_cols_built} → "
-        f"after_real_variance_filter={n_cols} → "
-        f"after_bootstrap_se_filter={kept_columns.shape[0]} "
-        f"(survival rate={kept_columns.shape[0] / n_cols_built:.2%})"
-    )
 
     return {
         "real_sharpe":            real_sharpe,
@@ -353,11 +363,8 @@ def compute_deviation_matrix(
         "kept_columns":           kept_columns,
     }
 
-
 # =============================================================================
 # GLOBAL P-VALUE — single number per timeframe, the original White (2000) test.
-# Always k=1 (max) by definition — this is White's original BRC, unrelated to
-# the STEPM_K_FWE setting used inside the stepdown below.
 # =============================================================================
 def compute_global_pvalue(deviations: np.ndarray, statistic: np.ndarray) -> dict:
 
@@ -373,29 +380,20 @@ def compute_global_pvalue(deviations: np.ndarray, statistic: np.ndarray) -> dict
         "best_statistic":  best_statistic,
     }
 
-
 # =============================================================================
-# k-th LARGEST ACROSS ACTIVE COLUMNS, PER BOOTSTRAP REPLICA
-# k=1 reduces to np.max exactly (same values, same dtype) — this is what
-# guarantees STEPM_K_FWE=1 reproduces the original strict-FWE numbers.
+# ROW-CHUNKED K-TH LARGEST — same np.partition(...)[:, part_idx] result, but
 # =============================================================================
-def _kth_largest_active(deviations_active: np.ndarray, k: int) -> np.ndarray:
-
-    n_active = deviations_active.shape[1]
-    k_eff = min(k, n_active)
-
-    if k_eff == 1:
-        return np.max(deviations_active, axis=1)
-
-    # np.partition(-x, k_eff-1)[:, k_eff-1] gives the (k_eff-1)-th smallest of
-    # -x, i.e. the k_eff-th largest of x, without a full sort.
-    neg_partitioned = np.partition(-deviations_active, k_eff - 1, axis=1)
-    return -neg_partitioned[:, k_eff - 1]
-
+def _kth_largest_by_row_chunks(values: np.ndarray, k_eff: int, chunk_size: int = PARTITION_ROW_CHUNK) -> np.ndarray:
+    n_rows, n_cols = values.shape
+    part_idx = n_cols - k_eff
+    result = np.empty(n_rows, dtype=values.dtype)
+    for start in range(0, n_rows, chunk_size):
+        end = min(start + chunk_size, n_rows)
+        result[start:end] = np.partition(values[start:end], part_idx, axis=1)[:, part_idx]
+    return result
 
 # =============================================================================
 # STEPM (ROMANO & WOLF, 2005) — stepdown per-rule p-values controlling FWER
-# (k=1) or k-FWE (k>1, reasoned extension — see module docstring).
 # =============================================================================
 def stepwise_reality_check_pvalues(
     deviations: np.ndarray,
@@ -408,118 +406,82 @@ def stepwise_reality_check_pvalues(
     if k < 1:
         raise ValueError(f"k (k-FWE level) must be >= 1, got {k}.")
 
-    n_cols   = statistic.shape[0]
-    active   = np.ones(n_cols, dtype=bool)
-    raw_pval = np.full(n_cols, np.nan, dtype=np.float64)
+    n_bootstrap, n_cols = deviations.shape
+
+    order       = np.argsort(-statistic)
+    dev_sorted  = deviations[:, order]
+    stat_sorted = statistic[order]
+
+    raw_pval_sorted = np.full(n_cols, np.nan, dtype=np.float64)
+    active_start = 0
 
     for _iteration in range(max_iterations):
-        active_idx = np.flatnonzero(active)
-        if active_idx.size == 0:
+        n_active = n_cols - active_start
+        if n_active <= 0:
             break
 
-        if k > active_idx.size:
+        active_view = dev_sorted[:, active_start:]
+        active_stat = stat_sorted[active_start:]
+        k_eff = min(k, n_active)
+
+        if k_eff == n_active and n_active != k:
             logger.debug(
                 f"STEPDOWN iter={_iteration} ── requested k={k} exceeds active set "
-                f"size={active_idx.size} ── clamping to k_eff={active_idx.size} "
+                f"size={n_active} ── clamping to k_eff={k_eff} "
                 f"(k-FWE degenerates toward the global minimum in this iteration)"
             )
 
-        kth_dev_active = _kth_largest_active(deviations[:, active_idx], k)  # (n_bootstrap,)
+        if k_eff == 1:
+            kth_dev_active = active_view.max(axis=1)
+        else:
+            kth_dev_active = _kth_largest_by_row_chunks(active_view, k_eff)
 
-        candidate_p = (
-            kth_dev_active[:, None] >= statistic[active_idx][None, :]
-        ).mean(axis=0)
+        sorted_dev  = np.sort(kth_dev_active)
+        insert_pos  = np.searchsorted(sorted_dev, active_stat, side="left")
+        candidate_p = (n_bootstrap - insert_pos) / n_bootstrap
 
-        # Rejection is decided directly from the bootstrap p-value against
-        # alpha (reject iff candidate_p <= alpha). With k=1 this is the same
-        # criterion as comparing the statistic to the (1-alpha) quantile of
-        # max_dev_active (Algorithm 4.1 step 3), without the extra step of
-        # picking a quantile interpolation rule, and it ties the active-set
-        # construction to the same alpha used for the final pass/fail
-        # decision (see WHITE_PVALUE_TH). With k>1 the same mechanics apply
-        # to the k-th largest active deviation instead of the max.
         reject_local = candidate_p <= alpha
+        n_reject     = int(reject_local.sum())
 
-        logger.debug(
-            f"STEPDOWN iter={_iteration} ── k={k} ── active={active_idx.size} ── "
-            f"rejected_this_iter={int(reject_local.sum())} ── "
-            f"candidate_p range=[{candidate_p.min():.4f}, {candidate_p.max():.4f}]"
-        )
-
-        if STEPM_VERIFY and _iteration == 0:
-            # DESCRIBE[kth_dev_active] — the actual bar every column has to
-            # clear in the first step, for the configured k. Comparing this
-            # to DESCRIBE[z_stat] tells you directly how much k relaxes the
-            # bar relative to k=1 (strict FWE).
-            pct_dev = np.percentile(kth_dev_active, [0, 50, 90, 99, 100])
+        if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
-                f"DESCRIBE[kth_dev_active] iter0 (k={k}) ── percentiles "
-                f"[min,p50,p90,p99,max] = "
-                f"[{pct_dev[0]:.4f}, {pct_dev[1]:.4f}, {pct_dev[2]:.4f}, "
-                f"{pct_dev[3]:.4f}, {pct_dev[4]:.4f}]"
+                f"STEPDOWN iter={_iteration} ── k={k} ── active={n_active} ── "
+                f"rejected_this_iter={n_reject} ── "
+                f"candidate_p range=[{candidate_p.min():.4f}, {candidate_p.max():.4f}]"
             )
+            if _iteration == 0:
+                print_stepm_pvalue_quantile_equivalence_debug(k, kth_dev_active, alpha, active_stat, reject_local, n_active)
 
-            # VERIFY[pvalue_quantile_equivalence] — the p-value rule
-            # (candidate_p <= alpha) must agree with inverting the (1-alpha)
-            # quantile of kth_dev_active against the statistic (statistic >
-            # quantile). This holds by construction for any k, since both
-            # sides are built from the same kth_dev_active vector — it is not
-            # specific to k=1.
-            quantile_val      = np.quantile(kth_dev_active, 1.0 - alpha)
-            predicted_reject  = statistic[active_idx] > quantile_val
-            mismatches        = int(np.sum(predicted_reject != reject_local))
-            mismatch_rate     = mismatches / max(active_idx.size, 1)
-            logger.debug(
-                f"VERIFY[pvalue_quantile_equivalence] iter0 (k={k}) ── mismatches between "
-                f"p-value rule and quantile-inversion rule = {mismatches}/{active_idx.size} "
-                f"({mismatch_rate:.4%}) ── {'✅' if mismatch_rate < 0.01 else '❌'}"
-            )
-
-        if not reject_local.any():
-            raw_pval[active_idx] = candidate_p
+        if n_reject == 0:
+            raw_pval_sorted[active_start:] = candidate_p
             break
 
-        rejected_idx = active_idx[reject_local]
-        raw_pval[rejected_idx] = candidate_p[reject_local]
-        active[rejected_idx] = False
+        raw_pval_sorted[active_start:active_start + n_reject] = candidate_p[:n_reject]
+        active_start += n_reject
     else:
-        # max_iterations exhausted without the active set reaching a fixed
-        # point. Any column left as NaN here must not be allowed to silently
-        # become p=0.0 in the monotonization step below, so we fail loudly.
-        unresolved = np.flatnonzero(np.isnan(raw_pval))
-        if unresolved.size > 0:
+        unresolved_sorted = np.flatnonzero(np.isnan(raw_pval_sorted))
+        if unresolved_sorted.size > 0:
+            unresolved = order[unresolved_sorted]
             raise RuntimeError(
                 f"StepM stepdown did not converge within {max_iterations} "
                 f"iterations; unresolved column indices: {unresolved.tolist()}"
             )
 
-    order = np.argsort(-statistic)
-    running_max = 0.0
-    adjusted_pval = np.empty(n_cols, dtype=np.float64)
-    for idx in order:
-        val = raw_pval[idx]
-        if not np.isfinite(val):
-            raise RuntimeError(
-                f"StepM stepdown produced an undefined raw p-value for column "
-                f"index {idx}; refusing to silently treat it as zero."
-            )
-        running_max = max(running_max, val)
-        adjusted_pval[idx] = running_max
-
-    if STEPM_VERIFY:
-        # VERIFY[monotonicity] — adjusted p-values must be non-decreasing when
-        # read in descending-statistic order. This is the defining property
-        # of the running-max monotonization step and holds regardless of k;
-        # if it fails, the adjusted p-values are not valid stepdown p-values.
-        ordered_vals = adjusted_pval[order]
-        diffs = np.diff(ordered_vals)
-        monotonic_ok = bool(np.all(diffs >= -1e-9))
-        min_diff = float(diffs.min()) if diffs.size else float("nan")
-        logger.debug(
-            f"VERIFY[monotonicity] (k={k}) ── adjusted p-values non-decreasing along "
-            f"descending-statistic order ── {'✅' if monotonic_ok else '❌'} "
-            f"(min diff={min_diff:.2e})"
+    non_finite_sorted = ~np.isfinite(raw_pval_sorted)
+    if non_finite_sorted.any():
+        bad = order[non_finite_sorted]
+        raise RuntimeError(
+            f"StepM stepdown produced an undefined raw p-value for column "
+            f"index(es) {bad.tolist()}; refusing to silently treat it as zero."
         )
+
+    adjusted_pval_sorted = np.maximum.accumulate(raw_pval_sorted)
+
+    adjusted_pval = np.empty(n_cols, dtype=np.float64)
+    adjusted_pval[order] = adjusted_pval_sorted
+
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_monotonicity_debug(k, adjusted_pval_sorted)
 
     return adjusted_pval
 
@@ -533,26 +495,30 @@ def empty_stepm_fields() -> dict:
         "passed_stepm": True,
         "stepm_p":      None,
     }
-
-
 def pipe_stepm(
     raw_results: list,
     stepm_alpha: float = None,
     stepm_pvalue_th: float = None,
     n_bootstrap: int = None,
     block_size: int = None,
-    n_jobs: int = -1,
+    n_jobs: int = None,
+    stepm_k_percentile: float = None,
     timeframe: str = "",
 ) -> list:
 
     stepm_alpha     = stepm_alpha     if stepm_alpha     is not None else STEPM_ALPHA
-    stepm_pvalue_th = stepm_pvalue_th if stepm_pvalue_th is not None else stepm_alpha
-    n_bootstrap     = n_bootstrap     if n_bootstrap     is not None else WHITE_N_BOOTSTRAP
-    block_size      = block_size      if block_size      is not None else WHITE_BLOCK_SIZE
-    # k-FWE level is intentionally NOT a pipe_stepm parameter — it is read
-    # directly from the module constant below, so changing it only ever
-    # requires editing STEPM_K_FWE at the top of this file, never main.py.
-    k_fwe           = STEPM_K_FWE
+    stepm_pvalue_th  = stepm_pvalue_th if stepm_pvalue_th is not None else stepm_alpha
+    n_bootstrap      = n_bootstrap     if n_bootstrap     is not None else WHITE_N_BOOTSTRAP
+    block_size       = block_size      if block_size      is not None else WHITE_BLOCK_SIZE
+    n_jobs           = n_jobs          if n_jobs          is not None else STEPM_N_JOBS
+
+    n_jobs           = n_jobs          if n_jobs          is not None else STEPM_N_JOBS
+
+    if STEPM_K_MODE == "percentile" and stepm_k_percentile is None:
+        raise ValueError(
+            "stepm_k_percentile is required when STEPM_K_MODE == 'percentile' — "
+            "it has no module-level default; pass it explicitly from the caller."
+        )
 
     if not np.isclose(stepm_pvalue_th, stepm_alpha):
         raise ValueError(
@@ -565,17 +531,17 @@ def pipe_stepm(
 
     start = time.time()
 
-    matrix = build_flat_daily_matrix(raw_results)
-    if matrix is None:
+    matrix_arr, col_names, _all_dates = build_flat_daily_matrix(raw_results)
+    if matrix_arr is None:
         logger.warning(f"STEPM ── {timeframe} ── insufficient data — skipping, passing all rules through untouched")
         return [{**r, **empty_stepm_fields()} for r in raw_results]
 
-    if matrix.shape[1] < 2:
+    if matrix_arr.shape[1] < 2:
         logger.warning(f"STEPM ── {timeframe} ── insufficient columns — skipping, passing all rules through untouched")
         return [{**r, **empty_stepm_fields()} for r in raw_results]
 
     bootstrap_result = compute_deviation_matrix(
-        matrix, n_bootstrap=n_bootstrap, block_size=block_size,
+        matrix_arr, col_names, n_bootstrap=n_bootstrap, block_size=block_size,
         n_jobs=n_jobs, progress_label=timeframe,
     )
     kept_columns            = bootstrap_result["kept_columns"]
@@ -585,7 +551,7 @@ def pipe_stepm(
     z_stat                  = bootstrap_result["z_stat"]
 
     logger.info(
-        f"STEPM ── {timeframe} ── {matrix.shape[1] - len(kept_columns)} degenerate "
+        f"STEPM ── {timeframe} ── {matrix_arr.shape[1] - len(kept_columns)} degenerate "
         f"columns dropped ── {len(kept_columns)} columns remain"
     )
 
@@ -602,30 +568,25 @@ def pipe_stepm(
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
     logger.info(f"{'─' * 70}\n")
 
+    if STEPM_K_MODE == "absolute":
+        k_fwe = STEPM_K_FWE
+    elif STEPM_K_MODE == "percentile":
+        n_cols_for_k = len(kept_columns)
+        k_fwe = max(1, int(np.ceil(stepm_k_percentile * n_cols_for_k)))
+        logger.info(
+            f"STEPM ── {timeframe} ── STEPM_K_MODE=percentile ── resolved k={k_fwe} "
+            f"from {stepm_k_percentile:.4%} of {n_cols_for_k} surviving columns"
+        )
+    else:
+        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'absolute' or 'percentile'.")
+
     logger.info(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
 
     stepm_pvals    = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
     stepm_p_by_col = dict(zip(kept_columns, stepm_pvals))
 
-    if STEPM_VERIFY:
-        if k_fwe == 1:
-            # VERIFY[BRC_equivalence] — only holds under strict FWE (k=1): the
-            # BRC (White 2000) is exactly the first step of StepM restricted
-            # to the single best statistic (Romano & Wolf 2005, Sec.3). Under
-            # k-FWE (k>1) this equivalence does not hold by construction,
-            # since the reference statistic is no longer the max.
-            p_from_stepm = float(stepm_p_by_col.get(best_col_name, float("nan")))
-            brc_match = bool(np.isclose(p_from_stepm, global_result["global_p"], atol=1e-9))
-            logger.debug(
-                f"VERIFY[BRC_equivalence] {timeframe} (k={k_fwe}) ── global White p-value = "
-                f"{global_result['global_p']:.6f} vs StepM p-value of the same best column = "
-                f"{p_from_stepm:.6f} ── {'✅' if brc_match else '❌'}"
-            )
-        else:
-            logger.debug(
-                f"VERIFY[BRC_equivalence] {timeframe} ── skipped: not applicable under "
-                f"k-FWE (k={k_fwe} > 1) by construction"
-            )
+    if logger.isEnabledFor(logging.DEBUG):
+        print_stepm_brc_equivalence_debug(timeframe, k_fwe, global_result["global_p"], stepm_p_by_col, best_col_name)
 
     n_passed = 0
     results  = []

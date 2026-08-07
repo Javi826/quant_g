@@ -105,16 +105,16 @@ PARAM_GRID = {
 # =============================================================================
 
 PIPELINE_DSR         = True
-DSR_TH               = 0.8
+DSR_TH               = 0.70
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
 WFO_DD_TH            = 15
-WFO_R2_TH            = 0.8
+WFO_R2_TH            = 0.7
 WFO_WFR_TH           = 0.6
 
 PIPELINE_CORRELATION = True
-CORRELATION_DD_TH    = 0.55
+CORRELATION_DD_TH    = 0.60
 PIPELINE_MONTECARLO  = True
 MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True

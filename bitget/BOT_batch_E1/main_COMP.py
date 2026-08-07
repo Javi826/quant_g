@@ -39,10 +39,7 @@ from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
-from shared_batchs.pipeline.stepm import (
-    pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE,
-)
-
+from shared_batchs.pipeline.stepm import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -62,12 +59,13 @@ PARAM_GRID = {
 # =============================================================================
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH = 0.8
-
+DSR_TH              = 0.80
+STEPM_K_PERCENTILE  = 0.0005
 STEPM_ALPHA_RUN     = STEPM_ALPHA
 STEPM_PVALUE_TH_RUN = WHITE_PVALUE_TH
 STEPM_N_BOOTSTRAP   = WHITE_N_BOOTSTRAP
 STEPM_BLOCK_SIZE    = WHITE_BLOCK_SIZE
+
 
 
 # =============================================================================
@@ -81,6 +79,7 @@ def compare_dsr_vs_stepm_from_raw(
     stepm_pvalue_th: float | None = None,
     n_bootstrap: int | None = None,
     block_size: int | None = None,
+    stepm_k_percentile: float | None = None,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
@@ -94,13 +93,13 @@ def compare_dsr_vs_stepm_from_raw(
     dsr_by_id = {r["rule_id"]: r for r in dsr_results}
 
     stepm_results = pipe_stepm(
-        raw_results     = raw_results,
-        stepm_alpha     = stepm_alpha,
-        stepm_pvalue_th = stepm_pvalue_th,
-        n_bootstrap     = n_bootstrap,
-        block_size      = block_size,
-        n_jobs          = n_jobs,
-        timeframe       = timeframe,
+        raw_results        = raw_results,
+        stepm_alpha        = stepm_alpha,
+        stepm_pvalue_th     = stepm_pvalue_th,
+        n_bootstrap        = n_bootstrap,
+        block_size         = block_size,
+        stepm_k_percentile = stepm_k_percentile,
+        timeframe          = timeframe,
     )
     stepm_by_id = {r["rule_id"]: r for r in stepm_results}
 
@@ -120,6 +119,7 @@ def compare_dsr_vs_stepm(
     stepm_pvalue_th: float | None = None,
     n_bootstrap: int | None = None,
     block_size: int | None = None,
+    stepm_k_percentile: float | None = None,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
@@ -145,15 +145,16 @@ def compare_dsr_vs_stepm(
         backtest_module.BACKTEST_N_JOBS = original_n_jobs
 
     return compare_dsr_vs_stepm_from_raw(
-        raw_results     = raw_results,
-        dsr_th          = dsr_th,
-        n_combos        = n_combos,
-        stepm_alpha     = stepm_alpha,
-        stepm_pvalue_th = stepm_pvalue_th,
-        n_bootstrap     = n_bootstrap,
-        block_size      = block_size,
-        timeframe       = timeframe,
-        n_jobs          = n_jobs,
+        raw_results        = raw_results,
+        dsr_th             = dsr_th,
+        n_combos           = n_combos,
+        stepm_alpha        = stepm_alpha,
+        stepm_pvalue_th     = stepm_pvalue_th,
+        n_bootstrap        = n_bootstrap,
+        block_size         = block_size,
+        stepm_k_percentile = stepm_k_percentile,
+        timeframe          = timeframe,
+        n_jobs             = n_jobs,
     )
 
 
@@ -206,6 +207,7 @@ def _print_comparison(raw_results: list, dsr_by_id: dict, stepm_by_id: dict, tim
         logger.info(f"{rule_id:<{id_width}}{dsr_val:<10.4f}{dsr_mark:<10}{stepm_p:<10.4f}{stepm_mark:<10}")
 
     _print_correlation(dsr_vals, stepm_vals, timeframe)
+    _print_disagreement_breakdown(rows, timeframe)
 
     pct_dsr       = n_dsr_passed   / n_total * 100.0 if n_total else 0.0
     pct_stepm     = n_stepm_passed / n_total * 100.0 if n_total else 0.0
@@ -218,7 +220,38 @@ def _print_comparison(raw_results: list, dsr_by_id: dict, stepm_by_id: dict, tim
     logger.info(f"  AGREEMENT  ── {n_agreement}/{n_total} rules match ({pct_agreement:.2f}%)")
     logger.info(f"  OK-OK      ── {n_both_passed}/{n_total} both pass ({pct_both:.2f}%)")
     logger.info(f"{'─' * 70}\n")
+def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
+    """
+    rows: list of (rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok) tuples, already
+    restricted to rules where StepM produced a p-value (stepm_p is not None).
+    Prints three tables — both pass, DSR-only, StepM-only — each showing both
+    criteria's values side by side, so disagreements are visible individually
+    and not just counted in the aggregate OK-OK/AGREEMENT numbers.
+    """
+    both_pass  = [row for row in rows if row[2] and row[4]]
+    dsr_only   = [row for row in rows if row[2] and not row[4]]
+    stepm_only = [row for row in rows if row[4] and not row[2]]
 
+    id_width = max((len(row[0]) for row in rows), default=8) + 2
+    header = f"{'RULE_ID':<{id_width}}{'DSR':<10}{'DSR_OK':<10}{'STEPM_p':<10}{'STEPM_OK':<10}"
+
+    def _print_table(title: str, table_rows: list, sort_key, reverse: bool = False) -> None:
+        logger.info(f"\n{'─' * 70}")
+        logger.info(f"  {title} ── {timeframe} ── n={len(table_rows)}")
+        logger.info(f"{'─' * 70}")
+        if not table_rows:
+            logger.info("  (none)")
+            return
+        logger.info(header)
+        logger.info(f"{'─' * 70}")
+        for rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok in sorted(table_rows, key=sort_key, reverse=reverse):
+            dsr_mark   = "✅" if dsr_ok else "❌"
+            stepm_mark = "✅" if stepm_ok else "❌"
+            logger.info(f"{rule_id:<{id_width}}{dsr_val:<10.4f}{dsr_mark:<10}{stepm_p:<10.4f}{stepm_mark:<10}")
+
+    _print_table("BOTH PASS (DSR ✅ + STEPM ✅)", both_pass, sort_key=lambda row: row[3])
+    _print_table("DSR ONLY ── DSR ✅ but STEPM ❌ (disagreement)", dsr_only, sort_key=lambda row: row[1], reverse=True)
+    _print_table("STEPM ONLY ── STEPM ✅ but DSR ❌ (disagreement)", stepm_only, sort_key=lambda row: row[3])
 
 def _print_correlation(dsr_vals: list, stepm_vals: list, timeframe: str) -> None:
     if len(dsr_vals) < 3:
@@ -272,6 +305,7 @@ if __name__ == "__main__":
     logger.info(f"  STEPM_PVALUE_TH: {STEPM_PVALUE_TH_RUN}")
     logger.info(f"  N_BOOTSTRAP    : {STEPM_N_BOOTSTRAP}")
     logger.info(f"  BLOCK_SIZE     : {STEPM_BLOCK_SIZE}")
+    logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
     logger.info(f"{'─' * 115}\n")
 
     # -------------------------------------------------------------------
@@ -302,18 +336,19 @@ if __name__ == "__main__":
         )
 
         comparisons_by_timeframe[timeframe] = compare_dsr_vs_stepm(
-            rules           = rules_for_timeframe,
-            ohlcv_arr       = ohlcv_arr_by_timeframe[timeframe],
-            param_grid      = PARAM_GRID,
-            order_amount    = ORDER_AMOUNT,
-            dtype           = DTYPE,
-            dsr_th          = DSR_TH,
-            stepm_alpha     = STEPM_ALPHA_RUN,
-            stepm_pvalue_th = STEPM_PVALUE_TH_RUN,
-            n_bootstrap     = STEPM_N_BOOTSTRAP,
-            block_size      = STEPM_BLOCK_SIZE,
-            timeframe       = timeframe,
-            n_jobs          = N_JOBS,
+            rules              = rules_for_timeframe,
+            ohlcv_arr          = ohlcv_arr_by_timeframe[timeframe],
+            param_grid         = PARAM_GRID,
+            order_amount       = ORDER_AMOUNT,
+            dtype              = DTYPE,
+            dsr_th             = DSR_TH,
+            stepm_alpha        = STEPM_ALPHA_RUN,
+            stepm_pvalue_th     = STEPM_PVALUE_TH_RUN,
+            n_bootstrap        = STEPM_N_BOOTSTRAP,
+            block_size         = STEPM_BLOCK_SIZE,
+            stepm_k_percentile = STEPM_K_PERCENTILE,
+            timeframe          = timeframe,
+            n_jobs             = N_JOBS,
         )
 
     elapsed = int(time.time() - start)
