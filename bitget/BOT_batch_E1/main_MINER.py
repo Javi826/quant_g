@@ -104,8 +104,9 @@ PARAM_GRID = {
 # PIPELINES — sequential validation filters
 # =============================================================================
 
-PIPELINE_DSR         = True
 DSR_TH               = 0.70
+# ---- STEPM (uncomment together with pipe_stepm in rule_runner.py) ----
+# STEPM_K_PERCENTILE  = 0.0005
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
@@ -195,8 +196,6 @@ if __name__ == "__main__":
         dtype                   = DTYPE,
         dsr_th                  = DSR_TH,
         data_folder             = DATA_FOLDER_IS,
-        run_dsr                 = PIPELINE_DSR,
-        pipeline_wfo            = PIPELINE_WFO,
         rules_n_jobs            = RULES_N_JOBS,
         inner_n_jobs            = INNER_N_JOBS,
         n_symbols               = N_SYMBOLS,
@@ -205,19 +204,21 @@ if __name__ == "__main__":
         save_trades             = SAVE_TRADES,
         brief_trades_folder     = BRIEF_TRADES_FOLDER,
         show_plots              = SHOW_PLOTS,
-        # ---- PIPELINES ----
-        pipeline_correlation    = PIPELINE_CORRELATION,
         correlation_threshold   = CORRELATION_DD_TH,
-        pipeline_montecarlo     = PIPELINE_MONTECARLO,
         montecarlo_ruin_th      = MONTECARLO_RUIN_TH,
-        pipeline_multiverse     = PIPELINE_MULTIVERSE,
         multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
+        symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
+        deploy_output_path      = DEPLOY_OUTPUT_PATH,
+        run_config              = run_config,
+        # ---- PIPELINES ----
+        pipeline_wfo            = PIPELINE_WFO,
+        pipeline_correlation    = PIPELINE_CORRELATION,
+        pipeline_montecarlo     = PIPELINE_MONTECARLO,
+        pipeline_multiverse     = PIPELINE_MULTIVERSE,
+        # stepm_k_percentile    = STEPM_K_PERCENTILE,
         # ---- RUNS ----
         run_best_portfolio      = RUN_PORTFOLIO,
         run_deploy              = RUN_DEPLOY,
-        symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
-        deploy_output_path      = DEPLOY_OUTPUT_PATH,
-        run_config = run_config,
     )
 
     elapsed = int(time.time() - start)

@@ -5,6 +5,7 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.dsr import pipe_dsr
+from shared_batchs.pipeline.stepm import pipe_stepm
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
@@ -13,7 +14,6 @@ from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
 from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
 from shared_batchs.utils.reporting import print_rule_mining_ranking, print_rule_mining_min_by_group
-from shared_batchs.pipeline.dsr import pipe_dsr, empty_dsr_fields
 logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
 _OP_SLUG = {">": "gt", "<": "lt"}
@@ -86,8 +86,6 @@ def run_rule_mining_pipeline(
     dtype,
     dsr_th: float,
     data_folder: str,
-    run_dsr: bool = True,
-    pipeline_wfo: bool = True,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
     show_progress: bool = False,
@@ -98,26 +96,30 @@ def run_rule_mining_pipeline(
     brief_trades_folder: str = None,
     show_plots: bool = False,
     correlation_threshold: float = 0.75,
-    pipeline_correlation: bool = True,
-    pipeline_montecarlo: bool = True,
     montecarlo_ruin_th: float = 5.0,
-    pipeline_multiverse: bool = True,
     multiverse_p_value_th: float = 0.05,
-    run_best_portfolio: bool = True,
-    run_deploy: bool = False,
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
     run_config: dict = None,
+    # ---- PIPELINES ----
+    pipeline_wfo: bool = True,
+    pipeline_correlation: bool = True,
+    pipeline_montecarlo: bool = True,
+    pipeline_multiverse: bool = True,
+    stepm_k_percentile: float = None,
+    # ---- RUNS ----
+    run_best_portfolio: bool = True,
+    run_deploy: bool = False,
 ) -> list:
     # -------------------------------------------------------------------
     # BACKTESTING — one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
-    all_dsr_results = []
+    all_mbias_results = []
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
         logger.info(f"RULE MINING ── {timeframe} ── total candidate rules: {len(rules)}")
 
-        raw_results, n_combos = pipe_backtesting(
+        raw_results, n_combos, matrix_arr, col_names = pipe_backtesting(
             rules        = rules,
             ohlcv_arr    = ohlcv_arr_by_timeframe[timeframe],
             param_grid   = param_grid,
@@ -126,29 +128,34 @@ def run_rule_mining_pipeline(
             timeframe    = timeframe,
         )
 
-        if run_dsr:
-            dsr_results = pipe_dsr(
-                raw_results = raw_results,
-                dsr_th      = dsr_th,
-                n_combos    = n_combos,
-                timeframe   = timeframe,
-            )
-        else:
-            logger.info(f"DSR ── {timeframe} ── disabled — passing all rules through untouched")
-            dsr_results = [{**r, **empty_dsr_fields()} for r in raw_results]
+        # ---- MULTIPLE-BIAS FILTER — keep exactly ONE active, comment the other ----
+        mbias_results = pipe_dsr(
+            raw_results = raw_results,
+            matrix_arr  = matrix_arr,
+            dsr_th      = dsr_th,
+            n_combos    = n_combos,
+            timeframe   = timeframe,
+        )
+        # mbias_results = pipe_stepm(
+        #     raw_results        = raw_results,
+        #     matrix_arr         = matrix_arr,
+        #     col_names          = col_names,
+        #     stepm_k_percentile = stepm_k_percentile,
+        #     timeframe          = timeframe,
+        # )
 
-        del raw_results  # libera el universo bruto de este timeframe antes de pasar al siguiente
+        del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
 
-        all_dsr_results.extend([{**r, **_empty_wfo_fields()} for r in dsr_results])
+        all_mbias_results.extend([{**r, **_empty_wfo_fields()} for r in mbias_results])
 
-    passed_dsr_ids = {r["rule_id"] for r in all_dsr_results if r["passed_dsr"]}
-    print_rule_mining_ranking(all_dsr_results, list(passed_dsr_ids), "POST-DSR", survivor_ids=list(passed_dsr_ids), debug=True)
+    passed_mbias_ids = {r["rule_id"] for r in all_mbias_results if r["passed_mbias"]}
+    print_rule_mining_ranking(all_mbias_results, list(passed_mbias_ids), "POST-MBIAS", survivor_ids=list(passed_mbias_ids), debug=True)
     # -------------------------------------------------------------------
     # WFO, one timeframe at a time, only for rules that passed DSR.
     # -------------------------------------------------------------------
     wfo_by_id = {}
     for timeframe in timeframes:
-        rules_this_tf = [r for r in all_dsr_results if r["timeframe"] == timeframe and r["passed_dsr"]]
+        rules_this_tf = [r for r in all_mbias_results if r["timeframe"] == timeframe and r["passed_mbias"]]
 
         wfo_results = pipe_wfo(
             rules               = rules_this_tf,
@@ -174,7 +181,7 @@ def run_rule_mining_pipeline(
 
     all_raw_results = [
         wfo_by_id[r["rule_id"]] if r["rule_id"] in wfo_by_id else r
-        for r in all_dsr_results
+        for r in all_mbias_results
     ]
 
     wfo_candidate_ids = list(wfo_by_id.keys())
@@ -337,7 +344,7 @@ def run_rule_mining_pipeline(
                 run_config  = run_config,
             )
 
-    return validated_after_multiverse, all_dsr_results
+    return validated_after_multiverse, all_mbias_results
 
 def _build_top_output_path(base_path: str, top_idx: int) -> str:
     """Insert a _topN suffix before the file extension, e.g. rules_batch.py -> rules_batch_top1.py."""

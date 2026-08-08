@@ -1,4 +1,5 @@
 #shared/shared_batchs/utils/paralelization.py
+
 import numpy as np
 from multiprocessing.shared_memory import SharedMemory
 
@@ -33,3 +34,22 @@ def arrays_from_shared_memory(metadata: dict) -> tuple:
             else:
                 base_arrays[sym][key] = info["value"]
     return base_arrays, shm_handles
+
+
+def compact_columns_inplace(mask: np.ndarray, *arrays: np.ndarray, chunk_size: int = 5000, axis: int = 1) -> int:
+
+    keep_idx = np.flatnonzero(mask)
+    n_keep = keep_idx.size
+
+    for arr in arrays:
+        for chunk_start in range(0, n_keep, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, n_keep)
+            src_idx = keep_idx[chunk_start:chunk_end]
+            if arr.ndim == 1:
+                arr[chunk_start:chunk_end] = arr[src_idx]
+            elif axis == 1:
+                arr[:, chunk_start:chunk_end] = arr[:, src_idx]
+            else:
+                arr[chunk_start:chunk_end, :] = arr[src_idx, :]
+
+    return n_keep

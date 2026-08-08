@@ -10,8 +10,9 @@ from shared_batchs.backtesters.ZX_compute_BT import backtest_core
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays
 from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
+from multiprocessing.shared_memory import SharedMemory
 from shared_batchs.utils.batch_metrics import sharpe_from_daily_values, skew_kurtosis_from_daily_values, daily_values_from_sell_days
-from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
+from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
 
 logger = logging.getLogger("BOT_batch.pipeline.backtest_runner")
 
@@ -20,6 +21,7 @@ logger = logging.getLogger("BOT_batch.pipeline.backtest_runner")
 # =============================================================================
 BACKTEST_N_JOBS     = -1
 BACKTEST_MIN_TRADES = 100
+COLUMN_CHUNK_SIZE   = 5000  # columns processed per chunk during final matrix compaction
 
 # =============================================================================
 # FULL-PERIOD GRID SEARCH — selection-bias metrics (single pass, no WFO windows)
@@ -28,16 +30,39 @@ BACKTEST_MIN_TRADES = 100
 def _combo_id(params: dict) -> str:
     return "_".join(f"{k}{v}" for k, v in sorted(params.items()))
 
-def _sparse_daily_profit(daily_values: np.ndarray, start_day: np.datetime64) -> tuple | None:
+def _global_day_grid(ohlcv_arr: dict) -> tuple:
+    """
+    Continuous calendar-day grid spanning every symbol's OHLCV timestamps —
+    computed once per timeframe so every combo's daily P&L, regardless of
+    which rule or symbol produced it, lands on the exact same rows of the
+    shared matrix.
+    """
+    all_ts   = np.concatenate([arr["ts"] for arr in ohlcv_arr.values()])
+    all_days = all_ts.astype("datetime64[D]")
+    global_start_day = all_days.min()
+    global_end_day   = all_days.max()
+    n_days_range = int((global_end_day - global_start_day) / np.timedelta64(1, "D")) + 1
+    return global_start_day, n_days_range
 
-    nonzero_idx = np.flatnonzero(daily_values)
-    if nonzero_idx.size == 0:
-        return None
-    return (
-        nonzero_idx.astype(np.int32),
-        daily_values[nonzero_idx].astype(np.float32),
-        start_day,
-    )
+
+def _compact_matrix(matrix_arr: np.ndarray, col_names: np.ndarray, valid_mask: np.ndarray) -> tuple:
+
+    n_keep_cols = compact_columns_inplace(valid_mask, matrix_arr, col_names, chunk_size=COLUMN_CHUNK_SIZE, axis=1)
+    matrix_arr  = matrix_arr[:, :n_keep_cols]
+    col_names   = col_names[:n_keep_cols]
+
+    if matrix_arr.shape[1] == 0:
+        return matrix_arr, col_names.tolist()
+
+    row_mask = np.zeros(matrix_arr.shape[0], dtype=bool)
+    for start in range(0, matrix_arr.shape[1], COLUMN_CHUNK_SIZE):
+        end = min(start + COLUMN_CHUNK_SIZE, matrix_arr.shape[1])
+        row_mask |= np.any(matrix_arr[:, start:end] != 0, axis=1)
+
+    n_keep_rows = compact_columns_inplace(row_mask, matrix_arr, chunk_size=COLUMN_CHUNK_SIZE, axis=0)
+    matrix_arr  = matrix_arr[:n_keep_rows, :]
+
+    return matrix_arr, col_names.tolist()
 
 def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, dtype) -> dict:
     ohlcv_arrays = {}
@@ -107,7 +132,15 @@ def _empty_winner_metrics() -> dict:
         "max_dd_train":   np.nan,
     }
 
-def _evaluate_combo_sharpe(params: dict, prepared_arrays, order_amount: int) -> tuple:
+def _evaluate_combo_sharpe(
+    params: dict,
+    prepared_arrays,
+    order_amount: int,
+    matrix_view: np.ndarray,
+    valid_view: np.ndarray,
+    col_idx: int,
+    global_start_day: np.datetime64,
+) -> tuple:
     n_trades, sell_time_int, profits = _run_backtest_core_light(
         prepared_arrays,
         sell_after   = params["SELL_AFTER"],
@@ -116,23 +149,35 @@ def _evaluate_combo_sharpe(params: dict, prepared_arrays, order_amount: int) -> 
         order_amount = order_amount,
     )
     if n_trades == 0 or n_trades < BACKTEST_MIN_TRADES:
-        return -np.inf, params, None, None
- 
+        return -np.inf, params, None
+
     daily_values, n_days, start_day = _daily_values_from_trades(sell_time_int, profits)
 
     sharpe_metric = sharpe_from_daily_values(daily_values)
     sharpe_rank   = sharpe_metric if np.isfinite(sharpe_metric) else -np.inf
 
-    daily_profit = _sparse_daily_profit(daily_values, start_day)
-    return sharpe_rank, params, (daily_values, n_days, sharpe_metric), daily_profit
+    # Write this combo's daily P&L directly into its slot of the shared dense
+    # matrix, at the row offset matching the global day grid — same alignment
+    # build_flat_daily_matrix used to reconstruct downstream.
+    if np.count_nonzero(daily_values) > 1:
+        row_offset = int((start_day - global_start_day) / np.timedelta64(1, "D"))
+        matrix_view[row_offset:row_offset + n_days, col_idx] = daily_values.astype(np.float32)
+        valid_view[col_idx] = 1
+
+    return sharpe_rank, params, (daily_values, n_days, sharpe_metric)
 
 def _run_full_period_for_rule(
     rule_id: str,
+    rule_idx: int,
     ohlcv_arr: dict,
     signal_fn: callable,
     param_grid: dict,
     order_amount: int,
     dtype,
+    matrix_view: np.ndarray,
+    valid_view: np.ndarray,
+    global_start_day: np.datetime64,
+    n_combos: int,
     static_bundle: dict | None = None,
 ) -> tuple:
 
@@ -143,7 +188,9 @@ def _run_full_period_for_rule(
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
     if max_possible_trades < BACKTEST_MIN_TRADES:
-        return rule_id, {**_empty_winner_metrics(), "combo_daily_profit": {}, "best_combo_id": _combo_id(combos[0])}
+        return rule_id, {**_empty_winner_metrics(), "best_combo_id": _combo_id(combos[0])}
+
+    col_base = rule_idx * n_combos
 
     if static_bundle is not None:
         prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
@@ -152,14 +199,15 @@ def _run_full_period_for_rule(
 
     prepared_arrays = prepared_data[7]
 
-    rows = [_evaluate_combo_sharpe(params, prepared_arrays, order_amount) for params in combos]
+    rows = [
+        _evaluate_combo_sharpe(
+            params, prepared_arrays, order_amount,
+            matrix_view, valid_view, col_base + combo_idx, global_start_day,
+        )
+        for combo_idx, params in enumerate(combos)
+    ]
 
-    combo_daily_profit = {
-        _combo_id(params): daily_profit
-        for _sharpe, params, _bundle, daily_profit in rows
-        if daily_profit is not None and daily_profit[0].size > 1
-    }
-    best_sharpe, best_params, best_bundle, _best_daily = max(rows, key=lambda x: x[0])
+    best_sharpe, best_params, best_bundle = max(rows, key=lambda x: x[0])
     best_combo_id = _combo_id(best_params)
 
     if best_bundle is None:
@@ -168,7 +216,7 @@ def _run_full_period_for_rule(
         best_daily_values, best_n_days, best_sharpe_metric = best_bundle
         winner_metrics = _winner_metrics_from_daily_values(best_daily_values, best_n_days, best_sharpe_metric)
 
-    return rule_id, {**winner_metrics, "combo_daily_profit": combo_daily_profit, "best_combo_id": best_combo_id}
+    return rule_id, {**winner_metrics, "best_combo_id": best_combo_id}
 
 _STATIC_BUNDLE_CACHE: dict = {}
 
@@ -197,34 +245,76 @@ def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
 
 def _run_full_period_for_rule_shm(
     rule_id: str,
+    rule_idx: int,
     shm_metadata: dict,
     signal_fn: callable,
     param_grid: dict,
     order_amount: int,
     dtype,
+    matrix_metadata: dict,
+    valid_metadata: dict,
+    global_start_day: np.datetime64,
+    n_combos: int,
 ) -> tuple:
 
     ohlcv_arr, shm_handles = arrays_from_shared_memory(shm_metadata)
+    matrix_shm = SharedMemory(name=matrix_metadata["name"], create=False)
+    valid_shm  = SharedMemory(name=valid_metadata["name"], create=False)
     try:
+        matrix_view = np.ndarray(matrix_metadata["shape"], dtype=np.dtype(matrix_metadata["dtype"]), buffer=matrix_shm.buf)
+        valid_view  = np.ndarray(valid_metadata["shape"], dtype=np.dtype(valid_metadata["dtype"]), buffer=valid_shm.buf)
+
         static_bundle = _get_static_bundle(shm_metadata, ohlcv_arr)
-        return _run_full_period_for_rule(rule_id, ohlcv_arr, signal_fn, param_grid, order_amount, dtype, static_bundle)
+        return _run_full_period_for_rule(
+            rule_id, rule_idx, ohlcv_arr, signal_fn, param_grid, order_amount, dtype,
+            matrix_view, valid_view, global_start_day, n_combos, static_bundle,
+        )
     finally:
+        matrix_shm.close()
+        valid_shm.close()
         for shm in shm_handles:
             shm.close()
             
-def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dtype, progress_label: str = "") -> dict:
-
+def run_full_period_search(
+    rules: list,
+    param_grid: dict,
+    order_amount: int,
+    dtype,
+    global_start_day: np.datetime64,
+    n_days_range: int,
+    n_combos: int,
+    progress_label: str = "",
+) -> tuple:
+    """
+    Every worker writes its combos' daily P&L directly into a shared dense
+    matrix (n_days_range x n_rules*n_combos), at column
+    (rule_idx * n_combos + combo_idx). Avoids materializing one sparse
+    daily-profit series per combo in the parent process.
+    """
     desc = f"BACKTEST FULL {progress_label}".strip()
 
     if not rules:
-        return {}
+        return {}, np.empty((0, 0), dtype=np.float32), np.empty((0,), dtype=bool)
 
-    shm_list, shm_metadata = arrays_to_shared_memory(rules[0]["ohlcv_arr"])
+    n_rules = len(rules)
+    n_cols  = n_rules * n_combos
+
+    matrix_shm = SharedMemory(create=True, size=max(n_days_range * n_cols * 4, 1))
+    valid_shm  = SharedMemory(create=True, size=max(n_cols, 1))
+    matrix_metadata = {"name": matrix_shm.name, "shape": (n_days_range, n_cols), "dtype": "float32"}
+    valid_metadata  = {"name": valid_shm.name,  "shape": (n_cols,),              "dtype": "int8"}
+
+    # Zero-init: SharedMemory does not guarantee zeroed pages.
+    np.ndarray(matrix_metadata["shape"], dtype=np.float32, buffer=matrix_shm.buf)[:] = 0.0
+    np.ndarray(valid_metadata["shape"],  dtype=np.int8,    buffer=valid_shm.buf)[:]  = 0
+
+    shm_list, ohlcv_metadata = arrays_to_shared_memory(rules[0]["ohlcv_arr"])
     try:
         with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
             results = Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=1, pre_dispatch='all')(
                 delayed(_run_full_period_for_rule_shm)(
-                    r["rule_id"], shm_metadata, r["signal_fn"], param_grid, order_amount, dtype,
+                    r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount, dtype,
+                    matrix_metadata, valid_metadata, global_start_day, n_combos,
                 )
                 for r in rules
             )
@@ -233,7 +323,18 @@ def run_full_period_search(rules: list, param_grid: dict, order_amount: int, dty
             shm.close()
             shm.unlink()
 
-    return dict(results)
+    try:
+        matrix_shared = np.ndarray(matrix_metadata["shape"], dtype=np.float32, buffer=matrix_shm.buf)
+        valid_shared  = np.ndarray(valid_metadata["shape"], dtype=np.int8, buffer=valid_shm.buf)
+        matrix_arr = matrix_shared.copy()
+        valid_mask = valid_shared.astype(bool)
+    finally:
+        matrix_shm.close()
+        matrix_shm.unlink()
+        valid_shm.close()
+        valid_shm.unlink()
+
+    return dict(results), matrix_arr, valid_mask
 
 
 # =============================================================================
@@ -252,21 +353,32 @@ def pipe_backtesting(
     for _values in param_grid.values():
         n_combos *= len(_values)
 
+    global_start_day, n_days_range = _global_day_grid(ohlcv_arr)
 
     rules_for_search = [
-        {"rule_id": r["rule_id"], "ohlcv_arr": ohlcv_arr, "signal_fn": r["signal_fn"]}
-        for r in rules
+        {"rule_id": r["rule_id"], "rule_idx": i, "ohlcv_arr": ohlcv_arr, "signal_fn": r["signal_fn"]}
+        for i, r in enumerate(rules)
     ]
-    full_period_by_rule = run_full_period_search(
-        rules          = rules_for_search,
-        param_grid     = param_grid,
-        order_amount   = order_amount,
-        dtype          = dtype,
-        progress_label = timeframe,
+    full_period_by_rule, matrix_arr, valid_mask = run_full_period_search(
+        rules            = rules_for_search,
+        param_grid       = param_grid,
+        order_amount     = order_amount,
+        dtype            = dtype,
+        global_start_day = global_start_day,
+        n_days_range     = n_days_range,
+        n_combos         = n_combos,
+        progress_label   = timeframe,
     )
 
     raw_results = [
         {**r, **full_period_by_rule[r["rule_id"]]}
         for r in rules
     ]
-    return raw_results, n_combos
+
+    keys      = list(param_grid.keys())
+    combo_ids = [_combo_id(dict(zip(keys, c))) for c in itertools.product(*[param_grid[k] for k in keys])]
+    col_names = np.array([f"{r['rule_id']}__{cid}" for r in rules for cid in combo_ids], dtype=object)
+
+    matrix_arr, col_names = _compact_matrix(matrix_arr, col_names, valid_mask)
+
+    return raw_results, n_combos, matrix_arr, col_names

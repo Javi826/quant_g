@@ -7,8 +7,8 @@ from multiprocessing.shared_memory import SharedMemory
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
-from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory
-from shared_batchs.utils.reporting import print_stepm_matrix_debug, print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
+from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
+from shared_batchs.utils.reporting import print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
 from shared_batchs.utils.reporting import print_stepm_bootstrap_replicas_debug, print_stepm_se_filter_debug, print_stepm_studentization_debug
 from shared_batchs.utils.reporting import print_stepm_pvalue_quantile_equivalence_debug, print_stepm_monotonicity_debug, print_stepm_brc_equivalence_debug
 logger = logging.getLogger("BOT_batch.pipeline.stepm")
@@ -16,10 +16,10 @@ logger = logging.getLogger("BOT_batch.pipeline.stepm")
 # =============================================================================
 # STATISTICAL TEST CONFIG — bootstrap sizing, annualization, reproducibility
 # =============================================================================
-STEPM_ALPHA         = 0.1     # significance level used inside the Romano-Wolf stepdown search
+STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
 WHITE_N_BOOTSTRAP   = 1000
-WHITE_BLOCK_SIZE    = 20     # fixed block length — mirrors montecarlo.py BLOCK_SIZE
+WHITE_BLOCK_SIZE    = 50    # fixed block length — mirrors montecarlo.py BLOCK_SIZE
 
 # =============================================================================
 # STEPDOWN / K-FWE CONFIG — Romano-Wolf rejection rule and convergence cap
@@ -42,57 +42,6 @@ STEPM_N_JOBS         = -1
 BOOTSTRAP_BATCH_SIZE = 100    
 RANDOM_SEED          = 42
 SHARPE_PERIODS_YEAR  = 365.0  
-# =============================================================================
-# DAILY MATRIX CONSTRUCTION — T days x M trials (rule x combo)
-# =============================================================================
-def build_flat_daily_matrix(rules: list):
-
-    series_by_col = {}
-    for r in rules:
-        combo_profit = r.get("combo_daily_profit") or {}
-        for combo_id, s in combo_profit.items():
-            series_by_col[f"{r['rule_id']}__{combo_id}"] = s
-
-    if len(series_by_col) < 2:
-        logger.debug(f"MATRIX ── built {len(series_by_col)} columns — below minimum of 2")
-        return None, None, None
-
-    col_names = list(series_by_col.keys())
-
-    min_day, max_day = None, None
-    for day_offsets, _values, start_day in series_by_col.values():
-        col_min = start_day + day_offsets.min().astype("timedelta64[D]")
-        col_max = start_day + day_offsets.max().astype("timedelta64[D]")
-        if min_day is None or col_min < min_day:
-            min_day = col_min
-        if max_day is None or col_max > max_day:
-            max_day = col_max
-
-    n_days_range = int((max_day - min_day) / np.timedelta64(1, "D")) + 1
-    seen_mask = np.zeros(n_days_range, dtype=bool)
-
-    abs_idx_by_col = {}
-    for col_name, (day_offsets, _values, start_day) in series_by_col.items():
-        offset_from_min = int((start_day - min_day) / np.timedelta64(1, "D"))
-        abs_idx = offset_from_min + day_offsets.astype(np.int64)
-        seen_mask[abs_idx] = True
-        abs_idx_by_col[col_name] = abs_idx
-
-    compact_row = np.cumsum(seen_mask) - 1  # abs day idx -> compact row idx
-    n_rows = int(seen_mask.sum())
-
-    matrix_arr = np.zeros((n_rows, len(col_names)), dtype=np.float32)
-    for col_idx, col_name in enumerate(col_names):
-        _day_offsets, values, _start_day = series_by_col[col_name]
-        abs_idx = abs_idx_by_col[col_name]
-        matrix_arr[compact_row[abs_idx], col_idx] = values.astype(np.float32)
-
-    all_dates = None
-    if logger.isEnabledFor(logging.DEBUG):
-        all_dates = min_day + np.flatnonzero(seen_mask).astype("timedelta64[D]")
-        print_stepm_matrix_debug(col_names, matrix_arr, n_rows, all_dates)
-
-    return matrix_arr, col_names, all_dates
 
 # =============================================================================
 # CHUNKED REDUCTIONS — column-wise mean/std without materializing a full-size
@@ -232,23 +181,6 @@ def _bootstrap_deviations_batch_prefix_shm(
         for shm in shm_handles:
             shm.close()
 
-# =============================================================================
-# IN-PLACE COLUMN COMPACTION — equivalent to `arr[:, mask]` for every array
-# =============================================================================
-def _compact_columns_inplace(mask: np.ndarray, *arrays: np.ndarray, chunk_size: int = COLUMN_CHUNK_SIZE) -> int:
-    keep_idx = np.flatnonzero(mask)
-    n_keep = keep_idx.size
-
-    for arr in arrays:
-        for chunk_start in range(0, n_keep, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, n_keep)
-            src_idx = keep_idx[chunk_start:chunk_end]
-            if arr.ndim == 1:
-                arr[chunk_start:chunk_end] = arr[src_idx]
-            else:
-                arr[:, chunk_start:chunk_end] = arr[:, src_idx]
-
-    return n_keep
 
 def compute_deviation_matrix(
     matrix_arr: np.ndarray,
@@ -271,7 +203,7 @@ def compute_deviation_matrix(
     if finite_mask.all():
         kept_columns = col_names_arr
     else:
-        n_keep       = _compact_columns_inplace(finite_mask, matrix_arr, real_sharpe, col_names_arr)
+        n_keep       = compact_columns_inplace(finite_mask, matrix_arr, real_sharpe, col_names_arr, chunk_size=COLUMN_CHUNK_SIZE)
         matrix_arr   = matrix_arr[:, :n_keep]
         real_sharpe  = real_sharpe[:n_keep]
         kept_columns = col_names_arr[:n_keep]
@@ -337,7 +269,7 @@ def compute_deviation_matrix(
 
     valid_se = sigma_hat > 0
     if not valid_se.all():
-        n_keep       = _compact_columns_inplace(valid_se, deviations, real_sharpe, sigma_hat, kept_columns)
+        n_keep       = compact_columns_inplace(valid_se, deviations, real_sharpe, sigma_hat, kept_columns, chunk_size=COLUMN_CHUNK_SIZE)
         deviations   = deviations[:, :n_keep]
         real_sharpe  = real_sharpe[:n_keep]
         sigma_hat    = sigma_hat[:n_keep]
@@ -493,10 +425,13 @@ def empty_stepm_fields() -> dict:
     """Placeholder StepM fields for rules that were never evaluated (pipe skipped)."""
     return {
         "passed_stepm": True,
+        "passed_mbias": True,
         "stepm_p":      None,
     }
 def pipe_stepm(
     raw_results: list,
+    matrix_arr: np.ndarray,
+    col_names: list,
     stepm_alpha: float = None,
     stepm_pvalue_th: float = None,
     n_bootstrap: int = None,
@@ -531,7 +466,6 @@ def pipe_stepm(
 
     start = time.time()
 
-    matrix_arr, col_names, _all_dates = build_flat_daily_matrix(raw_results)
     if matrix_arr is None:
         logger.warning(f"STEPM ── {timeframe} ── insufficient data — skipping, passing all rules through untouched")
         return [{**r, **empty_stepm_fields()} for r in raw_results]
@@ -600,6 +534,7 @@ def pipe_stepm(
         results.append({
             **r,
             "passed_stepm": passed,
+            "passed_mbias": passed,
             "stepm_p":      float(stepm_p) if np.isfinite(stepm_p) else None,
         })
 

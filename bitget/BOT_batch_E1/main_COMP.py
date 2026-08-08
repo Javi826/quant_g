@@ -60,25 +60,17 @@ PARAM_GRID = {
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
 DSR_TH              = 0.80
-STEPM_K_PERCENTILE  = 0.0005
-STEPM_ALPHA_RUN     = STEPM_ALPHA
-STEPM_PVALUE_TH_RUN = WHITE_PVALUE_TH
-STEPM_N_BOOTSTRAP   = WHITE_N_BOOTSTRAP
-STEPM_BLOCK_SIZE    = WHITE_BLOCK_SIZE
-
-
+STEPM_K_PERCENTILE  = 0.001
 
 # =============================================================================
 # COMPARISON — build the raw universe once, hand it to both pipes, compare.
 # =============================================================================
 def compare_dsr_vs_stepm_from_raw(
     raw_results: list,
+    matrix_arr,
+    col_names: list,
     dsr_th: float,
     n_combos: int,
-    stepm_alpha: float | None = None,
-    stepm_pvalue_th: float | None = None,
-    n_bootstrap: int | None = None,
-    block_size: int | None = None,
     stepm_k_percentile: float | None = None,
     timeframe: str = "",
     n_jobs: int = -1,
@@ -86,6 +78,7 @@ def compare_dsr_vs_stepm_from_raw(
 
     dsr_results = pipe_dsr(
         raw_results = raw_results,
+        matrix_arr  = matrix_arr,
         dsr_th      = dsr_th,
         n_combos    = n_combos,
         timeframe   = timeframe,
@@ -94,10 +87,8 @@ def compare_dsr_vs_stepm_from_raw(
 
     stepm_results = pipe_stepm(
         raw_results        = raw_results,
-        stepm_alpha        = stepm_alpha,
-        stepm_pvalue_th     = stepm_pvalue_th,
-        n_bootstrap        = n_bootstrap,
-        block_size         = block_size,
+        matrix_arr         = matrix_arr,
+        col_names          = col_names,
         stepm_k_percentile = stepm_k_percentile,
         timeframe          = timeframe,
     )
@@ -107,7 +98,6 @@ def compare_dsr_vs_stepm_from_raw(
 
     return {"dsr_by_id": dsr_by_id, "stepm_by_id": stepm_by_id}
 
-
 def compare_dsr_vs_stepm(
     rules: list,
     ohlcv_arr: dict,
@@ -115,25 +105,15 @@ def compare_dsr_vs_stepm(
     order_amount: int,
     dtype,
     dsr_th: float,
-    stepm_alpha: float | None = None,
-    stepm_pvalue_th: float | None = None,
-    n_bootstrap: int | None = None,
-    block_size: int | None = None,
     stepm_k_percentile: float | None = None,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
 
-    # pipe_backtesting (backtest_runner.py) has no n_jobs parameter of its
-    # own — it always uses the module-level BACKTEST_N_JOBS constant
-    # internally. We override that constant for the duration of this call so
-    # n_jobs actually reaches the backtest search step too, then restore it,
-    # so we don't leave backtest_runner.py permanently mutated as a side
-    # effect of this script.
     original_n_jobs = backtest_module.BACKTEST_N_JOBS
     backtest_module.BACKTEST_N_JOBS = n_jobs
     try:
-        raw_results, n_combos = backtest_module.pipe_backtesting(
+        raw_results, n_combos, matrix_arr, col_names = backtest_module.pipe_backtesting(
             rules        = rules,
             ohlcv_arr    = ohlcv_arr,
             param_grid   = param_grid,
@@ -146,12 +126,10 @@ def compare_dsr_vs_stepm(
 
     return compare_dsr_vs_stepm_from_raw(
         raw_results        = raw_results,
+        matrix_arr         = matrix_arr,
+        col_names          = col_names,
         dsr_th             = dsr_th,
         n_combos           = n_combos,
-        stepm_alpha        = stepm_alpha,
-        stepm_pvalue_th     = stepm_pvalue_th,
-        n_bootstrap        = n_bootstrap,
-        block_size         = block_size,
         stepm_k_percentile = stepm_k_percentile,
         timeframe          = timeframe,
         n_jobs             = n_jobs,
@@ -301,10 +279,10 @@ if __name__ == "__main__":
     logger.debug(f"  MAX_DEPTH      : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM_GRID     : {PARAM_GRID}")
     logger.info(f"  DSR_TH         : {DSR_TH}")
-    logger.info(f"  STEPM_ALPHA    : {STEPM_ALPHA_RUN}")
-    logger.info(f"  STEPM_PVALUE_TH: {STEPM_PVALUE_TH_RUN}")
-    logger.info(f"  N_BOOTSTRAP    : {STEPM_N_BOOTSTRAP}")
-    logger.info(f"  BLOCK_SIZE     : {STEPM_BLOCK_SIZE}")
+    logger.info(f"  STEPM_ALPHA    : {STEPM_ALPHA}")
+    logger.info(f"  STEPM_PVALUE_TH: {WHITE_PVALUE_TH}")
+    logger.info(f"  N_BOOTSTRAP    : {WHITE_N_BOOTSTRAP}")
+    logger.info(f"  BLOCK_SIZE     : {WHITE_BLOCK_SIZE}")
     logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
     logger.info(f"{'─' * 115}\n")
 
@@ -342,10 +320,6 @@ if __name__ == "__main__":
             order_amount       = ORDER_AMOUNT,
             dtype              = DTYPE,
             dsr_th             = DSR_TH,
-            stepm_alpha        = STEPM_ALPHA_RUN,
-            stepm_pvalue_th     = STEPM_PVALUE_TH_RUN,
-            n_bootstrap        = STEPM_N_BOOTSTRAP,
-            block_size         = STEPM_BLOCK_SIZE,
             stepm_k_percentile = STEPM_K_PERCENTILE,
             timeframe          = timeframe,
             n_jobs             = N_JOBS,

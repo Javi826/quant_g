@@ -22,25 +22,6 @@ DSR_MAX_SHARPE_ANN  = 10.0  # DSR's own trust threshold — a combo above this i
 # PRIVATE HELPERS — N_eff estimation (streaming Gram accumulation, eigenvalue method)
 # =============================================================================
 
-def _iter_daily_profit_columns(all_raw_results: list):
-
-    for r in all_raw_results:
-        combo_profit = r.get("combo_daily_profit") or {}
-        for combo_id, s in combo_profit.items():
-            yield f"{r['rule_id']}__{combo_id}", s
-
-def _column_dates(column: tuple) -> np.ndarray:
-    """Rebuild the datetime64[D] index of a sparse column from its raw payload."""
-    day_offsets, _values, start_day = column
-    return start_day + day_offsets.astype("timedelta64[D]")
-
-
-def _common_date_axis(all_raw_results: list) -> np.ndarray | None:
-
-    date_arrays = [_column_dates(col) for _col_name, col in _iter_daily_profit_columns(all_raw_results)]
-    if len(date_arrays) < 2:
-        return None
-    return np.unique(np.concatenate(date_arrays))
 def _participation_ratio_from_gram(gram: np.ndarray, n_const: int) -> float:
 
     sum_eig    = float(np.einsum("ii->", gram)) + n_const
@@ -51,20 +32,19 @@ def _participation_ratio_from_gram(gram: np.ndarray, n_const: int) -> float:
 
 BATCH_SIZE_N_EFF = 2000  # standardized columns accumulated before each BLAS matmul —
                          # bounds RAM to T x BATCH_SIZE_N_EFF while keeping each matmul
-def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> tuple:
+def _estimate_n_eff_streaming(matrix_arr: np.ndarray, batch_size: int = BATCH_SIZE_N_EFF) -> tuple:
 
-    t_days       = all_dates.shape[0]
-    gram         = np.zeros((t_days, t_days), dtype=np.float64)
-    n_const      = 0
-    n_untrusted  = 0
-    n_valid      = 0
-    batch_cols   = []
-    sharpe_list  = []
+    t_days      = matrix_arr.shape[0]
+    n_cols      = matrix_arr.shape[1]
+    gram        = np.zeros((t_days, t_days), dtype=np.float64)
+    n_const     = 0
+    n_untrusted = 0
+    n_valid     = 0
+    batch_cols  = []
+    sharpe_list = []
 
-    for _col_name, column in _iter_daily_profit_columns(all_raw_results):
-        col = np.zeros(t_days, dtype=np.float32)
-        row_idx = np.searchsorted(all_dates, _column_dates(column))
-        col[row_idx] = column[1].astype(np.float32)
+    for col_idx in range(n_cols):
+        col = matrix_arr[:, col_idx]
 
         mean = col.mean()
         std  = col.std(ddof=1)
@@ -108,12 +88,11 @@ def _estimate_n_eff_streaming(all_raw_results: list, all_dates: np.ndarray, batc
     var_sr     = float(np.var(sharpe_arr, ddof=1)) if sharpe_arr.size > 1 else 0.0
 
     return n_eff, var_sr
-def estimate_n_eff_and_var_sr(all_raw_results: list) -> tuple | None:
+def estimate_n_eff_and_var_sr(matrix_arr: np.ndarray) -> tuple | None:
 
-    all_dates = _common_date_axis(all_raw_results)
-    if all_dates is None:
+    if matrix_arr is None or matrix_arr.shape[1] < 2:
         return None
-    return _estimate_n_eff_streaming(all_raw_results, all_dates)
+    return _estimate_n_eff_streaming(matrix_arr)
 
 # =============================================================================
 # PRIVATE HELPERS — DSR formula (paper Eq. 1-2)
@@ -152,12 +131,12 @@ def _evaluate_dsr_approval(dsr_value: float, dsr_th: float) -> bool:
 # =============================================================================
 # CORE DSR CALCULATION (across a set of candidate trials — typically one timeframe)
 # =============================================================================
-def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
+def _compute_dsr(all_raw_results: list, matrix_arr: np.ndarray, dsr_th: float, n_combos: int) -> dict:
 
     total_candidates = len(all_raw_results)
     n_bruto           = total_candidates * max(n_combos, 1)
 
-    n_eff_var_sr = estimate_n_eff_and_var_sr(all_raw_results)
+    n_eff_var_sr = estimate_n_eff_and_var_sr(matrix_arr)
 
     n_bruto_str    = f"{n_bruto:,}".replace(",", ".")
     m_str          = f"{total_candidates:,}".replace(",", ".")
@@ -237,23 +216,27 @@ def _compute_dsr(all_raw_results: list, dsr_th: float, n_combos: int) -> dict:
 # =============================================================================
 # PIPE DSR — one timeframe at a time
 # =============================================================================
+# =============================================================================
+# PIPE DSR — one timeframe at a time
+# =============================================================================
 def empty_dsr_fields() -> dict:
     """Placeholder DSR fields for rules that were never evaluated (pipe disabled)."""
     return {
-        "passed_dsr":         True,
-        "dsr":                0.0,
-        "sharpe_train":       None,
-        "skew_train":         None,
-        "kurtosis_train":     None,
-        "n_days_train":       None,
-        "net_gain_train":     None,
-        "max_dd_train":       None,
-        "combo_daily_profit": None,
-        "best_combo_id":      None,
+        "passed_dsr":     True,
+        "passed_mbias":   True,
+        "dsr":            0.0,
+        "sharpe_train":   None,
+        "skew_train":     None,
+        "kurtosis_train": None,
+        "n_days_train":   None,
+        "net_gain_train": None,
+        "max_dd_train":   None,
+        "best_combo_id":  None,
     }
 
 def pipe_dsr(
     raw_results: list,
+    matrix_arr: np.ndarray,
     dsr_th: float,
     n_combos: int,
     timeframe: str = "",
@@ -261,7 +244,7 @@ def pipe_dsr(
 
     start = time.time()
 
-    dsr_result     = _compute_dsr(raw_results, dsr_th=dsr_th, n_combos=n_combos)
+    dsr_result     = _compute_dsr(raw_results, matrix_arr, dsr_th=dsr_th, n_combos=n_combos)
     passed_dsr_ids = set(dsr_result["passed_dsr_ids"])
     dsr_by_id      = dsr_result["dsr_by_rule_id"]
 
@@ -273,16 +256,16 @@ def pipe_dsr(
         passed = rid in passed_dsr_ids
         results.append({
             **r,
-            "passed_dsr":         passed,
-            "dsr":                dsr_by_id.get(rid, 0.0),
-            "sharpe_train":       r["sharpe_train"],
-            "skew_train":         r["skew_train"],
-            "kurtosis_train":     r["kurtosis_train"],
-            "n_days_train":       r["n_days_train"],
-            "net_gain_train":     r["net_gain_train"],
-            "max_dd_train":       r["max_dd_train"],
-            "combo_daily_profit": r["combo_daily_profit"] if passed else None,
-            "best_combo_id":      r["best_combo_id"] if passed else None,
+            "passed_dsr":     passed,
+            "passed_mbias":   passed,
+            "dsr":            dsr_by_id.get(rid, 0.0),
+            "sharpe_train":   r["sharpe_train"],
+            "skew_train":     r["skew_train"],
+            "kurtosis_train": r["kurtosis_train"],
+            "n_days_train":   r["n_days_train"],
+            "net_gain_train": r["net_gain_train"],
+            "max_dd_train":   r["max_dd_train"],
+            "best_combo_id":  r["best_combo_id"] if passed else None,
         })
 
     elapsed = int(time.time() - start)
