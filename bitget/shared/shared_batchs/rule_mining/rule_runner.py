@@ -5,7 +5,7 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.dsr import pipe_dsr
-from shared_batchs.pipeline.stepm import pipe_stepm
+from shared_batchs.pipeline.stepM import pipe_stepm
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison

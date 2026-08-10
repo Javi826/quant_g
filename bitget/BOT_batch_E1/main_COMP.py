@@ -25,8 +25,11 @@ DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
-STEPM_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.stepm").setLevel(STEPM_LOG_LEVEL)
+STEPM_LOG_LEVEL = logging.DEBUG
+logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
+#------------------------------------------------------------------------------
+REPORTING_LOG_LEVEL = logging.DEBUG
+logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -39,7 +42,7 @@ from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
-from shared_batchs.pipeline.stepm import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
+from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -48,6 +51,7 @@ N_JOBS = -1  # -1 = use all available cores, for both the backtest search and th
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
 TIMEFRAMES = ["12Hutc"]
+#TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
@@ -59,7 +63,7 @@ PARAM_GRID = {
 # =============================================================================
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.80
+DSR_TH              = 0.70
 STEPM_K_PERCENTILE  = 0.001
 
 # =============================================================================
@@ -198,6 +202,7 @@ def _print_comparison(raw_results: list, dsr_by_id: dict, stepm_by_id: dict, tim
     logger.info(f"  AGREEMENT  ── {n_agreement}/{n_total} rules match ({pct_agreement:.2f}%)")
     logger.info(f"  OK-OK      ── {n_both_passed}/{n_total} both pass ({pct_both:.2f}%)")
     logger.info(f"{'─' * 70}\n")
+    
 def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
     """
     rows: list of (rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok) tuples, already

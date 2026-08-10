@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/stepm.py
+#shared_batchs/pipeline/stepM.py
 
 import time
 import logging
@@ -8,19 +8,19 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
-from shared_batchs.utils.reporting import print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
+from shared_batchs.utils.reporting import print_stepm_matrix_debug, print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
 from shared_batchs.utils.reporting import print_stepm_bootstrap_replicas_debug, print_stepm_se_filter_debug, print_stepm_studentization_debug
 from shared_batchs.utils.reporting import print_stepm_pvalue_quantile_equivalence_debug, print_stepm_monotonicity_debug, print_stepm_brc_equivalence_debug
-logger = logging.getLogger("BOT_batch.pipeline.stepm")
+logger = logging.getLogger("BOT_batch.pipeline.stepM")
 
 # =============================================================================
 # STATISTICAL TEST CONFIG — bootstrap sizing, annualization, reproducibility
 # =============================================================================
 STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
-WHITE_N_BOOTSTRAP   = 1000
-WHITE_BLOCK_SIZE    = 50    # fixed block length — mirrors montecarlo.py BLOCK_SIZE
-
+WHITE_N_BOOTSTRAP   = 500
+WHITE_BLOCK_SIZE    = 5    # fixed block length — mirrors montecarlo.py BLOCK_SIZE
+STEPM_USE_SPA       = True
 # =============================================================================
 # STEPDOWN / K-FWE CONFIG — Romano-Wolf rejection rule and convergence cap
 # =============================================================================
@@ -41,7 +41,7 @@ PARTITION_ROW_CHUNK = 50       # bootstrap replicas processed per np.partition c
 STEPM_N_JOBS         = -1
 BOOTSTRAP_BATCH_SIZE = 100    
 RANDOM_SEED          = 42
-SHARPE_PERIODS_YEAR  = 365.0  
+SHARPE_PERIODS_YEAR  = 365.0
 
 # =============================================================================
 # CHUNKED REDUCTIONS — column-wise mean/std without materializing a full-size
@@ -180,7 +180,19 @@ def _bootstrap_deviations_batch_prefix_shm(
     finally:
         for shm in shm_handles:
             shm.close()
-
+def apply_spa_recentering(studentized_deviations: np.ndarray, z_stat: np.ndarray, n_obs: int) -> tuple:
+    """Hansen (2005) SPA_c: recenter clearly-losing columns (z_stat below a
+    slowly-growing threshold) to 0 instead of their own negative mean, before
+    computing the bootstrap null. Improves power over the plain White (2000)
+    max-based test without inflating the asymptotic size. Implemented as a
+    constant additive shift, since subtracting a constant before studentizing
+    leaves sigma_hat (and therefore the bootstrap std) unchanged.
+    """
+    threshold = -np.sqrt(2.0 * np.log(np.log(max(n_obs, 3))))
+    bad_mask  = z_stat < threshold
+    if bad_mask.any():
+        studentized_deviations[:, bad_mask] += z_stat[bad_mask][None, :]
+    return studentized_deviations, bad_mask, threshold
 
 def compute_deviation_matrix(
     matrix_arr: np.ndarray,
@@ -198,6 +210,12 @@ def compute_deviation_matrix(
     col_names_arr = np.asarray(col_names)
 
     real_sharpe = _sharpe_per_column(matrix_arr)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        # NOTE: day offsets on the global calendar grid, not real calendar
+        # dates — stepM does not receive global_start_day from the caller.
+        day_offsets = np.arange(matrix_arr.shape[0])
+        print_stepm_matrix_debug(col_names, matrix_arr, matrix_arr.shape[0], day_offsets)
 
     finite_mask = np.isfinite(real_sharpe)
     if finite_mask.all():
@@ -287,6 +305,14 @@ def compute_deviation_matrix(
             progress_label, studentized_deviations, z_stat, n_cols_built, n_cols, kept_columns.shape[0],
         )
 
+    if STEPM_USE_SPA:
+        studentized_deviations, spa_mask, spa_threshold = apply_spa_recentering(studentized_deviations, z_stat, n_obs)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                f"SPA RECENTERING {progress_label} ── threshold={spa_threshold:.4f} ── "
+                f"{int(spa_mask.sum())}/{spa_mask.shape[0]} columns recentered to 0"
+            )
+
     return {
         "real_sharpe":            real_sharpe,
         "sigma_hat":              sigma_hat,
@@ -352,23 +378,28 @@ def stepwise_reality_check_pvalues(
         if n_active <= 0:
             break
 
-        active_view = dev_sorted[:, active_start:]
-        active_stat = stat_sorted[active_start:]
-        k_eff = min(k, n_active)
+        buffer_size    = min(active_start, k - 1)
+        extended_start = active_start - buffer_size
 
-        if k_eff == n_active and n_active != k:
+        extended_view = dev_sorted[:, extended_start:]
+        active_stat   = stat_sorted[active_start:]
+        n_extended    = extended_view.shape[1]
+        k_eff         = min(k, n_extended)
+
+        if k_eff == n_extended and n_extended != k:
             logger.debug(
-                f"STEPDOWN iter={_iteration} ── requested k={k} exceeds active set "
-                f"size={n_active} ── clamping to k_eff={k_eff} "
+                f"STEPDOWN iter={_iteration} ── requested k={k} exceeds extended set "
+                f"size={n_extended} (active={n_active} + buffer={buffer_size}) ── "
+                f"clamping to k_eff={k_eff} "
                 f"(k-FWE degenerates toward the global minimum in this iteration)"
             )
 
         if k_eff == 1:
-            kth_dev_active = active_view.max(axis=1)
+            kth_dev_extended = extended_view.max(axis=1)
         else:
-            kth_dev_active = _kth_largest_by_row_chunks(active_view, k_eff)
+            kth_dev_extended = _kth_largest_by_row_chunks(extended_view, k_eff)
 
-        sorted_dev  = np.sort(kth_dev_active)
+        sorted_dev  = np.sort(kth_dev_extended)
         insert_pos  = np.searchsorted(sorted_dev, active_stat, side="left")
         candidate_p = (n_bootstrap - insert_pos) / n_bootstrap
 
@@ -382,7 +413,7 @@ def stepwise_reality_check_pvalues(
                 f"candidate_p range=[{candidate_p.min():.4f}, {candidate_p.max():.4f}]"
             )
             if _iteration == 0:
-                print_stepm_pvalue_quantile_equivalence_debug(k, kth_dev_active, alpha, active_stat, reject_local, n_active)
+                print_stepm_pvalue_quantile_equivalence_debug(k, kth_dev_extended, alpha, active_stat, reject_local, n_active)
 
         if n_reject == 0:
             raw_pval_sorted[active_start:] = candidate_p
@@ -438,6 +469,7 @@ def pipe_stepm(
     block_size: int = None,
     n_jobs: int = None,
     stepm_k_percentile: float = None,
+    seed: int = None,
     timeframe: str = "",
 ) -> list:
 
@@ -446,8 +478,7 @@ def pipe_stepm(
     n_bootstrap      = n_bootstrap     if n_bootstrap     is not None else WHITE_N_BOOTSTRAP
     block_size       = block_size      if block_size      is not None else WHITE_BLOCK_SIZE
     n_jobs           = n_jobs          if n_jobs          is not None else STEPM_N_JOBS
-
-    n_jobs           = n_jobs          if n_jobs          is not None else STEPM_N_JOBS
+    seed             = seed            if seed            is not None else RANDOM_SEED
 
     if STEPM_K_MODE == "percentile" and stepm_k_percentile is None:
         raise ValueError(
@@ -473,10 +504,9 @@ def pipe_stepm(
     if matrix_arr.shape[1] < 2:
         logger.warning(f"STEPM ── {timeframe} ── insufficient columns — skipping, passing all rules through untouched")
         return [{**r, **empty_stepm_fields()} for r in raw_results]
-
     bootstrap_result = compute_deviation_matrix(
         matrix_arr, col_names, n_bootstrap=n_bootstrap, block_size=block_size,
-        n_jobs=n_jobs, progress_label=timeframe,
+        seed=seed, n_jobs=n_jobs, progress_label=timeframe,
     )
     kept_columns            = bootstrap_result["kept_columns"]
     real_sharpe             = bootstrap_result["real_sharpe"]

@@ -105,8 +105,8 @@ PARAM_GRID = {
 # =============================================================================
 
 DSR_TH               = 0.70
-# ---- STEPM (uncomment together with pipe_stepm in rule_runner.py) ----
-# STEPM_K_PERCENTILE  = 0.0005
+#STEPM (uncomment together with pipe_stepm in rule_runner.py)
+#STEPM_K_PERCENTILE  = 0.0005
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
-        f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'}  "
+        #f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'}  "
         f"WFO: 🟢  "
         f"CORRELATION: {'🟢' if PIPELINE_CORRELATION else '⚪'}  "
         f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
