@@ -10,7 +10,6 @@ from shared_batchs.pipeline.wfo import EMA_ALPHA,WFO_WINDOW_CONFIG, build_ohlcv_
 from shared_batchs.engines.wfo_WF import WARMUP_BARS, select_window_symbols, update_ema_state, round_params_dict
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays, get_bars_per_year
 from shared_config import VOLUME_COL
-
 logger = logging.getLogger("BOT_batch.runs.run_deploy")
 
 # =============================================================================
@@ -29,7 +28,7 @@ def _backward_frompresent_window_bounds(max_length: int, length_train_set: int, 
         train_end_idx -= length_test
     return windows
 
-
+# DESPUÉS
 def run_wfo_deploy_ema(
     ohlcv_is: dict,
     timeframe: str,
@@ -37,7 +36,6 @@ def run_wfo_deploy_ema(
     signal_fn: callable,
     order_amount: int,
     n_symbols: int,
-    dtype,
     n_jobs: int,
 ) -> tuple:
 
@@ -60,13 +58,11 @@ def run_wfo_deploy_ema(
     param_ranges      = dict(zip(param_names, lists_for_grid))
     dict_combinations = [dict(zip(param_names, comb)) for comb in itertools.product(*lists_for_grid)]
 
-    # Symmetric to EDGE_BUFFER_BARS in wfo_WF.py: drops trades opened too close
-    # to the window end to resolve naturally via SELL_AFTER (truncation bias),
-    # since these train windows carry no real cooldown data past train_end.
     EDGE_BUFFER_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
 
+
     def _evaluate(params, base_arrays, train_start_ts, train_edge_ts):
-        arrays      = build_ohlcv_with_signal(base_arrays, signal_fn, [], params, dtype)
+        arrays      = build_ohlcv_with_signal(base_arrays, signal_fn, [], params)
         results     = run_grid_backtest(
             arrays,
             sell_after   = params["SELL_AFTER"],

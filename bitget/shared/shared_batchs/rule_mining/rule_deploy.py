@@ -99,6 +99,7 @@ def save_rule_deploy_batch(
         f.write("\n".join(lines) + "\n")
     logger.info(f"DEPLOY ── rule mining batch saved → {output_path}")
 
+# DESPUÉS
 def run_deploy_rule(
     rule_id: str,
     specs: list,
@@ -110,7 +111,6 @@ def run_deploy_rule(
     timeframe: str,
     n_symbols: int,
     approved: bool,
-    dtype,
     n_jobs: int,
     symbols_live_folder: str,
     deploy_map: dict,
@@ -127,7 +127,6 @@ def run_deploy_rule(
         signal_fn    = signal_fn,
         order_amount = order_amount,
         n_symbols    = n_symbols,
-        dtype        = dtype,
         n_jobs       = n_jobs,
     )
     params_str   = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")

@@ -4,7 +4,6 @@ import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
-from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
@@ -72,7 +71,7 @@ def _empty_wfo_fields() -> dict:
 # =============================================================================
 # ORCHESTRATOR 
 # =============================================================================
-
+# DESPUÉS
 def run_rule_mining_pipeline(
     ohlcv_data_by_timeframe: dict,
     ohlcv_arr_by_timeframe: dict,
@@ -83,8 +82,6 @@ def run_rule_mining_pipeline(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    dtype,
-    dsr_th: float,
     data_folder: str,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -124,20 +121,8 @@ def run_rule_mining_pipeline(
             ohlcv_arr    = ohlcv_arr_by_timeframe[timeframe],
             param_grid   = param_grid,
             order_amount = order_amount,
-            dtype        = dtype,
             timeframe    = timeframe,
         )
-
-        # ---- MULTIPLE-BIAS FILTER — keep exactly ONE active, comment the other ----
-# =============================================================================
-#         mbias_results = pipe_dsr(
-#             raw_results = raw_results,
-#             matrix_arr  = matrix_arr,
-#             dsr_th      = dsr_th,
-#             n_combos    = n_combos,
-#             timeframe   = timeframe,
-#         )
-# =============================================================================
         mbias_results = pipe_stepm(
             raw_results        = raw_results,
             matrix_arr         = matrix_arr,
@@ -152,9 +137,6 @@ def run_rule_mining_pipeline(
 
     passed_mbias_ids = {r["rule_id"] for r in all_mbias_results if r["passed_mbias"]}
     print_rule_mining_ranking(all_mbias_results, list(passed_mbias_ids), "POST-MBIAS", survivor_ids=list(passed_mbias_ids), debug=True)
-    # -------------------------------------------------------------------
-    # WFO, one timeframe at a time, only for rules that passed DSR.
-    # -------------------------------------------------------------------
     wfo_by_id = {}
     for timeframe in timeframes:
         rules_this_tf = [r for r in all_mbias_results if r["timeframe"] == timeframe and r["passed_mbias"]]
@@ -169,7 +151,6 @@ def run_rule_mining_pipeline(
             dd_th               = dd_th,
             r2_th               = r2_th,
             wfr_th              = wfr_th,
-            dtype               = dtype,
             enabled             = pipeline_wfo,
             rules_n_jobs        = rules_n_jobs,
             inner_n_jobs        = inner_n_jobs,
@@ -263,7 +244,6 @@ def run_rule_mining_pipeline(
             dd_th                   = dd_th,
             r2_th                   = r2_th,
             wfr_th                  = wfr_th,
-            dtype                   = dtype,
             n_symbols               = n_symbols,
             p_value_th              = multiverse_p_value_th,
             enabled                 = pipeline_multiverse,
@@ -333,7 +313,6 @@ def run_rule_mining_pipeline(
                     order_amount        = order_amount,
                     n_symbols           = n_symbols,
                     approved            = rule_info["approved"],
-                    dtype               = dtype,
                     n_jobs              = inner_n_jobs,
                     symbols_live_folder = symbols_live_folder,
                     deploy_map          = deploy_map,

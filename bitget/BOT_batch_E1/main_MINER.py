@@ -30,10 +30,7 @@ logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG
 #------------------------------------------------------------------------------
 BACKTEST_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(BACKTEST_LOG_LEVEL)
-#DSR
-#------------------------------------------------------------------------------
-DSR_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
+
 #WFO
 #------------------------------------------------------------------------------
 WFO_LOG_LEVEL = logging.INFO
@@ -77,7 +74,6 @@ from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
-DTYPE        = np.float32
 RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 
@@ -103,10 +99,8 @@ PARAM_GRID = {
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-
-DSR_TH               = 0.50
-#STEPM (uncomment together with pipe_stepm in rule_runner.py)
-STEPM_K_PERCENTILE  = 0.001
+STEPM_K_PERCENTILE  = 0.005
+#0.005
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
@@ -126,7 +120,7 @@ SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
-#run_config = {"DSR_TH":DSR_TH,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
+run_config = {"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -148,13 +142,11 @@ if __name__ == "__main__":
     logger.info(f"  WFO WINDOWS : {_windows_str}")
     logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
-        #f"  PIPELINES   : DSR: {'🟢' if PIPELINE_DSR else '⚪'}  "
-        f"WFO: 🟢  "
+        f"  PIPELINES   : WFO: 🟢  "
         f"CORRELATION: {'🟢' if PIPELINE_CORRELATION else '⚪'}  "
         f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
         f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
     )
-#    logger.info(f"  DSR         : DSR_TH={DSR_TH}")
     logger.info(f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
     logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
     logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
@@ -183,7 +175,8 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------
     # RULE MINING — Phase A: DSR for every timeframe, then a combined
     # -------------------------------------------------------------------    
-    validated_wfo_test, all_dsr_results = run_rule_mining_pipeline(
+   
+    validated_wfo_test, all_mbias_results = run_rule_mining_pipeline(
         ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
         ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
         timeframes              = TIMEFRAMES,
@@ -193,8 +186,6 @@ if __name__ == "__main__":
         dd_th                   = WFO_DD_TH,
         r2_th                   = WFO_R2_TH,
         wfr_th                  = WFO_WFR_TH,
-        dtype                   = DTYPE,
-        dsr_th                  = DSR_TH,
         data_folder             = DATA_FOLDER_IS,
         rules_n_jobs            = RULES_N_JOBS,
         inner_n_jobs            = INNER_N_JOBS,
@@ -209,13 +200,13 @@ if __name__ == "__main__":
         multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
         symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
         deploy_output_path      = DEPLOY_OUTPUT_PATH,
-#        run_config              = run_config,
+        run_config              = run_config,
         # ---- PIPELINES ----
         pipeline_wfo            = PIPELINE_WFO,
         pipeline_correlation    = PIPELINE_CORRELATION,
         pipeline_montecarlo     = PIPELINE_MONTECARLO,
         pipeline_multiverse     = PIPELINE_MULTIVERSE,
-        stepm_k_percentile    = STEPM_K_PERCENTILE,
+        stepm_k_percentile     = STEPM_K_PERCENTILE,    
         # ---- RUNS ----
         run_best_portfolio      = RUN_PORTFOLIO,
         run_deploy              = RUN_DEPLOY,

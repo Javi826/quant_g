@@ -35,8 +35,6 @@ TIMEFRAME_HOURS = {
     "6Hutc": 6,
     "12Hutc": 12,
 }
-
-
 # =============================================================================
 # AUTOCOVARIANCE / AUTOCORRELATION — single series, FFT-based, biased (n)
 # =============================================================================
@@ -55,7 +53,6 @@ def _acf_from_acov(acov: np.ndarray) -> np.ndarray:
     with np.errstate(divide="ignore", invalid="ignore"):
         acf = acov / acov[0]
     return np.nan_to_num(acf, nan=0.0)
-
 
 # =============================================================================
 # M3 — POLITIS & WHITE (2004) AUTOMATIC BLOCK-LENGTH SELECTION
@@ -98,7 +95,6 @@ def method_politis_white(series: np.ndarray) -> float:
     b_opt = np.cbrt(2.0 * g_big ** 2 / d_mbb) * np.cbrt(n_obs)
     return float(np.clip(b_opt, 1.0, b_max))
 
-
 # =============================================================================
 # PER-TIMEFRAME DIAGNOSTIC
 # =============================================================================
@@ -131,7 +127,6 @@ def compute_block_size_range(timeframe: str, n_symbols: int) -> dict:
 
 def candles_to_days(n_candles: float, timeframe_hours: int) -> float:
     return n_candles * timeframe_hours / 24.0
-
 
 # =============================================================================
 # MAIN — block-size range per timeframe

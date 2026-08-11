@@ -242,7 +242,7 @@ def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_
     status_header = f"  {'STATUS':<8}" if show_status else ""
     log_fn(
         f"{'ID':<{id_width}}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
-        f"{'DSR':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
+        f"{'STEPM_P':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
     )
     log_fn(f"{'─' * 170}")
     for r in rows:
@@ -250,7 +250,7 @@ def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_
         log_fn(
             f"{_short_id(r['rule_id']):<{id_width}}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
-            f"{r.get('dsr', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
+            f"{r.get('stepm_p', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
             f"{r.get('multiverse_p_value', 0.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
@@ -261,7 +261,7 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     if not rows:
         return
-    threshold_metrics = ["net_gain", "max_dd", "r_squared", "dsr", "wfr"]
+    threshold_metrics = ["net_gain", "max_dd", "r_squared", "stepm_p", "wfr"]
     groups = {}
     for r in rows:
         key = (r["timeframe"], r["side"])
@@ -278,7 +278,7 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
     logger.info(
         f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
         f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
-        f"{'DSR min/max':<16}{'WFR min/max':<16}"
+        f"{'STEPM_P min/max':<16}{'WFR min/max':<16}"
     )
     logger.info(f"{'─' * 140}")
     for (tf, side), group_rows in sorted(groups.items()):
@@ -288,7 +288,7 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
             f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
             f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
             f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
-            f"{f'{s['dsr'][0]:.3f} / {s['dsr'][1]:.3f}':<16}"
+            f"{f'{s['stepm_p'][0]:.3f} / {s['stepm_p'][1]:.3f}':<16}"
             f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
         )
     logger.info(f"{'─' * 140}")
@@ -296,15 +296,14 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
     all_safe_net_gain = min(s["net_gain"][0]   for s in group_stats.values())
     all_safe_max_dd   = max(abs(s["max_dd"][0]) for s in group_stats.values())
     all_safe_r2       = min(s["r_squared"][0]  for s in group_stats.values())
-    all_safe_dsr      = min(s["dsr"][0]        for s in group_stats.values())
+    all_safe_stepm_p  = min(s["stepm_p"][0]    for s in group_stats.values())
     all_safe_wfr      = min(s["wfr"][0]        for s in group_stats.values())
 
-    # JOINT-SAFE: worst-case across each group's best (anchor) row -> guarantees >=1 survivor per group.
     anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
     safe_net_gain = min(a["net_gain"]  for a in anchors.values())
     safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
     safe_r2       = min(a["r_squared"] for a in anchors.values())
-    safe_dsr      = min(a["dsr"] for a in anchors.values())
+    safe_stepm_p  = min(a["stepm_p"] for a in anchors.values())
     safe_wfr      = min(a["wfr"] for a in anchors.values())
 
     logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
@@ -318,12 +317,12 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
     logger.info(
         f"\n  {label_all_safe.ljust(label_width)} ── "
         f"NET_GAIN>={all_safe_net_gain:.1f}  MAX_DD<={all_safe_max_dd:.1f}  R2>={all_safe_r2:.3f}  "
-        f"DSR>={all_safe_dsr:.3f}  WFR>={all_safe_wfr:.2f}"
+        f"STEPM_P<={all_safe_stepm_p:.3f}  WFR>={all_safe_wfr:.2f}"
     )
     logger.info(
         f"  {label_joint_safe.ljust(label_width)} ── "
         f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
-        f"DSR>={safe_dsr:.3f}  WFR>={safe_wfr:.2f}"
+        f"STEPM_P<={safe_stepm_p:.3f}  WFR>={safe_wfr:.2f}"
     )
     logger.info(f"{'─' * 140}\n")
 

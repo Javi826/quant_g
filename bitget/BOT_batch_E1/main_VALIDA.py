@@ -9,7 +9,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 import time
 import logging
 import importlib.util
-import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from tqdm_joblib import tqdm_joblib
@@ -35,7 +34,7 @@ from signals.signal_builder import build_signal_fn
 # =============================================================================
 # RUN CONFIGURATION
 # =============================================================================
-DTYPE        = np.float32
+
 RULES_N_JOBS = -1
 INNER_N_JOBS = 1
 N_SYMBOLS    = 10   # must match len(symbols_to_include) in universe.py (MY_SYMBOLS=True)
@@ -88,7 +87,7 @@ def _run_validation_wfo(rules: list, ohlcv_arr: dict, timeframe: str) -> list:
             delayed(_run_wfo_for_rule)(
                 i, total, rule, ohlcv_arr, rule["param_names"], rule["lists_for_grid"],
                 rule["order_amount"], timeframe, WFO_NET_GAIN_TH, WFO_DD_TH, WFO_R2_TH, WFO_WFR_TH,
-                DTYPE, INNER_N_JOBS, False, N_SYMBOLS, LOG_LEVEL, SAVE_TRADES, BRIEF_TRADES_FOLDER,
+                INNER_N_JOBS, False, N_SYMBOLS, LOG_LEVEL, SAVE_TRADES, BRIEF_TRADES_FOLDER,
             )
             for i, rule in enumerate(rules)
         )

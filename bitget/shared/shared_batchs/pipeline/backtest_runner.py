@@ -15,7 +15,7 @@ from shared_batchs.utils.batch_metrics import sharpe_from_daily_values, skew_kur
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
 
 logger = logging.getLogger("BOT_batch.pipeline.backtest_runner")
-
+DTYPE                = np.float32
 # =============================================================================
 # BACKTEST EXECUTION CONFIG
 # =============================================================================
@@ -64,16 +64,17 @@ def _compact_matrix(matrix_arr: np.ndarray, col_names: np.ndarray, valid_mask: n
 
     return matrix_arr, col_names.tolist()
 
-def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, dtype) -> dict:
+# DESPUÉS
+def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable) -> dict:
     ohlcv_arrays = {}
     for sym, arr in ohlcv_arr.items():
         signals = signal_fn(arr, live_trading=False)
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
+        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=DTYPE)}
     return ohlcv_arrays
 
-def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, dtype):
-
-    ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
+# DESPUÉS
+def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable):
+    ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn)
     return prepare_backtest_data(ohlcv_arrays)
 
 # =============================================================================
@@ -173,7 +174,6 @@ def _run_full_period_for_rule(
     signal_fn: callable,
     param_grid: dict,
     order_amount: int,
-    dtype,
     matrix_view: np.ndarray,
     valid_view: np.ndarray,
     global_start_day: np.datetime64,
@@ -184,7 +184,7 @@ def _run_full_period_for_rule(
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
 
-    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, dtype)
+    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn)
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
     if max_possible_trades < BACKTEST_MIN_TRADES:
@@ -250,7 +250,6 @@ def _run_full_period_for_rule_shm(
     signal_fn: callable,
     param_grid: dict,
     order_amount: int,
-    dtype,
     matrix_metadata: dict,
     valid_metadata: dict,
     global_start_day: np.datetime64,
@@ -266,7 +265,7 @@ def _run_full_period_for_rule_shm(
 
         static_bundle = _get_static_bundle(shm_metadata, ohlcv_arr)
         return _run_full_period_for_rule(
-            rule_id, rule_idx, ohlcv_arr, signal_fn, param_grid, order_amount, dtype,
+            rule_id, rule_idx, ohlcv_arr, signal_fn, param_grid, order_amount,
             matrix_view, valid_view, global_start_day, n_combos, static_bundle,
         )
     finally:
@@ -279,7 +278,6 @@ def run_full_period_search(
     rules: list,
     param_grid: dict,
     order_amount: int,
-    dtype,
     global_start_day: np.datetime64,
     n_days_range: int,
     n_combos: int,
@@ -313,7 +311,7 @@ def run_full_period_search(
         with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
             results = Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=1, pre_dispatch='all')(
                 delayed(_run_full_period_for_rule_shm)(
-                    r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount, dtype,
+                    r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount,
                     matrix_metadata, valid_metadata, global_start_day, n_combos,
                 )
                 for r in rules
@@ -345,7 +343,6 @@ def pipe_backtesting(
     ohlcv_arr: dict,
     param_grid: dict,
     order_amount: int,
-    dtype,
     timeframe: str = "",
 ) -> tuple:
 
@@ -363,7 +360,6 @@ def pipe_backtesting(
         rules            = rules_for_search,
         param_grid       = param_grid,
         order_amount     = order_amount,
-        dtype            = dtype,
         global_start_day = global_start_day,
         n_days_range     = n_days_range,
         n_combos         = n_combos,

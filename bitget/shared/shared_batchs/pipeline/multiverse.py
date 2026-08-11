@@ -11,7 +11,7 @@ from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays,prepare_signal_arrays,run_backtest_from_prepared_light
 from shared_batchs.utils.reporting import report_multiverse_debug
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
-
+DTYPE  = np.float32
 # =============================================================================
 # MCPT EXECUTION CONFIG
 # =============================================================================
@@ -87,6 +87,7 @@ def _block_bootstrap_sample(
         out[k * block_size:(k + 1) * block_size] = data_array[start:start + block_size]
     return out[:n_rows]
 
+# DESPUÉS
 def _evaluate_universe_batch_chunk(
     path_indices: list,
     paths: dict,
@@ -94,21 +95,21 @@ def _evaluate_universe_batch_chunk(
     n_symbols_expected: int,
     rules: list,
     order_amount: int,
-    dtype,
 ) -> list:
     return [
         _evaluate_universe_batch(
             path_idx, paths, ts_index, n_symbols_expected,
-            rules, order_amount, dtype,
+            rules, order_amount,
         )
         for path_idx in path_indices
     ]
+
+
 def _generate_mcpt_paths(
     df_hist: pd.DataFrame,
     n_paths: int,
     raw_columns: list,
     base_seed: int,
-    dtype,
     block_size: int,
 ) -> np.ndarray:
     
@@ -164,13 +165,12 @@ def _generate_mcpt_paths(
                 base_cols.append(sampled[:, 7 + idx_col])
         paths_array[i, :, :] = np.column_stack(base_cols)
 
-    return paths_array.astype(dtype, copy=False)
+    return paths_array.astype(DTYPE, copy=False)
 
 def _generate_mcpt_paths_all_symbols(
     ohlcv_data: dict,
     n_paths: int,
     raw_columns: list,
-    dtype,
     block_size: int,
     base_seed: int = 42,
 ) -> dict:
@@ -179,7 +179,7 @@ def _generate_mcpt_paths_all_symbols(
     paths_per_symbol = {}
     for symbol, df_hist in ohlcv_data.items():
         arr_paths = _generate_mcpt_paths(
-            df_hist, n_paths=n_paths, raw_columns=raw_columns, base_seed=base_seed, dtype=dtype,
+            df_hist, n_paths=n_paths, raw_columns=raw_columns, base_seed=base_seed,
             block_size=block_size,
         )
         if arr_paths is not None and arr_paths.shape[0] > 0:
@@ -190,7 +190,8 @@ def _generate_mcpt_paths_all_symbols(
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
-def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray, dtype) -> dict:
+# DESPUÉS
+def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray) -> dict:
     ts64 = ts_index.astype("datetime64[ns]")
 
     ohlcv_arr = {}
@@ -210,7 +211,7 @@ def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.nda
         }
     return ohlcv_arr
 
-
+# DESPUÉS
 def _evaluate_universe_batch(
     path_idx: int,
     paths: dict,
@@ -218,10 +219,9 @@ def _evaluate_universe_batch(
     n_symbols_expected: int,
     rules: list,
     order_amount: int,
-    dtype,
 ) -> dict:
 
-    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index, dtype)
+    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index)
 
     if len(synthetic_arr) < n_symbols_expected:
         return {r["rule_id"]: (None, None, None) for r in rules}
@@ -235,7 +235,7 @@ def _evaluate_universe_batch(
         ohlcv_arrays = {}
         for sym, arr in synthetic_arr.items():
             signals = r["signal_fn"](arr, live_trading=False)
-            ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
+            ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=DTYPE)}
 
         prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
         bt_results = run_backtest_from_prepared_light(
@@ -269,7 +269,6 @@ def _evaluate_multiverse_batch(
     ohlcv_data: dict,
     rules: list,
     order_amount: int,
-    dtype,
     p_value_th: float,
     block_size: int,
     n_paths: int = N_PERMUTATIONS,
@@ -288,7 +287,7 @@ def _evaluate_multiverse_batch(
     ts_index = ohlcv_data[ref_sym].index[:n_obs].to_numpy()
 
     paths = _generate_mcpt_paths_all_symbols(
-        ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], dtype=dtype, block_size=block_size,
+        ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], block_size=block_size,
     )
 
     n_symbols_expected = len(ohlcv_data)
@@ -302,7 +301,7 @@ def _evaluate_multiverse_batch(
         chunked_results = Parallel(n_jobs=n_jobs)(
             delayed(_evaluate_universe_batch_chunk)(
                 chunk.tolist(), paths, ts_index, n_symbols_expected,
-                rules, order_amount, dtype,
+                rules, order_amount,
             )
             for chunk in path_chunks
         )
@@ -355,7 +354,6 @@ def pipe_multiverse(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    dtype,
     n_symbols: int,
     p_value_th: float,
     enabled: bool = True,
@@ -384,7 +382,6 @@ def pipe_multiverse(
             ohlcv_data   = ohlcv_data_by_timeframe[timeframe],
             rules        = tf_rules,
             order_amount = order_amount,
-            dtype        = dtype,
             p_value_th   = p_value_th,
             n_paths      = n_paths,
             block_size   = resolved_block_size,

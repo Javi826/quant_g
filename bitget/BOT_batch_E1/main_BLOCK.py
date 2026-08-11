@@ -1,17 +1,5 @@
 #BOT_batch/main_BLOCK.py
-"""
-WHITE_BLOCK_SIZE estimation via Politis & White (2004) automatic block-length
-selection, applied to the Sharpe influence function on the real daily P&L matrix.
 
-The AMSE-optimal b targets estimation of a long-run-variance-type quantity and
-has rate n^(1/3). stepM.py, however, bootstraps the distribution of a
-studentized maximum (a one-sided tail quantile), whose optimal MBB rate is
-n^(1/4) (Hall, Horowitz & Jing, 1995). Using the PW b as a proxy is standard
-practice in the Romano-Wolf / StepM literature, but it is a proxy, not a
-result guaranteed by Politis & White (2004). Patton, Politis & White (2009)
-only correct the stationary-bootstrap (SB) variance constant D_SB; the MBB/CB
-constant D_CB = (4/3) g_hat(0)^2 used below is untouched by that correction.
-"""
 import os
 import sys
 import time
@@ -43,55 +31,40 @@ from shared_batchs.pipeline import backtest_runner as backtest_module
 # SPEED PROFILE — flip to False for the full dense run once the fast pass
 # has told you roughly where WHITE_BLOCK_SIZE should land.
 # =============================================================================
-FAST_MODE = False
+FAST_MODE = True
 
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION — mirror main_COMP.py
 # =============================================================================
-DTYPE  = np.float32
 N_JOBS = -1
 
 TIMEFRAMES = ["1H"]
-#TIMEFRAMES = ["12Hutc"]
-if FAST_MODE:
-    N_SYMBOLS  = 10
-    PARAM_GRID = {
-        "SELL_AFTER": [50],
-        "TP_PCT":     [2, 6, 10],
-        "SL_PCT":     [2, 6, 10],
-    }
-else:
-    N_SYMBOLS  = 10
-    PARAM_GRID = {
-        "SELL_AFTER": [50],
-        "TP_PCT":     [2, 4, 6, 8, 10],
-        "SL_PCT":     [2, 4, 6, 8, 10],
+TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+
+N_SYMBOLS  = 10
+PARAM_GRID = {
+    "SELL_AFTER": [50],
+    "TP_PCT":     [2, 4, 6, 8, 10],
+    "SL_PCT":     [2, 4, 6, 8, 10],
     }
 
 # =============================================================================
 # BLOCK-SIZE ANALYSIS CONFIGURATION
 # =============================================================================
-BLOCK_SIZE_GRID = [5, 10, 25, 50, 80]
+BLOCK_SIZE_GRID = [5, 10, 15, 20]
 
 RANDOM_SEED = 42
 
-# Column subsampling — the diagnostic is distributional, not per-rule, so a
-# large random subsample is statistically sufficient and bounds runtime/RAM.
 DIAG_MAX_COLUMNS = 2000    # columns used by the block-length diagnostic
 
-# Minimum-activity filter — a column with too few nonzero (trade-closed) days
-# has an ACF dominated by signal-arrival sparsity rather than return
-# dependence, which biases m_hat/b_opt for that column. Columns with an
-# active-day fraction below this threshold are dropped before diagnostics.
 MIN_ACTIVE_DAYS_FRACTION = 0.05
 
 # M3 — Politis & White automatic selection
 PW_C_SIGNIF    = 2.0     # multiplier of the sqrt(log10(n)/n) significance band
 PW_QUANTILES   = [50, 75, 90, 95]
-PW_RECOMMEND_Q = 90      # under-shooting b inflates type-I error, so aim high
+PW_RECOMMEND_Q = 90      
 
 ACF_CHUNK_COLUMNS = 250         # used by _autocovariance_by_column
-
 
 # =============================================================================
 # SHARED HELPERS
@@ -107,12 +80,7 @@ def _subsample_columns(matrix_arr: np.ndarray, max_columns: int, seed: int) -> t
 
 
 def _filter_active_columns(matrix_arr: np.ndarray, min_fraction: float) -> tuple:
-    """Drop columns whose nonzero-day fraction is below min_fraction.
 
-    Prevents signal-arrival sparsity (long runs of zero P&L on days with no
-    closed trade) from dominating the autocovariance estimate that drives
-    m_hat / b_opt for that column.
-    """
     n_obs = matrix_arr.shape[0]
     active_days = np.count_nonzero(matrix_arr, axis=0)
     active_fraction = active_days / n_obs
@@ -144,12 +112,7 @@ def _log_sparsity_diagnostics(matrix_arr: np.ndarray, timeframe: str) -> None:
 
 
 def _sharpe_influence_function(values: np.ndarray) -> tuple:
-    """Standardized influence function of the annualized Sharpe ratio.
 
-    Returns (psi, valid) where valid marks columns with positive sample std.
-    Caller is expected to subset columns by `valid` immediately — invalid
-    columns are not zeroed here to avoid redundant computation.
-    """
     x64 = values.astype(np.float64, copy=False)
     mu  = x64.mean(axis=0)
     sd  = x64.std(axis=0, ddof=1)
@@ -226,9 +189,7 @@ def method_politis_white(matrix_arr: np.ndarray, timeframe: str) -> dict:
         clean = (cumulative[window_start + k_n] - cumulative[window_start]) == 0
         newly = clean & (~resolved)
         if newly.any():
-            # +1 offset matches Patton's reference MATLAB implementation
-            # (opt_block_length_REV_dec07.m), not a literal reading of the
-            # paper's m-hat definition — kept for numerical parity with it.
+
             m_hat[newly] = window_start + 1
             resolved |= newly
         if resolved.all():
@@ -323,7 +284,6 @@ if __name__ == "__main__":
                 ohlcv_arr    = ohlcv_arr,
                 param_grid   = PARAM_GRID,
                 order_amount = ORDER_AMOUNT,
-                dtype        = DTYPE,
                 timeframe    = timeframe,
             )
         finally:

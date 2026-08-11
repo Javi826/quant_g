@@ -46,7 +46,6 @@ from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_T
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
-DTYPE  = np.float32
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
@@ -102,12 +101,12 @@ def compare_dsr_vs_stepm_from_raw(
 
     return {"dsr_by_id": dsr_by_id, "stepm_by_id": stepm_by_id}
 
+# DESPUÉS
 def compare_dsr_vs_stepm(
     rules: list,
     ohlcv_arr: dict,
     param_grid: dict,
     order_amount: int,
-    dtype,
     dsr_th: float,
     stepm_k_percentile: float | None = None,
     timeframe: str = "",
@@ -122,7 +121,6 @@ def compare_dsr_vs_stepm(
             ohlcv_arr    = ohlcv_arr,
             param_grid   = param_grid,
             order_amount = order_amount,
-            dtype        = dtype,
             timeframe    = timeframe,
         )
     finally:
@@ -323,7 +321,6 @@ if __name__ == "__main__":
             ohlcv_arr          = ohlcv_arr_by_timeframe[timeframe],
             param_grid         = PARAM_GRID,
             order_amount       = ORDER_AMOUNT,
-            dtype              = DTYPE,
             dsr_th             = DSR_TH,
             stepm_k_percentile = STEPM_K_PERCENTILE,
             timeframe          = timeframe,

@@ -13,7 +13,7 @@ from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_b
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
 from shared_batchs.utils.ohlcv_utils import get_bars_per_year
 from shared_batchs.utils.batch_metrics import compute_metrics
-
+DTYPE  = np.float32
 logger = logging.getLogger("BOT_batch.pipeline.wfo")
 
 # =============================================================================
@@ -49,7 +49,6 @@ def build_ohlcv_with_signal(
     signal_fn: callable,
     signal_params_keys: list,
     param_dict: dict,
-    dtype,
     _signal_cache: dict = None,
 ) -> dict:
 
@@ -65,7 +64,7 @@ def build_ohlcv_with_signal(
     for sym, arr in base_arrays.items():
         sig_kwargs = {k: param_dict[k.upper()] for k in signal_params_keys if k.upper() in param_dict}
         signals    = signal_fn(arr, **sig_kwargs, live_trading=False)
-        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=dtype)}
+        ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=DTYPE)}
 
     if cache_key is not None:
         _signal_cache.clear()  # only one window's signals need to live at a time
@@ -110,19 +109,19 @@ def compute_metric(results: dict) -> float:
 
     raise ValueError(f"Unknown METRIC_MODE: {METRIC_MODE}")
 
+# DESPUÉS
 def _evaluate_fn(
     params: dict,
     base_arrays: dict,
     signal_fn: callable,
     signal_params_keys: list,
     order_amount: int,
-    dtype,
     _signal_cache: dict = None,
     _prepared_cache: dict = None,
 ) -> tuple:
     """Single param combination evaluation for one WFO train window."""
     ohlcv_arrays = build_ohlcv_with_signal(
-        base_arrays, signal_fn, signal_params_keys, params, dtype, _signal_cache=_signal_cache
+        base_arrays, signal_fn, signal_params_keys, params, _signal_cache=_signal_cache
     )
     prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
     results = run_backtest_from_prepared_light(
@@ -134,17 +133,17 @@ def _evaluate_fn(
     )
     return compute_metric(results), params
 
+# DESPUÉS
 def _collect_trades_fn(
     params: dict,
     base_arrays: dict,
     signal_fn: callable,
     signal_params_keys: list,
     order_amount: int,
-    dtype,
     _prepared_cache: dict = None,
 ) -> pd.DataFrame:
     """Run backtest with best_params on a window and return the trade log."""
-    ohlcv_arrays  = build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params, dtype)
+    ohlcv_arrays  = build_ohlcv_with_signal(base_arrays, signal_fn, signal_params_keys, params)
     prepared_data = _get_prepared_data(base_arrays, ohlcv_arrays, _prepared_cache=_prepared_cache)
     results       = run_backtest_from_prepared(
         prepared_data,
@@ -210,7 +209,6 @@ def run_wfo_is(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    dtype,
     n_jobs: int = -1,
     show_progress: bool = False,
     n_symbols: int = None,
@@ -234,7 +232,6 @@ def run_wfo_is(
         signal_fn          = signal_fn,
         signal_params_keys = signal_params_keys,
         order_amount       = order_amount,
-        dtype              = dtype,
         _signal_cache      = _signal_cache,
         _prepared_cache    = _prepared_cache,
     )
@@ -244,7 +241,6 @@ def run_wfo_is(
         signal_fn          = signal_fn,
         signal_params_keys = signal_params_keys,
         order_amount       = order_amount,
-        dtype              = dtype,
         _prepared_cache    = _prepared_cache,
     )
 
@@ -324,7 +320,6 @@ def _run_wfo_for_rule(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    dtype,
     inner_n_jobs: int,
     show_progress: bool,
     n_symbols: int,
@@ -353,7 +348,6 @@ def _run_wfo_for_rule(
         dd_th               = dd_th,
         r2_th               = r2_th,
         wfr_th              = wfr_th,
-        dtype               = dtype,
         n_jobs              = inner_n_jobs,
         show_progress       = show_progress,
         n_symbols           = n_symbols,
@@ -401,7 +395,6 @@ def pipe_wfo(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    dtype,
     enabled: bool = True,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -426,7 +419,7 @@ def pipe_wfo(
         results = Parallel(n_jobs=rules_n_jobs)(
             delayed(_run_wfo_for_rule)(
                 i, total, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
-                timeframe, net_gain_th, dd_th, r2_th, wfr_th, dtype, inner_n_jobs, show_progress, n_symbols,
+                timeframe, net_gain_th, dd_th, r2_th, wfr_th, inner_n_jobs, show_progress, n_symbols,
                 log_level, save_trades, brief_trades_folder,
             )
             for i, rule in enumerate(rules)
