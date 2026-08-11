@@ -104,9 +104,9 @@ PARAM_GRID = {
 # PIPELINES — sequential validation filters
 # =============================================================================
 
-DSR_TH               = 0.70
+DSR_TH               = 0.50
 #STEPM (uncomment together with pipe_stepm in rule_runner.py)
-#STEPM_K_PERCENTILE  = 0.0005
+STEPM_K_PERCENTILE  = 0.001
 
 PIPELINE_WFO         = True
 WFO_NET_GAIN_TH      = 30
@@ -126,7 +126,7 @@ SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
-run_config = {"DSR_TH":DSR_TH,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
+#run_config = {"DSR_TH":DSR_TH,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -154,7 +154,7 @@ if __name__ == "__main__":
         f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
         f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
     )
-    logger.info(f"  DSR         : DSR_TH={DSR_TH}")
+#    logger.info(f"  DSR         : DSR_TH={DSR_TH}")
     logger.info(f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
     logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
     logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
@@ -209,13 +209,13 @@ if __name__ == "__main__":
         multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
         symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
         deploy_output_path      = DEPLOY_OUTPUT_PATH,
-        run_config              = run_config,
+#        run_config              = run_config,
         # ---- PIPELINES ----
         pipeline_wfo            = PIPELINE_WFO,
         pipeline_correlation    = PIPELINE_CORRELATION,
         pipeline_montecarlo     = PIPELINE_MONTECARLO,
         pipeline_multiverse     = PIPELINE_MULTIVERSE,
-        # stepm_k_percentile    = STEPM_K_PERCENTILE,
+        stepm_k_percentile    = STEPM_K_PERCENTILE,
         # ---- RUNS ----
         run_best_portfolio      = RUN_PORTFOLIO,
         run_deploy              = RUN_DEPLOY,

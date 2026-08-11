@@ -17,8 +17,23 @@ logger = logging.getLogger("BOT_batch.pipeline.multiverse")
 # =============================================================================
 
 N_PERMUTATIONS  = 1000
-BLOCK_SIZE      = 20   # 1 = simple bootstrap with replacement (no block structure).
-N_JOBS          = -1
+MCPT_N_JOBS     = -1
+
+BLOCK_SIZE_BY_TIMEFRAME = {
+    "1H":     403,
+    "4H":     120,
+    "6Hutc":  72,
+    "12Hutc": 33,
+}
+
+def _resolve_block_size(timeframe: str) -> int:
+    block_size = BLOCK_SIZE_BY_TIMEFRAME.get(timeframe)
+    if block_size is None:
+        raise ValueError(
+            f"MULTIVERSE ── timeframe={timeframe!r} has no entry in "
+            f"BLOCK_SIZE_BY_TIMEFRAME — add it explicitly, no fallback is defined."
+        )
+    return block_size
 
 # =============================================================================
 # MCPT PATH GENERATION — moving block bootstrap (overlapping blocks + replacement)
@@ -94,8 +109,9 @@ def _generate_mcpt_paths(
     raw_columns: list,
     base_seed: int,
     dtype,
-    block_size: int = BLOCK_SIZE,
+    block_size: int,
 ) -> np.ndarray:
+    
     df_features, df_raw = _compute_log_features(df_hist, raw_columns)
     n_rows = len(df_features)
     if n_rows == 0:
@@ -150,15 +166,16 @@ def _generate_mcpt_paths(
 
     return paths_array.astype(dtype, copy=False)
 
-
 def _generate_mcpt_paths_all_symbols(
     ohlcv_data: dict,
     n_paths: int,
     raw_columns: list,
     dtype,
+    block_size: int,
     base_seed: int = 42,
-    block_size: int = BLOCK_SIZE,
 ) -> dict:
+    
+    
     paths_per_symbol = {}
     for symbol, df_hist in ohlcv_data.items():
         arr_paths = _generate_mcpt_paths(
@@ -254,9 +271,9 @@ def _evaluate_multiverse_batch(
     order_amount: int,
     dtype,
     p_value_th: float,
+    block_size: int,
     n_paths: int = N_PERMUTATIONS,
-    block_size: int = BLOCK_SIZE,
-    n_jobs: int = N_JOBS,
+    n_jobs: int = MCPT_N_JOBS,
     timeframe: str = "",
 ) -> tuple:
 
@@ -343,8 +360,8 @@ def pipe_multiverse(
     p_value_th: float,
     enabled: bool = True,
     n_paths: int = N_PERMUTATIONS,
-    block_size: int = BLOCK_SIZE,
-    n_jobs: int = N_JOBS,
+    block_size: int | None = None,
+    n_jobs: int = MCPT_N_JOBS,
 ) -> list:
 
     start = time.time()
@@ -361,6 +378,8 @@ def pipe_multiverse(
     approved_by_id: dict = {}
 
     for timeframe, tf_rules in rules_by_timeframe.items():
+        resolved_block_size = block_size if block_size is not None else _resolve_block_size(timeframe)
+
         tf_p_values, tf_approved = _evaluate_multiverse_batch(
             ohlcv_data   = ohlcv_data_by_timeframe[timeframe],
             rules        = tf_rules,
@@ -368,7 +387,7 @@ def pipe_multiverse(
             dtype        = dtype,
             p_value_th   = p_value_th,
             n_paths      = n_paths,
-            block_size   = block_size,
+            block_size   = resolved_block_size,
             n_jobs       = n_jobs,
             timeframe    = timeframe,
         )

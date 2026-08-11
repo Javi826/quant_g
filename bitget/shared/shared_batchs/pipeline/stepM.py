@@ -1,5 +1,4 @@
 #shared_batchs/pipeline/stepM.py
-
 import time
 import logging
 import numpy as np
@@ -18,8 +17,8 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
-WHITE_N_BOOTSTRAP   = 500
-WHITE_BLOCK_SIZE    = 5    # fixed block length — mirrors montecarlo.py BLOCK_SIZE
+WHITE_N_BOOTSTRAP   = 1000
+WHITE_BLOCK_SIZE    = 20   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
 STEPM_USE_SPA       = True
 # =============================================================================
 # STEPDOWN / K-FWE CONFIG — Romano-Wolf rejection rule and convergence cap
@@ -180,13 +179,11 @@ def _bootstrap_deviations_batch_prefix_shm(
     finally:
         for shm in shm_handles:
             shm.close()
+            
 def apply_spa_recentering(studentized_deviations: np.ndarray, z_stat: np.ndarray, n_obs: int) -> tuple:
     """Hansen (2005) SPA_c: recenter clearly-losing columns (z_stat below a
     slowly-growing threshold) to 0 instead of their own negative mean, before
-    computing the bootstrap null. Improves power over the plain White (2000)
-    max-based test without inflating the asymptotic size. Implemented as a
-    constant additive shift, since subtracting a constant before studentizing
-    leaves sigma_hat (and therefore the bootstrap std) unchanged.
+    computing the bootstrap null. 
     """
     threshold = -np.sqrt(2.0 * np.log(np.log(max(n_obs, 3))))
     bad_mask  = z_stat < threshold
@@ -447,7 +444,6 @@ def stepwise_reality_check_pvalues(
         print_stepm_monotonicity_debug(k, adjusted_pval_sorted)
 
     return adjusted_pval
-
 
 # =============================================================================
 # PIPE STEPM — orchestration layer, mirroring dsr.py's pipe_dsr exactly.

@@ -129,20 +129,22 @@ def run_rule_mining_pipeline(
         )
 
         # ---- MULTIPLE-BIAS FILTER — keep exactly ONE active, comment the other ----
-        mbias_results = pipe_dsr(
-            raw_results = raw_results,
-            matrix_arr  = matrix_arr,
-            dsr_th      = dsr_th,
-            n_combos    = n_combos,
-            timeframe   = timeframe,
+# =============================================================================
+#         mbias_results = pipe_dsr(
+#             raw_results = raw_results,
+#             matrix_arr  = matrix_arr,
+#             dsr_th      = dsr_th,
+#             n_combos    = n_combos,
+#             timeframe   = timeframe,
+#         )
+# =============================================================================
+        mbias_results = pipe_stepm(
+            raw_results        = raw_results,
+            matrix_arr         = matrix_arr,
+            col_names          = col_names,
+            stepm_k_percentile = stepm_k_percentile,
+            timeframe          = timeframe,
         )
-        # mbias_results = pipe_stepm(
-        #     raw_results        = raw_results,
-        #     matrix_arr         = matrix_arr,
-        #     col_names          = col_names,
-        #     stepm_k_percentile = stepm_k_percentile,
-        #     timeframe          = timeframe,
-        # )
 
         del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
 

@@ -25,10 +25,10 @@ DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
-STEPM_LOG_LEVEL = logging.DEBUG
+STEPM_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
 #------------------------------------------------------------------------------
-REPORTING_LOG_LEVEL = logging.DEBUG
+REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
@@ -50,20 +50,20 @@ DTYPE  = np.float32
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-TIMEFRAMES = ["12Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
-N_SYMBOLS  = 10
+N_SYMBOLS  = 1
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [2, 4, 6, 8, 10],
-    "SL_PCT":     [2, 4, 6, 8, 10],
+    "TP_PCT":     [2,4,6,8,10],
+    "SL_PCT":     [2,4,6,8,10],
 }
 
 # =============================================================================
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.70
+DSR_TH              = 0.7
 STEPM_K_PERCENTILE  = 0.001
 
 # =============================================================================
