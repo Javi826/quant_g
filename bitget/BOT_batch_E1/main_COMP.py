@@ -49,7 +49,7 @@ from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_T
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-#TIMEFRAMES = ["12Hutc"]
+TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 1
 

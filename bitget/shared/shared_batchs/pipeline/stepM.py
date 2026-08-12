@@ -17,7 +17,7 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
-WHITE_N_BOOTSTRAP   = 10000
+WHITE_N_BOOTSTRAP   = 5000
 WHITE_BLOCK_SIZE    = 10   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
 STEPM_USE_SPA       = True
 # =============================================================================

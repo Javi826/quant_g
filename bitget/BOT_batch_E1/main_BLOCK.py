@@ -40,6 +40,7 @@ N_JOBS = -1
 
 TIMEFRAMES = ["1H"]
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+TIMEFRAMES = ["12Hutc"]
 
 N_SYMBOLS  = 10
 PARAM_GRID = {
@@ -55,7 +56,7 @@ BLOCK_SIZE_GRID = [5, 10, 15, 20]
 
 RANDOM_SEED = 42
 
-DIAG_MAX_COLUMNS = 2000    # columns used by the block-length diagnostic
+DIAG_MAX_COLUMNS = 200000    # columns used by the block-length diagnostic
 
 MIN_ACTIVE_DAYS_FRACTION = 0.05
 
