@@ -31,7 +31,7 @@ MIN_STRATEGIES   = 5
 MAX_STRATEGIES   = 8
 TOP_N            = 3
 
-REQUIRE_SUBPERIODS_POSITIVE = False
+REQUIRE_SUBPERIODS_POSITIVE = True
 REQUIRE_LONG_SHORT          = True
 REQUIRE_ALL_TIMEFRAMES      = True
 # =============================================================================

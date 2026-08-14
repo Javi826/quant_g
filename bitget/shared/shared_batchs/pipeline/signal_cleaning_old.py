@@ -1,4 +1,3 @@
-#shared_batchs/pipeline/signal_cleaning.py
 import os
 import time
 import logging
@@ -17,11 +16,13 @@ logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 # =============================================================================
 SIGNAL_MASK_N_JOBS       = -1
 SIGNAL_MASK_CHUNK_SIZE   = None  # None -> auto-sized from n_jobs and rule count
-DECORRELATE_THRESHOLD    = 0.8
+DECORRELATE_THRESHOLD    = 0.9
 DECORRELATE_BATCH_SIZE   = 1000
-GPU_SURVIVOR_CHUNK       = 25_000  # survivor columns compared per GPU matmul chunk, bounds
-                                   # the (batch_size x chunk) correlation temporary
-GPU_INITIAL_CAPACITY     = 20_000  # initial survivors buffer capacity, doubled on overflow
+GPU_SURVIVOR_CHUNK       = 20_000  # matmul sub-chunk size (both levels below); fixed for reproducibility
+GPU_SURVIVOR_VRAM_BUDGET_BYTES = 6 * 1024**3  # fixed 6 GiB budget for the VRAM-resident survivor buffer
+                                    # (level 1, no transfer cost). Overflow beyond this spills to level 2
+                                    # (host RAM, fetched per chunk) — conservative so it coexists safely
+                                    # with batch_gpu and the rest of the pipeline sharing the GPU.
 RANDOM_SEED              = 42
 METRIC_LABEL_WIDTH       = 36  # fixed label width so all metric-block prints align
 
@@ -63,6 +64,7 @@ def build_signal_mask_matrix(
     chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,
 ) -> "sparse.csr_matrix":
 
+
     symbols = list(ohlcv_arr.keys())
     effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
     rule_chunks = _chunk_list(all_rules, effective_chunk_size)
@@ -101,7 +103,6 @@ def build_signal_mask_keys(
     n_jobs: int = SIGNAL_MASK_N_JOBS,
     chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,
 ) -> list:
-
 
     symbols = list(ohlcv_arr.keys())
     effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
@@ -178,8 +179,9 @@ def pipe_signal_cleaning(
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  SIGNAL MASK CLEANING (pre-backtest, exact match) ── {timeframe}")
     logger.info(f"{'─' * 70}")
-    logger.info(f"  {'total rules (pre TP/SL grid)':<{METRIC_LABEL_WIDTH}} : {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"  {'dropped as exact duplicates':<{METRIC_LABEL_WIDTH}} : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
+    logger.info(f"  {'total rules (pre TP/SL grid)':<{METRIC_LABEL_WIDTH}} : {n_rules_total:,}")
+    logger.info(f"  {'dropped as exact duplicates':<{METRIC_LABEL_WIDTH}} : {n_dropped:,} / {n_rules_total:,} │ {n_dropped / n_rules_total:.4%}")
+    logger.info(f"  {'kept (unique signal masks)':<{METRIC_LABEL_WIDTH}} : {n_unique:,} / {n_rules_total:,} │ {n_unique / n_rules_total:.4%}")
     logger.info(f"{'─' * 70}\n")
 
     return [rules[i] for i in representative_idx]
@@ -217,45 +219,37 @@ def _sequential_decorrelate_within_batch(candidate_norm: np.ndarray, threshold: 
     return keep_mask
 
 
-_MANAGED_POOL = cp.cuda.MemoryPool(cp.cuda.malloc_managed)
+def _survivor_vram_capacity(n_days: int, budget_bytes: int = GPU_SURVIVOR_VRAM_BUDGET_BYTES) -> int:
+
+    return max(1, int(budget_bytes // (n_days * 4)))
 
 
-def _alloc_managed_survivors(n_days: int, n_cols: int) -> cp.ndarray:
-
-    n_bytes = n_days * n_cols * cp.dtype(cp.float32).itemsize
-    mem = _MANAGED_POOL.malloc(n_bytes)
-    return cp.ndarray((n_days, n_cols), dtype=cp.float32, memptr=mem)
-
-
-def _ensure_survivor_capacity(survivors_gpu: cp.ndarray, n_survivors: int, n_new: int, n_days: int) -> cp.ndarray:
-
-    capacity = survivors_gpu.shape[1]
-    if n_survivors + n_new <= capacity:
-        return survivors_gpu
-
-    new_capacity = capacity
-    while n_survivors + n_new > new_capacity:
-        new_capacity *= 2
-
-    grown = _alloc_managed_survivors(n_days, new_capacity)
-    grown[:, :n_survivors] = survivors_gpu[:, :n_survivors]
-    return grown
-
-
-def _max_corr_against_survivors_gpu(
+def _max_corr_against_survivors(
     batch_gpu: cp.ndarray,
     survivors_gpu: cp.ndarray,
-    n_survivors: int,
+    n_survivors_vram: int,
+    overflow_position_chunks: list,
+    matrix_norm: np.ndarray,
     chunk_size: int,
 ) -> cp.ndarray:
 
     n_batch_cols = batch_gpu.shape[1]
     max_corr = cp.zeros(n_batch_cols, dtype=cp.float32)
 
-    for start in range(0, n_survivors, chunk_size):
-        end = min(start + chunk_size, n_survivors)
+    # Tier 1 — VRAM-resident, no transfer.
+    for start in range(0, n_survivors_vram, chunk_size):
+        end = min(start + chunk_size, n_survivors_vram)
         corr_block = batch_gpu.T @ survivors_gpu[:, start:end]
         cp.maximum(max_corr, corr_block.max(axis=1), out=max_corr)
+
+    # Tier 2 — overflow, fetched from host RAM per chunk.
+    for positions in overflow_position_chunks:
+        for start in range(0, len(positions), chunk_size):
+            sub_positions = positions[start:start + chunk_size]
+            overflow_chunk_gpu = cp.asarray(matrix_norm[:, sub_positions])
+            corr_block = batch_gpu.T @ overflow_chunk_gpu
+            cp.maximum(max_corr, corr_block.max(axis=1), out=max_corr)
+            del overflow_chunk_gpu
 
     return max_corr
 
@@ -266,7 +260,7 @@ def pipe_decorrelation(
     timeframe: str = "",
     threshold: float = DECORRELATE_THRESHOLD,
     batch_size: int = DECORRELATE_BATCH_SIZE,
-    survivor_chunk_size: int = GPU_SURVIVOR_CHUNK,
+    survivor_chunk_size: int = GPU_SURVIVOR_CHUNK,  # None -> auto-sized from free VRAM per batch
     seed: int = RANDOM_SEED,
 ) -> tuple:
 
@@ -276,10 +270,12 @@ def pipe_decorrelation(
 
     matrix_norm = _normalize_columns_for_correlation(matrix_arr)
 
-    survivors_gpu = _alloc_managed_survivors(n_days, GPU_INITIAL_CAPACITY)
-    n_survivors = 0
-    survivor_chunks = []
-    dropped_chunks = []
+    vram_capacity    = _survivor_vram_capacity(n_days)
+    survivors_gpu    = cp.empty((n_days, vram_capacity), dtype=cp.float32)
+    n_survivors_vram = 0
+    overflow_chunks  = []  # host-side position arrays, beyond the fixed VRAM budget
+    survivor_chunks  = []  # full accepted-order bookkeeping, regardless of storage tier
+    dropped_chunks   = []
 
     n_batches = int(np.ceil(n_cols / batch_size))
     desc = f"DECORRELATE GPU ({batch_size} cols/batch)"
@@ -290,8 +286,10 @@ def pipe_decorrelation(
         batch_norm = matrix_norm[:, batch_positions]
         batch_gpu = cp.asarray(batch_norm)
 
-        if n_survivors > 0:
-            max_corr = _max_corr_against_survivors_gpu(batch_gpu, survivors_gpu, n_survivors, survivor_chunk_size)
+        if n_survivors_vram > 0 or overflow_chunks:
+            max_corr = _max_corr_against_survivors(
+                batch_gpu, survivors_gpu, n_survivors_vram, overflow_chunks, matrix_norm, survivor_chunk_size
+            )
             passes_survivors = cp.asnumpy(max_corr) <= threshold
         else:
             passes_survivors = np.ones(batch_gpu.shape[1], dtype=bool)
@@ -302,16 +300,21 @@ def pipe_decorrelation(
 
         keep_mask = _sequential_decorrelate_within_batch(candidate_norm, threshold)
 
-        accepted_positions    = candidate_positions[keep_mask]
-        rejected_within_batch = candidate_positions[~keep_mask]
+        accepted_positions     = candidate_positions[keep_mask]
+        accepted_norm          = candidate_norm[:, keep_mask]
+        rejected_within_batch  = candidate_positions[~keep_mask]
 
         n_accepted = accepted_positions.shape[0]
-        survivors_gpu = _ensure_survivor_capacity(survivors_gpu, n_survivors, n_accepted, n_days)
         if n_accepted > 0:
-            survivors_gpu[:, n_survivors:n_survivors + n_accepted] = cp.asarray(candidate_norm[:, keep_mask])
-        n_survivors += n_accepted
+            space_left = vram_capacity - n_survivors_vram
+            n_to_vram  = min(space_left, n_accepted)
+            if n_to_vram > 0:
+                survivors_gpu[:, n_survivors_vram:n_survivors_vram + n_to_vram] = cp.asarray(accepted_norm[:, :n_to_vram])
+                n_survivors_vram += n_to_vram
+            if n_to_vram < n_accepted:
+                overflow_chunks.append(accepted_positions[n_to_vram:])
+            survivor_chunks.append(accepted_positions)
 
-        survivor_chunks.append(accepted_positions)
         dropped_chunks.append(rejected_vs_survivors)
         dropped_chunks.append(rejected_within_batch)
 
@@ -329,8 +332,9 @@ def pipe_decorrelation(
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  DECORRELATION FILTER (GPU, pre-StepM, threshold ρ>{threshold}) ── {timeframe}")
     logger.info(f"{'─' * 70}")
-    logger.info(f"  {'total columns (post-backtest)':<{METRIC_LABEL_WIDTH}} : {format(n_cols, ',').replace(',', '.')}")
-    logger.info(f"  {'dropped (redundant)':<{METRIC_LABEL_WIDTH}} : {n_dropped_count / n_cols:.0%} │ {format(n_dropped_count, ',').replace(',', '.')} / {format(n_cols, ',').replace(',', '.')}")
+    logger.info(f"  {'total columns (post-backtest)':<{METRIC_LABEL_WIDTH}} : {n_cols:,}")
+    logger.info(f"  {'dropped (redundant)':<{METRIC_LABEL_WIDTH}} : {n_dropped_count:,} / {n_cols:,} │ {n_dropped_count / n_cols:.4%}")
+    logger.info(f"  {'kept (survivors)':<{METRIC_LABEL_WIDTH}} : {n_survivors_count:,} / {n_cols:,} │ {n_survivors_count / n_cols:.4%}")
     logger.info(f"{'─' * 70}\n")
 
     return matrix_arr[:, survivor_positions], np.asarray(col_names)[survivor_positions]

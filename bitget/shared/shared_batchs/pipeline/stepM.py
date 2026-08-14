@@ -520,12 +520,22 @@ def pipe_stepm(
     best_col_idx  = global_result["best_col_idx"]
     best_col_name = str(kept_columns[best_col_idx])
 
+    best_raw_idx  = int(np.argmax(real_sharpe))
+    best_raw_name = str(kept_columns[best_raw_idx])
+
+    logger.info(f"\n{'─' * 70}")
+    logger.info(f"  MAX RAW SHARPE (no bootstrap adjustment) ── {timeframe}")
+    logger.info(f"{'─' * 70}")
+    logger.info(f"  best column       : {best_raw_name}")
+    logger.info(f"  best real Sharpe  : {real_sharpe[best_raw_idx]:.4f}")
+    logger.info(f"{'─' * 70}\n")
+
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  GLOBAL WHITE p-value (studentized) ── {timeframe}")
     logger.info(f"{'─' * 70}")
-    logger.info(f"  best column       : {best_col_name}")
-    logger.info(f"  best real Sharpe  : {real_sharpe[best_col_idx]:.4f}")
-    logger.info(f"  best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
+    logger.info(f"  best column(z)    : {best_col_name}")
+    logger.info(f"  best Sharpe(z)    : {real_sharpe[best_col_idx]:.4f}")
+    #logger.debug(f"  best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
     logger.info(f"{'─' * 70}\n")
 

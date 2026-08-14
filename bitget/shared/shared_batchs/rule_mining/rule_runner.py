@@ -131,11 +131,13 @@ def run_rule_mining_pipeline(
             timeframe    = timeframe,
         )
         
-        matrix_arr, col_names = pipe_decorrelation(
-            matrix_arr = matrix_arr,
-            col_names  = col_names,
-            timeframe  = timeframe,
-        )
+# =============================================================================
+#         matrix_arr, col_names = pipe_decorrelation(
+#             matrix_arr = matrix_arr,
+#             col_names  = col_names,
+#             timeframe  = timeframe,
+#         )
+# =============================================================================
         
         mbias_results = pipe_stepm(
             raw_results        = raw_results,
