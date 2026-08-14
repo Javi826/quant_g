@@ -70,24 +70,6 @@ def _find_window_indices(
         return None
     return t0, t1, test0, test1
 
-def select_window_symbols(
-    candidate_indices: dict,
-    ohlcv_arr: dict,
-    n_symbols: int | None,
-) -> dict:
-
-    if n_symbols is None:
-        return candidate_indices
-
-    def _avg_train_vol(sym: str) -> float:
-        t0, t1, _, _ = candidate_indices[sym]
-        arr = ohlcv_arr[sym]
-        vol = arr.get(VOLUME_COL, arr["close"] * 0)
-        return float(np.mean(vol[t0:t1])) if t1 > t0 else 0.0
-
-    selected_syms = sorted(candidate_indices, key=_avg_train_vol, reverse=True)[:n_symbols]
-    return {sym: candidate_indices[sym] for sym in selected_syms}
-
 def _evaluate_with_shm(params: dict, shm_metadata: dict, evaluate_fn) -> tuple:
     """Worker: reconstruct base_arrays from shared memory and evaluate."""
     base_arrays, shm_handles = arrays_from_shared_memory(shm_metadata)
@@ -110,7 +92,6 @@ def walk_forward_optimization(
     ema_alpha,
     n_jobs=-1,
     show_progress=False,
-    n_symbols=None,
     collect_train_trades_fn=None,
     collect_test_trades_fn=None,
 ):
@@ -200,11 +181,11 @@ def walk_forward_optimization(
                 candidate_indices[sym] = indices
 
         # -----------------------------------------------------------------
-        # Select exactly n_symbols (OOS1 priority + fill by volume)
+        # Every symbol with valid data for this window is used — the symbol
+        # universe itself is already fixed upstream (main_MINER.py), before
+        # StepM/WFO/Multiverse ever run.
         # -----------------------------------------------------------------
-        selected_indices = select_window_symbols(
-            candidate_indices, ohlcv_arr, n_symbols
-        )
+        selected_indices = candidate_indices
 
         train_indices = {sym: (t0, t1)       for sym, (t0, t1, _,     _    ) in selected_indices.items()}
         test_indices  = {sym: (test0, test1) for sym, (_,  _,  test0, test1) in selected_indices.items()}

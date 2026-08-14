@@ -1,4 +1,4 @@
-
+#develop/live_lab/live_lab_C.py
 import os
 import glob
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger("live_lab.compare")
 # =============================================================================
 
 PRODUCTION_XLSX = os.path.expanduser(
-    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_E1/bot_trades_E1.csv"
+    "~/projects/quant/quant_b/bitget/BOT_trading/persistence/bot_files_00/bot_trades_00.xlsx"
 )
 BATCH_TRADES_DIR = os.path.expanduser(
     "~/projects/quant/quant_b/develop/brief_trades"
@@ -21,20 +21,19 @@ BATCH_TRADES_DIR = os.path.expanduser(
 
 # Batch file pattern: trades_{OOS_PERIOD}_{BATCH_MODE}_{strategy_id}.csv
 #OOS_PERIOD  = "oos"      # "oos" | "oos2" | "oos3"
-OOS_PERIOD  = "wfo_test"   
+OOS_PERIOD  = "full"   
 BATCH_MODE  = "regime"   # "baseline" | "regime"
 
 # Time window filte (None = no filter)
-DATE_FROM = "2026-04-08"
-DATE_TO   = "2026-06-30"
+DATE_FROM = "2026-07-11"
+DATE_TO   = "2026-08-13"
 
-# Set to [] to compare all available strategies
 SELECTED_STRATEGIES = [
-    "05_reversal_long_1H",
-    #"20_parity_short_6Hutc",
-    "22_flag_short_15m",
-    "31_orderblocks_long_15m",
-    "34_orderblocks_short_30m",
+    "00106_4H_short_RSI14lt50_AND_ADX14gt25_AND_CLOSEgtMA100",
+    "00048_4H_long_RSI14lt50_AND_CLOSEgtMA100_AND_CLOSEgtCLOSEm5",
+    "00111_1H_short_RSI14lt50_AND_CLOSEgtMA100_AND_CLOSEgtCLOSEm5",
+    "00041_4H_long_RSI14gt50_AND_CLOSEltMA100_AND_CLOSEltCLOSEm5",
+    "00104_4H_short_RSI14gt50_AND_CLOSEltMA100_AND_CLOSEltCLOSEm5",
 ]
 
 # A production trade matches a batch trade if it opens within this many minutes
@@ -47,8 +46,7 @@ EXCLUDE_SYMBOLS = [
 ]
 
 # Strategy to plot individually (None to skip)
-PLOT_STRATEGY = "05_reversal_long_1H"
-#PLOT_STRATEGY = "05_reversal_long_1H"
+PLOT_STRATEGY = "00106_4H_short_RSI14lt50_AND_ADX14gt25_AND_CLOSEgtMA100"
 
 # Strategy for entry-rounds inspection (None to skip)
 ENTRY_ROUNDS_STRATEGY = PLOT_STRATEGY 
@@ -68,7 +66,7 @@ EDGE_CANDLES = 50
 # =============================================================================
 
 def load_production(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
+    df = pd.read_excel(path)
     df.columns = [c.strip().upper() for c in df.columns]
     df["OPEN_AT"]  = pd.to_datetime(df["OPEN_AT"],  errors="coerce", utc=True)
     df["CLOSE_AT"] = pd.to_datetime(df["CLOSE_AT"], errors="coerce", utc=True)
@@ -89,17 +87,25 @@ def load_production(path: str) -> pd.DataFrame:
 
 def load_batch(trades_dir: str, oos_period: str, mode: str, strategy_ids: list[str]) -> pd.DataFrame:
     frames = []
-    has_mode = not oos_period.startswith("wfo")
+    has_mode = not oos_period.startswith(("wfo", "full"))
     prefix   = f"trades_{oos_period}_{mode}_" if has_mode else f"trades_{oos_period}_"
     pattern  = os.path.join(trades_dir, f"{prefix}*.csv")
     for path in glob.glob(pattern):
         fname    = os.path.basename(path)
         strat_id = fname.replace(prefix, "").replace(".csv", "")
-        if strategy_ids and strat_id not in strategy_ids:
-            continue
+
+        # rule_id may carry an outer index/timeframe prefix around the strategy
+        # label (e.g. "00000_1H_short_00111_1H_short_RSI14..."), so match by
+        # suffix against the canonical strategy label, not exact equality.
+        matched_sid = strat_id
+        if strategy_ids:
+            matched_sid = next((sid for sid in strategy_ids if strat_id.endswith(sid)), None)
+            if matched_sid is None:
+                continue
+
         try:
             df = pd.read_csv(path)
-            df["strategy"] = strat_id
+            df["strategy"] = matched_sid
             frames.append(df)
         except Exception as e:
             logger.warning(f"  ⚠️  Could not read {fname}: {e}")
@@ -155,7 +161,9 @@ def compute_metrics(df: pd.DataFrame) -> dict:
 # =============================================================================
 # REPORT
 # =============================================================================
-
+def _short_id(strategy_id: str) -> str:
+    """Extract the leading numeric id from a strategy label (e.g. '00041')."""
+    return strategy_id.split("_")[0]
 def print_report(
     results:    list[dict],
     oos_period: str,
@@ -171,7 +179,7 @@ def print_report(
     logger.info(f"  Excluded   : {EXCLUDE_SYMBOLS or '—'}")
     logger.info(f"{'='*110}")
     logger.info(
-        f"  {'STRATEGY':<32} "
+        f"  {'STRATEGY':<10} "
         f"{'N_TR prod':>9} {'N_TR btch':>9} {'Δ':>6} | "
         f"{'WR% prod':>9} {'WR% btch':>9} {'Δ':>6} | "
         f"{'PNL prod':>10} {'PNL btch':>10} {'Δ':>8}"
@@ -181,7 +189,7 @@ def print_report(
     for r in results:
         p   = r["prod"]
         b   = r["batch"]
-        sid = r["strategy_id"]
+        sid = _short_id(r["strategy_id"])
 
         dn = (b["n_trades"] - p["n_trades"]) if (p["n_trades"] and b["n_trades"]) else None
         dw = round(b["win_rate"]     - p["win_rate"],     1) if not (np.isnan(p["win_rate"])     or np.isnan(b["win_rate"]))     else None
@@ -197,7 +205,7 @@ def print_report(
             return f"{sign}{val:{fmt}}"
 
         logger.info(
-            f"  {sid:<32} "
+            f"  {sid:<10} "
             f"{_fmt(p['n_trades'], 'd'):>9} {_fmt(b['n_trades'], 'd'):>9} {_delta(dn, 'd'):>6} | "
             f"{_fmt(p['win_rate']):>9} {_fmt(b['win_rate']):>9} {_delta(dw):>6} | "
             f"{_fmt(p['total_profit'], '.2f'):>10} {_fmt(b['total_profit'], '.2f'):>10} {_delta(dp, '.2f'):>8}"
@@ -299,7 +307,7 @@ def print_match_report(match_result: dict, forward_minutes: int) -> None:
     logger.info(f"  TRADE MATCHING — anchor-synced per strategy | window +{forward_minutes} min (prod after batch)")
     logger.info(f"{'='*120}")
     logger.info(
-        f"  {'STRATEGY':<32} {'ANCHOR':<20} {'MATCHED':>8} {'P_ONLY':>7} {'B_ONLY':>7} "
+        f"  {'STRATEGY':<10} {'ANCHOR':<20} {'MATCHED':>8} {'P_ONLY':>7} {'B_ONLY':>7} "
         f"{'MATCH%':>7} {'WR_OK':>6} {'WR_OK%':>7}"
     )
     logger.info(f"  {'-'*100}")
@@ -309,7 +317,7 @@ def print_match_report(match_result: dict, forward_minutes: int) -> None:
         wr_pct = f"{r['wr_agree_pct']}" if r["wr_agree_pct"] is not None else "—"
         m_pct  = f"{r['match_pct']}"    if r["match_pct"]    is not None else "—"
         logger.info(
-            f"  {r['strategy_id']:<32} {anchor:<20} {r['matched']:>8} {r['prod_only']:>7} {r['batch_only']:>7} "
+            f"  {_short_id(r['strategy_id']):<10} {anchor:<20} {r['matched']:>8} {r['prod_only']:>7} {r['batch_only']:>7} "
             f"{m_pct:>7} {r['wr_agree']:>6} {wr_pct:>7}"
         )
 
@@ -317,7 +325,7 @@ def print_match_report(match_result: dict, forward_minutes: int) -> None:
     wr_pct = f"{t['wr_agree_pct']}" if t["wr_agree_pct"] is not None else "—"
     logger.info(f"  {'-'*100}")
     logger.info(
-        f"  {'SYSTEM TOTAL':<32} {'':<20} {t['matched']:>8} {t['prod_only']:>7} {t['batch_only']:>7} "
+        f"  {'SYSTEM TOTAL':<10} {'':<20} {t['matched']:>8} {t['prod_only']:>7} {t['batch_only']:>7} "
         f"{'':>7} {t['wr_agree']:>6} {wr_pct:>7}"
     )
     logger.info(f"  {'='*120}\n")
@@ -467,7 +475,7 @@ def print_wr_score_report(
     logger.info(f"\n{'='*80}")
     logger.info(f"  WR DAILY SCORE ({label}) — % days where round(WR,0) matches prod vs batch")
     logger.info(f"{'='*80}")
-    logger.info(f"  {'STRATEGY':<32} {'DAYS_COMMON':>12} {'DAYS_MATCH':>11} {'SCORE%':>8}")
+    logger.info(f"  {'STRATEGY':<10} {'DAYS_COMMON':>12} {'DAYS_MATCH':>11} {'SCORE%':>8}")
     logger.info(f"  {'-'*65}")
 
     total_common = total_match = 0
@@ -476,14 +484,14 @@ def print_wr_score_report(
         b = df_batch[df_batch["strategy"] == sid]
         r = compute_wr_daily_score(p, b)
         score_str = f"{r['score_pct']}" if r["score_pct"] is not None else "—"
-        logger.info(f"  {sid:<32} {r['days_common']:>12} {r['days_match']:>11} {score_str:>8}")
+        logger.info(f"  {_short_id(sid):<10} {r['days_common']:>12} {r['days_match']:>11} {score_str:>8}")
         total_common += r["days_common"]
         total_match  += r["days_match"]
 
     total_score = round(total_match / total_common * 100, 1) if total_common else None
     score_str   = f"{total_score}" if total_score is not None else "—"
     logger.info(f"  {'-'*65}")
-    logger.info(f"  {'SYSTEM TOTAL':<32} {total_common:>12} {total_match:>11} {score_str:>8}")
+    logger.info(f"  {'SYSTEM TOTAL':<10} {total_common:>12} {total_match:>11} {score_str:>8}")
     logger.info(f"  {'='*80}\n")
 
 
@@ -762,6 +770,12 @@ def main() -> None:
 
     logger.info("  Loading batch trades...")
     df_batch = load_batch(BATCH_TRADES_DIR, OOS_PERIOD, BATCH_MODE, strategy_ids)
+    if df_batch.empty:
+        logger.warning(
+            f"  ⚠️  No batch trade files found for OOS_PERIOD='{OOS_PERIOD}' "
+            f"BATCH_MODE='{BATCH_MODE}' in {BATCH_TRADES_DIR}"
+        )
+        return
     df_batch = apply_filters(df_batch, effective_from, DATE_TO, strategy_ids)
 
     all_strategies = sorted(

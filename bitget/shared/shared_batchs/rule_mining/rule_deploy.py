@@ -109,7 +109,6 @@ def run_deploy_rule(
     param_grid: dict,
     order_amount: int,
     timeframe: str,
-    n_symbols: int,
     approved: bool,
     n_jobs: int,
     symbols_live_folder: str,
@@ -126,7 +125,6 @@ def run_deploy_rule(
         param_grid   = param_grid,
         signal_fn    = signal_fn,
         order_amount = order_amount,
-        n_symbols    = n_symbols,
         n_jobs       = n_jobs,
     )
     params_str   = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")

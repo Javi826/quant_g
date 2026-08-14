@@ -354,7 +354,6 @@ def pipe_multiverse(
     dd_th: float,
     r2_th: float,
     wfr_th: float,
-    n_symbols: int,
     p_value_th: float,
     enabled: bool = True,
     n_paths: int = N_PERMUTATIONS,

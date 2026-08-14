@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import logging
-import numpy as np
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
@@ -64,7 +63,7 @@ logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
-from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
@@ -83,10 +82,11 @@ INNER_N_JOBS = 1
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = False
+RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+#TIMEFRAMES = ["6Hutc"]
 #TIMEFRAMES = ["12Hutc"]
 N_SYMBOLS  = 10
 
@@ -99,7 +99,7 @@ PARAM_GRID = {
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-STEPM_K_PERCENTILE  = 0.005
+STEPM_K_PERCENTILE  = 0.02
 #0.005
 
 PIPELINE_WFO         = True
@@ -170,6 +170,7 @@ if __name__ == "__main__":
             min_price         = MIN_PRICE,
             filter_symbols_fn = filter_symbols,
         )
+        ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
     # -------------------------------------------------------------------
@@ -189,7 +190,6 @@ if __name__ == "__main__":
         data_folder             = DATA_FOLDER_IS,
         rules_n_jobs            = RULES_N_JOBS,
         inner_n_jobs            = INNER_N_JOBS,
-        n_symbols               = N_SYMBOLS,
         max_depth               = RULE_MAX_DEPTH,
         log_level               = WFO_LOG_LEVEL,
         save_trades             = SAVE_TRADES,

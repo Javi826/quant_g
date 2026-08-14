@@ -48,14 +48,9 @@ SELECTED_SYMBOLS = [
     "ETHUSDT",
     "SOLUSDT",
     "XRPUSDT",
-    "DOGEUSDT",
-    "SUIUSDT",
-    "BNBUSDT",
-    "ADAUSDT",
-    "TAOUSDT",
-    "HYPEUSDT"]
+]
 
-SYMBOL_MODE        = "auto"   #manual o auto
+SYMBOL_MODE        = "manual"   #manual o auto
 N_SYMBOLS_DOWNLOAD = 40
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"

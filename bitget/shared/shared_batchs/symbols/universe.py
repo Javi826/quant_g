@@ -9,24 +9,17 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # FILTER SYMBOLS
 # =============================================================================
 MY_SYMBOLS = False
+symbols_to_include = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+]
 symbols_to_exclude  = {"BTCUSDT","ETHUSDT"}
 #symbols_to_exclude = {}
 
 # Symbols must have data available from this date onward (covers WFO window 0 train_start).
 MIN_START_DATE = "2022-01-02"
-
-symbols_to_include = [
-    "ADAUSDT",
-    "AVAXUSDT",
-    "BCHUSDT",
-    "BNBUSDT",
-    "DOGEUSDT",
-    "LINKUSDT",
-    "NEARUSDT",
-    "SOLUSDT",
-    "XLMUSDT",
-    "XRPUSDT",
-]
 
 def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, custom_symbols=None):
@@ -117,3 +110,23 @@ def select_universe(
     logger.debug(f"IS pool ({len(filtered_is):>3}): {filtered_is}")
 
     return ohlcv_is
+
+# =============================================================================
+# TOP-N SYMBOL SELECTION BY VOLUME — applied once, upstream of every pipeline
+# stage (StepM, WFO, Multiverse), so they all operate on the same fixed set.
+# =============================================================================
+def select_top_n_by_volume(ohlcv_data: dict, n_symbols: int | None) -> dict:
+
+    if n_symbols is None or n_symbols >= len(ohlcv_data):
+        return ohlcv_data
+
+    avg_volume_by_symbol = {
+        sym: float(df[VOLUME_COL].mean())
+        for sym, df in ohlcv_data.items()
+    }
+
+    top_symbols = sorted(avg_volume_by_symbol, key=avg_volume_by_symbol.get, reverse=True)[:n_symbols]
+
+    logger.debug(f"Top {n_symbols} symbols by avg volume: {top_symbols}")
+
+    return {sym: ohlcv_data[sym] for sym in top_symbols}

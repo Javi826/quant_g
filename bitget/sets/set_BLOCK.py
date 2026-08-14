@@ -19,7 +19,7 @@ logging.getLogger("BOT_batch.pipeline.stepM").setLevel(logging.WARNING)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
@@ -42,7 +42,7 @@ TIMEFRAMES = ["1H"]
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 TIMEFRAMES = ["12Hutc"]
 
-N_SYMBOLS  = 10
+N_SYMBOLS  = 1
 PARAM_GRID = {
     "SELL_AFTER": [50],
     "TP_PCT":     [2, 4, 6, 8, 10],
@@ -274,6 +274,7 @@ if __name__ == "__main__":
             min_price         = MIN_PRICE,
             filter_symbols_fn = filter_symbols,
         )
+        ohlcv_is  = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
         ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
         rules     = _build_rule_dicts(ohlcv_is, timeframe, RULE_MAX_DEPTH)
 

@@ -34,7 +34,7 @@ logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
@@ -51,7 +51,7 @@ N_JOBS = -1  # -1 = use all available cores, for both the backtest search and th
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
 TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
-N_SYMBOLS  = 1
+N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -62,8 +62,8 @@ PARAM_GRID = {
 # =============================================================================
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.7
-STEPM_K_PERCENTILE  = 0.001
+DSR_TH              = 0.6
+STEPM_K_PERCENTILE  = 0.01
 
 # =============================================================================
 # COMPARISON — build the raw universe once, hand it to both pipes, compare.
@@ -177,6 +177,8 @@ def _print_comparison(raw_results: list, dsr_by_id: dict, stepm_by_id: dict, tim
     logger.info(f"  DSR vs STEPM ── {timeframe}")
     logger.info(f"{'─' * 70}")
 
+    _print_side_breakdown(raw_results, dsr_by_id, stepm_by_id)
+
     id_width = max((len(row[0]) for row in rows), default=8) + 2
     logger.info(f"  top {min(20, len(rows))} by STEPM p-value")
     logger.info(f"{'RULE_ID':<{id_width}}{'DSR':<10}{'DSR_OK':<10}{'STEPM_p':<10}{'STEPM_OK':<10}")
@@ -233,6 +235,55 @@ def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
     _print_table("BOTH PASS (DSR ✅ + STEPM ✅)", both_pass, sort_key=lambda row: row[3])
     _print_table("DSR ONLY ── DSR ✅ but STEPM ❌ (disagreement)", dsr_only, sort_key=lambda row: row[1], reverse=True)
     _print_table("STEPM ONLY ── STEPM ✅ but DSR ❌ (disagreement)", stepm_only, sort_key=lambda row: row[3])
+
+def _print_side_breakdown(raw_results: list, dsr_by_id: dict, stepm_by_id: dict) -> None:
+    """Counts long/short rules among those that PASSED each method (DSR, STEPM)."""
+    dsr_long = dsr_short = stepm_long = stepm_short = 0
+
+    for r in raw_results:
+        rid  = r["rule_id"]
+        side = r.get("side")
+
+        if dsr_by_id.get(rid, {}).get("passed_dsr", False):
+            if side == "long":
+                dsr_long += 1
+            elif side == "short":
+                dsr_short += 1
+
+        if stepm_by_id.get(rid, {}).get("passed_stepm", False):
+            if side == "long":
+                stepm_long += 1
+            elif side == "short":
+                stepm_short += 1
+
+    logger.info(f"  {'METHOD':<10}{'LONG':<8}{'SHORT':<8}{'TOTAL':<8}")
+    logger.info(f"  {'DSR':<10}{dsr_long:<8}{dsr_short:<8}{dsr_long + dsr_short:<8}")
+    logger.info(f"  {'STEPM':<10}{stepm_long:<8}{stepm_short:<8}{stepm_long + stepm_short:<8}")
+
+
+def _print_market_bias(ohlcv_arr: dict, timeframe: str) -> None:
+    """Equal-weight average buy&hold return across all symbols in the universe,
+    to check whether the test period itself was directionally biased."""
+    returns = []
+    for arr in ohlcv_arr.values():
+        close = arr["close"]
+        if len(close) < 2:
+            continue
+        returns.append((float(close[-1]) / float(close[0]) - 1.0) * 100.0)
+
+    if not returns:
+        logger.warning(f"MARKET BIAS ── {timeframe} ── no data")
+        return
+
+    avg_ret       = float(np.mean(returns))
+    pct_positive  = float(np.mean([r > 0 for r in returns])) * 100.0
+
+    logger.info(f"{'─' * 70}")
+    logger.info(f"  MARKET BIAS (buy&hold, equal-weight) ── {timeframe} ── n_symbols={len(returns)}")
+    logger.info(f"    Avg return        : {avg_ret:+.2f}%")
+    logger.info(f"    Symbols positive  : {pct_positive:.1f}%")
+    logger.info(f"{'─' * 70}\n")
+
 
 def _print_correlation(dsr_vals: list, stepm_vals: list, timeframe: str) -> None:
     if len(dsr_vals) < 3:
@@ -302,6 +353,7 @@ if __name__ == "__main__":
             min_price         = MIN_PRICE,
             filter_symbols_fn = filter_symbols,
         )
+        ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
         ohlcv_data_by_timeframe[timeframe] = ohlcv_is
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
 
@@ -312,6 +364,8 @@ if __name__ == "__main__":
     comparisons_by_timeframe = {}
 
     for timeframe in TIMEFRAMES:
+        _print_market_bias(ohlcv_arr_by_timeframe[timeframe], timeframe)
+
         rules_for_timeframe = _build_rule_dicts(
             ohlcv_data_by_timeframe[timeframe], timeframe, RULE_MAX_DEPTH,
         )

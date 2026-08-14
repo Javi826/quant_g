@@ -235,27 +235,27 @@ def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_
 
     count_str = f"{len(survivor_ids)} / {len(candidate_ids)} passed" if show_status else f"{len(rows)} / {len(candidate_ids)} tested"
 
-    log_fn(f"\n{'─' * 170}")
+    log_fn(f"\n{'─' * 180}")
     log_fn(f"  RULE MINING RESULTS — {stage_label} ── {count_str}")
-    log_fn(f"{'─' * 170}")
+    log_fn(f"{'─' * 180}")
 
     status_header = f"  {'STATUS':<8}" if show_status else ""
     log_fn(
-        f"{'ID':<{id_width}}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
+        f"{'ID':<{id_width}}{'SHARPE':<10}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
         f"{'STEPM_P':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
     )
-    log_fn(f"{'─' * 170}")
+    log_fn(f"{'─' * 180}")
     for r in rows:
         status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
         log_fn(
-            f"{_short_id(r['rule_id']):<{id_width}}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
+            f"{_short_id(r['rule_id']):<{id_width}}{(r.get('sharpe') or 0.0):<10.3f}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
             f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
             f"{r.get('stepm_p', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
             f"{r.get('multiverse_p_value', 0.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"
         )
 
-    log_fn(f"{'─' * 170}\n")
+    log_fn(f"{'─' * 180}\n")
 
 def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]

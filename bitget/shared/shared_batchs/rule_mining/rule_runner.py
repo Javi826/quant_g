@@ -7,6 +7,8 @@ from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.stepM import pipe_stepm
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
+from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning,pipe_decorrelation
+
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
@@ -86,7 +88,6 @@ def run_rule_mining_pipeline(
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
     show_progress: bool = False,
-    n_symbols: int = None,
     max_depth: int = MAX_DEPTH,
     log_level: int = logging.INFO,
     save_trades: bool = False,
@@ -114,7 +115,13 @@ def run_rule_mining_pipeline(
     all_mbias_results = []
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
-        logger.info(f"RULE MINING ── {timeframe} ── total candidate rules: {len(rules)}")
+        logger.info(f"==== RULE MINING ── {timeframe} ── total candidate rules: {len(rules)} ====")
+
+        rules = pipe_signal_cleaning(
+            rules       = rules,
+            ohlcv_arr   = ohlcv_arr_by_timeframe[timeframe],
+            timeframe   = timeframe,
+        )
 
         raw_results, n_combos, matrix_arr, col_names = pipe_backtesting(
             rules        = rules,
@@ -123,6 +130,13 @@ def run_rule_mining_pipeline(
             order_amount = order_amount,
             timeframe    = timeframe,
         )
+        
+        matrix_arr, col_names = pipe_decorrelation(
+            matrix_arr = matrix_arr,
+            col_names  = col_names,
+            timeframe  = timeframe,
+        )
+        
         mbias_results = pipe_stepm(
             raw_results        = raw_results,
             matrix_arr         = matrix_arr,
@@ -155,7 +169,6 @@ def run_rule_mining_pipeline(
             rules_n_jobs        = rules_n_jobs,
             inner_n_jobs        = inner_n_jobs,
             show_progress       = show_progress,
-            n_symbols           = n_symbols,
             log_level           = log_level,
             save_trades         = save_trades,
             brief_trades_folder = brief_trades_folder,
@@ -244,7 +257,6 @@ def run_rule_mining_pipeline(
             dd_th                   = dd_th,
             r2_th                   = r2_th,
             wfr_th                  = wfr_th,
-            n_symbols               = n_symbols,
             p_value_th              = multiverse_p_value_th,
             enabled                 = pipeline_multiverse,
         )
@@ -311,7 +323,6 @@ def run_rule_mining_pipeline(
                     signal_fn           = rule_info["signal_fn"],
                     param_grid          = param_grid,
                     order_amount        = order_amount,
-                    n_symbols           = n_symbols,
                     approved            = rule_info["approved"],
                     n_jobs              = inner_n_jobs,
                     symbols_live_folder = symbols_live_folder,

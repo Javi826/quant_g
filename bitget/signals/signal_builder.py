@@ -9,8 +9,9 @@ def describe_rule(bank: ConditionBank, rule_specs: list) -> str:
 
 
 def build_signal_fn(rule_specs: list, side: str):
-    def signal_fn(arr: dict, live_trading: bool = True) -> np.ndarray:
-        bank = ConditionBank(arr)
+    def signal_fn(arr: dict, live_trading: bool = True, bank: ConditionBank = None) -> np.ndarray:
+        if bank is None:
+            bank = ConditionBank(arr)
         mask = np.ones(bank.n, dtype=bool)
         for spec in rule_specs:
             mask &= bank.evaluate(spec)

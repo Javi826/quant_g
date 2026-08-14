@@ -17,7 +17,7 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
-WHITE_N_BOOTSTRAP   = 5000
+WHITE_N_BOOTSTRAP   = 1000
 WHITE_BLOCK_SIZE    = 10   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
 STEPM_USE_SPA       = True
 # =============================================================================
@@ -454,6 +454,7 @@ def empty_stepm_fields() -> dict:
         "passed_stepm": True,
         "passed_mbias": True,
         "stepm_p":      None,
+        "sharpe":       None,
     }
 def pipe_stepm(
     raw_results: list,
@@ -544,6 +545,7 @@ def pipe_stepm(
 
     stepm_pvals    = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
     stepm_p_by_col = dict(zip(kept_columns, stepm_pvals))
+    sharpe_by_col  = dict(zip(kept_columns, real_sharpe))
 
     if logger.isEnabledFor(logging.DEBUG):
         print_stepm_brc_equivalence_debug(timeframe, k_fwe, global_result["global_p"], stepm_p_by_col, best_col_name)
@@ -554,6 +556,7 @@ def pipe_stepm(
         best_combo_id = r.get("best_combo_id")
         col_name      = f"{r['rule_id']}__{best_combo_id}" if best_combo_id else None
         stepm_p       = stepm_p_by_col.get(col_name, float("nan"))
+        sharpe_val    = sharpe_by_col.get(col_name, float("nan"))
         passed        = bool(np.isfinite(stepm_p) and stepm_p <= stepm_pvalue_th)
         n_passed     += int(passed)
 
@@ -562,6 +565,7 @@ def pipe_stepm(
             "passed_stepm": passed,
             "passed_mbias": passed,
             "stepm_p":      float(stepm_p) if np.isfinite(stepm_p) else None,
+            "sharpe":       float(sharpe_val) if np.isfinite(sharpe_val) else None,
         })
 
     logger.info(f"STEPM ── {timeframe} ── k={k_fwe} ── {n_passed}/{len(raw_results)} rules pass")

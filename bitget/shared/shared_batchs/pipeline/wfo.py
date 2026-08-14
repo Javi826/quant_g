@@ -211,7 +211,6 @@ def run_wfo_is(
     wfr_th: float,
     n_jobs: int = -1,
     show_progress: bool = False,
-    n_symbols: int = None,
     collect_test_fn_override: callable = None,
 ) -> tuple:
 
@@ -256,7 +255,6 @@ def run_wfo_is(
         ema_alpha               = EMA_ALPHA,
         n_jobs                  = n_jobs,
         show_progress           = show_progress,
-        n_symbols               = n_symbols,
         collect_train_trades_fn = collect_train_fn,
         collect_test_trades_fn  = collect_test_fn,
     )
@@ -322,7 +320,6 @@ def _run_wfo_for_rule(
     wfr_th: float,
     inner_n_jobs: int,
     show_progress: bool,
-    n_symbols: int,
     log_level: int,
     save_trades: bool,
     brief_trades_folder: str,
@@ -350,7 +347,6 @@ def _run_wfo_for_rule(
         wfr_th              = wfr_th,
         n_jobs              = inner_n_jobs,
         show_progress       = show_progress,
-        n_symbols           = n_symbols,
     )
     n_windows = len(df_results) - 1 if df_results is not None else 0
     n_trades  = 0 if wfo_test_trades is None else len(wfo_test_trades)
@@ -399,7 +395,6 @@ def pipe_wfo(
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
     show_progress: bool = False,
-    n_symbols: int = None,
     log_level: int = logging.INFO,
     save_trades: bool = False,
     brief_trades_folder: str = None,
@@ -419,7 +414,7 @@ def pipe_wfo(
         results = Parallel(n_jobs=rules_n_jobs)(
             delayed(_run_wfo_for_rule)(
                 i, total, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
-                timeframe, net_gain_th, dd_th, r2_th, wfr_th, inner_n_jobs, show_progress, n_symbols,
+                timeframe, net_gain_th, dd_th, r2_th, wfr_th, inner_n_jobs, show_progress,
                 log_level, save_trades, brief_trades_folder,
             )
             for i, rule in enumerate(rules)

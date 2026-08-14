@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.multiverse_block_size")
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.setup.config_backtest import MIN_PRICE
 
@@ -105,7 +105,7 @@ def compute_block_size_range(timeframe: str, n_symbols: int) -> dict:
         min_price=MIN_PRICE,
         filter_symbols_fn=filter_symbols,
     )
-
+    ohlcv_is = select_top_n_by_volume(ohlcv_is, n_symbols)
     b_opt_values = []
     for symbol, df in list(ohlcv_is.items())[:n_symbols]:
         close = df["close"].to_numpy(dtype=np.float64)
