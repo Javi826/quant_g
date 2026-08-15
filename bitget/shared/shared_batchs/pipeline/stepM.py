@@ -199,6 +199,7 @@ def compute_deviation_matrix(
     seed: int = RANDOM_SEED,
     n_jobs: int = None,
     progress_label: str = "",
+    apply_spa: bool = True,
 ) -> dict:
 
     n_jobs = n_jobs if n_jobs is not None else STEPM_N_JOBS
@@ -302,7 +303,7 @@ def compute_deviation_matrix(
             progress_label, studentized_deviations, z_stat, n_cols_built, n_cols, kept_columns.shape[0],
         )
 
-    if STEPM_USE_SPA:
+    if apply_spa and STEPM_USE_SPA:
         studentized_deviations, spa_mask, spa_threshold = apply_spa_recentering(studentized_deviations, z_stat, n_obs)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(

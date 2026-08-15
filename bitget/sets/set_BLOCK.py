@@ -1,4 +1,4 @@
-#BOT_batch/main_BLOCK.py
+#BOT_batch/SET_BLOCK.py
 
 import os
 import sys
@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout, force=True)
-logger = logging.getLogger("BOT_batch.block_size_analysis")
+logger = logging.getLogger("BOT_batch.main_BLOCK")
 logger.setLevel(logging.INFO)
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(logging.INFO)
 logging.getLogger("BOT_batch.pipeline.stepM").setLevel(logging.WARNING)
@@ -38,21 +38,21 @@ FAST_MODE = True
 # =============================================================================
 N_JOBS = -1
 
-TIMEFRAMES = ["1H"]
-TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+#TIMEFRAMES = ["1H"]
+#TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 TIMEFRAMES = ["12Hutc"]
 
-N_SYMBOLS  = 1
+N_SYMBOLS  = 10
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [2, 4, 6, 8, 10],
-    "SL_PCT":     [2, 4, 6, 8, 10],
+    "TP_PCT":     [10],
+    "SL_PCT":     [10],
     }
 
 # =============================================================================
 # BLOCK-SIZE ANALYSIS CONFIGURATION
 # =============================================================================
-BLOCK_SIZE_GRID = [5, 10, 15, 20]
+BLOCK_SIZE_GRID = [10,20,50]
 
 RANDOM_SEED = 42
 

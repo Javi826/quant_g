@@ -1,12 +1,13 @@
 #BOT_batch/main_COMP.py
 """
-DSR vs StepM — full brute universe comparison, single standalone script.
+DSR vs StepM vs FDR — full brute universe comparison, single standalone script.
 """
 import os
 import sys
 import time
 import logging
 import numpy as np
+from itertools import combinations
 from scipy.stats import pearsonr, spearmanr
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -27,6 +28,9 @@ logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
 STEPM_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
+
+FDR_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.fdr").setLevel(FDR_LOG_LEVEL)
 #------------------------------------------------------------------------------
 REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
@@ -43,6 +47,7 @@ from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
+from shared_batchs.pipeline.fdr import pipe_fdr, FDR_ALPHA
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
@@ -60,13 +65,25 @@ PARAM_GRID = {
 }
 
 # =============================================================================
-# DSR vs STEPM — full brute universe comparison, no other pipeline stages
+# DSR vs STEPM vs FDR — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.6
-STEPM_K_PERCENTILE  = 0.01
+DSR_TH              = 0.70
+STEPM_K_PERCENTILE  = 0.02
 
 # =============================================================================
-# COMPARISON — build the raw universe once, hand it to both pipes, compare.
+# METHOD REGISTRY — adding a new data-snooping test only requires a new entry
+# here plus a new "pairs" tuple in _print_correlation; every report function
+# below iterates over this registry instead of hardcoding method names.
+# =============================================================================
+METHOD_SPECS = {
+    "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
+    "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
+    "fdr":   {"value_key": "fdr_p",   "ok_key": "passed_fdr",   "label": "FDR"},
+}
+METHOD_ORDER = ["dsr", "stepm", "fdr"]
+
+# =============================================================================
+# COMPARISON — build the raw universe once, hand it to all three pipes, compare.
 # =============================================================================
 def compare_dsr_vs_stepm_from_raw(
     raw_results: list,
@@ -75,6 +92,7 @@ def compare_dsr_vs_stepm_from_raw(
     dsr_th: float,
     n_combos: int,
     stepm_k_percentile: float | None = None,
+    fdr_alpha: float = FDR_ALPHA,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
@@ -97,11 +115,20 @@ def compare_dsr_vs_stepm_from_raw(
     )
     stepm_by_id = {r["rule_id"]: r for r in stepm_results}
 
-    _print_comparison(raw_results, dsr_by_id, stepm_by_id, timeframe)
+    fdr_results = pipe_fdr(
+        raw_results = raw_results,
+        matrix_arr  = matrix_arr,
+        col_names   = col_names,
+        fdr_alpha   = fdr_alpha,
+        timeframe   = timeframe,
+    )
+    fdr_by_id = {r["rule_id"]: r for r in fdr_results}
 
-    return {"dsr_by_id": dsr_by_id, "stepm_by_id": stepm_by_id}
+    results_by_method = {"dsr": dsr_by_id, "stepm": stepm_by_id, "fdr": fdr_by_id}
+    _print_comparison(raw_results, results_by_method, timeframe)
 
-# DESPUÉS
+    return results_by_method
+
 def compare_dsr_vs_stepm(
     rules: list,
     ohlcv_arr: dict,
@@ -109,6 +136,7 @@ def compare_dsr_vs_stepm(
     order_amount: int,
     dsr_th: float,
     stepm_k_percentile: float | None = None,
+    fdr_alpha: float = FDR_ALPHA,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
@@ -133,6 +161,7 @@ def compare_dsr_vs_stepm(
         dsr_th             = dsr_th,
         n_combos           = n_combos,
         stepm_k_percentile = stepm_k_percentile,
+        fdr_alpha          = fdr_alpha,
         timeframe          = timeframe,
         n_jobs             = n_jobs,
     )
@@ -141,124 +170,164 @@ def compare_dsr_vs_stepm(
 # =============================================================================
 # REPORTING
 # =============================================================================
-def _print_comparison(raw_results: list, dsr_by_id: dict, stepm_by_id: dict, timeframe: str) -> None:
-
-    n_total        = len(raw_results)
-    n_dsr_passed   = 0
-    n_stepm_passed = 0
-    n_agreement    = 0
-    n_both_passed  = 0
-    rows           = []
-    dsr_vals, stepm_vals = [], []
-
+def _build_comparison_rows(raw_results: list, results_by_method: dict) -> list:
+    """One dict per rule, with each method's value/ok, restricted to rules
+    where STEPM produced a p-value (same gate as before FDR was added)."""
+    rows = []
     for r in raw_results:
-        rid      = r["rule_id"]
-        dsr_r    = dsr_by_id.get(rid, {})
-        stepm_r  = stepm_by_id.get(rid, {})
+        rid = r["rule_id"]
+        stepm_r = results_by_method["stepm"].get(rid, {})
+        if stepm_r.get("stepm_p") is None:
+            continue
 
-        dsr_val  = dsr_r.get("dsr", 0.0)
-        dsr_ok   = bool(dsr_r.get("passed_dsr", False))
-        stepm_p  = stepm_r.get("stepm_p")
-        stepm_ok = bool(stepm_r.get("passed_stepm", False))
+        row = {"rule_id": rid, "side": r.get("side")}
+        for method in METHOD_ORDER:
+            spec      = METHOD_SPECS[method]
+            method_r  = results_by_method[method].get(rid, {})
+            row[f"{method}_value"] = method_r.get(spec["value_key"])
+            row[f"{method}_ok"]    = bool(method_r.get(spec["ok_key"], False))
+        rows.append(row)
+    return rows
 
-        n_dsr_passed   += int(dsr_ok)
-        n_stepm_passed += int(stepm_ok)
-        n_agreement    += int(dsr_ok == stepm_ok)
-        n_both_passed  += int(dsr_ok and stepm_ok)
 
-        if stepm_p is not None:
-            rows.append((rid, dsr_val, dsr_ok, stepm_p, stepm_ok))
-            dsr_vals.append(dsr_val)
-            stepm_vals.append(stepm_p)
+def _format_row(row: dict, id_width: int) -> str:
+    cells = [f"{row['rule_id']:<{id_width}}"]
+    for method in METHOD_ORDER:
+        value = row[f"{method}_value"]
+        value = value if value is not None else float("nan")
+        mark  = "✅" if row[f"{method}_ok"] else "❌"
+        cells.append(f"{value:<10.4f}{mark:<10}")
+    return "".join(cells)
 
-    rows.sort(key=lambda row: row[3])  # by StepM p-value, ascending
 
-    logger.info(f"\n{'─' * 70}")
-    logger.info(f"  DSR vs STEPM ── {timeframe}")
-    logger.info(f"{'─' * 70}")
+def _row_header(id_width: int) -> str:
+    cells = [f"{'RULE_ID':<{id_width}}"]
+    for method in METHOD_ORDER:
+        label     = METHOD_SPECS[method]["label"]
+        value_col = "DSR" if method == "dsr" else f"{label}_p"
+        cells.append(f"{value_col:<10}{label + '_OK':<10}")
+    return "".join(cells)
 
-    _print_side_breakdown(raw_results, dsr_by_id, stepm_by_id)
 
-    id_width = max((len(row[0]) for row in rows), default=8) + 2
+def _print_comparison(raw_results: list, results_by_method: dict, timeframe: str) -> None:
+
+    n_total = len(raw_results)
+
+    ok_by_method = {method: {} for method in METHOD_ORDER}
+    for method in METHOD_ORDER:
+        spec  = METHOD_SPECS[method]
+        by_id = results_by_method[method]
+        for r in raw_results:
+            rid = r["rule_id"]
+            ok_by_method[method][rid] = bool(by_id.get(rid, {}).get(spec["ok_key"], False))
+
+    n_passed = {method: sum(ok_by_method[method].values()) for method in METHOD_ORDER}
+
+    n_pairwise_both_passed = {
+        (m1, m2): sum(
+            ok_by_method[m1][r["rule_id"]] and ok_by_method[m2][r["rule_id"]]
+            for r in raw_results
+        )
+        for m1, m2 in combinations(METHOD_ORDER, 2)
+    }
+
+    n_all_passed = sum(
+        all(ok_by_method[m][r["rule_id"]] for m in METHOD_ORDER)
+        for r in raw_results
+    )
+
+    rows = _build_comparison_rows(raw_results, results_by_method)
+    rows.sort(key=lambda row: row["stepm_value"] if row["stepm_value"] is not None else float("inf"))
+
+    logger.info(f"\n{'─' * 90}")
+    logger.info(f"  DSR vs STEPM vs FDR ── {timeframe}")
+    logger.info(f"{'─' * 90}")
+
+    _print_side_breakdown(raw_results, results_by_method)
+
+    id_width = max((len(row["rule_id"]) for row in rows), default=8) + 2
     logger.info(f"  top {min(20, len(rows))} by STEPM p-value")
-    logger.info(f"{'RULE_ID':<{id_width}}{'DSR':<10}{'DSR_OK':<10}{'STEPM_p':<10}{'STEPM_OK':<10}")
-    logger.info(f"{'─' * 70}")
-    for rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok in rows[:10]:
-        dsr_mark   = "✅" if dsr_ok else "❌"
-        stepm_mark = "✅" if stepm_ok else "❌"
-        logger.info(f"{rule_id:<{id_width}}{dsr_val:<10.4f}{dsr_mark:<10}{stepm_p:<10.4f}{stepm_mark:<10}")
+    logger.info(_row_header(id_width))
+    logger.info(f"{'─' * 90}")
+    for row in rows[:10]:
+        logger.info(_format_row(row, id_width))
 
-    _print_correlation(dsr_vals, stepm_vals, timeframe)
+    _print_correlation(rows, timeframe)
     _print_disagreement_breakdown(rows, timeframe)
 
-    pct_dsr       = n_dsr_passed   / n_total * 100.0 if n_total else 0.0
-    pct_stepm     = n_stepm_passed / n_total * 100.0 if n_total else 0.0
-    pct_agreement = n_agreement    / n_total * 100.0 if n_total else 0.0
-    pct_both      = n_both_passed  / n_total * 100.0 if n_total else 0.0
+    logger.info(f"{'─' * 90}")
+    for method in METHOD_ORDER:
+        label = METHOD_SPECS[method]["label"]
+        pct   = n_passed[method] / n_total * 100.0 if n_total else 0.0
+        logger.info(f"  {label:<10}── {n_passed[method]}/{n_total} passed ({pct:.2f}%)")
 
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  DSR        ── {n_dsr_passed}/{n_total} passed ({pct_dsr:.2f}%)")
-    logger.info(f"  STEPM      ── {n_stepm_passed}/{n_total} passed ({pct_stepm:.2f}%)")
-    logger.info(f"  AGREEMENT  ── {n_agreement}/{n_total} rules match ({pct_agreement:.2f}%)")
-    logger.info(f"  OK-OK      ── {n_both_passed}/{n_total} both pass ({pct_both:.2f}%)")
-    logger.info(f"{'─' * 70}\n")
-    
+    for (m1, m2), n_both in n_pairwise_both_passed.items():
+        label1, label2 = METHOD_SPECS[m1]["label"], METHOD_SPECS[m2]["label"]
+        pct = n_both / n_total * 100.0 if n_total else 0.0
+        logger.info(f"  {label1}-{label2} BOTH-PASS ── {n_both}/{n_total} ({pct:.2f}%)")
+
+    pct_all_passed = n_all_passed / n_total * 100.0 if n_total else 0.0
+    logger.info(f"  ALL-PASS   ── {n_all_passed}/{n_total} all three pass ({pct_all_passed:.2f}%)")
+    logger.info(f"{'─' * 90}\n")
+
+
 def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
     """
-    rows: list of (rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok) tuples, already
-    restricted to rules where StepM produced a p-value (stepm_p is not None).
-    Prints three tables — both pass, DSR-only, StepM-only — each showing both
-    criteria's values side by side, so disagreements are visible individually
-    and not just counted in the aggregate OK-OK/AGREEMENT numbers.
+    rows: dicts from _build_comparison_rows, already restricted to rules where
+    StepM produced a p-value. Splits into ALL PASS, ALL FAIL, and MIXED
+    (methods disagree on this rule) — MIXED is where conclusions differ and
+    avoids the 8-way combinatorics that per-method-pair tables would need.
     """
-    both_pass  = [row for row in rows if row[2] and row[4]]
-    dsr_only   = [row for row in rows if row[2] and not row[4]]
-    stepm_only = [row for row in rows if row[4] and not row[2]]
+    all_pass, all_fail, mixed = [], [], []
+    for row in rows:
+        oks = tuple(row[f"{method}_ok"] for method in METHOD_ORDER)
+        if all(oks):
+            all_pass.append(row)
+        elif not any(oks):
+            all_fail.append(row)
+        else:
+            mixed.append(row)
 
-    id_width = max((len(row[0]) for row in rows), default=8) + 2
-    header = f"{'RULE_ID':<{id_width}}{'DSR':<10}{'DSR_OK':<10}{'STEPM_p':<10}{'STEPM_OK':<10}"
+    id_width = max((len(row["rule_id"]) for row in rows), default=8) + 2
+    header   = _row_header(id_width)
 
-    def _print_table(title: str, table_rows: list, sort_key, reverse: bool = False) -> None:
-        logger.info(f"\n{'─' * 70}")
+    def _print_table(title: str, table_rows: list) -> None:
+        logger.info(f"\n{'─' * 90}")
         logger.info(f"  {title} ── {timeframe} ── n={len(table_rows)}")
-        logger.info(f"{'─' * 70}")
+        logger.info(f"{'─' * 90}")
         if not table_rows:
             logger.info("  (none)")
             return
         logger.info(header)
-        logger.info(f"{'─' * 70}")
-        for rule_id, dsr_val, dsr_ok, stepm_p, stepm_ok in sorted(table_rows, key=sort_key, reverse=reverse):
-            dsr_mark   = "✅" if dsr_ok else "❌"
-            stepm_mark = "✅" if stepm_ok else "❌"
-            logger.info(f"{rule_id:<{id_width}}{dsr_val:<10.4f}{dsr_mark:<10}{stepm_p:<10.4f}{stepm_mark:<10}")
+        logger.info(f"{'─' * 90}")
+        sort_key = lambda r: r["stepm_value"] if r["stepm_value"] is not None else float("inf")
+        for row in sorted(table_rows, key=sort_key):
+            logger.info(_format_row(row, id_width))
 
-    _print_table("BOTH PASS (DSR ✅ + STEPM ✅)", both_pass, sort_key=lambda row: row[3])
-    _print_table("DSR ONLY ── DSR ✅ but STEPM ❌ (disagreement)", dsr_only, sort_key=lambda row: row[1], reverse=True)
-    _print_table("STEPM ONLY ── STEPM ✅ but DSR ❌ (disagreement)", stepm_only, sort_key=lambda row: row[3])
+    _print_table(f"ALL PASS ({' + '.join(METHOD_SPECS[m]['label'] for m in METHOD_ORDER)})", all_pass)
+    _print_table("MIXED ── methods disagree", mixed)
 
-def _print_side_breakdown(raw_results: list, dsr_by_id: dict, stepm_by_id: dict) -> None:
-    """Counts long/short rules among those that PASSED each method (DSR, STEPM)."""
-    dsr_long = dsr_short = stepm_long = stepm_short = 0
+
+def _print_side_breakdown(raw_results: list, results_by_method: dict) -> None:
+    """Counts long/short rules among those that PASSED each method."""
+    counts = {method: {"long": 0, "short": 0} for method in METHOD_ORDER}
 
     for r in raw_results:
         rid  = r["rule_id"]
         side = r.get("side")
-
-        if dsr_by_id.get(rid, {}).get("passed_dsr", False):
-            if side == "long":
-                dsr_long += 1
-            elif side == "short":
-                dsr_short += 1
-
-        if stepm_by_id.get(rid, {}).get("passed_stepm", False):
-            if side == "long":
-                stepm_long += 1
-            elif side == "short":
-                stepm_short += 1
+        if side not in ("long", "short"):
+            continue
+        for method in METHOD_ORDER:
+            spec  = METHOD_SPECS[method]
+            by_id = results_by_method[method]
+            if by_id.get(rid, {}).get(spec["ok_key"], False):
+                counts[method][side] += 1
 
     logger.info(f"  {'METHOD':<10}{'LONG':<8}{'SHORT':<8}{'TOTAL':<8}")
-    logger.info(f"  {'DSR':<10}{dsr_long:<8}{dsr_short:<8}{dsr_long + dsr_short:<8}")
-    logger.info(f"  {'STEPM':<10}{stepm_long:<8}{stepm_short:<8}{stepm_long + stepm_short:<8}")
+    for method in METHOD_ORDER:
+        label            = METHOD_SPECS[method]["label"]
+        long_n, short_n  = counts[method]["long"], counts[method]["short"]
+        logger.info(f"  {label:<10}{long_n:<8}{short_n:<8}{long_n + short_n:<8}")
 
 
 def _print_market_bias(ohlcv_arr: dict, timeframe: str) -> None:
@@ -275,8 +344,8 @@ def _print_market_bias(ohlcv_arr: dict, timeframe: str) -> None:
         logger.warning(f"MARKET BIAS ── {timeframe} ── no data")
         return
 
-    avg_ret       = float(np.mean(returns))
-    pct_positive  = float(np.mean([r > 0 for r in returns])) * 100.0
+    avg_ret      = float(np.mean(returns))
+    pct_positive = float(np.mean([r > 0 for r in returns])) * 100.0
 
     logger.info(f"{'─' * 70}")
     logger.info(f"  MARKET BIAS (buy&hold, equal-weight) ── {timeframe} ── n_symbols={len(returns)}")
@@ -285,37 +354,69 @@ def _print_market_bias(ohlcv_arr: dict, timeframe: str) -> None:
     logger.info(f"{'─' * 70}\n")
 
 
-def _print_correlation(dsr_vals: list, stepm_vals: list, timeframe: str) -> None:
-    if len(dsr_vals) < 3:
+def _print_correlation(rows: list, timeframe: str) -> None:
+    if len(rows) < 3:
         logger.warning(f"COMPARE ── {timeframe} ── not enough rules to compute correlation")
         return
 
-    dsr_arr, stepm_arr = np.asarray(dsr_vals), np.asarray(stepm_vals)
+    pairs = [
+        ("dsr_value",   "stepm_value", "DSR",     "STEPM_p"),
+        ("dsr_value",   "fdr_value",   "DSR",     "FDR_p"),
+        ("stepm_value", "fdr_value",   "STEPM_p", "FDR_p"),
+    ]
 
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  DSR vs STEPM_p CORRELATION ── {timeframe}")
+    logger.info(f"{'─' * 90}")
+    logger.info(f"  CROSS-METHOD CORRELATION ── {timeframe}")
 
-    pearson_r, pearson_p   = pearsonr(dsr_arr, stepm_arr)
-    spearman_r, spearman_p = spearmanr(dsr_arr, stepm_arr)
-    logger.info(f"  [ALL RULES]              n={len(dsr_vals)}")
-    logger.info(f"    Pearson  r = {pearson_r:.4f}  (p={pearson_p:.4g})")
-    logger.info(f"    Spearman r = {spearman_r:.4f}  (p={spearman_p:.4g})")
+    for key_a, key_b, label_a, label_b in pairs:
+        valid = [row for row in rows if row[key_a] is not None and row[key_b] is not None]
+        if len(valid) < 3:
+            logger.info(f"  [{label_a} vs {label_b}] not enough rules (n={len(valid)})")
+            continue
 
-    # Second cut: excluding p=1.0 (the saturated tail, indistinguishable
-    # from noise by construction) — this is where the real ranking signal,
-    # if any, tends to concentrate.
-    not_saturated = stepm_arr < 1.0
-    n_not_saturated = int(not_saturated.sum())
-    if n_not_saturated >= 3:
-        pearson_r2, pearson_p2   = pearsonr(dsr_arr[not_saturated], stepm_arr[not_saturated])
-        spearman_r2, spearman_p2 = spearmanr(dsr_arr[not_saturated], stepm_arr[not_saturated])
-        logger.info(f"  [EXCLUDING STEPM_p=1.0]  n={n_not_saturated}")
-        logger.info(f"    Pearson  r = {pearson_r2:.4f}  (p={pearson_p2:.4g})")
-        logger.info(f"    Spearman r = {spearman_r2:.4f}  (p={spearman_p2:.4g})")
-    else:
-        logger.info(f"  [EXCLUDING STEPM_p=1.0]  not enough rules (n={n_not_saturated})")
+        arr_a = np.asarray([row[key_a] for row in valid])
+        arr_b = np.asarray([row[key_b] for row in valid])
 
-    logger.info(f"{'─' * 70}")
+        pearson_r, pearson_p   = pearsonr(arr_a, arr_b)
+        spearman_r, spearman_p = spearmanr(arr_a, arr_b)
+        logger.info(f"  [{label_a} vs {label_b}]  n={len(valid)}")
+        logger.info(f"    Pearson  r = {pearson_r:.4f}  (p={pearson_p:.4g})")
+        logger.info(f"    Spearman r = {spearman_r:.4f}  (p={spearman_p:.4g})")
+
+        # Both STEPM's stepdown and BY's harmonic correction (c(m) ~ ln(m),
+        # dividing the threshold by ~12x at m=118k) produce a saturated tail
+        # of p=1.0 ties by construction — excluding them on either side
+        # isolates the region where ranking signal, if any, still discriminates.
+        saturatable_keys = [
+            key for key, label in ((key_a, label_a), (key_b, label_b))
+            if label in ("STEPM_p", "FDR_p")
+        ]
+        for sat_key in saturatable_keys:
+            sat_label     = label_a if sat_key == key_a else label_b
+            n_saturated   = sum(1 for row in valid if row[sat_key] >= 1.0)
+            pct_saturated = n_saturated / len(valid) * 100.0 if valid else 0.0
+            logger.info(f"    {sat_label}=1.0 saturation : {n_saturated}/{len(valid)} ({pct_saturated:.1f}%)")
+
+        if saturatable_keys:
+            not_saturated = [
+                row for row in valid
+                if all(row[sat_key] < 1.0 for sat_key in saturatable_keys)
+            ]
+            excl_label = " & ".join(
+                f"{(label_a if k == key_a else label_b)}=1.0" for k in saturatable_keys
+            )
+            if len(not_saturated) >= 3:
+                a2 = np.asarray([row[key_a] for row in not_saturated])
+                b2 = np.asarray([row[key_b] for row in not_saturated])
+                pr2, pp2 = pearsonr(a2, b2)
+                sr2, sp2 = spearmanr(a2, b2)
+                logger.info(f"  [excluding {excl_label}]  n={len(not_saturated)}")
+                logger.info(f"    Pearson  r = {pr2:.4f}  (p={pp2:.4g})")
+                logger.info(f"    Spearman r = {sr2:.4f}  (p={sp2:.4g})")
+            else:
+                logger.info(f"  [excluding {excl_label}]  not enough rules (n={len(not_saturated)})")
+
+    logger.info(f"{'─' * 90}")
 
 
 # =============================================================================
@@ -326,7 +427,7 @@ if __name__ == "__main__":
     start = time.time()
 
     logger.info(f"\n{'─' * 115}")
-    logger.info(f"  DSR vs STEPM — FULL BRUTE UNIVERSE COMPARISON")
+    logger.info(f"  DSR vs STEPM vs FDR — FULL BRUTE UNIVERSE COMPARISON")
     logger.info(f"{'─' * 115}")
     logger.info(f"  TIMEFRAMES     : {TIMEFRAMES}")
     logger.info(f"  N_SYMBOLS      : {N_SYMBOLS}")
@@ -338,6 +439,7 @@ if __name__ == "__main__":
     logger.info(f"  N_BOOTSTRAP    : {WHITE_N_BOOTSTRAP}")
     logger.info(f"  BLOCK_SIZE     : {WHITE_BLOCK_SIZE}")
     logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
+    logger.info(f"  FDR_ALPHA      : {FDR_ALPHA}")
     logger.info(f"{'─' * 115}\n")
 
     # -------------------------------------------------------------------
@@ -358,8 +460,8 @@ if __name__ == "__main__":
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
 
     # -------------------------------------------------------------------
-    # DSR vs STEPM — one comparison per timeframe, on the full brute
-    # universe (neither pipe pre-filters what the other sees).
+    # DSR vs STEPM vs FDR — one comparison per timeframe, on the full brute
+    # universe (no pipe pre-filters what the others see).
     # -------------------------------------------------------------------
     comparisons_by_timeframe = {}
 
@@ -377,6 +479,7 @@ if __name__ == "__main__":
             order_amount       = ORDER_AMOUNT,
             dsr_th             = DSR_TH,
             stepm_k_percentile = STEPM_K_PERCENTILE,
+            fdr_alpha          = FDR_ALPHA,
             timeframe          = timeframe,
             n_jobs             = N_JOBS,
         )
