@@ -29,6 +29,7 @@ def _generate_subperiod_weights(n_splits: int) -> list:
 
 MIN_STRATEGIES   = 5
 MAX_STRATEGIES   = 8
+MAX_TOTAL_STRATEGIES  = 35
 TOP_N            = 3
 
 REQUIRE_SUBPERIODS_POSITIVE = True
@@ -56,6 +57,58 @@ def _is_short(strategy_id: str) -> bool:
 
 def _get_timeframe(strategy_id: str) -> str:
     return strategy_id.split("_")[1]
+
+def _compute_net_gain_pct(trades_df: pd.DataFrame, initial_balance: float) -> float:
+    if trades_df is None or trades_df.empty:
+        return -np.inf
+    return trades_df["profit"].sum() / initial_balance * 100
+
+def _cap_strategies_round_robin(
+    validated_wfo_trades: list,
+    initial_balance: float,
+    max_total_strategies: int,
+) -> list:
+    """Cap the strategy pool to max_total_strategies using round-robin
+    selection across (timeframe, side) groups, best net_gain first."""
+    trades_by_id = {sid: df for sid, df in validated_wfo_trades}
+
+    if len(trades_by_id) <= max_total_strategies:
+        return validated_wfo_trades
+
+    groups = {}
+    for sid in trades_by_id:
+        key = (_get_timeframe(sid), "long" if _is_long(sid) else "short")
+        groups.setdefault(key, []).append(sid)
+
+    for key in groups:
+        groups[key].sort(
+            key=lambda sid: _compute_net_gain_pct(trades_by_id[sid], initial_balance),
+            reverse=True,
+        )
+
+    selected   = []
+    group_keys = list(groups.keys())
+    cursor     = {key: 0 for key in group_keys}
+
+    while len(selected) < max_total_strategies:
+        added_this_round = False
+        for key in group_keys:
+            if cursor[key] < len(groups[key]):
+                selected.append(groups[key][cursor[key]])
+                cursor[key] += 1
+                added_this_round = True
+                if len(selected) >= max_total_strategies:
+                    break
+        if not added_this_round:
+            break
+
+    logger.info(
+        f"  Strategy pool capped: {len(trades_by_id)} -> {len(selected)} "
+        f"(max_total_strategies={max_total_strategies}, round-robin by net_gain)"
+    )
+
+    return [(sid, trades_by_id[sid]) for sid in selected]
+
 # =============================================================================
 # PRIVATE HELPERS — Splitting
 # =============================================================================
@@ -336,6 +389,7 @@ def find_best_portfolio_combination_wfo(
     split_months: int              = WFO_SPLIT_MONTHS,
     min_strategies: int            = MIN_STRATEGIES,
     max_strategies: int            = MAX_STRATEGIES,
+    max_total_strategies: int      = MAX_TOTAL_STRATEGIES,
     top_n: int                     = TOP_N,
     require_long_short: bool       = REQUIRE_LONG_SHORT,
     require_all_timeframes: bool   = REQUIRE_ALL_TIMEFRAMES,
@@ -347,6 +401,12 @@ def find_best_portfolio_combination_wfo(
     if not validated_wfo_trades:
         logger.warning("No validated WFO trades — skipping best WFO portfolio search.")
         return []
+
+    validated_wfo_trades = _cap_strategies_round_robin(
+        validated_wfo_trades = validated_wfo_trades,
+        initial_balance      = initial_balance,
+        max_total_strategies = max_total_strategies,
+    )
 
     all_ids = list({sid for sid, _ in validated_wfo_trades})
     logger.info(f"\n{'='*115}")
