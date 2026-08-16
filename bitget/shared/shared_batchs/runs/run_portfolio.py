@@ -27,10 +27,10 @@ def _generate_subperiod_weights(n_splits: int) -> list:
     weights = [rest_weight] * n_rest + [last_weight]
     return [round(w, 6) for w in weights]
 
-MIN_STRATEGIES   = 5
-MAX_STRATEGIES   = 8
-MAX_TOTAL_STRATEGIES  = 35
-TOP_N            = 3
+MIN_STRATEGIES        = 5
+MAX_STRATEGIES        = 8
+MAX_TOTAL_STRATEGIES  = 40
+TOP_N                 = 3
 
 REQUIRE_SUBPERIODS_POSITIVE = True
 REQUIRE_LONG_SHORT          = True
@@ -342,6 +342,25 @@ def _weighted_rank_score(
     split_labels = [label for label, _, _, _ in subperiods]
     return sum(entry[f"{label}_rank"] * w for label, w in zip(split_labels, weights))
 
+def _valid_subsets_for_timeframe(longs: list, shorts: list, size: int):
+
+    pool = longs + shorts
+    if len(pool) < size:
+        return
+
+    if longs and shorts:
+        min_longs = max(1, size - len(shorts))
+        max_longs = min(size - 1, len(longs))
+        for n_longs in range(min_longs, max_longs + 1):
+            n_shorts = size - n_longs
+            for long_combo in combinations(longs, n_longs):
+                for short_combo in combinations(shorts, n_shorts):
+                    yield long_combo + short_combo
+    else:
+        for combo in combinations(pool, size):
+            yield combo
+
+
 def _generate_combos(
     all_ids: list,
     min_strategies: int,
@@ -349,34 +368,54 @@ def _generate_combos(
     require_long_short: bool,
     require_all_timeframes: bool = False,
 ) -> list:
-    """Generate strategy combinations, avoiding long-only/short-only combos upfront when required."""
+
     if not require_long_short:
         combos = [
             combo
             for size in range(min_strategies, max_strategies + 1)
             for combo in combinations(all_ids, size)
         ]
-    else:
-        longs  = [s for s in all_ids if _is_long(s)]
-        shorts = [s for s in all_ids if _is_short(s)]
+        if require_all_timeframes:
+            required_tfs = {_get_timeframe(s) for s in all_ids}
+            combos = [
+                combo for combo in combos
+                if required_tfs.issubset({_get_timeframe(s) for s in combo})
+            ]
+        return combos
 
-        combos = []
-        for size in range(min_strategies, max_strategies + 1):
-            min_longs = max(1, size - len(shorts))
-            max_longs = min(size - 1, len(longs))
-            for n_longs in range(min_longs, max_longs + 1):
-                n_shorts = size - n_longs
-                for long_combo in combinations(longs, n_longs):
-                    for short_combo in combinations(shorts, n_shorts):
-                        combos.append(long_combo + short_combo)
+    timeframe_groups = {}
+    for sid in all_ids:
+        tf   = _get_timeframe(sid)
+        side = "long" if _is_long(sid) else "short"
+        timeframe_groups.setdefault(tf, {"long": [], "short": []})[side].append(sid)
 
-    if require_all_timeframes:
-        required_tfs = {_get_timeframe(s) for s in all_ids}
-        combos = [
-            combo for combo in combos
-            if required_tfs.issubset({_get_timeframe(s) for s in combo})
-        ]
+    tf_list = list(timeframe_groups.keys())
+    n_tfs   = len(tf_list)
+    min_size_per_tf = {
+        tf: (2 if groups["long"] and groups["short"] else 1)
+        for tf, groups in timeframe_groups.items()
+    }
 
+    combos = []
+
+    def backtrack(idx: int, current_combo: tuple, current_size: int) -> None:
+        if idx == n_tfs:
+            if min_strategies <= current_size <= max_strategies:
+                combos.append(current_combo)
+            return
+
+        tf     = tf_list[idx]
+        groups = timeframe_groups[tf]
+        remaining_min = sum(min_size_per_tf[t] for t in tf_list[idx + 1:])
+
+        min_size_here = min_size_per_tf[tf]
+        max_size_here = max_strategies - current_size - remaining_min
+
+        for size in range(min_size_here, max_size_here + 1):
+            for subset in _valid_subsets_for_timeframe(groups["long"], groups["short"], size):
+                backtrack(idx + 1, current_combo + subset, current_size + size)
+
+    backtrack(0, tuple(), 0)
     return combos
 
 # =============================================================================

@@ -29,7 +29,6 @@ logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG
 #------------------------------------------------------------------------------
 BACKTEST_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(BACKTEST_LOG_LEVEL)
-
 #WFO
 #------------------------------------------------------------------------------
 WFO_LOG_LEVEL = logging.INFO
@@ -87,19 +86,20 @@ RUN_DEPLOY    = True
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES = ["6Hutc"]
-#TIMEFRAMES = ["12Hutc"]
+#TIMEFRAMES = ["4H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [2,4,6,8,10],
-    "SL_PCT":     [2,4,6,8,10],
+    "TP_PCT":     [6,10],
+    "SL_PCT":     [6,10],
 }
+
 
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-STEPM_K_PERCENTILE  = 0.02
+STEPM_K_PERCENTILE  = 0.005
 #0.005
 
 PIPELINE_WFO         = True
@@ -120,7 +120,7 @@ SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
-run_config = {"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
+run_config = {"STEPM_K_PERCENTILE": STEPM_K_PERCENTILE,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -151,6 +151,7 @@ if __name__ == "__main__":
     logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
     logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
     logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
+    logger.info(f"  STEPM       : K_PERCENTILE={STEPM_K_PERCENTILE}")
     logger.info(
         f"  RUNS        : BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
         f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"

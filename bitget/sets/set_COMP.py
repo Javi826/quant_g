@@ -1,4 +1,4 @@
-#BOT_batch/main_COMP.py
+#BOT_batch/set_COMP.py
 """
 DSR vs StepM vs FDR — full brute universe comparison, single standalone script.
 """
@@ -53,34 +53,38 @@ from shared_batchs.pipeline.fdr import pipe_fdr, FDR_ALPHA
 # =============================================================================
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
-TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-TIMEFRAMES = ["12Hutc"]
+TIMEFRAMES = [ "4H", "6Hutc", "12Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [2,4,6,8,10],
-    "SL_PCT":     [2,4,6,8,10],
+    "TP_PCT":     [8,10],
+    "SL_PCT":     [8,10],
 }
 
 # =============================================================================
 # DSR vs STEPM vs FDR — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.70
-STEPM_K_PERCENTILE  = 0.02
+DSR_TH              = 0.90
+STEPM_K_PERCENTILE  = 0.01
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
 # here plus a new "pairs" tuple in _print_correlation; every report function
 # below iterates over this registry instead of hardcoding method names.
 # =============================================================================
+DSR_TEST   = True
+STEPM_TEST = True
+FDR_TEST   = False
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
     "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
     "fdr":   {"value_key": "fdr_p",   "ok_key": "passed_fdr",   "label": "FDR"},
 }
-METHOD_ORDER = ["dsr", "stepm", "fdr"]
+_METHOD_FLAGS = {"dsr": DSR_TEST, "stepm": STEPM_TEST, "fdr": FDR_TEST}
+METHOD_ORDER  = [m for m in ["dsr", "stepm", "fdr"] if _METHOD_FLAGS[m]]
 
 # =============================================================================
 # COMPARISON — build the raw universe once, hand it to all three pipes, compare.
@@ -97,34 +101,38 @@ def compare_dsr_vs_stepm_from_raw(
     n_jobs: int = -1,
 ) -> dict:
 
-    dsr_results = pipe_dsr(
-        raw_results = raw_results,
-        matrix_arr  = matrix_arr,
-        dsr_th      = dsr_th,
-        n_combos    = n_combos,
-        timeframe   = timeframe,
-    )
-    dsr_by_id = {r["rule_id"]: r for r in dsr_results}
+    results_by_method = {}
 
-    stepm_results = pipe_stepm(
-        raw_results        = raw_results,
-        matrix_arr         = matrix_arr,
-        col_names          = col_names,
-        stepm_k_percentile = stepm_k_percentile,
-        timeframe          = timeframe,
-    )
-    stepm_by_id = {r["rule_id"]: r for r in stepm_results}
+    if "dsr" in METHOD_ORDER:
+        dsr_results = pipe_dsr(
+            raw_results = raw_results,
+            matrix_arr  = matrix_arr,
+            dsr_th      = dsr_th,
+            n_combos    = n_combos,
+            timeframe   = timeframe,
+        )
+        results_by_method["dsr"] = {r["rule_id"]: r for r in dsr_results}
 
-    fdr_results = pipe_fdr(
-        raw_results = raw_results,
-        matrix_arr  = matrix_arr,
-        col_names   = col_names,
-        fdr_alpha   = fdr_alpha,
-        timeframe   = timeframe,
-    )
-    fdr_by_id = {r["rule_id"]: r for r in fdr_results}
+    if "stepm" in METHOD_ORDER:
+        stepm_results = pipe_stepm(
+            raw_results        = raw_results,
+            matrix_arr         = matrix_arr,
+            col_names          = col_names,
+            stepm_k_percentile = stepm_k_percentile,
+            timeframe          = timeframe,
+        )
+        results_by_method["stepm"] = {r["rule_id"]: r for r in stepm_results}
 
-    results_by_method = {"dsr": dsr_by_id, "stepm": stepm_by_id, "fdr": fdr_by_id}
+    if "fdr" in METHOD_ORDER:
+        fdr_results = pipe_fdr(
+            raw_results = raw_results,
+            matrix_arr  = matrix_arr,
+            col_names   = col_names,
+            fdr_alpha   = fdr_alpha,
+            timeframe   = timeframe,
+        )
+        results_by_method["fdr"] = {r["rule_id"]: r for r in fdr_results}
+
     _print_comparison(raw_results, results_by_method, timeframe)
 
     return results_by_method
@@ -170,14 +178,20 @@ def compare_dsr_vs_stepm(
 # =============================================================================
 # REPORTING
 # =============================================================================
+_SORT_METHOD = "stepm" if "stepm" in METHOD_ORDER else (METHOD_ORDER[0] if METHOD_ORDER else None)
+
+def _sort_key(row: dict):
+    if _SORT_METHOD is None:
+        return 0
+    val = row.get(f"{_SORT_METHOD}_value")
+    return val if val is not None else float("inf")
 def _build_comparison_rows(raw_results: list, results_by_method: dict) -> list:
     """One dict per rule, with each method's value/ok, restricted to rules
     where STEPM produced a p-value (same gate as before FDR was added)."""
     rows = []
     for r in raw_results:
         rid = r["rule_id"]
-        stepm_r = results_by_method["stepm"].get(rid, {})
-        if stepm_r.get("stepm_p") is None:
+        if "stepm" in results_by_method and results_by_method["stepm"].get(rid, {}).get("stepm_p") is None:
             continue
 
         row = {"rule_id": rid, "side": r.get("side")}
@@ -237,7 +251,7 @@ def _print_comparison(raw_results: list, results_by_method: dict, timeframe: str
     )
 
     rows = _build_comparison_rows(raw_results, results_by_method)
-    rows.sort(key=lambda row: row["stepm_value"] if row["stepm_value"] is not None else float("inf"))
+    rows.sort(key=_sort_key)
 
     logger.info(f"\n{'─' * 90}")
     logger.info(f"  DSR vs STEPM vs FDR ── {timeframe}")
@@ -300,7 +314,7 @@ def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
             return
         logger.info(header)
         logger.info(f"{'─' * 90}")
-        sort_key = lambda r: r["stepm_value"] if r["stepm_value"] is not None else float("inf")
+        sort_key = _sort_key
         for row in sorted(table_rows, key=sort_key):
             logger.info(_format_row(row, id_width))
 
@@ -359,10 +373,14 @@ def _print_correlation(rows: list, timeframe: str) -> None:
         logger.warning(f"COMPARE ── {timeframe} ── not enough rules to compute correlation")
         return
 
-    pairs = [
+    _all_pairs = [
         ("dsr_value",   "stepm_value", "DSR",     "STEPM_p"),
         ("dsr_value",   "fdr_value",   "DSR",     "FDR_p"),
         ("stepm_value", "fdr_value",   "STEPM_p", "FDR_p"),
+    ]
+    pairs = [
+        p for p in _all_pairs
+        if p[0].replace("_value", "") in METHOD_ORDER and p[1].replace("_value", "") in METHOD_ORDER
     ]
 
     logger.info(f"{'─' * 90}")

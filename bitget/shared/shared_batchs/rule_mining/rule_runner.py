@@ -115,7 +115,9 @@ def run_rule_mining_pipeline(
     all_mbias_results = []
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
-        logger.info(f"==== RULE MINING ── {timeframe} ── total candidate rules: {len(rules)} ====")
+        logger.info(f"\n{'=' * 70}")
+        logger.info(f"========= RULE MINING ── {timeframe} ── total candidate rules: {len(rules)} =========")
+        logger.info(f"{'=' * 70}")
 
         rules = pipe_signal_cleaning(
             rules       = rules,

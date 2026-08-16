@@ -65,7 +65,6 @@ def _compute_log_features(df: pd.DataFrame, raw_columns: list) -> tuple:
     df_raw = df[raw_columns].copy() if raw_columns else pd.DataFrame(index=df.index)
     return df, df_raw
 
-
 def _block_bootstrap_sample(
     data_array: np.ndarray,
     n_rows: int,
@@ -87,7 +86,6 @@ def _block_bootstrap_sample(
         out[k * block_size:(k + 1) * block_size] = data_array[start:start + block_size]
     return out[:n_rows]
 
-# DESPUÉS
 def _evaluate_universe_batch_chunk(
     path_indices: list,
     paths: dict,
@@ -186,11 +184,9 @@ def _generate_mcpt_paths_all_symbols(
             paths_per_symbol[symbol] = arr_paths
     return paths_per_symbol
 
-
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
-# DESPUÉS
 def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray) -> dict:
     ts64 = ts_index.astype("datetime64[ns]")
 
@@ -333,8 +329,6 @@ def _evaluate_multiverse_batch(
         )
 
     return p_value_by_id, approved_by_id
-
-
 # =============================================================================
 # PIPE MULTIVERSE — evaluates every rule's WFO test trades independently
 # =============================================================================
