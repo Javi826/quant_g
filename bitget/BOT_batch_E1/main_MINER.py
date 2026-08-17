@@ -91,7 +91,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
-#TIMEFRAMES = ["4H"]
+#TIMEFRAMES = ["1H","12Hutc"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {

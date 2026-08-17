@@ -16,7 +16,7 @@ logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 # =============================================================================
 SIGNAL_MASK_N_JOBS       = -1
 SIGNAL_MASK_CHUNK_SIZE   = None  # None -> auto-sized from n_jobs and rule count
-DECORRELATE_THRESHOLD    = 0.8
+DECORRELATE_THRESHOLD    = 0.5
 DECORRELATE_BATCH_SIZE   = 1000
 GPU_SURVIVOR_CHUNK       = 25_000  # survivor columns compared per GPU matmul chunk, bounds
                                    # the (batch_size x chunk) correlation temporary

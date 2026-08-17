@@ -47,28 +47,29 @@ from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
-from shared_batchs.pipeline.fdr import pipe_fdr, FDR_ALPHA
+from shared_batchs.pipeline.fdr import pipe_fdr
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
-TIMEFRAMES = [ "4H", "6Hutc", "12Hutc"]
+TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [8,10],
-    "SL_PCT":     [8,10],
+    "TP_PCT":     [6,8,10],
+    "SL_PCT":     [6,8,10],
 }
 
 # =============================================================================
 # DSR vs STEPM vs FDR — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.90
+DSR_TH              = 0.85
 STEPM_K_PERCENTILE  = 0.01
+FDR_ALPHA           = 0.20
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
@@ -77,7 +78,7 @@ STEPM_K_PERCENTILE  = 0.01
 # =============================================================================
 DSR_TEST   = True
 STEPM_TEST = True
-FDR_TEST   = False
+FDR_TEST   = True
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
     "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
@@ -256,32 +257,35 @@ def _print_comparison(raw_results: list, results_by_method: dict, timeframe: str
     logger.info(f"\n{'─' * 90}")
     logger.info(f"  DSR vs STEPM vs FDR ── {timeframe}")
     logger.info(f"{'─' * 90}")
-
     _print_side_breakdown(raw_results, results_by_method)
-
     id_width = max((len(row["rule_id"]) for row in rows), default=8) + 2
     logger.info(f"  top {min(20, len(rows))} by STEPM p-value")
     logger.info(_row_header(id_width))
     logger.info(f"{'─' * 90}")
     for row in rows[:10]:
         logger.info(_format_row(row, id_width))
-
     _print_correlation(rows, timeframe)
     _print_disagreement_breakdown(rows, timeframe)
-
     logger.info(f"{'─' * 90}")
+    single_labels = [METHOD_SPECS[m]["label"] for m in METHOD_ORDER]
+    pair_labels   = [
+        f"{METHOD_SPECS[m1]['label']}-{METHOD_SPECS[m2]['label']} BOTH-PASS"
+        for m1, m2 in n_pairwise_both_passed
+    ]
+    all_labels    = single_labels + pair_labels + ["ALL-PASS"]
+    label_width   = max(len(label) for label in all_labels) + 2
     for method in METHOD_ORDER:
         label = METHOD_SPECS[method]["label"]
         pct   = n_passed[method] / n_total * 100.0 if n_total else 0.0
-        logger.info(f"  {label:<10}── {n_passed[method]}/{n_total} passed ({pct:.2f}%)")
-
+        logger.info(f"  {label:<{label_width}}── {n_passed[method]}/{n_total} passed ({pct:.2f}%)")
     for (m1, m2), n_both in n_pairwise_both_passed.items():
-        label1, label2 = METHOD_SPECS[m1]["label"], METHOD_SPECS[m2]["label"]
-        pct = n_both / n_total * 100.0 if n_total else 0.0
-        logger.info(f"  {label1}-{label2} BOTH-PASS ── {n_both}/{n_total} ({pct:.2f}%)")
-
-    pct_all_passed = n_all_passed / n_total * 100.0 if n_total else 0.0
-    logger.info(f"  ALL-PASS   ── {n_all_passed}/{n_total} all three pass ({pct_all_passed:.2f}%)")
+        label       = f"{METHOD_SPECS[m1]['label']}-{METHOD_SPECS[m2]['label']} BOTH-PASS"
+        n_max_pair  = max(n_passed[m1], n_passed[m2])
+        overlap_pct = n_both / n_max_pair * 100.0 if n_max_pair else 0.0
+        logger.info(f"  {label:<{label_width}}── {n_both}/{n_max_pair}  │  overlap vs largest: {overlap_pct:.1f}%")
+    n_max_single       = max(n_passed.values()) if n_passed else 0
+    overlap_all_passed = n_all_passed / n_max_single * 100.0 if n_max_single else 0.0
+    logger.info(f"  {'ALL-PASS':<{label_width}}── {n_all_passed}/{n_max_single}  │  overlap vs largest: {overlap_all_passed:.1f}%")
     logger.info(f"{'─' * 90}\n")
 
 

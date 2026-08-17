@@ -11,7 +11,7 @@ import numpy as np
 from multiprocessing.shared_memory import SharedMemory
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
+from numba import njit, prange
 from statsmodels.stats.multitest import multipletests
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
 logger = logging.getLogger("BOT_batch.pipeline.fdr")
@@ -38,7 +38,7 @@ BOOTSTRAP_BATCH_SIZE = 100     # columns processed per parallel batch
 # Controls FDR under arbitrary dependence between p-values, at the cost of
 # being more conservative than plain BH.
 # =============================================================================
-FDR_ALPHA = 0.30   # significance level (gamma) used for the pass/fail decision
+ # significance level (gamma) used for the pass/fail decision
 
 # =============================================================================
 # CHUNKED REDUCTIONS — column-wise mean/std without materializing a full-size
@@ -92,6 +92,39 @@ def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np
 
     return starts_full, starts_last, len_last, n_blocks_needed
 
+@njit(parallel=True, fastmath=False, cache=True)
+def _block_bootstrap_sums_numba(
+    ps: np.ndarray,
+    ps2: np.ndarray,
+    starts_full: np.ndarray,
+    starts_last: np.ndarray,
+    block_size: int,
+    len_last: int,
+) -> tuple:
+    n_replicas    = starts_last.shape[0]
+    n_blocks_full = starts_full.shape[1]
+    batch_size    = ps.shape[1]
+
+    total_sum   = np.empty((n_replicas, batch_size), dtype=np.float64)
+    total_sumsq = np.empty((n_replicas, batch_size), dtype=np.float64)
+
+    for r in prange(n_replicas):
+        start_last = starts_last[r]
+        end_last   = start_last + len_last
+        for c in range(batch_size):
+            s  = 0.0
+            sq = 0.0
+            for b in range(n_blocks_full):
+                start = starts_full[r, b]
+                end   = start + block_size
+                s  += ps[end, c]  - ps[start, c]
+                sq += ps2[end, c] - ps2[start, c]
+            s  += ps[end_last, c]  - ps[start_last, c]
+            sq += ps2[end_last, c] - ps2[start_last, c]
+            total_sum[r, c]   = s
+            total_sumsq[r, c] = sq
+
+    return total_sum, total_sumsq
 
 def _bootstrap_deviations_batch_prefix(
     batch_values: np.ndarray,
@@ -114,47 +147,20 @@ def _bootstrap_deviations_batch_prefix(
     ps2[0] = 0.0
     np.cumsum(x64 * x64, axis=0, out=ps2[1:])
 
-    n_replicas = starts_last.shape[0]
-    batch_size = x64.shape[1]
+    total_sum, total_sumsq = _block_bootstrap_sums_numba(
+        ps, ps2, starts_full, starts_last, block_size, len_last,
+    )
 
-    boot_deviations = np.empty((n_replicas, batch_size), dtype=np.float64)
+    means = total_sum / n_obs
+    var = (total_sumsq - n_obs * means * means) / (n_obs - 1)
+    np.maximum(var, 0.0, out=var)  # guard tiny negative fp error before sqrt
+    stds = np.sqrt(var)
 
-    for chunk_start in range(0, n_replicas, replica_chunk):
-        chunk_end = min(chunk_start + replica_chunk, n_replicas)
-        chunk_size = chunk_end - chunk_start
+    with np.errstate(divide="ignore", invalid="ignore"):
+        boot_sharpe = (means / stds) * np.sqrt(SHARPE_PERIODS_YEAR)
+    boot_sharpe = np.where(stds > 0, boot_sharpe, -np.inf)
 
-        starts_full_chunk = starts_full[chunk_start:chunk_end]
-        starts_last_chunk = starts_last[chunk_start:chunk_end]
-
-        if starts_full_chunk.shape[1] > 0:
-            end_full_chunk   = starts_full_chunk + block_size
-            sum_full_chunk   = (ps[end_full_chunk]  - ps[starts_full_chunk]).sum(axis=1)
-            sumsq_full_chunk = (ps2[end_full_chunk] - ps2[starts_full_chunk]).sum(axis=1)
-        else:
-            sum_full_chunk   = np.zeros((chunk_size, batch_size), dtype=np.float64)
-            sumsq_full_chunk = np.zeros((chunk_size, batch_size), dtype=np.float64)
-
-        end_last_chunk   = starts_last_chunk + len_last
-        sum_last_chunk   = ps[end_last_chunk]  - ps[starts_last_chunk]
-        sumsq_last_chunk = ps2[end_last_chunk] - ps2[starts_last_chunk]
-
-        total_sum_chunk   = sum_full_chunk + sum_last_chunk
-        total_sumsq_chunk = sumsq_full_chunk + sumsq_last_chunk
-
-        means_chunk = total_sum_chunk / n_obs
-        var_chunk = (total_sumsq_chunk - n_obs * means_chunk * means_chunk) / (n_obs - 1)
-        np.maximum(var_chunk, 0.0, out=var_chunk)  # guard tiny negative fp error before sqrt
-        stds_chunk = np.sqrt(var_chunk)
-
-        with np.errstate(divide="ignore", invalid="ignore"):
-            boot_sharpe_chunk = (means_chunk / stds_chunk) * np.sqrt(SHARPE_PERIODS_YEAR)
-        boot_sharpe_chunk = np.where(stds_chunk > 0, boot_sharpe_chunk, -np.inf)
-
-        boot_deviations[chunk_start:chunk_end] = boot_sharpe_chunk - real_sharpe_batch[None, :]
-
-    return boot_deviations
-
-
+    return boot_sharpe - real_sharpe_batch[None, :]
 def _bootstrap_deviations_batch_prefix_shm(
     shm_metadata: dict,
     start: int,
@@ -240,13 +246,17 @@ def compute_deviation_matrix(
 
     try:
         desc = f"FDR BOOTSTRAP {progress_label} ({BOOTSTRAP_BATCH_SIZE} cols/batch)".strip()
-        with tqdm_joblib(tqdm(desc=desc, total=n_batches, dynamic_ncols=True)):
-            Parallel(n_jobs=n_jobs)(
+        list(tqdm(
+            Parallel(n_jobs=n_jobs, return_as="generator")(
                 delayed(_bootstrap_deviations_batch_prefix_shm)(
                     shm_metadata, start, end, block_size, len_last, n_obs, real_sharpe[start:end],
                 )
                 for start, end in batch_bounds
-            )
+            ),
+            desc=desc,
+            total=n_batches,
+            dynamic_ncols=True,
+        ))
         # Own copy, decoupled from the shared-memory segment released below.
         deviations = deviations_shared.copy()
     finally:
@@ -300,7 +310,7 @@ def compute_individual_pvalues(
 # =============================================================================
 # BY CORRECTION
 # =============================================================================
-def compute_by_correction(p_values: np.ndarray, alpha: float = FDR_ALPHA) -> np.ndarray:
+def compute_by_correction(p_values: np.ndarray, alpha: float) -> np.ndarray:
     _, p_adjusted, _, _ = multipletests(p_values, alpha=alpha, method="fdr_by")
     return p_adjusted
 
@@ -313,12 +323,11 @@ def empty_fdr_fields() -> dict:
         "passed_fdr": True,
         "fdr_p":      None,
     }
-
 def pipe_fdr(
     raw_results: list,
     matrix_arr: np.ndarray,
     col_names: list,
-    fdr_alpha: float = FDR_ALPHA,
+    fdr_alpha: float,
     n_bootstrap: int = None,
     block_size: int = None,
     n_jobs: int = None,
