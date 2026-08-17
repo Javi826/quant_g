@@ -3,7 +3,6 @@ import itertools
 import logging
 import numpy as np
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 from joblib import Parallel, delayed
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE, COMISION
 from shared_batchs.backtesters.ZX_compute_BT import backtest_core
@@ -289,7 +288,7 @@ def run_full_period_search(
     (rule_idx * n_combos + combo_idx). Avoids materializing one sparse
     daily-profit series per combo in the parent process.
     """
-    desc = f"BACKTEST FULL {progress_label}".strip()
+    desc = f"BACKTEST FULL   {progress_label}".strip()
 
     if not rules:
         return {}, np.empty((0, 0), dtype=np.float32), np.empty((0,), dtype=bool)
@@ -308,14 +307,18 @@ def run_full_period_search(
 
     shm_list, ohlcv_metadata = arrays_to_shared_memory(rules[0]["ohlcv_arr"])
     try:
-        with tqdm_joblib(tqdm(desc=desc, total=len(rules), dynamic_ncols=True)):
-            results = Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=1, pre_dispatch='all')(
-                delayed(_run_full_period_for_rule_shm)(
-                    r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount,
-                    matrix_metadata, valid_metadata, global_start_day, n_combos,
-                )
-                for r in rules
+        results = list(tqdm(
+        Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=1, pre_dispatch='all', return_as="generator")(
+            delayed(_run_full_period_for_rule_shm)(
+                r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount,
+                matrix_metadata, valid_metadata, global_start_day, n_combos,
             )
+            for r in rules
+            ),
+            desc=desc,
+            total=len(rules),
+            dynamic_ncols=True,
+        ))
     finally:
         for shm in shm_list:
             shm.close()

@@ -7,7 +7,6 @@ import cupy as cp
 from scipy import sparse
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 from signals.condition_bank import ConditionBank
 
 logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
@@ -23,7 +22,7 @@ GPU_SURVIVOR_CHUNK       = 25_000  # survivor columns compared per GPU matmul ch
                                    # the (batch_size x chunk) correlation temporary
 GPU_INITIAL_CAPACITY     = 20_000  # initial survivors buffer capacity, doubled on overflow
 RANDOM_SEED              = 42
-METRIC_LABEL_WIDTH       = 36  # fixed label width so all metric-block prints align
+METRIC_LABEL_WIDTH       = 25  # fixed label width so all metric-block prints align
 
 # =============================================================================
 # SIGNAL MASK BUILD
@@ -67,11 +66,15 @@ def build_signal_mask_matrix(
     effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
     rule_chunks = _chunk_list(all_rules, effective_chunk_size)
 
-    with tqdm_joblib(tqdm(desc="SIGNAL MASK BUILD", total=len(rule_chunks), dynamic_ncols=True)):
-        chunk_sparses = Parallel(n_jobs=n_jobs, backend="loky")(
+    chunk_sparses = list(tqdm(
+        Parallel(n_jobs=n_jobs, backend="loky", return_as="generator")(
             delayed(_compute_signal_mask_chunk)(chunk, ohlcv_arr, symbols)
             for chunk in rule_chunks
-        )
+        ),
+        desc="SIGNAL MASK BUILD",
+        total=len(rule_chunks),
+        dynamic_ncols=True,
+    ))
 
     return sparse.vstack(chunk_sparses, format="csr")
 
@@ -107,11 +110,15 @@ def build_signal_mask_keys(
     effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
     rule_chunks = _chunk_list(all_rules, effective_chunk_size)
 
-    with tqdm_joblib(tqdm(desc="SIGNAL MASK BUILD", total=len(rule_chunks), dynamic_ncols=True)):
-        chunk_keys_lists = Parallel(n_jobs=n_jobs, backend="loky")(
+    chunk_keys_lists = list(tqdm(
+        Parallel(n_jobs=n_jobs, backend="loky", return_as="generator")(
             delayed(_compute_signal_mask_keys_chunk)(chunk, ohlcv_arr, symbols)
             for chunk in rule_chunks
-        )
+        ),
+        desc="SIGNAL MASK BUILD",
+        total=len(rule_chunks),
+        dynamic_ncols=True,
+    ))
 
     all_keys = []
     for chunk_keys in chunk_keys_lists:

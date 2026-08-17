@@ -11,12 +11,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
-from tqdm import tqdm as _tqdm_global
-from tqdm.contrib.logging import logging_redirect_tqdm
-
-_tqdm_global.monitor_interval = 0  # disable tqdm's background monitor thread —
-                                    # prevents stray bar redraws in joblib/threaded contexts
-
 LOG_LEVEL = logging.INFO
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
@@ -36,6 +30,10 @@ logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG
 #------------------------------------------------------------------------------
 BACKTEST_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(BACKTEST_LOG_LEVEL)
+#STPEM
+#------------------------------------------------------------------------------
+STEPM_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
 #WFO
 #------------------------------------------------------------------------------
 WFO_LOG_LEVEL = logging.INFO

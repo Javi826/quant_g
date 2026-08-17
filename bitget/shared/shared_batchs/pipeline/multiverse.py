@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 from shared_config import VOLUME_COL
 from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays,prepare_signal_arrays,run_backtest_from_prepared_light
 from shared_batchs.utils.reporting import report_multiverse_debug
@@ -288,19 +287,23 @@ def _evaluate_multiverse_batch(
 
     n_symbols_expected = len(ohlcv_data)
 
-    desc = f"MULTIVERSE {timeframe}".strip()
+    desc = f"MULTIVERSE {timeframe}".strip().ljust(18)
     n_workers  = n_jobs if n_jobs > 0 else (os.cpu_count() or 1)
     n_chunks   = min(n_paths, n_workers)
     path_chunks = [chunk for chunk in np.array_split(np.arange(n_paths), n_chunks) if len(chunk) > 0]
 
-    with tqdm_joblib(tqdm(desc=desc, total=len(path_chunks), dynamic_ncols=True)):
-        chunked_results = Parallel(n_jobs=n_jobs)(
+    chunked_results = list(tqdm(
+        Parallel(n_jobs=n_jobs, return_as="generator")(
             delayed(_evaluate_universe_batch_chunk)(
                 chunk.tolist(), paths, ts_index, n_symbols_expected,
                 rules, order_amount,
             )
             for chunk in path_chunks
-        )
+        ),
+        desc=desc,
+        total=len(path_chunks),
+        dynamic_ncols=True,
+    ))
     per_path_results = [res for chunk_res in chunked_results for res in chunk_res]
 
     p_value_by_id  = {}
@@ -394,6 +397,6 @@ def pipe_multiverse(
     ]
 
     elapsed = int(time.time() - start)
-    logger.info(f"MULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+    logger.info(f"\nMULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return results

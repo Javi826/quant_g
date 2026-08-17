@@ -5,7 +5,6 @@ import numpy as np
 from multiprocessing.shared_memory import SharedMemory
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 from numba import njit, prange
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
 from shared_batchs.utils.reporting import print_stepm_matrix_debug, print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
@@ -273,14 +272,18 @@ def compute_deviation_matrix(
     deviations_shared = np.ndarray((n_bootstrap, n_cols), dtype=deviations_dtype, buffer=deviations_shm.buf)
 
     try:
-        desc = f"STEPM BOOTSTRAP {progress_label} ({BOOTSTRAP_BATCH_SIZE} cols/batch)".strip()
-        with tqdm_joblib(tqdm(desc=desc, total=n_batches, dynamic_ncols=True)):
-            Parallel(n_jobs=n_jobs)(
+        desc = f"STEPM BOOTSTRAP {progress_label}".strip()
+        list(tqdm(
+            Parallel(n_jobs=n_jobs, return_as="generator")(
                 delayed(_bootstrap_deviations_batch_prefix_shm)(
                     shm_metadata, start, end, block_size, len_last, n_obs, real_sharpe[start:end],
                 )
                 for start, end in batch_bounds
-            )
+            ),
+            desc=desc,
+            total=n_batches,
+            dynamic_ncols=True,
+        ))
         # Own copy, decoupled from the shared-memory segment released below.
         deviations = deviations_shared.copy()
     finally:
@@ -416,7 +419,7 @@ def stepwise_reality_check_pvalues(
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
-                f"STEPDOWN iter={_iteration} ── k={k} ── active={n_active} ── "
+                f"STEPD iter={_iteration} ── k={k} ── active={n_active} ── "
                 f"rejected_this_iter={n_reject} ── "
                 f"candidate_p range=[{candidate_p.min():.4f}, {candidate_p.max():.4f}]"
             )
@@ -547,7 +550,7 @@ def pipe_stepm(
     logger.info(f"{'─' * 70}")
     logger.info(f"  best column(z)    : {best_col_name}")
     logger.info(f"  best Sharpe(z)    : {real_sharpe[best_col_idx]:.4f}")
-    #logger.debug(f"  best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
+    logger.debug(f"  best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
     logger.info(f"{'─' * 70}\n")
 

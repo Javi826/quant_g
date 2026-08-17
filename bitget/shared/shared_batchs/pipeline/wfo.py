@@ -7,7 +7,6 @@ import pandas as pd
 from functools import partial
 from joblib import Parallel, delayed
 from tqdm import tqdm
-from tqdm_joblib import tqdm_joblib
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.backtesters.ZX_compute_BT import prepare_backtest_data, run_backtest_from_prepared, run_backtest_from_prepared_light
 from shared_batchs.engines.wfo_WF import walk_forward_optimization
@@ -399,9 +398,6 @@ def pipe_wfo(
     save_trades: bool = False,
     brief_trades_folder: str = None,
 ) -> list:
-
-    start = time.time()
-
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_wfo_fields()} for r in rules]
@@ -410,24 +406,18 @@ def pipe_wfo(
     lists_for_grid = [param_grid[k] for k in param_names]
     total          = len(rules)
 
-    with tqdm_joblib(tqdm(desc=f"WFO {timeframe}", total=total, dynamic_ncols=True)):
-        results = Parallel(n_jobs=rules_n_jobs)(
+    results = list(tqdm(
+        Parallel(n_jobs=rules_n_jobs, return_as="generator")(
             delayed(_run_wfo_for_rule)(
                 i, total, rule, ohlcv_arr, param_names, lists_for_grid, order_amount,
                 timeframe, net_gain_th, dd_th, r2_th, wfr_th, inner_n_jobs, show_progress,
                 log_level, save_trades, brief_trades_folder,
             )
             for i, rule in enumerate(rules)
-        )
-
-    if results:
-        _wfo_cfg = WFO_WINDOW_CONFIG.get(timeframe, {})
-        logger.info(
-            f"WFO ── {timeframe} completed ── {results[0]['n_windows']} windows | "
-            f"train={_wfo_cfg.get('train_months')}m  test={_wfo_cfg.get('test_months')}m"
-        )
-
-    elapsed = int(time.time() - start)
-    logger.info(f"WFO ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+        ),
+        desc=f"WFO {timeframe}".ljust(12),
+        total=total,
+        dynamic_ncols=True,
+    ))
 
     return results
