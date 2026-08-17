@@ -11,10 +11,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
+from tqdm import tqdm as _tqdm_global
+from tqdm.contrib.logging import logging_redirect_tqdm
+
+_tqdm_global.monitor_interval = 0  # disable tqdm's background monitor thread —
+                                    # prevents stray bar redraws in joblib/threaded contexts
+
 LOG_LEVEL = logging.INFO
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 logger.setLevel(LOG_LEVEL)
+
 #UNIVERSE
 #------------------------------------------------------------------------------
 UNIVERSE_LOG_LEVEL = logging.INFO
@@ -81,25 +88,23 @@ INNER_N_JOBS = 1
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = True
+RUN_DEPLOY    = False
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES = ["6Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["4H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [6,10],
-    "SL_PCT":     [6,10],
+    "TP_PCT":     [6,8,10],
+    "SL_PCT":     [6,8,10],
 }
-
-
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-STEPM_K_PERCENTILE  = 0.005
+STEPM_K_PERCENTILE  = 0.03
 #0.005
 
 PIPELINE_WFO         = True
