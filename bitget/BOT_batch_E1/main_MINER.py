@@ -102,7 +102,7 @@ PARAM_GRID = {
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-STEPM_K_PERCENTILE  = 0.03
+STEPM_K_PERCENTILE  = 0.01
 #0.005
 
 PIPELINE_WFO         = True

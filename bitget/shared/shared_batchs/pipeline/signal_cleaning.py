@@ -22,7 +22,7 @@ GPU_SURVIVOR_CHUNK       = 25_000  # survivor columns compared per GPU matmul ch
                                    # the (batch_size x chunk) correlation temporary
 GPU_INITIAL_CAPACITY     = 20_000  # initial survivors buffer capacity, doubled on overflow
 RANDOM_SEED              = 42
-METRIC_LABEL_WIDTH       = 25  # fixed label width so all metric-block prints align
+METRIC_LABEL_WIDTH       = 28  # fixed label width so all metric-block prints align
 
 # =============================================================================
 # SIGNAL MASK BUILD

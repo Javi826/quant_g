@@ -538,19 +538,19 @@ def pipe_stepm(
     best_raw_idx  = int(np.argmax(real_sharpe))
     best_raw_name = str(kept_columns[best_raw_idx])
 
-    logger.info(f"\n{'─' * 70}")
-    logger.info(f"  MAX RAW SHARPE (no bootstrap adjustment) ── {timeframe}")
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  best column       : {best_raw_name}")
-    logger.info(f"  best real Sharpe  : {real_sharpe[best_raw_idx]:.4f}")
-    logger.info(f"{'─' * 70}\n")
+    logger.debug(f"\n{'─' * 70}")
+    logger.debug(f"  MAX RAW SHARPE (no bootstrap adjustment) ── {timeframe}")
+    logger.debug(f"{'─' * 70}")
+    logger.debug(f"  best column       : {best_raw_name}")
+    logger.debug(f"  best real Sharpe  : {real_sharpe[best_raw_idx]:.4f}")
+    logger.debug(f"{'─' * 70}\n")
 
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  GLOBAL WHITE p-value (studentized) ── {timeframe}")
     logger.info(f"{'─' * 70}")
     logger.info(f"  best column(z)    : {best_col_name}")
     logger.info(f"  best Sharpe(z)    : {real_sharpe[best_col_idx]:.4f}")
-    logger.debug(f"  best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
+    logger.debug(f" best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
     logger.info(f"{'─' * 70}\n")
 
@@ -571,26 +571,40 @@ def pipe_stepm(
     stepm_pvals    = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
     stepm_p_by_col = dict(zip(kept_columns, stepm_pvals))
     sharpe_by_col  = dict(zip(kept_columns, real_sharpe))
-
+    z_stat_by_col  = dict(zip(kept_columns, z_stat))
+    
     if logger.isEnabledFor(logging.DEBUG):
         print_stepm_brc_equivalence_debug(timeframe, k_fwe, global_result["global_p"], stepm_p_by_col, best_col_name)
-
+    
+    # For each rule_id, pick the combo with the lowest stepm_p among all combos
+    # already tested by StepM — consistent with the studentized test itself,
+    # instead of trusting the raw-Sharpe winner selected upstream.
+    best_col_by_rule: dict[str, str] = {}
+    for col_name in kept_columns:
+        rule_id = str(col_name).rsplit("__", 1)[0]
+        current_best = best_col_by_rule.get(rule_id)
+        if current_best is None or stepm_p_by_col[col_name] < stepm_p_by_col[current_best]:
+            best_col_by_rule[rule_id] = col_name
+    
     n_passed = 0
     results  = []
     for r in raw_results:
-        best_combo_id = r.get("best_combo_id")
-        col_name      = f"{r['rule_id']}__{best_combo_id}" if best_combo_id else None
+        col_name      = best_col_by_rule.get(r["rule_id"])
+        best_combo_id = str(col_name).rsplit("__", 1)[1] if col_name else None
         stepm_p       = stepm_p_by_col.get(col_name, float("nan"))
         sharpe_val    = sharpe_by_col.get(col_name, float("nan"))
+        z_val         = z_stat_by_col.get(col_name, float("nan"))
         passed        = bool(np.isfinite(stepm_p) and stepm_p <= stepm_pvalue_th)
         n_passed     += int(passed)
-
+    
         results.append({
             **r,
-            "passed_stepm": passed,
-            "passed_mbias": passed,
-            "stepm_p":      float(stepm_p) if np.isfinite(stepm_p) else None,
-            "sharpe":       float(sharpe_val) if np.isfinite(sharpe_val) else None,
+            "best_combo_id": best_combo_id,
+            "passed_stepm":  passed,
+            "passed_mbias":  passed,
+            "stepm_p":       float(stepm_p) if np.isfinite(stepm_p) else None,
+            "sharpe":        float(sharpe_val) if np.isfinite(sharpe_val) else None,
+            "z_stat":        float(z_val) if np.isfinite(z_val) else None,
         })
 
     logger.info(f"STEPM ── {timeframe} ── k={k_fwe} ── {n_passed}/{len(raw_results)} rules pass")
