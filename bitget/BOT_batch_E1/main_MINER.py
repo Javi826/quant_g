@@ -131,91 +131,96 @@ run_config = {"STEPM_K_PERCENTILE": STEPM_K_PERCENTILE,"WFO_NET_GAIN_TH":WFO_NET
 if __name__ == "__main__":
     start = time.time()
 
-    logger.info(f"\n{'─' * 115}")
-    logger.info(f"  RULE MINING START")
-    logger.info(f"{'─' * 115}")
-    logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
-    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
-    logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
-    logger.info(f"  PARAM GRID  : {PARAM_GRID}")
-    _windows_str = "  |  ".join(
-        f"{tf}: train={WFO_WINDOW_CONFIG.get(tf, {}).get('train_months')}m test={WFO_WINDOW_CONFIG.get(tf, {}).get('test_months')}m"
-        for tf in TIMEFRAMES
-    )
-    logger.info(f"  WFO WINDOWS : {_windows_str}")
-    logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
-    logger.info(
-        f"  PIPELINES   : WFO: 🟢  "
-        f"CORRELATION: {'🟢' if PIPELINE_CORRELATION else '⚪'}  "
-        f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
-        f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
-    )
-    logger.info(f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
-    logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
-    logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
-    logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
-    logger.info(f"  STEPM       : K_PERCENTILE={STEPM_K_PERCENTILE}")
-    logger.info(
-        f"  RUNS        : BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
-        f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"
-    )
-    logger.info(f"{'─' * 115}\n")
-
-    # -------------------------------------------------------------------
-    # DATA LOADING — cheap, sequential across timeframes. Rule mining
-    # -------------------------------------------------------------------
-    ohlcv_data_by_timeframe = {}
-    ohlcv_arr_by_timeframe  = {}
-
-    for timeframe in TIMEFRAMES:
-        ohlcv_is = select_universe(
-            data_folder_is    = DATA_FOLDER_IS,
-            timeframe         = timeframe,
-            min_price         = MIN_PRICE,
-            filter_symbols_fn = filter_symbols,
+    try:
+        logger.info(f"\n{'─' * 115}")
+        logger.info(f"  RULE MINING START")
+        logger.info(f"{'─' * 115}")
+        logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
+        logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
+        logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
+        logger.info(f"  PARAM GRID  : {PARAM_GRID}")
+        _windows_str = "  |  ".join(
+            f"{tf}: train={WFO_WINDOW_CONFIG.get(tf, {}).get('train_months')}m test={WFO_WINDOW_CONFIG.get(tf, {}).get('test_months')}m"
+            for tf in TIMEFRAMES
         )
-        ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
-        ohlcv_data_by_timeframe[timeframe] = ohlcv_is
-        ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
-    # -------------------------------------------------------------------
-    # RULE MINING — Phase A: DSR for every timeframe, then a combined
-    # -------------------------------------------------------------------    
-   
-    validated_wfo_test, all_mbias_results = run_rule_mining_pipeline(
-        ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
-        ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
-        timeframes              = TIMEFRAMES,
-        param_grid              = PARAM_GRID,
-        order_amount            = ORDER_AMOUNT,
-        net_gain_th             = WFO_NET_GAIN_TH,
-        dd_th                   = WFO_DD_TH,
-        r2_th                   = WFO_R2_TH,
-        wfr_th                  = WFO_WFR_TH,
-        data_folder             = DATA_FOLDER_IS,
-        rules_n_jobs            = RULES_N_JOBS,
-        inner_n_jobs            = INNER_N_JOBS,
-        max_depth               = RULE_MAX_DEPTH,
-        log_level               = WFO_LOG_LEVEL,
-        save_trades             = SAVE_TRADES,
-        brief_trades_folder     = BRIEF_TRADES_FOLDER,
-        show_plots              = SHOW_PLOTS,
-        correlation_threshold   = CORRELATION_DD_TH,
-        montecarlo_ruin_th      = MONTECARLO_RUIN_TH,
-        multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
-        symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
-        deploy_output_path      = DEPLOY_OUTPUT_PATH,
-        run_config              = run_config,
-        # ---- PIPELINES ----
-        pipeline_wfo            = PIPELINE_WFO,
-        pipeline_correlation    = PIPELINE_CORRELATION,
-        pipeline_montecarlo     = PIPELINE_MONTECARLO,
-        pipeline_multiverse     = PIPELINE_MULTIVERSE,
-        stepm_k_percentile     = STEPM_K_PERCENTILE,    
-        # ---- RUNS ----
-        run_best_portfolio      = RUN_PORTFOLIO,
-        run_deploy              = RUN_DEPLOY,
-    )
+        logger.info(f"  WFO WINDOWS : {_windows_str}")
+        logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
+        logger.info(
+            f"  PIPELINES   : WFO: 🟢  "
+            f"CORRELATION: {'🟢' if PIPELINE_CORRELATION else '⚪'}  "
+            f"MONTECARLO: {'🟢' if PIPELINE_MONTECARLO else '⚪'}  "
+            f"MULTIVERSE: {'🟢' if PIPELINE_MULTIVERSE else '⚪'}"
+        )
+        logger.info(f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}")
+        logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
+        logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
+        logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
+        logger.info(f"  STEPM       : K_PERCENTILE={STEPM_K_PERCENTILE}")
+        logger.info(
+            f"  RUNS        : BEST PORTFOLIO: {'🟢' if RUN_PORTFOLIO else '⚪'}  "
+            f"DEPLOY: {'🟢' if RUN_DEPLOY else '⚪'}"
+        )
+        logger.info(f"{'─' * 115}\n")
 
-    elapsed = int(time.time() - start)
-    logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
-    #profile_pipeline.print_summary()  # DIAGNOSTIC ONLY — remove after profiling
+        # -------------------------------------------------------------------
+        # DATA LOADING — cheap, sequential across timeframes. Rule mining
+        # -------------------------------------------------------------------
+        ohlcv_data_by_timeframe = {}
+        ohlcv_arr_by_timeframe  = {}
+
+        for timeframe in TIMEFRAMES:
+            ohlcv_is = select_universe(
+                data_folder_is    = DATA_FOLDER_IS,
+                timeframe         = timeframe,
+                min_price         = MIN_PRICE,
+                filter_symbols_fn = filter_symbols,
+            )
+            ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
+            ohlcv_data_by_timeframe[timeframe] = ohlcv_is
+            ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
+        # -------------------------------------------------------------------
+        # RULE MINING — Phase A: DSR for every timeframe, then a combined
+        # -------------------------------------------------------------------    
+
+        validated_wfo_test, all_mbias_results = run_rule_mining_pipeline(
+            ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
+            ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
+            timeframes              = TIMEFRAMES,
+            param_grid              = PARAM_GRID,
+            order_amount            = ORDER_AMOUNT,
+            net_gain_th             = WFO_NET_GAIN_TH,
+            dd_th                   = WFO_DD_TH,
+            r2_th                   = WFO_R2_TH,
+            wfr_th                  = WFO_WFR_TH,
+            data_folder             = DATA_FOLDER_IS,
+            rules_n_jobs            = RULES_N_JOBS,
+            inner_n_jobs            = INNER_N_JOBS,
+            max_depth               = RULE_MAX_DEPTH,
+            log_level               = WFO_LOG_LEVEL,
+            save_trades             = SAVE_TRADES,
+            brief_trades_folder     = BRIEF_TRADES_FOLDER,
+            show_plots              = SHOW_PLOTS,
+            correlation_threshold   = CORRELATION_DD_TH,
+            montecarlo_ruin_th      = MONTECARLO_RUIN_TH,
+            multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
+            symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
+            deploy_output_path      = DEPLOY_OUTPUT_PATH,
+            run_config              = run_config,
+            # ---- PIPELINES ----
+            pipeline_wfo            = PIPELINE_WFO,
+            pipeline_correlation    = PIPELINE_CORRELATION,
+            pipeline_montecarlo     = PIPELINE_MONTECARLO,
+            pipeline_multiverse     = PIPELINE_MULTIVERSE,
+            stepm_k_percentile     = STEPM_K_PERCENTILE,    
+            # ---- RUNS ----
+            run_best_portfolio      = RUN_PORTFOLIO,
+            run_deploy              = RUN_DEPLOY,
+        )
+
+        elapsed = int(time.time() - start)
+        logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+
+    except KeyboardInterrupt:
+        elapsed = int(time.time() - start)
+        logger.info(f"\n⛔  INTERRUPTED BY USER — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+        sys.exit(0)

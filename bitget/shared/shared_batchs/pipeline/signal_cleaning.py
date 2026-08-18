@@ -19,7 +19,11 @@ SIGNAL_MASK_CHUNK_SIZE   = None  # None -> auto-sized from n_jobs and rule count
 DECORRELATE_THRESHOLD    = 0.5
 DECORRELATE_BATCH_SIZE   = 1000
 GPU_SURVIVOR_CHUNK       = 25_000  # survivor columns compared per GPU matmul chunk, bounds
-                                   # the (batch_size x chunk) correlation temporary
+
+JACCARD_SIMILARITY_THRESHOLD = 0.8
+JACCARD_BIT_BLOCK = 32768
+
+
 GPU_INITIAL_CAPACITY     = 20_000  # initial survivors buffer capacity, doubled on overflow
 RANDOM_SEED              = 42
 METRIC_LABEL_WIDTH       = 28  # fixed label width so all metric-block prints align
@@ -115,7 +119,7 @@ def build_signal_mask_keys(
             delayed(_compute_signal_mask_keys_chunk)(chunk, ohlcv_arr, symbols)
             for chunk in rule_chunks
         ),
-        desc="SIGNAL MASK BUILD",
+        desc="SIGNAL MASK BUILD ",
         total=len(rule_chunks),
         dynamic_ncols=True,
     ))
@@ -341,3 +345,195 @@ def pipe_decorrelation(
     logger.info(f"{'─' * 70}\n")
 
     return matrix_arr[:, survivor_positions], np.asarray(col_names)[survivor_positions]
+
+# =============================================================================
+# JACCARD SIMILARITY FILTER (GPU, bit-packed) — standalone, near-duplicate
+# =============================================================================
+
+_POPCOUNT_TABLE_NP = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint16)
+
+def _packed_signal_matrix(rules: list, ohlcv_arr: dict, n_jobs: int) -> tuple:
+    """Builds a bit-packed (n_bytes, n_rules) uint8 matrix directly from the
+    same signal_fn evaluation used for exact-match cleaning, plus the side of
+    each rule. Never holds an unpacked dense matrix."""
+    signal_keys   = build_signal_mask_keys(rules, ohlcv_arr, n_jobs=n_jobs)
+    sides         = np.array([side for side, _ in signal_keys])
+    packed_matrix = np.vstack([
+        np.frombuffer(packed_bytes, dtype=np.uint8) for _, packed_bytes in signal_keys
+    ]).T  # (n_bytes, n_rules)
+    return packed_matrix, sides
+
+
+def _popcount_packed(packed: np.ndarray) -> np.ndarray:
+    """Per-column popcount of a packed uint8 matrix, via byte lookup table
+    (no bit-unpacking, stays at the packed array's footprint)."""
+    return _POPCOUNT_TABLE_NP[packed].sum(axis=0, dtype=np.float32)
+
+
+def _alloc_managed_packed_survivors(n_bytes: int, n_cols: int) -> cp.ndarray:
+
+    mem = _MANAGED_POOL.malloc(n_bytes * n_cols)
+    return cp.ndarray((n_bytes, n_cols), dtype=cp.uint8, memptr=mem)
+
+
+def _ensure_packed_survivor_capacity(survivors_gpu: cp.ndarray, n_survivors: int, n_new: int, n_bytes: int) -> cp.ndarray:
+
+    capacity = survivors_gpu.shape[1]
+    if n_survivors + n_new <= capacity:
+        return survivors_gpu
+
+    new_capacity = capacity
+    while n_survivors + n_new > new_capacity:
+        new_capacity *= 2
+
+    grown = _alloc_managed_packed_survivors(n_bytes, new_capacity)
+    grown[:, :n_survivors] = survivors_gpu[:, :n_survivors]
+    return grown
+
+def _unpackbits_columns(packed: cp.ndarray) -> cp.ndarray:
+
+    n_bytes, n_cols = packed.shape
+    flat_bits = cp.unpackbits(packed.ravel(order="F"))
+    return flat_bits.reshape(n_cols, n_bytes * 8).T
+
+
+def _pairwise_intersection_gpu(
+    packed_a: cp.ndarray,
+    packed_b: cp.ndarray,
+    bit_block: int = JACCARD_BIT_BLOCK,
+) -> cp.ndarray:
+
+    n_bytes = packed_a.shape[0]
+    byte_block = max(1, bit_block // 8)
+
+    intersection = cp.zeros((packed_a.shape[1], packed_b.shape[1]), dtype=cp.float32)
+    for byte_start in range(0, n_bytes, byte_block):
+        byte_end   = min(byte_start + byte_block, n_bytes)
+        unpacked_a = _unpackbits_columns(packed_a[byte_start:byte_end]).astype(cp.float32)
+        unpacked_b = _unpackbits_columns(packed_b[byte_start:byte_end]).astype(cp.float32)
+        intersection += unpacked_a.T @ unpacked_b
+
+    return intersection
+
+
+def _jaccard_filter_side_gpu(
+    packed_matrix: np.ndarray,
+    threshold: float,
+    batch_size: int,
+    survivor_chunk_size: int,
+) -> np.ndarray:
+    """Greedy GPU Jaccard redundancy filter for a single side group.
+    Operates on bit-packed columns end-to-end — survivors stay packed on
+    GPU, only per-batch/per-chunk slices get unpacked transiently."""
+    n_bytes, n_cols = packed_matrix.shape
+    if n_cols == 0:
+        return np.array([], dtype=np.int64)
+
+    col_sums = _popcount_packed(packed_matrix)  # |A| per column, CPU side
+
+    survivors_gpu     = _alloc_managed_packed_survivors(n_bytes, GPU_INITIAL_CAPACITY)
+    survivor_sums_gpu = cp.zeros(GPU_INITIAL_CAPACITY, dtype=cp.float32)
+    n_survivors = 0
+    survivor_chunks = []
+
+    n_batches = int(np.ceil(n_cols / batch_size))
+    desc = f"JACCARD FILTER GPU"
+
+    for batch_start in tqdm(range(0, n_cols, batch_size), desc=desc, total=n_batches, dynamic_ncols=True):
+        batch_end    = min(batch_start + batch_size, n_cols)
+        batch_gpu    = cp.asarray(packed_matrix[:, batch_start:batch_end])
+        batch_sums   = cp.asarray(col_sums[batch_start:batch_end])
+        n_batch_cols = batch_gpu.shape[1]
+
+        keep_mask = cp.ones(n_batch_cols, dtype=cp.bool_)
+
+        if n_survivors > 0:
+            max_jaccard = cp.zeros(n_batch_cols, dtype=cp.float32)
+            for start in range(0, n_survivors, survivor_chunk_size):
+                end = min(start + survivor_chunk_size, n_survivors)
+                intersection = _pairwise_intersection_gpu(batch_gpu, survivors_gpu[:, start:end])
+                union = batch_sums[:, None] + survivor_sums_gpu[start:end][None, :] - intersection
+                union = cp.where(union == 0, 1.0, union)  # guard empty-set pairs
+                jaccard_block = intersection / union
+                cp.maximum(max_jaccard, jaccard_block.max(axis=1), out=max_jaccard)
+            keep_mask = max_jaccard <= threshold
+
+        accepted_local = cp.where(keep_mask)[0]
+        n_accepted = int(accepted_local.shape[0])
+
+        if n_accepted > 0:
+            cand_gpu  = batch_gpu[:, accepted_local]
+            cand_sums = batch_sums[accepted_local]
+            intra_intersection = _pairwise_intersection_gpu(cand_gpu, cand_gpu)
+            intra_union = cand_sums[:, None] + cand_sums[None, :] - intra_intersection
+            intra_union = cp.where(intra_union == 0, 1.0, intra_union)
+            intra_jaccard = cp.asnumpy(intra_intersection / intra_union)
+
+            keep_within = np.zeros(n_accepted, dtype=bool)
+            accepted_within = []
+            for i in range(n_accepted):
+                if accepted_within and intra_jaccard[i, accepted_within].max() > threshold:
+                    continue
+                keep_within[i] = True
+                accepted_within.append(i)
+
+            final_local = cp.asnumpy(accepted_local)[keep_within]
+        else:
+            final_local = np.array([], dtype=np.int64)
+
+        n_final = final_local.shape[0]
+        survivors_gpu = _ensure_packed_survivor_capacity(survivors_gpu, n_survivors, n_final, n_bytes)
+        if survivor_sums_gpu.shape[0] < n_survivors + n_final:
+            grown_sums = cp.zeros(survivors_gpu.shape[1], dtype=cp.float32)
+            grown_sums[:n_survivors] = survivor_sums_gpu[:n_survivors]
+            survivor_sums_gpu = grown_sums
+
+        if n_final > 0:
+            survivors_gpu[:, n_survivors:n_survivors + n_final] = batch_gpu[:, cp.asarray(final_local)]
+            survivor_sums_gpu[n_survivors:n_survivors + n_final] = batch_sums[cp.asarray(final_local)]
+        n_survivors += n_final
+
+        survivor_chunks.append(batch_start + final_local)
+
+        del batch_gpu
+        cp.get_default_memory_pool().free_all_blocks()
+
+    del survivors_gpu, survivor_sums_gpu
+    cp.get_default_memory_pool().free_all_blocks()
+
+    return np.concatenate(survivor_chunks) if survivor_chunks else np.array([], dtype=np.int64)
+
+
+def pipe_signal_cleaning_jaccard(
+    rules: list,
+    ohlcv_arr: dict,
+    timeframe: str = "",
+    threshold: float = JACCARD_SIMILARITY_THRESHOLD,
+    batch_size: int = DECORRELATE_BATCH_SIZE,
+    survivor_chunk_size: int = GPU_SURVIVOR_CHUNK,
+    n_jobs: int = SIGNAL_MASK_N_JOBS,
+) -> list:
+
+    packed_matrix, sides = _packed_signal_matrix(rules, ohlcv_arr, n_jobs)
+
+    kept_positions = []
+    for side in np.unique(sides):
+        side_positions = np.where(sides == side)[0]
+        side_matrix    = packed_matrix[:, side_positions]
+        kept_local = _jaccard_filter_side_gpu(side_matrix, threshold, batch_size, survivor_chunk_size)
+        kept_positions.append(side_positions[kept_local])
+
+    kept_positions = np.sort(np.concatenate(kept_positions)) if kept_positions else np.array([], dtype=np.int64)
+
+    n_rules_total = len(rules)
+    n_kept        = kept_positions.shape[0]
+    n_dropped     = n_rules_total - n_kept
+
+    logger.info(f"\n{'─' * 70}")
+    logger.info(f"  JACCARD SIMILARITY FILTER (GPU, threshold={threshold}) ── {timeframe}")
+    logger.info(f"{'─' * 70}")
+    logger.info(f"  {'total rules (input)':<{METRIC_LABEL_WIDTH}} : {format(n_rules_total, ',').replace(',', '.')}")
+    logger.info(f"  {'dropped (near-duplicate)':<{METRIC_LABEL_WIDTH}} : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
+    logger.info(f"{'─' * 70}\n")
+
+    return [rules[i] for i in kept_positions]

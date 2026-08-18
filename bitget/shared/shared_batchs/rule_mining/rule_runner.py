@@ -7,7 +7,7 @@ from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.stepM import pipe_stepm
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
-from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning,pipe_decorrelation
+from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning, pipe_decorrelation, pipe_signal_cleaning_jaccard
 
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
@@ -119,10 +119,18 @@ def run_rule_mining_pipeline(
         logger.info(f"========= RULE MINING ── {timeframe} ── total candidate rules: {len(rules)} =========")
         logger.info(f"{'=' * 70}")
 
-        rules = pipe_signal_cleaning(
-            rules       = rules,
-            ohlcv_arr   = ohlcv_arr_by_timeframe[timeframe],
-            timeframe   = timeframe,
+# =============================================================================
+#         rules = pipe_signal_cleaning(
+#             rules       = rules,
+#             ohlcv_arr   = ohlcv_arr_by_timeframe[timeframe],
+#             timeframe   = timeframe,
+#         )
+# =============================================================================
+        
+        rules = pipe_signal_cleaning_jaccard(
+            rules     = rules,
+            ohlcv_arr = ohlcv_arr_by_timeframe[timeframe],
+            timeframe = timeframe,
         )
 
         raw_results, n_combos, matrix_arr, col_names = pipe_backtesting(
