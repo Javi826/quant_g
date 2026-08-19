@@ -222,13 +222,14 @@ def _short_id(rule_id: str) -> str:
     parts = rule_id.split("_")
     return "_".join(parts[:3])
 
-def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None, debug: bool = False) -> None:
+# AFTER
+def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_label: str, survivor_ids: list = None) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
     rows.sort(key=lambda r: int(r["rule_id"].split("_")[0]))
 
     show_status  = survivor_ids is not None
     survivor_set = set(survivor_ids) if show_status else None
-    log_fn       = logger.debug if debug else logger.info
+    log_fn       = logger.debug
 
     id_width    = max((len(_short_id(r["rule_id"])) for r in rows), default=8) + 2
     label_width = max((len(r["label"]) for r in rows), default=8) + 2
@@ -257,7 +258,8 @@ def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_
 
     log_fn(f"{'─' * 180}\n")
 
-def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -> None:
+# AFTER
+def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list, stage_label: str, candidate_ids: list) -> None:
     rows = [r for r in all_raw_results if r["rule_id"] in set(highlight_ids)]
     if not rows:
         return
@@ -273,13 +275,7 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list) -
             for m in threshold_metrics
         }
     logger.info(f"\n{'─' * 140}")
-    logger.info(f"  MIN/MAX METRICS BY TIMEFRAME + SIDE ── {len(groups)} group(s)")
-    logger.info(f"{'─' * 140}")
-    logger.info(
-        f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}"
-        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
-        f"{'STEPM_P min/max':<16}{'WFR min/max':<16}"
-    )
+    logger.info(f"  RULE MINING RESULTS — {stage_label} ── {len(highlight_ids)} / {len(candidate_ids)} passed")
     logger.info(f"{'─' * 140}")
     for (tf, side), group_rows in sorted(groups.items()):
         s = group_stats[(tf, side)]

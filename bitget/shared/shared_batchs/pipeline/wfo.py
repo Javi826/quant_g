@@ -33,6 +33,14 @@ METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"
 EMA_ALPHA   = 0.3
 
 # =============================================================================
+# WFO APPROVAL THRESHOLDS
+# =============================================================================
+WFO_NET_GAIN_TH = 30
+WFO_DD_TH       = 15
+WFO_R2_TH       = 0.7
+WFO_WFR_TH      = 0.6
+
+# =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
 
@@ -386,10 +394,10 @@ def pipe_wfo(
     param_grid: dict,
     order_amount: int,
     timeframe: str,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
+    net_gain_th: float = None,
+    dd_th: float = None,
+    r2_th: float = None,
+    wfr_th: float = None,
     enabled: bool = True,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -401,6 +409,11 @@ def pipe_wfo(
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_wfo_fields()} for r in rules]
+
+    net_gain_th = net_gain_th if net_gain_th is not None else WFO_NET_GAIN_TH
+    dd_th       = dd_th       if dd_th       is not None else WFO_DD_TH
+    r2_th       = r2_th       if r2_th       is not None else WFO_R2_TH
+    wfr_th      = wfr_th      if wfr_th      is not None else WFO_WFR_TH
 
     param_names    = list(param_grid.keys())
     lists_for_grid = [param_grid[k] for k in param_names]

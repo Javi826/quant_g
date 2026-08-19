@@ -15,14 +15,15 @@ DTYPE  = np.float32
 # MCPT EXECUTION CONFIG
 # =============================================================================
 
-N_PERMUTATIONS  = 1000
-MCPT_N_JOBS     = -1
-
+N_PERMUTATIONS       = 1000
+MCPT_N_JOBS          = -1
+MULTIVERSE_PVALUE_TH = 0.10
+#1H-400 segun script
 BLOCK_SIZE_BY_TIMEFRAME = {
-    "1H":     403,
+    "1H":     150,
     "4H":     120,
-    "6Hutc":  72,
-    "12Hutc": 33,
+    "6Hutc":  70,
+    "12Hutc": 30,
 }
 
 def _resolve_block_size(timeframe: str) -> int:
@@ -347,16 +348,14 @@ def pipe_multiverse(
     ohlcv_data_by_timeframe: dict,
     param_grid: dict,
     order_amount: int,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
-    p_value_th: float,
+    p_value_th: float = None,
     enabled: bool = True,
     n_paths: int = N_PERMUTATIONS,
     block_size: int | None = None,
     n_jobs: int = MCPT_N_JOBS,
 ) -> list:
+
+    p_value_th = p_value_th if p_value_th is not None else MULTIVERSE_PVALUE_TH
 
     start = time.time()
 

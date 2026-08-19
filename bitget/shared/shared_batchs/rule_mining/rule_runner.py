@@ -73,17 +73,12 @@ def _empty_wfo_fields() -> dict:
 # =============================================================================
 # ORCHESTRATOR 
 # =============================================================================
-# DESPUÉS
 def run_rule_mining_pipeline(
     ohlcv_data_by_timeframe: dict,
     ohlcv_arr_by_timeframe: dict,
     timeframes: list,
     param_grid: dict,
     order_amount: int,
-    net_gain_th: float,
-    dd_th: float,
-    r2_th: float,
-    wfr_th: float,
     data_folder: str,
     rules_n_jobs: int = 1,
     inner_n_jobs: int = -1,
@@ -93,9 +88,6 @@ def run_rule_mining_pipeline(
     save_trades: bool = False,
     brief_trades_folder: str = None,
     show_plots: bool = False,
-    correlation_threshold: float = 0.75,
-    montecarlo_ruin_th: float = 5.0,
-    multiverse_p_value_th: float = 0.05,
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
     run_config: dict = None,
@@ -104,7 +96,6 @@ def run_rule_mining_pipeline(
     pipeline_correlation: bool = True,
     pipeline_montecarlo: bool = True,
     pipeline_multiverse: bool = True,
-    stepm_k_percentile: float = None,
     # ---- RUNS ----
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
@@ -115,9 +106,9 @@ def run_rule_mining_pipeline(
     all_mbias_results = []
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
-        logger.info(f"\n{'=' * 70}")
-        logger.info(f"========= RULE MINING ── {timeframe} ── total candidate rules: {len(rules)} =========")
-        logger.info(f"{'=' * 70}")
+        logger.info(f"\n\033[36m{'=' * 70}")
+        logger.info(f"======== RULE MINING ── {timeframe} ── total candidate rules: {format(len(rules), ',').replace(',', '.')} =========")
+        logger.info(f"{'=' * 70}\033[0m")
 
 # =============================================================================
 #         rules = pipe_signal_cleaning(
@@ -140,21 +131,12 @@ def run_rule_mining_pipeline(
             order_amount = order_amount,
             timeframe    = timeframe,
         )
-        
-# =============================================================================
-#         matrix_arr, col_names = pipe_decorrelation(
-#             matrix_arr = matrix_arr,
-#             col_names  = col_names,
-#             timeframe  = timeframe,
-#         )
-# =============================================================================
-        
+                
         mbias_results = pipe_stepm(
-            raw_results        = raw_results,
-            matrix_arr         = matrix_arr,
-            col_names          = col_names,
-            stepm_k_percentile = stepm_k_percentile,
-            timeframe          = timeframe,
+            raw_results = raw_results,
+            matrix_arr  = matrix_arr,
+            col_names   = col_names,
+            timeframe   = timeframe,
         )
 
         del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
@@ -162,7 +144,8 @@ def run_rule_mining_pipeline(
         all_mbias_results.extend([{**r, **_empty_wfo_fields()} for r in mbias_results])
 
     passed_mbias_ids = {r["rule_id"] for r in all_mbias_results if r["passed_mbias"]}
-    print_rule_mining_ranking(all_mbias_results, list(passed_mbias_ids), "POST-MBIAS", survivor_ids=list(passed_mbias_ids), debug=True)
+    # AFTER
+    print_rule_mining_ranking(all_mbias_results, list(passed_mbias_ids), "POST-MBIAS", survivor_ids=list(passed_mbias_ids))
     wfo_by_id = {}
     for timeframe in timeframes:
         rules_this_tf = [r for r in all_mbias_results if r["timeframe"] == timeframe and r["passed_mbias"]]
@@ -173,10 +156,6 @@ def run_rule_mining_pipeline(
             param_grid          = param_grid,
             order_amount        = order_amount,
             timeframe           = timeframe,
-            net_gain_th         = net_gain_th,
-            dd_th               = dd_th,
-            r2_th               = r2_th,
-            wfr_th              = wfr_th,
             enabled             = pipeline_wfo,
             rules_n_jobs        = rules_n_jobs,
             inner_n_jobs        = inner_n_jobs,
@@ -206,7 +185,7 @@ def run_rule_mining_pipeline(
         if r["approved"] and r["wfo_test_trades"] is not None and not r["wfo_test_trades"].empty
     ]
 
-    print_rule_mining_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo])
+    print_rule_mining_min_by_group(all_raw_results, [rid for rid, _ in validated_after_wfo], "POST-WFO", wfo_candidate_ids)
 
     # -------------------------------------------------------------------
     # Correlation (portfolio construction: drop redundant rules)
@@ -217,13 +196,12 @@ def run_rule_mining_pipeline(
         survivors_rules = pipe_correlation(
             rules           = rules_for_corr,
             initial_balance = INITIAL_BALANCE,
-            threshold       = correlation_threshold,
             enabled         = pipeline_correlation,
         )
         survivors_corr              = [r["rule_id"] for r in survivors_rules]
         validated_after_correlation = [(rid, raw_by_id[rid]["wfo_test_trades"]) for rid in survivors_corr]
         print_rule_mining_ranking(all_raw_results, candidates_before_corr, "POST-CORRELATION", survivor_ids=survivors_corr)
-        print_rule_mining_min_by_group(all_raw_results, survivors_corr)
+        print_rule_mining_min_by_group(all_raw_results, survivors_corr, "POST-CORRELATION", candidates_before_corr)
     else:
         validated_after_correlation = validated_after_wfo
         print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_correlation], "POST-CORRELATION")
@@ -236,7 +214,6 @@ def run_rule_mining_pipeline(
         mc_results = pipe_montecarlo(
             rules           = rules_for_mc,
             initial_balance = INITIAL_BALANCE,
-            prob_ruin_th    = montecarlo_ruin_th,
             enabled         = pipeline_montecarlo,
         )
         for r in mc_results:
@@ -247,7 +224,7 @@ def run_rule_mining_pipeline(
         ]
         survivors_mc = [rid for rid, _ in validated_after_montecarlo]
         print_rule_mining_ranking(all_raw_results, candidates_before_mc, "POST-MONTECARLO", survivor_ids=survivors_mc)
-        print_rule_mining_min_by_group(all_raw_results, survivors_mc)
+        print_rule_mining_min_by_group(all_raw_results, survivors_mc, "POST-MONTECARLO", candidates_before_mc)
     else:
         validated_after_montecarlo = validated_after_correlation
         print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_montecarlo], "POST-MONTECARLO")
@@ -265,11 +242,6 @@ def run_rule_mining_pipeline(
             ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
             param_grid              = param_grid,
             order_amount            = order_amount,
-            net_gain_th             = net_gain_th,
-            dd_th                   = dd_th,
-            r2_th                   = r2_th,
-            wfr_th                  = wfr_th,
-            p_value_th              = multiverse_p_value_th,
             enabled                 = pipeline_multiverse,
         )
         for r in mv_results:
@@ -280,7 +252,7 @@ def run_rule_mining_pipeline(
         ]
         survivors_mv = [rid for rid, _ in validated_after_multiverse]
         print_rule_mining_ranking(all_raw_results, candidates_before_mv, "POST-MULTIVERSE", survivor_ids=survivors_mv)
-        print_rule_mining_min_by_group(all_raw_results, survivors_mv)
+        print_rule_mining_min_by_group(all_raw_results, survivors_mv, "POST-MULTIVERSE", candidates_before_mv)
     else:
         validated_after_multiverse = validated_after_montecarlo
         print_rule_mining_ranking(all_raw_results, [rid for rid, _ in validated_after_multiverse], "POST-MULTIVERSE")

@@ -12,6 +12,7 @@ N_SIMULATIONS      = 1000
 BLOCK_SIZE         = 20   # 1 = simple bootstrap with replacement (no block structure).
 RUIN_THRESHOLD_PCT = 25   # % capital drawdown considered "ruin" within a single simulation
 SEED               = 42   # fixed seed for reproducible bootstrap runs
+MONTECARLO_RUIN_TH = 10   # max % of simulations allowed to hit ruin for approval
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -100,7 +101,7 @@ def _empty_montecarlo_fields() -> dict:
 def pipe_montecarlo(
     rules: list,
     initial_balance: float,
-    prob_ruin_th: float,
+    prob_ruin_th: float = None,
     enabled: bool = True,
     n_simulations: int = N_SIMULATIONS,
     block_size: int = BLOCK_SIZE,
@@ -108,6 +109,7 @@ def pipe_montecarlo(
     seed: int = SEED,
 ) -> list:
 
+    prob_ruin_th = prob_ruin_th if prob_ruin_th is not None else MONTECARLO_RUIN_TH
 
     if not enabled:
         logger.info(f"MONTECARLO ── disabled — passing all {len(rules)} rules through untouched")

@@ -48,37 +48,38 @@ from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
 from shared_batchs.pipeline.fdr import pipe_fdr
+from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-#TIMEFRAMES = ["12Hutc"]
+TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
     "TP_PCT":     [6,8,10],
-    "SL_PCT":     [6,8,10],
+    "SL_PCT":     [6,8],
 }
 
 # =============================================================================
 # DSR vs STEPM vs FDR — full brute universe comparison, no other pipeline stages
 # =============================================================================
-DSR_TH              = 0.85
+DSR_TH              = 0.95
 STEPM_K_PERCENTILE  = 0.01
-FDR_ALPHA           = 0.20
+FDR_ALPHA           = 0.2
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
 # here plus a new "pairs" tuple in _print_correlation; every report function
 # below iterates over this registry instead of hardcoding method names.
 # =============================================================================
-DSR_TEST   = True
+DSR_TEST   = False
 STEPM_TEST = True
-FDR_TEST   = True
+FDR_TEST   = False
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
     "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
@@ -149,6 +150,14 @@ def compare_dsr_vs_stepm(
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
+
+# =============================================================================
+#     rules = pipe_signal_cleaning_jaccard(
+#         rules     = rules,
+#         ohlcv_arr = ohlcv_arr,
+#         timeframe = timeframe,
+#     )
+# =============================================================================
 
     original_n_jobs = backtest_module.BACKTEST_N_JOBS
     backtest_module.BACKTEST_N_JOBS = n_jobs
@@ -279,13 +288,13 @@ def _print_comparison(raw_results: list, results_by_method: dict, timeframe: str
         pct   = n_passed[method] / n_total * 100.0 if n_total else 0.0
         logger.info(f"  {label:<{label_width}}── {n_passed[method]}/{n_total} passed ({pct:.2f}%)")
     for (m1, m2), n_both in n_pairwise_both_passed.items():
-        label       = f"{METHOD_SPECS[m1]['label']}-{METHOD_SPECS[m2]['label']} BOTH-PASS"
-        n_max_pair  = max(n_passed[m1], n_passed[m2])
-        overlap_pct = n_both / n_max_pair * 100.0 if n_max_pair else 0.0
-        logger.info(f"  {label:<{label_width}}── {n_both}/{n_max_pair}  │  overlap vs largest: {overlap_pct:.1f}%")
-    n_max_single       = max(n_passed.values()) if n_passed else 0
-    overlap_all_passed = n_all_passed / n_max_single * 100.0 if n_max_single else 0.0
-    logger.info(f"  {'ALL-PASS':<{label_width}}── {n_all_passed}/{n_max_single}  │  overlap vs largest: {overlap_all_passed:.1f}%")
+        label        = f"{METHOD_SPECS[m1]['label']}-{METHOD_SPECS[m2]['label']} BOTH-PASS"
+        n_union_pair = n_passed[m1] + n_passed[m2] - n_both
+        jaccard_pct  = n_both / n_union_pair * 100.0 if n_union_pair else 0.0
+        logger.info(f"  {label:<{label_width}}── {n_both}/{n_union_pair}  │  Jaccard: {jaccard_pct:.1f}%")
+    n_union_all       = len({r["rule_id"] for r in raw_results if any(ok_by_method[m][r["rule_id"]] for m in METHOD_ORDER)})
+    jaccard_all_pct   = n_all_passed / n_union_all * 100.0 if n_union_all else 0.0
+    logger.info(f"  {'ALL-PASS':<{label_width}}── {n_all_passed}/{n_union_all}  │  Jaccard: {jaccard_all_pct:.1f}%")
     logger.info(f"{'─' * 90}\n")
 
 

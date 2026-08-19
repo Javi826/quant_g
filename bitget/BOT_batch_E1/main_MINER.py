@@ -70,7 +70,11 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
-from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA
+from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA, WFO_NET_GAIN_TH, WFO_DD_TH, WFO_R2_TH, WFO_WFR_TH
+from shared_batchs.pipeline.correlation import CORRELATION_DD_TH
+from shared_batchs.pipeline.montecarlo import MONTECARLO_RUIN_TH
+from shared_batchs.pipeline.multiverse import MULTIVERSE_PVALUE_TH
+from shared_batchs.pipeline.stepM import STEPM_K_PERCENTILE
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
@@ -97,33 +101,31 @@ N_SYMBOLS  = 10
 PARAM_GRID = {
     "SELL_AFTER": [50],
     "TP_PCT":     [6,8,10],
-    "SL_PCT":     [6,8,10],
+    "SL_PCT":     [6,8],
 }
 # =============================================================================
 # PIPELINES — sequential validation filters
 # =============================================================================
-STEPM_K_PERCENTILE  = 0.01
-#0.005
-
 PIPELINE_WFO         = True
-WFO_NET_GAIN_TH      = 30
-WFO_DD_TH            = 15
-WFO_R2_TH            = 0.7
-WFO_WFR_TH           = 0.6
-
 PIPELINE_CORRELATION = True
-CORRELATION_DD_TH    = 0.55
 PIPELINE_MONTECARLO  = True
-MONTECARLO_RUIN_TH   = 10
 PIPELINE_MULTIVERSE  = True
-MULTIVERSE_PVALUE_TH = 0.05
 
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")
 SYMBOLS_LIVE_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "symbols_live")
 BRIEF_TRADES_FOLDER  = os.path.join(STRATEGIES_E1_FOLDER, "brief_trades")
 DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_batch.py")
 
-run_config = {"STEPM_K_PERCENTILE": STEPM_K_PERCENTILE,"WFO_NET_GAIN_TH":WFO_NET_GAIN_TH,"WFO_DD_TH":WFO_DD_TH,"WFO_R2_TH":WFO_R2_TH,"WFO_WFR_TH":WFO_WFR_TH,"CORRELATION_DD_TH":CORRELATION_DD_TH,"MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH,"MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH}
+run_config = {
+    "STEPM_K_PERCENTILE":   STEPM_K_PERCENTILE,
+    "WFO_NET_GAIN_TH":      WFO_NET_GAIN_TH,
+    "WFO_DD_TH":            WFO_DD_TH,
+    "WFO_R2_TH":            WFO_R2_TH,
+    "WFO_WFR_TH":           WFO_WFR_TH,
+    "CORRELATION_DD_TH":    CORRELATION_DD_TH,
+    "MONTECARLO_RUIN_TH":   MONTECARLO_RUIN_TH,
+    "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH,
+}
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -188,10 +190,6 @@ if __name__ == "__main__":
             timeframes              = TIMEFRAMES,
             param_grid              = PARAM_GRID,
             order_amount            = ORDER_AMOUNT,
-            net_gain_th             = WFO_NET_GAIN_TH,
-            dd_th                   = WFO_DD_TH,
-            r2_th                   = WFO_R2_TH,
-            wfr_th                  = WFO_WFR_TH,
             data_folder             = DATA_FOLDER_IS,
             rules_n_jobs            = RULES_N_JOBS,
             inner_n_jobs            = INNER_N_JOBS,
@@ -200,19 +198,13 @@ if __name__ == "__main__":
             save_trades             = SAVE_TRADES,
             brief_trades_folder     = BRIEF_TRADES_FOLDER,
             show_plots              = SHOW_PLOTS,
-            correlation_threshold   = CORRELATION_DD_TH,
-            montecarlo_ruin_th      = MONTECARLO_RUIN_TH,
-            multiverse_p_value_th   = MULTIVERSE_PVALUE_TH,
             symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
             deploy_output_path      = DEPLOY_OUTPUT_PATH,
             run_config              = run_config,
-            # ---- PIPELINES ----
             pipeline_wfo            = PIPELINE_WFO,
             pipeline_correlation    = PIPELINE_CORRELATION,
             pipeline_montecarlo     = PIPELINE_MONTECARLO,
             pipeline_multiverse     = PIPELINE_MULTIVERSE,
-            stepm_k_percentile     = STEPM_K_PERCENTILE,    
-            # ---- RUNS ----
             run_best_portfolio      = RUN_PORTFOLIO,
             run_deploy              = RUN_DEPLOY,
         )

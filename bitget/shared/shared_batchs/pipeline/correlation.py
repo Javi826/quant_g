@@ -4,6 +4,8 @@ import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.pipeline.correlation")
 
+
+CORRELATION_DD_TH = 0.55
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
@@ -125,9 +127,11 @@ def decorrelate_by_profit(
 def pipe_correlation(
     rules: list,
     initial_balance: float,
-    threshold: float = 0.7,
+    threshold: float = None,
     enabled: bool = True,
 ) -> list:
+
+    threshold = threshold if threshold is not None else CORRELATION_DD_TH
 
     if not enabled:
         logger.info(f"CORRELATION ── disabled — passing all {len(rules)} rules through untouched")

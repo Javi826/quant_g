@@ -15,7 +15,7 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 # STATISTICAL TEST CONFIG — bootstrap sizing, annualization, reproducibility
 # =============================================================================
-STEPM_ALPHA         = 0.05     # significance level used inside the Romano-Wolf stepdown search
+STEPM_ALPHA         = 0.10     # significance level used inside the Romano-Wolf stepdown search
 WHITE_PVALUE_TH     = STEPM_ALPHA
 WHITE_N_BOOTSTRAP   = 1000
 WHITE_BLOCK_SIZE    = 10   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
@@ -25,8 +25,8 @@ STEPM_USE_SPA       = True
 # =============================================================================
 STEPM_K_MODE         = "percentile"  # "absolute" or "percentile"
 STEPM_K_FWE          = 1             # used when STEPM_K_MODE == "absolute"
+STEPM_K_PERCENTILE   = 0.04          # used when STEPM_K_MODE == "percentile"
 STEPM_MAX_ITERATIONS = 500           # safety cap on stepdown iterations
-
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — bounds peak RAM without changing any result
 # =============================================================================
@@ -484,18 +484,13 @@ def pipe_stepm(
     timeframe: str = "",
 ) -> list:
 
-    stepm_alpha     = stepm_alpha     if stepm_alpha     is not None else STEPM_ALPHA
-    stepm_pvalue_th  = stepm_pvalue_th if stepm_pvalue_th is not None else stepm_alpha
-    n_bootstrap      = n_bootstrap     if n_bootstrap     is not None else WHITE_N_BOOTSTRAP
-    block_size       = block_size      if block_size      is not None else WHITE_BLOCK_SIZE
-    n_jobs           = n_jobs          if n_jobs          is not None else STEPM_N_JOBS
-    seed             = seed            if seed            is not None else RANDOM_SEED
-
-    if STEPM_K_MODE == "percentile" and stepm_k_percentile is None:
-        raise ValueError(
-            "stepm_k_percentile is required when STEPM_K_MODE == 'percentile' — "
-            "it has no module-level default; pass it explicitly from the caller."
-        )
+    stepm_alpha        = stepm_alpha        if stepm_alpha        is not None else STEPM_ALPHA
+    stepm_pvalue_th     = stepm_pvalue_th    if stepm_pvalue_th    is not None else stepm_alpha
+    n_bootstrap         = n_bootstrap        if n_bootstrap        is not None else WHITE_N_BOOTSTRAP
+    block_size          = block_size         if block_size         is not None else WHITE_BLOCK_SIZE
+    n_jobs              = n_jobs             if n_jobs             is not None else STEPM_N_JOBS
+    seed                = seed               if seed               is not None else RANDOM_SEED
+    stepm_k_percentile  = stepm_k_percentile if stepm_k_percentile is not None else STEPM_K_PERCENTILE
 
     if not np.isclose(stepm_pvalue_th, stepm_alpha):
         raise ValueError(
@@ -574,10 +569,7 @@ def pipe_stepm(
     
     if logger.isEnabledFor(logging.DEBUG):
         print_stepm_brc_equivalence_debug(timeframe, k_fwe, global_result["global_p"], stepm_p_by_col, best_col_name)
-    
-    # For each rule_id, pick the combo with the lowest stepm_p among all combos
-    # already tested by StepM — consistent with the studentized test itself,
-    # instead of trusting the raw-Sharpe winner selected upstream.
+
     best_col_by_rule: dict[str, str] = {}
     for col_name in kept_columns:
         rule_id = str(col_name).rsplit("__", 1)[0]

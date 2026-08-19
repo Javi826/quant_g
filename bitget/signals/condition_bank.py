@@ -23,6 +23,7 @@ HISTVOL_REGIME_SMA_PERIODS = [20,50]
 ATR_BASE_PERIODS           = [14,21]        
 ATR_REGIME_SMA_PERIODS     = [10,30] 
 
+
 #------------------------------------------------------------------------------
     
 RSI_PERIODS                = [7,14,21]  
@@ -42,23 +43,23 @@ ATR_BASE_PERIODS           = [7,14,21]
 ATR_REGIME_SMA_PERIODS     = [10,30,50]
 
 
-# =============================================================================
 # RSI_PERIODS                = [7,14,21]  
 # RSI_THRESHOLDS             = [30,40,50,60,70]  
-# 
+
 # ADX_PERIODS                = [] 
 # ADX_THRESHOLDS             = []   
-# 
-# MA_PERIODS                 = [20,50,100]
-# 
-# MOMENTUM_PERIODS           = [5,10,20]     
-# 
-# HISTVOL_BASE_PERIODS       = [10,20,30,40]     
-# HISTVOL_REGIME_SMA_PERIODS = [20,30,40]     
-# 
+
+# MA_PERIODS                 = []
+
+# MOMENTUM_PERIODS           = []     
+
+# HISTVOL_BASE_PERIODS       = [10,20,30]     
+# HISTVOL_REGIME_SMA_PERIODS = [20,30,40,50]     
+
 # ATR_BASE_PERIODS           = [7,14,21]        
-# ATR_REGIME_SMA_PERIODS     = [20,30,40]
-# =============================================================================
+# ATR_REGIME_SMA_PERIODS     = [10,20,30,40,50]
+
+
 #------------------------------------------------------------------------------
 
 def _sma(close: np.ndarray, window: int) -> np.ndarray:
