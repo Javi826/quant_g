@@ -119,6 +119,7 @@ DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_
 
 # =============================================================================
 # RUN CONFIG — single source of truth: printed at startup AND persisted
+# verbatim into the deploy output file via save_rule_deploy_batch().
 # =============================================================================
 run_config = {
     "TIMEFRAMES":            TIMEFRAMES,
@@ -154,34 +155,34 @@ def _pipeline_icon(enabled: bool) -> str:
     return "🟢" if enabled else "⚪"
 
 
-def log_run_config(cfg: dict) -> None:
+def log_run_config() -> None:
     logger.info(f"\n{'─' * 115}")
     logger.info(f"  RULE MINING START")
     logger.info(f"{'─' * 115}")
-    logger.info(f"  TIMEFRAMES  : {cfg['TIMEFRAMES']}")
-    logger.info(f"  N_SYMBOLS   : {cfg['N_SYMBOLS']}")
+    logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
+    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
     logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
-    logger.info(f"  PARAM GRID  : {cfg['PARAM_GRID']}")
-    logger.info(f"  WFO WINDOWS : {_format_wfo_windows(cfg['WFO_WINDOW_CONFIG'])}")
-    logger.info(f"  EMA_ALPHA   : {cfg['EMA_ALPHA']}")
+    logger.info(f"  PARAM GRID  : {PARAM_GRID}")
+    logger.info(f"  WFO WINDOWS : {_format_wfo_windows({tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES})}")
+    logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
     logger.info(
-        f"  PIPELINES   : WFO: {_pipeline_icon(cfg['PIPELINE_WFO'])}  "
-        f"CORRELATION: {_pipeline_icon(cfg['PIPELINE_CORRELATION'])}  "
-        f"MONTECARLO: {_pipeline_icon(cfg['PIPELINE_MONTECARLO'])}  "
-        f"MULTIVERSE: {_pipeline_icon(cfg['PIPELINE_MULTIVERSE'])}"
+        f"  PIPELINES   : WFO: {_pipeline_icon(PIPELINE_WFO)}  "
+        f"CORRELATION: {_pipeline_icon(PIPELINE_CORRELATION)}  "
+        f"MONTECARLO: {_pipeline_icon(PIPELINE_MONTECARLO)}  "
+        f"MULTIVERSE: {_pipeline_icon(PIPELINE_MULTIVERSE)}"
     )
-    logger.info(f"  SIGNAL CLEAN: JACCARD_TH={cfg['JACCARD_SIMILARITY_TH']}")
-    logger.info(f"  STEPM       : K_PERCENTILE={cfg['STEPM_K_PERCENTILE']}")
+    logger.info(f"  SIGNAL CLEAN: JACCARD_TH={JACCARD_SIMILARITY_TH}")
+    logger.info(f"  STEPM       : K_PERCENTILE={STEPM_K_PERCENTILE}")
     logger.info(
-        f"  WFO         : NET_GAIN_TH={cfg['WFO_NET_GAIN_TH']}  DD_TH={cfg['WFO_DD_TH']}  "
-        f"R2_TH={cfg['WFO_R2_TH']}  WFR_TH={cfg['WFO_WFR_TH']}"
+        f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  "
+        f"R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}"
     )
-    logger.info(f"  CORRELATION : DD_TH={cfg['CORRELATION_DD_TH']}")
-    logger.info(f"  MONTECARLO  : RUIN_TH={cfg['MONTECARLO_RUIN_TH']}")
-    logger.info(f"  MULTIVERSE  : PVALUE_TH={cfg['MULTIVERSE_PVALUE_TH']}")
+    logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
+    logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
+    logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
     logger.info(
-        f"  RUNS        : BEST PORTFOLIO: {_pipeline_icon(cfg['RUN_PORTFOLIO'])}  "
-        f"DEPLOY: {_pipeline_icon(cfg['RUN_DEPLOY'])}"
+        f"  RUNS        : BEST PORTFOLIO: {_pipeline_icon(RUN_PORTFOLIO)}  "
+        f"DEPLOY: {_pipeline_icon(RUN_DEPLOY)}"
     )
     logger.info(f"{'─' * 115}\n")
 
@@ -193,7 +194,7 @@ if __name__ == "__main__":
     start = time.time()
 
     try:
-        log_run_config(run_config)
+        log_run_config()
 
         # -------------------------------------------------------------------
         # DATA LOADING — cheap, sequential across timeframes. Rule mining

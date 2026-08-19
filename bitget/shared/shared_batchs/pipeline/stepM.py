@@ -560,7 +560,7 @@ def pipe_stepm(
     else:
         raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'absolute' or 'percentile'.")
 
-    logger.info(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
+    logger.debug(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
 
     stepm_pvals    = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
     stepm_p_by_col = dict(zip(kept_columns, stepm_pvals))
