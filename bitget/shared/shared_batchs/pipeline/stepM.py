@@ -25,7 +25,7 @@ STEPM_USE_SPA       = True
 # =============================================================================
 STEPM_K_MODE         = "percentile"  # "absolute" or "percentile"
 STEPM_K_FWE          = 1             # used when STEPM_K_MODE == "absolute"
-STEPM_K_PERCENTILE   = 0.02          # used when STEPM_K_MODE == "percentile"
+STEPM_K_PERCENTILE   = 0.02         # used when STEPM_K_MODE == "percentile"
 STEPM_MAX_ITERATIONS = 500           # safety cap on stepdown iterations
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — bounds peak RAM without changing any result

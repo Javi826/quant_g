@@ -29,11 +29,11 @@ logger = logging.getLogger("pipeline")
 # FOLDERS
 # =============================================================================
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR    = os.path.join(BASE_DIR, "data")
-RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
-CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
-HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
-SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
+DATA_DIR    = os.path.join(BASE_DIR, "data_20")
+RAW_DIR     = os.path.join(DATA_DIR, "01_raw_20")
+CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean_20")
+HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow_20")
+SPLIT_DIR   = os.path.join(DATA_DIR, "04_split_20")
 
 # =============================================================================
 # PIPELINE CONFIG
@@ -43,29 +43,33 @@ EXPORT_CSV = False
 # =============================================================================
 # SYMBOL SELECTION
 # =============================================================================
+ #manual
 SELECTED_SYMBOLS = [
+    "BCHUSDT",
     "BTCUSDT",
+    "BNBUSDT",  
     "ETHUSDT",
-    "SOLUSDT",
     "XRPUSDT",
 ]
 
-SYMBOL_MODE        = "auto"   #manual o auto
-N_SYMBOLS_DOWNLOAD = 40
+SYMBOL_MODE        = "manual"   #manual o auto
+N_SYMBOLS_DOWNLOAD = 50
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","30m","15m","5m","1m"]
-START_DATE = "2022-01-01"
+#TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","30m","15m","5m","1m"]
+TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","15m"]
+START_DATE = "2019-01-01"
 END_DATE   = None 
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
+#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","15m"]]
 
 # =============================================================================
 # SPLIT DATA
