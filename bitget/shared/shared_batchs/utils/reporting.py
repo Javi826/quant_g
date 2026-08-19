@@ -274,13 +274,32 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list, s
             m: (min(r[m] for r in group_rows), max(r[m] for r in group_rows))
             for m in threshold_metrics
         }
+
+    candidate_rows = [r for r in all_raw_results if r["rule_id"] in set(candidate_ids)]
+    candidate_groups = {}
+    for r in candidate_rows:
+        key = (r["timeframe"], r["side"])
+        candidate_groups.setdefault(key, []).append(r)
+
+    n_total_passed    = len(highlight_ids)
+    n_total_candidate = len(candidate_ids)
+    total_pass_pct    = n_total_passed / n_total_candidate if n_total_candidate else 0.0
+
     logger.info(f"\n{'─' * 140}")
-    logger.info(f"  RULE MINING RESULTS — {stage_label} ── {len(highlight_ids)} / {len(candidate_ids)} passed")
+    logger.info(f"  RULE MINING RESULTS — {stage_label} ── {n_total_passed} / {n_total_candidate} passed ({total_pass_pct:.1%}) ✅")
+    logger.info(f"{'─' * 140}")
+    logger.info(
+        f"{'TIMEFRAME':<12}{'SIDE':<8}{'N':<6}{'PASS%':<9}"
+        f"{'NET_GAIN% min/max':<22}{'MAX_DD% min/max':<20}{'R2 min/max':<16}"
+        f"{'STEPM_P min/max':<16}{'WFR min/max':<16}"
+    )
     logger.info(f"{'─' * 140}")
     for (tf, side), group_rows in sorted(groups.items()):
         s = group_stats[(tf, side)]
+        n_group_candidates = len(candidate_groups.get((tf, side), []))
+        group_pass_pct = len(group_rows) / n_group_candidates if n_group_candidates else 0.0
         logger.info(
-            f"{tf:<12}{side:<8}{len(group_rows):<6}"
+            f"{tf:<12}{side:<8}{len(group_rows):<6}{f'{group_pass_pct:.1%}':<9}"
             f"{f'{s['net_gain'][0]:.1f} / {s['net_gain'][1]:.1f}':<22}"
             f"{f'{s['max_dd'][0]:.1f} / {s['max_dd'][1]:.1f}':<20}"
             f"{f'{s['r_squared'][0]:.3f} / {s['r_squared'][1]:.3f}':<16}"
@@ -288,39 +307,6 @@ def print_rule_mining_min_by_group(all_raw_results: list, highlight_ids: list, s
             f"{f'{s['wfr'][0]:.2f} / {s['wfr'][1]:.2f}':<16}"
         )
     logger.info(f"{'─' * 140}")
-    # ALL-SAFE: worst-case across the whole table -> every rule shown passes all conditions at once.
-    all_safe_net_gain = min(s["net_gain"][0]   for s in group_stats.values())
-    all_safe_max_dd   = max(abs(s["max_dd"][0]) for s in group_stats.values())
-    all_safe_r2       = min(s["r_squared"][0]  for s in group_stats.values())
-    all_safe_stepm_p  = min(s["stepm_p"][0]    for s in group_stats.values())
-    all_safe_wfr      = min(s["wfr"][0]        for s in group_stats.values())
-
-    anchors = {key: max(group_rows, key=lambda r: r["net_gain"]) for key, group_rows in groups.items()}
-    safe_net_gain = min(a["net_gain"]  for a in anchors.values())
-    safe_max_dd   = max(abs(a["max_dd"]) for a in anchors.values())
-    safe_r2       = min(a["r_squared"] for a in anchors.values())
-    safe_stepm_p  = min(a["stepm_p"] for a in anchors.values())
-    safe_wfr      = min(a["wfr"] for a in anchors.values())
-
-    logger.debug("\n  Anchor row per group (highest NET_GAIN, used to derive joint-safe thresholds):")
-    for (tf, side), a in sorted(anchors.items()):
-        logger.debug(f"    {tf:<10}{side:<8}{a['rule_id']}")
-
-    label_all_safe   = "ALL - SAFE THRESHOLDS (guaranteed ALL rows in the table)"
-    label_joint_safe = "ONE - SAFE THRESHOLDS (guaranteed ≥1 survivor per group)"
-    label_width      = max(len(label_all_safe), len(label_joint_safe))
-
-    logger.info(
-        f"\n  {label_all_safe.ljust(label_width)} ── "
-        f"NET_GAIN>={all_safe_net_gain:.1f}  MAX_DD<={all_safe_max_dd:.1f}  R2>={all_safe_r2:.3f}  "
-        f"STEPM_P<={all_safe_stepm_p:.3f}  WFR>={all_safe_wfr:.2f}"
-    )
-    logger.info(
-        f"  {label_joint_safe.ljust(label_width)} ── "
-        f"NET_GAIN>={safe_net_gain:.1f}  MAX_DD<={safe_max_dd:.1f}  R2>={safe_r2:.3f}  "
-        f"STEPM_P<={safe_stepm_p:.3f}  WFR>={safe_wfr:.2f}"
-    )
-    logger.info(f"{'─' * 140}\n")
 
 # =============================================================================
 # DSR — debug-only reporting (moved from pipeline/dsr.py)

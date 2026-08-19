@@ -8,6 +8,7 @@ from scipy import sparse
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from signals.condition_bank import ConditionBank
+from signals.signal_builder import build_signal_fn
 
 logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 
@@ -17,7 +18,7 @@ logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 SIGNAL_MASK_N_JOBS     = -1
 SIGNAL_MASK_CHUNK_SIZE = None  # None -> auto-sized from n_jobs and rule count
 
-JACCARD_SIMILARITY_TH  = 0.9999999
+JACCARD_SIMILARITY_TH  = 0.80
 JACCARD_BIT_BLOCK      = 8235
 JACCARD_BIT_BLOCK      = 32768
 
@@ -81,53 +82,81 @@ def build_signal_mask_matrix(
 
     return sparse.vstack(chunk_sparses, format="csr")
 
-def _pack_signal_mask_row(bool_row: np.ndarray) -> bytes:
+def _spec_identity(spec: dict) -> tuple:
+    """Hashable identity of a condition spec, used to deduplicate specs across rules."""
+    return tuple(sorted(spec.items()))
 
-    return np.packbits(bool_row).tobytes()
+
+def _collect_unique_specs(all_rules: list) -> tuple:
+    """Return (unique_specs, index_by_identity) preserving first-seen order."""
+    unique_specs = []
+    index_by_identity = {}
+    for rule in all_rules:
+        for spec in rule["specs"]:
+            identity = _spec_identity(spec)
+            if identity not in index_by_identity:
+                index_by_identity[identity] = len(unique_specs)
+                unique_specs.append(spec)
+    return unique_specs, index_by_identity
 
 
-def _compute_signal_mask_keys_chunk(rule_chunk: list, ohlcv_arr: dict, symbols: list) -> list:
+def _compute_spec_signals_symbol(unique_specs: list, arr: dict) -> np.ndarray:
+    """Evaluate every unique spec on a single symbol through the production
+    signal path, so the 1-bar shift stays owned by signal_builder."""
+    bank = ConditionBank(arr)
+    rows = np.empty((len(unique_specs), bank.n), dtype=bool)
+    for i, spec in enumerate(unique_specs):
+        signal = build_signal_fn([spec], "long")(arr, live_trading=False, bank=bank)
+        rows[i] = signal.astype(bool)
+    return rows
 
-    banks = {sym: ConditionBank(ohlcv_arr[sym]) for sym in symbols}
 
-    chunk_keys = []
-    for rule in rule_chunk:
-        signal_parts = [
-            np.asarray(rule["signal_fn"](ohlcv_arr[sym], live_trading=False, bank=banks[sym]), dtype=bool)
+def _build_spec_word_table(unique_specs: list, ohlcv_arr: dict, n_jobs: int) -> tuple:
+    """Bit-pack the per-spec signal rows into uint64 words for fast AND-reduction.
+    Returns (words, n_bytes) where n_bytes is the unpadded packed row length."""
+    symbols = list(ohlcv_arr.keys())
+
+    rows_by_symbol = list(tqdm(
+        Parallel(n_jobs=n_jobs, backend="loky", return_as="generator")(
+            delayed(_compute_spec_signals_symbol)(unique_specs, ohlcv_arr[sym])
             for sym in symbols
-        ]
-        row = np.concatenate(signal_parts)
-        chunk_keys.append((rule["side"], _pack_signal_mask_row(row)))
-    return chunk_keys
+        ),
+        desc="SIGNAL MASK BUILD ",
+        total=len(symbols),
+        dynamic_ncols=True,
+    ))
 
+    packed = np.packbits(np.concatenate(rows_by_symbol, axis=1), axis=1)
+    n_bytes = packed.shape[1]
+
+    word_padding = (-n_bytes) % np.dtype(np.uint64).itemsize
+    if word_padding:
+        packed = np.pad(packed, ((0, 0), (0, word_padding)))
+
+    words = np.ascontiguousarray(packed).view(np.uint64)
+    return words, n_bytes
 
 def build_signal_mask_keys(
     all_rules: list,
     ohlcv_arr: dict,
     n_jobs: int = SIGNAL_MASK_N_JOBS,
-    chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,
+    chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,  # kept for API compatibility
 ) -> list:
 
-
-    symbols = list(ohlcv_arr.keys())
-    effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
-    rule_chunks = _chunk_list(all_rules, effective_chunk_size)
-
-    chunk_keys_lists = list(tqdm(
-        Parallel(n_jobs=n_jobs, backend="loky", return_as="generator")(
-            delayed(_compute_signal_mask_keys_chunk)(chunk, ohlcv_arr, symbols)
-            for chunk in rule_chunks
-        ),
-        desc="SIGNAL MASK BUILD ",
-        total=len(rule_chunks),
-        dynamic_ncols=True,
-    ))
+    unique_specs, index_by_identity = _collect_unique_specs(all_rules)
+    words, n_bytes = _build_spec_word_table(unique_specs, ohlcv_arr, n_jobs)
 
     all_keys = []
-    for chunk_keys in chunk_keys_lists:
-        all_keys.extend(chunk_keys)
-    return all_keys
+    for rule in all_rules:
+        spec_rows = [index_by_identity[_spec_identity(spec)] for spec in rule["specs"]]
 
+        combined = words[spec_rows[0]]
+        for row_idx in spec_rows[1:]:
+            combined = combined & words[row_idx]
+
+        all_keys.append((rule["side"], combined.view(np.uint8)[:n_bytes].tobytes()))
+
+    return all_keys
 
 def deduplicate_exact_signal_keys(signal_keys: list) -> tuple:
 
