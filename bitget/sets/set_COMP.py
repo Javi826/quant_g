@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout,
 logger = logging.getLogger("BOT_batch.main_comp")
 logger.setLevel(LOG_LEVEL)
 
-DSR_LOG_LEVEL = logging.INFO
+DSR_LOG_LEVEL = logging.DEBUG
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
@@ -77,8 +77,8 @@ FDR_ALPHA           = 0.2
 # here plus a new "pairs" tuple in _print_correlation; every report function
 # below iterates over this registry instead of hardcoding method names.
 # =============================================================================
-DSR_TEST   = False
-STEPM_TEST = True
+DSR_TEST   = True
+STEPM_TEST = False
 FDR_TEST   = False
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},

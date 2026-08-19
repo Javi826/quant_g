@@ -91,12 +91,10 @@ def run_rule_mining_pipeline(
     symbols_live_folder: str = None,
     deploy_output_path: str = None,
     run_config: dict = None,
-    # ---- PIPELINES ----
     pipeline_wfo: bool = True,
     pipeline_correlation: bool = True,
     pipeline_montecarlo: bool = True,
     pipeline_multiverse: bool = True,
-    # ---- RUNS ----
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
 ) -> list:
