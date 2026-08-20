@@ -3,8 +3,8 @@ import os
 import logging
 from datetime import datetime
 import pandas as pd
-from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG
-from shared_batchs.runs.run_deploy import run_wfo_deploy_ema,save_deploy_symbols
+from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, INNER_N_JOBS
+from shared_batchs.runs.run_deploy import run_wfo_deploy_ema, save_deploy_symbols
 
 logger = logging.getLogger("BOT_batch.rule_mining.deploy")
 
@@ -99,7 +99,6 @@ def save_rule_deploy_batch(
         f.write("\n".join(lines) + "\n")
     logger.info(f"DEPLOY ── rule mining batch saved → {output_path}")
 
-# DESPUÉS
 def run_deploy_rule(
     rule_id: str,
     specs: list,
@@ -110,7 +109,6 @@ def run_deploy_rule(
     order_amount: int,
     timeframe: str,
     approved: bool,
-    n_jobs: int,
     symbols_live_folder: str,
     deploy_map: dict,
     label_width: int = 0,
@@ -125,7 +123,7 @@ def run_deploy_rule(
         param_grid   = param_grid,
         signal_fn    = signal_fn,
         order_amount = order_amount,
-        n_jobs       = n_jobs,
+        n_jobs       = INNER_N_JOBS,
     )
     params_str   = " | ".join(f"{k}={v}" for k, v in deploy_params.items() if k != "SELL_AFTER")
     status       = "🟢 active" if approved else "🔴 inactive"

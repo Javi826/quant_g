@@ -8,15 +8,10 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
-MY_SYMBOLS = False
-symbols_to_include = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT",
-    "XRPUSDT",
-]
-symbols_to_exclude  = {"BTCUSDT","ETHUSDT"}
-#symbols_to_exclude = {}
+ENABLE_INCLUDE_FILTER = False
+ENABLE_EXCLUDE_FILTER = True
+INCLUDED_SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT"]
+EXCLUDED_SYMBOLS = {"BTCUSDT", "ETHUSDT"}
 
 # Symbols must have data available from this date onward (covers WFO window 0 train_start).
 MIN_START_DATE = "2022-01-02"
@@ -29,18 +24,18 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     removed_by_reasons = {"No data": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0, "Starts too late": 0}
     
     #Inclusion
-    if MY_SYMBOLS:
-        inclusion_list = custom_symbols if custom_symbols is not None else symbols_to_include
+    if ENABLE_INCLUDE_FILTER:
+        inclusion_list = custom_symbols if custom_symbols is not None else INCLUDED_SYMBOLS
         symbols = [s for s in symbols if s in inclusion_list]
         
     #Exclusion
     for sym in symbols:
-        if sym in symbols_to_exclude:
+        if ENABLE_EXCLUDE_FILTER and sym in EXCLUDED_SYMBOLS:
             removed_symbols.append(sym)
             continue
         
-        #Si my_symbols=True, solo cargar sin filtros
-        if MY_SYMBOLS:
+        #Si ENABLE_INCLUDE_FILTER=True, solo cargar sin filtros
+        if ENABLE_INCLUDE_FILTER:
             file_path = os.path.join(data_folder, f"{sym}_{timeframe}.parquet")
             if os.path.exists(file_path):
                 df = pd.read_parquet(file_path)
@@ -88,7 +83,12 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
     logger.debug(f"🔹Total symbols     : {len(symbols)}")
     logger.debug(f"🔹Symbols removed   : {len(removed_symbols)}")
     logger.debug(f"🔹Symbols remaining : {len(filtered_symbols)}")
-    
+
+    active_reasons = {reason: count for reason, count in removed_by_reasons.items() if count > 0}
+    if active_reasons:
+        reasons_str = "  |  ".join(f"{reason}: {count}" for reason, count in active_reasons.items())
+        logger.debug(f"🔹Removed reasons   : {reasons_str}")
+
     return ohlcv_data, filtered_symbols
 
 # =============================================================================
@@ -106,6 +106,17 @@ def select_universe(
     ohlcv_is, filtered_is = filter_symbols_fn(
         raw_is, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is, min_price=min_price, vol_window=50
     )
+    cutoff_ts = pd.Timestamp(MIN_START_DATE)
+    for sym, df in ohlcv_is.items():
+        logger.debug(f"  {sym:<12} start before cut: {df.index[0]}")
+
+    ohlcv_is = {
+        sym: df[df.index >= cutoff_ts]
+        for sym, df in ohlcv_is.items()
+    }
+
+    for sym, df in ohlcv_is.items():
+        logger.debug(f"  {sym:<12} start after  cut: {df.index[0]}")
 
     logger.debug(f"IS pool ({len(filtered_is):>3}): {filtered_is}")
 
@@ -113,7 +124,6 @@ def select_universe(
 
 # =============================================================================
 # TOP-N SYMBOL SELECTION BY VOLUME — applied once, upstream of every pipeline
-# stage (StepM, WFO, Multiverse), so they all operate on the same fixed set.
 # =============================================================================
 def select_top_n_by_volume(ohlcv_data: dict, n_symbols: int | None) -> dict:
 

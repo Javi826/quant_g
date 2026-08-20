@@ -35,10 +35,17 @@ EMA_ALPHA   = 0.3
 # =============================================================================
 # WFO APPROVAL THRESHOLDS
 # =============================================================================
+
 WFO_NET_GAIN_TH = 30
 WFO_DD_TH       = 15
-WFO_R2_TH       = 0.7
+WFO_R2_TH       = 0.8
 WFO_WFR_TH      = 0.6
+
+# =============================================================================
+# WFO PARALLELIZATION
+# =============================================================================
+RULES_N_JOBS = -1  # parallelizes across rules
+INNER_N_JOBS = 1   # parallelizes the param grid search within each rule's window
 
 # =============================================================================
 # PRIVATE HELPERS
@@ -399,8 +406,8 @@ def pipe_wfo(
     r2_th: float = None,
     wfr_th: float = None,
     enabled: bool = True,
-    rules_n_jobs: int = 1,
-    inner_n_jobs: int = -1,
+    rules_n_jobs: int = None,
+    inner_n_jobs: int = None,
     show_progress: bool = False,
     log_level: int = logging.INFO,
     save_trades: bool = False,
@@ -410,10 +417,12 @@ def pipe_wfo(
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_wfo_fields()} for r in rules]
 
-    net_gain_th = net_gain_th if net_gain_th is not None else WFO_NET_GAIN_TH
-    dd_th       = dd_th       if dd_th       is not None else WFO_DD_TH
-    r2_th       = r2_th       if r2_th       is not None else WFO_R2_TH
-    wfr_th      = wfr_th      if wfr_th      is not None else WFO_WFR_TH
+    net_gain_th  = net_gain_th  if net_gain_th  is not None else WFO_NET_GAIN_TH
+    dd_th        = dd_th        if dd_th        is not None else WFO_DD_TH
+    r2_th        = r2_th        if r2_th        is not None else WFO_R2_TH
+    wfr_th       = wfr_th       if wfr_th       is not None else WFO_WFR_TH
+    rules_n_jobs = rules_n_jobs if rules_n_jobs is not None else RULES_N_JOBS
+    inner_n_jobs = inner_n_jobs if inner_n_jobs is not None else INNER_N_JOBS
 
     param_names    = list(param_grid.keys())
     lists_for_grid = [param_grid[k] for k in param_names]

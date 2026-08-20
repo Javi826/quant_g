@@ -1,10 +1,7 @@
 #shared_batchs/pipeline/signal_cleaning.py
-import os
-import time
 import logging
 import numpy as np
 import cupy as cp
-from scipy import sparse
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from signals.condition_bank import ConditionBank
@@ -24,8 +21,6 @@ JACCARD_TILE_WORDS     = 8   # uint64 words staged in shared memory per tile pas
 JACCARD_POPCOUNT_ROWS  = 4096  # host-side popcount chunk, caps peak memory
 
 DECORRELATE_THRESHOLD  = 0.5
-
-DECORRELATE_THRESHOLD  = 0.5
 DECORRELATE_BATCH_SIZE = 1000
 
 GPU_INITIAL_CAPACITY   = 20_000 
@@ -33,57 +28,6 @@ GPU_SURVIVOR_CHUNK     = 25_000 # initial survivors buffer capacity, doubled on 
 RANDOM_SEED            = 42
 METRIC_LABEL_WIDTH     = 28  # fixed label width so all metric-block prints align
 
-# =============================================================================
-# SIGNAL MASK BUILD
-# =============================================================================
-def _auto_chunk_size(n_rules: int, n_jobs: int) -> int:
-
-    workers = n_jobs if n_jobs > 0 else (os.cpu_count() or 1)
-    return max(1, n_rules // (workers * 8))
-
-
-def _chunk_list(items: list, chunk_size: int) -> list:
-    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
-
-
-def _compute_signal_mask_chunk(rule_chunk: list, ohlcv_arr: dict, symbols: list) -> "sparse.csr_matrix":
-
-    banks = {sym: ConditionBank(ohlcv_arr[sym]) for sym in symbols}
-
-    chunk_rows = []
-    for rule in rule_chunk:
-        signal_parts = [
-            np.asarray(rule["signal_fn"](ohlcv_arr[sym], live_trading=False, bank=banks[sym]), dtype=bool)
-            for sym in symbols
-        ]
-        chunk_rows.append(np.concatenate(signal_parts))
-
-    chunk_dense = np.vstack(chunk_rows)
-    return sparse.csr_matrix(chunk_dense)
-
-
-def build_signal_mask_matrix(
-    all_rules: list,
-    ohlcv_arr: dict,
-    n_jobs: int = SIGNAL_MASK_N_JOBS,
-    chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,
-) -> "sparse.csr_matrix":
-
-    symbols = list(ohlcv_arr.keys())
-    effective_chunk_size = chunk_size or _auto_chunk_size(len(all_rules), n_jobs)
-    rule_chunks = _chunk_list(all_rules, effective_chunk_size)
-
-    chunk_sparses = list(tqdm(
-        Parallel(n_jobs=n_jobs, backend="loky", return_as="generator")(
-            delayed(_compute_signal_mask_chunk)(chunk, ohlcv_arr, symbols)
-            for chunk in rule_chunks
-        ),
-        desc="SIGNAL MASK BUILD",
-        total=len(rule_chunks),
-        dynamic_ncols=True,
-    ))
-
-    return sparse.vstack(chunk_sparses, format="csr")
 
 def _spec_identity(spec: dict) -> tuple:
     """Hashable identity of a condition spec, used to deduplicate specs across rules."""
@@ -160,69 +104,6 @@ def build_signal_mask_keys(
         all_keys.append((rule["side"], combined.view(np.uint8)[:n_bytes].tobytes()))
 
     return all_keys
-
-def deduplicate_exact_signal_keys(signal_keys: list) -> tuple:
-
-    n_rules = len(signal_keys)
-    first_seen: dict = {}
-    representative_idx = []
-    group_of = np.empty(n_rules, dtype=np.int64)
-
-    for i, key in enumerate(signal_keys):
-        if key not in first_seen:
-            first_seen[key] = i
-            representative_idx.append(i)
-        group_of[i] = first_seen[key]
-
-    representative_idx = np.array(representative_idx, dtype=np.int64)
-    return representative_idx, group_of
-
-def deduplicate_exact_signal_masks(mask_matrix: "sparse.csr_matrix", sides: list) -> tuple:
-
-    mask_matrix = mask_matrix.tocsr()
-    mask_matrix.sort_indices()
-
-    n_rules = mask_matrix.shape[0]
-    first_seen: dict = {}
-    representative_idx = []
-    group_of = np.empty(n_rules, dtype=np.int64)
-
-    for i in range(n_rules):
-        row_bytes = mask_matrix.indices[mask_matrix.indptr[i]:mask_matrix.indptr[i + 1]].tobytes()
-        row_key   = (sides[i], row_bytes)
-        if row_key not in first_seen:
-            first_seen[row_key] = i
-            representative_idx.append(i)
-        group_of[i] = first_seen[row_key]
-
-    representative_idx = np.array(representative_idx, dtype=np.int64)
-    return representative_idx, group_of
-
-# =============================================================================
-# PIPE SIGNAL CLEANING — pre-backtest step
-# =============================================================================
-def pipe_signal_cleaning(
-    rules: list,
-    ohlcv_arr: dict,
-    timeframe: str = "",
-    n_jobs: int = SIGNAL_MASK_N_JOBS,
-) -> list:
-
-    signal_keys = build_signal_mask_keys(rules, ohlcv_arr, n_jobs=n_jobs)
-    representative_idx, group_of = deduplicate_exact_signal_keys(signal_keys)
-
-    n_rules_total = len(rules)
-    n_unique      = representative_idx.shape[0]
-    n_dropped     = n_rules_total - n_unique
-
-    logger.info(f"\n{'─' * 70}")
-    logger.info(f"  SIGNAL MASK CLEANING (pre-backtest, exact match) ── {timeframe}")
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  {'total rules (pre TP/SL grid)':<{METRIC_LABEL_WIDTH}} : {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"  {'dropped as exact duplicates':<{METRIC_LABEL_WIDTH}} : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"{'─' * 70}\n")
-
-    return [rules[i] for i in representative_idx]
 
 # =============================================================================
 # JACCARD SIMILARITY FILTER (GPU, bit-packed) — standalone, near-duplicate

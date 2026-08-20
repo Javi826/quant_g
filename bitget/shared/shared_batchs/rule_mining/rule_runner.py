@@ -5,9 +5,10 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.stepM import pipe_stepm
+from shared_batchs.pipeline.fdr_pi0 import pipe_pi0
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
-from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning, pipe_decorrelation, pipe_signal_cleaning_jaccard
+from shared_batchs.pipeline.signal_cleaning import  pipe_decorrelation, pipe_signal_cleaning_jaccard
 
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
@@ -80,8 +81,6 @@ def run_rule_mining_pipeline(
     param_grid: dict,
     order_amount: int,
     data_folder: str,
-    rules_n_jobs: int = 1,
-    inner_n_jobs: int = -1,
     show_progress: bool = False,
     max_depth: int = MAX_DEPTH,
     log_level: int = logging.INFO,
@@ -102,19 +101,12 @@ def run_rule_mining_pipeline(
     # BACKTESTING — one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_mbias_results = []
+    pi0_by_timeframe  = {}
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
         logger.info(f"\n\033[36m{'=' * 70}")
         logger.info(f"======== RULE MINING ── {timeframe} ── total candidate rules: {format(len(rules), ',').replace(',', '.')} =========")
         logger.info(f"{'=' * 70}\033[0m")
-
-# =============================================================================
-#         rules = pipe_signal_cleaning(
-#             rules       = rules,
-#             ohlcv_arr   = ohlcv_arr_by_timeframe[timeframe],
-#             timeframe   = timeframe,
-#         )
-# =============================================================================
         
         rules = pipe_signal_cleaning_jaccard(
             rules     = rules,
@@ -136,6 +128,14 @@ def run_rule_mining_pipeline(
             col_names   = col_names,
             timeframe   = timeframe,
         )
+        
+# =============================================================================
+#         pi0_by_timeframe[timeframe] = pipe_pi0(
+#             matrix_arr = matrix_arr,
+#             col_names  = col_names,
+#             timeframe  = timeframe,
+#         )
+# =============================================================================
 
         del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
 
@@ -155,8 +155,6 @@ def run_rule_mining_pipeline(
             order_amount        = order_amount,
             timeframe           = timeframe,
             enabled             = pipeline_wfo,
-            rules_n_jobs        = rules_n_jobs,
-            inner_n_jobs        = inner_n_jobs,
             show_progress       = show_progress,
             log_level           = log_level,
             save_trades         = save_trades,
@@ -306,7 +304,6 @@ def run_rule_mining_pipeline(
                     param_grid          = param_grid,
                     order_amount        = order_amount,
                     approved            = rule_info["approved"],
-                    n_jobs              = inner_n_jobs,
                     symbols_live_folder = symbols_live_folder,
                     deploy_map          = deploy_map,
                     label_width         = label_width,

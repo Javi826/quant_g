@@ -67,6 +67,7 @@ logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("numba").setLevel(logging.WARNING)
 from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
@@ -79,11 +80,6 @@ from shared_batchs.pipeline.signal_cleaning import JACCARD_SIMILARITY_TH
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
-# =============================================================================
-# UNIVERSE / SEARCH SPACE CONFIGURATION
-# =============================================================================
-RULES_N_JOBS = -1
-INNER_N_JOBS = 1
 
 # =============================================================================
 # RUNS + OUTPUTS — portfolio construction and output stages
@@ -118,28 +114,9 @@ DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_
 
 # =============================================================================
 # RUN CONFIG — single source of truth: printed at startup AND persisted
-# verbatim into the deploy output file via save_rule_deploy_batch().
 # =============================================================================
-run_config = {
-    "TIMEFRAMES":            TIMEFRAMES,
-    "N_SYMBOLS":              N_SYMBOLS,
-    "PARAM_GRID":             PARAM_GRID,
-    "WFO_WINDOW_CONFIG":      {tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES},
-    "EMA_ALPHA":              EMA_ALPHA,
-    "PIPELINE_WFO":           PIPELINE_WFO,
-    "PIPELINE_CORRELATION":   PIPELINE_CORRELATION,
-    "PIPELINE_MONTECARLO":    PIPELINE_MONTECARLO,
-    "PIPELINE_MULTIVERSE":    PIPELINE_MULTIVERSE,
-    "WFO_NET_GAIN_TH":        WFO_NET_GAIN_TH,
-    "WFO_DD_TH":              WFO_DD_TH,
-    "WFO_R2_TH":              WFO_R2_TH,
-    "WFO_WFR_TH":             WFO_WFR_TH,
-    "CORRELATION_DD_TH":      CORRELATION_DD_TH,
-    "MONTECARLO_RUIN_TH":     MONTECARLO_RUIN_TH,
-    "MULTIVERSE_PVALUE_TH":   MULTIVERSE_PVALUE_TH,
-    "STEPM_K_PERCENTILE":     STEPM_K_PERCENTILE,
-    "JACCARD_SIMILARITY_TH":  JACCARD_SIMILARITY_TH,
-}
+run_config = {"TIMEFRAMES": TIMEFRAMES, "N_SYMBOLS": N_SYMBOLS, "PARAM_GRID": PARAM_GRID, "WFO_WINDOW_CONFIG": {tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES}, "EMA_ALPHA": EMA_ALPHA, "PIPELINE_WFO": PIPELINE_WFO, "PIPELINE_CORRELATION": PIPELINE_CORRELATION, "PIPELINE_MONTECARLO": PIPELINE_MONTECARLO, "PIPELINE_MULTIVERSE": PIPELINE_MULTIVERSE,
+    "WFO_NET_GAIN_TH": WFO_NET_GAIN_TH, "WFO_DD_TH": WFO_DD_TH, "WFO_R2_TH": WFO_R2_TH, "WFO_WFR_TH": WFO_WFR_TH, "CORRELATION_DD_TH": CORRELATION_DD_TH, "MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH, "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH, "STEPM_K_PERCENTILE": STEPM_K_PERCENTILE, "JACCARD_SIMILARITY_TH": JACCARD_SIMILARITY_TH}
 # =============================================================================
 # LOGGING HELPERS — render the startup banner from run_config
 # =============================================================================
@@ -148,11 +125,8 @@ def _format_wfo_windows(wfo_window_config: dict) -> str:
         f"{tf}: train={cfg.get('train_months')}m test={cfg.get('test_months')}m"
         for tf, cfg in wfo_window_config.items()
     )
-
-
 def _pipeline_icon(enabled: bool) -> str:
     return "🟢" if enabled else "⚪"
-
 
 def log_run_config() -> None:
     logger.info(f"\n{'─' * 115}")
@@ -188,7 +162,6 @@ def log_run_config() -> None:
 # =============================================================================
 # MAIN
 # =============================================================================
-
 if __name__ == "__main__":
     start = time.time()
 
@@ -214,7 +187,6 @@ if __name__ == "__main__":
         # -------------------------------------------------------------------
         # RULE MINING — Phase A: DSR for every timeframe, then a combined
         # -------------------------------------------------------------------
-
         validated_wfo_test, all_mbias_results = run_rule_mining_pipeline(
             ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
             ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
@@ -222,8 +194,6 @@ if __name__ == "__main__":
             param_grid              = PARAM_GRID,
             order_amount            = ORDER_AMOUNT,
             data_folder             = DATA_FOLDER_IS,
-            rules_n_jobs            = RULES_N_JOBS,
-            inner_n_jobs            = INNER_N_JOBS,
             max_depth               = RULE_MAX_DEPTH,
             log_level               = WFO_LOG_LEVEL,
             save_trades             = SAVE_TRADES,

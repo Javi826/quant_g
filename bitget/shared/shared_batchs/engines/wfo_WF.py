@@ -376,7 +376,7 @@ def walk_forward_optimization(
     df_results.insert(2, 'test_start',  test_start_dates)
     df_results.insert(3, 'test_end',    test_end_dates)
     df_results['best_crite']      = best_criteria_list
-    df_results['tn_trades']       = test_n_trades_list
+    df_results['ts_trades']       = test_n_trades_list
     df_results['tr_symbols']      = [len(s) for s in train_symbols_list]
     df_results['ts_symbols']      = [len(s) for s in test_symbols_list]
     df_results['tr_syms']         = train_symbols_list

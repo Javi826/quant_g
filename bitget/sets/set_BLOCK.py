@@ -56,7 +56,7 @@ BLOCK_SIZE_GRID = [10,20,50]
 
 RANDOM_SEED = 42
 
-DIAG_MAX_COLUMNS = 200000    # columns used by the block-length diagnostic
+DIAG_MAX_COLUMNS = 500_000    # columns used by the block-length diagnostic
 
 MIN_ACTIVE_DAYS_FRACTION = 0.05
 
