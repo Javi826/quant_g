@@ -5,7 +5,7 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.stepM import pipe_stepm
-from shared_batchs.pipeline.fdr_pi0 import pipe_pi0
+from shared_batchs.pipeline.FF_test import pipe_FF_test
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.pipeline.signal_cleaning import  pipe_decorrelation, pipe_signal_cleaning_jaccard
@@ -129,13 +129,11 @@ def run_rule_mining_pipeline(
             timeframe   = timeframe,
         )
         
-# =============================================================================
-#         pi0_by_timeframe[timeframe] = pipe_pi0(
-#             matrix_arr = matrix_arr,
-#             col_names  = col_names,
-#             timeframe  = timeframe,
-#         )
-# =============================================================================
+        pi0_by_timeframe[timeframe] = pipe_FF_test(
+            matrix_arr = matrix_arr,
+            col_names  = col_names,
+            timeframe  = timeframe,
+        )
 
         del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
 

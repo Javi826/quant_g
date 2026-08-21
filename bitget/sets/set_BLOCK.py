@@ -1,4 +1,4 @@
-#BOT_batch/SET_BLOCK.py
+#BOT_batch/set_BLOCK.py
 
 import os
 import sys
@@ -39,14 +39,14 @@ FAST_MODE = True
 N_JOBS = -1
 
 #TIMEFRAMES = ["1H"]
-#TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-TIMEFRAMES = ["12Hutc"]
+TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 
 N_SYMBOLS  = 10
 PARAM_GRID = {
     "SELL_AFTER": [50],
-    "TP_PCT":     [6,8,10],
-    "SL_PCT":     [8,10],
+    "TP_PCT":     [8],
+    "SL_PCT":     [8],
     }
 
 # =============================================================================

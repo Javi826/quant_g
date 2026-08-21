@@ -52,8 +52,8 @@ SELECTED_SYMBOLS = [
     "XRPUSDT",
 ]
 
-SYMBOL_MODE        = "manual"   #manual o auto
-N_SYMBOLS_DOWNLOAD = 50
+SYMBOL_MODE        = "auto"   #manual o auto
+N_SYMBOLS_DOWNLOAD = 25
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
                                        

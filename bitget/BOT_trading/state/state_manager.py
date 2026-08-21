@@ -1,3 +1,4 @@
+#BOT_trading/state/state_manager.py
 """
 state/state_manager.py State Manager - Handles bot state persistence and broker synchronization.
 
@@ -281,22 +282,10 @@ def sync_broker(open_positions: Dict,
                 strategy_candles: Dict,
                 account_number: str,
                 state_file: str) -> None:
-    """
-    Monitor and alert on discrepancies between local state and broker.
-    READ-ONLY: Does not modify state or log trades.
-    
-    Aggregates positions by symbol+direction and compares with broker.
-    Uses contract precision (volumePlace) for size comparison to avoid float errors.
-    Logs discrepancies to PostgreSQL for historical tracking.
-    
-    Args:
-        open_positions: Current open positions dict
-        strategy_candles: Candle counters dict
-        account_number: Account identifier
-        state_file: State file path (unused, kept for signature compatibility)
-    """
+
     import time
     from alerts.telegram_notifier import send_sync_alert
+    from execution.trade_logger import log_sync_discrepancy
 
     
     if not get_ws_manager():
@@ -426,7 +415,7 @@ def sync_broker(open_positions: Dict,
                         broker_size=0.0,
                         strategies=local_data['long_strategies']
                     )
-                    from execution.trade_logger import log_sync_discrepancy
+                    #from execution.trade_logger import log_sync_discrepancy
                     # PostgreSQL log
                     log_sync_discrepancy(
                         account=account_number,
