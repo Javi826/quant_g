@@ -337,10 +337,10 @@ def validate_strategy_configuration(strategies, implemented_strategies):
     for strat in strategies:
         strat_id = strat.get('id', '')
         
-        if not re.match(r'^\d{5}_\w+', strat_id):
+        if not re.match(r'^\d{5,6}_\w+', strat_id):
             errors.append(
                 f"Strategy '{strat_id}' has invalid ID format. "
-                f"Expected: 'NNNNN_strategy_name' (e.g., '00053_rule_mining_id')"
+                f"Expected: 'NNNNN_strategy_name' or 'NNNNNN_strategy_name' (e.g., '00053_rule_mining_id')"
             )
             validation_y10_errors += 1
             continue
@@ -348,10 +348,10 @@ def validate_strategy_configuration(strategies, implemented_strategies):
         id_parts = strat_id.split('_', 1)
         id_number = id_parts[0]
         
-        if len(id_number) != 5:
+        if len(id_number) not in (5, 6):
             errors.append(
-                f"Strategy '{strat_id}' numeric prefix must be exactly 5 digits "
-                f"(e.g., '00053_name', not '0053_name' or '053_name')"
+                f"Strategy '{strat_id}' numeric prefix must be 5 or 6 digits "
+                f"(e.g., '00053_name' or '100053_name')"
             )
             validation_y10_errors += 1
         

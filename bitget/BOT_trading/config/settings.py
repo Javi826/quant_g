@@ -19,12 +19,12 @@ ACCOUNTS = {
         "reference_symbol": "BTCUSDT",
     },
     "00": {
-        "initial_capital": 10000,
+        "initial_capital": 40000,
         "dashboard_port": 5000,
         "description": "Main Account",
-        "type": "demo",
+        "type": "production",
         "risk_control_enabled": True,
-        "postgresql_enabled": False,
+        "postgresql_enabled": True,
         "reference_symbol": "BTCUSDT",
     },  
     "01": {
@@ -71,13 +71,13 @@ COMMON_REQUIRED_PARAMS = [
 ]
 
 # Order amount limits (USDT)
-MIN_ORDER_AMOUNT = 100
+MIN_ORDER_AMOUNT = 400
 MAX_ORDER_AMOUNT = 500
 
 # TP/SL limits (%)
-MIN_TP_PCT = 2
+MIN_TP_PCT = 6
 MAX_TP_PCT = 10
-MIN_SL_PCT = 2
+MIN_SL_PCT = 6
 MAX_SL_PCT = 10
 
 # Candles timeout limits

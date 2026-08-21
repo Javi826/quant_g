@@ -1,12 +1,13 @@
 #BOT_batch/set_COMP.py
 """
-DSR vs StepM vs FDR — full brute universe comparison, single standalone script.
+DSR vs StepM — full brute universe comparison, single standalone script.
 """
 import os
 import sys
 import time
 import logging
 import numpy as np
+import matplotlib.pyplot as plt
 from itertools import combinations
 from scipy.stats import pearsonr, spearmanr
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -29,8 +30,8 @@ logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 STEPM_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
 
-FDR_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.fdr").setLevel(FDR_LOG_LEVEL)
+FF_LOG_LEVEL = logging.INFO
+logging.getLogger("BOT_batch.pipeline.FF_test").setLevel(FF_LOG_LEVEL)
 #------------------------------------------------------------------------------
 REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
@@ -47,7 +48,7 @@ from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
-from shared_batchs.pipeline.fdr import pipe_fdr
+from shared_batchs.pipeline.FF_test import pipe_FF_test
 from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
@@ -55,7 +56,7 @@ from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-TIMEFRAMES = ["12Hutc"]
+#TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 10
 
@@ -66,30 +67,39 @@ PARAM_GRID = {
 }
 
 # =============================================================================
-# DSR vs STEPM vs FDR — full brute universe comparison, no other pipeline stages
+# DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
 DSR_TH              = 0.95
 STEPM_K_PERCENTILE  = 0.01
-FDR_ALPHA           = 0.2
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
 # here plus a new "pairs" tuple in _print_correlation; every report function
 # below iterates over this registry instead of hardcoding method names.
 # =============================================================================
-DSR_TEST   = True
+DSR_TEST   = False
 STEPM_TEST = False
-FDR_TEST   = False
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
     "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
-    "fdr":   {"value_key": "fdr_p",   "ok_key": "passed_fdr",   "label": "FDR"},
 }
-_METHOD_FLAGS = {"dsr": DSR_TEST, "stepm": STEPM_TEST, "fdr": FDR_TEST}
-METHOD_ORDER  = [m for m in ["dsr", "stepm", "fdr"] if _METHOD_FLAGS[m]]
+_METHOD_FLAGS = {"dsr": DSR_TEST, "stepm": STEPM_TEST}
+METHOD_ORDER  = [m for m in ["dsr", "stepm"] if _METHOD_FLAGS[m]]
 
 # =============================================================================
-# COMPARISON — build the raw universe once, hand it to all three pipes, compare.
+# SIGNAL CLEANING — dedupe near-identical rules before the brute backtest
+# =============================================================================
+SIGNAL_CLEANING_TEST = True
+
+# =============================================================================
+# FF BOOTSTRAP — standalone diagnostic, not part of the DSR/STEPM comparison
+# =============================================================================
+FF_TEST            = True
+FF_SAMPLE_REPLICAS = 5     # raw null replicas kept for the histogram overlay
+FF_SHOW_PLOTS      = True
+
+# =============================================================================
+# COMPARISON — build the raw universe once, hand it to all pipes, compare.
 # =============================================================================
 def compare_dsr_vs_stepm_from_raw(
     raw_results: list,
@@ -98,10 +108,13 @@ def compare_dsr_vs_stepm_from_raw(
     dsr_th: float,
     n_combos: int,
     stepm_k_percentile: float | None = None,
-    fdr_alpha: float = FDR_ALPHA,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
+
+    if not METHOD_ORDER:
+        logger.warning(f"COMPARE ── {timeframe} ── no method enabled (DSR/STEPM both off) — skipping comparison")
+        return {}
 
     results_by_method = {}
 
@@ -125,44 +138,33 @@ def compare_dsr_vs_stepm_from_raw(
         )
         results_by_method["stepm"] = {r["rule_id"]: r for r in stepm_results}
 
-    if "fdr" in METHOD_ORDER:
-        fdr_results = pipe_fdr(
-            raw_results = raw_results,
-            matrix_arr  = matrix_arr,
-            col_names   = col_names,
-            fdr_alpha   = fdr_alpha,
-            timeframe   = timeframe,
-        )
-        results_by_method["fdr"] = {r["rule_id"]: r for r in fdr_results}
-
     _print_comparison(raw_results, results_by_method, timeframe)
 
     return results_by_method
 
-def compare_dsr_vs_stepm(
+
+def _run_backtest_universe(
     rules: list,
     ohlcv_arr: dict,
     param_grid: dict,
     order_amount: int,
-    dsr_th: float,
-    stepm_k_percentile: float | None = None,
-    fdr_alpha: float = FDR_ALPHA,
-    timeframe: str = "",
+    timeframe: str,
     n_jobs: int = -1,
-) -> dict:
-
-# =============================================================================
-#     rules = pipe_signal_cleaning_jaccard(
-#         rules     = rules,
-#         ohlcv_arr = ohlcv_arr,
-#         timeframe = timeframe,
-#     )
-# =============================================================================
+    apply_signal_cleaning: bool = False,
+) -> tuple:
+    """Run the brute-force backtest once; shared by the method comparison
+    and any standalone diagnostic (e.g. FF) that needs the same matrix."""
+    if apply_signal_cleaning:
+        rules = pipe_signal_cleaning_jaccard(
+            rules     = rules,
+            ohlcv_arr = ohlcv_arr,
+            timeframe = timeframe,
+        )
 
     original_n_jobs = backtest_module.BACKTEST_N_JOBS
     backtest_module.BACKTEST_N_JOBS = n_jobs
     try:
-        raw_results, n_combos, matrix_arr, col_names = backtest_module.pipe_backtesting(
+        return backtest_module.pipe_backtesting(
             rules        = rules,
             ohlcv_arr    = ohlcv_arr,
             param_grid   = param_grid,
@@ -171,18 +173,6 @@ def compare_dsr_vs_stepm(
         )
     finally:
         backtest_module.BACKTEST_N_JOBS = original_n_jobs
-
-    return compare_dsr_vs_stepm_from_raw(
-        raw_results        = raw_results,
-        matrix_arr         = matrix_arr,
-        col_names          = col_names,
-        dsr_th             = dsr_th,
-        n_combos           = n_combos,
-        stepm_k_percentile = stepm_k_percentile,
-        fdr_alpha          = fdr_alpha,
-        timeframe          = timeframe,
-        n_jobs             = n_jobs,
-    )
 
 
 # =============================================================================
@@ -197,7 +187,7 @@ def _sort_key(row: dict):
     return val if val is not None else float("inf")
 def _build_comparison_rows(raw_results: list, results_by_method: dict) -> list:
     """One dict per rule, with each method's value/ok, restricted to rules
-    where STEPM produced a p-value (same gate as before FDR was added)."""
+    where STEPM produced a p-value (same gate as before)."""
     rows = []
     for r in raw_results:
         rid = r["rule_id"]
@@ -264,7 +254,7 @@ def _print_comparison(raw_results: list, results_by_method: dict, timeframe: str
     rows.sort(key=_sort_key)
 
     logger.info(f"\n{'─' * 90}")
-    logger.info(f"  DSR vs STEPM vs FDR ── {timeframe}")
+    logger.info(f"  DSR vs STEPM ── {timeframe}")
     logger.info(f"{'─' * 90}")
     _print_side_breakdown(raw_results, results_by_method)
     id_width = max((len(row["rule_id"]) for row in rows), default=8) + 2
@@ -303,7 +293,7 @@ def _print_disagreement_breakdown(rows: list, timeframe: str) -> None:
     rows: dicts from _build_comparison_rows, already restricted to rules where
     StepM produced a p-value. Splits into ALL PASS, ALL FAIL, and MIXED
     (methods disagree on this rule) — MIXED is where conclusions differ and
-    avoids the 8-way combinatorics that per-method-pair tables would need.
+    avoids the combinatorics that per-method-pair tables would need.
     """
     all_pass, all_fail, mixed = [], [], []
     for row in rows:
@@ -387,9 +377,7 @@ def _print_correlation(rows: list, timeframe: str) -> None:
         return
 
     _all_pairs = [
-        ("dsr_value",   "stepm_value", "DSR",     "STEPM_p"),
-        ("dsr_value",   "fdr_value",   "DSR",     "FDR_p"),
-        ("stepm_value", "fdr_value",   "STEPM_p", "FDR_p"),
+        ("dsr_value", "stepm_value", "DSR", "STEPM_p"),
     ]
     pairs = [
         p for p in _all_pairs
@@ -414,13 +402,12 @@ def _print_correlation(rows: list, timeframe: str) -> None:
         logger.info(f"    Pearson  r = {pearson_r:.4f}  (p={pearson_p:.4g})")
         logger.info(f"    Spearman r = {spearman_r:.4f}  (p={spearman_p:.4g})")
 
-        # Both STEPM's stepdown and BY's harmonic correction (c(m) ~ ln(m),
-        # dividing the threshold by ~12x at m=118k) produce a saturated tail
-        # of p=1.0 ties by construction — excluding them on either side
-        # isolates the region where ranking signal, if any, still discriminates.
+        # StepM's stepdown produces a saturated tail of p=1.0 ties by
+        # construction — excluding them isolates the region where ranking
+        # signal, if any, still discriminates.
         saturatable_keys = [
             key for key, label in ((key_a, label_a), (key_b, label_b))
-            if label in ("STEPM_p", "FDR_p")
+            if label in ("STEPM_p",)
         ]
         for sat_key in saturatable_keys:
             sat_label     = label_a if sat_key == key_a else label_b
@@ -451,6 +438,50 @@ def _print_correlation(rows: list, timeframe: str) -> None:
 
 
 # =============================================================================
+# FF BOOTSTRAP PLOTS — visual read of the same numbers pipe_FF_test logs
+# =============================================================================
+def _plot_ff_bootstrap(result: dict, timeframe: str) -> None:
+    if result is None:
+        logger.warning(f"FF PLOT ── {timeframe} ── no result available, skipping")
+        return
+
+    fig, (ax_hist, ax_pct) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle(f"FF Bootstrap ── {timeframe}")
+
+    # ---- Left: real cross-section vs a sample of null replicas ------------
+    real_tstat = result["real_tstat"]
+    ax_hist.hist(real_tstat, bins=100, density=True, alpha=0.6, label="Real (observed)", color="tab:blue")
+
+    sim_sample = result.get("sim_tstat_sample")
+    if sim_sample is not None:
+        sim_flat = sim_sample[np.isfinite(sim_sample)]
+        ax_hist.hist(sim_flat, bins=100, density=True, alpha=0.5, label="Null (bootstrap replicas)", color="tab:orange")
+
+    ax_hist.set_xlabel("t(α)")
+    ax_hist.set_ylabel("density")
+    ax_hist.set_title("Cross-sectional distribution")
+    ax_hist.legend()
+
+    # ---- Right: Sim vs Act percentile curve --------------------------------
+    percentiles      = result["percentiles"]
+    real_percentiles = result["real_percentiles"]
+    sim_percentiles  = result["sim_percentiles"]
+    x_pos            = np.arange(len(percentiles))
+
+    ax_pct.plot(x_pos, real_percentiles, marker="o", label="Act (real)", color="tab:blue")
+    ax_pct.plot(x_pos, sim_percentiles, marker="o", label="Sim (null)", color="tab:orange")
+    ax_pct.set_xticks(x_pos)
+    ax_pct.set_xticklabels([f"{p:g}" for p in percentiles])
+    ax_pct.set_xlabel("percentile")
+    ax_pct.set_ylabel("t(α)")
+    ax_pct.set_title("Sim vs Act by percentile")
+    ax_pct.legend()
+
+    fig.tight_layout()
+    plt.show()
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -458,7 +489,7 @@ if __name__ == "__main__":
     start = time.time()
 
     logger.info(f"\n{'─' * 115}")
-    logger.info(f"  DSR vs STEPM vs FDR — FULL BRUTE UNIVERSE COMPARISON")
+    logger.info(f"  DSR vs STEPM — FULL BRUTE UNIVERSE COMPARISON")
     logger.info(f"{'─' * 115}")
     logger.info(f"  TIMEFRAMES     : {TIMEFRAMES}")
     logger.info(f"  N_SYMBOLS      : {N_SYMBOLS}")
@@ -470,7 +501,8 @@ if __name__ == "__main__":
     logger.info(f"  N_BOOTSTRAP    : {WHITE_N_BOOTSTRAP}")
     logger.info(f"  BLOCK_SIZE     : {WHITE_BLOCK_SIZE}")
     logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
-    logger.info(f"  FDR_ALPHA      : {FDR_ALPHA}")
+    logger.info(f"  SIGNAL_CLEANING: {SIGNAL_CLEANING_TEST}")
+    logger.info(f"  FF_TEST        : {FF_TEST}")
     logger.info(f"{'─' * 115}\n")
 
     # -------------------------------------------------------------------
@@ -491,8 +523,9 @@ if __name__ == "__main__":
         ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
 
     # -------------------------------------------------------------------
-    # DSR vs STEPM vs FDR — one comparison per timeframe, on the full brute
-    # universe (no pipe pre-filters what the others see).
+    # DSR vs STEPM — one comparison per timeframe, on the full brute
+    # universe (no pipe pre-filters what the others see). FF runs as a
+    # separate diagnostic on the same matrix, not part of the comparison.
     # -------------------------------------------------------------------
     comparisons_by_timeframe = {}
 
@@ -503,17 +536,36 @@ if __name__ == "__main__":
             ohlcv_data_by_timeframe[timeframe], timeframe, RULE_MAX_DEPTH,
         )
 
-        comparisons_by_timeframe[timeframe] = compare_dsr_vs_stepm(
-            rules              = rules_for_timeframe,
-            ohlcv_arr          = ohlcv_arr_by_timeframe[timeframe],
-            param_grid         = PARAM_GRID,
-            order_amount       = ORDER_AMOUNT,
+        raw_results, n_combos, matrix_arr, col_names = _run_backtest_universe(
+            rules                  = rules_for_timeframe,
+            ohlcv_arr              = ohlcv_arr_by_timeframe[timeframe],
+            param_grid             = PARAM_GRID,
+            order_amount           = ORDER_AMOUNT,
+            timeframe              = timeframe,
+            n_jobs                 = N_JOBS,
+            apply_signal_cleaning  = SIGNAL_CLEANING_TEST,
+        )
+
+        comparisons_by_timeframe[timeframe] = compare_dsr_vs_stepm_from_raw(
+            raw_results        = raw_results,
+            matrix_arr         = matrix_arr,
+            col_names          = col_names,
             dsr_th             = DSR_TH,
+            n_combos           = n_combos,
             stepm_k_percentile = STEPM_K_PERCENTILE,
-            fdr_alpha          = FDR_ALPHA,
             timeframe          = timeframe,
             n_jobs             = N_JOBS,
         )
+
+        if FF_TEST:
+            ff_result = pipe_FF_test(
+                matrix_arr        = matrix_arr,
+                col_names         = col_names,
+                timeframe         = timeframe,
+                n_sample_replicas = FF_SAMPLE_REPLICAS,
+            )
+            if FF_SHOW_PLOTS:
+                _plot_ff_bootstrap(ff_result, timeframe)
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")

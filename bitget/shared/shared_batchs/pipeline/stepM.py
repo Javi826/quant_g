@@ -13,19 +13,20 @@ from shared_batchs.utils.reporting import print_stepm_pvalue_quantile_equivalenc
 logger = logging.getLogger("BOT_batch.pipeline.stepM")
 
 # =============================================================================
-# STATISTICAL TEST CONFIG — bootstrap sizing, annualization, reproducibility
+# STATISTICAL TEST CONFIG + STEPDOWN / K-FWE CONFIG -ROmano Wolf
 # =============================================================================
-STEPM_ALPHA         = 0.10     # significance level used inside the Romano-Wolf stepdown search
-WHITE_PVALUE_TH     = STEPM_ALPHA
-WHITE_N_BOOTSTRAP   = 1000
-WHITE_BLOCK_SIZE    = 10   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
-STEPM_USE_SPA       = True
-# =============================================================================
-# STEPDOWN / K-FWE CONFIG — Romano-Wolf rejection rule and convergence cap
-# =============================================================================
+STEPM_ALPHA          = 0.10     # significance level used inside the Romano-Wolf stepdown search
 STEPM_K_MODE         = "percentile"  # "absolute" or "percentile"
 STEPM_K_FWE          = 1             # used when STEPM_K_MODE == "absolute"
 STEPM_K_PERCENTILE   = 0.02         # used when STEPM_K_MODE == "percentile"
+
+# =============================================================================
+# STATISTICAL TEST 
+# =============================================================================
+WHITE_PVALUE_TH      = STEPM_ALPHA
+WHITE_N_BOOTSTRAP    = 1000
+WHITE_BLOCK_SIZE     = 10   # fixed block length — mirrors montecarlo.py BLOCK_SIZE
+STEPM_USE_SPA        = True
 STEPM_MAX_ITERATIONS = 500           # safety cap on stepdown iterations
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — bounds peak RAM without changing any result

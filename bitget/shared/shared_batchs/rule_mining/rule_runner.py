@@ -8,8 +8,7 @@ from shared_batchs.pipeline.stepM import pipe_stepm
 from shared_batchs.pipeline.FF_test import pipe_FF_test
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
-from shared_batchs.pipeline.signal_cleaning import  pipe_decorrelation, pipe_signal_cleaning_jaccard
-
+from shared_batchs.pipeline.signal_cleaning import  pipe_signal_cleaning_jaccard
 from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plot_rule_mining_portfolio_comparison
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
@@ -30,7 +29,7 @@ def _slugify_label(label: str) -> str:
 
 
 def _build_rule_id(i: int, timeframe: str, rule: dict) -> str:
-    return f"{i:05d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
+    return f"{i:06d}_{timeframe}_{rule['side']}_{_slugify_label(rule['label'])}"
 
 def _build_rule_dicts(ohlcv_data: dict, timeframe: str, max_depth: int) -> list:
 
@@ -101,7 +100,7 @@ def run_rule_mining_pipeline(
     # BACKTESTING — one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_mbias_results = []
-    pi0_by_timeframe  = {}
+    FF_by_timeframe  = {}
     for timeframe in timeframes:
         rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
         logger.info(f"\n\033[36m{'=' * 70}")
@@ -128,19 +127,14 @@ def run_rule_mining_pipeline(
             col_names   = col_names,
             timeframe   = timeframe,
         )
-        
-        pi0_by_timeframe[timeframe] = pipe_FF_test(
-            matrix_arr = matrix_arr,
-            col_names  = col_names,
-            timeframe  = timeframe,
-        )
 
         del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
+ # libera el universo bruto de este timeframe antes de pasar al siguiente
 
         all_mbias_results.extend([{**r, **_empty_wfo_fields()} for r in mbias_results])
 
     passed_mbias_ids = {r["rule_id"] for r in all_mbias_results if r["passed_mbias"]}
-    # AFTER
+
     print_rule_mining_ranking(all_mbias_results, list(passed_mbias_ids), "POST-MBIAS", survivor_ids=list(passed_mbias_ids))
     wfo_by_id = {}
     for timeframe in timeframes:

@@ -12,17 +12,16 @@ logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 # =============================================================================
 # CONFIG
 # =============================================================================
+JACCARD_SIMILARITY_TH  = 0.400
+
+
 SIGNAL_MASK_N_JOBS     = -1
 SIGNAL_MASK_CHUNK_SIZE = None  # None -> auto-sized from n_jobs and rule count
-
-JACCARD_SIMILARITY_TH  = 0.80
 JACCARD_TILE           = 32  # output tile side; must stay in sync with the CUDA kernel
 JACCARD_TILE_WORDS     = 8   # uint64 words staged in shared memory per tile pass
 JACCARD_POPCOUNT_ROWS  = 4096  # host-side popcount chunk, caps peak memory
-
 DECORRELATE_THRESHOLD  = 0.5
 DECORRELATE_BATCH_SIZE = 1000
-
 GPU_INITIAL_CAPACITY   = 20_000 
 GPU_SURVIVOR_CHUNK     = 25_000 # initial survivors buffer capacity, doubled on overflow
 RANDOM_SEED            = 42

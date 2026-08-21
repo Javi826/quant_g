@@ -10,10 +10,10 @@ logger = logging.getLogger("BOT_batch.pipeline.FF_test")
 # =============================================================================
 # CONFIG — Fama-French (2010) joint MOVING-BLOCK bootstrap, cross-sectional
 # =============================================================================
-FF_N_BOOTSTRAP = 10000
+FF_N_BOOTSTRAP = 1000
 FF_RANDOM_SEED = 42
-FF_BLOCK_SIZE  = 20  # fixed block length — mirrors stepM.py WHITE_BLOCK_SIZE
-FF_PERCENTILES = np.array([1,10,50,90,95,99])
+FF_BLOCK_SIZE  = 10  # fixed block length — mirrors stepM.py WHITE_BLOCK_SIZE
+FF_PERCENTILES = np.array([1,5,10,50,95,99,99.99])
 
 # =============================================================================
 # ACTIVE-DAY CONFIG — a column's n is its count of nonzero (traded) days,
@@ -29,15 +29,12 @@ FF_COLUMN_CHUNK_SIZE = 256
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — percentile phase processes replicas in batches
 # =============================================================================
-BOOTSTRAP_CHUNK_SIZE = 500
+BOOTSTRAP_CHUNK_SIZE  = 500
 COLUMN_CHUNK_SIZE     = 5000    # column chunk size for the cheap moments pass (Pass 1)
 METRIC_LABEL_WIDTH    = 12
 
-
 def _format_thousands(value: int) -> str:
     return format(value, ",").replace(",", ".")
-
-
 # =============================================================================
 # PASS 1 — REAL MOMENTS, COLUMN-CHUNKED
 # =============================================================================
@@ -57,7 +54,6 @@ def _real_moments_chunked(matrix_arr: np.ndarray, chunk_size: int = COLUMN_CHUNK
 
     return counts, sums, sumsq
 
-
 def _tstat_from_moments(counts: np.ndarray, sums: np.ndarray, sumsq: np.ndarray, min_active_days: int) -> np.ndarray:
 
     n = counts.astype(np.float64)
@@ -74,7 +70,6 @@ def _tstat_from_moments(counts: np.ndarray, sums: np.ndarray, sumsq: np.ndarray,
         tstat = np.where(stds > 0, (means / stds) * np.sqrt(n), np.nan)
     return tstat
 
-
 # =============================================================================
 # MOVING BLOCK BOOTSTRAP — mirrors stepM.py's _generate_block_starts exactly.
 # =============================================================================
@@ -90,7 +85,6 @@ def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np
     starts_last = starts[:, -1]
 
     return starts_full, starts_last, len_last, n_blocks_needed
-
 
 # =============================================================================
 # PASS 2 — TRANSPOSED PREFIX SUMS PER COLUMN CHUNK
@@ -112,7 +106,6 @@ def _compute_prefix_sums_chunk(matrix_chunk: np.ndarray, active_mask_chunk: np.n
     np.cumsum(active_mask_chunk.astype(np.int32), axis=0, out=ps_cnt[1:])
 
     return np.ascontiguousarray(ps.T), np.ascontiguousarray(ps2.T), np.ascontiguousarray(ps_cnt.T)
-
 
 @njit(parallel=True, fastmath=False, cache=True)
 def _block_bootstrap_tstat_numba_colwise(
@@ -170,7 +163,6 @@ def _block_bootstrap_tstat_numba_colwise(
 
     return tstat
 
-
 def _build_bootstrap_tstat_matrix(
     matrix_adjusted: np.ndarray,
     active_mask: np.ndarray,
@@ -200,12 +192,10 @@ def _build_bootstrap_tstat_matrix(
 
     return tstat_full
 
-
 def _demean_active_days(matrix_arr: np.ndarray, active_mask: np.ndarray, means_active: np.ndarray) -> np.ndarray:
 
     adjusted = np.where(active_mask, matrix_arr - means_active[None, :], 0.0)
     return adjusted.astype(np.float64)
-
 
 def _run_joint_bootstrap(
     matrix_adjusted: np.ndarray,
@@ -217,6 +207,7 @@ def _run_joint_bootstrap(
     seed: int,
     min_active_days_per_run: int,
     block_size: int = FF_BLOCK_SIZE,
+    n_sample_replicas: int = 0,
 ) -> tuple:
 
     n_obs = matrix_adjusted.shape[0]
@@ -231,6 +222,9 @@ def _run_joint_bootstrap(
         matrix_adjusted, active_mask, starts_full, starts_last,
         block_size, len_last, min_active_days_per_run,
     )
+
+    # ---- Sample of raw null replicas, kept only for plotting purposes ------
+    sample_replicas = tstat_full[:n_sample_replicas].copy() if n_sample_replicas > 0 else None
 
     # ---- Fase B: cross-sectional percentiles, replica-chunked --------------
     percentile_sum   = np.zeros(percentiles.shape[0], dtype=np.float64)
@@ -250,14 +244,14 @@ def _run_joint_bootstrap(
 
     avg_sim_percentiles = percentile_sum / n_valid_runs
     pct_below_actual    = 100.0 * below_actual_cnt / n_valid_runs
-    return avg_sim_percentiles, pct_below_actual
-
+    return avg_sim_percentiles, pct_below_actual, sample_replicas
 
 def _log_ff_report(
     percentiles: np.ndarray,
     real_percentiles: np.ndarray,
     sim_percentiles: np.ndarray,
     pct_below_actual: np.ndarray,
+    n_ge_percentile: np.ndarray,
     n_cols_built: int,
     n_dropped: int,
     n_bootstrap: int,
@@ -265,25 +259,34 @@ def _log_ff_report(
     block_size: int,
     timeframe: str,
 ) -> None:
-    logger.info(f"\n{'─' * 70}")
+    logger.info(f"\n{'─' * 85}")
     logger.info(f"  FAMA-FRENCH (2010) JOINT BLOCK BOOTSTRAP — t(α) percentiles ── {timeframe}")
-    logger.info(f"{'─' * 70}")
+    logger.info(f"{'─' * 85}")
     logger.info(
-        f"  columns (rules) : {_format_thousands(n_cols_built)}   "
+        f"  columns (rule × combo) : {_format_thousands(n_cols_built)}   "
         f"dropped (< {min_active_days} active days) : {_format_thousands(n_dropped)}   "
         f"bootstrap runs : {_format_thousands(n_bootstrap)}   "
         f"block size : {block_size}"
     )
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  {'Pct':>5} │ {'Sim':>8} {'Act':>8} {'%<Act':>8}")
+    logger.info(f"{'─' * 85}")
+    logger.info(f"  {'Pct':>5} │ {'N≥Pct':>9} │ {'Sim':>8} {'Real':>8} {'%<Real':>8}")
     for i, pct in enumerate(percentiles):
-        logger.info(f"  {pct:>5.0f} │ {sim_percentiles[i]:>8.2f} {real_percentiles[i]:>8.2f} {pct_below_actual[i]:>7.2f}%")
-    logger.info(f"{'─' * 70}")
+        logger.info(
+            f"  {pct:>5.0f} │ {_format_thousands(int(n_ge_percentile[i])):>9} │ "
+            f"{sim_percentiles[i]:>8.2f} {real_percentiles[i]:>8.2f} {pct_below_actual[i]:>7.2f}%"
+        )
+    logger.info(f"{'─' * 85}")
+    logger.info("  Pct    : percentile level being compared across columns")
+    logger.info("  N≥Pct  : how many real columns reach or exceed that percentile")
+    logger.info("  Sim    : average value at that percentile across bootstrap replicas (pure luck)")
+    logger.info("  Real   : actual value at that percentile in the real data")
+    logger.info("  %<Real : share of bootstrap replicas that fell below Real at that percentile")
+    logger.info(f"{'─' * 85}")
     logger.info(
-        "  Act far below Sim in the left tail and/or far above in the right tail signals "
+        "  Real far below Sim in the left tail and/or far above in the right tail signals "
         "genuine skill (positive or negative) beyond what pure luck would produce."
     )
-    logger.info(f"{'─' * 70}\n")
+    logger.info(f"{'─' * 85}\n")
 
 
 # =============================================================================
@@ -301,6 +304,7 @@ def pipe_FF_test(
     min_active_days: int = MIN_ACTIVE_DAYS_PER_COLUMN,
     min_active_days_per_run: int = MIN_ACTIVE_DAYS_PER_RUN,
     block_size: int = FF_BLOCK_SIZE,
+    n_sample_replicas: int = 0,
 ) -> dict:
 
     if not enabled:
@@ -343,14 +347,18 @@ def pipe_FF_test(
     matrix_adjusted  = _demean_active_days(matrix_kept, active_mask_kept, means_active_kept)
     real_percentiles = np.percentile(real_tstat, percentiles)
 
-    sim_percentiles, pct_below_actual = _run_joint_bootstrap(
+    sorted_tstat_asc = np.sort(real_tstat)
+    n_ge_percentile  = sorted_tstat_asc.shape[0] - np.searchsorted(sorted_tstat_asc, real_percentiles, side="left")
+
+    sim_percentiles, pct_below_actual, sim_tstat_sample = _run_joint_bootstrap(
         matrix_adjusted, active_mask_kept, real_percentiles, percentiles,
         n_bootstrap, chunk_size, seed, min_active_days_per_run, block_size,
+        n_sample_replicas,
     )
 
     n_dropped = matrix_arr.shape[1] - n_kept
     _log_ff_report(
-        percentiles, real_percentiles, sim_percentiles, pct_below_actual,
+        percentiles, real_percentiles, sim_percentiles, pct_below_actual, n_ge_percentile,
         matrix_arr.shape[1], n_dropped, n_bootstrap, min_active_days, block_size, timeframe,
     )
 
@@ -360,6 +368,7 @@ def pipe_FF_test(
         "sim_percentiles":  sim_percentiles,
         "pct_below_actual": pct_below_actual,
         "real_tstat":       real_tstat,
+        "sim_tstat_sample": sim_tstat_sample,
         "kept_idx":         kept_idx,
         "n_cols_built":     matrix_arr.shape[1],
         "n_dropped":        n_dropped,

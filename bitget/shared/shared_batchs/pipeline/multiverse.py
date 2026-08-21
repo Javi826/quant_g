@@ -14,17 +14,16 @@ DTYPE  = np.float32
 # =============================================================================
 # MCPT EXECUTION CONFIG
 # =============================================================================
-
-N_PERMUTATIONS       = 1000
-MCPT_N_JOBS          = -1
-MULTIVERSE_PVALUE_TH = 0.10
-#1H-400 segun script
+MULTIVERSE_PVALUE_TH    = 0.10
 BLOCK_SIZE_BY_TIMEFRAME = {
-    "1H":     150,
+    "1H":     150, #1H-400 -> script
     "4H":     120,
     "6Hutc":  70,
     "12Hutc": 30,
 }
+
+N_PERMUTATIONS       = 1000
+MCPT_N_JOBS          = -1
 
 def _resolve_block_size(timeframe: str) -> int:
     block_size = BLOCK_SIZE_BY_TIMEFRAME.get(timeframe)
