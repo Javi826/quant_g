@@ -30,10 +30,10 @@ logger = logging.getLogger("pipeline")
 # =============================================================================
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR    = os.path.join(BASE_DIR, "data_20")
-RAW_DIR     = os.path.join(DATA_DIR, "01_raw_20")
-CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean_20")
-HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow_20")
-SPLIT_DIR   = os.path.join(DATA_DIR, "04_split_20")
+RAW_DIR     = os.path.join(DATA_DIR, "01_raw")
+CLEAN_DIR   = os.path.join(DATA_DIR, "02_clean")
+HIGHLOW_DIR = os.path.join(DATA_DIR, "03_highlow")
+SPLIT_DIR   = os.path.join(DATA_DIR, "04_split")
 
 # =============================================================================
 # PIPELINE CONFIG

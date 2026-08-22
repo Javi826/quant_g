@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout,
 logger = logging.getLogger("BOT_batch.main_comp")
 logger.setLevel(LOG_LEVEL)
 
-DSR_LOG_LEVEL = logging.DEBUG
+DSR_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.dsr").setLevel(DSR_LOG_LEVEL)
 logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
@@ -58,7 +58,7 @@ N_JOBS = -1  # -1 = use all available cores, for both the backtest search and th
 TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
-N_SYMBOLS  = 10
+N_SYMBOLS  = 2
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -524,8 +524,6 @@ if __name__ == "__main__":
 
     # -------------------------------------------------------------------
     # DSR vs STEPM — one comparison per timeframe, on the full brute
-    # universe (no pipe pre-filters what the others see). FF runs as a
-    # separate diagnostic on the same matrix, not part of the comparison.
     # -------------------------------------------------------------------
     comparisons_by_timeframe = {}
 

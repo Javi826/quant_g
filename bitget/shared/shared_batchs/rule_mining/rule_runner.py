@@ -128,8 +128,7 @@ def run_rule_mining_pipeline(
             timeframe   = timeframe,
         )
 
-        del raw_results, matrix_arr  # libera el universo bruto de este timeframe antes de pasar al siguiente
- # libera el universo bruto de este timeframe antes de pasar al siguiente
+        del raw_results, matrix_arr  
 
         all_mbias_results.extend([{**r, **_empty_wfo_fields()} for r in mbias_results])
 
