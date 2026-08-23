@@ -10,12 +10,12 @@ from scipy import signal as sp_signal
 RSI_PERIODS                = [14,21]  
 RSI_THRESHOLDS             = [30,70]  
 
-ADX_PERIODS                = [14,21] 
-ADX_THRESHOLDS             = [20,30]   
+ADX_PERIODS                = [] 
+ADX_THRESHOLDS             = []   
 
-MA_PERIODS                 = [20,100]
+MA_PERIODS                 = []
 
-MOMENTUM_PERIODS           = [5,20]     
+MOMENTUM_PERIODS           = []     
 
 HISTVOL_BASE_PERIODS       = [10,20]     
 HISTVOL_REGIME_SMA_PERIODS = [20,50]     
@@ -48,12 +48,12 @@ ATR_REGIME_SMA_PERIODS     = [10,30]
 RSI_PERIODS                = [7,14,21]  
 RSI_THRESHOLDS             = [30,40,50,60,70]  
 
-ADX_PERIODS                = [] 
-ADX_THRESHOLDS             = []   
+ADX_PERIODS                = [7,14,21] 
+ADX_THRESHOLDS             = [20,25,30,35]   
 
-MA_PERIODS                 = []
+MA_PERIODS                 = [20,50,100,150]
 
-MOMENTUM_PERIODS           = []     
+MOMENTUM_PERIODS           = [5,10,20,25]    
 
 HISTVOL_BASE_PERIODS       = [10,20,30]     
 HISTVOL_REGIME_SMA_PERIODS = [20,30,40,50]     

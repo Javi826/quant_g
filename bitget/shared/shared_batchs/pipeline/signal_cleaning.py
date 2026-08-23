@@ -12,7 +12,7 @@ logger = logging.getLogger("BOT_batch.pipeline.signal_cleaning")
 # =============================================================================
 # CONFIG
 # =============================================================================
-JACCARD_SIMILARITY_TH  = 0.80
+JACCARD_SIMILARITY_TH  = 0.8
 
 
 SIGNAL_MASK_N_JOBS     = -1

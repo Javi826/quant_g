@@ -92,7 +92,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
-N_SYMBOLS  = 10
+N_SYMBOLS  = 2
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -117,7 +117,7 @@ DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_
 # RUN CONFIG — single source of truth: printed at startup AND persisted
 # =============================================================================
 run_config = {"TIMEFRAMES": TIMEFRAMES, "N_SYMBOLS": N_SYMBOLS, "PARAM_GRID": PARAM_GRID, "WFO_WINDOW_CONFIG": {tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES}, "EMA_ALPHA": EMA_ALPHA, "PIPELINE_WFO": PIPELINE_WFO, "PIPELINE_CORRELATION": PIPELINE_CORRELATION, "PIPELINE_MONTECARLO": PIPELINE_MONTECARLO, "PIPELINE_MULTIVERSE": PIPELINE_MULTIVERSE,
-    "WFO_NET_GAIN_TH": WFO_NET_GAIN_TH, "WFO_DD_TH": WFO_DD_TH, "WFO_R2_TH": WFO_R2_TH, "WFO_WFR_TH": WFO_WFR_TH, "CORRELATION_DD_TH": CORRELATION_DD_TH, "MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH, "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH, "STEPM_K_PERCENTILE": STEPM_K_PERCENTILE, "JACCARD_SIMILARITY_TH": JACCARD_SIMILARITY_TH}
+              "WFO_NET_GAIN_TH": WFO_NET_GAIN_TH, "WFO_DD_TH": WFO_DD_TH, "WFO_R2_TH": WFO_R2_TH, "WFO_WFR_TH": WFO_WFR_TH, "CORRELATION_DD_TH": CORRELATION_DD_TH, "MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH, "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH, "STEPM_K_PERCENTILE": STEPM_K_PERCENTILE, "JACCARD_SIMILARITY_TH": JACCARD_SIMILARITY_TH}
 # =============================================================================
 # LOGGING HELPERS — render the startup banner from run_config
 # =============================================================================
@@ -151,7 +151,7 @@ def log_run_config() -> None:
         f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  "
         f"R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}"
     )
-    logger.info(f"  CORRELATION : DD_TH={CORRELATION_DD_TH}")
+    logger.info(f"  CORRELATION : CORR_TH={CORRELATION_DD_TH}")
     logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
     logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
     logger.info(

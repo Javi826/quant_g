@@ -10,10 +10,10 @@ logger = logging.getLogger("BOT_batch.pipeline.FF_test")
 # =============================================================================
 # CONFIG — Fama-French (2010) joint MOVING-BLOCK bootstrap, cross-sectional
 # =============================================================================
-FF_N_BOOTSTRAP = 1000
+FF_N_BOOTSTRAP = 2000
 FF_RANDOM_SEED = 42
 FF_BLOCK_SIZE  = 10  # fixed block length — mirrors stepM.py WHITE_BLOCK_SIZE
-FF_PERCENTILES = np.array([1,5,10,50,95,99,99.99])
+FF_PERCENTILES = np.array([10,50,90,99,99.99])
 
 # =============================================================================
 # ACTIVE-DAY CONFIG — a column's n is its count of nonzero (traded) days,
@@ -276,11 +276,9 @@ def _log_ff_report(
             f"{sim_percentiles[i]:>8.2f} {real_percentiles[i]:>8.2f} {pct_below_actual[i]:>7.2f}%"
         )
     logger.info(f"{'─' * 85}")
-    logger.info("  Pct    : percentile level being compared across columns")
-    logger.info("  N≥Pct  : how many real columns reach or exceed that percentile")
     logger.info("  Sim    : average value at that percentile across bootstrap replicas (pure luck)")
     logger.info("  Real   : actual value at that percentile in the real data")
-    logger.info("  %<Real : share of bootstrap replicas that fell below Real at that percentile")
+    logger.info("  %<Real : n of bootstrap replicas that are < Real at that percentile")
     logger.info(f"{'─' * 85}")
     logger.info(
         "  Real far below Sim in the left tail and/or far above in the right tail signals "

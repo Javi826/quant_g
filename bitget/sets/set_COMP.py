@@ -55,7 +55,7 @@ from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================
 N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
-TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
+TIMEFRAMES = ["1H","4H", "6Hutc", "12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
 #TIMEFRAMES = ["1H"]
 N_SYMBOLS  = 2
@@ -70,7 +70,7 @@ PARAM_GRID = {
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
 DSR_TH              = 0.95
-STEPM_K_PERCENTILE  = 0.01
+STEPM_K_PERCENTILE  = 0.001
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
