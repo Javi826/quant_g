@@ -1,4 +1,4 @@
-#BOT_batch/set_COMP.py
+#BOT_batch/set_MBIAS.py
 """
 DSR vs StepM — full brute universe comparison, single standalone script.
 """
@@ -7,7 +7,6 @@ import sys
 import time
 import logging
 import numpy as np
-import matplotlib.pyplot as plt
 from itertools import combinations
 from scipy.stats import pearsonr, spearmanr
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
@@ -29,9 +28,6 @@ logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(DSR_LOG_LEVEL)
 
 STEPM_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
-
-FF_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.FF_test").setLevel(FF_LOG_LEVEL)
 #------------------------------------------------------------------------------
 REPORTING_LOG_LEVEL = logging.INFO
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
@@ -48,7 +44,6 @@ from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from shared_batchs.pipeline.dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
-from shared_batchs.pipeline.FF_test import pipe_FF_test
 from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
@@ -77,8 +72,8 @@ STEPM_K_PERCENTILE  = 0.001
 # here plus a new "pairs" tuple in _print_correlation; every report function
 # below iterates over this registry instead of hardcoding method names.
 # =============================================================================
-DSR_TEST   = False
-STEPM_TEST = False
+DSR_TEST   = True
+STEPM_TEST = True
 METHOD_SPECS = {
     "dsr":   {"value_key": "dsr",     "ok_key": "passed_dsr",   "label": "DSR"},
     "stepm": {"value_key": "stepm_p", "ok_key": "passed_stepm", "label": "STEPM"},
@@ -90,13 +85,6 @@ METHOD_ORDER  = [m for m in ["dsr", "stepm"] if _METHOD_FLAGS[m]]
 # SIGNAL CLEANING — dedupe near-identical rules before the brute backtest
 # =============================================================================
 SIGNAL_CLEANING_TEST = True
-
-# =============================================================================
-# FF BOOTSTRAP — standalone diagnostic, not part of the DSR/STEPM comparison
-# =============================================================================
-FF_TEST            = True
-FF_SAMPLE_REPLICAS = 5     # raw null replicas kept for the histogram overlay
-FF_SHOW_PLOTS      = True
 
 # =============================================================================
 # COMPARISON — build the raw universe once, hand it to all pipes, compare.
@@ -438,50 +426,6 @@ def _print_correlation(rows: list, timeframe: str) -> None:
 
 
 # =============================================================================
-# FF BOOTSTRAP PLOTS — visual read of the same numbers pipe_FF_test logs
-# =============================================================================
-def _plot_ff_bootstrap(result: dict, timeframe: str) -> None:
-    if result is None:
-        logger.warning(f"FF PLOT ── {timeframe} ── no result available, skipping")
-        return
-
-    fig, (ax_hist, ax_pct) = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f"FF Bootstrap ── {timeframe}")
-
-    # ---- Left: real cross-section vs a sample of null replicas ------------
-    real_tstat = result["real_tstat"]
-    ax_hist.hist(real_tstat, bins=100, density=True, alpha=0.6, label="Real (observed)", color="tab:blue")
-
-    sim_sample = result.get("sim_tstat_sample")
-    if sim_sample is not None:
-        sim_flat = sim_sample[np.isfinite(sim_sample)]
-        ax_hist.hist(sim_flat, bins=100, density=True, alpha=0.5, label="Null (bootstrap replicas)", color="tab:orange")
-
-    ax_hist.set_xlabel("t(α)")
-    ax_hist.set_ylabel("density")
-    ax_hist.set_title("Cross-sectional distribution")
-    ax_hist.legend()
-
-    # ---- Right: Sim vs Act percentile curve --------------------------------
-    percentiles      = result["percentiles"]
-    real_percentiles = result["real_percentiles"]
-    sim_percentiles  = result["sim_percentiles"]
-    x_pos            = np.arange(len(percentiles))
-
-    ax_pct.plot(x_pos, real_percentiles, marker="o", label="Act (real)", color="tab:blue")
-    ax_pct.plot(x_pos, sim_percentiles, marker="o", label="Sim (null)", color="tab:orange")
-    ax_pct.set_xticks(x_pos)
-    ax_pct.set_xticklabels([f"{p:g}" for p in percentiles])
-    ax_pct.set_xlabel("percentile")
-    ax_pct.set_ylabel("t(α)")
-    ax_pct.set_title("Sim vs Act by percentile")
-    ax_pct.legend()
-
-    fig.tight_layout()
-    plt.show()
-
-
-# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -502,7 +446,6 @@ if __name__ == "__main__":
     logger.info(f"  BLOCK_SIZE     : {WHITE_BLOCK_SIZE}")
     logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
     logger.info(f"  SIGNAL_CLEANING: {SIGNAL_CLEANING_TEST}")
-    logger.info(f"  FF_TEST        : {FF_TEST}")
     logger.info(f"{'─' * 115}\n")
 
     # -------------------------------------------------------------------
@@ -537,33 +480,23 @@ if __name__ == "__main__":
         raw_results, n_combos, matrix_arr, col_names = _run_backtest_universe(
             rules                  = rules_for_timeframe,
             ohlcv_arr              = ohlcv_arr_by_timeframe[timeframe],
-            param_grid             = PARAM_GRID,
+            param_grid              = PARAM_GRID,
             order_amount           = ORDER_AMOUNT,
-            timeframe              = timeframe,
-            n_jobs                 = N_JOBS,
-            apply_signal_cleaning  = SIGNAL_CLEANING_TEST,
+            timeframe               = timeframe,
+            n_jobs                  = N_JOBS,
+            apply_signal_cleaning   = SIGNAL_CLEANING_TEST,
         )
 
         comparisons_by_timeframe[timeframe] = compare_dsr_vs_stepm_from_raw(
             raw_results        = raw_results,
-            matrix_arr         = matrix_arr,
-            col_names          = col_names,
-            dsr_th             = DSR_TH,
-            n_combos           = n_combos,
-            stepm_k_percentile = STEPM_K_PERCENTILE,
-            timeframe          = timeframe,
-            n_jobs             = N_JOBS,
+            matrix_arr          = matrix_arr,
+            col_names           = col_names,
+            dsr_th              = DSR_TH,
+            n_combos            = n_combos,
+            stepm_k_percentile  = STEPM_K_PERCENTILE,
+            timeframe           = timeframe,
+            n_jobs              = N_JOBS,
         )
-
-        if FF_TEST:
-            ff_result = pipe_FF_test(
-                matrix_arr        = matrix_arr,
-                col_names         = col_names,
-                timeframe         = timeframe,
-                n_sample_replicas = FF_SAMPLE_REPLICAS,
-            )
-            if FF_SHOW_PLOTS:
-                _plot_ff_bootstrap(ff_result, timeframe)
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
