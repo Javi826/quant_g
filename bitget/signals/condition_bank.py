@@ -48,12 +48,12 @@ ATR_REGIME_SMA_PERIODS     = [10,30]
 RSI_PERIODS                = [7,14,21]  
 RSI_THRESHOLDS             = [30,40,50,60,70]  
 
-ADX_PERIODS                = [7,14,21] 
-ADX_THRESHOLDS             = [20,25,30,35]   
+ADX_PERIODS                = [] 
+ADX_THRESHOLDS             = []   
 
-MA_PERIODS                 = [20,50,100,150]
+MA_PERIODS                 = []
 
-MOMENTUM_PERIODS           = [5,10,20,25]    
+MOMENTUM_PERIODS           = []    
 
 HISTVOL_BASE_PERIODS       = [10,20,30]     
 HISTVOL_REGIME_SMA_PERIODS = [20,30,40,50]     

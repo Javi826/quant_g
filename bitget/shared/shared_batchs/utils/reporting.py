@@ -11,12 +11,11 @@ logger = logging.getLogger("BOT_batch.utils.reporting")
 # =============================================================================
 
 def print_metrics_table(metrics_list: list, title: str) -> None:
-    df          = pd.DataFrame(metrics_list)
+    df          = pd.DataFrame(metrics_list).drop(columns=["Calmar"])
     df["Curve"] = df["Curve"].astype(str)
     max_len     = df["Curve"].str.len().max()
     df["Curve"] = df["Curve"].apply(lambda x: x.ljust(max_len))
     logger.debug(f"\n{title}\n{df.to_string(index=False)}")
-
 
 def print_portfolio_metrics_table(
     strategy_trades: list,
@@ -190,7 +189,7 @@ def print_best_wfo_portfolio(
             tl_last = tl[(tl["sell_time"] >= last_t_start) & (tl["sell_time"] < last_t_end)]
             m_last  = compute_metrics(tl_last, capital=total_capital, name="") if len(tl_last) > 0 else None
 
-            _cols = ["NetGain", "DD", "WinRate", "R2", "PF", "Calmar", "Weekly%", "MaxWeeksToRecovery"]
+            _cols = ["NetGain", "DD", "WinRate", "R2", "PF", "Sharpe", "Weekly%", "MaxWeeksToRecovery"]
             logger.info(f"\n  {'Period':<16} {' '.join(f'{c:>10}' for c in _cols)}")
             logger.info(f"  {'─'*16} {'─'*(10*len(_cols) + len(_cols) - 1)}")
 
@@ -201,12 +200,12 @@ def print_best_wfo_portfolio(
                     f"{mm['Win_Rate']:.1f}%",
                     f"{mm['R_Squared']:.3f}",
                     f"{mm['Profit_Factor']:.2f}",
-                    f"{mm['Calmar']:.2f}",
+                    f"{mm['Sharpe']:.2f}",
                     f"{mm['Weekly_pct']:.1f}%",
                     f"{mm['Max_Weeks_to_Recovery']}",
                 ]
                 return f"  {label:<16} " + " ".join(f"{v:>10}" for v in vals)
-
+            
             logger.info(_row("Full period", m))
             if m_last is not None:
                 logger.info(_row(f"Last split ({last_label})", m_last))
@@ -241,15 +240,15 @@ def print_rule_mining_ranking(all_raw_results: list, candidate_ids: list, stage_
 
     status_header = f"  {'STATUS':<8}" if show_status else ""
     log_fn(
-        f"{'ID':<{id_width}}{'SHARPE':<10}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'CALMAR':<8}{'R2':<8}"
+        f"{'ID':<{id_width}}{'NET_GAIN%':<12}{'MAX_DD%':<10}{'PF':<8}{'SHARPE':<8}{'R2':<8}"
         f"{'STEPM_P':<8}{'WFR':<8}{'MC_RUIN':<9}{'MV_PVAL':<9}{'TRADES':<8}{'RULE':<{label_width}}{status_header}"
     )
     log_fn(f"{'─' * 180}")
     for r in rows:
         status_cell = f"  {('✅' if r['rule_id'] in survivor_set else '❌'):<8}" if show_status else ""
         log_fn(
-            f"{_short_id(r['rule_id']):<{id_width}}{(r.get('sharpe') or 0.0):<10.3f}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
-            f"{r['profit_factor']:<8.2f}{r['calmar']:<8.2f}{r['r_squared']:<8.3f}"
+            f"{_short_id(r['rule_id']):<{id_width}}{r['net_gain']:<12.1f}{r['max_dd']:<10.1f}"
+            f"{r['profit_factor']:<8.2f}{(r.get('sharpe') or 0.0):<8.3f}{r['r_squared']:<8.3f}"
             f"{r.get('stepm_p', 0.0):<8.3f}{r['wfr']:<8.2f}{r.get('montecarlo_prob_ruin', 0.0):<9.1f}"
             f"{r.get('multiverse_p_value', 0.0):<9.3f}"
             f"{r['n_trades']:<8}{r['label']:<{label_width}}{status_cell}"

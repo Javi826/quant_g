@@ -62,13 +62,13 @@ logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
 logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
 #REPORTING
 #------------------------------------------------------------------------------
-REPORTING_LOG_LEVEL = logging.INFO
+REPORTING_LOG_LEVEL = logging.DEBUG
 logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("numba").setLevel(logging.WARNING)
-from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume, ENABLE_INCLUDE_FILTER, ENABLE_EXCLUDE_FILTER, MIN_START_DATE
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA, WFO_NET_GAIN_TH, WFO_DD_TH, WFO_R2_TH, WFO_WFR_TH
@@ -133,27 +133,26 @@ def log_run_config() -> None:
     logger.info(f"\n{'─' * 115}")
     logger.info(f"  RULE MINING START")
     logger.info(f"{'─' * 115}")
+    logger.info(f"  DATASET     : {os.path.basename(DATA_FOLDER_IS)}")
+    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS} | INCLUDE_FILTER: {_pipeline_icon(ENABLE_INCLUDE_FILTER)}  EXCLUDE_FILTER: {_pipeline_icon(ENABLE_EXCLUDE_FILTER)}  MIN_START_DATE: {MIN_START_DATE}")
     logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
-    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS}")
     logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM GRID  : {PARAM_GRID}")
-    logger.info(f"  WFO WINDOWS : {_format_wfo_windows({tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES})}")
-    logger.info(f"  EMA_ALPHA   : {EMA_ALPHA}")
+    logger.info(f"  WFO WINDOWS : {_format_wfo_windows({tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES})} | EMA_ALPHA: {EMA_ALPHA}")
     logger.info(
         f"  PIPELINES   : WFO: {_pipeline_icon(PIPELINE_WFO)}  "
         f"CORRELATION: {_pipeline_icon(PIPELINE_CORRELATION)}  "
         f"MONTECARLO: {_pipeline_icon(PIPELINE_MONTECARLO)}  "
         f"MULTIVERSE: {_pipeline_icon(PIPELINE_MULTIVERSE)}"
     )
-    logger.info(f"  SIGNAL CLEAN: JACCARD_TH={JACCARD_SIMILARITY_TH}")
-    logger.info(f"  STEPM       : K_PERCENTILE={STEPM_K_PERCENTILE}")
     logger.info(
-        f"  WFO         : NET_GAIN_TH={WFO_NET_GAIN_TH}  DD_TH={WFO_DD_TH}  "
-        f"R2_TH={WFO_R2_TH}  WFR_TH={WFO_WFR_TH}"
+        f"  PIPES       : JACCARD_TH={JACCARD_SIMILARITY_TH} | "
+        f"K_PERCENTILE={STEPM_K_PERCENTILE} | "
+        f"NET_GAIN_TH={WFO_NET_GAIN_TH} DD_TH={WFO_DD_TH} R2_TH={WFO_R2_TH} WFR_TH={WFO_WFR_TH} | "
+        f"CORR_TH={CORRELATION_DD_TH} | "
+        f"MC_RUIN_TH={MONTECARLO_RUIN_TH} | "
+        f"MV_PVALUE_TH={MULTIVERSE_PVALUE_TH}"
     )
-    logger.info(f"  CORRELATION : CORR_TH={CORRELATION_DD_TH}")
-    logger.info(f"  MONTECARLO  : RUIN_TH={MONTECARLO_RUIN_TH}")
-    logger.info(f"  MULTIVERSE  : PVALUE_TH={MULTIVERSE_PVALUE_TH}")
     logger.info(
         f"  RUNS        : BEST PORTFOLIO: {_pipeline_icon(RUN_PORTFOLIO)}  "
         f"DEPLOY: {_pipeline_icon(RUN_DEPLOY)}"

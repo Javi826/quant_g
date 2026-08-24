@@ -16,12 +16,12 @@ EXCLUDED_SYMBOLS = {"BTCUSDT", "ETHUSDT"}
 # Symbols must have data available from this date onward (covers WFO window 0 train_start).
 MIN_START_DATE = "2020-01-02"
 
-def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exchange=None,
+def filter_symbols(symbols, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, custom_symbols=None):
     ohlcv_data         = {}
     filtered_symbols   = []
     removed_symbols    = []
-    removed_by_reasons = {"No data": 0, "Last close too low": 0, "Avg volume too low": 0, "File missing": 0, "Starts too late": 0}
+    removed_by_reasons = {"No data": 0, "Last close too low": 0, "File missing": 0, "Starts too late": 0}
     
     #Inclusion
     if ENABLE_INCLUDE_FILTER:
@@ -62,11 +62,7 @@ def filter_symbols(symbols, min_vol_usdt, timeframe=None, data_folder=None, exch
                 last_close = df['close'].iloc[-1]
                 if last_close <= min_price:
                     reasons.append("Last close too low")
-                    
-            if df is not None:
-                avg_vol = df[VOLUME_COL].tail(vol_window).mean()
-                if avg_vol < min_vol_usdt:
-                    reasons.append("Avg volume too low")
+                
                     
             if df is not None and not df.empty:
                 if df.index[0] > pd.Timestamp(MIN_START_DATE):
@@ -104,7 +100,7 @@ def select_universe(
     raw_is = sorted([f.split("_")[0] for f in os.listdir(data_folder_is) if f.endswith(f"_{timeframe}.parquet")])
 
     ohlcv_is, filtered_is = filter_symbols_fn(
-        raw_is, min_vol_usdt=0, timeframe=timeframe, data_folder=data_folder_is, min_price=min_price, vol_window=50
+        raw_is, timeframe=timeframe, data_folder=data_folder_is, min_price=min_price, vol_window=50
     )
     cutoff_ts = pd.Timestamp(MIN_START_DATE)
     for sym, df in ohlcv_is.items():

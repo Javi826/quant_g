@@ -13,10 +13,7 @@ logger = logging.getLogger("BOT_batch.pipeline.dsr")
 EULER_GAMMA         = 0.5772156649015328606
 SHARPE_PERIODS_YEAR = 365.0
 DSR_MAX_SHARPE_ANN  = 10.0  # DSR's own trust threshold — a combo above this is not run through
-                            # the backtest again, it's simply excluded from DSR's own calculations
-                            # (n_eff, var_sr, per-rule scoring). Other consumers of the same raw
-                            # backtest output (e.g. StepM) are free to trust it or not, on their own.
-        
+
 #shared_batchs/pipeline/dsr.py (continued)
 # =============================================================================
 # PRIVATE HELPERS — N_eff estimation (streaming Gram accumulation, eigenvalue method)
