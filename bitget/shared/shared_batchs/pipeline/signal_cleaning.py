@@ -364,8 +364,8 @@ def pipe_signal_cleaning_jaccard(
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  JACCARD SIMILARITY FILTER (GPU, threshold={threshold}) ── {timeframe}")
     logger.info(f"{'─' * 70}")
-    logger.info(f"  {'total rules (input)':<{METRIC_LABEL_WIDTH}} : {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"  {'dropped (near-duplicate)':<{METRIC_LABEL_WIDTH}} : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
+    logger.info(f"  OUT rules       : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
+    logger.info(f"  IN  rules       : {n_kept / n_rules_total:.0%} │ {format(n_kept, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
     logger.info(f"{'─' * 70}\n")
 
     return [rules[i] for i in kept_positions]

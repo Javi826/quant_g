@@ -32,9 +32,9 @@ MAX_STRATEGIES        = 8
 MAX_TOTAL_STRATEGIES  = 25
 TOP_N                 = 3
 
-REQUIRE_SUBPERIODS_POSITIVE = False
-REQUIRE_LONG_SHORT          = False
-REQUIRE_ALL_TIMEFRAMES      = False
+REQUIRE_SUBPERIODS_POSITIVE = True
+REQUIRE_LONG_SHORT          = True
+REQUIRE_ALL_TIMEFRAMES      = True
 # =============================================================================
 # PRIVATE HELPERS — Validation
 # =============================================================================

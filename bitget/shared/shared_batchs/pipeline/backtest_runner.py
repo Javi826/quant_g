@@ -30,12 +30,7 @@ def _combo_id(params: dict) -> str:
     return "_".join(f"{k}{v}" for k, v in sorted(params.items()))
 
 def _global_day_grid(ohlcv_arr: dict) -> tuple:
-    """
-    Continuous calendar-day grid spanning every symbol's OHLCV timestamps —
-    computed once per timeframe so every combo's daily P&L, regardless of
-    which rule or symbol produced it, lands on the exact same rows of the
-    shared matrix.
-    """
+
     all_ts   = np.concatenate([arr["ts"] for arr in ohlcv_arr.values()])
     all_days = all_ts.astype("datetime64[D]")
     global_start_day = all_days.min()
@@ -156,9 +151,6 @@ def _evaluate_combo_sharpe(
     sharpe_metric = sharpe_from_daily_values(daily_values)
     sharpe_rank   = sharpe_metric if np.isfinite(sharpe_metric) else -np.inf
 
-    # Write this combo's daily P&L directly into its slot of the shared dense
-    # matrix, at the row offset matching the global day grid — same alignment
-    # build_flat_daily_matrix used to reconstruct downstream.
     if np.count_nonzero(daily_values) > 1:
         row_offset = int((start_day - global_start_day) / np.timedelta64(1, "D"))
         matrix_view[row_offset:row_offset + n_days, col_idx] = daily_values.astype(np.float32)
@@ -282,12 +274,7 @@ def run_full_period_search(
     n_combos: int,
     progress_label: str = "",
 ) -> tuple:
-    """
-    Every worker writes its combos' daily P&L directly into a shared dense
-    matrix (n_days_range x n_rules*n_combos), at column
-    (rule_idx * n_combos + combo_idx). Avoids materializing one sparse
-    daily-profit series per combo in the parent process.
-    """
+
     desc = f"BACKTEST FULL   {progress_label}".strip()
 
     if not rules:

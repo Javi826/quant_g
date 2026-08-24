@@ -15,59 +15,27 @@ LOG_LEVEL = logging.INFO
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_rule_mining")
 logger.setLevel(LOG_LEVEL)
-
-#UNIVERSE
-#------------------------------------------------------------------------------
-UNIVERSE_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.universe").setLevel(UNIVERSE_LOG_LEVEL)
-#RULE_MINNING
-#------------------------------------------------------------------------------
-RULE_RUNNER_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.rule_mining.runner").setLevel(RULE_RUNNER_LOG_LEVEL)
-RULE_GENERATOR_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.rule_mining.generator").setLevel(RULE_GENERATOR_LOG_LEVEL)
-#BACKTEST
-#------------------------------------------------------------------------------
-BACKTEST_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.backtest_runner").setLevel(BACKTEST_LOG_LEVEL)
-#STPEM
-#------------------------------------------------------------------------------
-STEPM_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.stepM").setLevel(STEPM_LOG_LEVEL)
-#WFO
-#------------------------------------------------------------------------------
-WFO_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.wfo").setLevel(WFO_LOG_LEVEL)
-logging.getLogger("BOT_batch.engines.wfo_WF").setLevel(WFO_LOG_LEVEL)
-#CORRELATION
-#------------------------------------------------------------------------------
-CORRELATION_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.correlation").setLevel(CORRELATION_LOG_LEVEL)
-#MONTECARLO
-#------------------------------------------------------------------------------
-MONTECARLO_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.montecarlo").setLevel(MONTECARLO_LOG_LEVEL)
-#MULTIVERSE
-#------------------------------------------------------------------------------
-MULTIVERSE_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.pipeline.multiverse").setLevel(MULTIVERSE_LOG_LEVEL)
-#BESTPORFTOLIO
-#------------------------------------------------------------------------------
-RUN_PORTFOLIO_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.runs.run_best_wfo_portfolio").setLevel(RUN_PORTFOLIO_LOG_LEVEL)
-#DEPLOY
-#------------------------------------------------------------------------------
-DEPLOY_LOG_LEVEL = logging.INFO
-logging.getLogger("BOT_batch.rule_mining.deploy").setLevel(DEPLOY_LOG_LEVEL)
-logging.getLogger("BOT_batch.runs.run_deploy").setLevel(DEPLOY_LOG_LEVEL)
-#REPORTING
-#------------------------------------------------------------------------------
-REPORTING_LOG_LEVEL = logging.DEBUG
-logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
-
-logging.getLogger("joblib").setLevel(logging.WARNING)
-logging.getLogger("matplotlib").setLevel(logging.WARNING)
-logging.getLogger("numba").setLevel(logging.WARNING)
+MODULE_LOG_LEVELS = {
+    "BOT_batch.pipeline.universe":          logging.INFO,
+    "BOT_batch.rule_mining.generator":      logging.INFO,
+    "BOT_batch.pipeline.backtest_runner":   logging.INFO,
+    "BOT_batch.pipeline.stepM":             logging.INFO,
+    "BOT_batch.pipeline.wfo":               logging.INFO,
+    "BOT_batch.engines.wfo_WF":             logging.INFO,
+    "BOT_batch.pipeline.correlation":       logging.INFO,
+    "BOT_batch.pipeline.montecarlo":        logging.INFO,
+    "BOT_batch.pipeline.multiverse":        logging.INFO,
+    "BOT_batch.runs.run_best_wfo_portfolio":logging.INFO,
+    "BOT_batch.rule_mining.deploy":         logging.INFO,
+    "BOT_batch.runs.run_deploy":            logging.INFO,
+    "BOT_batch.utils.reporting":            logging.INFO,
+}
+for module_name, level in MODULE_LOG_LEVELS.items():
+    logging.getLogger(module_name).setLevel(level)
+for noisy_logger in ("joblib", "matplotlib", "numba"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+ #-----------------------------------------------------------------------------
+   
 from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume, ENABLE_INCLUDE_FILTER, ENABLE_EXCLUDE_FILTER, MIN_START_DATE
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
@@ -194,7 +162,7 @@ if __name__ == "__main__":
             order_amount            = ORDER_AMOUNT,
             data_folder             = DATA_FOLDER_IS,
             max_depth               = RULE_MAX_DEPTH,
-            log_level               = WFO_LOG_LEVEL,
+            log_level               = MODULE_LOG_LEVELS["BOT_batch.pipeline.wfo"],
             save_trades             = SAVE_TRADES,
             brief_trades_folder     = BRIEF_TRADES_FOLDER,
             show_plots              = SHOW_PLOTS,

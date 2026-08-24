@@ -7,21 +7,23 @@ from scipy import signal as sp_signal
 # CONFIG
 # =============================================================================
 
-RSI_PERIODS                = [14,21]  
-RSI_THRESHOLDS             = [30,70]  
-
-ADX_PERIODS                = [] 
-ADX_THRESHOLDS             = []   
-
-MA_PERIODS                 = []
-
-MOMENTUM_PERIODS           = []     
-
-HISTVOL_BASE_PERIODS       = [10,20]     
-HISTVOL_REGIME_SMA_PERIODS = [20,50]     
-
-ATR_BASE_PERIODS           = [14,21]        
-ATR_REGIME_SMA_PERIODS     = [10,30] 
+# =============================================================================
+# RSI_PERIODS                = [14,21]  
+# RSI_THRESHOLDS             = [30,70]  
+# 
+# ADX_PERIODS                = [] 
+# ADX_THRESHOLDS             = []   
+# 
+# MA_PERIODS                 = []
+# 
+# MOMENTUM_PERIODS           = []     
+# 
+# HISTVOL_BASE_PERIODS       = [10,20]     
+# HISTVOL_REGIME_SMA_PERIODS = [20,50]     
+# 
+# ATR_BASE_PERIODS           = [14,21]        
+# ATR_REGIME_SMA_PERIODS     = [10,30] 
+# =============================================================================
 
 
 #------------------------------------------------------------------------------

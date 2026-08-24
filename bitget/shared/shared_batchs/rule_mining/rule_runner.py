@@ -5,7 +5,6 @@ from shared_batchs.pipeline.wfo import pipe_wfo
 from shared_config import VOLUME_COL
 from shared_batchs.pipeline.backtest_runner import pipe_backtesting
 from shared_batchs.pipeline.stepM import pipe_stepm
-from shared_batchs.pipeline.FF_test import pipe_FF_test
 from shared_batchs.pipeline.montecarlo import pipe_montecarlo
 from shared_batchs.pipeline.correlation import pipe_correlation
 from shared_batchs.pipeline.signal_cleaning import  pipe_signal_cleaning_jaccard
