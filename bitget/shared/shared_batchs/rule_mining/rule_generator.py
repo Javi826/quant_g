@@ -85,8 +85,10 @@ def generate_all_rules(arr_sample: dict, max_depth: int = MAX_DEPTH) -> list:
     all_rules = []
     for side in SIDES:
         for rule_specs in rule_combos:
-            if not all(is_side_coherent(spec, side) for spec in rule_specs):
-                continue
+# =============================================================================
+#             if not all(is_side_coherent(spec, side) for spec in rule_specs):
+#                 continue
+# =============================================================================
             all_rules.append({
                 "side":       side,
                 "specs":      rule_specs,

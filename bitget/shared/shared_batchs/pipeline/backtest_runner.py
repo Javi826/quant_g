@@ -311,7 +311,7 @@ def run_full_period_search(
     shm_list, ohlcv_metadata = arrays_to_shared_memory(rules[0]["ohlcv_arr"])
     try:
         results = list(tqdm(
-        Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=1, pre_dispatch='all', return_as="generator")(
+            Parallel(n_jobs=BACKTEST_N_JOBS, batch_size=64, pre_dispatch='all', return_as="generator")(
             delayed(_run_full_period_for_rule_shm)(
                 r["rule_id"], r["rule_idx"], ohlcv_metadata, r["signal_fn"], param_grid, order_amount,
                 matrix_metadata, valid_metadata, global_start_day, n_combos,

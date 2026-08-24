@@ -38,7 +38,7 @@ from signals.signal_builder import build_signal_fn
 # =============================================================================
 
 RULES_N_JOBS = -1
-N_SYMBOLS    = 4   # must match len(symbols_to_include) in universe.py (MY_SYMBOLS=True)
+N_SYMBOLS    = 2   # must match len(symbols_to_include) in universe.py (MY_SYMBOLS=True)
 
 SAVE_TRADES          = True
 STRATEGIES_E1_FOLDER = os.path.join(os.path.dirname(__file__), "strategies_E1")

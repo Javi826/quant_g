@@ -1,6 +1,5 @@
 #shared_batchs/pipeline/wfo.py
 import os
-import time
 import logging
 import numpy as np
 import pandas as pd
@@ -26,16 +25,18 @@ WFO_WFR_TH      = 0.6
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
-WFO_WINDOW_CONFIG = {
-    "15m":    {"train_months": 9, "test_months": 2},
-    "30m":    {"train_months": 9, "test_months": 2},
-    "1H":     {"train_months": 9, "test_months": 2},
-    "4H":     {"train_months": 9, "test_months": 2},
-    "6Hutc":  {"train_months": 9, "test_months": 2},
-    "12Hutc": {"train_months": 9, "test_months": 2},
-    "1Dutc":  {"train_months": 9, "test_months": 2},
-}
-
+# =============================================================================
+# WFO_WINDOW_CONFIG = {
+#     "15m":    {"train_months": 9, "test_months": 2},
+#     "30m":    {"train_months": 9, "test_months": 2},
+#     "1H":     {"train_months": 9, "test_months": 2},
+#     "4H":     {"train_months": 9, "test_months": 2},
+#     "6Hutc":  {"train_months": 9, "test_months": 2},
+#     "12Hutc": {"train_months": 9, "test_months": 2},
+#     "1Dutc":  {"train_months": 9, "test_months": 2},
+# }
+# 
+# =============================================================================
 WFO_WINDOW_CONFIG = {
     "15m":    {"train_months": 9, "test_months": 2},
     "30m":    {"train_months": 9, "test_months": 2},

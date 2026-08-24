@@ -8,7 +8,7 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
-ENABLE_INCLUDE_FILTER = False
+ENABLE_INCLUDE_FILTER = True
 INCLUDED_SYMBOLS = ["BTCUSDT","ETHUSDT"]
 
 ENABLE_EXCLUDE_FILTER = False
