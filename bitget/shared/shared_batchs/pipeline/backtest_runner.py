@@ -1,6 +1,6 @@
 #shared_batchs/pipeline/backtest_runner.py
-import itertools
 import logging
+import itertools
 import numpy as np
 from tqdm import tqdm
 from joblib import Parallel, delayed
@@ -152,7 +152,7 @@ def _evaluate_combo_sharpe(
 
     if np.count_nonzero(daily_values) > 1:
         row_offset = int((start_day - global_start_day) / np.timedelta64(1, "D"))
-        matrix_view[row_offset:row_offset + n_days, col_idx] = daily_values.astype(np.float32)
+        matrix_view[col_idx, row_offset:row_offset + n_days] = daily_values.astype(np.float32)
         valid_view[col_idx] = 1
 
     return sharpe_rank, params, (daily_values, n_days, sharpe_metric)
@@ -237,11 +237,7 @@ def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
 _CONDITION_BANK_CACHE: dict = {}
 
 def _get_condition_banks(shm_metadata: dict, ohlcv_arr: dict) -> dict:
-    """
-    One ConditionBank per symbol, built once per worker process and reused
-    across every rule/combo this worker evaluates. Same eviction policy as
-    _get_static_bundle: only one timeframe's banks live in cache at a time.
-    """
+
     cache_key = _static_bundle_cache_key(shm_metadata)
     if cache_key is None:
         return {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()}
@@ -305,7 +301,7 @@ def run_full_period_search(
 
     matrix_shm = SharedMemory(create=True, size=max(n_days_range * n_cols * 4, 1))
     valid_shm  = SharedMemory(create=True, size=max(n_cols, 1))
-    matrix_metadata = {"name": matrix_shm.name, "shape": (n_days_range, n_cols), "dtype": "float32"}
+    matrix_metadata = {"name": matrix_shm.name, "shape": (n_cols, n_days_range), "dtype": "float32"}
     valid_metadata  = {"name": valid_shm.name,  "shape": (n_cols,),              "dtype": "int8"}
 
     # Zero-init: SharedMemory does not guarantee zeroed pages.
@@ -334,7 +330,7 @@ def run_full_period_search(
     try:
         matrix_shared = np.ndarray(matrix_metadata["shape"], dtype=np.float32, buffer=matrix_shm.buf)
         valid_shared  = np.ndarray(valid_metadata["shape"], dtype=np.int8, buffer=valid_shm.buf)
-        matrix_arr = matrix_shared.copy()
+        matrix_arr = np.ascontiguousarray(matrix_shared.T)
         valid_mask = valid_shared.astype(bool)
     finally:
         matrix_shm.close()
@@ -343,7 +339,6 @@ def run_full_period_search(
         valid_shm.unlink()
 
     return dict(results), matrix_arr, valid_mask
-
 
 # =============================================================================
 # PIPE BACKTESTING — the single stage that runs the search and returns the

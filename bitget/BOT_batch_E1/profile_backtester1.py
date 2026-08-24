@@ -1,68 +1,308 @@
-#profile_matrix_layout.py
+#profile_backtester.py
+import os
+import sys
 import time
 import argparse
 import numpy as np
 
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
+
+from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
+from shared_batchs.setup.config_paths import DATA_FOLDER_IS
+from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
+from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
+from shared_batchs.rule_mining.rule_generator import generate_all_rules
+from shared_batchs.backtesters.ZX_compute_BT import (
+    prepare_static_arrays,
+    prepare_signal_arrays,
+    backtest_core,
+)
+from shared_config import VOLUME_COL
+from signals.condition_bank import ConditionBank
+
+_EVENT_COUNTS: list = []
+
+
+# =============================================================================
+# INSTRUMENTED COPY of prepare_signal_arrays — profiling only.
+# Mirrors shared_batchs/backtesters/ZX_compute_BT.pyx exactly, split into
+# timed sub-stages. Does not replace or modify the production .pyx function.
+# =============================================================================
+def _prepare_signal_arrays_profiled(static_bundle, ohlcv_arrays, timer):
+    symbols = static_bundle["symbols"]
+    sym_ids = static_bundle["sym_ids"]
+    sym_len = static_bundle["sym_len"]
+    max_len = static_bundle["open_2d"].shape[1]
+    n_syms  = len(symbols)
+
+    # ---- stage: sym_data dict construction ----
+    t0 = time.perf_counter()
+    sym_data = {}
+    for sym in symbols:
+        data   = ohlcv_arrays[sym]
+        sid    = sym_ids[sym]
+        n      = int(sym_len[sid])
+        ts_int = static_bundle["ts_int_arrays"][sym]
+        sym_data[sym] = {
+            'ts':        ts_int.view('datetime64[ns]'),
+            'ts_int':    ts_int,
+            'open':      data['open'],
+            'close':     data['close'],
+            'high':      data['high'],
+            'low':       data['low'],
+            'signal':    data['signal'][:n],
+            'len':       n,
+            'high_time': data['high_time'],
+            'low_time':  data['low_time'],
+        }
+    timer.add("psa_sym_data_build", time.perf_counter() - t0)
+
+    # ---- stage: signal_2d allocation + fill ----
+    t0 = time.perf_counter()
+    signal_2d = np.full((n_syms, max_len), 0, dtype=np.int64)
+    for sym in symbols:
+        sid        = sym_ids[sym]
+        d          = sym_data[sym]
+        signal_arr = d['signal']
+        n          = d['len']
+        signal_2d[sid, :n] = signal_arr.astype(np.int64)
+    timer.add("psa_signal_2d_fill", time.perf_counter() - t0)
+
+    # ---- stage: event chunk construction (per-symbol nonzero indices) ----
+    t0 = time.perf_counter()
+    event_chunks = []
+    for sym in symbols:
+        sid        = sym_ids[sym]
+        d          = sym_data[sym]
+        signal_arr = d['signal']
+        n          = d['len']
+        sig_idxs = np.flatnonzero(signal_arr)
+        sig_idxs = sig_idxs[sig_idxs < n]
+        if sig_idxs.size:
+            ts_ints = d['ts_int'][sig_idxs]
+            chunk   = np.empty((sig_idxs.size, 3), dtype=np.int64)
+            chunk[:, 0] = ts_ints
+            chunk[:, 1] = sid
+            chunk[:, 2] = sig_idxs
+            event_chunks.append(chunk)
+    timer.add("psa_event_chunks_build", time.perf_counter() - t0)
+
+    # ---- stage: concat + lexsort ----
+    t0 = time.perf_counter()
+    if event_chunks:
+        signal_events = np.concatenate(event_chunks, axis=0)
+        order         = np.lexsort((signal_events[:, 1], signal_events[:, 0]))
+        signal_events = signal_events[order]
+    else:
+        signal_events = np.empty((0, 3), dtype=np.int64)
+    timer.add("psa_concat_lexsort", time.perf_counter() - t0)
+    _EVENT_COUNTS.append(signal_events.shape[0])
+
+    # ---- stage: ev_col0 build ----
+    t0 = time.perf_counter()
+    if signal_events.shape[0] > 0:
+        ev_col0 = np.ascontiguousarray(signal_events[:, 0], dtype=np.int64)
+    else:
+        ev_col0 = np.empty((0,), dtype=np.int64)
+    timer.add("psa_ev_col0_build", time.perf_counter() - t0)
+
+    arrays = (
+        static_bundle["open_2d"], static_bundle["close_2d"],
+        static_bundle["high_2d"], static_bundle["low_2d"],
+        static_bundle["high_time_2d"], static_bundle["low_time_2d"],
+        static_bundle["ts_int_2d"], signal_2d, sym_len,
+        signal_events, static_bundle["all_timestamps_int"], ev_col0
+    )
+
+    return (sym_data, {}, static_bundle["all_timestamps_int"], static_bundle["all_timestamps_dt"],
+            sym_ids, static_bundle["ts_int_arrays"], static_bundle["close_arrays"], arrays)
+
+# =============================================================================
+# CLI ARGS
+# =============================================================================
 parser = argparse.ArgumentParser()
-parser.add_argument("--n_days", type=int, default=1800,
-                     help="Rows in the (days, cols) layout — total calendar-day span.")
-parser.add_argument("--n_cols", type=int, default=100_000,
-                     help="Columns — number of rule/combo slots. Production scale is ~966000; "
-                          "reduce here if RAM is limited (each layout needs n_days*n_cols*4 bytes).")
-parser.add_argument("--local_days", type=int, default=180,
-                     help="Length of the daily_values segment written per column, matching a typical "
-                          "combo's trade span.")
+parser.add_argument("--timeframe", type=str, default="1H")
+parser.add_argument("--n_symbols", type=int, default=2)
+parser.add_argument("--n_rules", type=int, default=300)
+parser.add_argument("--max_depth", type=int, default=None)
+parser.add_argument("--shared_banks", action="store_true",
+                     help="Reuse one ConditionBank per symbol across all rules (new production path). "
+                          "Omit this flag to reproduce the old per-rule bank=None behavior.")
 args = parser.parse_args()
 
-N_DAYS      = args.n_days
-N_COLS      = args.n_cols
-LOCAL_DAYS  = min(args.local_days, N_DAYS)
-BYTES_TOTAL = N_DAYS * N_COLS * 4
+TIMEFRAME  = args.timeframe
+N_SYMBOLS  = args.n_symbols
+N_RULES    = args.n_rules
 
-print(f"n_days={N_DAYS}  n_cols={N_COLS}  local_days={LOCAL_DAYS}  "
-      f"per_matrix_size={BYTES_TOTAL / 1e9:.2f} GB")
+PARAM_GRID = {
+    "SELL_AFTER": [50],
+    "TP_PCT":     [6, 8, 10],
+    "SL_PCT":     [6, 8],
+}
 
-# =============================================================================
-# Precompute the same random write plan for both layouts, so both benchmarks
-# perform the exact same number of writes at the exact same row offsets.
-# =============================================================================
-rng = np.random.default_rng(42)
-row_offsets = rng.integers(0, N_DAYS - LOCAL_DAYS + 1, size=N_COLS)
-payload     = rng.random(LOCAL_DAYS, dtype=np.float64).astype(np.float32)
+COMI_FACTOR     = 0.001
+INITIAL_BALANCE = 10000.0
+
 
 # =============================================================================
-# LAYOUT A — (n_days, n_cols), current production layout: writes a column
+# TIMER HELPER
 # =============================================================================
-matrix_col_major = np.zeros((N_DAYS, N_COLS), dtype=np.float32)
+class Timer:
+    def __init__(self):
+        self.totals = {}
+
+    def add(self, key, seconds):
+        self.totals[key] = self.totals.get(key, 0.0) + seconds
+
+    def report(self, n_rules):
+        grand_total = sum(self.totals.values())
+        rows = sorted(self.totals.items(), key=lambda x: -x[1])
+        key_width = max([len(k) for k in self.totals] + [len("TOTAL")]) + 2
+
+        print(f"\n{'=' * 90}")
+        print(f"PROFILING REPORT — timeframe={TIMEFRAME} n_symbols={N_SYMBOLS} n_rules={n_rules}")
+        print(f"{'=' * 90}")
+        header = f"  {'STAGE':<{key_width}}{'TOTAL(s)':>12}{'PCT':>9}{'PER_RULE(ms)':>16}"
+        print(header)
+        print(f"  {'-' * (len(header) - 2)}")
+        for key, seconds in rows:
+            pct = (seconds / grand_total * 100) if grand_total else 0.0
+            per_rule_ms = (seconds / n_rules * 1000) if n_rules else 0.0
+            print(f"  {key:<{key_width}}{seconds:12.3f}{pct:8.1f}%{per_rule_ms:15.3f} ms")
+        print(f"  {'-' * (len(header) - 2)}")
+        print(f"  {'TOTAL':<{key_width}}{grand_total:12.3f}")
+        print(f"{'=' * 90}\n")
+
+
+timer = Timer()
+
+# =============================================================================
+# LOAD DATA
+# =============================================================================
+t0 = time.perf_counter()
+ohlcv_is = select_universe(
+    data_folder_is    = DATA_FOLDER_IS,
+    timeframe         = TIMEFRAME,
+    min_price         = MIN_PRICE,
+    filter_symbols_fn = filter_symbols,
+)
+ohlcv_is  = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
+ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
+timer.add("data_loading", time.perf_counter() - t0)
+
+# =============================================================================
+# STATIC BUNDLE (built once, same as the shared-memory cache path)
+# =============================================================================
+t0 = time.perf_counter()
+static_bundle = prepare_static_arrays(ohlcv_arr)
+timer.add("prepare_static_once", time.perf_counter() - t0)
+
+# =============================================================================
+# CONDITION BANKS — one per symbol, built once, reused across all rules
+# (mirrors _get_condition_banks in the production backtest_runner.py path)
+# =============================================================================
+t0 = time.perf_counter()
+condition_banks = {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()} if args.shared_banks else None
+timer.add("prepare_condition_banks_once", time.perf_counter() - t0)
+
+print(f"shared_banks={'ON (new production path)' if args.shared_banks else 'OFF (old per-rule bank=None)'}")
+
+# =============================================================================
+# GENERATE RULES
+# =============================================================================
+arr_sample = next(iter(ohlcv_arr.values()))
+t0 = time.perf_counter()
+all_rules = generate_all_rules({
+    "open":  arr_sample["open"],
+    "high":  arr_sample["high"],
+    "low":   arr_sample["low"],
+    "close": arr_sample["close"],
+    VOLUME_COL: arr_sample[VOLUME_COL],
+}, max_depth=args.max_depth) if args.max_depth else generate_all_rules({
+    "open":  arr_sample["open"],
+    "high":  arr_sample["high"],
+    "low":   arr_sample["low"],
+    "close": arr_sample["close"],
+    VOLUME_COL: arr_sample[VOLUME_COL],
+})
+timer.add("rule_generation_total", time.perf_counter() - t0)
+
+sample_rules = all_rules[:N_RULES]
+print(f"Sampling {len(sample_rules)} rules out of {len(all_rules)} generated.")
+
+keys   = list(PARAM_GRID.keys())
+combos = []
+for sell_after in PARAM_GRID["SELL_AFTER"]:
+    for tp in PARAM_GRID["TP_PCT"]:
+        for sl in PARAM_GRID["SL_PCT"]:
+            combos.append({"SELL_AFTER": sell_after, "TP_PCT": tp, "SL_PCT": sl})
+
+# =============================================================================
+# PER-RULE BREAKDOWN — signal_fn / prepare / backtest_core
+# =============================================================================
+total_trades_all = 0
+
+for rule in sample_rules:
+    signal_fn = rule["signal_fn"]
+
+    # ---- signal_fn ----
+    t0 = time.perf_counter()
+    ohlcv_arrays_for_rule = {}
+    for sym, arr in ohlcv_arr.items():
+        bank    = condition_banks.get(sym) if condition_banks else None
+        signals = signal_fn(arr, live_trading=False, bank=bank)
+        ohlcv_arrays_for_rule[sym] = {**arr, "signal": np.asarray(signals, dtype=np.float32)}
+    timer.add("signal_fn", time.perf_counter() - t0)
+
+    # ---- prepare_signal_arrays (instrumented copy, sub-stage timing) ----
+    prepared_data = _prepare_signal_arrays_profiled(static_bundle, ohlcv_arrays_for_rule, timer)
+
+    prepared_arrays = prepared_data[7]
+    (open_2d, close_2d, high_2d, low_2d,
+     high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+     signal_events, all_timestamps_int, ev_col0) = prepared_arrays
+
+    # ---- backtest_core, summed over all combos (same as _run_full_period_for_rule) ----
+    t0 = time.perf_counter()
+    for combo in combos:
+        core_output = backtest_core(
+            open_2d, close_2d, high_2d, low_2d,
+            high_time_2d, low_time_2d, ts_int_2d, signal_2d, sym_len,
+            signal_events, all_timestamps_int, ev_col0,
+            INITIAL_BALANCE, COMI_FACTOR, float(ORDER_AMOUNT),
+            int(combo["SELL_AFTER"]), float(combo["TP_PCT"]), float(combo["SL_PCT"]),
+        )
+        total_trades_all += core_output[0]
+    timer.add("backtest_core", time.perf_counter() - t0)
+
+print(f"Total trades executed across all rules/combos: {total_trades_all}")
+
+if _EVENT_COUNTS:
+    events_arr = np.array(_EVENT_COUNTS)
+    print(f"signal_events per rule (both symbols combined) — "
+          f"min={events_arr.min()}  mean={events_arr.mean():.0f}  "
+          f"median={np.median(events_arr):.0f}  max={events_arr.max()}")
+
+# =============================================================================
+# JOBLIB / IPC OVERHEAD — serial vs single-rule parallel dispatch
+# =============================================================================
+from joblib import Parallel, delayed
+
+def _noop_task(x):
+    return x
 
 t0 = time.perf_counter()
-for col_idx in range(N_COLS):
-    r0 = row_offsets[col_idx]
-    matrix_col_major[r0:r0 + LOCAL_DAYS, col_idx] = payload
-elapsed_col_major = time.perf_counter() - t0
-
-del matrix_col_major
-
-# =============================================================================
-# LAYOUT B — (n_cols, n_days), transposed: writes a contiguous row segment
-# =============================================================================
-matrix_row_major = np.zeros((N_COLS, N_DAYS), dtype=np.float32)
+for i in range(min(50, N_RULES)):
+    _noop_task(i)
+serial_baseline = time.perf_counter() - t0
 
 t0 = time.perf_counter()
-for col_idx in range(N_COLS):
-    r0 = row_offsets[col_idx]
-    matrix_row_major[col_idx, r0:r0 + LOCAL_DAYS] = payload
-elapsed_row_major = time.perf_counter() - t0
+Parallel(n_jobs=-1, batch_size=1)(delayed(_noop_task)(i) for i in range(min(50, N_RULES)))
+parallel_overhead = time.perf_counter() - t0
 
-del matrix_row_major
+timer.add("ipc_overhead_50_noop_tasks", max(parallel_overhead - serial_baseline, 0.0))
 
-# =============================================================================
-# REPORT
-# =============================================================================
-speedup = elapsed_col_major / elapsed_row_major if elapsed_row_major > 0 else float("inf")
-
-print(f"\n{'=' * 70}")
-print(f"LAYOUT A  (days, cols) — column writes (current)   : {elapsed_col_major:8.3f} s")
-print(f"LAYOUT B  (cols, days) — row writes (transposed)    : {elapsed_row_major:8.3f} s")
-print(f"SPEEDUP (A / B)                                      : {speedup:8.2f}x")
-print(f"{'=' * 70}")
+timer.report(len(sample_rules))
