@@ -12,7 +12,7 @@ from shared_batchs.backtesters.ZX_compute_BT import prepare_signal_arrays
 from multiprocessing.shared_memory import SharedMemory
 from shared_batchs.utils.batch_metrics import sharpe_from_daily_values, skew_kurtosis_from_daily_values, daily_values_from_sell_days
 from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
-
+from signals.condition_bank import ConditionBank
 logger = logging.getLogger("BOT_batch.pipeline.backtest_runner")
 DTYPE                = np.float32
 # =============================================================================
@@ -58,17 +58,16 @@ def _compact_matrix(matrix_arr: np.ndarray, col_names: np.ndarray, valid_mask: n
 
     return matrix_arr, col_names.tolist()
 
-# DESPUÉS
-def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable) -> dict:
+def _build_full_period_ohlcv(ohlcv_arr: dict, signal_fn: callable, condition_banks: dict | None = None) -> dict:
     ohlcv_arrays = {}
     for sym, arr in ohlcv_arr.items():
-        signals = signal_fn(arr, live_trading=False)
+        bank    = condition_banks.get(sym) if condition_banks else None
+        signals = signal_fn(arr, live_trading=False, bank=bank)
         ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=DTYPE)}
     return ohlcv_arrays
 
-# DESPUÉS
-def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable):
-    ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn)
+def prepare_full_period_data(ohlcv_arr: dict, signal_fn: callable, condition_banks: dict | None = None):
+    ohlcv_arrays = _build_full_period_ohlcv(ohlcv_arr, signal_fn, condition_banks)
     return prepare_backtest_data(ohlcv_arrays)
 
 # =============================================================================
@@ -170,12 +169,13 @@ def _run_full_period_for_rule(
     global_start_day: np.datetime64,
     n_combos: int,
     static_bundle: dict | None = None,
+    condition_banks: dict | None = None,
 ) -> tuple:
 
     keys   = list(param_grid.keys())
     combos = [dict(zip(keys, c)) for c in itertools.product(*[param_grid[k] for k in keys])]
 
-    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn)
+    ohlcv_arrays        = _build_full_period_ohlcv(ohlcv_arr, signal_fn, condition_banks)
     max_possible_trades = sum(int(np.count_nonzero(arr["signal"])) for arr in ohlcv_arrays.values())
 
     if max_possible_trades < BACKTEST_MIN_TRADES:
@@ -234,6 +234,25 @@ def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
         _STATIC_BUNDLE_CACHE[cache_key] = bundle
     return bundle
 
+_CONDITION_BANK_CACHE: dict = {}
+
+def _get_condition_banks(shm_metadata: dict, ohlcv_arr: dict) -> dict:
+    """
+    One ConditionBank per symbol, built once per worker process and reused
+    across every rule/combo this worker evaluates. Same eviction policy as
+    _get_static_bundle: only one timeframe's banks live in cache at a time.
+    """
+    cache_key = _static_bundle_cache_key(shm_metadata)
+    if cache_key is None:
+        return {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()}
+
+    banks = _CONDITION_BANK_CACHE.get(cache_key)
+    if banks is None:
+        _CONDITION_BANK_CACHE.clear()
+        banks = {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()}
+        _CONDITION_BANK_CACHE[cache_key] = banks
+    return banks
+
 def _run_full_period_for_rule_shm(
     rule_id: str,
     rule_idx: int,
@@ -254,10 +273,11 @@ def _run_full_period_for_rule_shm(
         matrix_view = np.ndarray(matrix_metadata["shape"], dtype=np.dtype(matrix_metadata["dtype"]), buffer=matrix_shm.buf)
         valid_view  = np.ndarray(valid_metadata["shape"], dtype=np.dtype(valid_metadata["dtype"]), buffer=valid_shm.buf)
 
-        static_bundle = _get_static_bundle(shm_metadata, ohlcv_arr)
+        static_bundle   = _get_static_bundle(shm_metadata, ohlcv_arr)
+        condition_banks = _get_condition_banks(shm_metadata, ohlcv_arr)
         return _run_full_period_for_rule(
             rule_id, rule_idx, ohlcv_arr, signal_fn, param_grid, order_amount,
-            matrix_view, valid_view, global_start_day, n_combos, static_bundle,
+            matrix_view, valid_view, global_start_day, n_combos, static_bundle, condition_banks,
         )
     finally:
         matrix_shm.close()

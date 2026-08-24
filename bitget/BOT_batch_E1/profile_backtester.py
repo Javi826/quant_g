@@ -10,13 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
 
-print("DEBUG __file__:", __file__)
-print("DEBUG shared path exists:", os.path.isdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared"))))
-print("DEBUG shared_batchs path exists:", os.path.isdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batchs"))))
-print("DEBUG sys.path:")
-for p in sys.path:
-    print("   ", p)
-
 from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
 from shared_batchs.setup.config_paths import DATA_FOLDER_IS
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
@@ -28,6 +21,7 @@ from shared_batchs.backtesters.ZX_compute_BT import (
     backtest_core,
 )
 from shared_config import VOLUME_COL
+from signals.condition_bank import ConditionBank
 
 # =============================================================================
 # CLI ARGS
@@ -37,6 +31,9 @@ parser.add_argument("--timeframe", type=str, default="1H")
 parser.add_argument("--n_symbols", type=int, default=10)
 parser.add_argument("--n_rules", type=int, default=300)
 parser.add_argument("--max_depth", type=int, default=None)
+parser.add_argument("--shared_banks", action="store_true", default=True,
+                     help="Reuse one ConditionBank per symbol across all rules (new production path). "
+                          "Omit this flag to reproduce the old per-rule bank=None behavior.")
 args = parser.parse_args()
 
 TIMEFRAME  = args.timeframe
@@ -107,6 +104,16 @@ static_bundle = prepare_static_arrays(ohlcv_arr)
 timer.add("prepare_static_once", time.perf_counter() - t0)
 
 # =============================================================================
+# CONDITION BANKS — one per symbol, built once, reused across all rules
+# (mirrors _get_condition_banks in the production backtest_runner.py path)
+# =============================================================================
+t0 = time.perf_counter()
+condition_banks = {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()} if args.shared_banks else None
+timer.add("prepare_condition_banks_once", time.perf_counter() - t0)
+
+print(f"shared_banks={'ON (new production path)' if args.shared_banks else 'OFF (old per-rule bank=None)'}")
+
+# =============================================================================
 # GENERATE RULES
 # =============================================================================
 arr_sample = next(iter(ohlcv_arr.values()))
@@ -148,7 +155,8 @@ for rule in sample_rules:
     t0 = time.perf_counter()
     ohlcv_arrays_for_rule = {}
     for sym, arr in ohlcv_arr.items():
-        signals = signal_fn(arr, live_trading=False)
+        bank    = condition_banks.get(sym) if condition_banks else None
+        signals = signal_fn(arr, live_trading=False, bank=bank)
         ohlcv_arrays_for_rule[sym] = {**arr, "signal": np.asarray(signals, dtype=np.float32)}
     timer.add("signal_fn", time.perf_counter() - t0)
 
