@@ -291,9 +291,7 @@
                 
                 <div class="tabs-container" style="margin-top: 20px;">
                     <button class="tab-btn active" onclick="switchEquitySubTab('curves')">Curves</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('compose')">Compose</button>
                     <button class="tab-btn" onclick="switchEquitySubTab('period')">Period</button>
-                    <button class="tab-btn" onclick="switchEquitySubTab('correlation')">Correlation</button>
                 </div>
                 
                 <div id="equity-subtab-curves" class="tab-content active">
@@ -367,58 +365,7 @@
                         <canvas id="drawdownChart"></canvas>
                     </div>
                 </div>
-                
-                <div id="equity-subtab-compose" class="tab-content">
-                    <h3 style="margin-bottom: 20px; color: #c9d1d9;">Strategy Combinations - TOP 10</h3>
-                    
-                    <!-- Date Filter for Compose -->
-                    <div class="date-filter-container">
-                        <div class="date-filter-group">
-                            <label>From:</label>
-                            <input type="date" id="compose-date-from">
-                        </div>
-                        <div class="date-filter-group">
-                            <label>To:</label>
-                            <input type="date" id="compose-date-to">
-                        </div>
-                        <button class="btn-clear-dates" onclick="clearComposeDates()">Clear</button>
-                    </div>
-                    
-                    <div class="date-filter-container" style="margin-top: 10px;">
-                        <div class="date-filter-group">
-                            <label>📊 Sort by:</label>
-                            <select id="compose-metric" style="padding: 8px 12px; font-size: 14px; border-radius: 6px; background: #0d1117; color: #c9d1d9; border: 1px solid #21262d;">
-                                <option value="num_trades">#trades</option>
-                                <option value="total_profit_pct">Profit_%</option>
-                                <option value="total_profit_usd">Profit_$</option>
-                                <option value="profit_factor">Profit Factor</option>
-                                <option value="weekly_win_pct">Weekly_%</option>
-                                <option value="win_rate">Win Rate</option>
-                                <option value="max_dd">Max DD (lowest)</option>
-                                <option value="r_squared">R² (highest)</option>
-                                <option value="sharpe_ratio">Sharpe</option>
-                            </select>
-                        </div>
-                        <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd;" onclick="loadComposeAnalysis()">🔄 Show TOP 10</button>
-                    </div>
-                    
-                    <div id="compose-container">
-                        <div style="text-align: center; color: #8b949e; padding: 40px;">
-                            Select a metric and click "Show TOP 10"
-                        </div>
-                    </div>
-                    
-                    <button class="update-chart-btn" onclick="loadComposeCharts()" style="display: none; margin-top: 20px;" id="compose-plot-btn">📊 Plot Selected Combinations</button>
-                    
-                    <div id="compose-charts-container" style="margin-top: 30px;">
-                        <div style="height: 400px; margin-bottom: 20px;">
-                            <canvas id="compose-equity-chart"></canvas>
-                        </div>
-                        <div style="height: 400px;">
-                            <canvas id="compose-drawdown-chart"></canvas>
-                        </div>
-                    </div>
-                </div>
+
                 <div id="equity-subtab-period" class="tab-content">
                     <h3 style="margin-bottom: 16px; color: #c9d1d9;">Period Analysis</h3>
 
@@ -499,48 +446,6 @@
                             <div style="text-align: center; color: #8b949e; padding: 40px;">
                                 Select strategies and click "Update"
                             </div>
-                        </div>
-                    </div>
-
-                </div>
-               
-                <div id="equity-subtab-correlation" class="tab-content">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="margin: 0; color: #c9d1d9;">Strategy Correlation Analysis</h3>
-                        
-                        <!-- Metric selector -->
-                        <div class="view-selector">
-                            <button class="view-btn active" onclick="setCorrelationMetric('profit')">Profit</button>
-                            <button class="view-btn" onclick="setCorrelationMetric('drawdown')">Drawdown</button>
-                        </div>
-                    </div>
-                    
-                    <button class="btn-clear-dates" style="background: #388bfd; color: white; border-color: #388bfd; margin-bottom: 20px;" onclick="updateCorrelationAnalysis()">🔄 Update Correlation</button>
-                    
-                    <div class="strategy-checkboxes" id="correlation-strategy-checkboxes">
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="correlation-strat-all" value="ALL" checked>
-                            <label for="correlation-strat-all">ALL STRATEGIES</label>
-                        </div>
-                    </div>
-                    
-                    <!-- Correlation Matrix -->
-                    <div class="config-card" style="margin-top: 20px;">
-                        <h3>Correlation Matrix</h3>
-                        <div id="correlation-matrix-container" style="overflow-x: auto;">
-                            <p style="color: #8b949e; text-align: center; padding: 40px;">
-                                Select strategies and click "Update Correlation" to generate matrix
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <!-- High Correlation Pairs -->
-                    <div class="config-card" style="margin-top: 20px;">
-                        <h3>⚠️ High Correlation Pairs (>0.7)</h3>
-                        <div id="high-corr-pairs" style="min-height: 60px;">
-                            <p style="color: #8b949e; text-align: center; padding: 20px;">
-                                No data yet - click "Update Correlation"
-                            </p>
                         </div>
                     </div>
                 </div>
