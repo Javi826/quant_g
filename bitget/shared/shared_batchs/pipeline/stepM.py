@@ -2,11 +2,8 @@
 import time
 import logging
 import numpy as np
-from multiprocessing.shared_memory import SharedMemory
-from joblib import Parallel, delayed
 from tqdm import tqdm
-from numba import njit, prange
-from shared_batchs.utils.paralelization import arrays_to_shared_memory, arrays_from_shared_memory, compact_columns_inplace
+from shared_batchs.utils.paralelization import compact_columns_inplace
 from shared_batchs.utils.reporting import print_stepm_matrix_debug, print_stepm_real_variance_filter_debug, print_stepm_block_starts_debug
 from shared_batchs.utils.reporting import print_stepm_bootstrap_replicas_debug, print_stepm_se_filter_debug, print_stepm_studentization_debug
 from shared_batchs.utils.reporting import print_stepm_pvalue_quantile_equivalence_debug, print_stepm_monotonicity_debug, print_stepm_brc_equivalence_debug
@@ -31,15 +28,14 @@ STEPM_MAX_ITERATIONS = 500           # safety cap on stepdown iterations
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — bounds peak RAM without changing any result
 # =============================================================================
-REPLICA_CHUNK       = 100      # replicas processed per gather chunk inside the bootstrap prefix-sum step
-COLUMN_CHUNK_SIZE   = 5000     # columns processed per chunk for chunked reductions/compaction over dense matrices
-PARTITION_ROW_CHUNK = 50       # bootstrap replicas processed per np.partition call in the stepdown
+COLUMN_CHUNK_SIZE    = 5000     # columns processed per chunk for chunked reductions/compaction over dense matrices
+PARTITION_ROW_CHUNK  = 50       # bootstrap replicas processed per np.partition call in the stepdown
+BOOTSTRAP_CHUNK_SIZE = 8192     # columns processed per GEMM call in the bootstrap moment computation
 
 # =============================================================================
 # PARALLELISM + FIX
 # =============================================================================
-STEPM_N_JOBS         = -1
-BOOTSTRAP_BATCH_SIZE = 100    
+STEPM_N_JOBS         = -1     # kept for API compatibility; bootstrap parallelism now comes from BLAS threads, not process pools
 RANDOM_SEED          = 42
 SHARPE_PERIODS_YEAR  = 365.0
 
@@ -79,7 +75,7 @@ def _sharpe_per_column(matrix_arr: np.ndarray) -> np.ndarray:
     return np.where(stds > 0, sharpe, -np.inf)
 
 # =============================================================================
-# MOVING BLOCK BOOTSTRAP — PREFIX-SUM FORMULATION
+# MOVING BLOCK BOOTSTRAP — WEIGHT-MATRIX (GEMM) FORMULATION
 # =============================================================================
 def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np.random.Generator):
 
@@ -94,68 +90,53 @@ def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np
 
     return starts_full, starts_last, len_last, n_blocks_needed
 
-@njit(parallel=True, fastmath=False, cache=True)
-def _block_bootstrap_sums_numba(
-    ps: np.ndarray,
-    ps2: np.ndarray,
-    starts_full: np.ndarray,
-    starts_last: np.ndarray,
-    block_size: int,
-    len_last: int,
-) -> tuple:
-    n_replicas    = starts_last.shape[0]
-    n_blocks_full = starts_full.shape[1]
-    batch_size    = ps.shape[1]
-
-    total_sum   = np.empty((n_replicas, batch_size), dtype=np.float64)
-    total_sumsq = np.empty((n_replicas, batch_size), dtype=np.float64)
-
-    for r in prange(n_replicas):
-        start_last = starts_last[r]
-        end_last   = start_last + len_last
-        for c in range(batch_size):
-            s  = 0.0
-            sq = 0.0
-            for b in range(n_blocks_full):
-                start = starts_full[r, b]
-                end   = start + block_size
-                s  += ps[end, c]  - ps[start, c]
-                sq += ps2[end, c] - ps2[start, c]
-            s  += ps[end_last, c]  - ps[start_last, c]
-            sq += ps2[end_last, c] - ps2[start_last, c]
-            total_sum[r, c]   = s
-            total_sumsq[r, c] = sq
-
-    return total_sum, total_sumsq
-
-def _bootstrap_deviations_batch_prefix(
-    batch_values: np.ndarray,
+def _build_bootstrap_weight_matrix(
     starts_full: np.ndarray,
     starts_last: np.ndarray,
     block_size: int,
     len_last: int,
     n_obs: int,
-    real_sharpe_batch: np.ndarray,
-    replica_chunk: int = REPLICA_CHUNK,
+    n_replicas: int,
 ) -> np.ndarray:
+    """Builds W (n_replicas, n_obs) where W[r, i] = number of times observation
+    i is included in bootstrap replica r. Every replica shares the same block
+    starts across all columns, so W is built once and reused as a GEMM operand
+    for every column chunk (means/sumsq for all columns at once = W @ X).
+    """
+    diff = np.zeros((n_replicas, n_obs + 1), dtype=np.int32)
+    row_idx = np.arange(n_replicas)
 
-    x64 = batch_values.astype(np.float64, copy=False)
+    n_blocks_full = starts_full.shape[1]
+    if n_blocks_full > 0:
+        rows_full   = np.repeat(row_idx, n_blocks_full)
+        starts_flat = starts_full.ravel()
+        ends_flat   = starts_flat + block_size
+        np.add.at(diff, (rows_full, starts_flat), 1)
+        np.add.at(diff, (rows_full, ends_flat), -1)
 
-    ps = np.empty((n_obs + 1, x64.shape[1]), dtype=np.float64)
-    ps[0] = 0.0
-    np.cumsum(x64, axis=0, out=ps[1:])
+    ends_last = starts_last + len_last
+    np.add.at(diff, (row_idx, starts_last), 1)
+    np.add.at(diff, (row_idx, ends_last), -1)
 
-    ps2 = np.empty_like(ps)
-    ps2[0] = 0.0
-    np.cumsum(x64 * x64, axis=0, out=ps2[1:])
+    weights = np.cumsum(diff[:, :n_obs], axis=1)
+    return weights.astype(np.float32)
 
-    # NOTE: computation stays in float64 for numerical stability; only
-    total_sum, total_sumsq = _block_bootstrap_sums_numba(
-        ps, ps2, starts_full, starts_last, block_size, len_last,
-    )
+def _bootstrap_moments_chunk(
+    weight_matrix: np.ndarray,
+    batch_values: np.ndarray,
+    real_sharpe_batch: np.ndarray,
+    n_obs: int,
+) -> tuple:
+    """Computes bootstrap deviations and their column-wise sigma for one
+    column chunk via two GEMMs (BLAS), replacing the per-observation scalar
+    loop. Numerically equivalent to the prefix-sum formulation, not bit-exact
+    (different floating-point summation order inside BLAS).
+    """
+    total_sum   = weight_matrix @ batch_values
+    total_sumsq = weight_matrix @ (batch_values * batch_values)
 
     means = total_sum / n_obs
-    var = (total_sumsq - n_obs * means * means) / (n_obs - 1)
+    var   = (total_sumsq - n_obs * means * means) / (n_obs - 1)
     np.maximum(var, 0.0, out=var)  # guard tiny negative fp error before sqrt
     stds = np.sqrt(var)
 
@@ -163,33 +144,11 @@ def _bootstrap_deviations_batch_prefix(
         boot_sharpe = (means / stds) * np.sqrt(SHARPE_PERIODS_YEAR)
     boot_sharpe = np.where(stds > 0, boot_sharpe, -np.inf)
 
-    return boot_sharpe - real_sharpe_batch[None, :]
+    deviations_chunk = boot_sharpe - real_sharpe_batch[None, :]
+    sigma_chunk       = deviations_chunk.std(axis=0, ddof=1)
 
+    return deviations_chunk, sigma_chunk
 
-def _bootstrap_deviations_batch_prefix_shm(
-    shm_metadata: dict,
-    start: int,
-    end: int,
-    block_size: int,
-    len_last: int,
-    n_obs: int,
-    real_sharpe_batch: np.ndarray,
-) -> None:
-
-    base_arrays, shm_handles = arrays_from_shared_memory(shm_metadata)
-    try:
-        matrix       = base_arrays["stepm"]["matrix"]
-        starts_full  = base_arrays["stepm"]["starts_full"]
-        starts_last  = base_arrays["stepm"]["starts_last"]
-        deviations   = base_arrays["stepm"]["deviations"]
-        batch_values = matrix[:, start:end]
-        deviations[:, start:end] = _bootstrap_deviations_batch_prefix(
-            batch_values, starts_full, starts_last, block_size, len_last, n_obs, real_sharpe_batch,
-        )
-    finally:
-        for shm in shm_handles:
-            shm.close()
-            
 def apply_spa_recentering(studentized_deviations: np.ndarray, z_stat: np.ndarray, n_obs: int) -> tuple:
     """Hansen (2005) SPA_c: recenter clearly-losing columns (z_stat below a
     slowly-growing threshold) to 0 instead of their own negative mean, before
@@ -210,8 +169,6 @@ def compute_deviation_matrix(
     n_jobs: int = None,
     progress_label: str = "",
 ) -> dict:
-
-    n_jobs = n_jobs if n_jobs is not None else STEPM_N_JOBS
 
     n_cols_built  = matrix_arr.shape[1]
     col_names_arr = np.asarray(col_names)
@@ -247,54 +204,31 @@ def compute_deviation_matrix(
     if logger.isEnabledFor(logging.DEBUG):
         print_stepm_block_starts_debug(progress_label, n_blocks_needed, block_size, len_last, n_obs, n_cols)
 
+    weight_matrix = _build_bootstrap_weight_matrix(
+        starts_full, starts_last, block_size, len_last, n_obs, n_bootstrap,
+    )
+
     matrix_arr32 = matrix_arr  # already float32 — no extra copy needed
 
-    n_batches = int(np.ceil(n_cols / BOOTSTRAP_BATCH_SIZE))
+    n_batches = int(np.ceil(n_cols / BOOTSTRAP_CHUNK_SIZE))
     batch_bounds = [
-        (i * BOOTSTRAP_BATCH_SIZE, min((i + 1) * BOOTSTRAP_BATCH_SIZE, n_cols))
+        (i * BOOTSTRAP_CHUNK_SIZE, min((i + 1) * BOOTSTRAP_CHUNK_SIZE, n_cols))
         for i in range(n_batches)
     ]
 
-    # MEMORY OPTIMIZATION: deviations is the dominant buffer in this pipeline
-    deviations_dtype  = np.float32
-    deviations_nbytes = n_bootstrap * n_cols * np.dtype(deviations_dtype).itemsize
+    deviations = np.empty((n_bootstrap, n_cols), dtype=np.float32)
+    sigma_hat  = np.empty(n_cols, dtype=np.float64)
 
-    shm_list, shm_metadata = arrays_to_shared_memory({
-        "stepm": {"matrix": matrix_arr32, "starts_full": starts_full, "starts_last": starts_last},
-    })
-    deviations_shm = SharedMemory(create=True, size=max(deviations_nbytes, 1))
-    shm_list.append(deviations_shm)
-    shm_metadata["stepm"]["deviations"] = {
-        "name":  deviations_shm.name,
-        "shape": (n_bootstrap, n_cols),
-        "dtype": str(np.dtype(deviations_dtype)),
-    }
-    deviations_shared = np.ndarray((n_bootstrap, n_cols), dtype=deviations_dtype, buffer=deviations_shm.buf)
-
-    try:
-        desc = f"STEPM BOOTSTRAP {progress_label}".strip()
-        list(tqdm(
-            Parallel(n_jobs=n_jobs, return_as="generator")(
-                delayed(_bootstrap_deviations_batch_prefix_shm)(
-                    shm_metadata, start, end, block_size, len_last, n_obs, real_sharpe[start:end],
-                )
-                for start, end in batch_bounds
-            ),
-            desc=desc,
-            total=n_batches,
-            dynamic_ncols=True,
-        ))
-        # Own copy, decoupled from the shared-memory segment released below.
-        deviations = deviations_shared.copy()
-    finally:
-        for shm in shm_list:
-            shm.close()
-            shm.unlink()
+    desc = f"STEPM BOOTSTRAP {progress_label}".strip()
+    for start, end in tqdm(batch_bounds, desc=desc, dynamic_ncols=True):
+        dev_chunk, sigma_chunk = _bootstrap_moments_chunk(
+            weight_matrix, matrix_arr32[:, start:end], real_sharpe[start:end], n_obs,
+        )
+        deviations[:, start:end] = dev_chunk
+        sigma_hat[start:end]     = sigma_chunk
 
     if logger.isEnabledFor(logging.DEBUG):
         print_stepm_bootstrap_replicas_debug(progress_label, deviations, n_cols, n_bootstrap)
-
-    sigma_hat = _std_by_column_chunks(deviations, ddof=1)
 
     valid_se = sigma_hat > 0
     if not valid_se.all():

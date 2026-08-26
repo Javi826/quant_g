@@ -37,7 +37,7 @@ from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
-from shared_batchs.pipeline.FF_test import pipe_FF_test
+from FF_test import pipe_FF_test
 from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION

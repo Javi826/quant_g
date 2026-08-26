@@ -1,7 +1,5 @@
-#BOT_batch/set_MBIAS.py
-"""
-DSR vs StepM — full brute universe comparison, single standalone script.
-"""
+#BOT_batch/set_SNOOP.py
+
 import os
 import sys
 import time
@@ -42,7 +40,7 @@ from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
-from shared_batchs.pipeline.dsr import pipe_dsr
+from dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
 from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 # =============================================================================

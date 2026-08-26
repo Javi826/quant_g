@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/FF_test.py
+#sets/FF_test.py
 import time
 import logging
 import numpy as np
