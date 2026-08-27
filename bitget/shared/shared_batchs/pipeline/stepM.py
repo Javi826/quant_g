@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/stepM.py
+#shared_batchs/pipeline/stepM.py (crypto)
 import time
 import logging
 import numpy as np
@@ -488,9 +488,11 @@ def pipe_stepm(
     elif STEPM_K_MODE == "percentile":
         n_cols_for_k = len(kept_columns)
         k_fwe = max(1, int(np.ceil(stepm_k_percentile * n_cols_for_k)))
+        k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
+        n_cols_for_k_fmt = f"{n_cols_for_k:,}".replace(",", ".")
         logger.info(
-            f"STEPM ── {timeframe} ── STEPM_K_MODE=percentile ── resolved k={k_fwe} "
-            f"from {stepm_k_percentile:.4%} of {n_cols_for_k} surviving columns"
+            f"STEPM ── {timeframe} ── STEPM_K_MODE=percentile ── resolved k={k_fwe_fmt} "
+            f"from {stepm_k_percentile:.4%} of {n_cols_for_k_fmt} surviving columns"
         )
     else:
         raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'absolute' or 'percentile'.")
@@ -533,7 +535,10 @@ def pipe_stepm(
             "z_stat":        float(z_val) if np.isfinite(z_val) else None,
         })
 
-    logger.info(f"STEPM ── {timeframe} ── k={k_fwe} ── {n_passed}/{len(raw_results)} rules pass")
+    k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
+    n_passed_fmt = f"{n_passed:,}".replace(",", ".")
+    n_total_fmt = f"{len(raw_results):,}".replace(",", ".")
+    logger.info(f"STEPM ── {timeframe} ── k={k_fwe_fmt} ── {n_passed_fmt}/{n_total_fmt} rules pass")
 
     elapsed = int(time.time() - start)
     logger.info(f"STEPM ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
