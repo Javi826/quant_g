@@ -209,7 +209,9 @@ def _run_full_period_for_rule(
 
     return rule_id, {**winner_metrics, "best_combo_id": best_combo_id}
 
-_STATIC_BUNDLE_CACHE: dict = {}
+_STATIC_BUNDLE_CACHE: dict   = {}
+_CONDITION_BANK_CACHE: dict  = {}
+_SHM_HANDLES_CACHE: dict     = {}   # cache_key -> list[SharedMemory]; same lifetime as the two caches above
 
 def _static_bundle_cache_key(shm_metadata: dict):
     try:
@@ -222,6 +224,28 @@ def _static_bundle_cache_key(shm_metadata: dict):
         return None
 
 
+def _sync_worker_caches(cache_key, shm_handles: list) -> None:
+
+    if cache_key is None:
+        for shm in shm_handles:
+            shm.close()
+        return
+
+    if cache_key in _STATIC_BUNDLE_CACHE or cache_key in _CONDITION_BANK_CACHE:
+        for shm in shm_handles:
+            shm.close()
+        return
+
+    for shm in _SHM_HANDLES_CACHE.values():
+        for old_shm in shm:
+            old_shm.close()
+    _SHM_HANDLES_CACHE.clear()
+    _STATIC_BUNDLE_CACHE.clear()
+    _CONDITION_BANK_CACHE.clear()
+
+    _SHM_HANDLES_CACHE[cache_key] = shm_handles
+
+
 def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
     cache_key = _static_bundle_cache_key(shm_metadata)
     if cache_key is None:
@@ -229,22 +253,18 @@ def _get_static_bundle(shm_metadata: dict, ohlcv_arr: dict):
 
     bundle = _STATIC_BUNDLE_CACHE.get(cache_key)
     if bundle is None:
-        _STATIC_BUNDLE_CACHE.clear()
         bundle = prepare_static_arrays(ohlcv_arr)
         _STATIC_BUNDLE_CACHE[cache_key] = bundle
     return bundle
 
-_CONDITION_BANK_CACHE: dict = {}
 
 def _get_condition_banks(shm_metadata: dict, ohlcv_arr: dict) -> dict:
-
     cache_key = _static_bundle_cache_key(shm_metadata)
     if cache_key is None:
         return {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()}
 
     banks = _CONDITION_BANK_CACHE.get(cache_key)
     if banks is None:
-        _CONDITION_BANK_CACHE.clear()
         banks = {sym: ConditionBank(arr) for sym, arr in ohlcv_arr.items()}
         _CONDITION_BANK_CACHE[cache_key] = banks
     return banks
@@ -269,6 +289,9 @@ def _run_full_period_for_rule_shm(
         matrix_view = np.ndarray(matrix_metadata["shape"], dtype=np.dtype(matrix_metadata["dtype"]), buffer=matrix_shm.buf)
         valid_view  = np.ndarray(valid_metadata["shape"], dtype=np.dtype(valid_metadata["dtype"]), buffer=valid_shm.buf)
 
+        cache_key = _static_bundle_cache_key(shm_metadata)
+        _sync_worker_caches(cache_key, shm_handles)
+
         static_bundle   = _get_static_bundle(shm_metadata, ohlcv_arr)
         condition_banks = _get_condition_banks(shm_metadata, ohlcv_arr)
         return _run_full_period_for_rule(
@@ -278,8 +301,8 @@ def _run_full_period_for_rule_shm(
     finally:
         matrix_shm.close()
         valid_shm.close()
-        for shm in shm_handles:
-            shm.close()
+        # shm_handles are NOT closed here — their lifetime is now owned by
+        # _SHM_HANDLES_CACHE, tied to _STATIC_BUNDLE_CACHE / _CONDITION_BANK_CACHE.
             
 def run_full_period_search(
     rules: list,
