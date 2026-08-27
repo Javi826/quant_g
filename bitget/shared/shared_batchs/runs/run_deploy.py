@@ -1,4 +1,4 @@
-#shared_batchs/runs/run_deploy.py
+#shared_batchs/runs/run_deploy.py (crypto)
 import itertools
 import logging
 import os
@@ -71,9 +71,6 @@ def run_wfo_deploy_ema(
         trade_log   = results["__PORTFOLIO__"]["trade_log"]
         n_before    = len(trade_log)
         if not trade_log.empty:
-            # Only SELL_AFTER exits opened inside the buffer risk truncation
-            # (dataset ran out before their natural exit); TP/SL exits are
-            # always resolved against real price and never truncated.
             truncated_mask = (
                 (trade_log["exit_reason"] == "SELL_AFTER") &
                 (trade_log["buy_time"] >= pd.Timestamp(train_start_ts)) &

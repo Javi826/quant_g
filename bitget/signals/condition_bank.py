@@ -1,4 +1,4 @@
-#signals/condition_bank.py
+#signals/condition_bank.py (forex)
 import numpy as np
 import pandas as pd
 from scipy import signal as sp_signal
@@ -57,12 +57,12 @@ from scipy import signal as sp_signal
 RSI_PERIODS                = [7,14,21]  
 RSI_THRESHOLDS             = [30,40,50,60,70]  
 
-ADX_PERIODS                = [7,14,21]  
-ADX_THRESHOLDS             = [20,25,30,35]   
+ADX_PERIODS                = []  
+ADX_THRESHOLDS             = []   
 # 
-MA_PERIODS                 = [20,50,100,150]
+MA_PERIODS                 = []
 # 
-MOMENTUM_PERIODS           = [5,10,15,20]   
+MOMENTUM_PERIODS           = []   
 
 HISTVOL_BASE_PERIODS       = [10,20,30]     
 HISTVOL_REGIME_SMA_PERIODS = [20,30,40,50]     
@@ -407,10 +407,14 @@ class ConditionBank:
     _REGISTRY_BY_TYPE = {entry["type"]: entry for entry in INDICATOR_REGISTRY}
 
     def __init__(self, arr: dict):
-        self.open   = np.ascontiguousarray(arr["open"],dtype=np.float64)
-        self.high   = np.ascontiguousarray(arr["high"],dtype=np.float64)
-        self.low    = np.ascontiguousarray(arr["low"],dtype=np.float64)
-        self.close  = np.ascontiguousarray(arr["close"],dtype=np.float64)
+        # np.array(..., copy=True) instead of ascontiguousarray: the latter is a
+        # no-op when the input is already float64 and contiguous, so it would
+        # keep a view over shm-backed input and outlive the shared memory once
+        # this bank is cached across worker tasks.
+        self.open   = np.array(arr["open"],  dtype=np.float64, copy=True)
+        self.high   = np.array(arr["high"],  dtype=np.float64, copy=True)
+        self.low    = np.array(arr["low"],   dtype=np.float64, copy=True)
+        self.close  = np.array(arr["close"], dtype=np.float64, copy=True)
         self.n      = len(self.close)
         self._cache = {}
 

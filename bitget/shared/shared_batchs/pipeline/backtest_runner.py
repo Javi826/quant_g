@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/backtest_runner.py /crypto
+#shared_batchs/pipeline/backtest_runner.py (crypto)
 import logging
 import itertools
 import numpy as np

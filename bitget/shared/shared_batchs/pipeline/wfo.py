@@ -17,35 +17,35 @@ logger = logging.getLogger("BOT_batch.pipeline.wfo")
 # =============================================================================
 # WFO APPROVAL THRESHOLDS
 # =============================================================================
-WFO_NET_GAIN_TH = 20
+WFO_NET_GAIN_TH = 30
 WFO_DD_TH       = 15
-WFO_R2_TH       = 0.7
+WFO_R2_TH       = 0.8
 WFO_WFR_TH      = 0.6
 
 # =============================================================================
 # WFO EXECUTION CONFIG
 # =============================================================================
+WFO_WINDOW_CONFIG = {
+    "15m":    {"train_months": 9, "test_months": 2},
+    "30m":    {"train_months": 9, "test_months": 2},
+    "1H":     {"train_months": 9, "test_months": 2},
+    "4H":     {"train_months": 9, "test_months": 2},
+    "6Hutc":  {"train_months": 9, "test_months": 2},
+    "12Hutc": {"train_months": 9, "test_months": 2},
+    "1Dutc":  {"train_months": 9, "test_months": 2},
+}
+
 # =============================================================================
 # WFO_WINDOW_CONFIG = {
 #     "15m":    {"train_months": 9, "test_months": 2},
 #     "30m":    {"train_months": 9, "test_months": 2},
-#     "1H":     {"train_months": 9, "test_months": 2},
-#     "4H":     {"train_months": 9, "test_months": 2},
-#     "6Hutc":  {"train_months": 9, "test_months": 2},
-#     "12Hutc": {"train_months": 9, "test_months": 2},
+#     "1H":     {"train_months": 12, "test_months": 3},
+#     "4H":     {"train_months": 12, "test_months": 3},
+#     "6Hutc":  {"train_months": 12, "test_months": 3},
+#     "12Hutc": {"train_months": 12, "test_months": 3},
 #     "1Dutc":  {"train_months": 9, "test_months": 2},
 # }
-# 
 # =============================================================================
-WFO_WINDOW_CONFIG = {
-    "15m":    {"train_months": 9, "test_months": 2},
-    "30m":    {"train_months": 9, "test_months": 2},
-    "1H":     {"train_months": 12, "test_months": 3},
-    "4H":     {"train_months": 12, "test_months": 3},
-    "6Hutc":  {"train_months": 12, "test_months": 3},
-    "12Hutc": {"train_months": 12, "test_months": 3},
-    "1Dutc":  {"train_months": 9, "test_months": 2},
-}
 
 ANCHORED    = False
 METRIC_MODE = "NET_GAIN_PCT"   # "NET_GAIN_PCT" or "CALMAR"

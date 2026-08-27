@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/sets/set_SNOOP.py', 'bitget/sets/set_FF.py']
+recent_files = ['bitget/BOT_batch_E1/main_crypto.py', 'bitget/shared/shared_batchs/pipeline/backtest_runner.py']
 
 [main]
 version = 0.2.0

@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/multiverse.py /crypto
+#shared_batchs/pipeline/multiverse.py (crypto)
 import os
 import time
 import logging

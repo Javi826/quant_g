@@ -10,7 +10,7 @@ logger = logging.getLogger("BOT_batch.pipeline.FF_test")
 # =============================================================================
 # CONFIG — Fama-French (2010) joint MOVING-BLOCK bootstrap, cross-sectional
 # =============================================================================
-FF_N_BOOTSTRAP = 2000
+FF_N_BOOTSTRAP = 1500
 FF_RANDOM_SEED = 42
 FF_BLOCK_SIZE  = 10  # fixed block length — mirrors stepM.py WHITE_BLOCK_SIZE
 FF_PERCENTILES = np.array([10,50,90,99,99.99])

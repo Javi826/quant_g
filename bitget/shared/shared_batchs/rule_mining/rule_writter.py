@@ -1,4 +1,4 @@
-#shared/shared_batchs/rule_mining/rule_deploy.py
+#shared/shared_batchs/rule_mining/rule_writter.py (crypto)
 import os
 import logging
 from datetime import datetime

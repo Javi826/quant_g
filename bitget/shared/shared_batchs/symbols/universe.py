@@ -8,14 +8,14 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
-ENABLE_INCLUDE_FILTER = True
+ENABLE_INCLUDE_FILTER = False
 INCLUDED_SYMBOLS = ["BTCUSDT","ETHUSDT"]
 
-ENABLE_EXCLUDE_FILTER = False
+ENABLE_EXCLUDE_FILTER = True
 EXCLUDED_SYMBOLS = {"BTCUSDT", "ETHUSDT"}
 
 # Symbols must have data available from this date onward (covers WFO window 0 train_start).
-MIN_START_DATE = "2020-01-02"
+MIN_START_DATE = "2022-01-02"
 
 def filter_symbols(symbols, timeframe=None, data_folder=None, exchange=None,
                    min_price=None, vol_window=50, custom_symbols=None):

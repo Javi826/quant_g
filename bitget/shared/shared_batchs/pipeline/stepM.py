@@ -15,7 +15,7 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 STEPM_ALPHA          = 0.10           # significance level used inside the Romano-Wolf stepdown search
 STEPM_K_MODE         = "percentile"   # "absolute" or "percentile"
 STEPM_K_FWE          = 1              # used when STEPM_K_MODE == "absolute"
-STEPM_K_PERCENTILE   = 0.05           # used when STEPM_K_MODE == "percentile"
+STEPM_K_PERCENTILE   = 0.02           # used when STEPM_K_MODE == "percentile"
 
 # =============================================================================
 # STATISTICAL TEST 

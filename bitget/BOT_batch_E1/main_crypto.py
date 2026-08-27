@@ -1,4 +1,4 @@
-#BOT_batch/main_MINER.py
+#BOT_batch/main_MINER.py (crypto)
 import os
 import sys
 import time
@@ -60,7 +60,7 @@ RUN_DEPLOY    = False
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
-N_SYMBOLS  = 2
+N_SYMBOLS  = 10
 
 PARAM_GRID = {
     "SELL_AFTER": [50],

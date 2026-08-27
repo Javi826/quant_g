@@ -1,4 +1,4 @@
-#shared/shared_batchs/rule_mining/rule_runner.py
+#shared/shared_batchs/rule_mining/rule_runner.py (crypto)
 import os
 import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
@@ -12,7 +12,7 @@ from shared_batchs.utils.plotting import plot_rule_mining_filter_comparison, plo
 from shared_batchs.setup.config_backtest import INITIAL_BALANCE
 from shared_batchs.runs.run_portfolio import find_best_portfolio_combination_wfo
 from shared_batchs.rule_mining.rule_generator import generate_all_rules, MAX_DEPTH
-from shared_batchs.rule_mining.rule_deploy import run_deploy_rule, save_rule_deploy_batch
+from shared_batchs.rule_mining.rule_writter import run_deploy_rule, save_rule_deploy_batch
 from shared_batchs.utils.reporting import print_rule_mining_ranking, print_rule_mining_min_by_group
 logger = logging.getLogger("BOT_batch.rule_mining.runner")
 
