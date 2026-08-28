@@ -407,10 +407,7 @@ class ConditionBank:
     _REGISTRY_BY_TYPE = {entry["type"]: entry for entry in INDICATOR_REGISTRY}
 
     def __init__(self, arr: dict):
-        # np.array(..., copy=True) instead of ascontiguousarray: the latter is a
-        # no-op when the input is already float64 and contiguous, so it would
-        # keep a view over shm-backed input and outlive the shared memory once
-        # this bank is cached across worker tasks.
+
         self.open   = np.array(arr["open"],  dtype=np.float64, copy=True)
         self.high   = np.array(arr["high"],  dtype=np.float64, copy=True)
         self.low    = np.array(arr["low"],   dtype=np.float64, copy=True)

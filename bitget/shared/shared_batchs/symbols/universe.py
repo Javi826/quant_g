@@ -1,4 +1,4 @@
-#shared_batch/pipeline/universe.py
+#shared_batch/pipeline/universe.py (forex)
 import os
 import logging
 import pandas as pd
@@ -97,26 +97,20 @@ def select_universe(
     min_price:         float,
     filter_symbols_fn: callable,
 ) -> dict:
-
     raw_is = sorted([f.split("_")[0] for f in os.listdir(data_folder_is) if f.endswith(f"_{timeframe}.parquet")])
-
     ohlcv_is, filtered_is = filter_symbols_fn(
         raw_is, timeframe=timeframe, data_folder=data_folder_is, min_price=min_price, vol_window=50
     )
     cutoff_ts = pd.Timestamp(MIN_START_DATE)
+    ohlcv_is_cut = {}
     for sym, df in ohlcv_is.items():
-        logger.debug(f"  {sym:<12} start before cut: {df.index[0]}")
-
-    ohlcv_is = {
-        sym: df[df.index >= cutoff_ts]
-        for sym, df in ohlcv_is.items()
-    }
-
-    for sym, df in ohlcv_is.items():
-        logger.debug(f"  {sym:<12} start after  cut: {df.index[0]}")
-
+        start_before = df.index[0]
+        df_cut = df[df.index >= cutoff_ts]
+        ohlcv_is_cut[sym] = df_cut
+        start_after = df_cut.index[0] if len(df_cut) else None
+        logger.debug(f"  {sym:<12} before: {str(start_before):<19}  after: {str(start_after):<19}")
+    ohlcv_is = ohlcv_is_cut
     logger.debug(f"IS pool ({len(filtered_is):>3}): {filtered_is}")
-
     return ohlcv_is
 
 # =============================================================================
