@@ -1,7 +1,10 @@
-#sets/FF_test.py
+#sets/FF_test_new.py
+import os
 import time
 import logging
 import numpy as np
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 from numba import njit, prange
 from tqdm import tqdm
 
@@ -22,36 +25,137 @@ MIN_ACTIVE_DAYS_PER_COLUMN = 30  # real-data column filter, tune to strategy fre
 MIN_ACTIVE_DAYS_PER_RUN    = 30  # same floor applied inside every bootstrap run
 
 # =============================================================================
-# COLUMN-CHUNKING CONFIG — bootstrap kernel processes FF_COLUMN_CHUNK_SIZE
+# COLUMN-CHUNKING CONFIG — the bootstrap kernel processes FF_COLUMN_CHUNK_SIZE
 # =============================================================================
-FF_COLUMN_CHUNK_SIZE = 256
+FF_COLUMN_CHUNK_SIZE = 1024
+
+# =============================================================================
+# MOMENTS-CHUNKING CONFIG — column width handled by one prange iteration of
+# the real-moments pass. Small enough that the three accumulators stay in L1.
+# =============================================================================
+FF_MOMENTS_CHUNK_SIZE = 512
 
 # =============================================================================
 # MEMORY-CHUNKING CONFIG — percentile phase processes replicas in batches
 # =============================================================================
 BOOTSTRAP_CHUNK_SIZE  = 500
-COLUMN_CHUNK_SIZE     = 5000    # column chunk size for the cheap moments pass (Pass 1)
 METRIC_LABEL_WIDTH    = 12
+
+# =============================================================================
+# PERCENTILE THREADING CONFIG — replica rows are reduced independently, so the
+# cross-sectional percentile phase is spread across threads. 0 = auto-detect.
+# =============================================================================
+FF_PERCENTILE_N_THREADS = 0
+FF_PERCENTILE_MAX_THREADS = 32
+
+# =============================================================================
+# PROFILING CONFIG — per-phase wall-clock breakdown. Purely observational:
+# no phase is skipped, reordered or altered when enabled.
+# =============================================================================
+FF_PROFILE = True
 
 def _format_thousands(value: int) -> str:
     return format(value, ",").replace(",", ".")
+
 # =============================================================================
-# PASS 1 — REAL MOMENTS, COLUMN-CHUNKED
+# PHASE TIMER — accumulates wall time per named section across repeated calls,
+# so the per-chunk sections inside the bootstrap loop roll up into one total.
 # =============================================================================
-def _real_moments_chunked(matrix_arr: np.ndarray, chunk_size: int = COLUMN_CHUNK_SIZE) -> tuple:
+class _PhaseTimer:
+
+    def __init__(self, enabled: bool = FF_PROFILE):
+        self.enabled = enabled
+        self.totals  = {}
+        self.counts  = {}
+        self.order   = []
+
+    @contextmanager
+    def section(self, name: str):
+        if not self.enabled:
+            yield
+            return
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.record(name, time.perf_counter() - t0)
+
+    def record(self, name: str, elapsed: float) -> None:
+        if not self.enabled:
+            return
+        if name not in self.totals:
+            self.totals[name] = 0.0
+            self.counts[name] = 0
+            self.order.append(name)
+        self.totals[name] += elapsed
+        self.counts[name] += 1
+
+    def log_report(self, total_elapsed: float, timeframe: str = "") -> None:
+        if not self.enabled or not self.order:
+            return
+
+        accounted  = sum(self.totals.values())
+        name_width = max(len(name) for name in self.order)
+        share      = lambda seconds: 100.0 * seconds / total_elapsed if total_elapsed > 0 else 0.0
+
+        logger.debug(f"\n{'─' * 85}")
+        logger.debug(f"  FF BOOTSTRAP — PHASE PROFILE ── {timeframe}")
+        logger.debug(f"{'─' * 85}")
+        logger.debug(f"  {'phase':<{name_width}} │ {'calls':>8} │ {'seconds':>10} │ {'% total':>8}")
+        for name in self.order:
+            logger.debug(
+                f"  {name:<{name_width}} │ {self.counts[name]:>8} │ "
+                f"{self.totals[name]:>10.2f} │ {share(self.totals[name]):>7.1f}%"
+            )
+        logger.debug(f"{'─' * 85}")
+        logger.debug(f"  accounted {accounted:.2f} s of {total_elapsed:.2f} s total ({share(accounted):.1f}%)")
+        logger.debug(f"{'─' * 85}\n")
+
+# =============================================================================
+# PASS 1 — REAL MOMENTS, PARALLEL OVER COLUMN CHUNKS
+# =============================================================================
+@njit(parallel=True, fastmath=False, cache=True)
+def _real_moments_numba(
+    matrix_arr: np.ndarray,
+    counts: np.ndarray,
+    sums: np.ndarray,
+    sumsq: np.ndarray,
+    chunk_size: int,
+) -> None:
+
     n_obs, n_cols = matrix_arr.shape
+    n_chunks      = (n_cols + chunk_size - 1) // chunk_size
+
+    for t in prange(n_chunks):
+        col_start = t * chunk_size
+        col_end   = min(col_start + chunk_size, n_cols)
+        width     = col_end - col_start
+
+        cnt_acc = np.zeros(width, dtype=np.int64)
+        s_acc   = np.zeros(width, dtype=np.float64)
+        q_acc   = np.zeros(width, dtype=np.float64)
+
+        # ---- Row-major traversal: the read stays sequential within each row,
+        #      which keeps the walk TLB-friendly however wide the matrix is.
+        for i in range(n_obs):
+            for j in range(width):
+                v = matrix_arr[i, col_start + j]
+                if v != 0.0:
+                    cnt_acc[j] += 1
+                s_acc[j] += v
+                q_acc[j] += v * v
+
+        for j in range(width):
+            counts[col_start + j] = cnt_acc[j]
+            sums[col_start + j]   = s_acc[j]
+            sumsq[col_start + j]  = q_acc[j]
+
+def _real_moments(matrix_arr: np.ndarray, chunk_size: int = FF_MOMENTS_CHUNK_SIZE) -> tuple:
+    n_cols = matrix_arr.shape[1]
     counts = np.empty(n_cols, dtype=np.int64)
     sums   = np.empty(n_cols, dtype=np.float64)
     sumsq  = np.empty(n_cols, dtype=np.float64)
-
-    for start in range(0, n_cols, chunk_size):
-        end   = min(start + chunk_size, n_cols)
-        chunk = matrix_arr[:, start:end]
-        active_mask = chunk != 0.0
-        counts[start:end] = active_mask.sum(axis=0)
-        sums[start:end]   = np.where(active_mask, chunk, 0.0).sum(axis=0, dtype=np.float64)
-        sumsq[start:end]  = np.where(active_mask, chunk * chunk, 0.0).sum(axis=0, dtype=np.float64)
-
+    _real_moments_numba(matrix_arr, counts, sums, sumsq, chunk_size)
     return counts, sums, sumsq
 
 def _tstat_from_moments(counts: np.ndarray, sums: np.ndarray, sumsq: np.ndarray, min_active_days: int) -> np.ndarray:
@@ -87,31 +191,39 @@ def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np
     return starts_full, starts_last, len_last, n_blocks_needed
 
 # =============================================================================
-# PASS 2 — TRANSPOSED PREFIX SUMS PER COLUMN CHUNK
+# CHUNK PACK BUFFER — narrow contiguous staging area, allocated once per run.
+#
+# It serves two purposes at once. First, the kernel walks one column at a time,
+# so it reads with a stride equal to its source's row stride; slicing the full
+# P&L matrix directly would make that stride n_cols x itemsize, which at a
+# million columns puts every element of a column on its own page and thrashes
+# the TLB. Packing pins the stride at chunk x itemsize, making kernel
+# throughput independent of matrix width. Second, when the active-day filter
+# has dropped columns, the gather of the surviving ones happens here, so the
+# kernel never needs the index map and no full-size filtered copy is ever
+# materialized.
 # =============================================================================
-def _compute_prefix_sums_chunk(matrix_chunk: np.ndarray, active_mask_chunk: np.ndarray) -> tuple:
-    n_obs, chunk_cols = matrix_chunk.shape
-    x64 = matrix_chunk.astype(np.float64, copy=False)
+class _PackBuffer:
 
-    ps = np.empty((n_obs + 1, chunk_cols), dtype=np.float64)
-    ps[0] = 0.0
-    np.cumsum(x64, axis=0, out=ps[1:])
+    def __init__(self, n_obs: int, max_cols: int, dtype: np.dtype):
+        self.matrix = np.empty((n_obs, max_cols), dtype=dtype)
 
-    ps2 = np.empty((n_obs + 1, chunk_cols), dtype=np.float64)
-    ps2[0] = 0.0
-    np.cumsum(x64 * x64, axis=0, out=ps2[1:])
+    def pack(self, matrix_arr: np.ndarray, cols: slice | np.ndarray, n_cols: int) -> np.ndarray:
+        out = self.matrix[:, :n_cols]
+        np.copyto(out, matrix_arr[:, cols])
+        return out
 
-    ps_cnt = np.empty((n_obs + 1, chunk_cols), dtype=np.int32)
-    ps_cnt[0] = 0
-    np.cumsum(active_mask_chunk.astype(np.int32), axis=0, out=ps_cnt[1:])
+    @property
+    def nbytes(self) -> int:
+        return self.matrix.nbytes
 
-    return np.ascontiguousarray(ps.T), np.ascontiguousarray(ps2.T), np.ascontiguousarray(ps_cnt.T)
-
+# =============================================================================
+# BOOTSTRAP KERNEL — DEMEAN AND PREFIX SUMS FUSED INTO THE PARALLEL REGION
+## =============================================================================
 @njit(parallel=True, fastmath=False, cache=True)
-def _block_bootstrap_tstat_numba_colwise(
-    ps_t: np.ndarray,       # (chunk_cols, n_obs+1) float64 — row-contiguous per column
-    ps2_t: np.ndarray,      # (chunk_cols, n_obs+1) float64
-    ps_cnt_t: np.ndarray,   # (chunk_cols, n_obs+1) int32
+def _block_bootstrap_tstat_numba_fused(
+    matrix_chunk: np.ndarray,  # (n_obs, chunk_cols) raw P&L, packed contiguous
+    means_chunk: np.ndarray,   # (chunk_cols,) float64 — active-day mean
     starts_full: np.ndarray,   # (n_replicas, n_blocks_full) int32
     starts_last: np.ndarray,   # (n_replicas,) int32
     block_size: int,
@@ -119,27 +231,57 @@ def _block_bootstrap_tstat_numba_colwise(
     min_active_days: int,
 ) -> np.ndarray:
 
-    n_cols_chunk  = ps_t.shape[0]
-    n_replicas    = starts_last.shape[0]
-    n_blocks_full = starts_full.shape[1]
+    n_obs          = matrix_chunk.shape[0]
+    n_cols_chunk   = matrix_chunk.shape[1]
+    n_replicas     = starts_last.shape[0]
+    n_blocks_full  = starts_full.shape[1]
+    n_block_starts = n_obs - block_size + 1
 
     tstat = np.empty((n_replicas, n_cols_chunk), dtype=np.float32)
 
     for c in prange(n_cols_chunk):
-        row_ps  = ps_t[c]
-        row_ps2 = ps2_t[c]
-        row_cnt = ps_cnt_t[c]
+        mean_c = means_chunk[c]
+
+        # ---- Demean and prefix sums in one pass, thread-locally.
+        row_ps  = np.empty(n_obs + 1, dtype=np.float64)
+        row_ps2 = np.empty(n_obs + 1, dtype=np.float64)
+        row_cnt = np.empty(n_obs + 1, dtype=np.int32)
+
+        row_ps[0]  = 0.0
+        row_ps2[0] = 0.0
+        row_cnt[0] = 0
+        for i in range(n_obs):
+            raw = matrix_chunk[i, c]
+            if raw != 0.0:
+                v   = np.float64(raw) - mean_c
+                inc = 1
+            else:
+                v   = 0.0
+                inc = 0
+            row_ps[i + 1]  = row_ps[i] + v
+            row_ps2[i + 1] = row_ps2[i] + v * v
+            row_cnt[i + 1] = row_cnt[i] + inc
+
+        # ---- Per-block sums, hoisted out of the replica loop so the hot path
+        #      is 3 reads instead of 6 reads plus 3 subtractions.
+        block_s   = np.empty(n_block_starts, dtype=np.float64)
+        block_sq  = np.empty(n_block_starts, dtype=np.float64)
+        block_cnt = np.empty(n_block_starts, dtype=np.int32)
+
+        for k in range(n_block_starts):
+            block_s[k]   = row_ps[k + block_size]  - row_ps[k]
+            block_sq[k]  = row_ps2[k + block_size] - row_ps2[k]
+            block_cnt[k] = row_cnt[k + block_size] - row_cnt[k]
 
         for r in range(n_replicas):
             s   = 0.0
             sq  = 0.0
             cnt = 0
             for b in range(n_blocks_full):
-                start = starts_full[r, b]
-                end   = start + block_size
-                s   += row_ps[end]    - row_ps[start]
-                sq  += row_ps2[end]   - row_ps2[start]
-                cnt += row_cnt[end]   - row_cnt[start]
+                k    = starts_full[r, b]
+                s   += block_s[k]
+                sq  += block_sq[k]
+                cnt += block_cnt[k]
 
             start_last = starts_last[r]
             end_last   = start_last + len_last
@@ -164,42 +306,117 @@ def _block_bootstrap_tstat_numba_colwise(
     return tstat
 
 def _build_bootstrap_tstat_matrix(
-    matrix_adjusted: np.ndarray,
-    active_mask: np.ndarray,
+    matrix_arr: np.ndarray,
+    kept_idx: np.ndarray,
+    all_kept: bool,
+    means_active: np.ndarray,
     starts_full: np.ndarray,
     starts_last: np.ndarray,
     block_size: int,
     len_last: int,
     min_active_days_per_run: int,
     column_chunk_size: int = FF_COLUMN_CHUNK_SIZE,
+    profiler: "_PhaseTimer" = None,
 ) -> np.ndarray:
 
-    n_obs, n_cols = matrix_adjusted.shape
-    n_bootstrap   = starts_last.shape[0]
+    n_obs       = matrix_arr.shape[0]
+    n_kept      = means_active.shape[0]
+    n_bootstrap = starts_last.shape[0]
+    profiler    = profiler or _PhaseTimer(enabled=False)
 
-    tstat_full = np.empty((n_bootstrap, n_cols), dtype=np.float32)
+    tstat_full = np.empty((n_bootstrap, n_kept), dtype=np.float32)
 
-    n_chunks = int(np.ceil(n_cols / column_chunk_size))
-    for start in tqdm(range(0, n_cols, column_chunk_size), desc="FF BOOTSTRAP", total=n_chunks, dynamic_ncols=True):
-        end = min(start + column_chunk_size, n_cols)
+    column_chunk_size = min(column_chunk_size, n_kept)
+    pack = _PackBuffer(n_obs, column_chunk_size, matrix_arr.dtype)
+    logger.debug(f"FF BOOTSTRAP ── pack buffer {pack.nbytes / 1e6:.0f} MB")
 
-        ps_t, ps2_t, ps_cnt_t = _compute_prefix_sums_chunk(
-            matrix_adjusted[:, start:end], active_mask[:, start:end],
-        )
-        tstat_full[:, start:end] = _block_bootstrap_tstat_numba_colwise(
-            ps_t, ps2_t, ps_cnt_t, starts_full, starts_last, block_size, len_last, min_active_days_per_run,
-        )
+    n_chunks = int(np.ceil(n_kept / column_chunk_size))
+    for chunk_idx, start in enumerate(
+        tqdm(range(0, n_kept, column_chunk_size), desc="FF BOOTSTRAP      ", total=n_chunks, dynamic_ncols=True)
+    ):
+        end   = min(start + column_chunk_size, n_kept)
+        width = end - start
+
+        with profiler.section("A1 pack chunk"):
+            cols         = slice(start, end) if all_kept else kept_idx[start:end]
+            matrix_chunk = pack.pack(matrix_arr, cols, width)
+
+        # ---- The first chunk absorbs numba's JIT compilation on a cache miss,
+        #      so it is reported separately to keep the steady-state cost clean.
+        kernel_label = "A2 fused kernel (1st, incl JIT)" if chunk_idx == 0 else "A3 fused kernel"
+        with profiler.section(kernel_label):
+            tstat_full[:, start:end] = _block_bootstrap_tstat_numba_fused(
+                matrix_chunk, means_active[start:end], starts_full, starts_last,
+                block_size, len_last, min_active_days_per_run,
+            )
 
     return tstat_full
 
-def _demean_active_days(matrix_arr: np.ndarray, active_mask: np.ndarray, means_active: np.ndarray) -> np.ndarray:
+# =============================================================================
+# THREADED ROW-WISE NANPERCENTILE
+# =============================================================================
+def _resolve_percentile_threads(n_rows: int, n_threads: int = FF_PERCENTILE_N_THREADS) -> int:
+    if n_threads <= 0:
+        n_threads = min(FF_PERCENTILE_MAX_THREADS, os.cpu_count() or 1)
+    return max(1, min(n_threads, n_rows))
 
-    adjusted = np.where(active_mask, matrix_arr - means_active[None, :], 0.0)
-    return adjusted.astype(np.float64)
+def _nanpercentile_row_range(
+    tstat_batch: np.ndarray,
+    percentiles: np.ndarray,
+    out: np.ndarray,
+    row_start: int,
+    row_end: int,
+) -> int:
+
+    n_all_nan = 0
+    for r in range(row_start, row_end):
+        row    = tstat_batch[r]
+        finite = row[~np.isnan(row)]
+        if finite.size == 0:
+            out[r] = np.nan
+            n_all_nan += 1
+        else:
+            out[r] = np.percentile(finite, percentiles, overwrite_input=True)
+    return n_all_nan
+
+def _nanpercentile_rows_threaded(
+    tstat_batch: np.ndarray,
+    percentiles: np.ndarray,
+    n_threads: int = FF_PERCENTILE_N_THREADS,
+) -> np.ndarray:
+
+    n_rows = tstat_batch.shape[0]
+    n_pct  = percentiles.shape[0]
+
+    # ---- Probe the exact output dtype NumPy would produce rather than
+    #      assuming it: percentile promotes float32 input to float64 through
+    #      the float64 interpolation weight, and the Phase-B accumulators are
+    #      sensitive to that width.
+    out_dtype = np.percentile(np.zeros(2, dtype=tstat_batch.dtype), percentiles).dtype
+    out       = np.empty((n_rows, n_pct), dtype=out_dtype)
+
+    n_threads = _resolve_percentile_threads(n_rows, n_threads)
+    if n_threads == 1:
+        n_all_nan = _nanpercentile_row_range(tstat_batch, percentiles, out, 0, n_rows)
+    else:
+        bounds = np.linspace(0, n_rows, n_threads + 1).astype(np.int64)
+        with ThreadPoolExecutor(max_workers=n_threads) as pool:
+            futures = [
+                pool.submit(_nanpercentile_row_range, tstat_batch, percentiles, out, int(lo), int(hi))
+                for lo, hi in zip(bounds[:-1], bounds[1:]) if hi > lo
+            ]
+            n_all_nan = sum(future.result() for future in futures)
+
+    if n_all_nan:
+        logger.warning(f"FF BOOTSTRAP ── {n_all_nan} all-NaN replica row(s) encountered")
+
+    return out
 
 def _run_joint_bootstrap(
-    matrix_adjusted: np.ndarray,
-    active_mask: np.ndarray,
+    matrix_arr: np.ndarray,
+    kept_idx: np.ndarray,
+    all_kept: bool,
+    means_active: np.ndarray,
     real_percentiles: np.ndarray,
     percentiles: np.ndarray,
     n_bootstrap: int,
@@ -208,19 +425,23 @@ def _run_joint_bootstrap(
     min_active_days_per_run: int,
     block_size: int = FF_BLOCK_SIZE,
     n_sample_replicas: int = 0,
+    profiler: "_PhaseTimer" = None,
 ) -> tuple:
 
-    n_obs = matrix_adjusted.shape[0]
+    n_obs    = matrix_arr.shape[0]
+    profiler = profiler or _PhaseTimer(enabled=False)
 
-    rng = np.random.default_rng(seed)
-    starts_full, starts_last, len_last, n_blocks_needed = _generate_block_starts(
-        n_obs, block_size, n_bootstrap, rng,
-    )
+    with profiler.section("A0 block starts"):
+        rng = np.random.default_rng(seed)
+        starts_full, starts_last, len_last, n_blocks_needed = _generate_block_starts(
+            n_obs, block_size, n_bootstrap, rng,
+        )
 
     # ---- Fase A: full t(alpha) matrix, column-chunked ----------------------
     tstat_full = _build_bootstrap_tstat_matrix(
-        matrix_adjusted, active_mask, starts_full, starts_last,
+        matrix_arr, kept_idx, all_kept, means_active, starts_full, starts_last,
         block_size, len_last, min_active_days_per_run,
+        profiler = profiler,
     )
 
     # ---- Sample of raw null replicas, kept only for plotting purposes ------
@@ -235,12 +456,15 @@ def _run_joint_bootstrap(
         end    = min(start + chunk_size, n_bootstrap)
         n_runs = end - start
 
-        tstat_batch        = tstat_full[start:end]
-        batch_percentiles  = np.nanpercentile(tstat_batch, percentiles, axis=1).T  # (n_runs, n_pct)
+        tstat_batch = tstat_full[start:end]
 
-        percentile_sum   += batch_percentiles.sum(axis=0)
-        below_actual_cnt += (batch_percentiles < real_percentiles[None, :]).sum(axis=0)
-        n_valid_runs     += n_runs
+        with profiler.section("B1 nanpercentile"):
+            batch_percentiles = _nanpercentile_rows_threaded(tstat_batch, percentiles)  # (n_runs, n_pct)
+
+        with profiler.section("B2 accumulate"):
+            percentile_sum   += batch_percentiles.sum(axis=0)
+            below_actual_cnt += (batch_percentiles < real_percentiles[None, :]).sum(axis=0)
+            n_valid_runs     += n_runs
 
     avg_sim_percentiles = percentile_sum / n_valid_runs
     pct_below_actual    = 100.0 * below_actual_cnt / n_valid_runs
@@ -320,10 +544,12 @@ def pipe_FF_test(
             f"n_obs ({n_obs_check}); cannot form a single block."
         )
 
-    start = time.time()
+    start    = time.time()
+    profiler = _PhaseTimer()
 
-    counts, sums, sumsq = _real_moments_chunked(matrix_arr)
-    real_tstat = _tstat_from_moments(counts, sums, sumsq, min_active_days)
+    with profiler.section("P1 real moments"):
+        counts, sums, sumsq = _real_moments(matrix_arr)
+        real_tstat = _tstat_from_moments(counts, sums, sumsq, min_active_days)
 
     finite_mask = np.isfinite(real_tstat)
     n_kept = int(finite_mask.sum())
@@ -333,25 +559,25 @@ def pipe_FF_test(
             f"with finite t(alpha)."
         )
 
-    kept_idx    = np.flatnonzero(finite_mask)
-    matrix_kept = matrix_arr[:, kept_idx]
-    real_tstat  = real_tstat[kept_idx]
-    counts_kept = counts[kept_idx]
-    sums_kept   = sums[kept_idx]
+    # ---- Only per-column scalars are materialized here. The demeaned matrix
+    #      and the active-day mask are derived inside the kernel instead.
+    with profiler.section("P2 column stats"):
+        kept_idx     = np.flatnonzero(finite_mask)
+        all_kept     = n_kept == matrix_arr.shape[1]
+        real_tstat   = real_tstat[kept_idx]
+        means_active = sums[kept_idx] / counts[kept_idx].astype(np.float64)
 
-    active_mask_kept  = matrix_kept != 0.0
-    means_active_kept = sums_kept / counts_kept.astype(np.float64)
+    with profiler.section("P4 real percentiles"):
+        real_percentiles = np.percentile(real_tstat, percentiles)
 
-    matrix_adjusted  = _demean_active_days(matrix_kept, active_mask_kept, means_active_kept)
-    real_percentiles = np.percentile(real_tstat, percentiles)
-
-    sorted_tstat_asc = np.sort(real_tstat)
-    n_ge_percentile  = sorted_tstat_asc.shape[0] - np.searchsorted(sorted_tstat_asc, real_percentiles, side="left")
+        sorted_tstat_asc = np.sort(real_tstat)
+        n_ge_percentile  = sorted_tstat_asc.shape[0] - np.searchsorted(sorted_tstat_asc, real_percentiles, side="left")
 
     sim_percentiles, pct_below_actual, sim_tstat_sample = _run_joint_bootstrap(
-        matrix_adjusted, active_mask_kept, real_percentiles, percentiles,
+        matrix_arr, kept_idx, all_kept, means_active, real_percentiles, percentiles,
         n_bootstrap, chunk_size, seed, min_active_days_per_run, block_size,
         n_sample_replicas,
+        profiler = profiler,
     )
 
     n_dropped = matrix_arr.shape[1] - n_kept
@@ -377,7 +603,10 @@ def pipe_FF_test(
     if col_names is not None:
         result["kept_columns"] = np.asarray(col_names)[kept_idx]
 
-    elapsed = int(time.time() - start)
+    total_elapsed = time.time() - start
+    profiler.log_report(total_elapsed, timeframe)
+
+    elapsed = int(total_elapsed)
     logger.info(f"FF BOOTSTRAP ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
 
     return result
