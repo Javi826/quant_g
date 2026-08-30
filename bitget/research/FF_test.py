@@ -16,7 +16,7 @@ logger = logging.getLogger("BOT_batch.pipeline.FF_test")
 FF_N_BOOTSTRAP = 1500
 FF_RANDOM_SEED = 42
 FF_BLOCK_SIZE  = 10  # fixed block length — mirrors stepM.py WHITE_BLOCK_SIZE
-FF_PERCENTILES = np.array([10,50,90,99,99.99])
+FF_PERCENTILES = np.array([10,50,90,95,98,99,99.9,99.99])
 
 # =============================================================================
 # ACTIVE-DAY CONFIG — a column's n is its count of nonzero (traded) days,
@@ -192,16 +192,6 @@ def _generate_block_starts(n_obs: int, block_size: int, n_replicas: int, rng: np
 
 # =============================================================================
 # CHUNK PACK BUFFER — narrow contiguous staging area, allocated once per run.
-#
-# It serves two purposes at once. First, the kernel walks one column at a time,
-# so it reads with a stride equal to its source's row stride; slicing the full
-# P&L matrix directly would make that stride n_cols x itemsize, which at a
-# million columns puts every element of a column on its own page and thrashes
-# the TLB. Packing pins the stride at chunk x itemsize, making kernel
-# throughput independent of matrix width. Second, when the active-day filter
-# has dropped columns, the gather of the surviving ones happens here, so the
-# kernel never needs the index map and no full-size filtered copy is ever
-# materialized.
 # =============================================================================
 class _PackBuffer:
 
@@ -483,32 +473,32 @@ def _log_ff_report(
     block_size: int,
     timeframe: str,
 ) -> None:
-    logger.info(f"\n{'─' * 85}")
-    logger.info(f"  FAMA-FRENCH (2010) JOINT BLOCK BOOTSTRAP — t(α) percentiles ── {timeframe}")
-    logger.info(f"{'─' * 85}")
-    logger.info(
+    logger.debug(f"\n{'─' * 85}")
+    logger.debug(f"  FAMA-FRENCH (2010) JOINT BLOCK BOOTSTRAP — t(α) percentiles ── {timeframe}")
+    logger.debug(f"{'─' * 85}")
+    logger.debug(
         f"  columns (rule × combo) : {_format_thousands(n_cols_built)}   "
         f"dropped (< {min_active_days} active days) : {_format_thousands(n_dropped)}   "
         f"bootstrap runs : {_format_thousands(n_bootstrap)}   "
         f"block size : {block_size}"
     )
-    logger.info(f"{'─' * 85}")
-    logger.info(f"  {'Pct':>5} │ {'N≥Pct':>9} │ {'Sim':>8} {'Real':>8} {'%<Real':>8}")
+    logger.debug(f"{'─' * 85}")
+    logger.debug(f"  {'Pct':>5} │ {'N≥Pct':>9} │ {'Sim':>8} {'Real':>8} {'%<Real':>8}")
     for i, pct in enumerate(percentiles):
-        logger.info(
+        logger.debug(
             f"  {pct:>5.0f} │ {_format_thousands(int(n_ge_percentile[i])):>9} │ "
             f"{sim_percentiles[i]:>8.2f} {real_percentiles[i]:>8.2f} {pct_below_actual[i]:>7.2f}%"
         )
-    logger.info(f"{'─' * 85}")
-    logger.info("  Sim    : average value at that percentile across bootstrap replicas (pure luck)")
-    logger.info("  Real   : actual value at that percentile in the real data")
-    logger.info("  %<Real : n of bootstrap replicas that are < Real at that percentile")
-    logger.info(f"{'─' * 85}")
-    logger.info(
+    logger.debug(f"{'─' * 85}")
+    logger.debug("  Sim    : average value at that percentile across bootstrap replicas (pure luck)")
+    logger.debug("  Real   : actual value at that percentile in the real data")
+    logger.debug("  %<Real : n of bootstrap replicas that are < Real at that percentile")
+    logger.debug(f"{'─' * 85}")
+    logger.debug(
         "  Real far below Sim in the left tail and/or far above in the right tail signals "
         "genuine skill (positive or negative) beyond what pure luck would produce."
     )
-    logger.info(f"{'─' * 85}\n")
+    logger.debug(f"{'─' * 85}\n")
 
 
 # =============================================================================

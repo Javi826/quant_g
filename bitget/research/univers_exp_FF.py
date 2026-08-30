@@ -52,6 +52,15 @@ PARAM_GRID = {
     "TP_PCT":     [6,8,10],
     "SL_PCT":     [6,8],
 }
+
+SYMBOL_POOL = [
+    "BTCUSDT","ETHUSDT", 
+    "ADAUSDT","AVAXUSDT", 
+    "BCHUSDT","BNBUSDT",
+    "DOGEUSDT","LINKUSDT",
+    "NEARUSDT","SOLUSDT", 
+    "XLMUSDT","XRPUSDT",
+]  
 # =============================================================================
 # SIGNAL CLEANING — dedupe near-identical rules before the brute backtest
 # =============================================================================

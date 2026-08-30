@@ -12,25 +12,11 @@ import logging
 logger = logging.getLogger('BOT_trading.api.metrics')
 
 class MetricsCalculator:
-    """
-    Calculadora de métricas financieras para análisis de trading.
-    Todas las funciones son estáticas y pueden usarse independientemente.
-    """
+
     
     @staticmethod
     def profit_factor(df: pd.DataFrame) -> float:
-        """
-        Calcula el Profit Factor.
-        
-        Profit Factor = Total Wins / Total Losses
-        
-        Args:
-            df: DataFrame con columna 'PROFIT'
-        
-        Returns:
-            Profit Factor redondeado a 2 decimales
-            Retorna 0 si no hay pérdidas
-        """
+
         total_wins = df[df['PROFIT'] > 0]['PROFIT'].sum()
         total_losses = abs(df[df['PROFIT'] < 0]['PROFIT'].sum())
         
@@ -40,16 +26,7 @@ class MetricsCalculator:
     
     @staticmethod
     def weekly_win_percentage(df: pd.DataFrame) -> float:
-        """
-        Calcula el porcentaje de semanas con profit positivo.
-        
-        Args:
-            df: DataFrame con columnas 'PROFIT' y 'CLOSE_AT'
-        
-        Returns:
-            Porcentaje de semanas positivas redondeado a 1 decimal
-            Retorna 0 si no hay semanas
-        """
+
         df = df.copy()
         df['CLOSE_DATE'] = pd.to_datetime(df['CLOSE_AT'])
         df['week'] = df['CLOSE_DATE'].dt.to_period('W')
@@ -64,16 +41,7 @@ class MetricsCalculator:
     
     @staticmethod
     def max_drawdown_from_equity(equity_series: pd.Series) -> float:
-        """
-        Calcula el Max Drawdown en porcentaje desde una serie de equity.
-        
-        Args:
-            equity_series: Serie de pandas con valores de equity
-        
-        Returns:
-            Max Drawdown en % (valor negativo) redondeado a 2 decimales
-            Retorna 0 si no hay drawdown
-        """
+
         if len(equity_series) == 0:
             return 0.0
         
@@ -84,16 +52,7 @@ class MetricsCalculator:
     
     @staticmethod
     def max_drawdown_from_trades(df: pd.DataFrame, capital_assigned: float) -> float:
-        """
-        Calcula el Max Drawdown directamente desde trades.
-        
-        Args:
-            df: DataFrame con columnas 'PROFIT' y 'CLOSE_AT'
-            capital_assigned: Capital asignado inicial
-        
-        Returns:
-            Max Drawdown en % (valor negativo) redondeado a 2 decimales
-        """
+
         if len(df) == 0 or capital_assigned == 0:
             return 0.0
         
@@ -109,18 +68,7 @@ class MetricsCalculator:
     
     @staticmethod
     def sharpe_ratio(daily_returns: pd.Series) -> float:
-        """
-        Calcula el Sharpe Ratio anualizado.
-        
-        Sharpe = (Mean Return / Std Return) * sqrt(252)
-        
-        Args:
-            daily_returns: Serie de retornos diarios (pct_change)
-        
-        Returns:
-            Sharpe Ratio anualizado redondeado a 2 decimales
-            Retorna 0 si no hay datos o std = 0
-        """
+
         if len(daily_returns) == 0:
             return 0.0
         
@@ -133,21 +81,7 @@ class MetricsCalculator:
     
     @staticmethod
     def calculate_r_squared(equity_values):
-        """
-        Calcula R² de la equity curve vs línea recta.
-        Mide consistencia del crecimiento.
-        
-        R² = 1.0 → Línea recta perfecta (ideal)
-        R² > 0.9 → Muy consistente
-        R² = 0.7-0.9 → Buena consistencia
-        R² < 0.7 → Equity errática
-        
-        Args:
-            equity_values: Lista o array de valores de equity
-        
-        Returns:
-            float: R² entre 0 y 1
-        """
+
         if len(equity_values) < 2:
             return 0.0
         
@@ -201,17 +135,7 @@ class MetricsCalculator:
     
     @staticmethod
     def total_profit_percentage(total_profit: float, capital_assigned: float) -> float:
-        """
-        Calcula el profit total en porcentaje.
-        
-        Args:
-            total_profit: Profit total en USD
-            capital_assigned: Capital asignado
-        
-        Returns:
-            Profit % redondeado a 2 decimales
-            Retorna 0 si capital_assigned es 0
-        """
+
         if capital_assigned > 0:
             return round((total_profit / capital_assigned) * 100, 2)
         return 0.0
@@ -219,18 +143,7 @@ class MetricsCalculator:
     @classmethod
     def calculate_all_metrics(cls, df: pd.DataFrame, capital_assigned: float, 
                               include_profit_pct: bool = False) -> Dict[str, any]:
-        """
-        ✅ MÉTODO UNIFICADO - Calcula TODAS las métricas de forma consistente.
-        Usado tanto por Curves como por Compose para garantizar métricas idénticas.
-        
-        Args:
-            df: DataFrame con trades (columnas: PROFIT, CLOSE_AT)
-            capital_assigned: Capital total asignado
-            include_profit_pct: Si True, incluye total_profit_pct en el resultado (para Compose)
-        
-        Returns:
-            Dict con todas las métricas + equity diaria (para gráficas en Curves)
-        """
+
         if len(df) == 0:
             result = {
                 'num_trades': 0,

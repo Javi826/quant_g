@@ -8,10 +8,10 @@ logger = logging.getLogger("BOT_batch.pipeline.universe")
 # =============================================================================
 # FILTER SYMBOLS
 # =============================================================================
-ENABLE_INCLUDE_FILTER = False
-INCLUDED_SYMBOLS = ["BTCUSDT","ETHUSDT"]
+ENABLE_INCLUDE_FILTER = True
+INCLUDED_SYMBOLS = ["XLMUSDT"]
 
-ENABLE_EXCLUDE_FILTER = True
+ENABLE_EXCLUDE_FILTER = False
 EXCLUDED_SYMBOLS = {"BTCUSDT", "ETHUSDT"}
 
 # Symbols must have data available from this date onward (covers WFO window 0 train_start).
