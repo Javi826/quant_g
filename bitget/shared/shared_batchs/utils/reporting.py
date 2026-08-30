@@ -159,12 +159,17 @@ def print_best_wfo_portfolio(
     logger.info(f"\n{'='*W}")
     logger.info(f"  BEST WFO PORTFOLIO — metric: {metric} | splits: {len(subperiods)}")
     logger.info(f"{'='*W}")
+    total_weeks = (subperiods[-1][2] - subperiods[0][1]).days / 7.0
+
     for rank, entry in enumerate(top, start=1):
-        combo      = entry["combo"]
-        score      = entry["weighted_rank_score"]
-        avg_trades = np.mean([len(df) for sid, df in trades_list if sid in combo])
-        percentile = score / n_qualified * 100
-        logger.info(f"\nBEST #{rank} — Strategies: {len(combo)}  |  AvgTrades/strat={avg_trades:.0f}  |  WeightedRankScore={score:.2f}  |  Top {percentile:.1f}%")
+        combo                  = entry["combo"]
+        score                  = entry["weighted_rank_score"]
+        n_strategies           = len(combo)
+        total_trades           = sum(len(df) for sid, df in trades_list if sid in combo)
+        avg_trades_weekly_sys  = total_trades / total_weeks if total_weeks > 0 else float("nan")
+        avg_trades_weekly_strat = avg_trades_weekly_sys / n_strategies if n_strategies > 0 else float("nan")
+        percentile             = score / n_qualified * 100
+        logger.info(f"\nBEST #{rank} — Strategies: {n_strategies}  |  AvgTrades/week(system)={avg_trades_weekly_sys:.2f}  |  AvgTrades/week(strat)={avg_trades_weekly_strat:.2f}  |  Top {percentile:.1f}%")
         logger.info(f"{'─'*W}")
         for s in sorted(combo, key=lambda s: int(s.split("_")[0])):
             icon = "🟢" if "_long_" in s else "🔴"

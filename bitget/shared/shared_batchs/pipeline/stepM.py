@@ -12,10 +12,10 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 # STATISTICAL TEST CONFIG + STEPDOWN / K-FWE CONFIG -ROmano Wolf
 # =============================================================================
-STEPM_ALPHA          = 0.10           # significance level used inside the Romano-Wolf stepdown search
-STEPM_K_MODE         = "percentile"   # "absolute" or "percentile"
-STEPM_K_FWE          = 1              # used when STEPM_K_MODE == "absolute"
-STEPM_K_PERCENTILE   = 0.02           # used when STEPM_K_MODE == "percentile"
+STEPM_ALPHA        = 0.10           # significance level used inside the Romano-Wolf stepdown search
+STEPM_K_MODE       = "kesime"       # "kmaxime" or "kesime"
+STEPM_K_FWE        = 1              # used when STEPM_K_MODE == "kmaxime"
+STEPM_K_ESIME      = 0.02           # used when STEPM_K_MODE == "kesime"
 
 # =============================================================================
 # STATISTICAL TEST 
@@ -98,11 +98,7 @@ def _build_bootstrap_weight_matrix(
     n_obs: int,
     n_replicas: int,
 ) -> np.ndarray:
-    """Builds W (n_replicas, n_obs) where W[r, i] = number of times observation
-    i is included in bootstrap replica r. Every replica shares the same block
-    starts across all columns, so W is built once and reused as a GEMM operand
-    for every column chunk (means/sumsq for all columns at once = W @ X).
-    """
+
     diff = np.zeros((n_replicas, n_obs + 1), dtype=np.int32)
     row_idx = np.arange(n_replicas)
 
@@ -127,11 +123,7 @@ def _bootstrap_moments_chunk(
     real_sharpe_batch: np.ndarray,
     n_obs: int,
 ) -> tuple:
-    """Computes bootstrap deviations and their column-wise sigma for one
-    column chunk via two GEMMs (BLAS), replacing the per-observation scalar
-    loop. Numerically equivalent to the prefix-sum formulation, not bit-exact
-    (different floating-point summation order inside BLAS).
-    """
+
     total_sum   = weight_matrix @ batch_values
     total_sumsq = weight_matrix @ (batch_values * batch_values)
 
@@ -414,7 +406,7 @@ def pipe_stepm(
     n_bootstrap: int = None,
     block_size: int = None,
     n_jobs: int = None,
-    stepm_k_percentile: float = None,
+    stepm_k_esime: float = None,
     seed: int = None,
     timeframe: str = "",
 ) -> list:
@@ -425,7 +417,7 @@ def pipe_stepm(
     block_size          = block_size         if block_size         is not None else WHITE_BLOCK_SIZE
     n_jobs              = n_jobs             if n_jobs             is not None else STEPM_N_JOBS
     seed                = seed               if seed               is not None else RANDOM_SEED
-    stepm_k_percentile  = stepm_k_percentile if stepm_k_percentile is not None else STEPM_K_PERCENTILE
+    stepm_k_esime       = stepm_k_esime      if stepm_k_esime      is not None else STEPM_K_ESIME
 
     if not np.isclose(stepm_pvalue_th, stepm_alpha):
         raise ValueError(
@@ -483,19 +475,19 @@ def pipe_stepm(
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
     logger.info(f"{'─' * 70}\n")
 
-    if STEPM_K_MODE == "absolute":
+    if STEPM_K_MODE == "kmaxime":
         k_fwe = STEPM_K_FWE
-    elif STEPM_K_MODE == "percentile":
+    elif STEPM_K_MODE == "kesime":
         n_cols_for_k = len(kept_columns)
-        k_fwe = max(1, int(np.ceil(stepm_k_percentile * n_cols_for_k)))
+        k_fwe = max(1, int(np.ceil(stepm_k_esime * n_cols_for_k)))
         k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
         n_cols_for_k_fmt = f"{n_cols_for_k:,}".replace(",", ".")
         logger.info(
-            f"STEPM ── {timeframe} ── STEPM_K_MODE=percentile ── resolved k={k_fwe_fmt} "
-            f"from {stepm_k_percentile:.4%} of {n_cols_for_k_fmt} surviving columns"
+            f"STEPM ── {timeframe} ── STEPM_K_MODE=kesime ── resolved k={k_fwe_fmt} "
+            f"from {stepm_k_esime:.4%} of {n_cols_for_k_fmt} surviving columns"
         )
     else:
-        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'absolute' or 'percentile'.")
+        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'kmaxime' or 'kesime'.")
 
     logger.debug(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
 

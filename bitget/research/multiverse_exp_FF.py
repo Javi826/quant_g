@@ -1,4 +1,4 @@
-#experiments/multiverse_exp_FF.py
+#experiments/multiverse_exp_FF.py (crypto)
 import os
 import sys
 import time
@@ -34,8 +34,9 @@ from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
 from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
+from shared_batchs.pipeline import backtest_runner as backtest_module
+from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 from FF_test import pipe_FF_test
-from univers_exp_FF import _run_backtest_universe
 
 # =============================================================================
 # GENERAL
@@ -117,6 +118,38 @@ def _ranking_score(ff_result: dict, rank_percentiles: list) -> float:
     idx = [int(np.where(np.isclose(percentiles, p))[0][0]) for p in rank_percentiles]
     return float(np.mean(pct_below_actual[idx]))
 
+# =============================================================================
+# BACKTEST UNIVERSE — build the raw universe once, hand it to the FF pipe.
+# =============================================================================
+def _run_backtest_universe(
+    rules: list,
+    ohlcv_arr: dict,
+    param_grid: dict,
+    order_amount: int,
+    timeframe: str,
+    n_jobs: int = -1,
+    apply_signal_cleaning: bool = False,
+) -> tuple:
+    """Run the brute-force backtest once; shared by any diagnostic that needs the same matrix."""
+    if apply_signal_cleaning:
+        rules = pipe_signal_cleaning_jaccard(
+            rules     = rules,
+            ohlcv_arr = ohlcv_arr,
+            timeframe = timeframe,
+        )
+
+    original_n_jobs = backtest_module.BACKTEST_N_JOBS
+    backtest_module.BACKTEST_N_JOBS = n_jobs
+    try:
+        return backtest_module.pipe_backtesting(
+            rules        = rules,
+            ohlcv_arr    = ohlcv_arr,
+            param_grid   = param_grid,
+            order_amount = order_amount,
+            timeframe    = timeframe,
+        )
+    finally:
+        backtest_module.BACKTEST_N_JOBS = original_n_jobs
 # =============================================================================
 # SINGLE COMBO RUN
 # =============================================================================
