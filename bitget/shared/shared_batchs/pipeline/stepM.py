@@ -15,8 +15,14 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 STEPM_ALPHA        = 0.10           # significance level used inside the Romano-Wolf stepdown search
 STEPM_K_MODE       = "kesime"       # "kmaxime" or "kesime"
 STEPM_K_FWE        = 1              # used when STEPM_K_MODE == "kmaxime"
-STEPM_K_ESIME      = 0.02           # used when STEPM_K_MODE == "kesime"
+STEPM_K_ESIME_TF   = {
+    "1H":     0.02,
+    "4H":     0.02,
+    "6Hutc":  0.02,
+    "12Hutc": 0.02,
+}
 
+CROSS_SECTIONAL_PERCENTILES = np.array([50, 90, 95, 96, 97, 98, 99, 99.9, 99.99, 100])
 # =============================================================================
 # STATISTICAL TEST 
 # =============================================================================
@@ -35,7 +41,6 @@ BOOTSTRAP_CHUNK_SIZE = 8192     # columns processed per GEMM call in the bootstr
 # =============================================================================
 # PARALLELISM + FIX
 # =============================================================================
-STEPM_N_JOBS         = -1     # kept for API compatibility; bootstrap parallelism now comes from BLAS threads, not process pools
 RANDOM_SEED          = 42
 SHARPE_PERIODS_YEAR  = 365.0
 
@@ -158,7 +163,6 @@ def compute_deviation_matrix(
     n_bootstrap: int = WHITE_N_BOOTSTRAP,
     block_size: int = WHITE_BLOCK_SIZE,
     seed: int = RANDOM_SEED,
-    n_jobs: int = None,
     progress_label: str = "",
 ) -> dict:
 
@@ -288,6 +292,38 @@ def _kth_largest_by_row_chunks(values: np.ndarray, k_eff: int, chunk_size: int =
     return result
 
 # =============================================================================
+# CUT DIAGNOSTIC — where the stepdown cut k lands on the cross-sectional grid
+# =============================================================================
+def _percentile_from_k(k: int, n_cols: int, grid: np.ndarray = CROSS_SECTIONAL_PERCENTILES) -> float:
+    """Snap the exact percentile implied by k to the nearest grid value, so the
+    reported row matches the corresponding FF_test row exactly."""
+    exact = 100.0 * (n_cols - k) / max(n_cols - 1, 1)
+    return float(grid[np.argmin(np.abs(grid - exact))])
+
+
+def compute_cut_diagnostic(
+    studentized_deviations: np.ndarray,
+    z_stat: np.ndarray,
+    k: int,
+    chunk_size: int = PARTITION_ROW_CHUNK,
+) -> dict:
+    """Cross-sectional read of the null at the percentile the stepdown cut sits
+    on: same statistic, same null and same reduction FF_test uses, so both
+    report an identical %<Real for that row."""
+    pct  = _percentile_from_k(k, z_stat.shape[0])
+    real = float(np.percentile(z_stat, pct))
+
+    below = 0
+    for start in range(0, studentized_deviations.shape[0], chunk_size):
+        batch  = studentized_deviations[start:start + chunk_size]
+        below += int((np.percentile(batch, pct, axis=1) < real).sum())
+
+    return {
+        "percentile":  pct,
+        "real":        real,
+        "pct_below":   100.0 * below / studentized_deviations.shape[0],
+    }
+# =============================================================================
 # STEPM (ROMANO & WOLF, 2005) — stepdown per-rule p-values controlling FWER
 # =============================================================================
 def stepwise_reality_check_pvalues(
@@ -401,34 +437,20 @@ def pipe_stepm(
     raw_results: list,
     matrix_arr: np.ndarray,
     col_names: list,
-    stepm_alpha: float = None,
-    stepm_pvalue_th: float = None,
-    n_bootstrap: int = None,
-    block_size: int = None,
-    n_jobs: int = None,
+    stepm_alpha: float = STEPM_ALPHA,   # drives both the stepdown active sets and the pass/fail cut; splitting them would void the FWE guarantee
+    n_bootstrap: int = WHITE_N_BOOTSTRAP,
+    block_size: int = WHITE_BLOCK_SIZE,
     stepm_k_esime: float = None,
-    seed: int = None,
+    seed: int = RANDOM_SEED,
     timeframe: str = "",
 ) -> list:
 
-    stepm_alpha        = stepm_alpha        if stepm_alpha        is not None else STEPM_ALPHA
-    stepm_pvalue_th     = stepm_pvalue_th    if stepm_pvalue_th    is not None else stepm_alpha
-    n_bootstrap         = n_bootstrap        if n_bootstrap        is not None else WHITE_N_BOOTSTRAP
-    block_size          = block_size         if block_size         is not None else WHITE_BLOCK_SIZE
-    n_jobs              = n_jobs             if n_jobs             is not None else STEPM_N_JOBS
-    seed                = seed               if seed               is not None else RANDOM_SEED
-    stepm_k_esime       = stepm_k_esime      if stepm_k_esime      is not None else STEPM_K_ESIME
-
-    if not np.isclose(stepm_pvalue_th, stepm_alpha):
-        raise ValueError(
-            f"stepm_pvalue_th ({stepm_pvalue_th}) must equal stepm_alpha "
-            f"({stepm_alpha}). The FWE guarantee of Algorithm 4.1 only holds "
-            "when the pass/fail threshold matches the alpha used to build "
-            "the stepdown active sets — decoupling them invalidates the FWE "
-            "control for both values."
-        )
-
     start = time.time()
+
+    if stepm_k_esime is None:
+        if timeframe not in STEPM_K_ESIME_TF:
+            raise ValueError(f"No STEPM_K_ESIME configured for timeframe: {timeframe!r}")
+        stepm_k_esime = STEPM_K_ESIME_TF[timeframe]
 
     if matrix_arr is None:
         logger.warning(f"STEPM ── {timeframe} ── insufficient data — skipping, passing all rules through untouched")
@@ -439,7 +461,7 @@ def pipe_stepm(
         return [{**r, **empty_stepm_fields()} for r in raw_results]
     bootstrap_result = compute_deviation_matrix(
         matrix_arr, col_names, n_bootstrap=n_bootstrap, block_size=block_size,
-        seed=seed, n_jobs=n_jobs, progress_label=timeframe,
+        seed=seed, progress_label=timeframe,
     )
     kept_columns            = bootstrap_result["kept_columns"]
     real_sharpe             = bootstrap_result["real_sharpe"]
@@ -458,6 +480,20 @@ def pipe_stepm(
 
     best_raw_idx  = int(np.argmax(real_sharpe))
     best_raw_name = str(kept_columns[best_raw_idx])
+    
+    if STEPM_K_MODE == "kmaxime":
+        k_fwe = STEPM_K_FWE
+    elif STEPM_K_MODE == "kesime":
+        n_cols_for_k = len(kept_columns)
+        k_fwe = max(1, int(np.ceil(stepm_k_esime * n_cols_for_k)))
+        k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
+        n_cols_for_k_fmt = f"{n_cols_for_k:,}".replace(",", ".")
+        logger.info(
+            f"STEPM ── {timeframe} ── STEPM_K_MODE=kesime ── resolved k={k_fwe_fmt} "
+            f"from {stepm_k_esime:.4%} of {n_cols_for_k_fmt} surviving columns"
+        )
+    else:
+        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'kmaxime' or 'kesime'.")
 
     logger.debug(f"\n{'─' * 70}")
     logger.debug(f"  MAX RAW SHARPE (no bootstrap adjustment) ── {timeframe}")
@@ -473,21 +509,13 @@ def pipe_stepm(
     logger.info(f"  best Sharpe(z)    : {real_sharpe[best_col_idx]:.4f}")
     logger.debug(f" best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
     logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
-    logger.info(f"{'─' * 70}\n")
 
-    if STEPM_K_MODE == "kmaxime":
-        k_fwe = STEPM_K_FWE
-    elif STEPM_K_MODE == "kesime":
-        n_cols_for_k = len(kept_columns)
-        k_fwe = max(1, int(np.ceil(stepm_k_esime * n_cols_for_k)))
-        k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
-        n_cols_for_k_fmt = f"{n_cols_for_k:,}".replace(",", ".")
-        logger.info(
-            f"STEPM ── {timeframe} ── STEPM_K_MODE=kesime ── resolved k={k_fwe_fmt} "
-            f"from {stepm_k_esime:.4%} of {n_cols_for_k_fmt} surviving columns"
-        )
-    else:
-        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'kmaxime' or 'kesime'.")
+    cut = compute_cut_diagnostic(studentized_deviations, z_stat, k_fwe)
+    logger.info(
+        f"  P{cut['percentile']:<17.6g}: {cut['pct_below']:.2f}% <Real  "
+        f"(k={f'{k_fwe:,}'.replace(',', '.')})"
+    )
+    logger.info(f"{'─' * 70}\n")
 
     logger.debug(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
 
@@ -514,7 +542,7 @@ def pipe_stepm(
         stepm_p       = stepm_p_by_col.get(col_name, float("nan"))
         sharpe_val    = sharpe_by_col.get(col_name, float("nan"))
         z_val         = z_stat_by_col.get(col_name, float("nan"))
-        passed        = bool(np.isfinite(stepm_p) and stepm_p <= stepm_pvalue_th)
+        passed        = bool(np.isfinite(stepm_p) and stepm_p <= stepm_alpha)
         n_passed     += int(passed)
     
         results.append({

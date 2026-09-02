@@ -88,14 +88,14 @@ def _block_bootstrap_sample(
 def _evaluate_universe_batch_chunk(
     path_indices: list,
     paths: dict,
-    ts_index_by_symbol: dict,
+    ts_index: np.ndarray,
     n_symbols_expected: int,
     rules: list,
     order_amount: int,
 ) -> list:
     return [
         _evaluate_universe_batch(
-            path_idx, paths, ts_index_by_symbol, n_symbols_expected,
+            path_idx, paths, ts_index, n_symbols_expected,
             rules, order_amount,
         )
         for path_idx in path_indices
@@ -186,13 +186,14 @@ def _generate_mcpt_paths_all_symbols(
 # =============================================================================
 # PRIVATE HELPERS
 # =============================================================================
-def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index_by_symbol: dict) -> dict:
+def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index: np.ndarray) -> dict:
+    ts64 = ts_index.astype("datetime64[ns]")
+
     ohlcv_arr = {}
     for sym, arr_paths in paths_per_symbol.items():
         if path_idx >= arr_paths.shape[0]:
             continue
-        arr  = arr_paths[path_idx]  # (n_obs, n_features)
-        ts64 = ts_index_by_symbol[sym].astype("datetime64[ns]")[:arr.shape[0]]
+        arr = arr_paths[path_idx]  # (n_obs, n_features)
         ohlcv_arr[sym] = {
             "ts":        ts64,
             "open":      arr[:, 0].astype(np.float64),
@@ -205,16 +206,17 @@ def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index_by_symb
         }
     return ohlcv_arr
 
+# DESPUÉS
 def _evaluate_universe_batch(
     path_idx: int,
     paths: dict,
-    ts_index_by_symbol: dict,
+    ts_index: np.ndarray,
     n_symbols_expected: int,
     rules: list,
     order_amount: int,
 ) -> dict:
 
-    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index_by_symbol)
+    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index)
 
     if len(synthetic_arr) < n_symbols_expected:
         return {r["rule_id"]: (None, None, None) for r in rules}
@@ -275,7 +277,9 @@ def _evaluate_multiverse_batch(
             {r["rule_id"]: False for r in rules},
         )
 
-    ts_index_by_symbol = {sym: df.index.to_numpy() for sym, df in ohlcv_data.items()}
+    ref_sym  = max(ohlcv_data.keys(), key=lambda sym: len(ohlcv_data[sym]))
+    n_obs    = len(ohlcv_data[ref_sym])
+    ts_index = ohlcv_data[ref_sym].index[:n_obs].to_numpy()
 
     paths = _generate_mcpt_paths_all_symbols(
         ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], block_size=block_size,
@@ -291,7 +295,7 @@ def _evaluate_multiverse_batch(
     chunked_results = list(tqdm(
         Parallel(n_jobs=n_jobs, return_as="generator")(
             delayed(_evaluate_universe_batch_chunk)(
-                chunk.tolist(), paths, ts_index_by_symbol, n_symbols_expected,
+                chunk.tolist(), paths, ts_index, n_symbols_expected,
                 rules, order_amount,
             )
             for chunk in path_chunks

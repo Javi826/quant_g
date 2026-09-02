@@ -57,15 +57,20 @@ SYMBOL_POOL = [
     "XLMUSDT","XRPUSDT",
 ] 
 
-TIMEFRAMES   = ["1H"]
-COMBO_SIZES  = [1,2,5,10]
+# =============================================================================
+# TIMEFRAMES   = ["1H","4H","6Hutc","12Hutc"]
+# COMBO_SIZES  = [10]
+# =============================================================================
+
+TIMEFRAMES   = ["4H"]
+COMBO_SIZES  = [1,10]
 
 # Sample size per combo size. None = exhaustive (used automatically for N=1).
 N_SAMPLES_PER_SIZE = {
     1: None,
     2: 20,
     5: 40,
-   10: 20,
+    10: 1,
 }
 
 PARAM_GRID = {
@@ -74,8 +79,9 @@ PARAM_GRID = {
     "SL_PCT":     [6,8],
 }
 
-RANK_PERCENTILES = [95,98,99,99.9,99.99]
-TOP_N_DISPLAY    = 20
+RANK_PERCENTILES    = [95,96,97,98,99,99.9]
+TOP_N_DISPLAY       = 5
+PCT_BELOW_THRESHOLD = 20.0  # %<Real threshold marking "real clearly beats the null" at a given percentile
 
 # =============================================================================
 # COMBO GENERATION
@@ -119,6 +125,16 @@ def _ranking_score(ff_result: dict, rank_percentiles: list) -> float:
     return float(np.mean(pct_below_actual[idx]))
 
 # =============================================================================
+# PER-PERCENTILE %<Real — one value per RANK_PERCENTILE, keyed for the report
+# =============================================================================
+def _pct_below_by_rank(ff_result: dict, rank_percentiles: list) -> dict:
+    percentiles      = ff_result["percentiles"]
+    pct_below_actual = ff_result["pct_below_actual"]
+    return {
+        f"pct_below_{p}": float(pct_below_actual[int(np.where(np.isclose(percentiles, p))[0][0])])
+        for p in rank_percentiles
+    }
+# =============================================================================
 # BACKTEST UNIVERSE — build the raw universe once, hand it to the FF pipe.
 # =============================================================================
 def _run_backtest_universe(
@@ -150,6 +166,20 @@ def _run_backtest_universe(
         )
     finally:
         backtest_module.BACKTEST_N_JOBS = original_n_jobs
+        
+# =============================================================================
+# THRESHOLD REPORT — per RANK_PERCENTILE, which combos clear PCT_BELOW_THRESHOLD
+# =============================================================================
+def _log_threshold_report(subset: pd.DataFrame, rank_percentiles: list, threshold: float) -> None:
+    logger.info(f"\n{'=' * 100}")
+    logger.info(f"  COMBOS ABOVE THRESHOLD ── %<Real > {threshold}")
+    logger.info(f"{'=' * 100}")
+    for p in rank_percentiles:
+        col     = f"pct_below_{p}"
+        passing = subset[subset[col] > threshold].sort_values(col, ascending=False)
+        logger.info(f"\n  Pct {p} ── {len(passing)}/{len(subset)} combo(s) pass")
+        if len(passing) > 0:
+            logger.info(passing[["symbols", "n_symbols", col]].to_string(index=False))
 # =============================================================================
 # SINGLE COMBO RUN
 # =============================================================================
@@ -186,6 +216,7 @@ def _run_combo(combo: tuple, ohlcv_is_pool: dict, ohlcv_arr_pool: dict, timefram
         "n_symbols": len(combo),
         "symbols":   "+".join(combo),
         "score":     _ranking_score(ff_result, RANK_PERCENTILES),
+        **_pct_below_by_rank(ff_result, RANK_PERCENTILES),
     }
 
 # =============================================================================
@@ -209,14 +240,15 @@ if __name__ == "__main__":
         ohlcv_is_pool, ohlcv_arr_pool = _load_pool_data(timeframe)
 
         for size in COMBO_SIZES:
-            combos = _generate_combos(SYMBOL_POOL, size, N_SAMPLES_PER_SIZE.get(size), RANDOM_SEED)
+            combos   = _generate_combos(SYMBOL_POOL, size, N_SAMPLES_PER_SIZE.get(size), RANDOM_SEED)
+            n_combos = len(combos)
             logger.info(f"\n{'=' * 100}")
-            logger.info(f"  {timeframe.upper()} ── N={size} ── RUNNING {len(combos)} COMBO(S)")
+            logger.info(f"  {timeframe.upper()} ── N={size} ── RUNNING {n_combos} COMBO(S)")
             logger.info(f"{'=' * 100}\n")
 
-            for combo in combos:
+            for combo_idx, combo in enumerate(combos, start=1):
                 logger.info(f"{'-' * 100}")
-                logger.info(f"Testing: {' + '.join(combo)}")
+                logger.info(f"Testing: {' + '.join(combo)} <{combo_idx}/{n_combos}>")
                 logger.info(f"{'-' * 100}")
                 row = _run_combo(combo, ohlcv_is_pool, ohlcv_arr_pool, timeframe)
                 if row is not None:
@@ -233,6 +265,8 @@ if __name__ == "__main__":
             logger.info(subset.head(TOP_N_DISPLAY).to_string(index=False))
         else:
             logger.info(subset.head(TOP_N_DISPLAY)[["symbols", "n_symbols", "score"]].to_string(index=False))
+
+        _log_threshold_report(subset, RANK_PERCENTILES, PCT_BELOW_THRESHOLD)
 
     elapsed = int(time.time() - start)
     logger.info(f"\n🏁 TOTAL — {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
