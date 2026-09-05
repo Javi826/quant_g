@@ -400,13 +400,13 @@ def pipe_wfo(
     param_grid: dict,
     order_amount: int,
     timeframe: str,
-    net_gain_th: float = None,
-    dd_th: float = None,
-    r2_th: float = None,
-    wfr_th: float = None,
+    net_gain_th: float = WFO_NET_GAIN_TH,
+    dd_th: float = WFO_DD_TH,
+    r2_th: float = WFO_R2_TH,
+    wfr_th: float = WFO_WFR_TH,
     enabled: bool = True,
-    rules_n_jobs: int = None,
-    inner_n_jobs: int = None,
+    rules_n_jobs: int = RULES_N_JOBS,
+    inner_n_jobs: int = INNER_N_JOBS,
     show_progress: bool = False,
     log_level: int = logging.INFO,
     save_trades: bool = False,
@@ -415,13 +415,6 @@ def pipe_wfo(
     if not enabled:
         logger.info(f"WFO ── {timeframe} ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_wfo_fields()} for r in rules]
-
-    net_gain_th  = net_gain_th  if net_gain_th  is not None else WFO_NET_GAIN_TH
-    dd_th        = dd_th        if dd_th        is not None else WFO_DD_TH
-    r2_th        = r2_th        if r2_th        is not None else WFO_R2_TH
-    wfr_th       = wfr_th       if wfr_th       is not None else WFO_WFR_TH
-    rules_n_jobs = rules_n_jobs if rules_n_jobs is not None else RULES_N_JOBS
-    inner_n_jobs = inner_n_jobs if inner_n_jobs is not None else INNER_N_JOBS
 
     param_names    = list(param_grid.keys())
     lists_for_grid = [param_grid[k] for k in param_names]
@@ -436,7 +429,7 @@ def pipe_wfo(
             )
             for i, rule in enumerate(rules)
         ),
-        desc=f"WFO {timeframe}".ljust(12),
+        desc=f"WFO LOOP       {timeframe}".ljust(12),
         total=total,
         dynamic_ncols=True,
     ))

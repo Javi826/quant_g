@@ -6,7 +6,7 @@ import pandas as pd
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, INNER_N_JOBS
 from shared_batchs.runs.run_deploy import run_wfo_deploy_ema, save_deploy_symbols
 
-logger = logging.getLogger("BOT_batch.rule_mining.deploy")
+logger = logging.getLogger("BOT_batch.rule_mining.writter")
 
 def _fmt_spec(spec: dict) -> str:
     if "sma_period" in spec:

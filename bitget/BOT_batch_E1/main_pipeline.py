@@ -18,6 +18,7 @@ logger.setLevel(LOG_LEVEL)
 MODULE_LOG_LEVELS = {
     "BOT_batch.pipeline.universe":          logging.INFO,
     "BOT_batch.rule_mining.generator":      logging.INFO,
+    "BOT_batch.pipeline.signal_cleaning":   logging.INFO,
     "BOT_batch.pipeline.backtest_runner":   logging.INFO,
     "BOT_batch.pipeline.stepM":             logging.INFO,
     "BOT_batch.pipeline.wfo":               logging.INFO,
@@ -26,7 +27,7 @@ MODULE_LOG_LEVELS = {
     "BOT_batch.pipeline.montecarlo":        logging.INFO,
     "BOT_batch.pipeline.multiverse":        logging.INFO,
     "BOT_batch.runs.run_best_wfo_portfolio":logging.INFO,
-    "BOT_batch.rule_mining.deploy":         logging.INFO,
+    "BOT_batch.rule_mining.writter":        logging.INFO,
     "BOT_batch.runs.run_deploy":            logging.INFO,
     "BOT_batch.utils.reporting":            logging.INFO,
 }
@@ -36,8 +37,8 @@ for noisy_logger in ("joblib", "matplotlib", "numba"):
     logging.getLogger(noisy_logger).setLevel(logging.WARNING)
  #-----------------------------------------------------------------------------
    
-from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume, ENABLE_INCLUDE_FILTER, ENABLE_EXCLUDE_FILTER, MIN_START_DATE
-from shared_batchs.setup.config_paths import DATA_FOLDER_IS
+from shared_batchs.symbols.universe import build_universe, MIN_START_DATE_BY_DATASET
+from shared_batchs.setup.config_paths import DATA_FOLDER_BY_DATASET
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.pipeline.wfo import WFO_WINDOW_CONFIG, EMA_ALPHA, WFO_NET_GAIN_TH, WFO_DD_TH, WFO_R2_TH, WFO_WFR_TH
 from shared_batchs.pipeline.correlation import CORRELATION_DD_TH
@@ -46,7 +47,7 @@ from shared_batchs.pipeline.multiverse import MULTIVERSE_PVALUE_TH
 from shared_batchs.pipeline.stepM import STEPM_K_ESIME_TF
 from shared_batchs.pipeline.signal_cleaning import JACCARD_SIMILARITY_TH
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
+from shared_batchs.setup.config_backtest import  ORDER_AMOUNT
 from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
 
 # =============================================================================
@@ -55,12 +56,25 @@ from shared_batchs.rule_mining.rule_runner import run_rule_mining_pipeline
 SHOW_PLOTS    = True
 SAVE_TRADES   = False
 RUN_PORTFOLIO = True
-RUN_DEPLOY    = False
+RUN_DEPLOY    = True
+#------------------------------------------------------------------------------
+# SPLIT_MODE = True  -> mining/StepM on IS data, WFO+correlation+MC+multiverse on OOS data
+# SPLIT_MODE = False -> single-source mode, every stage runs on MERGED data
+SPLIT_MODE = False
+
+DATASET_MINING, DATASET_VALIDATION = ("IS", "OOS") if SPLIT_MODE else ("MERGED", "MERGED")
+#------------------------------------------------------------------------------
 #------------------------------------------------------------------------------
 
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
 #TIMEFRAMES = ["12Hutc"]
-N_SYMBOLS  = 10
+
+SYMBOLS_BY_TIMEFRAME = {
+    "1H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "4H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "6Hutc":  ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "12Hutc": ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+}
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -84,7 +98,7 @@ DEPLOY_OUTPUT_PATH   = os.path.join(STRATEGIES_E1_FOLDER, "rules_files", "rules_
 # =============================================================================
 # RUN CONFIG — single source of truth: printed at startup AND persisted
 # =============================================================================
-run_config = {"TIMEFRAMES": TIMEFRAMES, "N_SYMBOLS": N_SYMBOLS, "PARAM_GRID": PARAM_GRID, "WFO_WINDOW_CONFIG": {tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES}, "EMA_ALPHA": EMA_ALPHA, "PIPELINE_WFO": PIPELINE_WFO, "PIPELINE_CORRELATION": PIPELINE_CORRELATION, "PIPELINE_MONTECARLO": PIPELINE_MONTECARLO, "PIPELINE_MULTIVERSE": PIPELINE_MULTIVERSE,
+run_config = {"SPLIT_MODE": SPLIT_MODE, "DATASET_MINING": DATASET_MINING, "DATASET_VALIDATION": DATASET_VALIDATION, "TIMEFRAMES": TIMEFRAMES, "SYMBOLS_BY_TIMEFRAME": SYMBOLS_BY_TIMEFRAME, "PARAM_GRID": PARAM_GRID, "WFO_WINDOW_CONFIG": {tf: WFO_WINDOW_CONFIG.get(tf, {}) for tf in TIMEFRAMES}, "EMA_ALPHA": EMA_ALPHA, "PIPELINE_WFO": PIPELINE_WFO, "PIPELINE_CORRELATION": PIPELINE_CORRELATION, "PIPELINE_MONTECARLO": PIPELINE_MONTECARLO, "PIPELINE_MULTIVERSE": PIPELINE_MULTIVERSE,
               "WFO_NET_GAIN_TH": WFO_NET_GAIN_TH, "WFO_DD_TH": WFO_DD_TH, "WFO_R2_TH": WFO_R2_TH, "WFO_WFR_TH": WFO_WFR_TH, "CORRELATION_DD_TH": CORRELATION_DD_TH, "MONTECARLO_RUIN_TH": MONTECARLO_RUIN_TH, "MULTIVERSE_PVALUE_TH": MULTIVERSE_PVALUE_TH, "STEPM_K_ESIME": {tf: STEPM_K_ESIME_TF[tf] for tf in TIMEFRAMES}, "JACCARD_SIMILARITY_TH": JACCARD_SIMILARITY_TH}
 # =============================================================================
 # LOGGING HELPERS — render the startup banner from run_config
@@ -101,8 +115,21 @@ def log_run_config() -> None:
     logger.info(f"\n{'─' * 115}")
     logger.info(f"  RULE MINING START")
     logger.info(f"{'─' * 115}")
-    logger.info(f"  DATASET     : {os.path.basename(DATA_FOLDER_IS)}")
-    logger.info(f"  N_SYMBOLS   : {N_SYMBOLS} | INCLUDE_FILTER: {_pipeline_icon(ENABLE_INCLUDE_FILTER)}  EXCLUDE_FILTER: {_pipeline_icon(ENABLE_EXCLUDE_FILTER)}  MIN_START_DATE: {MIN_START_DATE}")
+    if SPLIT_MODE:
+        logger.info(
+            f"  DATASET     : SPLIT ── mining: {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET_MINING])} "
+            f"({MIN_START_DATE_BY_DATASET[DATASET_MINING]}) | "
+            f"validation: {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET_VALIDATION])} "
+            f"({MIN_START_DATE_BY_DATASET[DATASET_VALIDATION]})"
+        )
+    else:
+        logger.info(
+            f"  DATASET     : {DATASET_MINING} ── {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET_MINING])} "
+            f"({MIN_START_DATE_BY_DATASET[DATASET_MINING]})"
+        )
+    logger.info(f"  SYMBOLS     :")
+    for tf, symbols in SYMBOLS_BY_TIMEFRAME.items():
+        logger.info(f"    {tf:<10}({len(symbols)}) {symbols}")
     logger.info(f"  TIMEFRAMES  : {TIMEFRAMES}")
     logger.debug(f"  MAX DEPTH  : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM GRID  : {PARAM_GRID}")
@@ -115,7 +142,8 @@ def log_run_config() -> None:
     )
     logger.info(
         f"  PIPES       : JACCARD_TH={JACCARD_SIMILARITY_TH} | "
-        f"STEPM_K_ESIME={run_config['STEPM_K_ESIME']} | "
+     #   f"STEPM_K_MODE={STEPM_K_MODE} | "
+        f"K_ESIME={run_config['STEPM_K_ESIME']} | "
         f"NET_GAIN_TH={WFO_NET_GAIN_TH} DD_TH={WFO_DD_TH} R2_TH={WFO_R2_TH} WFR_TH={WFO_WFR_TH} | "
         f"CORR_TH={CORRELATION_DD_TH} | "
         f"MC_RUIN_TH={MONTECARLO_RUIN_TH} | "
@@ -133,48 +161,64 @@ def log_run_config() -> None:
 if __name__ == "__main__":
     start = time.time()
     try:
+        missing_tf = [tf for tf in TIMEFRAMES if tf not in SYMBOLS_BY_TIMEFRAME]
+        if missing_tf:
+            raise ValueError(f"SYMBOLS_BY_TIMEFRAME is missing entries for timeframes: {missing_tf}")
+
         log_run_config()
 
         # -------------------------------------------------------------------
-        # DATA LOADING — cheap, sequential across timeframes. Rule mining
+        # DATA LOADING — one call validates and loads every symbol, every
+        # timeframe, up front (fails fast if any symbol is bad).
         # -------------------------------------------------------------------
-        ohlcv_data_by_timeframe = {}
-        ohlcv_arr_by_timeframe  = {}
+        ohlcv_data_mining_by_timeframe = build_universe(
+            DATA_FOLDER_BY_DATASET[DATASET_MINING], SYMBOLS_BY_TIMEFRAME,
+            dataset=DATASET_MINING,
+        )
+        ohlcv_arr_mining_by_timeframe  = {
+            timeframe: prepare_ohlcv_arrays(ohlcv_df)
+            for timeframe, ohlcv_df in ohlcv_data_mining_by_timeframe.items()
+        }
 
-        for timeframe in TIMEFRAMES:
-            ohlcv_is = select_universe(
-                data_folder_is    = DATA_FOLDER_IS,
-                timeframe         = timeframe,
-                min_price         = MIN_PRICE,
-                filter_symbols_fn = filter_symbols,
+        if SPLIT_MODE:
+            ohlcv_data_validation_by_timeframe = build_universe(
+                DATA_FOLDER_BY_DATASET[DATASET_VALIDATION], SYMBOLS_BY_TIMEFRAME,
+                dataset=DATASET_VALIDATION,
             )
-            ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
-            ohlcv_data_by_timeframe[timeframe] = ohlcv_is
-            ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
+            ohlcv_arr_validation_by_timeframe = {
+                timeframe: prepare_ohlcv_arrays(ohlcv_df)
+                for timeframe, ohlcv_df in ohlcv_data_validation_by_timeframe.items()
+            }
+        else:
+            # Single-source mode: both roles share the same already-loaded dataset.
+            ohlcv_data_validation_by_timeframe = ohlcv_data_mining_by_timeframe
+            ohlcv_arr_validation_by_timeframe  = ohlcv_arr_mining_by_timeframe
         # -------------------------------------------------------------------
         # RULE MINING — Phase A: DSR for every timeframe, then a combined
         # -------------------------------------------------------------------
         validated_wfo_test, all_mbias_results = run_rule_mining_pipeline(
-            ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
-            ohlcv_arr_by_timeframe  = ohlcv_arr_by_timeframe,
-            timeframes              = TIMEFRAMES,
-            param_grid              = PARAM_GRID,
-            order_amount            = ORDER_AMOUNT,
-            data_folder             = DATA_FOLDER_IS,
-            max_depth               = RULE_MAX_DEPTH,
-            log_level               = MODULE_LOG_LEVELS["BOT_batch.pipeline.wfo"],
-            save_trades             = SAVE_TRADES,
-            brief_trades_folder     = BRIEF_TRADES_FOLDER,
-            show_plots              = SHOW_PLOTS,
-            symbols_live_folder     = SYMBOLS_LIVE_FOLDER,
-            deploy_output_path      = DEPLOY_OUTPUT_PATH,
-            run_config              = run_config,
-            pipeline_wfo            = PIPELINE_WFO,
-            pipeline_correlation    = PIPELINE_CORRELATION,
-            pipeline_montecarlo     = PIPELINE_MONTECARLO,
-            pipeline_multiverse     = PIPELINE_MULTIVERSE,
-            run_best_portfolio      = RUN_PORTFOLIO,
-            run_deploy              = RUN_DEPLOY,
+            ohlcv_data_mining_by_timeframe     = ohlcv_data_mining_by_timeframe,
+            ohlcv_arr_mining_by_timeframe      = ohlcv_arr_mining_by_timeframe,
+            ohlcv_data_validation_by_timeframe = ohlcv_data_validation_by_timeframe,
+            ohlcv_arr_validation_by_timeframe  = ohlcv_arr_validation_by_timeframe,
+            timeframes                         = TIMEFRAMES,
+            param_grid                         = PARAM_GRID,
+            order_amount                       = ORDER_AMOUNT,
+            data_folder                        = DATA_FOLDER_BY_DATASET[DATASET_VALIDATION],
+            max_depth                          = RULE_MAX_DEPTH,
+            log_level                          = MODULE_LOG_LEVELS["BOT_batch.pipeline.wfo"],
+            save_trades                        = SAVE_TRADES,
+            brief_trades_folder                = BRIEF_TRADES_FOLDER,
+            show_plots                         = SHOW_PLOTS,
+            symbols_live_folder                = SYMBOLS_LIVE_FOLDER,
+            deploy_output_path                 = DEPLOY_OUTPUT_PATH,
+            run_config                         = run_config,
+            pipeline_wfo                       = PIPELINE_WFO,
+            pipeline_correlation               = PIPELINE_CORRELATION,
+            pipeline_montecarlo                = PIPELINE_MONTECARLO,
+            pipeline_multiverse                = PIPELINE_MULTIVERSE,
+            run_best_portfolio                 = RUN_PORTFOLIO,
+            run_deploy                         = RUN_DEPLOY,
         )
 
         elapsed = int(time.time() - start)

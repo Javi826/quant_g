@@ -56,25 +56,14 @@ def generate_rule_combinations(bank: ConditionBank, condition_specs: list, max_d
 
 
 def is_side_coherent(spec: dict, side: str) -> bool:
-    """Discard specs whose directional bias contradicts the given side."""
-    spec_type = spec["type"]
-    op        = spec.get("op")
 
-    if spec_type == "rsi":
+    if spec["type"] == "rsi":
+        op    = spec.get("op")
         value = spec["value"]
         if op == "<" and value <= 30:
             return side == "long"
         if op == ">" and value >= 70:
             return side == "short"
-        return True
-
-    if spec_type in ("ma", "momentum"):
-        if op == ">":
-            return side == "long"
-        if op == "<":
-            return side == "short"
-        return True
-
     return True
 
 

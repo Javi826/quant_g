@@ -1,4 +1,4 @@
-#shared/shared_batchs/rule_mining/rule_runner.py
+#shared/shared_batchs/rule_mining/rule_runner.py 
 import os
 import logging
 from shared_batchs.pipeline.wfo import pipe_wfo
@@ -70,13 +70,11 @@ def _empty_wfo_fields() -> dict:
         "wfo_test_trades": None,
     }
 # =============================================================================
-# ORCHESTRATOR
+# ORCHESTRATOR 
 # =============================================================================
 def run_rule_mining_pipeline(
-    ohlcv_data_mining_by_timeframe: dict,
-    ohlcv_arr_mining_by_timeframe: dict,
-    ohlcv_data_validation_by_timeframe: dict,
-    ohlcv_arr_validation_by_timeframe: dict,
+    ohlcv_data_by_timeframe: dict,
+    ohlcv_arr_by_timeframe: dict,
     timeframes: list,
     param_grid: dict,
     order_amount: int,
@@ -97,31 +95,31 @@ def run_rule_mining_pipeline(
     run_best_portfolio: bool = True,
     run_deploy: bool = False,
 ) -> list:
-    #-----------------------------------------------------------------
+    # -------------------------------------------------------------------
     # BACKTESTING — one timeframe at a time, ALL timeframes before moving on.
     # -------------------------------------------------------------------
     all_mbias_results = []
     FF_by_timeframe  = {}
     for timeframe in timeframes:
-        rules = _build_rule_dicts(ohlcv_data_mining_by_timeframe[timeframe], timeframe, max_depth)
+        rules = _build_rule_dicts(ohlcv_data_by_timeframe[timeframe], timeframe, max_depth)
         logger.info(f"\n\033[36m{'=' * 70}")
         logger.info(f"======== RULE MINING ── {timeframe} ── total candidate rules: {format(len(rules), ',').replace(',', '.')} =========")
         logger.info(f"{'=' * 70}\033[0m")
-
+        
         rules = pipe_signal_cleaning_jaccard(
             rules     = rules,
-            ohlcv_arr = ohlcv_arr_mining_by_timeframe[timeframe],
+            ohlcv_arr = ohlcv_arr_by_timeframe[timeframe],
             timeframe = timeframe,
         )
 
         raw_results, n_combos, matrix_arr, col_names = pipe_backtesting(
             rules        = rules,
-            ohlcv_arr    = ohlcv_arr_mining_by_timeframe[timeframe],
+            ohlcv_arr    = ohlcv_arr_by_timeframe[timeframe],
             param_grid   = param_grid,
             order_amount = order_amount,
             timeframe    = timeframe,
         )
-
+                
         mbias_results = pipe_stepm(
             raw_results = raw_results,
             matrix_arr  = matrix_arr,
@@ -129,7 +127,7 @@ def run_rule_mining_pipeline(
             timeframe   = timeframe,
         )
 
-        del raw_results, matrix_arr
+        del raw_results, matrix_arr  
 
         all_mbias_results.extend([{**r, **_empty_wfo_fields()} for r in mbias_results])
 
@@ -142,7 +140,7 @@ def run_rule_mining_pipeline(
 
         wfo_results = pipe_wfo(
             rules               = rules_this_tf,
-            ohlcv_arr           = ohlcv_arr_validation_by_timeframe[timeframe],
+            ohlcv_arr           = ohlcv_arr_by_timeframe[timeframe],
             param_grid          = param_grid,
             order_amount        = order_amount,
             timeframe           = timeframe,
@@ -227,7 +225,7 @@ def run_rule_mining_pipeline(
         rules_for_mv = [raw_by_id[rid] for rid in candidates_before_mv]
         mv_results = pipe_multiverse(
             rules                   = rules_for_mv,
-            ohlcv_data_by_timeframe = ohlcv_data_validation_by_timeframe,
+            ohlcv_data_by_timeframe = ohlcv_data_by_timeframe,
             param_grid              = param_grid,
             order_amount            = order_amount,
             enabled                 = pipeline_multiverse,
@@ -291,7 +289,7 @@ def run_rule_mining_pipeline(
                     specs               = rule_info["specs"],
                     side                = rule_info["side"],
                     timeframe           = rule_tf,
-                    ohlcv_is            = ohlcv_data_validation_by_timeframe[rule_tf],
+                    ohlcv_is            = ohlcv_data_by_timeframe[rule_tf],
                     signal_fn           = rule_info["signal_fn"],
                     param_grid          = param_grid,
                     order_amount        = order_amount,

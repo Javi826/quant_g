@@ -1,4 +1,4 @@
-#BOT_batch/set_BLOCK.py
+#research/calibrations/calibration_BLOCK_sM.py
 
 import os
 import sys
@@ -7,9 +7,9 @@ import logging
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_batch")))
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.main_BLOCK")
@@ -19,30 +19,30 @@ logging.getLogger("BOT_batch.pipeline.stepM").setLevel(logging.WARNING)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
-from shared_batchs.setup.config_paths import DATA_FOLDER_IS
+from shared_batchs.symbols.universe import build_universe
+from shared_batchs.setup.config_paths import DATA_FOLDER_BY_DATASET
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
+from shared_batchs.setup.config_backtest import ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
-
-# =============================================================================
-# SPEED PROFILE — flip to False for the full dense run once the fast pass
-# has told you roughly where WHITE_BLOCK_SIZE should land.
-# =============================================================================
-FAST_MODE = True
+from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
 
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION — mirror main_COMP.py
 # =============================================================================
-N_JOBS = -1
+DATASET = "MERGED"   # "IS", "OOS" or "MERGED"
+N_JOBS  = -1
 
-#TIMEFRAMES = ["1H"]
 TIMEFRAMES = ["1H","4H","6Hutc","12Hutc"]
-#TIMEFRAMES = ["12Hutc"]
 
-N_SYMBOLS  = 10
+SYMBOLS_BY_TIMEFRAME = {
+    "1H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "4H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "6Hutc":  ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "12Hutc": ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+}
+
 PARAM_GRID = {
     "SELL_AFTER": [50],
     "TP_PCT":     [8],
@@ -260,23 +260,27 @@ if __name__ == "__main__":
     logger.info(f"\n{'=' * 78}")
     logger.info(f"  WHITE_BLOCK_SIZE ESTIMATION")
     logger.info(f"{'=' * 78}")
-    logger.info(f"  FAST_MODE         : {FAST_MODE}")
+    logger.info(f"  DATASET           : {DATASET} ── {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET])}")
     logger.info(f"  TIMEFRAMES        : {TIMEFRAMES}")
-    logger.info(f"  N_SYMBOLS         : {N_SYMBOLS}")
+    logger.info(f"  SYMBOLS_BY_TF     : {{tf: len(s) for tf, s in SYMBOLS_BY_TIMEFRAME.items()}}")
     logger.info(f"  PARAM_GRID        : {PARAM_GRID}")
     logger.info(f"  BLOCK_SIZE_GRID   : {BLOCK_SIZE_GRID}")
     logger.info(f"{'=' * 78}")
 
+    ohlcv_data_by_timeframe = build_universe(
+        DATA_FOLDER_BY_DATASET[DATASET], SYMBOLS_BY_TIMEFRAME,
+        dataset=DATASET,
+    )
     for timeframe in TIMEFRAMES:
-        ohlcv_is  = select_universe(
-            data_folder_is    = DATA_FOLDER_IS,
-            timeframe         = timeframe,
-            min_price         = MIN_PRICE,
-            filter_symbols_fn = filter_symbols,
-        )
-        ohlcv_is  = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
+        ohlcv_is  = ohlcv_data_by_timeframe[timeframe]
         ohlcv_arr = prepare_ohlcv_arrays(ohlcv_is)
         rules     = _build_rule_dicts(ohlcv_is, timeframe, RULE_MAX_DEPTH)
+
+        rules = pipe_signal_cleaning_jaccard(
+            rules     = rules,
+            ohlcv_arr = ohlcv_arr,
+            timeframe = timeframe,
+        )
 
         original_n_jobs = backtest_module.BACKTEST_N_JOBS
         backtest_module.BACKTEST_N_JOBS = N_JOBS

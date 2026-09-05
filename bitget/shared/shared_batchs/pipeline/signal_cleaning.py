@@ -1,4 +1,4 @@
-#shared_batchs/pipeline/signal_cleaning.py
+#shared_batchs/pipeline/signal_cleaning.py (crypto)
 import logging
 import numpy as np
 import cupy as cp
@@ -57,7 +57,7 @@ def _compute_spec_signals_symbol(unique_specs: list, arr: dict) -> np.ndarray:
     return rows
 
 
-def _build_spec_word_table(unique_specs: list, ohlcv_arr: dict, n_jobs: int) -> tuple:
+def _build_spec_word_table(unique_specs: list, ohlcv_arr: dict, n_jobs: int, timeframe: str = "") -> tuple:
     """Bit-pack the per-spec signal rows into uint64 words for fast AND-reduction.
     Returns (words, n_bytes) where n_bytes is the unpadded packed row length."""
     symbols = list(ohlcv_arr.keys())
@@ -67,7 +67,7 @@ def _build_spec_word_table(unique_specs: list, ohlcv_arr: dict, n_jobs: int) -> 
             delayed(_compute_spec_signals_symbol)(unique_specs, ohlcv_arr[sym])
             for sym in symbols
         ),
-        desc="SIGNAL MASK BUILD ",
+        desc=f"SIGNAL MASK     {timeframe}",
         total=len(symbols),
         dynamic_ncols=True,
     ))
@@ -87,10 +87,11 @@ def build_signal_mask_keys(
     ohlcv_arr: dict,
     n_jobs: int = SIGNAL_MASK_N_JOBS,
     chunk_size: int = SIGNAL_MASK_CHUNK_SIZE,  # kept for API compatibility
+    timeframe: str = "",
 ) -> list:
 
     unique_specs, index_by_identity = _collect_unique_specs(all_rules)
-    words, n_bytes = _build_spec_word_table(unique_specs, ohlcv_arr, n_jobs)
+    words, n_bytes = _build_spec_word_table(unique_specs, ohlcv_arr, n_jobs, timeframe)
 
     all_keys = []
     for rule in all_rules:
@@ -110,11 +111,11 @@ def build_signal_mask_keys(
 
 _POPCOUNT_TABLE_NP = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint16)
 
-def _packed_signal_matrix(rules: list, ohlcv_arr: dict, n_jobs: int) -> tuple:
+def _packed_signal_matrix(rules: list, ohlcv_arr: dict, n_jobs: int, timeframe: str = "") -> tuple:
     """Pack every rule signal into one contiguous uint64 row so that the GPU
     kernel can AND whole 64-bit words. Returns (words, sides) with words
     shaped (n_rules, n_words)."""
-    signal_keys = build_signal_mask_keys(rules, ohlcv_arr, n_jobs=n_jobs)
+    signal_keys = build_signal_mask_keys(rules, ohlcv_arr, n_jobs=n_jobs, timeframe=timeframe)
     sides       = np.array([side for side, _ in signal_keys])
 
     n_rules   = len(signal_keys)
@@ -252,6 +253,7 @@ def _jaccard_filter_side_gpu(
     threshold: float,
     batch_size: int,
     survivor_chunk_size: int,
+    timeframe: str = "",
 ) -> np.ndarray:
 
     n_cols, n_words = packed_matrix.shape
@@ -266,7 +268,7 @@ def _jaccard_filter_side_gpu(
     survivor_chunks = []
 
     n_batches = int(np.ceil(n_cols / batch_size))
-    desc = "JACCARD FILTER GPU"
+    desc = f"JACCARD GPU     {timeframe}"
 
     for batch_start in tqdm(range(0, n_cols, batch_size), desc=desc, total=n_batches, dynamic_ncols=True):
         batch_end    = min(batch_start + batch_size, n_cols)
@@ -346,13 +348,15 @@ def pipe_signal_cleaning_jaccard(
     n_jobs: int = SIGNAL_MASK_N_JOBS,
 ) -> list:
 
-    packed_matrix, sides = _packed_signal_matrix(rules, ohlcv_arr, n_jobs)
+    _all_ts_dbg = np.concatenate([arr["ts"] for arr in ohlcv_arr.values()])
+    logger.debug(f"JACCARD INPUT   {timeframe}: date range [{_all_ts_dbg.min()} .. {_all_ts_dbg.max()}] over {len(ohlcv_arr)} symbol(s)")
 
+    packed_matrix, sides = _packed_signal_matrix(rules, ohlcv_arr, n_jobs, timeframe)
     kept_positions = []
     for side in np.unique(sides):
         side_positions = np.where(sides == side)[0]
         side_matrix    = packed_matrix[side_positions]
-        kept_local = _jaccard_filter_side_gpu(side_matrix, threshold, batch_size, survivor_chunk_size)
+        kept_local = _jaccard_filter_side_gpu(side_matrix, threshold, batch_size, survivor_chunk_size, timeframe)
         kept_positions.append(side_positions[kept_local])
 
     kept_positions = np.sort(np.concatenate(kept_positions)) if kept_positions else np.array([], dtype=np.int64)
@@ -361,12 +365,7 @@ def pipe_signal_cleaning_jaccard(
     n_kept        = kept_positions.shape[0]
     n_dropped     = n_rules_total - n_kept
 
-    logger.info(f"\n{'─' * 70}")
-    logger.info(f"  JACCARD SIMILARITY FILTER (GPU, threshold={threshold}) ── {timeframe}")
-    logger.info(f"{'─' * 70}")
-    logger.info(f"  OUT rules       : {n_dropped / n_rules_total:.0%} │ {format(n_dropped, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"  IN  rules       : {n_kept / n_rules_total:.0%} │ {format(n_kept, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')}")
-    logger.info(f"{'─' * 70}\n")
+    logger.info(f"\n{'JACCARD FILTER':<16}{timeframe}: {n_kept / n_rules_total:.0%} │ {format(n_kept, ',').replace(',', '.')} / {format(n_rules_total, ',').replace(',', '.')} (th={threshold})")
 
     return [rules[i] for i in kept_positions]
 

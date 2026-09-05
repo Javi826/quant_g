@@ -378,6 +378,9 @@ def pipe_backtesting(
     for _values in param_grid.values():
         n_combos *= len(_values)
 
+    _all_ts_dbg = np.concatenate([arr["ts"] for arr in ohlcv_arr.values()])
+    logger.debug(f"BACKTEST FULL INPUT {timeframe}: date range [{_all_ts_dbg.min()} .. {_all_ts_dbg.max()}] over {len(ohlcv_arr)} symbol(s)")
+
     global_start_day, n_days_range = _global_day_grid(ohlcv_arr)
 
     rules_for_search = [

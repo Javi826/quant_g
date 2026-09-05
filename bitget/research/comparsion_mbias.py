@@ -1,4 +1,4 @@
-#BOT_batch/set_SNOOP.py
+#BOT_batch_E1/research/comparison_mbias.py
 
 import os
 import sys
@@ -33,25 +33,30 @@ logging.getLogger("BOT_batch.utils.reporting").setLevel(REPORTING_LOG_LEVEL)
 logging.getLogger("joblib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
-from shared_batchs.setup.config_paths import DATA_FOLDER_IS
+from shared_batchs.symbols.universe import build_universe
+from shared_batchs.setup.config_paths import DATA_FOLDER_BY_DATASET
 from shared_batchs.rule_mining.rule_generator import MAX_DEPTH as RULE_MAX_DEPTH
 from shared_batchs.rule_mining.rule_runner import _build_rule_dicts
 from shared_batchs.utils.ohlcv_utils import prepare_ohlcv_arrays
-from shared_batchs.setup.config_backtest import MIN_PRICE, ORDER_AMOUNT
+from shared_batchs.setup.config_backtest import ORDER_AMOUNT
 from shared_batchs.pipeline import backtest_runner as backtest_module
 from dsr import pipe_dsr
 from shared_batchs.pipeline.stepM import pipe_stepm, STEPM_ALPHA, WHITE_PVALUE_TH, WHITE_N_BOOTSTRAP, WHITE_BLOCK_SIZE
 from shared_batchs.pipeline.signal_cleaning import pipe_signal_cleaning_jaccard
+
 # =============================================================================
 # UNIVERSE / SEARCH SPACE CONFIGURATION
 # =============================================================================
-N_JOBS = -1  # -1 = use all available cores, for both the backtest search and the StepM bootstrap
+DATASET = "MERGED"   # "IS", "OOS" or "MERGED"
+N_JOBS  = -1         # -1 = use all available cores, for both the backtest search and the StepM bootstrap
 
 TIMEFRAMES = ["1H","4H", "6Hutc", "12Hutc"]
-#TIMEFRAMES = ["12Hutc"]
-#TIMEFRAMES = ["1H"]
-N_SYMBOLS  = 2
+SYMBOLS_BY_TIMEFRAME = {
+    "1H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "4H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "6Hutc":  ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "12Hutc": ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+}
 
 PARAM_GRID = {
     "SELL_AFTER": [50],
@@ -63,7 +68,7 @@ PARAM_GRID = {
 # DSR vs STEPM — full brute universe comparison, no other pipeline stages
 # =============================================================================
 DSR_TH              = 0.95
-STEPM_K_PERCENTILE  = 0.001
+STEPM_K_ESIME       = 0.001
 
 # =============================================================================
 # METHOD REGISTRY — adding a new data-snooping test only requires a new entry
@@ -93,7 +98,7 @@ def compare_dsr_vs_stepm_from_raw(
     col_names: list,
     dsr_th: float,
     n_combos: int,
-    stepm_k_percentile: float | None = None,
+    stepm_k_esime: float | None = None,
     timeframe: str = "",
     n_jobs: int = -1,
 ) -> dict:
@@ -116,11 +121,11 @@ def compare_dsr_vs_stepm_from_raw(
 
     if "stepm" in METHOD_ORDER:
         stepm_results = pipe_stepm(
-            raw_results        = raw_results,
-            matrix_arr         = matrix_arr,
-            col_names          = col_names,
-            stepm_k_percentile = stepm_k_percentile,
-            timeframe          = timeframe,
+            raw_results    = raw_results,
+            matrix_arr     = matrix_arr,
+            col_names      = col_names,
+            stepm_k_esime  = stepm_k_esime,
+            timeframe      = timeframe,
         )
         results_by_method["stepm"] = {r["rule_id"]: r for r in stepm_results}
 
@@ -433,8 +438,9 @@ if __name__ == "__main__":
     logger.info(f"\n{'─' * 115}")
     logger.info(f"  DSR vs STEPM — FULL BRUTE UNIVERSE COMPARISON")
     logger.info(f"{'─' * 115}")
+    logger.info(f"  DATASET        : {DATASET} ── {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET])}")
     logger.info(f"  TIMEFRAMES     : {TIMEFRAMES}")
-    logger.info(f"  N_SYMBOLS      : {N_SYMBOLS}")
+    logger.info(f"  SYMBOLS_BY_TF  : {{tf: len(s) for tf, s in SYMBOLS_BY_TIMEFRAME.items()}}")
     logger.debug(f"  MAX_DEPTH      : {RULE_MAX_DEPTH}")
     logger.info(f"  PARAM_GRID     : {PARAM_GRID}")
     logger.info(f"  DSR_TH         : {DSR_TH}")
@@ -442,26 +448,21 @@ if __name__ == "__main__":
     logger.info(f"  STEPM_PVALUE_TH: {WHITE_PVALUE_TH}")
     logger.info(f"  N_BOOTSTRAP    : {WHITE_N_BOOTSTRAP}")
     logger.info(f"  BLOCK_SIZE     : {WHITE_BLOCK_SIZE}")
-    logger.info(f"  K_PERCENTILE   : {STEPM_K_PERCENTILE}")
+    logger.info(f"  K_ESIME        : {STEPM_K_ESIME}")
     logger.info(f"  SIGNAL_CLEANING: {SIGNAL_CLEANING_TEST}")
     logger.info(f"{'─' * 115}\n")
 
     # -------------------------------------------------------------------
     # DATA LOADING — cheap, sequential across timeframes.
     # -------------------------------------------------------------------
-    ohlcv_data_by_timeframe = {}
-    ohlcv_arr_by_timeframe  = {}
-
-    for timeframe in TIMEFRAMES:
-        ohlcv_is = select_universe(
-            data_folder_is    = DATA_FOLDER_IS,
-            timeframe         = timeframe,
-            min_price         = MIN_PRICE,
-            filter_symbols_fn = filter_symbols,
-        )
-        ohlcv_is = select_top_n_by_volume(ohlcv_is, N_SYMBOLS)
-        ohlcv_data_by_timeframe[timeframe] = ohlcv_is
-        ohlcv_arr_by_timeframe[timeframe]  = prepare_ohlcv_arrays(ohlcv_is)
+    ohlcv_data_by_timeframe = build_universe(
+        DATA_FOLDER_BY_DATASET[DATASET], SYMBOLS_BY_TIMEFRAME,
+        dataset=DATASET,
+    )
+    ohlcv_arr_by_timeframe  = {
+        timeframe: prepare_ohlcv_arrays(ohlcv_is)
+        for timeframe, ohlcv_is in ohlcv_data_by_timeframe.items()
+    }
 
     # -------------------------------------------------------------------
     # DSR vs STEPM — one comparison per timeframe, on the full brute
@@ -486,14 +487,14 @@ if __name__ == "__main__":
         )
 
         comparisons_by_timeframe[timeframe] = compare_dsr_vs_stepm_from_raw(
-            raw_results        = raw_results,
-            matrix_arr          = matrix_arr,
-            col_names           = col_names,
-            dsr_th              = DSR_TH,
-            n_combos            = n_combos,
-            stepm_k_percentile  = STEPM_K_PERCENTILE,
-            timeframe           = timeframe,
-            n_jobs              = N_JOBS,
+            raw_results     = raw_results,
+            matrix_arr      = matrix_arr,
+            col_names       = col_names,
+            dsr_th          = DSR_TH,
+            n_combos        = n_combos,
+            stepm_k_esime   = STEPM_K_ESIME,
+            timeframe       = timeframe,
+            n_jobs          = N_JOBS,
         )
 
     elapsed = int(time.time() - start)

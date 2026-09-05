@@ -3,7 +3,6 @@ import logging
 import numpy as np
 import pandas as pd
 from shared_batchs.utils.batch_metrics import compute_metrics
-from shared_batchs.utils.plotting import plot_multiverse_synthetic_vs_historical
 logger = logging.getLogger("BOT_batch.utils.reporting")
 
 # =============================================================================
@@ -402,107 +401,7 @@ def print_dsr_train_metrics(raw_by_id: dict, dsr_by_id: dict, sr_by_id: dict, ca
             f"{r.get('label', ''):<{label_width}}{status:<8}"
         )
     logger.debug(f"{'─' * 200}\n")
-
-# =============================================================================
-# MULTIVERSE — debug-only reporting (moved from pipeline/multiverse.py)
-# =============================================================================
-
-def print_multiverse_drift_analysis(ohlcv_data: dict, paths: dict) -> None:
-    rows = []
-    for sym, df_hist in ohlcv_data.items():
-        arr_paths = paths.get(sym)
-        if arr_paths is None or arr_paths.shape[0] == 0:
-            continue
-
-        hist_close = df_hist["close"].to_numpy(dtype=np.float64)
-        hist_n_bars        = len(hist_close)
-        hist_total_ret_pct = float((hist_close[-1] / hist_close[0] - 1.0) * 100.0)
-
-        synth_close = arr_paths[:, :, 3].astype(np.float64)
-        synth_n_bars           = arr_paths.shape[1]
-        synth_total_ret_pct    = (synth_close[:, -1] / synth_close[:, 0] - 1.0) * 100.0
-        synth_pct_paths_positive = float(np.mean(synth_total_ret_pct > 0) * 100.0)
-
-        rows.append({
-            "symbol":                   sym,
-            "hist_n_bars":              hist_n_bars,
-            "synth_n_bars":             synth_n_bars,
-            "hist_total_ret_pct":       hist_total_ret_pct,
-            "synth_pct_paths_positive": synth_pct_paths_positive,
-        })
-
-    if not rows:
-        logger.warning("MULTIVERSE DRIFT ANALYSIS ── no valid symbols to analyze")
-        return
-
-    df_drift = pd.DataFrame(rows)
-    summary  = df_drift.drop(columns=["symbol"]).mean()
-    df_drift = pd.concat(
-        [df_drift, pd.DataFrame([{"symbol": "MEAN", **summary.to_dict()}])],
-        ignore_index=True,
-    )
-
-    pd.set_option("display.float_format", lambda x: f"{x:.4f}")
-    logger.info(f"\n{'─' * 115}")
-    logger.info("  MULTIVERSE DRIFT ANALYSIS ── historical vs MCPT permuted paths")
-    logger.info(f"{'─' * 115}")
-    logger.info(f"\n{df_drift.to_string(index=False)}")
-    logger.info(f"{'─' * 115}\n")
-
-def print_multiverse_debug_summary(
-    per_path_results: list,
-    rules: list,
-    p_value_by_id: dict,
-    approved_by_id: dict,
-    n_paths: int,
-    block_size: int,
-) -> None:
-    for r in rules:
-        rid = r["rule_id"]
-        rule_results = [res[rid] for res in per_path_results]
-
-        n_valid = sum(1 for res in rule_results if res[0] is not None)
-        if n_valid == 0:
-            continue
-
-        n_no_trades   = sum(1 for res in rule_results if res[0] is not None and not res[2])
-        n_with_trades = sum(1 for res in rule_results if res[0] is not None and res[2])
-        pct_no_trades = n_no_trades / n_valid * 100.0
-        logger.debug(
-            f"MULTIVERSE DEBUG ── {rid} ── no_trades_paths={n_no_trades}/{n_valid} ({pct_no_trades:.1f}%) "
-            f"with_trades_paths={n_with_trades}/{n_valid}"
-        )
-        if n_with_trades > 0:
-            with_trades_profits = [res[1] for res in rule_results if res[0] is not None and res[2]]
-            logger.debug(
-                f"MULTIVERSE DEBUG ── {rid} ── with_trades profit_sum stats: "
-                f"min={min(with_trades_profits):.2f} max={max(with_trades_profits):.2f} "
-                f"mean={float(np.mean(with_trades_profits)):.2f}"
-            )
-
-        real_profit = float(r["wfo_test_trades"]["profit"].sum())
-        p_value     = p_value_by_id[rid]
-        approved    = approved_by_id[rid]
-        logger.debug(
-            f"MULTIVERSE ── {rid} ── n_paths={n_paths} block_size={block_size} valid_universes={n_valid} "
-            f"real_profit={real_profit:.2f} p_value={p_value:.4f} -> {'PASS' if approved else 'FAIL'}"
-        )
-
-def report_multiverse_debug(
-    ohlcv_data: dict,
-    paths: dict,
-    per_path_results: list,
-    rules: list,
-    p_value_by_id: dict,
-    approved_by_id: dict,
-    n_paths: int,
-    block_size: int,
-) -> None:
-    """Debug-only orchestrator: drift analysis table + synthetic-vs-historical plots + per-rule summary."""
-    print_multiverse_drift_analysis(ohlcv_data, paths)
-    plot_multiverse_synthetic_vs_historical(ohlcv_data, paths)
-    print_multiverse_debug_summary(per_path_results, rules, p_value_by_id, approved_by_id, n_paths, block_size)
-    
+ 
 # =============================================================================
 # STEPM — debug-only reporting (moved from pipeline/stepm.py)
 # =============================================================================
@@ -662,3 +561,153 @@ def print_stepm_brc_equivalence_debug(
             f"VERIFY[BRC_equivalence] {timeframe} ── skipped: not applicable under "
             f"k-FWE (k={k_fwe} > 1) by construction"
         )
+        
+# =============================================================================
+# MULTIVERSE — debug-only reporting (moved from pipeline/multiverse.py)
+# =============================================================================
+
+def _mean_offdiag_correlation(series_by_symbol: dict) -> float:
+    """Mean off-diagonal correlation of a set of aligned series (tail-aligned)."""
+    if len(series_by_symbol) < 2:
+        return float("nan")
+
+    common  = min(len(arr) for arr in series_by_symbol.values())
+    matrix  = np.column_stack([arr[-common:] for arr in series_by_symbol.values()])
+    corr    = np.corrcoef(matrix, rowvar=False)
+    offdiag = corr[~np.eye(corr.shape[0], dtype=bool)]
+    return float(np.nanmean(offdiag))
+
+
+def print_multiverse_path_validation(
+    ohlcv_data: dict,
+    synthetic_arr: dict,
+    layout_info: dict,
+    ref_symbol: str,
+    n_ref_rows: int,
+    timeframe: str,
+    block_size: int,
+) -> None:
+
+    logger.debug(f"\n{'─' * 100}")
+    logger.debug(f"  MULTIVERSE PATH VALIDATION ── {timeframe} ── path 0")
+    logger.debug(f"{'─' * 100}")
+    logger.debug(
+        f"  layout      : block_size={block_size} n_blocks={layout_info['n_blocks']} "
+        f"phase={layout_info['phase']} order_head={layout_info['order_head']}"
+    )
+    logger.debug(f"  grid        : ref={ref_symbol} n_ref_rows={n_ref_rows} symbols={len(synthetic_arr)}")
+    logger.debug(f"  {'symbol':<12} {'rows':>7} {'real_end':>12} {'synth_end':>12} {'drift_err':>11}")
+
+    real_returns, synth_returns = {}, {}
+    for symbol, arr in synthetic_arr.items():
+        real_close  = ohlcv_data[symbol]["close"].to_numpy(dtype=np.float64)
+        synth_close = arr["close"]
+
+        real_returns[symbol]  = np.diff(np.log(real_close))
+        synth_returns[symbol] = np.diff(np.log(synth_close))
+
+        drift_err = abs(float(synth_close[-1]) / float(real_close[-1]) - 1.0)
+        logger.debug(
+            f"  {symbol:<12} {len(synth_close):>7} {real_close[-1]:>12.4f} "
+            f"{synth_close[-1]:>12.4f} {drift_err:>10.2%}"
+        )
+
+    logger.debug(
+        f"  cross-sect  : mean off-diagonal corr of log returns ── "
+        f"real={_mean_offdiag_correlation(real_returns):.4f} "
+        f"synthetic={_mean_offdiag_correlation(synth_returns):.4f}"
+    )
+    logger.debug(f"{'─' * 100}\n")
+
+
+def print_multiverse_wfo_validation(
+    probe_rule: dict,
+    probe_schedule: list,
+    probe_profit: float,
+    param_names: list,
+    timeframe: str,
+) -> None:
+
+    logger.debug(f"\n{'─' * 100}")
+    logger.debug(f"  MULTIVERSE WFO VALIDATION ── {timeframe} ── path 0 ── rule={probe_rule['rule_id']}")
+    logger.debug(f"{'─' * 100}")
+    logger.debug(
+        f"  real side   : n_windows={probe_rule.get('n_windows')} "
+        f"best_params={probe_rule.get('best_params')} "
+        f"profit={float(probe_rule['wfo_test_trades']['profit'].sum()):.2f}"
+    )
+
+    if not probe_schedule:
+        logger.debug("  synth side  : WFO produced no window schedule on this path")
+    else:
+        logger.debug(f"  synth side  : n_windows={len(probe_schedule)} profit={probe_profit:.2f}")
+        for name in param_names:
+            logger.debug(f"  {name:<12}: " + " → ".join(str(w[name]) for w in probe_schedule))
+
+    logger.debug(f"{'─' * 100}\n")
+
+
+def print_multiverse_null_distribution(
+    rules: list,
+    profits_by_id: dict,
+    p_value_by_id: dict,
+    approved_by_id: dict,
+    n_paths: int,
+    block_size: int,
+) -> None:
+    """Per-rule real statistic against the shape of its null distribution."""
+    logger.debug(f"\n{'─' * 130}")
+    logger.debug(f"  MULTIVERSE NULL DISTRIBUTION ── n_paths={n_paths} block_size={block_size}")
+    logger.debug(f"{'─' * 130}")
+    logger.debug(
+        f"  {'RULE_ID':<44} {'REAL':>11} {'NULL_MEAN':>11} {'NULL_P90':>11} "
+        f"{'NULL_MAX':>11} {'ZERO_PATHS':>11} {'P':>8} {'STATUS':>8}"
+    )
+    logger.debug(f"{'─' * 130}")
+
+    for rule in rules:
+        rule_id = rule["rule_id"]
+        nulls   = np.asarray(profits_by_id[rule_id], dtype=np.float64)
+        if nulls.size == 0:
+            continue
+
+        real       = float(rule["wfo_test_trades"]["profit"].sum())
+        zero_paths = int(np.sum(nulls == 0.0))
+        logger.debug(
+            f"  {_short_id(rule_id):<44} {real:>11.2f} {nulls.mean():>11.2f} "
+            f"{np.percentile(nulls, 90):>11.2f} {nulls.max():>11.2f} "
+            f"{f'{zero_paths}/{nulls.size}':>11} {p_value_by_id[rule_id]:>8.4f} "
+            f"{('✅' if approved_by_id[rule_id] else '❌'):>8}"
+        )
+
+    logger.debug(f"{'─' * 130}\n")
+
+
+def report_multiverse_debug(
+    ohlcv_data: dict,
+    synthetic_arr: dict,
+    layout_info: dict,
+    ref_symbol: str,
+    n_ref_rows: int,
+    probe_rule: dict,
+    probe_schedule: list,
+    probe_profit: float,
+    rules: list,
+    param_names: list,
+    profits_by_id: dict,
+    p_value_by_id: dict,
+    approved_by_id: dict,
+    n_paths: int,
+    block_size: int,
+    timeframe: str,
+) -> None:
+    """Debug-only orchestrator: path generation validation, WFO cross-check, null distribution."""
+    print_multiverse_path_validation(
+        ohlcv_data, synthetic_arr, layout_info, ref_symbol, n_ref_rows, timeframe, block_size,
+    )
+    print_multiverse_wfo_validation(
+        probe_rule, probe_schedule, probe_profit, param_names, timeframe,
+    )
+    print_multiverse_null_distribution(
+        rules, profits_by_id, p_value_by_id, approved_by_id, n_paths, block_size,
+    )

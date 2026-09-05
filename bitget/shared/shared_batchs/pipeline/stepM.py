@@ -1,5 +1,4 @@
 #shared_batchs/pipeline/stepM.py (crypto)
-import time
 import logging
 import numpy as np
 from tqdm import tqdm
@@ -12,15 +11,18 @@ logger = logging.getLogger("BOT_batch.pipeline.stepM")
 # =============================================================================
 # STATISTICAL TEST CONFIG + STEPDOWN / K-FWE CONFIG -ROmano Wolf
 # =============================================================================
-STEPM_ALPHA        = 0.10           # significance level used inside the Romano-Wolf stepdown search
-STEPM_K_MODE       = "kesime"       # "kmaxime" or "kesime"
-STEPM_K_FWE        = 1              # used when STEPM_K_MODE == "kmaxime"
-STEPM_K_ESIME_TF   = {
+SHARPE_PERIODS_YEAR = 365
+STEPM_ALPHA         = 0.05           # significance level used inside the Romano-Wolf stepdown search
+STEPM_K_MODE        = "kesime"       # "kmaxime" or "kesime"
+STEPM_K_FWE         = 1              # used when STEPM_K_MODE == "kmaxime"
+STEPM_K_ESIME_TF    = {
     "1H":     0.02,
     "4H":     0.02,
     "6Hutc":  0.02,
     "12Hutc": 0.02,
 }
+FDP_GAMMA          = 0.10           # max tolerated false discovery proportion (Romano-Wolf 2007, Algorithm 4.1)
+FDP_K_MAX          = 8192           # upper bound of the geometric k sweep: 1, 2, 4, ... FDP_K_MAX
 
 CROSS_SECTIONAL_PERCENTILES = np.array([50, 90, 95, 96, 97, 98, 99, 99.9, 99.99, 100])
 # =============================================================================
@@ -42,7 +44,6 @@ BOOTSTRAP_CHUNK_SIZE = 8192     # columns processed per GEMM call in the bootstr
 # PARALLELISM + FIX
 # =============================================================================
 RANDOM_SEED          = 42
-SHARPE_PERIODS_YEAR  = 365.0
 
 # =============================================================================
 # CHUNKED REDUCTIONS — column-wise mean/std without materializing a full-size
@@ -172,8 +173,6 @@ def compute_deviation_matrix(
     real_sharpe = _sharpe_per_column(matrix_arr)
 
     if logger.isEnabledFor(logging.DEBUG):
-        # NOTE: day offsets on the global calendar grid, not real calendar
-        # dates — stepM does not receive global_start_day from the caller.
         day_offsets = np.arange(matrix_arr.shape[0])
         print_stepm_matrix_debug(col_names, matrix_arr, matrix_arr.shape[0], day_offsets)
 
@@ -422,6 +421,49 @@ def stepwise_reality_check_pvalues(
     return adjusted_pval
 
 # =============================================================================
+# FDP CONTROL (ROMANO & WOLF, 2007, ALGORITHM 4.1) — sequentially apply the
+# k-FWER stepdown for a geometric ladder of k, stopping at the first k whose
+# rejection count no longer justifies the tolerated number of false rejections.
+# =============================================================================
+def resolve_k_by_fdp(
+    deviations: np.ndarray,
+    statistic: np.ndarray,
+    gamma: float = FDP_GAMMA,
+    alpha: float = STEPM_ALPHA,
+    k_max: int = FDP_K_MAX,
+    timeframe: str = "",
+) -> tuple:
+
+    if not 0.0 < gamma < 1.0:
+        raise ValueError(f"FDP_GAMMA must lie in (0, 1), got {gamma}.")
+
+    k        = 1
+    last_run = None
+
+    while k <= k_max:
+        pvals      = stepwise_reality_check_pvalues(deviations, statistic, alpha=alpha, k=k)
+        n_rejected = int((pvals <= alpha).sum())
+        last_run   = (k, pvals, n_rejected)
+
+        gamma_implied = k / n_rejected if n_rejected else float("inf")
+        k_fmt         = f"{k:,}".replace(",", ".")
+        n_fmt         = f"{n_rejected:,}".replace(",", ".")
+        logger.info(
+            f"FDP SEARCH     {timeframe}: k={k_fmt:>9} ── {n_fmt:>9} columns rejected "
+            f"── gamma_implied={gamma_implied:.4f}"
+        )
+
+        if n_rejected < k / gamma - 1.0:
+            return last_run
+
+        k *= 2
+
+    logger.warning(
+        f"FDP SEARCH     {timeframe}: stop criterion never met up to FDP_K_MAX={k_max} "
+        f"── k clamped, realized FDP may exceed gamma={gamma}"
+    )
+    return last_run
+# =============================================================================
 # PIPE STEPM — orchestration layer, mirroring dsr.py's pipe_dsr exactly.
 # =============================================================================
 def empty_stepm_fields() -> dict:
@@ -437,15 +479,13 @@ def pipe_stepm(
     raw_results: list,
     matrix_arr: np.ndarray,
     col_names: list,
-    stepm_alpha: float = STEPM_ALPHA,   # drives both the stepdown active sets and the pass/fail cut; splitting them would void the FWE guarantee
+    stepm_alpha: float = STEPM_ALPHA,
     n_bootstrap: int = WHITE_N_BOOTSTRAP,
     block_size: int = WHITE_BLOCK_SIZE,
     stepm_k_esime: float = None,
     seed: int = RANDOM_SEED,
     timeframe: str = "",
 ) -> list:
-
-    start = time.time()
 
     if stepm_k_esime is None:
         if timeframe not in STEPM_K_ESIME_TF:
@@ -469,7 +509,7 @@ def pipe_stepm(
     studentized_deviations  = bootstrap_result["studentized_deviations"]
     z_stat                  = bootstrap_result["z_stat"]
 
-    logger.info(
+    logger.debug(
         f"STEPM ── {timeframe} ── {matrix_arr.shape[1] - len(kept_columns)} degenerate "
         f"columns dropped ── {len(kept_columns)} columns remain"
     )
@@ -481,6 +521,8 @@ def pipe_stepm(
     best_raw_idx  = int(np.argmax(real_sharpe))
     best_raw_name = str(kept_columns[best_raw_idx])
     
+    stepm_pvals = None
+
     if STEPM_K_MODE == "kmaxime":
         k_fwe = STEPM_K_FWE
     elif STEPM_K_MODE == "kesime":
@@ -489,12 +531,15 @@ def pipe_stepm(
         k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
         n_cols_for_k_fmt = f"{n_cols_for_k:,}".replace(",", ".")
         logger.info(
-            f"STEPM ── {timeframe} ── STEPM_K_MODE=kesime ── resolved k={k_fwe_fmt} "
+            f"STEPM COLUMNS   {timeframe}: STEPM_K_MODE=kesime ── resolved k={k_fwe_fmt} "
             f"from {stepm_k_esime:.4%} of {n_cols_for_k_fmt} surviving columns"
         )
+    elif STEPM_K_MODE == "fdp":
+        k_fwe, stepm_pvals, _ = resolve_k_by_fdp(
+            studentized_deviations, z_stat, timeframe=timeframe,
+        )
     else:
-        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'kmaxime' or 'kesime'.")
-
+        raise ValueError(f"Unknown STEPM_K_MODE={STEPM_K_MODE!r}; expected 'kmaxime', 'kesime' or 'fdp'.")
     logger.debug(f"\n{'─' * 70}")
     logger.debug(f"  MAX RAW SHARPE (no bootstrap adjustment) ── {timeframe}")
     logger.debug(f"{'─' * 70}")
@@ -505,21 +550,22 @@ def pipe_stepm(
     logger.info(f"\n{'─' * 70}")
     logger.info(f"  GLOBAL WHITE p-value (studentized) ── {timeframe}")
     logger.info(f"{'─' * 70}")
-    logger.info(f"  best column(z)    : {best_col_name}")
-    logger.info(f"  best Sharpe(z)    : {real_sharpe[best_col_idx]:.4f}")
-    logger.debug(f" best z-statistic  : {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
-    logger.info(f"  global p-value    : {global_result['global_p']:.4f}")
+    logger.info(f"  best column(z) : {best_col_name}")
+    logger.info(f"  best Sharpe(z) : {real_sharpe[best_col_idx]:.4f}")
+    logger.debug(f" best z-statistic: {global_result['best_statistic']:.4f}  (sigma_hat={sigma_hat[best_col_idx]:.4f})")
+    logger.info(f"  global p-value : {global_result['global_p']:.4f}")
 
     cut = compute_cut_diagnostic(studentized_deviations, z_stat, k_fwe)
     logger.info(
-        f"  P{cut['percentile']:<17.6g}: {cut['pct_below']:.2f}% <Real  "
+        f"  P{cut['percentile']:<14.6g}: {cut['pct_below']:.2f}% <Real  "
         f"(k={f'{k_fwe:,}'.replace(',', '.')})"
     )
     logger.info(f"{'─' * 70}\n")
 
     logger.debug(f"STEPM ── {timeframe} ── k-FWE level k={k_fwe}" + (" (strict FWE)" if k_fwe == 1 else " (relaxed control — reasoned extension, see module docstring)"))
 
-    stepm_pvals    = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
+    if stepm_pvals is None:
+        stepm_pvals = stepwise_reality_check_pvalues(studentized_deviations, z_stat, alpha=stepm_alpha, k=k_fwe)
     stepm_p_by_col = dict(zip(kept_columns, stepm_pvals))
     sharpe_by_col  = dict(zip(kept_columns, real_sharpe))
     z_stat_by_col  = dict(zip(kept_columns, z_stat))
@@ -555,12 +601,19 @@ def pipe_stepm(
             "z_stat":        float(z_val) if np.isfinite(z_val) else None,
         })
 
-    k_fwe_fmt = f"{k_fwe:,}".replace(",", ".")
-    n_passed_fmt = f"{n_passed:,}".replace(",", ".")
-    n_total_fmt = f"{len(raw_results):,}".replace(",", ".")
-    logger.info(f"STEPM ── {timeframe} ── k={k_fwe_fmt} ── {n_passed_fmt}/{n_total_fmt} rules pass")
+    n_cols_rejected = int((stepm_pvals <= stepm_alpha).sum())
+    gamma_implied   = k_fwe / n_cols_rejected if n_cols_rejected else float("inf")
 
-    elapsed = int(time.time() - start)
-    logger.info(f"STEPM ── {timeframe} ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+    k_fwe_fmt           = f"{k_fwe:,}".replace(",", ".")
+    n_passed_fmt        = f"{n_passed:,}".replace(",", ".")
+    n_total_fmt         = f"{len(raw_results):,}".replace(",", ".")
+    n_cols_rejected_fmt = f"{n_cols_rejected:,}".replace(",", ".")
+    n_cols_kept_fmt     = f"{len(kept_columns):,}".replace(",", ".")
+
+    logger.info(
+        f"STEPM COLUMNS  {timeframe}: k={k_fwe_fmt} ── {n_cols_rejected_fmt}/{n_cols_kept_fmt} columns rejected "
+        f"── gamma_implied={gamma_implied:.4f}"
+    )
+    logger.info(f"STEPM RULES    {timeframe}: {n_passed_fmt}/{n_total_fmt} rules pass")
 
     return results

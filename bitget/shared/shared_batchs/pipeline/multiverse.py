@@ -1,30 +1,65 @@
 #shared_batchs/pipeline/multiverse.py (crypto)
 import os
-import time
 import logging
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from shared_config import VOLUME_COL
-from shared_batchs.backtesters.ZX_compute_BT import prepare_static_arrays,prepare_signal_arrays,run_backtest_from_prepared_light
+from shared_batchs.pipeline.wfo import run_wfo_is
+from shared_batchs.utils.plotting import plot_multiverse_synthetic_vs_historical
 from shared_batchs.utils.reporting import report_multiverse_debug
 logger = logging.getLogger("BOT_batch.pipeline.multiverse")
-DTYPE  = np.float32
+
 # =============================================================================
 # MCPT EXECUTION CONFIG
 # =============================================================================
-MULTIVERSE_PVALUE_TH    = 0.10
+MULTIVERSE_PVALUE_TH    = 0.05
 BLOCK_SIZE_BY_TIMEFRAME = {
-    "1H":     150, #1H-400 -> script
+    "1H":     150,
     "4H":     120,
     "6Hutc":  70,
     "12Hutc": 30,
 }
 
-N_PERMUTATIONS       = 1000
-MCPT_N_JOBS          = -1
+N_PERMUTATIONS = 1000
+MCPT_N_JOBS    = -1
+MCPT_BASE_SEED = 42
 
+# Paths regenerated on demand for the debug plot only — independent of n_paths
+MCPT_PLOT_N_PATHS = 100
+
+# =============================================================================
+# SAMPLING METHOD — disjoint block permutation (Masters, 2020)
+# =============================================================================
+_WFO_NEUTRAL_TH = {
+    "net_gain_th": float("-inf"),
+    "dd_th":       float("inf"),
+    "r2_th":       float("-inf"),
+    "wfr_th":      float("-inf"),
+}
+
+_WORKER_SILENCED_LOGGERS = (
+    "BOT_batch.pipeline.wfo",
+    "BOT_batch.engines.wfo_WF",
+    "joblib",
+    "matplotlib",
+    "numba",
+)
+
+# Feature column layout of the permuted data array.
+_COL_LOG_RET_CLOSE  = 0
+_COL_LOG_OPEN_LOW   = 1
+_COL_LOG_OPEN_HIGH  = 2
+_COL_LOG_OPEN_CLOSE = 3
+_COL_VAR_LOW_TIME   = 4
+_COL_VAR_HIGH_TIME  = 5
+_N_BASE_FEATURES    = 6
+
+
+# =============================================================================
+# CONFIG RESOLVERS — explicit failure, no silent fallbacks
+# =============================================================================
 def _resolve_block_size(timeframe: str) -> int:
     block_size = BLOCK_SIZE_BY_TIMEFRAME.get(timeframe)
     if block_size is None:
@@ -34,226 +69,286 @@ def _resolve_block_size(timeframe: str) -> int:
         )
     return block_size
 
+
 # =============================================================================
-# MCPT PATH GENERATION — moving block bootstrap (overlapping blocks + replacement)
+# LOG FEATURE EXTRACTION — done once per symbol, reused by every path
 # =============================================================================
-def _compute_log_features(df: pd.DataFrame, raw_columns: list) -> tuple:
-    df = df.copy()
-    prev_close = df["close"].shift(1)
-    prev_close.iloc[0] = df["open"].iloc[0]
+def _compute_log_features(df_hist: pd.DataFrame, raw_columns: list) -> tuple:
 
-    df["log_ret_close"]  = np.log(df["close"] / prev_close)
-    df["log_open_low"]   = np.log(df["low"]   / df["open"])
-    df["log_open_high"]  = np.log(df["high"]  / df["open"])
-    df["log_open_close"] = np.log(df["close"] / df["open"])
+    close = df_hist["close"].to_numpy(np.float64)
+    open_ = df_hist["open"].to_numpy(np.float64)
+    high  = df_hist["high"].to_numpy(np.float64)
+    low   = df_hist["low"].to_numpy(np.float64)
 
-    if len(df.index) >= 2:
-        time_deltas = (df.index[1:] - df.index[:-1]).total_seconds()
-        mode = pd.Series(time_deltas).mode()[0]
-        time_deltas = np.insert(time_deltas, 0, mode)
-    else:
-        time_deltas = np.zeros(len(df.index))
-    df["time_variation"] = time_deltas
+    prev_close    = np.empty_like(close)
+    prev_close[0] = open_[0]
+    prev_close[1:] = close[:-1]
 
-    index_sec = df.index.view(np.int64) // 10**9
-    low_sec   = pd.to_datetime(df["low_time"]).view(np.int64) // 10**9
-    high_sec  = pd.to_datetime(df["high_time"]).view(np.int64) // 10**9
-    df["var_low_time"]  = (low_sec  - index_sec).astype(float)
-    df["var_high_time"] = (high_sec - index_sec).astype(float)
+    ts_index = df_hist.index.to_numpy(dtype="datetime64[ns]")
+    ts_sec   = ts_index.astype("datetime64[s]").astype(np.int64)
+    low_sec  = pd.to_datetime(df_hist["low_time"]).to_numpy(dtype="datetime64[s]").astype(np.int64)
+    high_sec = pd.to_datetime(df_hist["high_time"]).to_numpy(dtype="datetime64[s]").astype(np.int64)
 
-    df_raw = df[raw_columns].copy() if raw_columns else pd.DataFrame(index=df.index)
-    return df, df_raw
-
-def _block_bootstrap_sample(
-    data_array: np.ndarray,
-    n_rows: int,
-    block_size: int,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Moving block bootstrap: overlapping blocks sampled with replacement, concatenated and truncated to n_rows."""
-    if block_size <= 1:
-        chosen_idx = rng.integers(0, n_rows, size=n_rows)
-        return data_array[chosen_idx]
-
-    n_blocks = n_rows - block_size + 1
-    n_blocks_needed = int(np.ceil(n_rows / block_size))
-    chosen = rng.integers(0, n_blocks, size=n_blocks_needed)
-
-    n_features = data_array.shape[1]
-    out = np.empty((n_blocks_needed * block_size, n_features), dtype=data_array.dtype)
-    for k, start in enumerate(chosen):
-        out[k * block_size:(k + 1) * block_size] = data_array[start:start + block_size]
-    return out[:n_rows]
-
-def _evaluate_universe_batch_chunk(
-    path_indices: list,
-    paths: dict,
-    ts_index_by_symbol: dict,
-    n_symbols_expected: int,
-    rules: list,
-    order_amount: int,
-) -> list:
-    return [
-        _evaluate_universe_batch(
-            path_idx, paths, ts_index_by_symbol, n_symbols_expected,
-            rules, order_amount,
-        )
-        for path_idx in path_indices
+    columns = [
+        np.log(close / prev_close),
+        np.log(low   / open_),
+        np.log(high  / open_),
+        np.log(close / open_),
+        (low_sec  - ts_sec).astype(np.float64),
+        (high_sec - ts_sec).astype(np.float64),
     ]
+    for raw_col in raw_columns:
+        columns.append(df_hist[raw_col].to_numpy(np.float64))
 
+    data_array = np.column_stack(columns)
+    return data_array, float(open_[0]), ts_index
 
-def _generate_mcpt_paths(
-    df_hist: pd.DataFrame,
-    n_paths: int,
-    raw_columns: list,
-    base_seed: int,
-    block_size: int,
-) -> np.ndarray:
-    
-    df_features, df_raw = _compute_log_features(df_hist, raw_columns)
-    n_rows = len(df_features)
-    if n_rows == 0:
-        return np.empty((0, 0, 0))
+def _build_path_bundle(ohlcv_data: dict, raw_columns: list, timeframe: str) -> dict:
 
-    cols = [
-        df_features["log_ret_close"].to_numpy(np.float64),
-        df_features["log_open_low"].to_numpy(np.float64),
-        df_features["log_open_high"].to_numpy(np.float64),
-        df_features["log_open_close"].to_numpy(np.float64),
-        df_features["time_variation"].to_numpy(np.float64),
-        df_features["var_low_time"].to_numpy(np.float64),
-        df_features["var_high_time"].to_numpy(np.float64),
-    ]
-    for rc in raw_columns:
-        cols.append(df_raw[rc].to_numpy(np.float64))
-    data_array = np.column_stack(cols)
-    n_raw          = data_array.shape[1] - 7
-    n_features_out = 7 + n_raw
+    ref_ts = np.unique(np.concatenate([
+        df_hist.index.to_numpy(dtype="datetime64[ns]") for df_hist in ohlcv_data.values()
+    ]))
+    n_ref_rows = len(ref_ts)
+    ref_symbol = max(ohlcv_data.keys(), key=lambda k: len(ohlcv_data[k].index))
 
-    start_price     = float(df_features["open"].iloc[0])
-    start_timestamp = df_features.index[0].value // 10**9
-
-    effective_block_size = min(block_size, n_rows)
-
-    paths_array = np.empty((n_paths, n_rows, n_features_out), dtype=np.float64)
-
-    for i in range(n_paths):
-        rng     = np.random.default_rng(base_seed + i)
-        sampled = _block_bootstrap_sample(data_array, n_rows, effective_block_size, rng)
-
-        log_ret_close  = sampled[:, 0]
-        log_open_low   = sampled[:, 1]
-        log_open_high  = sampled[:, 2]
-        log_open_close = sampled[:, 3]
-
-        close_prices = start_price * np.exp(np.cumsum(log_ret_close))
-        open_prices  = close_prices * np.exp(-log_open_close)
-        low_prices   = open_prices  * np.exp(log_open_low)
-        high_prices  = open_prices  * np.exp(log_open_high)
-
-        cumul_seconds = np.cumsum(sampled[:, 4])
-        times      = start_timestamp + cumul_seconds
-        low_times  = times + sampled[:, 5]
-        high_times = times + sampled[:, 6]
-
-        base_cols = [open_prices, low_prices, high_prices, close_prices, low_times, high_times, times]
-        if n_raw > 0:
-            for idx_col in range(n_raw):
-                base_cols.append(sampled[:, 7 + idx_col])
-        paths_array[i, :, :] = np.column_stack(base_cols)
-
-    return paths_array.astype(DTYPE, copy=False)
-
-def _generate_mcpt_paths_all_symbols(
-    ohlcv_data: dict,
-    n_paths: int,
-    raw_columns: list,
-    block_size: int,
-    base_seed: int = 42,
-) -> dict:
-    
-    
-    paths_per_symbol = {}
+    symbols = {}
     for symbol, df_hist in ohlcv_data.items():
-        arr_paths = _generate_mcpt_paths(
-            df_hist, n_paths=n_paths, raw_columns=raw_columns, base_seed=base_seed,
-            block_size=block_size,
-        )
-        if arr_paths is not None and arr_paths.shape[0] > 0:
-            paths_per_symbol[symbol] = arr_paths
-    return paths_per_symbol
+        data_array, start_price, ts_index = _compute_log_features(df_hist, raw_columns)
 
-# =============================================================================
-# PRIVATE HELPERS
-# =============================================================================
-def _synthetic_ohlcv_arr(paths_per_symbol: dict, path_idx: int, ts_index_by_symbol: dict) -> dict:
-    ohlcv_arr = {}
-    for sym, arr_paths in paths_per_symbol.items():
-        if path_idx >= arr_paths.shape[0]:
-            continue
-        arr  = arr_paths[path_idx]  # (n_obs, n_features)
-        ts64 = ts_index_by_symbol[sym].astype("datetime64[ns]")[:arr.shape[0]]
-        ohlcv_arr[sym] = {
-            "ts":        ts64,
-            "open":      arr[:, 0].astype(np.float64),
-            "high":      arr[:, 2].astype(np.float64),
-            "low":       arr[:, 1].astype(np.float64),
-            "close":     arr[:, 3].astype(np.float64),
-            VOLUME_COL:  arr[:, 7].astype(np.float64),
-            "low_time":  np.array(arr[:, 4], dtype="datetime64[ns]"),
-            "high_time": np.array(arr[:, 5], dtype="datetime64[ns]"),
+        global_pos = np.searchsorted(ref_ts, ts_index, side="left")
+
+        if global_pos.size > 1 and np.any(np.diff(global_pos) <= 0):
+            raise ValueError(
+                f"MULTIVERSE ── {timeframe} ── symbol={symbol!r} has duplicated or "
+                f"non-monotonic timestamps: the index must be strictly increasing."
+            )
+
+        symbols[symbol] = {
+            "data_array":  data_array,
+            "start_price": start_price,
+            "ts_index":    ts_index,
+            "global_pos":  global_pos,
         }
-    return ohlcv_arr
 
-def _evaluate_universe_batch(
+    logger.debug(
+        f"MULTIVERSE ── {timeframe} ── union grid {n_ref_rows} bars ── "
+        f"per-symbol bars {min(len(s['global_pos']) for s in symbols.values())}"
+        f"..{max(len(s['global_pos']) for s in symbols.values())}"
+    )
+
+    return {
+        "symbols":    symbols,
+        "ref_symbol": ref_symbol,
+        "n_ref_rows": n_ref_rows,
+        "n_raw":      len(raw_columns),
+    }
+
+
+# =============================================================================
+# BLOCK LAYOUT — drawn once per path, shared by every symbol
+# =============================================================================
+def _draw_block_layout(rng: np.random.Generator, n_ref_rows: int, block_size: int) -> tuple:
+
+    if block_size <= 1:
+        edges = np.arange(n_ref_rows + 1, dtype=np.int64)
+        return edges, rng.permutation(n_ref_rows), 0
+
+    phase = int(rng.integers(0, block_size))
+
+    interior = np.arange(phase, n_ref_rows, block_size, dtype=np.int64)
+    if phase > 0:
+        interior = np.concatenate((np.zeros(1, dtype=np.int64), interior))
+    edges = np.concatenate((interior, np.array([n_ref_rows], dtype=np.int64)))
+
+    order = rng.permutation(len(edges) - 1)
+    return edges, order, phase
+
+
+def _gather_index_permutation(edges: np.ndarray, order: np.ndarray, global_pos: np.ndarray) -> np.ndarray:
+
+    local_starts = np.searchsorted(global_pos, edges[:-1], side="left")
+    local_ends   = np.searchsorted(global_pos, edges[1:],  side="left")
+
+    starts  = local_starts[order]
+    lengths = local_ends[order] - starts
+
+    keep = lengths > 0
+    starts, lengths = starts[keep], lengths[keep]
+
+    total   = int(lengths.sum())
+    offsets = np.concatenate((np.zeros(1, dtype=np.int64), np.cumsum(lengths)[:-1]))
+    return np.repeat(starts - offsets, lengths) + np.arange(total, dtype=np.int64)
+
+
+# =============================================================================
+# PATH RECONSTRUCTION
+# =============================================================================
+def _reconstruct_symbol_path(symbol_bundle: dict, gather_index: np.ndarray, n_raw: int) -> dict:
+
+    sampled  = symbol_bundle["data_array"][gather_index]
+    ts_index = symbol_bundle["ts_index"]
+
+    close_prices = symbol_bundle["start_price"] * np.exp(np.cumsum(sampled[:, _COL_LOG_RET_CLOSE]))
+    open_prices  = close_prices * np.exp(-sampled[:, _COL_LOG_OPEN_CLOSE])
+    low_prices   = open_prices  * np.exp(sampled[:, _COL_LOG_OPEN_LOW])
+    high_prices  = open_prices  * np.exp(sampled[:, _COL_LOG_OPEN_HIGH])
+
+    ts_seconds = ts_index.astype("datetime64[s]").astype(np.int64)
+    low_time   = (ts_seconds + sampled[:, _COL_VAR_LOW_TIME].astype(np.int64)).astype("datetime64[s]")
+    high_time  = (ts_seconds + sampled[:, _COL_VAR_HIGH_TIME].astype(np.int64)).astype("datetime64[s]")
+
+    volume = (
+        sampled[:, _N_BASE_FEATURES]
+        if n_raw > 0
+        else np.zeros(len(gather_index), dtype=np.float64)
+    )
+
+    return {
+        "ts":        ts_index,
+        "open":      open_prices,
+        "high":      high_prices,
+        "low":       low_prices,
+        "close":     close_prices,
+        VOLUME_COL:  volume,
+        "low_time":  low_time.astype("datetime64[ns]"),
+        "high_time": high_time.astype("datetime64[ns]"),
+    }
+
+
+def _build_synthetic_ohlcv_arr(
+    bundle: dict,
     path_idx: int,
-    paths: dict,
-    ts_index_by_symbol: dict,
-    n_symbols_expected: int,
-    rules: list,
-    order_amount: int,
-) -> dict:
+    block_size: int,
+    base_seed: int,
+) -> tuple:
+    """Generate one full synthetic universe, reproducibly, from its path seed."""
+    rng        = np.random.default_rng(base_seed + path_idx)
+    n_ref_rows = bundle["n_ref_rows"]
+    n_raw      = bundle["n_raw"]
 
-    synthetic_arr = _synthetic_ohlcv_arr(paths, path_idx, ts_index_by_symbol)
+    edges, order, phase = _draw_block_layout(rng, n_ref_rows, block_size)
+    layout_info = {"phase": phase, "n_blocks": len(edges) - 1, "order_head": order[:5].tolist()}
 
-    if len(synthetic_arr) < n_symbols_expected:
-        return {r["rule_id"]: (None, None, None) for r in rules}
-
-    static_bundle = prepare_static_arrays(synthetic_arr)
-
-    results = {}
-    for r in rules:
-        best_params = r["best_params"]
-
-        ohlcv_arrays = {}
-        for sym, arr in synthetic_arr.items():
-            signals = r["signal_fn"](arr, live_trading=False)
-            ohlcv_arrays[sym] = {**arr, "signal": np.asarray(signals, dtype=DTYPE)}
-
-        prepared_data = prepare_signal_arrays(static_bundle, ohlcv_arrays)
-        bt_results = run_backtest_from_prepared_light(
-            prepared_data,
-            sell_after   = best_params["SELL_AFTER"],
-            tp_pct       = best_params["TP_PCT"],
-            sl_pct       = best_params["SL_PCT"],
-            order_amount = order_amount,
+    ohlcv_arr = {
+        symbol: _reconstruct_symbol_path(
+            symbol_bundle,
+            _gather_index_permutation(edges, order, symbol_bundle["global_pos"]),
+            n_raw,
         )
+        for symbol, symbol_bundle in bundle["symbols"].items()
+    }
+    return ohlcv_arr, layout_info
 
-        trade_log = bt_results["__PORTFOLIO__"]["trade_log"]
-        if trade_log is None or trade_log.empty:
-            results[r["rule_id"]] = (True, 0.0, False)
-        else:
-            profit_sum = float(trade_log["profit"].sum())
-            results[r["rule_id"]] = (True, profit_sum, True)
+
+# =============================================================================
+# PATH EVALUATION — the full real WFO procedure, run on synthetic prices
+# =============================================================================
+def _evaluate_rules_on_path(
+    ohlcv_arr: dict,
+    rules: list,
+    param_names: list,
+    lists_for_grid: list,
+    order_amount: int,
+    timeframe: str,
+    return_schedules: bool = False,
+) -> dict:
+    results = {}
+    for rule in rules:
+        try:
+            (
+                _best_params, _approved, _net_gain, _max_dd, wfo_test_trades, df_results, _wfr, _metrics,
+            ) = run_wfo_is(
+                ohlcv_arr          = ohlcv_arr,
+                param_names        = param_names,
+                lists_for_grid     = lists_for_grid,
+                signal_fn          = rule["signal_fn"],
+                signal_params_keys = [],
+                order_amount       = order_amount,
+                timeframe          = timeframe,
+                n_jobs             = 1,
+                show_progress      = False,
+                **_WFO_NEUTRAL_TH,
+            )
+        except Exception as exc:
+            logger.debug(f"MULTIVERSE ── {timeframe} ── rule={rule['rule_id']} WFO failed on path: {exc}")
+            results[rule["rule_id"]] = (0.0, None)
+            continue
+
+        # A synthetic path with no trades is a legitimate null draw worth 0.0:
+        # discarding it would truncate the left tail and inflate the null mean.
+        profit = (
+            0.0
+            if wfo_test_trades is None or wfo_test_trades.empty
+            else float(wfo_test_trades["profit"].sum())
+        )
+        schedule = None
+        if return_schedules and df_results is not None and len(df_results) > 1:
+            schedule = df_results.iloc[:-1][param_names].to_dict("records")
+        results[rule["rule_id"]] = (profit, schedule)
 
     return results
+
+
+def _evaluate_path_chunk(
+    path_indices: list,
+    bundle: dict,
+    rules: list,
+    param_names: list,
+    lists_for_grid: list,
+    order_amount: int,
+    timeframe: str,
+    block_size: int,
+    base_seed: int,
+) -> list:
+
+    for logger_name in _WORKER_SILENCED_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    chunk_results = []
+    for path_idx in path_indices:
+        ohlcv_arr, _layout = _build_synthetic_ohlcv_arr(
+            bundle, path_idx, block_size, base_seed,
+        )
+        path_results = _evaluate_rules_on_path(
+            ohlcv_arr, rules, param_names, lists_for_grid, order_amount, timeframe,
+        )
+        chunk_results.append({rid: profit for rid, (profit, _sched) in path_results.items()})
+    return chunk_results
+
 
 # =============================================================================
 # APPROVAL CRITERION — Monte Carlo Permutation Test p-value
 # =============================================================================
-def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
-    n_matching_or_beating = sum(1 for p in permuted_profits if p >= real_profit)
-    return n_matching_or_beating / len(permuted_profits)
+def _compute_p_value(real_profit: float, permuted_profits: np.ndarray) -> float:
+
+    n_matching_or_beating = int(np.sum(permuted_profits >= real_profit))
+    return (1 + n_matching_or_beating) / (1 + len(permuted_profits))
+
+
+# =============================================================================
+# PLOTTING — paths regenerated on demand, never materialized for all n_paths
+# =============================================================================
+_PLOT_CLOSE_COL_IDX = 3
+
+
+def _build_paths_for_plotting(
+    bundle: dict,
+    n_plot_paths: int,
+    block_size: int,
+    base_seed: int,
+) -> dict:
+    paths_by_symbol = {
+        symbol: np.zeros((n_plot_paths, len(symbol_bundle["ts_index"]), _PLOT_CLOSE_COL_IDX + 1), dtype=np.float32)
+        for symbol, symbol_bundle in bundle["symbols"].items()
+    }
+
+    for path_idx in range(n_plot_paths):
+        ohlcv_arr, _layout = _build_synthetic_ohlcv_arr(bundle, path_idx, block_size, base_seed)
+        for symbol, arr in ohlcv_arr.items():
+            paths_by_symbol[symbol][path_idx, :, _PLOT_CLOSE_COL_IDX] = arr["close"]
+
+    return paths_by_symbol
+
 
 # =============================================================================
 # CORE MULTIVERSE EVALUATION (one timeframe, every rule of that timeframe)
@@ -261,75 +356,106 @@ def _compute_p_value(real_profit: float, permuted_profits: list) -> float:
 def _evaluate_multiverse_batch(
     ohlcv_data: dict,
     rules: list,
+    param_grid: dict,
     order_amount: int,
     p_value_th: float,
     block_size: int,
-    n_paths: int = N_PERMUTATIONS,
-    n_jobs: int = MCPT_N_JOBS,
-    timeframe: str = "",
+    n_paths: int,
+    n_jobs: int,
+    base_seed: int,
+    timeframe: str,
+    show_plots: bool = False,
 ) -> tuple:
-
     if not ohlcv_data or not rules:
         return (
             {r["rule_id"]: 1.0   for r in rules},
             {r["rule_id"]: False for r in rules},
         )
 
-    ts_index_by_symbol = {sym: df.index.to_numpy() for sym, df in ohlcv_data.items()}
+    param_names    = list(param_grid.keys())
+    lists_for_grid = [param_grid[k] for k in param_names]
 
-    paths = _generate_mcpt_paths_all_symbols(
-        ohlcv_data, n_paths=n_paths, raw_columns=[VOLUME_COL], block_size=block_size,
+    bundle = _build_path_bundle(ohlcv_data, raw_columns=[VOLUME_COL], timeframe=timeframe)
+
+    logger.info(
+        f"\nMULTIVERSE      {timeframe}: {len(rules)} rules ── {n_paths} paths ── "
+        f"block_size={block_size}"
     )
 
-    n_symbols_expected = len(ohlcv_data)
+    if show_plots:
+        plot_paths = _build_paths_for_plotting(
+            bundle, min(MCPT_PLOT_N_PATHS, n_paths), block_size, base_seed,
+        )
+        plot_multiverse_synthetic_vs_historical(ohlcv_data, plot_paths)
 
-    desc = f"MULTIVERSE {timeframe}".strip().ljust(18)
-    n_workers  = n_jobs if n_jobs > 0 else (os.cpu_count() or 1)
-    n_chunks   = min(n_paths, n_workers)
+    n_workers   = n_jobs if n_jobs > 0 else (os.cpu_count() or 1)
+    n_chunks    = min(n_paths, n_workers * 2)
     path_chunks = [chunk for chunk in np.array_split(np.arange(n_paths), n_chunks) if len(chunk) > 0]
 
     chunked_results = list(tqdm(
         Parallel(n_jobs=n_jobs, return_as="generator")(
-            delayed(_evaluate_universe_batch_chunk)(
-                chunk.tolist(), paths, ts_index_by_symbol, n_symbols_expected,
-                rules, order_amount,
+            delayed(_evaluate_path_chunk)(
+                chunk.tolist(), bundle, rules, param_names, lists_for_grid,
+                order_amount, timeframe, block_size, base_seed,
             )
             for chunk in path_chunks
         ),
-        desc=desc,
+        desc=f"MULTIVERSE      {timeframe}".strip().ljust(18),
         total=len(path_chunks),
         dynamic_ncols=True,
     ))
     per_path_results = [res for chunk_res in chunked_results for res in chunk_res]
 
-    p_value_by_id  = {}
-    approved_by_id = {}
-    for r in rules:
-        rid = r["rule_id"]
-        permuted_profits = [res[rid][1] for res in per_path_results if res[rid][0] is not None]
-        n_valid = len(permuted_profits)
+    profits_by_id  = {
+        r["rule_id"]: np.array([res[r["rule_id"]] for res in per_path_results], dtype=np.float64)
+        for r in rules
+    }
 
-        if n_valid == 0:
-            p_value_by_id[rid]  = 1.0
-            approved_by_id[rid] = False
+    p_value_by_id, approved_by_id = {}, {}
+    for rule in rules:
+        rid   = rule["rule_id"]
+        nulls = profits_by_id[rid]
+
+        if nulls.size == 0:
+            p_value_by_id[rid], approved_by_id[rid] = 1.0, False
             continue
 
-        real_profit = float(r["wfo_test_trades"]["profit"].sum())
-        p_value     = _compute_p_value(real_profit, permuted_profits)
-        approved    = p_value <= p_value_th
-
-        p_value_by_id[rid]  = p_value
-        approved_by_id[rid] = approved
+        real_profit          = float(rule["wfo_test_trades"]["profit"].sum())
+        p_value              = _compute_p_value(real_profit, nulls)
+        p_value_by_id[rid]   = p_value
+        approved_by_id[rid]  = p_value <= p_value_th
 
     if logger.isEnabledFor(logging.DEBUG):
+        probe_arr, probe_layout = _build_synthetic_ohlcv_arr(bundle, 0, block_size, base_seed)
+        probe_profit, probe_schedule = _evaluate_rules_on_path(
+            probe_arr, rules[:1], param_names, lists_for_grid, order_amount, timeframe,
+            return_schedules=True,
+        )[rules[0]["rule_id"]]
+
         report_multiverse_debug(
-            ohlcv_data, paths, per_path_results, rules,
-            p_value_by_id, approved_by_id, n_paths, block_size,
+            ohlcv_data     = ohlcv_data,
+            synthetic_arr  = probe_arr,
+            layout_info    = probe_layout,
+            ref_symbol     = bundle["ref_symbol"],
+            n_ref_rows     = bundle["n_ref_rows"],
+            probe_rule     = rules[0],
+            probe_schedule = probe_schedule,
+            probe_profit   = probe_profit,
+            rules          = rules,
+            param_names    = param_names,
+            profits_by_id  = profits_by_id,
+            p_value_by_id  = p_value_by_id,
+            approved_by_id = approved_by_id,
+            n_paths        = n_paths,
+            block_size     = block_size,
+            timeframe      = timeframe,
         )
 
     return p_value_by_id, approved_by_id
+
+
 # =============================================================================
-# PIPE MULTIVERSE — evaluates every rule's WFO test trades independently
+# PIPE MULTIVERSE
 # =============================================================================
 def _empty_multiverse_fields() -> dict:
     """Placeholder Multiverse fields for rules that were never evaluated (pipe disabled)."""
@@ -348,35 +474,48 @@ def pipe_multiverse(
     n_paths: int = N_PERMUTATIONS,
     block_size: int | None = None,
     n_jobs: int = MCPT_N_JOBS,
+    base_seed: int = MCPT_BASE_SEED,
+    show_plots: bool = False,
 ) -> list:
-
     p_value_th = p_value_th if p_value_th is not None else MULTIVERSE_PVALUE_TH
 
-    start = time.time()
 
     if not enabled:
         logger.info(f"MULTIVERSE ── disabled — passing all {len(rules)} rules through untouched")
         return [{**r, **_empty_multiverse_fields()} for r in rules]
 
-    rules_by_timeframe: dict = {}
-    for r in rules:
-        rules_by_timeframe.setdefault(r["timeframe"], []).append(r)
+    evaluable_rules = [
+        r for r in rules
+        if r.get("wfo_test_trades") is not None and not r["wfo_test_trades"].empty
+    ]
+    unevaluable_ids = {r["rule_id"] for r in rules} - {r["rule_id"] for r in evaluable_rules}
+    if unevaluable_ids:
+        logger.warning(
+            f"MULTIVERSE ── {len(unevaluable_ids)} rules have no WFO test trades — rejected"
+        )
 
-    p_value_by_id:  dict = {}
-    approved_by_id: dict = {}
+    rules_by_timeframe: dict = {}
+    for rule in evaluable_rules:
+        rules_by_timeframe.setdefault(rule["timeframe"], []).append(rule)
+
+    p_value_by_id:  dict = {rid: 1.0   for rid in unevaluable_ids}
+    approved_by_id: dict = {rid: False for rid in unevaluable_ids}
 
     for timeframe, tf_rules in rules_by_timeframe.items():
         resolved_block_size = block_size if block_size is not None else _resolve_block_size(timeframe)
 
         tf_p_values, tf_approved = _evaluate_multiverse_batch(
-            ohlcv_data   = ohlcv_data_by_timeframe[timeframe],
-            rules        = tf_rules,
-            order_amount = order_amount,
-            p_value_th   = p_value_th,
-            n_paths      = n_paths,
-            block_size   = resolved_block_size,
-            n_jobs       = n_jobs,
-            timeframe    = timeframe,
+            ohlcv_data    = ohlcv_data_by_timeframe[timeframe],
+            rules         = tf_rules,
+            param_grid    = param_grid,
+            order_amount  = order_amount,
+            p_value_th    = p_value_th,
+            block_size    = resolved_block_size,
+            n_paths       = n_paths,
+            n_jobs        = n_jobs,
+            base_seed     = base_seed,
+            timeframe     = timeframe,
+            show_plots    = show_plots,
         )
         p_value_by_id.update(tf_p_values)
         approved_by_id.update(tf_approved)
@@ -390,7 +529,7 @@ def pipe_multiverse(
         for r in rules
     ]
 
-    elapsed = int(time.time() - start)
-    logger.info(f"\nMULTIVERSE ── elapsed {elapsed // 3600} h {(elapsed % 3600) // 60} min {elapsed % 60} s")
+    n_passed = sum(1 for r in results if r["passed_multiverse"])
+    logger.info(f"MULTIVERSE ── {n_passed}/{len(results)} rules pass (p <= {p_value_th})")
 
     return results

@@ -45,14 +45,22 @@ EXPORT_CSV = False
 # =============================================================================
  #manual
 SELECTED_SYMBOLS = [
-    "BCHUSDT",
     "BTCUSDT",
-    "BNBUSDT",  
     "ETHUSDT",
+    "ADAUSDT",
+    "AVAXUSDT",
+    "BCHUSDT",
+    "BNBUSDT",
+    "DOGEUSDT",
+    "LINKUSDT",
+    "NEARUSDT",
+    "SOLUSDT",
+    "UNIUSDT",
+    "XLMUSDT",
     "XRPUSDT",
 ]
 
-SYMBOL_MODE        = "auto"   #manual o auto
+SYMBOL_MODE        = "manual"   #manual o auto
 N_SYMBOLS_DOWNLOAD = 25
 RWA_MODE           = "crypto_only"   # "crypto_only" | "rwa_only"                                                            
 REFERENCE_SYMBOL   = "BTCUSDT"
@@ -60,16 +68,14 @@ REFERENCE_SYMBOL   = "BTCUSDT"
 # =============================================================================
 # EXTRACTION
 # =============================================================================
-#TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","30m","15m","5m","1m"]
-TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","15m"]
-START_DATE = "2019-01-01"
+TIMEFRAMES = ["1Dutc","12Hutc","6Hutc","4H","1H","15m","5m"]
+START_DATE = "2017-01-01"
 END_DATE   = None 
 
 # =============================================================================
 # HIGH/LOW TIMESTAMPS
 # =============================================================================
-#TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","5m"],["30m","5m"],["15m","1m"],["5m","1m"]]
-TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","15m"],["4H","15m"],["1H","15m"]]
+TIMEFRAMES_HIGHLOW = [["1Dutc","1H"],["12Hutc","15m"],["6Hutc","5m"],["4H","5m"],["1H","5m"],["15m","5m"]]
 
 # =============================================================================
 # SPLIT DATA

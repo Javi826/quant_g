@@ -300,6 +300,7 @@ def plot_montecarlo_equity_curves(
 
 def plot_multiverse_synthetic_vs_historical(ohlcv_data: dict, paths: dict) -> None:
     for sym, df_hist in ohlcv_data.items():
+        
         arr_paths = paths.get(sym)
         if arr_paths is None or arr_paths.shape[0] == 0:
             continue

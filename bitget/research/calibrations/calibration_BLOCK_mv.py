@@ -1,4 +1,4 @@
-#BOT_batch/diag_multiverse_block_size.py
+#research/calibrations/calibration_BLOCK_mv.py
 """
 Block-size candidate for multiverse.py's MCPT bootstrap — M3
 (Politis & White 2004) applied to log_ret_close squared
@@ -10,22 +10,28 @@ import logging
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared")))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared", "shared_batch")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "shared", "shared_batch")))
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout, force=True)
 logger = logging.getLogger("BOT_batch.multiverse_block_size")
 
-from shared_batchs.symbols.universe import filter_symbols, select_universe, select_top_n_by_volume
-from shared_batchs.setup.config_paths import DATA_FOLDER_IS
-from shared_batchs.setup.config_backtest import MIN_PRICE
+from shared_batchs.symbols.universe import build_universe
+from shared_batchs.setup.config_paths import DATA_FOLDER_BY_DATASET
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-TIMEFRAMES = ["1H", "4H", "6Hutc", "12Hutc"]
-N_SYMBOLS = 10
+DATASET    = "MERGED"   # "IS", "OOS" or "MERGED"
+TIMEFRAMES = ["1H", "4H"]
+
+SYMBOLS_BY_TIMEFRAME = {
+    "1H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "4H":     ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "6Hutc":  ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+    "12Hutc": ["ADAUSDT","AVAXUSDT","BCHUSDT","BNBUSDT","DOGEUSDT","LINKUSDT","NEARUSDT","SOLUSDT","UNIUSDT","XRPUSDT"],
+}
 
 PW_C_SIGNIF = 2.0  # multiplier of the sqrt(log10(n)/n) significance band
 
@@ -98,16 +104,9 @@ def method_politis_white(series: np.ndarray) -> float:
 # =============================================================================
 # PER-TIMEFRAME DIAGNOSTIC
 # =============================================================================
-def compute_block_size_range(timeframe: str, n_symbols: int) -> dict:
-    ohlcv_is = select_universe(
-        data_folder_is=DATA_FOLDER_IS,
-        timeframe=timeframe,
-        min_price=MIN_PRICE,
-        filter_symbols_fn=filter_symbols,
-    )
-    ohlcv_is = select_top_n_by_volume(ohlcv_is, n_symbols)
+def compute_block_size_range(ohlcv_is: dict) -> dict:
     b_opt_values = []
-    for symbol, df in list(ohlcv_is.items())[:n_symbols]:
+    for symbol, df in ohlcv_is.items():
         close = df["close"].to_numpy(dtype=np.float64)
         log_ret = np.diff(np.log(close))
         log_ret_sq = log_ret ** 2
@@ -132,9 +131,14 @@ def candles_to_days(n_candles: float, timeframe_hours: int) -> float:
 # MAIN — block-size range per timeframe
 # =============================================================================
 if __name__ == "__main__":
+    logger.info(f"DATASET: {DATASET} ── {os.path.basename(DATA_FOLDER_BY_DATASET[DATASET])}")
+    ohlcv_data_by_timeframe = build_universe(
+        DATA_FOLDER_BY_DATASET[DATASET], SYMBOLS_BY_TIMEFRAME,
+        dataset=DATASET,
+    )
     results = []
     for timeframe in TIMEFRAMES:
-        block_range = compute_block_size_range(timeframe, N_SYMBOLS)
+        block_range = compute_block_size_range(ohlcv_data_by_timeframe[timeframe])
         tf_hours = TIMEFRAME_HOURS[timeframe]
 
         p50_days = candles_to_days(block_range["p50_candles"], tf_hours)

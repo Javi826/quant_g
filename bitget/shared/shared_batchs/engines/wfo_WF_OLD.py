@@ -1,4 +1,4 @@
-#shared/shared_batchs/engines/wfo_WF.py (forex)
+#shared/shared_batchs/engines/wfo_WF.py (crypto)
 import logging
 import contextlib
 import numpy as np
@@ -14,8 +14,6 @@ from shared_batchs.utils.batch_metrics import compute_metrics
 logger = logging.getLogger("BOT_batch.engines.wfo_WF")
 
 WARMUP_BARS = 100
-
-MIN_COOLDOWN_BARS = 50
 
 # =============================================================================
 # PARAM ROUNDING HELPERS
@@ -100,9 +98,17 @@ def walk_forward_optimization(
     if evaluate_fn is None:
         raise ValueError("You must pass an evaluate_fn(params, base_arrays) function")
 
-    COOLDOWN_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]) + [MIN_COOLDOWN_BARS])
+    # Cooldown buffer: real price data appended after the test window so that
+    # trades opened near the end can resolve naturally (TP/SL/timeout) instead
+    # of being force-closed at the window boundary. Mirrors WARMUP_BARS on the
+    # other end. Sized to the largest SELL_AFTER in the grid (worst case).
+    COOLDOWN_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
 
-    EDGE_BUFFER_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]) + [MIN_COOLDOWN_BARS])
+    # Edge buffer: symmetric to COOLDOWN_BARS but for the train window. Signals
+    # opened in the last EDGE_BUFFER_BARS bars of train would not have room to
+    # close naturally before train_end, so their trades get force-closed at the
+    # boundary (truncation bias). Trades opened past this cutoff are dropped.
+    EDGE_BUFFER_BARS = max(param_ranges.get("SELL_AFTER", [WARMUP_BARS]))
 
     keys               = list(param_ranges.keys())
     all_combinations   = list(itertools.product(*[param_ranges[k] for k in keys]))
@@ -289,7 +295,7 @@ def walk_forward_optimization(
                 # bias) — TP/SL exits are always resolved against real price and safe
                 # to keep regardless of when they opened.
                 truncated_mask = (
-                    df_train["exit_reason"].isin(["SELL_AFTER", "END_OF_DATA"]) &
+                    (df_train["exit_reason"] == "SELL_AFTER") &
                     (df_train["buy_time"] >= pd.Timestamp(train_start_ts)) &
                     (df_train["buy_time"] > pd.Timestamp(train_edge_ts))
                 )

@@ -1,13 +1,16 @@
-#shared/shared_batch_regime/config_paths.py
 import os
-BITGET_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-SPLIT_BASE     = os.path.join(BITGET_ROOT, "data_crypto", "data", "04_split", "expanding")
-DATA_FOLDER_IS = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-08_IS")
-
+BITGET_ROOT     = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 # =============================================================================
-# BITGET_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-# SPLIT_BASE     = os.path.join(BITGET_ROOT, "data_crypto", "data_20", "04_split", "expanding")
-# DATA_FOLDER_IS = os.path.join(SPLIT_BASE, "IS",  "crypto_2019-01_2026-08_IS")
+# DATASET FOLDERS — IS/OOS for split mode, MERGED for single-source mode
 # =============================================================================
+SPLIT_BASE          = os.path.join(BITGET_ROOT, "data_crypto", "data", "04_split", "expanding")
 
+DATA_FOLDER_IS      = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2024-01_IS")
+DATA_FOLDER_OOS     = os.path.join(SPLIT_BASE, "OOS", "crypto_2024-01_2026-08_OOS")
+DATA_FOLDER_MERGED  = os.path.join(SPLIT_BASE, "IS",  "crypto_2022-01_2026-08_IS")
 
+DATA_FOLDER_BY_DATASET = {
+    "IS":     DATA_FOLDER_IS,
+    "OOS":    DATA_FOLDER_OOS,
+    "MERGED": DATA_FOLDER_MERGED,
+}

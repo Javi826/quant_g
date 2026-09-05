@@ -1,4 +1,4 @@
-#shared_batchs/runs/run_deploy.py (crypto)
+#shared_batchs/runs/run_deploy.py 
 import itertools
 import logging
 import os
