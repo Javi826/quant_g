@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['bitget/BOT_batch_E1/main_pipeline.py', 'bitget/data_crypto/main_data.py', 'bitget/shared/shared_batchs/symbols/universe.py', 'bitget/shared/shared_batchs/engines/wfo_WF.py']
+recent_files = ['bitget/BOT_batch_E1/main_pipeline.py', 'bitget/shared/shared_batchs/backtesters/ZX_compute_BTC.pyx']
 
 [main]
 version = 0.2.0

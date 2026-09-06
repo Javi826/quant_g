@@ -1,9 +1,9 @@
-#shared/shared_batchs/backtesters/ZX_compute_BT.pyx (crypto)
-# cython: language_level=3
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
+#shared/shared_batchs/backtesters/ZX_compute_BT.pyx NO_PYRAMID
+#cython: language_level=3
+#cython: boundscheck=False
+#cython: wraparound=False
+#cython: cdivision=True
+#cython: nonecheck=False
 
 import logging
 import warnings
@@ -475,7 +475,7 @@ def backtest_core(
                         exit_idx = 0
                     exec_price_intra = close_mv[sid, exit_idx]
                     exec_time_int    = pos_sell_time_int[slot]
-                    reason_code      = 0
+                    reason_code      = 3 if sell_after == 0 else 0
 
                 qty_c            = pos_qty[slot]
                 buy_price_c       = pos_buy_price[slot]
@@ -549,9 +549,12 @@ def backtest_core(
                         qty      = order_amount / price_t
                         comm_buy = order_amount * comi_factor
 
-                        exit_idx = buy_idx + sell_after
-                        if exit_idx >= n_bars:
+                        if sell_after == 0:
                             exit_idx = n_bars - 1
+                        else:
+                            exit_idx = buy_idx + sell_after
+                            if exit_idx >= n_bars:
+                                exit_idx = n_bars - 1
 
                         sell_time_int = ts_int_mv[sid, exit_idx]
 
@@ -650,7 +653,7 @@ def _run_core_from_arrays(arrays, sym_ids, ohlcv_arrays, sell_after, tp_pct, sl_
         int(sell_after), float(tp_pct), float(sl_pct)
     )
 
-    exit_reason_names   = np.array(['SELL_AFTER', 'TP', 'SL'], dtype=object)
+    exit_reason_names   = np.array(['SELL_AFTER', 'TP', 'SL', 'END_OF_DATA'], dtype=object)
     position_type_names = np.array(['LONG', 'SHORT'], dtype=object)
 
     trade_log = pd.DataFrame({

@@ -58,8 +58,6 @@ SAVE_TRADES   = False
 RUN_PORTFOLIO = True
 RUN_DEPLOY    = True
 #------------------------------------------------------------------------------
-# SPLIT_MODE = True  -> mining/StepM on IS data, WFO+correlation+MC+multiverse on OOS data
-# SPLIT_MODE = False -> single-source mode, every stage runs on MERGED data
 SPLIT_MODE = False
 
 DATASET_MINING, DATASET_VALIDATION = ("IS", "OOS") if SPLIT_MODE else ("MERGED", "MERGED")
@@ -77,7 +75,7 @@ SYMBOLS_BY_TIMEFRAME = {
 }
 
 PARAM_GRID = {
-    "SELL_AFTER": [50],
+    "SELL_AFTER": [0],
     "TP_PCT":     [6,8,10],
     "SL_PCT":     [6,8],
 }
